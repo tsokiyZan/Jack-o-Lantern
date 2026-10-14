@@ -1726,6 +1726,8 @@ pub struct WaterBoundPathNavigation {
     /// instead of turning the mob towards each node here.
     steered_by_move_control: bool,
     wanted_position: Option<(Vector3<f64>, f64)>,
+    /// The block the current path was asked for: vanilla's `PathNavigation.targetPos`.
+    requested_target: Option<BlockPos>,
 }
 
 impl Default for WaterBoundPathNavigation {
@@ -1744,6 +1746,7 @@ impl WaterBoundPathNavigation {
             allow_breaching,
             steered_by_move_control: false,
             wanted_position: None,
+            requested_target: None,
         }
     }
 
@@ -1867,6 +1870,17 @@ fn next_entity_pos(path: &Path, width: f32) -> Option<Vector3<f64>> {
 
 impl PathNavigationTrait for WaterBoundPathNavigation {
     fn set_progress(&mut self, goal: NavigatorGoal) {
+        if self.steered_by_move_control {
+            // Vanilla `PathNavigation.createPath` hands back the current path while
+            // it is unfinished and still asked for the same block, so a goal that
+            // re-targets every tick keeps following it.
+            let target = BlockPos::floored_v(goal.destination);
+            if self.requested_target == Some(target) && !self.is_done() {
+                self.inner.speed_modifier = goal.speed;
+                return;
+            }
+            self.requested_target = Some(target);
+        }
         self.inner.set_progress(goal);
     }
 
