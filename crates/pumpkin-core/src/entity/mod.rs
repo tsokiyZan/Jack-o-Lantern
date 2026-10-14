@@ -2576,7 +2576,6 @@ impl Entity {
         self.is_in_water() && self.is_submerged_in_water()
     }
 
-
     #[must_use]
     pub fn is_visually_crawling(&self) -> bool {
         self.is_visually_swimming() && !self.is_in_water()

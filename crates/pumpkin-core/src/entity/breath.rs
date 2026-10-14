@@ -130,7 +130,18 @@ impl BreathManager {
                         EntityStatus::DrownParticles,
                         None,
                     );
-                    living.damage(caller, DROWNING_DAMAGE, DamageType::DROWN);
+                    // Vanilla `Player.isInvulnerableTo`: the game rule spares players only.
+                    let spared = caller.get_player().is_some()
+                        && !entity
+                            .world
+                            .load()
+                            .level_info
+                            .load()
+                            .game_rules
+                            .drowning_damage;
+                    if !spared {
+                        living.damage(caller, DROWNING_DAMAGE, DamageType::DROWN);
+                    }
                 }
             } else if self.air() < max_air && Self::should_effects_refill_air_supply(living) {
                 self.set_air(caller, Self::increase_air_supply(caller, self.air()));
