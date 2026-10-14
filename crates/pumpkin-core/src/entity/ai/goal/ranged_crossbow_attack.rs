@@ -224,11 +224,7 @@ impl Goal for RangedCrossbowAttackGoal {
                     .navigator
                     .lock()
                     .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .set_progress(NavigatorGoal {
-                        current_progress: mob_pos,
-                        destination: target_pos,
-                        speed: move_speed,
-                    });
+                    .set_progress(NavigatorGoal::new(mob_pos, target_pos, move_speed));
                 self.update_path_delay = 20 + rand::random_range(0..20);
             }
         } else {

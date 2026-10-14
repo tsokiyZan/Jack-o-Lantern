@@ -119,11 +119,10 @@ impl Goal for MeleeAttackGoal {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             let target_pos = target.get_entity().pos.load();
-            navigator.set_progress(NavigatorGoal {
-                current_progress: mob.get_entity().pos.load(),
-                destination: target_pos,
-                speed: self.speed,
-            });
+            navigator.set_progress(
+                NavigatorGoal::new(mob.get_entity().pos.load(), target_pos, self.speed)
+                    .with_reach_range(0),
+            );
             self.last_target_position = Some(target_pos);
         }
         self.update_countdown_ticks = 0;
@@ -185,11 +184,9 @@ impl Goal for MeleeAttackGoal {
                 .navigator
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
-            navigator.set_progress(NavigatorGoal {
-                current_progress: mob_pos,
-                destination: current_target_pos,
-                speed: self.speed,
-            });
+            navigator.set_progress(
+                NavigatorGoal::new(mob_pos, current_target_pos, self.speed).with_reach_range(0),
+            );
             self.last_target_position = Some(current_target_pos);
             self.update_countdown_ticks = 4 + mob.get_random().random_range(0..7);
             if dist_sq > 1024.0 {

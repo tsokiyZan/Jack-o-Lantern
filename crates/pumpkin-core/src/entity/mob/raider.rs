@@ -271,11 +271,7 @@ impl Goal for ObtainRaidLeaderBannerGoal {
                     .navigator
                     .lock()
                     .unwrap_or_else(std::sync::PoisonError::into_inner);
-                nav.set_progress(NavigatorGoal {
-                    current_progress: pos,
-                    destination: cand_pos,
-                    speed: 1.15,
-                });
+                nav.set_progress(NavigatorGoal::new(pos, cand_pos, 1.15));
                 break;
             }
         }
@@ -374,11 +370,7 @@ impl Goal for RaiderMoveThroughVillageGoal {
             let dx: f64 = (rand::random::<f64>() - 0.5) * 32.0;
             let dz: f64 = (rand::random::<f64>() - 0.5) * 32.0;
             let dest = Vector3::new(pos.x + dx, pos.y, pos.z + dz);
-            nav.set_progress(NavigatorGoal {
-                current_progress: pos,
-                destination: dest,
-                speed: self.speed_modifier,
-            });
+            nav.set_progress(NavigatorGoal::new(pos, dest, self.speed_modifier));
         }
     }
 }

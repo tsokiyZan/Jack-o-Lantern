@@ -259,9 +259,14 @@ pub struct NavigatorGoal {
     pub current_progress: Vector3<f64>,
     pub destination: Vector3<f64>,
     pub speed: f64,
+    /// How close, in Manhattan distance, the path has to get to `destination`.
+    pub reach_range: i32,
 }
 
 impl NavigatorGoal {
+    /// Vanilla `PathNavigation.moveTo`'s reach when a caller passes none.
+    pub const DEFAULT_REACH_RANGE: i32 = 1;
+
     #[must_use]
     pub const fn new(
         current_progress: Vector3<f64>,
@@ -272,7 +277,16 @@ impl NavigatorGoal {
             current_progress,
             destination,
             speed,
+            reach_range: Self::DEFAULT_REACH_RANGE,
         }
+    }
+
+    /// Asks for a path that ends within `reach_range` of the destination, like the
+    /// `reachRange` argument of vanilla's `moveTo` and `createPath`.
+    #[must_use]
+    pub const fn with_reach_range(mut self, reach_range: i32) -> Self {
+        self.reach_range = reach_range;
+        self
     }
 }
 
@@ -534,6 +548,9 @@ impl PathNavigation {
         self.speed_modifier = goal.speed;
         self.last_stuck_check = self.tick_count;
         self.last_stuck_check_pos = goal.current_progress;
+        if !keep_path {
+            self.reach_range = goal.reach_range;
+        }
         self.current_goal = Some(goal);
         if !keep_path {
             self.path = None;

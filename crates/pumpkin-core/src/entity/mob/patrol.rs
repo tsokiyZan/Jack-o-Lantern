@@ -209,11 +209,7 @@ impl Goal for LongDistancePatrolGoal {
                 .navigator
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
-            nav.set_progress(NavigatorGoal {
-                current_progress: pos,
-                destination: patrol_target.to_f64(),
-                speed,
-            });
+            nav.set_progress(NavigatorGoal::new(pos, patrol_target.to_f64(), speed));
         }
     }
 }

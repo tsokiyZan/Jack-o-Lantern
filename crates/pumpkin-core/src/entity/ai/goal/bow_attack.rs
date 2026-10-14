@@ -202,11 +202,7 @@ impl Goal for BowAttackGoal {
                 navigator.stop();
                 self.strafing_time += 1;
             } else {
-                navigator.set_progress(NavigatorGoal {
-                    current_progress: mob_pos,
-                    destination: target_pos,
-                    speed: self.speed,
-                });
+                navigator.set_progress(NavigatorGoal::new(mob_pos, target_pos, self.speed));
                 self.strafing_time = -1;
             }
         }

@@ -128,15 +128,15 @@ impl<M: MoveToTargetPos> MoveToTargetPosGoal<M> {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
 
-        navigator.set_progress(NavigatorGoal {
-            current_progress: mob.get_entity().pos.load(),
-            destination: Vector3::new(
+        navigator.set_progress(NavigatorGoal::new(
+            mob.get_entity().pos.load(),
+            Vector3::new(
                 target.0.x as f64 + 0.5,
                 target.0.y as f64,
                 target.0.z as f64 + 0.5,
             ),
-            speed: self.speed,
-        });
+            self.speed,
+        ));
     }
 }
 
@@ -206,15 +206,15 @@ impl<M: MoveToTargetPos> Goal for MoveToTargetPosGoal<M> {
                     .lock()
                     .unwrap_or_else(std::sync::PoisonError::into_inner);
 
-                navigator.set_progress(NavigatorGoal {
-                    current_progress: mob.get_entity().pos.load(),
-                    destination: Vector3::new(
+                navigator.set_progress(NavigatorGoal::new(
+                    mob.get_entity().pos.load(),
+                    Vector3::new(
                         target.0.x as f64 + 0.5,
                         target.0.y as f64,
                         target.0.z as f64 + 0.5,
                     ),
-                    speed: self.speed,
-                });
+                    self.speed,
+                ));
             }
         }
     }
