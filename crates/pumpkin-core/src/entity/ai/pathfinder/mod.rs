@@ -524,13 +524,21 @@ impl PathNavigation {
     }
 
     pub fn set_progress(&mut self, goal: NavigatorGoal) {
+        // Vanilla `PathNavigation.createPath` hands back the current path while it
+        // is unfinished and still leads to the requested block, so a goal that
+        // re-requests a still target keeps its first path instead of re-planning.
+        let keep_path = self.path.as_ref().is_some_and(|path| {
+            !path.is_done() && path.get_target() == BlockPos::floored_v(goal.destination)
+        });
         self.is_idle.store(false, Ordering::Relaxed);
         self.speed_modifier = goal.speed;
         self.last_stuck_check = self.tick_count;
         self.last_stuck_check_pos = goal.current_progress;
         self.current_goal = Some(goal);
-        self.path = None;
-        self.reset_stuck_timeout();
+        if !keep_path {
+            self.path = None;
+            self.reset_stuck_timeout();
+        }
     }
 
     pub fn adopt_path(
@@ -685,6 +693,12 @@ impl PathNavigation {
 
         let start_pos = start_node.pos.0;
         let mut closed_set: FxHashMap<Vector3<i32>, Node> = FxHashMap::default();
+        // Vanilla keeps one `Node` per position and overwrites its `walkedDistance`
+        // whenever the search looks at it, even when the cheaper-path check then
+        // rejects the update. That shortens how far a search reaches, so the
+        // distance is tracked per position here rather than on the node copies.
+        let mut walked_dist: FxHashMap<Vector3<i32>, f32> = FxHashMap::default();
+        walked_dist.insert(start_node.pos.0, 0.0);
 
         self.open_set.clear();
         self.open_set.insert(start_node);
@@ -730,9 +744,14 @@ impl PathNavigation {
             self.evaluator
                 .get_neighbors(&current, &mut self.neighbors_buf);
 
+            let current_walked = walked_dist
+                .get(&current.pos.0)
+                .copied()
+                .unwrap_or(current.walked_dist);
             for mut neighbor in self.neighbors_buf.drain(..) {
                 let step_cost = current.distance(&neighbor);
-                neighbor.walked_dist = current.walked_dist + step_cost;
+                neighbor.walked_dist = current_walked + step_cost;
+                walked_dist.insert(neighbor.pos.0, neighbor.walked_dist);
                 let tentative_g = current.g + step_cost + neighbor.cost_malus;
 
                 let in_heap = self.open_set.contains(&neighbor);
