@@ -85,6 +85,20 @@ impl FireBlock {
     }
 
     // Used for spreading fire
+    /// Vanilla's `FireBlock.getStateWithAge`.
+    pub fn get_state_with_age(
+        &self,
+        world: &World,
+        block: &Block,
+        pos: &BlockPos,
+        age: u8,
+    ) -> BlockStateId {
+        let mut fire_props =
+            FireProperties::from_state_id(self.get_state_for_position(world, block, pos));
+        fire_props.age = age;
+        fire_props.to_state_id(block)
+    }
+
     pub fn get_burn_chance(&self, world: &Arc<World>, pos: &BlockPos) -> i32 {
         let block_state = world.get_block_state(pos);
         if !block_state.is_air() {
@@ -223,7 +237,8 @@ impl BlockBehaviour for FireBlock {
             player: None,
             use_item_on: None,
         }) {
-            self.get_state_for_position(args.world, args.block, args.position)
+            let age = FireProperties::from_state_id(args.state_id).age;
+            self.get_state_with_age(args.world, args.block, args.position, age)
         } else {
             Block::AIR.default_state.id
         }
@@ -261,11 +276,7 @@ impl BlockBehaviour for FireBlock {
             player: None,
             use_item_on: None,
         }) {
-            world.set_block_state(
-                pos,
-                Block::AIR.default_state.id,
-                BlockFlags::NOTIFY_NEIGHBORS,
-            );
+            world.set_block_state(pos, Block::AIR.default_state.id, BlockFlags::NOTIFY_ALL);
             return;
         }
 
@@ -293,11 +304,7 @@ impl BlockBehaviour for FireBlock {
         if !infiniburn && Self::is_near_rain(world.as_ref(), pos) {
             let rain_chance = 0.2 + (age as f32) * 0.03;
             if rand::random::<f32>() < rain_chance {
-                world.set_block_state(
-                    pos,
-                    Block::AIR.default_state.id,
-                    BlockFlags::NOTIFY_NEIGHBORS,
-                );
+                world.set_block_state(pos, Block::AIR.default_state.id, BlockFlags::NOTIFY_ALL);
                 return;
             }
         }
@@ -308,21 +315,23 @@ impl BlockBehaviour for FireBlock {
         if new_age != age {
             fire_props.age = new_age;
             let new_state_id = fire_props.to_state_id(&Block::FIRE);
-            world.set_block_state(pos, new_state_id, BlockFlags::NOTIFY_ALL);
+            // Vanilla sets the new age with flags 260: no neighbour updates and
+            // nothing sent to clients, who never see the age.
+            world.set_block_state(pos, new_state_id, BlockFlags::empty());
         }
 
         if !infiniburn {
             // Check if fire should extinguish due to lack of fuel
             if !Self::are_blocks_around_flammable(world.as_ref(), pos) {
                 let block_below_state = world.get_block_state(&pos.down());
-                if !block_below_state.is_side_solid(BlockDirection::Up) || new_age > 3 {
+                if !block_below_state.is_side_solid(BlockDirection::Up) || age > 3 {
                     world.set_block_state(pos, Block::AIR.default_state.id, BlockFlags::NOTIFY_ALL);
-                    return;
                 }
+                return;
             }
 
             // At max age, fire has a chance to extinguish if not on flammable block
-            if new_age == 15
+            if age == 15
                 && rand::rng().random_range(0..4) == 0
                 && !Self::is_flammable(world.get_block_state_id(&pos.down()))
             {
@@ -448,7 +457,7 @@ impl BlockBehaviour for FireBlock {
                                 world.set_block_state(
                                     &offset_pos,
                                     new_state_id,
-                                    BlockFlags::NOTIFY_NEIGHBORS,
+                                    BlockFlags::NOTIFY_ALL,
                                 );
                             }
                         }
