@@ -1,6 +1,7 @@
 pub mod advancement;
 pub mod statistics;
 
+use crate::entity::movement_emission::MovementEmission;
 use core::f32;
 use std::collections::{HashMap, VecDeque};
 use std::f64::consts::TAU;
@@ -6936,6 +6937,75 @@ impl EntityBase for Player {
 
     fn is_spectator(&self) -> bool {
         self.gamemode.load() == GameMode::Spectator
+    }
+
+    fn entity_sound_source(&self) -> SoundCategory {
+        SoundCategory::Players
+    }
+
+    /// Vanilla `Player.playSound`: everyone but this player, whose client plays it itself.
+    fn play_sound_at_self(&self, sound: Sound, volume: f32, pitch: f32) {
+        let entity = self.get_entity();
+        if entity.is_silent() {
+            return;
+        }
+        entity.world.load().play_sound_raw_expect(
+            self,
+            sound as u16,
+            SoundCategory::Players,
+            &entity.pos.load(),
+            volume,
+            pitch,
+        );
+    }
+
+    /// Vanilla `Player.getMovementEmission`.
+    fn movement_emission(&self) -> MovementEmission {
+        let entity = self.get_entity();
+        if self.is_flying() || entity.on_ground.load(Ordering::Relaxed) && entity.is_sneaking() {
+            MovementEmission::None
+        } else {
+            MovementEmission::All
+        }
+    }
+
+    /// Vanilla `Player.playStepSound`.
+    fn play_step_sound(
+        &self,
+        caller: &dyn EntityBase,
+        pos: &BlockPos,
+        _block: &'static Block,
+        state: &'static BlockState,
+    ) {
+        let entity = self.get_entity();
+        if entity.is_in_water() {
+            caller.water_swim_sound(caller);
+            entity.play_muffled_step_sound(caller, state);
+            return;
+        }
+        let primary_pos = entity.primary_step_sound_block_pos(pos);
+        if primary_pos == *pos {
+            entity.play_step_sound_default(caller, state);
+            return;
+        }
+        let (primary_block, primary_state) = entity.world.load().get_block_and_state(&primary_pos);
+        if primary_block.has_tag(&tag::Block::MINECRAFT_COMBINATION_STEP_SOUND_BLOCKS) {
+            entity.play_combination_step_sounds(caller, primary_state, state);
+        } else {
+            entity.play_step_sound_default(caller, primary_state);
+        }
+    }
+
+    fn swim_sound(&self) -> Sound {
+        Sound::EntityPlayerSwim
+    }
+
+    fn swim_splash_sound(&self) -> Sound {
+        Sound::EntityPlayerSplash
+    }
+
+    fn swim_high_speed_splash_sound(&self) -> Sound {
+        Sound::EntityPlayerSplashHighSpeed
     }
 
     fn set_on_fire_for_ticks(&self, ticks: u32) {

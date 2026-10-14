@@ -1623,6 +1623,7 @@ impl World {
         let player_handle = handle.clone();
         players.par_iter().for_each(|player| {
             let _guard = player_handle.enter();
+            player.get_entity().tick_count.fetch_add(1, Relaxed);
             player.tick(server);
         });
         let player_elapsed = t_players.elapsed();
@@ -1663,6 +1664,7 @@ impl World {
 
                 for (entity, entity_chunk) in batch {
                     entity.get_entity().age.fetch_add(1, Relaxed);
+                    entity.get_entity().tick_count.fetch_add(1, Relaxed);
                     entity.tick(entity.as_ref(), server_ref);
 
                     let entity_inner = entity.get_entity();

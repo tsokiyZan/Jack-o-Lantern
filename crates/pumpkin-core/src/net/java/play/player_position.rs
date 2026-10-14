@@ -47,6 +47,29 @@ impl JavaClient {
         true
     }
 
+    /// The parts of vanilla's server-side `player.move` Pumpkin runs: step sounds and `step`
+    /// events (`applyMovementEmissionAndPlaySound`), then `setOnGroundWithMovement`'s
+    /// supporting block. Inside `move` the supporting block only updates when the player moved
+    /// vertically, so flat walking steps on the block from the previous packet.
+    fn apply_player_move(
+        player: &Arc<Player>,
+        last_pos: Vector3<f64>,
+        pos: Vector3<f64>,
+        on_ground: bool,
+    ) {
+        let entity = player.get_entity();
+        let caller: &dyn EntityBase = player.as_ref();
+        let movement = pos.sub(&last_pos);
+        // Spectators have `noPhysics`, and `move` returns before any of this.
+        if !player.is_spectator() {
+            if movement.y != 0.0 {
+                entity.check_supporting_block(caller, on_ground, Some(movement));
+            }
+            entity.apply_movement_emission_and_play_sound(caller, movement);
+        }
+        entity.check_supporting_block(caller, on_ground, Some(movement));
+    }
+
     #[expect(clippy::too_many_lines)]
     pub fn handle_position(
         &self,
@@ -121,6 +144,7 @@ impl JavaClient {
 
                 let new_on_ground = packet.collision & FLAG_ON_GROUND != 0;
                 entity.on_ground.store(new_on_ground, Ordering::Relaxed);
+                Self::apply_player_move(player, last_pos, pos, new_on_ground);
                 if new_on_ground && entity.is_fall_flying() {
                     entity.set_fall_flying(false);
                 }
@@ -265,6 +289,7 @@ impl JavaClient {
                 entity
                     .on_ground
                     .store((packet.collision & FLAG_ON_GROUND) != 0, Ordering::Relaxed);
+                Self::apply_player_move(player, last_pos, pos, (packet.collision & FLAG_ON_GROUND) != 0);
 
                 entity.set_rotation(wrap_degrees(packet.yaw) % 360.0, wrap_degrees(packet.pitch));
 

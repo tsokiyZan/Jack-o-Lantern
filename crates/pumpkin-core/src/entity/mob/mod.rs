@@ -10,6 +10,7 @@ use crate::entity::ai::control::look_control::LookControl;
 use crate::entity::ai::control::move_control::MoveControl;
 use crate::entity::ai::goal::goal_selector::GoalSelector;
 use crate::entity::ai::sensing::Sensing;
+use crate::entity::movement_emission::MovementEmission;
 use crate::entity::player::Player;
 use crate::entity::predicate::EntityPredicate;
 use crate::server::Server;
@@ -25,7 +26,7 @@ use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_data::tracked_data;
-use pumpkin_data::{Block, BlockDirection};
+use pumpkin_data::{Block, BlockDirection, BlockState};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::Difficulty;
 use pumpkin_util::math::boundingbox::{BoundingBox, EntityDimensions};
@@ -991,6 +992,55 @@ pub trait Mob: EntityBase + Send + Sync {
         sounds::sound_source(self.get_entity().entity_type)
     }
 
+    /// Vanilla `Entity.getMovementEmission`.
+    fn movement_emission(&self) -> MovementEmission {
+        MovementEmission::All
+    }
+
+    /// Vanilla `Entity.playStepSound`.
+    fn play_step_sound(
+        &self,
+        caller: &dyn EntityBase,
+        _pos: &BlockPos,
+        _block: &'static Block,
+        state: &'static BlockState,
+    ) {
+        self.get_entity().play_step_sound_default(caller, state);
+    }
+
+    /// Vanilla `Entity.nextStep`.
+    fn next_step(&self) -> f32 {
+        (self.get_entity().move_dist.load() as i32 + 1) as f32
+    }
+
+    /// Vanilla `Entity.playSwimSound`.
+    fn play_swim_sound(&self, caller: &dyn EntityBase, volume: f32) {
+        self.get_entity().play_swim_sound_default(caller, volume);
+    }
+
+    /// Vanilla `Entity.getSwimSound`.
+    fn swim_sound(&self) -> Sound {
+        Sound::EntityGenericSwim
+    }
+
+    /// Vanilla `Entity.getSwimSplashSound`.
+    fn swim_splash_sound(&self) -> Sound {
+        Sound::EntityGenericSplash
+    }
+
+    /// Vanilla `Entity.getSwimHighSpeedSplashSound`.
+    fn swim_high_speed_splash_sound(&self) -> Sound {
+        Sound::EntityGenericSplash
+    }
+
+    /// Vanilla `Entity.isFlapping`.
+    fn is_flapping(&self) -> bool {
+        false
+    }
+
+    /// Vanilla `Entity.onFlap`.
+    fn on_flap(&self) {}
+
     /// Vanilla `LivingEntity.getVoicePitch`.
     fn voice_pitch(&self) -> f32 {
         let base = if self.get_entity().is_baby() {
@@ -1837,6 +1887,52 @@ impl<T: Mob + Send + 'static> EntityBase for T {
 
     fn as_mob_entity(&self) -> Option<&MobEntity> {
         Some(<T as Mob>::get_mob_entity(self))
+    }
+
+    fn entity_sound_source(&self) -> SoundCategory {
+        <T as Mob>::sound_source(self)
+    }
+
+    fn movement_emission(&self) -> MovementEmission {
+        <T as Mob>::movement_emission(self)
+    }
+
+    fn play_step_sound(
+        &self,
+        caller: &dyn EntityBase,
+        pos: &BlockPos,
+        block: &'static Block,
+        state: &'static BlockState,
+    ) {
+        <T as Mob>::play_step_sound(self, caller, pos, block, state);
+    }
+
+    fn next_step(&self) -> f32 {
+        <T as Mob>::next_step(self)
+    }
+
+    fn play_swim_sound(&self, caller: &dyn EntityBase, volume: f32) {
+        <T as Mob>::play_swim_sound(self, caller, volume);
+    }
+
+    fn swim_sound(&self) -> Sound {
+        <T as Mob>::swim_sound(self)
+    }
+
+    fn swim_splash_sound(&self) -> Sound {
+        <T as Mob>::swim_splash_sound(self)
+    }
+
+    fn swim_high_speed_splash_sound(&self) -> Sound {
+        <T as Mob>::swim_high_speed_splash_sound(self)
+    }
+
+    fn is_flapping(&self) -> bool {
+        <T as Mob>::is_flapping(self)
+    }
+
+    fn on_flap(&self) {
+        <T as Mob>::on_flap(self);
     }
 
     fn write_custom_nbt(&self, nbt: &mut NbtCompound) {

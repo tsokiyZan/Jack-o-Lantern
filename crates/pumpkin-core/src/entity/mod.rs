@@ -87,6 +87,7 @@ pub mod lightning;
 pub mod living;
 pub mod marker;
 pub mod mob;
+pub mod movement_emission;
 pub mod passive;
 pub mod player;
 pub mod projectile;
@@ -392,6 +393,85 @@ pub trait EntityBase: Send + Sync + std::any::Any {
     fn is_flutterer(&self) -> bool {
         false
     }
+
+    /// Vanilla `Entity.getSoundSource`.
+    fn entity_sound_source(&self) -> SoundCategory {
+        SoundCategory::Neutral
+    }
+
+    /// Vanilla `Entity.playSound(sound, volume, pitch)`: at this entity, unless it is silent.
+    fn play_sound_at_self(&self, sound: Sound, volume: f32, pitch: f32) {
+        let entity = self.get_entity();
+        if entity.is_silent() {
+            return;
+        }
+        entity.world.load().play_sound_fine(
+            sound,
+            self.entity_sound_source(),
+            &entity.pos.load(),
+            volume,
+            pitch,
+        );
+    }
+
+    /// Vanilla `Entity.getControllingPassenger`.
+    fn controlling_passenger(&self) -> Option<Arc<dyn EntityBase>> {
+        None
+    }
+
+    /// Vanilla `Entity.getMovementEmission`.
+    fn movement_emission(&self) -> movement_emission::MovementEmission {
+        movement_emission::MovementEmission::All
+    }
+
+    /// Vanilla `Entity.playStepSound`.
+    fn play_step_sound(
+        &self,
+        caller: &dyn EntityBase,
+        _pos: &BlockPos,
+        _block: &'static Block,
+        state: &'static BlockState,
+    ) {
+        self.get_entity().play_step_sound_default(caller, state);
+    }
+
+    /// Vanilla `Entity.nextStep`.
+    fn next_step(&self) -> f32 {
+        (self.get_entity().move_dist.load() as i32 + 1) as f32
+    }
+
+    /// Vanilla `Entity.waterSwimSound`.
+    fn water_swim_sound(&self, caller: &dyn EntityBase) {
+        self.get_entity().water_swim_sound_default(caller);
+    }
+
+    /// Vanilla `Entity.playSwimSound`.
+    fn play_swim_sound(&self, caller: &dyn EntityBase, volume: f32) {
+        self.get_entity().play_swim_sound_default(caller, volume);
+    }
+
+    /// Vanilla `Entity.getSwimSound`.
+    fn swim_sound(&self) -> Sound {
+        Sound::EntityGenericSwim
+    }
+
+    /// Vanilla `Entity.getSwimSplashSound`.
+    fn swim_splash_sound(&self) -> Sound {
+        Sound::EntityGenericSplash
+    }
+
+    /// Vanilla `Entity.getSwimHighSpeedSplashSound`.
+    fn swim_high_speed_splash_sound(&self) -> Sound {
+        Sound::EntityGenericSplash
+    }
+
+    /// Vanilla `Entity.isFlapping`.
+    fn is_flapping(&self) -> bool {
+        false
+    }
+
+    /// Vanilla `Entity.onFlap`.
+    fn on_flap(&self) {}
 
     fn set_sprinting(&self, is_sprinting: bool) {
         if let Some(living) = self.get_living_entity() {
@@ -901,6 +981,8 @@ pub struct Entity {
     pub block_pos: AtomicCell<BlockPos>,
     /// The block supporting the entity
     pub supporting_block_pos: AtomicCell<Option<BlockPos>>,
+    /// Vanilla `Entity.onGroundNoBlocks`: on the ground last check with no block found under it.
+    pub on_ground_no_blocks: AtomicBool,
     /// The chunk coordinates of the entity's current position
     pub chunk_pos: AtomicCell<Vector2<i32>>,
     /// Indicates whether the entity is sneaking
@@ -969,6 +1051,15 @@ pub struct Entity {
     pub riding_cooldown: AtomicI32,
     /// The age of the entity in ticks. Negative values indicate a baby.
     pub age: AtomicI32,
+    /// Vanilla `Entity.tickCount`: ticks since this entity object was created or loaded.
+    pub tick_count: AtomicI32,
+    /// Vanilla `Entity.moveDist`, `flyDist` and `nextStep`, for step sounds.
+    pub move_dist: AtomicCell<f32>,
+    pub fly_dist: AtomicCell<f32>,
+    pub next_step: AtomicCell<f32>,
+    /// Vanilla `Entity.crystalSoundIntensity` and `lastCrystalSoundPlayTick`.
+    pub crystal_sound_intensity: AtomicCell<f32>,
+    pub last_crystal_sound_play_tick: AtomicI32,
 
     pub current_biome: ArcSwap<&'static Biome>,
     pub last_biome_update_pos: AtomicCell<BlockPos>,
@@ -1076,6 +1167,7 @@ impl Entity {
             movement: AtomicCell::new(Vector3::default()),
             block_pos: AtomicCell::new(BlockPos(Vector3::new(floor_x, floor_y, floor_z))),
             supporting_block_pos: AtomicCell::new(None),
+            on_ground_no_blocks: AtomicBool::new(false),
             chunk_pos: AtomicCell::new(Vector2::new(
                 get_section_cord(floor_x),
                 get_section_cord(floor_z),
@@ -1119,6 +1211,12 @@ impl Entity {
 
             riding_cooldown: AtomicI32::new(0),
             age: AtomicI32::new(0),
+            tick_count: AtomicI32::new(0),
+            move_dist: AtomicCell::new(0.0),
+            fly_dist: AtomicCell::new(0.0),
+            next_step: AtomicCell::new(1.0),
+            crystal_sound_intensity: AtomicCell::new(0.0),
+            last_crystal_sound_play_tick: AtomicI32::new(0),
             current_biome: ArcSwap::new(Arc::new(current_biome)),
             last_biome_update_pos: AtomicCell::new(BlockPos::new(floor_x, floor_y, floor_z)),
             portal_cooldown: AtomicU32::new(0),
@@ -1459,6 +1557,66 @@ impl Entity {
         self.supporting_block_pos.load()
     }
 
+    /// Vanilla `Entity.checkSupportingBlock`.
+    pub fn check_supporting_block(
+        &self,
+        caller: &dyn EntityBase,
+        on_ground: bool,
+        movement: Option<Vector3<f64>>,
+    ) {
+        if !on_ground {
+            self.on_ground_no_blocks.store(false, Ordering::Relaxed);
+            self.supporting_block_pos.store(None);
+            return;
+        }
+        let bb = self.bounding_box.load();
+        let test_area = BoundingBox::new(
+            Vector3::new(bb.min.x, bb.min.y - 1.0e-6, bb.min.z),
+            Vector3::new(bb.max.x, bb.min.y, bb.max.z),
+        );
+        let mut supporting = self.find_supporting_block(caller, test_area);
+        if supporting.is_some() || self.on_ground_no_blocks.load(Ordering::Relaxed) {
+            self.supporting_block_pos.store(supporting);
+        } else if let Some(movement) = movement {
+            supporting = self.find_supporting_block(
+                caller,
+                test_area.shift(Vector3::new(-movement.x, 0.0, -movement.z)),
+            );
+            self.supporting_block_pos.store(supporting);
+        }
+        self.on_ground_no_blocks
+            .store(supporting.is_none(), Ordering::Relaxed);
+    }
+
+    /// Vanilla `CollisionGetter.findSupportingBlock`: the colliding block whose centre is
+    /// closest to the entity, ties going to the greatest position (y, then z, then x).
+    fn find_supporting_block(
+        &self,
+        caller: &dyn EntityBase,
+        area: BoundingBox,
+    ) -> Option<BlockPos> {
+        let pos = self.pos.load();
+        let (_, positions) = self.world.load().get_block_collisions(area, caller);
+        let mut main: Option<(BlockPos, f64)> = None;
+        for (_, block_pos) in positions {
+            let center = block_pos.to_centered_f64();
+            let distance = center.squared_distance_to_vec(&pos);
+            let better = match main {
+                None => true,
+                Some((main_pos, main_distance)) => {
+                    distance < main_distance
+                        || (distance == main_distance
+                            && (main_pos.0.y, main_pos.0.z, main_pos.0.x)
+                                < (block_pos.0.y, block_pos.0.z, block_pos.0.x))
+                }
+            };
+            if better {
+                main = Some((block_pos, distance));
+            }
+        }
+        main.map(|(pos, _)| pos)
+    }
+
     #[expect(clippy::float_cmp)]
     fn adjust_movement_for_collisions(
         &self,
@@ -1470,7 +1628,6 @@ impl Entity {
         }
 
         self.on_ground.store(false, Ordering::SeqCst);
-        self.supporting_block_pos.store(None);
         self.horizontal_collision.store(false, Ordering::SeqCst);
 
         let bounding_box = self.bounding_box.load();
@@ -1489,19 +1646,10 @@ impl Entity {
         // Y-Axis adjustment
         if movement.get_axis(Axis::Y) != 0.0 {
             let mut max_time = 1.0;
-            let mut positions = block_positions.into_iter();
-            if let Some((mut collisions_len, mut position)) = positions.next() {
-                let mut supporting_block_pos = None;
+            if !block_positions.is_empty() {
+                let mut collided_below = false;
 
-                for (i, inert_box) in collisions.iter().enumerate() {
-                    if i == collisions_len {
-                        let Some((next_len, next_pos)) = positions.next() else {
-                            break;
-                        };
-                        collisions_len = next_len;
-                        position = next_pos;
-                    }
-
+                for inert_box in &collisions {
                     if let Some(collision_time) = bounding_box.calculate_collision_time(
                         inert_box,
                         adjusted_movement,
@@ -1510,9 +1658,8 @@ impl Entity {
                     ) {
                         max_time = collision_time;
 
-                        // If the entity is moving downwards and collides, set the supporting block position
                         if movement.get_axis(Axis::Y) < 0.0 {
-                            supporting_block_pos = Some(position);
+                            collided_below = true;
                         }
                     }
                 }
@@ -1522,9 +1669,7 @@ impl Entity {
                     adjusted_movement.set_axis(Axis::Y, changed_component);
                 }
 
-                self.on_ground
-                    .store(supporting_block_pos.is_some(), Ordering::SeqCst);
-                self.supporting_block_pos.store(supporting_block_pos);
+                self.on_ground.store(collided_below, Ordering::SeqCst);
             }
         }
 
@@ -1881,9 +2026,11 @@ impl Entity {
                 living.fall_distance.store(0.0);
             }
 
-            if !self.touching_water.load(Ordering::SeqCst) {
-
-                // TODO: Spawn splash particles
+            // Vanilla `firstTick`: the world bumps `tick_count` before the first tick.
+            if !self.touching_water.load(Ordering::SeqCst)
+                && self.tick_count.load(Ordering::Relaxed) > 1
+            {
+                self.do_water_splash_effect(caller);
             }
         }
 
@@ -1943,26 +2090,18 @@ impl Entity {
         Option<&'static BlockState>,
     ) {
         if let Some(mut supporting_block) = self.supporting_block_pos.load() {
-            if offset > 1.0e-5 {
+            if offset > f64::from(1.0e-5f32) {
+                // Vanilla `Entity.getOnPos(offset)`: fences (for offsets up to 0.5), walls and
+                // fence gates are tall, so the entity stands on them, not on the block below.
                 let (block, state) = self.world.load().get_block_and_state(&supporting_block);
-
-                // if let Some(props) = block.properties(state.id) {
-                //     let name = props.;
-
-                //     if offset <= 0.5
-                //         && (name == "OakFenceLikeProperties"
-                //             || name == "ResinBrickWallLikeProperties"
-                //             || name == "OakFenceGateLikeProperties"
-                //                 && OakFenceGateLikeProperties::from_state_id(state.id)
-                //                     .r#open)
-                //     {
-                //         return (supporting_block, Some(block), Some(state));
-                //     }
-                // }
+                if (offset <= 0.5 && block.has_tag(&tag::Block::MINECRAFT_FENCES))
+                    || block.has_tag(&tag::Block::MINECRAFT_WALLS)
+                    || block.has_tag(&tag::Block::MINECRAFT_FENCE_GATES)
+                {
+                    return (supporting_block, Some(block), Some(state));
+                }
 
                 supporting_block.0.y = (self.pos.load().y - offset).floor() as i32;
-
-                return (supporting_block, Some(block), Some(state));
             }
 
             return (supporting_block, None, None);
@@ -2102,6 +2241,15 @@ impl Entity {
 
         self.move_pos(final_move);
 
+        // Vanilla `setOnGroundWithMovement`, only run by `move` when the entity moved vertically.
+        if motion.y != 0.0 {
+            self.check_supporting_block(
+                caller,
+                self.on_ground.load(Ordering::SeqCst),
+                Some(final_move),
+            );
+        }
+
         let velocity_multiplier = f64::from(caller.get_block_speed_factor());
 
         self.velocity.store(final_move * velocity_multiplier);
@@ -2118,6 +2266,8 @@ impl Entity {
                 .block_registry
                 .update_entity_movement_after_fall_on(block, caller);
         }
+
+        self.apply_movement_emission_and_play_sound(caller, final_move);
     }
 
     pub fn push_out_of_blocks(&self, center_pos: Vector3<f64>) {
