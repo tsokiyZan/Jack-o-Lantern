@@ -177,6 +177,16 @@ impl BaseNodeEvaluator {
         }
     }
 
+    /// Vanilla closes the shared `Node` the search pops, which keeps it out of
+    /// every later neighbour list. Nodes here are handed out as copies, so the
+    /// search closes the cached one instead.
+    pub fn mark_closed(&mut self, pos: BlockPos) {
+        self.nodes
+            .entry(pos.0)
+            .or_insert_with(|| Node::new(pos))
+            .closed = true;
+    }
+
     pub fn reset(&mut self) {
         self.nodes.clear();
         self.context = None;

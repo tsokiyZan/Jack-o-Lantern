@@ -1,3 +1,4 @@
+use crate::entity::ai::pathfinder::node::PathType;
 use crate::entity::breath::BreathManager;
 use pumpkin_data::damage::DamageType;
 use std::sync::{
@@ -87,6 +88,8 @@ pub struct AxolotlEntity {
 impl AxolotlEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        // Vanilla `Axolotl`'s constructor.
+        mob_entity.set_pathfinding_malus(PathType::Water, 0.0);
         let variant = AxolotlVariant::random_variant();
         let axolotl = Self {
             mob_entity,

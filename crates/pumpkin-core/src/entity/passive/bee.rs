@@ -3,6 +3,7 @@ use std::sync::{
     atomic::{AtomicI32, AtomicU8, Ordering},
 };
 
+use crate::entity::ai::pathfinder::node::PathType;
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::Sound;
@@ -64,6 +65,12 @@ pub struct BeeEntity {
 impl BeeEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        // Vanilla `Bee`'s constructor.
+        mob_entity.set_pathfinding_malus(PathType::DamageFire, -1.0);
+        mob_entity.set_pathfinding_malus(PathType::Water, -1.0);
+        mob_entity.set_pathfinding_malus(PathType::WaterBorder, 16.0);
+        mob_entity.set_pathfinding_malus(PathType::Cocoa, -1.0);
+        mob_entity.set_pathfinding_malus(PathType::Fence, -1.0);
         let bee = Self {
             mob_entity,
             ageable_data: AgeableData::default(),

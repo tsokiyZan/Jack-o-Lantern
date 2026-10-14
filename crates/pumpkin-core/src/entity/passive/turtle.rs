@@ -3,6 +3,7 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 
+use crate::entity::ai::pathfinder::node::PathType;
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
@@ -35,6 +36,11 @@ pub struct TurtleEntity {
 impl TurtleEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        // Vanilla `Turtle`'s constructor.
+        mob_entity.set_pathfinding_malus(PathType::Water, 0.0);
+        mob_entity.set_pathfinding_malus(PathType::DoorIronClosed, -1.0);
+        mob_entity.set_pathfinding_malus(PathType::DoorWoodClosed, -1.0);
+        mob_entity.set_pathfinding_malus(PathType::DoorOpen, -1.0);
         let turtle = Self {
             mob_entity,
             ageable_data: AgeableData::default(),

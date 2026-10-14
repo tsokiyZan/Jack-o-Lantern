@@ -3,6 +3,7 @@ use std::sync::{
     atomic::{AtomicI32, Ordering},
 };
 
+use crate::entity::ai::pathfinder::node::PathType;
 use pumpkin_data::entity::{EntityStatus, EntityType};
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
@@ -78,6 +79,8 @@ pub struct SnifferEntity {
 impl SnifferEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        // Vanilla `Sniffer`'s constructor.
+        mob_entity.set_pathfinding_malus(PathType::Water, -1.0);
         let sniffer = Self {
             mob_entity,
             ageable_data: AgeableData::default(),
@@ -355,6 +358,13 @@ impl Mob for SnifferEntity {
 
     fn mob_tick(&self, _caller: &dyn EntityBase) {
         self.ageable_ai_step();
+        // Vanilla `onPathfindingStart`/`onPathfindingDone`: water is off limits
+        // unless the sniffer is burning or already in it. Paths are only built
+        // in the AI step that follows this, so setting it here is equivalent.
+        let entity = self.get_entity();
+        let may_swim = entity.is_on_fire() || entity.touching_water.load(Ordering::Relaxed);
+        self.mob_entity
+            .set_pathfinding_malus(PathType::Water, if may_swim { 0.0 } else { -1.0 });
         let state = self.get_state();
         match state {
             SnifferState::Searching => {

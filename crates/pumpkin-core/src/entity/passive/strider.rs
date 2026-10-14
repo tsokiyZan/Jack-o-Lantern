@@ -1,3 +1,4 @@
+use crate::entity::ai::pathfinder::node::PathType;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
 
@@ -35,6 +36,11 @@ pub struct StriderEntity {
 impl StriderEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        // Vanilla `Strider`'s constructor.
+        mob_entity.set_pathfinding_malus(PathType::Water, -1.0);
+        mob_entity.set_pathfinding_malus(PathType::Lava, 0.0);
+        mob_entity.set_pathfinding_malus(PathType::DangerFire, 0.0);
+        mob_entity.set_pathfinding_malus(PathType::DamageFire, 0.0);
         let strider = Self {
             mob_entity,
             ageable_data: AgeableData::default(),

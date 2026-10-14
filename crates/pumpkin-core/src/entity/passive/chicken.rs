@@ -3,6 +3,7 @@ use std::sync::{
     atomic::{AtomicI32, AtomicU8, Ordering, Ordering::Relaxed},
 };
 
+use crate::entity::ai::pathfinder::node::PathType;
 use pumpkin_data::chicken_sound_variant::ChickenSoundVariant;
 use pumpkin_data::chicken_variant::ChickenVariant;
 use pumpkin_data::item_stack::ItemStack;
@@ -52,6 +53,8 @@ impl ChickenEntity {
         let biome = world.get_biome(&entity.block_pos.load());
         let variant = ChickenVariant::select_for_biome(biome.registry_id);
         let mob_entity = MobEntity::new(entity);
+        // Vanilla `Chicken`'s constructor.
+        mob_entity.set_pathfinding_malus(PathType::Water, 0.0);
         let egg_lay_time = rand::rng().random_range(6000..12000);
         let chicken = Self {
             mob_entity,

@@ -1,4 +1,7 @@
-use super::{Entity, EntityBase, ai::pathfinder::Navigator, living::LivingEntity};
+use super::{
+    Entity, EntityBase, ai::pathfinder::Navigator, ai::pathfinder::node::PathType,
+    living::LivingEntity,
+};
 use crate::entity::ai::brain::memory::PackedMemories;
 use crate::entity::ai::brain::{Brain, BrainTick};
 use crate::entity::ai::control::MoveControlTrait;
@@ -121,6 +124,15 @@ impl MobEntity {
         EquipmentSlot::LEGS,
         EquipmentSlot::FEET,
     ];
+
+    /// Vanilla `Mob.setPathfindingMalus`: what this mob pays to path through
+    /// `path_type`, or `-1` to never enter it.
+    pub fn set_pathfinding_malus(&self, path_type: PathType, malus: f32) {
+        self.navigator
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .set_pathfinding_malus(path_type, malus);
+    }
 
     #[must_use]
     pub const fn get_equipment_for_slot(

@@ -1,3 +1,4 @@
+use crate::entity::ai::pathfinder::node::PathType;
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::{Arc, Weak};
 
@@ -24,6 +25,8 @@ pub struct ElderGuardianEntity {
 impl ElderGuardianEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        // Vanilla `Guardian`'s constructor.
+        mob_entity.set_pathfinding_malus(PathType::Water, 0.0);
         let guardian = Self {
             mob_entity,
             tick_count: AtomicI32::new(0),

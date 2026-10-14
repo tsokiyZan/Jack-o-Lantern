@@ -3,6 +3,7 @@ use std::sync::{
     atomic::{AtomicI32, Ordering},
 };
 
+use crate::entity::ai::pathfinder::node::PathType;
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
@@ -40,6 +41,9 @@ pub struct FrogEntity {
 impl FrogEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        // Vanilla `Frog`'s constructor.
+        mob_entity.set_pathfinding_malus(PathType::Water, 4.0);
+        mob_entity.set_pathfinding_malus(PathType::Trapdoor, -1.0);
         let frog = Self {
             mob_entity,
             ageable_data: AgeableData::default(),

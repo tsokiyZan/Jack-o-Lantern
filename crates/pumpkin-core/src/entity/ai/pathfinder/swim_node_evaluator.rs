@@ -90,6 +90,8 @@ impl NodeEvaluator for SwimNodeEvaluator {
 
         self.base.context = Some(context);
         self.base.mob_data = Some(mob_data);
+        // Vanilla `NodeEvaluator.prepare`: every search starts from fresh nodes.
+        self.base.nodes.clear();
         self.path_types_cache.clear();
     }
 

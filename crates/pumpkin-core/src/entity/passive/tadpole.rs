@@ -1,3 +1,4 @@
+use crate::entity::ai::pathfinder::node::PathType;
 use crate::entity::breath::BreathManager;
 use std::sync::{Arc, Weak};
 
@@ -32,6 +33,8 @@ pub struct TadpoleEntity {
 impl TadpoleEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        // Vanilla `WaterAnimal`'s constructor.
+        mob_entity.set_pathfinding_malus(PathType::Water, 0.0);
         let tadpole = Self {
             mob_entity,
             ageable_data: AgeableData::default(),

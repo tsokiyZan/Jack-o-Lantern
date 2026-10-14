@@ -130,6 +130,7 @@ impl PathFinder {
             };
 
             current.closed = true;
+            evaluator.mark_closed(current.pos);
             self.all_nodes.insert(current.pos.0, current);
 
             for (idx, (target, _)) in target_entries.iter_mut().enumerate() {
@@ -316,6 +317,15 @@ impl EvaluatorKind {
             Self::Fly(e) => e.get_target(pos),
             Self::Swim(e) => e.get_target(pos),
             Self::Amphibious(e) => e.get_target(pos),
+        }
+    }
+
+    pub fn mark_closed(&mut self, pos: BlockPos) {
+        match self {
+            Self::Walk(e) => e.base.mark_closed(pos),
+            Self::Fly(e) => e.walk.base.mark_closed(pos),
+            Self::Swim(e) => e.base.mark_closed(pos),
+            Self::Amphibious(e) => e.walk.base.mark_closed(pos),
         }
     }
 
@@ -644,7 +654,10 @@ impl PathNavigation {
 
         mob_data.set_pathfinding_malus(PathType::DangerFire, 16.0);
         mob_data.set_pathfinding_malus(PathType::DamageFire, -1.0);
-        mob_data.set_pathfinding_malus(PathType::Water, if self.can_float { 0.0 } else { 8.0 });
+        // Floating only changes where a path may start and end; like vanilla's
+        // `FloatGoal`, it leaves the cost of water alone. Mobs that swim set
+        // their own water malus.
+        mob_data.set_pathfinding_malus(PathType::Water, 8.0);
         mob_data.set_pathfinding_malus(PathType::Lava, -1.0);
         mob_data.set_pathfinding_malus(PathType::DangerOther, 8.0);
 
@@ -693,6 +706,7 @@ impl PathNavigation {
             let Some(current) = self.open_set.pop() else {
                 break;
             };
+            self.evaluator.mark_closed(current.pos);
 
             if current.distance_manhattan(&target) <= reach_range as f32 {
                 target.reached = true;

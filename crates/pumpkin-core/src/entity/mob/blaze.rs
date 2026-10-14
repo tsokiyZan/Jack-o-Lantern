@@ -1,3 +1,4 @@
+use crate::entity::ai::pathfinder::node::PathType;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
 
@@ -22,6 +23,11 @@ pub struct BlazeEntity {
 impl BlazeEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let entity = Arc::new(MobEntity::new(entity));
+        // Vanilla `Blaze`'s constructor.
+        entity.set_pathfinding_malus(PathType::Water, -1.0);
+        entity.set_pathfinding_malus(PathType::Lava, 8.0);
+        entity.set_pathfinding_malus(PathType::DangerFire, 0.0);
+        entity.set_pathfinding_malus(PathType::DamageFire, 0.0);
         let blaze = Self {
             entity,
             is_charged: AtomicBool::new(false),
