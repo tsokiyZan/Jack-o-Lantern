@@ -23,6 +23,19 @@
 | Cod, salmon and tropical fish school | Ported here from `AbstractSchoolingFish` and `FollowFlockLeaderGoal` |
 | Pufferfish puff up, sting and poison | Ported here from `Pufferfish` |
 | Eyeblossoms no longer disconnect nearby players | Fixed here; the trail particle now carries its options |
+| All living entities have an air supply and can drown | Upstream PR by colestebbens, merged here; turning off `drowning_damage` still spares players |
+| Fire burns out, and clients see it go out | Fixed here |
+| Scheduled block ticks survive chunk unload and load, and only run in ticking chunks | Fixed here |
+| Pale hanging moss needs support | Ported here |
+| `/forceload` actually loads the chunks | Fixed here |
+| Dolphins: full vanilla AI, including treasure hunting, item play, babies, following boats and swimming with players | Ported here from `Dolphin` |
+| Mob despawning and `noActionTime` follow vanilla; nothing despawns with no player online | Ported here from `Mob.checkDespawn` |
+| Water pathfinding costs: land mobs avoid water as in vanilla, and swimmers, blazes, striders, bees, frogs and sniffers use their own costs | Ported here from each mob's constructor |
+| The path search reaches exactly as far as vanilla's, and mobs keep their first path to a still target | Ported here from `PathFinder` and `PathNavigation.createPath` |
+| Zombies, husks, zombie villagers and drowned use vanilla's goal lists: zombies sink, target wandering traders and only baby turtles; drowned leave land targets alone by day | Ported here from `Zombie` and `Drowned` |
+| Melee mobs walk right up to their target | Ported here; `MeleeAttackGoal` paths with reach 0 |
+| Babies have vanilla hitbox sizes, and the `scale` attribute resizes hitboxes | Ported here from `getDimensions` and each mob's `BABY_DIMENSIONS` |
+| Mobs walk at vanilla speed, and goal speeds (panicking, tempting) match | Fixed here: input decay order and `getSpeed` |
 
 ## Issues
 
