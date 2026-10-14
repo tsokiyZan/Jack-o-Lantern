@@ -129,6 +129,15 @@ impl Animal for HappyGhastEntity {
 }
 
 impl Mob for HappyGhastEntity {
+    /// Vanilla `HappyGhast.canBreatheUnderwater`: ghastlings always can.
+    fn can_breathe_underwater(&self) -> bool {
+        self.is_baby()
+            || self
+                .get_entity()
+                .entity_type
+                .has_tag(&pumpkin_data::tag::EntityType::MINECRAFT_CAN_BREATHE_UNDER_WATER)
+    }
+
     fn as_ageable(&self) -> Option<&dyn AgeableMob> {
         Some(self)
     }

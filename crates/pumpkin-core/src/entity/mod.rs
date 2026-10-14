@@ -142,10 +142,15 @@ pub trait EntityBase: Send + Sync + std::any::Any {
 
     fn write_custom_nbt(&self, _nbt: &mut NbtCompound) {}
 
+    /// Reads base, living and custom tags.
     fn read_nbt_non_mut(&self, nbt: &NbtCompound) {
         self.get_entity().read_nbt_non_mut(nbt);
         if let Some(living) = self.get_living_entity() {
             living.read_living_nbt_non_mut(nbt);
+            let max_air = self
+                .get_mob()
+                .map_or(breath::MAX_AIR, mob::Mob::max_air_supply);
+            living.breath.read_nbt(nbt, max_air);
         }
         self.read_custom_nbt(nbt);
     }
@@ -2570,6 +2575,7 @@ impl Entity {
     pub fn is_under_water(&self) -> bool {
         self.is_in_water() && self.is_submerged_in_water()
     }
+
 
     #[must_use]
     pub fn is_visually_crawling(&self) -> bool {

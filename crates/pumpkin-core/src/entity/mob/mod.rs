@@ -956,6 +956,27 @@ pub trait Mob: EntityBase + Send + Sync {
         None
     }
 
+    /// Vanilla `LivingEntity.canBreatheUnderwater`.
+    fn can_breathe_underwater(&self) -> bool {
+        self.get_entity()
+            .entity_type
+            .has_tag(&tag::EntityType::MINECRAFT_CAN_BREATHE_UNDER_WATER)
+    }
+
+    /// Vanilla `Entity.getMaxAirSupply`.
+    fn max_air_supply(&self) -> i32 {
+        crate::entity::breath::MAX_AIR
+    }
+
+    /// Vanilla `LivingEntity.increaseAirSupply`.
+    fn increase_air_supply(&self, current: i32) -> i32 {
+        (current + crate::entity::breath::AIR_RECOVERY_RATE).min(self.max_air_supply())
+    }
+
+    /// The `handleAirSupply` that vanilla's water mobs run after `baseTick`,
+    /// given the air from before it. Most mobs have none.
+    fn handle_air_supply(&self, _pre_tick_air: i32) {}
+
     /// Metadata which must accompany this mob whenever it is spawned for a Java client.
     fn mob_java_spawn_metadata(&self, _version: JavaMinecraftVersion) -> Option<Box<[u8]>> {
         None

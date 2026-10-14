@@ -1,4 +1,6 @@
+use crate::entity::breath::BreathManager;
 use crossbeam::atomic::AtomicCell;
+use pumpkin_data::damage::DamageType;
 use std::sync::{
     Arc, Mutex,
     atomic::{AtomicBool, AtomicI32, Ordering},
@@ -204,6 +206,22 @@ impl CustomSound for NautilusEntity {
 }
 
 impl Mob for NautilusEntity {
+    /// Vanilla `Nautilus.handleAirSupply`, which `Nautilus.baseTick` skips for
+    /// mobs without AI.
+    fn handle_air_supply(&self, pre_tick_air: i32) {
+        if self.mob_entity.is_no_ai() {
+            return;
+        }
+        let in_water = self.get_entity().is_in_water();
+        BreathManager::handle_air_out_of_water(
+            self,
+            pre_tick_air,
+            in_water,
+            crate::entity::breath::MAX_AIR,
+            DamageType::DRY_OUT,
+        );
+    }
+
     fn as_custom_sound(&self) -> Option<&dyn crate::entity::custom_sound::CustomSound> {
         Some(self)
     }

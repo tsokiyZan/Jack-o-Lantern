@@ -1,3 +1,4 @@
+use crate::entity::breath::BreathManager;
 use std::f32::consts::{PI, TAU};
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
@@ -36,6 +37,11 @@ impl SquidEntity {
 }
 
 impl Mob for SquidEntity {
+    /// Vanilla `AgeableWaterCreature.handleAirSupply`.
+    fn handle_air_supply(&self, pre_tick_air: i32) {
+        BreathManager::water_animal_handle_air_supply(self, pre_tick_air);
+    }
+
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
     }

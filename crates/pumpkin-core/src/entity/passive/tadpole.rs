@@ -1,3 +1,4 @@
+use crate::entity::breath::BreathManager;
 use std::sync::{Arc, Weak};
 
 use pumpkin_data::entity::EntityType;
@@ -76,6 +77,11 @@ impl AgeableMob for TadpoleEntity {
 }
 
 impl Mob for TadpoleEntity {
+    /// Vanilla `WaterAnimal.handleAirSupply`.
+    fn handle_air_supply(&self, pre_tick_air: i32) {
+        BreathManager::water_animal_handle_air_supply(self, pre_tick_air);
+    }
+
     fn as_ageable(&self) -> Option<&dyn AgeableMob> {
         Some(self)
     }

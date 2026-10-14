@@ -1,3 +1,4 @@
+use crate::entity::breath::BreathManager;
 use std::sync::Arc;
 use std::sync::PoisonError;
 use std::sync::atomic::{AtomicI32, Ordering};
@@ -205,6 +206,11 @@ const fn poison(puff_state: i32) -> pumpkin_data::potion::Effect {
 impl Mob for PufferfishEntity {
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
+    }
+
+    /// Vanilla `WaterAnimal.handleAirSupply`.
+    fn handle_air_supply(&self, pre_tick_air: i32) {
+        BreathManager::water_animal_handle_air_supply(self, pre_tick_air);
     }
 
     fn mob_tick(&self, caller: &dyn EntityBase) {

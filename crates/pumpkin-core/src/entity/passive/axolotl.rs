@@ -1,3 +1,5 @@
+use crate::entity::breath::BreathManager;
+use pumpkin_data::damage::DamageType;
 use std::sync::{
     Arc, Weak,
     atomic::{AtomicBool, AtomicI32, Ordering},
@@ -233,6 +235,27 @@ impl Animal for AxolotlEntity {
 }
 
 impl Mob for AxolotlEntity {
+    /// Vanilla `Axolotl.handleAirSupply`, which `Axolotl.baseTick` skips for
+    /// mobs without AI.
+    fn handle_air_supply(&self, pre_tick_air: i32) {
+        if self.mob_entity.is_no_ai() {
+            return;
+        }
+        let in_water_or_rain = self.get_entity().is_in_water_or_rain();
+        BreathManager::handle_air_out_of_water(
+            self,
+            pre_tick_air,
+            in_water_or_rain,
+            self.max_air_supply(),
+            DamageType::DRY_OUT,
+        );
+    }
+
+    /// `Axolotl.getMaxAirSupply`.
+    fn max_air_supply(&self) -> i32 {
+        6000
+    }
+
     fn as_ageable(&self) -> Option<&dyn AgeableMob> {
         Some(self)
     }

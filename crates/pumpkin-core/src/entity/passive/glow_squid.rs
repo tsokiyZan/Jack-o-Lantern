@@ -1,3 +1,4 @@
+use crate::entity::breath::BreathManager;
 use std::sync::Arc;
 
 use pumpkin_data::particle::Particle;
@@ -27,6 +28,11 @@ impl GlowSquidEntity {
 }
 
 impl Mob for GlowSquidEntity {
+    /// Vanilla `AgeableWaterCreature.handleAirSupply`.
+    fn handle_air_supply(&self, pre_tick_air: i32) {
+        BreathManager::water_animal_handle_air_supply(self, pre_tick_air);
+    }
+
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
     }

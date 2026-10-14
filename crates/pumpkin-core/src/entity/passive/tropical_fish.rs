@@ -1,3 +1,4 @@
+use crate::entity::breath::BreathManager;
 use std::sync::Arc;
 
 use pumpkin_data::sound::Sound;
@@ -34,6 +35,11 @@ impl TropicalFishEntity {
 impl Mob for TropicalFishEntity {
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
+    }
+
+    /// Vanilla `WaterAnimal.handleAirSupply`.
+    fn handle_air_supply(&self, pre_tick_air: i32) {
+        BreathManager::water_animal_handle_air_supply(self, pre_tick_air);
     }
 
     fn mob_tick(&self, _caller: &dyn EntityBase) {
