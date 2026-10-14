@@ -179,6 +179,17 @@ impl Mob for PiglinBruteEntity {
         &self.mob_entity
     }
 
+    /// Vanilla `AbstractPiglin.playAmbientSound`: only while idle.
+    fn play_ambient_sound(&self) {
+        if self
+            .mob_entity
+            .with_brain(self, |tick| super::piglin_ai::is_idle(tick.brain))
+            && let Some(sound) = self.ambient_sound()
+        {
+            self.make_sound(sound);
+        }
+    }
+
     fn mob_init_data_tracker(&self) {
         let entity = self.get_entity();
         if self.is_immune_to_zombification() {

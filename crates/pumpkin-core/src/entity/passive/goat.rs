@@ -138,6 +138,15 @@ const BABY_DIMENSIONS: EntityDimensions =
     EntityDimensions::scalable(0.45, 0.65).with_eye_height(0.593_75);
 
 impl Mob for GoatEntity {
+    /// Vanilla `Goat.getAmbientSound`.
+    fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
+        Some(if self.is_screaming() {
+            pumpkin_data::sound::Sound::EntityGoatScreamingAmbient
+        } else {
+            pumpkin_data::sound::Sound::EntityGoatAmbient
+        })
+    }
+
     /// Vanilla `Goat.getDefaultDimensions`: long jumps shrink the goat.
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
         let entity = self.get_entity();

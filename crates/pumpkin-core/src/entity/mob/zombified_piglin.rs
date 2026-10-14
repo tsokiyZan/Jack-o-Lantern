@@ -114,6 +114,20 @@ const BABY_DIMENSIONS: EntityDimensions =
     EntityDimensions::scalable(0.49, 0.98).with_eye_height(0.78);
 
 impl Mob for ZombifiedPiglinEntity {
+    /// Vanilla `ZombifiedPiglin.getAmbientSound`.
+    fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
+        Some(
+            if self
+                .as_neutral()
+                .is_some_and(super::neutral::NeutralMob::is_angry)
+            {
+                pumpkin_data::sound::Sound::EntityZombifiedPiglinAngry
+            } else {
+                pumpkin_data::sound::Sound::EntityZombifiedPiglinAmbient
+            },
+        )
+    }
+
     /// Vanilla `ZombifiedPiglin.getDefaultDimensions`.
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
         let entity = self.get_entity();

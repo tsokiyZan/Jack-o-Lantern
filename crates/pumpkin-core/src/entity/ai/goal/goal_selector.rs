@@ -29,6 +29,15 @@ impl GoalSelector {
         }
     }
 
+    /// Whether a goal of type `G` is running, like vanilla's `WrappedGoal.isRunning` on
+    /// a goal a mob keeps a reference to.
+    #[must_use]
+    pub fn is_running<G: Goal + 'static>(&self) -> bool {
+        self.goals
+            .iter()
+            .any(|goal| goal.type_id == TypeId::of::<G>() && goal.running)
+    }
+
     pub fn remove_goals<G: Goal + 'static>(&mut self) -> Vec<PrioritizedGoal> {
         self.remove_goal_by_type_id(TypeId::of::<G>())
     }

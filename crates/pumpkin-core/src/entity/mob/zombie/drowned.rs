@@ -115,6 +115,17 @@ const BABY_DIMENSIONS: EntityDimensions =
     EntityDimensions::scalable(0.49, 0.98).with_eye_height(0.775);
 
 impl Mob for DrownedEntity {
+    /// Vanilla `Drowned.getAmbientSound`.
+    fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
+        Some(
+            if self.get_mob_entity().living_entity.entity.is_in_water() {
+                pumpkin_data::sound::Sound::EntityDrownedAmbientWater
+            } else {
+                pumpkin_data::sound::Sound::EntityDrownedAmbient
+            },
+        )
+    }
+
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
         self.entity.default_dimensions(pose)
     }

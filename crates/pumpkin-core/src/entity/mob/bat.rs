@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, AtomicI32, Ordering::Relaxed};
+use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
 
 use pumpkin_data::damage::DamageType;
 use pumpkin_data::sound::{Sound, SoundCategory};
@@ -18,14 +18,10 @@ use crate::world::World;
 
 const ROOSTING_FLAG: u8 = 1;
 const CLOSE_PLAYER_DISTANCE: f64 = 4.0;
-/// Vanilla: `getMinAmbientSoundDelay()` returns 80 for most mobs
-const MIN_AMBIENT_SOUND_DELAY: i32 = 80;
-
 pub struct BatEntity {
     pub mob_entity: MobEntity,
     hanging_position: Mutex<Option<BlockPos>>,
     roosting: AtomicBool,
-    ambient_sound_chance: AtomicI32,
 }
 
 impl BatEntity {
@@ -35,7 +31,6 @@ impl BatEntity {
             mob_entity,
             hanging_position: Mutex::new(None),
             roosting: AtomicBool::new(true),
-            ambient_sound_chance: AtomicI32::new(MIN_AMBIENT_SOUND_DELAY),
         };
         Arc::new(bat)
     }
@@ -74,23 +69,6 @@ impl BatEntity {
             .living_entity
             .entity
             .set_synced_data(tracked_data::bat::DATA_ID_FLAGS, flags);
-    }
-
-    fn tick_ambient_sound(&self, world: &World, pos: &Vector3<f64>) {
-        let chance = self.ambient_sound_chance.fetch_sub(1, Relaxed);
-        if chance <= 0 {
-            self.ambient_sound_chance
-                .store(MIN_AMBIENT_SOUND_DELAY, Relaxed);
-            if !self.is_roosting() || rand::random_range(0..4) == 0 {
-                world.play_sound_fine(
-                    Sound::EntityBatAmbient,
-                    SoundCategory::Ambient,
-                    pos,
-                    0.1,
-                    0.95,
-                );
-            }
-        }
     }
 
     fn tick_roosting(&self, world: &World, above_pos: &BlockPos, pos: &Vector3<f64>) {
@@ -207,6 +185,26 @@ impl BatEntity {
 }
 
 impl Mob for BatEntity {
+    /// Vanilla `Bat.getAmbientSound`: a resting bat squeaks one time in four.
+    fn ambient_sound(&self) -> Option<Sound> {
+        if self.is_roosting() && self.get_random().random_range(0..4) != 0 {
+            None
+        } else {
+            Some(Sound::EntityBatAmbient)
+        }
+    }
+
+    /// Vanilla `Bat.getVoicePitch`.
+    fn voice_pitch(&self) -> f32 {
+        let base = if self.get_entity().is_baby() {
+            1.5
+        } else {
+            1.0
+        };
+        let mut random = self.get_random();
+        (random.random::<f32>() - random.random::<f32>()).mul_add(0.2, base) * 0.95
+    }
+
     fn mob_init_data_tracker(&self) {
         let entity = self.get_entity();
         let flags: u8 = if self.is_roosting() { ROOSTING_FLAG } else { 0 };
@@ -234,8 +232,6 @@ impl Mob for BatEntity {
         let above_pos = BlockPos::new(block_pos.0.x, block_pos.0.y + 1, block_pos.0.z);
         let world = entity.world.load();
         let pos = entity.pos.load();
-
-        self.tick_ambient_sound(&world, &pos);
 
         if self.is_roosting() {
             self.tick_roosting(&world, &above_pos, &pos);

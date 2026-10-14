@@ -212,6 +212,17 @@ impl CustomSound for NautilusEntity {
 const BABY_DIMENSIONS: EntityDimensions = Entity::type_dimensions(&EntityType::NAUTILUS).scale(0.5);
 
 impl Mob for NautilusEntity {
+    /// Vanilla `Nautilus.getAmbientSound`.
+    fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
+        let entity = self.get_entity();
+        Some(match (entity.is_baby(), entity.is_under_water()) {
+            (true, true) => pumpkin_data::sound::Sound::EntityBabyNautilusAmbient,
+            (true, false) => pumpkin_data::sound::Sound::EntityBabyNautilusAmbientLand,
+            (false, true) => pumpkin_data::sound::Sound::EntityNautilusAmbient,
+            (false, false) => pumpkin_data::sound::Sound::EntityNautilusAmbientLand,
+        })
+    }
+
     /// Vanilla `Nautilus.getDefaultDimensions`.
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
         let entity = self.get_entity();

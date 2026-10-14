@@ -21,6 +21,7 @@ use pumpkin_data::data_component_impl::EquipmentSlot;
 use pumpkin_data::entity::{EntityPose, EntityType};
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
+use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_data::tracked_data;
 use pumpkin_data::{Block, BlockDirection};
@@ -32,6 +33,7 @@ use pumpkin_util::math::vector3::Vector3;
 use pumpkin_util::random::xoroshiro128::Xoroshiro;
 use pumpkin_util::random::{RandomGenerator, get_seed};
 use pumpkin_util::version::JavaMinecraftVersion;
+use rand::RngExt;
 use std::sync::Arc;
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU8, Ordering};
@@ -70,6 +72,7 @@ pub mod shulker;
 pub mod silverfish;
 pub mod skeleton;
 pub mod slime;
+pub mod sounds;
 pub mod spawn;
 pub mod spider;
 pub mod sun_burn;
@@ -100,6 +103,8 @@ pub struct MobEntity {
     pub position_target_range: AtomicI32,
     pub love_ticks: AtomicI32,
     pub breeding_cooldown: AtomicI32,
+    /// Vanilla `Mob.ambientSoundTime`.
+    pub ambient_sound_time: AtomicI32,
     pub breeder: AtomicCell<Option<Uuid>>,
     pub persistence_required: AtomicBool,
     pending_riders: std::sync::Mutex<Vec<Arc<dyn EntityBase>>>,
@@ -207,6 +212,7 @@ impl MobEntity {
             position_target_range: AtomicI32::new(-1),
             love_ticks: AtomicI32::new(0),
             breeding_cooldown: AtomicI32::new(0),
+            ambient_sound_time: AtomicI32::new(0),
             breeder: AtomicCell::new(None),
             persistence_required: AtomicBool::new(false),
             pending_riders: std::sync::Mutex::new(Vec::new()),
@@ -933,6 +939,67 @@ pub trait Mob: EntityBase + Send + Sync {
         rand::rng()
     }
 
+    /// Vanilla `Mob.getAmbientSound`.
+    fn ambient_sound(&self) -> Option<Sound> {
+        sounds::ambient_sound(self.get_entity().entity_type)
+    }
+
+    /// Vanilla `Mob.getAmbientSoundInterval`.
+    fn ambient_sound_interval(&self) -> i32 {
+        sounds::ambient_sound_interval(self.get_entity().entity_type)
+    }
+
+    /// Vanilla `Mob.playAmbientSound`.
+    fn play_ambient_sound(&self) {
+        if let Some(sound) = self.ambient_sound() {
+            self.make_sound(sound);
+        }
+    }
+
+    /// Vanilla `Mob.resetAmbientSoundTime`.
+    fn reset_ambient_sound_time(&self) {
+        self.get_mob_entity()
+            .ambient_sound_time
+            .store(-self.ambient_sound_interval(), Relaxed);
+    }
+
+    /// Vanilla `LivingEntity.getSoundVolume`.
+    fn sound_volume(&self) -> f32 {
+        sounds::sound_volume(self.get_entity().entity_type)
+    }
+
+    /// Vanilla `Entity.getSoundSource`.
+    fn sound_source(&self) -> SoundCategory {
+        sounds::sound_source(self.get_entity().entity_type)
+    }
+
+    /// Vanilla `LivingEntity.getVoicePitch`.
+    fn voice_pitch(&self) -> f32 {
+        let base = if self.get_entity().is_baby() {
+            1.5
+        } else {
+            1.0
+        };
+        let mut random = self.get_random();
+        (random.random::<f32>() - random.random::<f32>()).mul_add(0.2, base)
+    }
+
+    /// Vanilla `LivingEntity.makeSound`, through `Entity.playSound`, which a silent
+    /// entity skips.
+    fn make_sound(&self, sound: Sound) {
+        let entity = self.get_entity();
+        if entity.is_silent() {
+            return;
+        }
+        entity.world.load().play_sound_fine(
+            sound,
+            self.sound_source(),
+            &entity.pos.load(),
+            self.sound_volume(),
+            self.voice_pitch(),
+        );
+    }
+
     fn can_attack(&self, target: &dyn EntityBase) -> bool {
         let target_entity = target.get_entity();
         if target_entity.entity_type == &EntityType::GHAST {
@@ -1628,6 +1695,15 @@ impl<T: Mob + Send + 'static> EntityBase for T {
 
         if let Some(neutral) = self.as_neutral() {
             neutral.update_persistent_anger();
+        }
+
+        // The ambient-sound part of vanilla `Mob.baseTick`.
+        if mob_entity.living_entity.entity.is_alive()
+            && self.get_random().random_range(0..1000)
+                < mob_entity.ambient_sound_time.fetch_add(1, Relaxed)
+        {
+            self.reset_ambient_sound_time();
+            self.play_ambient_sound();
         }
 
         self.mob_tick(caller);

@@ -62,6 +62,11 @@ impl CustomSound for MagmaCubeEntity {
 }
 
 impl Mob for MagmaCubeEntity {
+    /// Vanilla `AbstractCubeMob.getSoundVolume`.
+    fn sound_volume(&self) -> f32 {
+        self.slime.sound_volume()
+    }
+
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
         self.slime.default_dimensions(pose)
     }

@@ -168,6 +168,15 @@ impl Animal for HorseEntity {
 const BABY_DIMENSIONS: EntityDimensions = Entity::type_dimensions(&EntityType::HORSE).scale(0.7);
 
 impl Mob for HorseEntity {
+    /// Vanilla `Horse.getAmbientSound`.
+    fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
+        Some(if self.get_entity().is_baby() {
+            pumpkin_data::sound::Sound::EntityBabyHorseAmbient
+        } else {
+            pumpkin_data::sound::Sound::EntityHorseAmbient
+        })
+    }
+
     /// Vanilla `Horse.getDefaultDimensions`.
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
         let entity = self.get_entity();

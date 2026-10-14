@@ -126,6 +126,15 @@ const BABY_DIMENSIONS: EntityDimensions =
     Entity::type_dimensions(&EntityType::SKELETON_HORSE).scale(0.7);
 
 impl Mob for SkeletonHorseEntity {
+    /// Vanilla `SkeletonHorse.getAmbientSound`.
+    fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
+        Some(if self.get_entity().is_submerged_in_water() {
+            pumpkin_data::sound::Sound::EntitySkeletonHorseAmbientWater
+        } else {
+            pumpkin_data::sound::Sound::EntitySkeletonHorseAmbient
+        })
+    }
+
     /// Vanilla `SkeletonHorse.getDefaultDimensions`.
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
         let entity = self.get_entity();

@@ -267,6 +267,11 @@ impl CustomSound for SlimeEntity {
 }
 
 impl Mob for SlimeEntity {
+    /// Vanilla `AbstractCubeMob.getSoundVolume`.
+    fn sound_volume(&self) -> f32 {
+        0.4 * self.get_size() as f32
+    }
+
     /// Vanilla `AbstractCubeMob.getDefaultDimensions`: the type's size times the slime's.
     fn default_dimensions(&self, _pose: EntityPose) -> EntityDimensions {
         Entity::type_dimensions(self.get_entity().entity_type).scale(self.get_size() as f32)

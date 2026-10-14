@@ -117,6 +117,15 @@ impl Animal for TurtleEntity {
 const BABY_DIMENSIONS: EntityDimensions = Entity::type_dimensions(&EntityType::TURTLE).scale(0.3);
 
 impl Mob for TurtleEntity {
+    /// Vanilla `Turtle.getAmbientSound`: only adults on land make one.
+    fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
+        let entity = self.get_entity();
+        (!entity.is_in_water()
+            && entity.on_ground.load(std::sync::atomic::Ordering::Relaxed)
+            && !entity.is_baby())
+        .then_some(pumpkin_data::sound::Sound::EntityTurtleAmbientLand)
+    }
+
     /// Vanilla `Turtle.getDefaultDimensions`.
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
         let entity = self.get_entity();

@@ -183,6 +183,23 @@ const BABY_DIMENSIONS: EntityDimensions =
     EntityDimensions::scalable(0.75, 0.85).with_eye_height(0.625);
 
 impl Mob for HoglinEntity {
+    /// Vanilla `Hoglin.getAmbientSound` through `HoglinAi.getSoundForCurrentActivity`:
+    /// angry while fighting. Pumpkin's hoglin runs goals, not the brain, so the fight
+    /// activity is its attack target and the retreat sound is never chosen.
+    fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
+        let has_target = self
+            .get_mob_entity()
+            .target
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .is_some();
+        Some(if has_target {
+            pumpkin_data::sound::Sound::EntityHoglinAngry
+        } else {
+            pumpkin_data::sound::Sound::EntityHoglinAmbient
+        })
+    }
+
     /// Vanilla `Hoglin.getDefaultDimensions`.
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
         let entity = self.get_entity();

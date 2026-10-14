@@ -10,7 +10,7 @@ use pumpkin_data::entity::EntityPose;
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::entity_status::EntityStatus;
 use pumpkin_data::item_stack::ItemStack;
-use pumpkin_data::sound::{Sound, SoundCategory};
+use pumpkin_data::sound::Sound;
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_data::tracked_data::dolphin::{GOT_FISH, MOISTNESS_LEVEL};
 use pumpkin_nbt::compound::NbtCompound;
@@ -61,8 +61,6 @@ const IN_WATER_SPEED_MODIFIER: f32 = 0.02;
 const SWIM_WITH_PLAYER_RANGE: f64 = 10.0;
 /// Guardians, which vanilla reaches through `Guardian.class` and so also matches elder guardians.
 const GUARDIANS: [&EntityType; 2] = [&EntityType::GUARDIAN, &EntityType::ELDER_GUARDIAN];
-/// Vanilla `AgeableWaterCreature.getAmbientSoundInterval`.
-const AMBIENT_SOUND_INTERVAL: i32 = 120;
 /// The baby chance of the `AgeableMobGroupData` vanilla's `Dolphin.finalizeSpawn` makes.
 const BABY_SPAWN_CHANCE: f32 = 0.1;
 /// `DolphinSwimToTreasureGoal` needs at least this much air to set off or keep going.
@@ -77,8 +75,6 @@ const THROWN_ITEM_PICKUP_DELAY: u8 = 40;
 pub struct DolphinEntity {
     pub mob_entity: MobEntity,
     ageable_data: AgeableData,
-    /// Vanilla `Mob.ambientSoundTime`.
-    ambient_sound_time: AtomicI32,
     pub got_fish: AtomicBool,
     pub moistness_level: AtomicI32,
 }
@@ -113,7 +109,6 @@ impl DolphinEntity {
         let dolphin = Self {
             mob_entity,
             ageable_data: AgeableData::default(),
-            ambient_sound_time: AtomicI32::new(0),
             got_fish: AtomicBool::new(false),
             moistness_level: AtomicI32::new(TOTAL_MOISTNESS_LEVEL),
         };
@@ -223,46 +218,6 @@ impl DolphinEntity {
             .get(&EquipmentSlot::MAIN_HAND)
     }
 
-    /// The ambient-sound part of vanilla `Mob.baseTick`.
-    fn tick_ambient_sound(&self) {
-        if !self.get_entity().is_alive() {
-            return;
-        }
-        if self.get_random().random_range(0..1000)
-            < self.ambient_sound_time.fetch_add(1, Ordering::Relaxed)
-        {
-            self.reset_ambient_sound_time();
-            // Vanilla `Dolphin.getAmbientSound`.
-            let sound = if self.get_entity().is_in_water() {
-                Sound::EntityDolphinAmbientWater
-            } else {
-                Sound::EntityDolphinAmbient
-            };
-            self.make_sound(sound);
-        }
-    }
-
-    /// Vanilla `Mob.resetAmbientSoundTime`.
-    fn reset_ambient_sound_time(&self) {
-        self.ambient_sound_time
-            .store(-AMBIENT_SOUND_INTERVAL, Ordering::Relaxed);
-    }
-
-    /// Vanilla `Mob.makeSound`, at `LivingEntity.getVoicePitch`.
-    fn make_sound(&self, sound: Sound) {
-        let entity = self.get_entity();
-        let base_pitch = if self.is_baby() { 1.5 } else { 1.0 };
-        let mut rng = self.get_random();
-        let pitch = (rng.random::<f32>() - rng.random::<f32>()).mul_add(0.2, base_pitch);
-        entity.world.load().play_sound_fine(
-            sound,
-            SoundCategory::Neutral,
-            &entity.pos.load(),
-            1.0,
-            pitch,
-        );
-    }
-
     fn set_moistness_level(&self, level: i32) {
         if self.moistness_level.swap(level, Ordering::Relaxed) != level {
             self.get_entity()
@@ -319,9 +274,13 @@ impl Mob for DolphinEntity {
         1 + self.get_random().random_range(0..3)
     }
 
-    /// Vanilla `Mob.playHurtSound` resets the ambient sound timer.
-    fn on_damage(&self, _damage_type: DamageType, _source: Option<&dyn EntityBase>) {
-        self.reset_ambient_sound_time();
+    /// Vanilla `Dolphin.getAmbientSound`.
+    fn ambient_sound(&self) -> Option<Sound> {
+        Some(if self.get_entity().is_in_water() {
+            Sound::EntityDolphinAmbientWater
+        } else {
+            Sound::EntityDolphinAmbient
+        })
     }
 
     /// Vanilla `Dolphin.canAttack`: babies never attack, otherwise `Mob.canAttack`.
@@ -355,7 +314,6 @@ impl Mob for DolphinEntity {
     fn mob_tick(&self, caller: &dyn EntityBase) {
         let living = &self.mob_entity.living_entity;
         let entity = &living.entity;
-        self.tick_ambient_sound();
         // `AgeableMob.aiStep`, which vanilla runs inside `super.tick()`.
         if entity.is_alive() {
             self.ageable_ai_step();

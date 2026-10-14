@@ -152,6 +152,14 @@ const BABY_DIMENSIONS: EntityDimensions =
     EntityDimensions::scalable(0.45, 0.7).with_eye_height(0.69);
 
 impl Mob for MooshroomEntity {
+    /// Vanilla `AbstractCow.getAmbientSound`, with the mooshroom's classic sound set.
+    fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
+        Some(
+            pumpkin_data::cow_sound_variant::CowSoundVariant::default()
+                .ambient_sound(self.get_entity().is_baby()),
+        )
+    }
+
     /// Vanilla `MushroomCow.getDefaultDimensions`.
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
         let entity = self.get_entity();

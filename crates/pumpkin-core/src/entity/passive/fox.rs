@@ -237,6 +237,48 @@ const BABY_DIMENSIONS: EntityDimensions = Entity::type_dimensions(&EntityType::F
     .with_eye_height(0.343_75);
 
 impl Mob for FoxEntity {
+    /// Vanilla `Fox.getAmbientSound`: a fox alone at night sometimes screeches.
+    fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
+        use rand::RngExt;
+        if self.is_sleeping() {
+            return Some(pumpkin_data::sound::Sound::EntityFoxSleep);
+        }
+        let entity = self.get_entity();
+        let world = entity.world.load();
+        if !world.is_bright_outside() && self.get_random().random::<f32>() < 0.1 {
+            let area = entity.bounding_box.load().expand(16.0, 16.0, 16.0);
+            if world
+                .get_players_at_box(&area)
+                .iter()
+                .all(|player| player.is_spectator())
+            {
+                return Some(pumpkin_data::sound::Sound::EntityFoxScreech);
+            }
+        }
+        Some(pumpkin_data::sound::Sound::EntityFoxAmbient)
+    }
+
+    /// Vanilla `Fox.playAmbientSound`: the screech is played at volume 2.
+    fn play_ambient_sound(&self) {
+        let Some(sound) = self.ambient_sound() else {
+            return;
+        };
+        if sound != pumpkin_data::sound::Sound::EntityFoxScreech {
+            self.make_sound(sound);
+            return;
+        }
+        let entity = self.get_entity();
+        if !entity.is_silent() {
+            entity.world.load().play_sound_fine(
+                sound,
+                self.sound_source(),
+                &entity.pos.load(),
+                2.0,
+                self.voice_pitch(),
+            );
+        }
+    }
+
     /// Vanilla `Fox.getDefaultDimensions`.
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
         let entity = self.get_entity();

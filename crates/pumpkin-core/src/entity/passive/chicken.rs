@@ -153,6 +153,13 @@ const BABY_DIMENSIONS: EntityDimensions =
     EntityDimensions::scalable(0.3, 0.4).with_eye_height(0.281_25);
 
 impl Mob for ChickenEntity {
+    /// Vanilla `Chicken.getAmbientSound`.
+    fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
+        let sounds = ChickenSoundVariant::from_id(self.sound_variant.load(Ordering::Relaxed))
+            .unwrap_or_default();
+        Some(sounds.ambient_sound(self.get_entity().is_baby()))
+    }
+
     /// Vanilla `Chicken.getDefaultDimensions`.
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
         let entity = self.get_entity();

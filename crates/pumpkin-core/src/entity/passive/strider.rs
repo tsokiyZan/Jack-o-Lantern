@@ -111,6 +111,17 @@ const BABY_DIMENSIONS: EntityDimensions =
     EntityDimensions::scalable(0.45, 0.85).with_eye_height(0.4375);
 
 impl Mob for StriderEntity {
+    /// Vanilla `Strider.getAmbientSound`: quiet while panicking or tempted.
+    fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
+        let goals = self
+            .get_mob_entity()
+            .goals_selector
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        (!goals.is_running::<EscapeDangerGoal>() && !goals.is_running::<TemptGoal>())
+            .then_some(pumpkin_data::sound::Sound::EntityStriderAmbient)
+    }
+
     /// Vanilla `Strider.getDefaultDimensions`.
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
         let entity = self.get_entity();

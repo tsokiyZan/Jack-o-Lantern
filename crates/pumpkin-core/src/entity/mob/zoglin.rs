@@ -136,6 +136,21 @@ impl ZoglinEntity {
 }
 
 impl Mob for ZoglinEntity {
+    /// Vanilla `Zoglin.getAmbientSound`: angry while it has an attack target.
+    fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
+        let has_target = self
+            .get_mob_entity()
+            .target
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .is_some();
+        Some(if has_target {
+            pumpkin_data::sound::Sound::EntityZoglinAngry
+        } else {
+            pumpkin_data::sound::Sound::EntityZoglinAmbient
+        })
+    }
+
     /// Vanilla `Zoglin.getDefaultDimensions`.
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
         let entity = self.get_entity();

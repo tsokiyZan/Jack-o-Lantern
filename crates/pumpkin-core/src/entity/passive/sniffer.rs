@@ -337,6 +337,15 @@ const DIGGING_DIMENSIONS: EntityDimensions = EntityDimensions::scalable(
 .with_eye_height(0.81);
 
 impl Mob for SnifferEntity {
+    /// Vanilla `Sniffer.getAmbientSound`.
+    fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
+        (!matches!(
+            self.get_state(),
+            SnifferState::Digging | SnifferState::Searching
+        ))
+        .then_some(pumpkin_data::sound::Sound::EntitySnifferIdle)
+    }
+
     /// Vanilla `Sniffer.getDefaultDimensions`: lower while digging.
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
         if self.get_state() == SnifferState::Digging {

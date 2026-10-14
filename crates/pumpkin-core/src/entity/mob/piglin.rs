@@ -9,7 +9,7 @@ use pumpkin_data::data_component_impl::EquipmentSlot;
 use pumpkin_data::entity::{EntityPose, EntityType};
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
-use pumpkin_data::sound::{Sound, SoundCategory};
+use pumpkin_data::sound::Sound;
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_data::tracked_data;
 use pumpkin_nbt::compound::NbtCompound;
@@ -36,14 +36,12 @@ pub struct PiglinEntity {
     pub is_charging_crossbow: AtomicBool,
     pub is_dancing: AtomicBool,
     pub inventory: Mutex<Vec<ItemStack>>,
-    pub ambient_sound_time: AtomicI32,
 }
 
 impl PiglinEntity {
     pub const CONVERSION_TIME: i32 = 300;
     pub const INVENTORY_SIZE: usize = 8;
     pub const XP_REWARD: u32 = 5;
-    pub const AMBIENT_SOUND_INTERVAL: i32 = 80;
     /// `CrossbowItem.getDefaultProjectileRange`.
     const CROSSBOW_PROJECTILE_RANGE: i32 = 8;
 
@@ -64,7 +62,6 @@ impl PiglinEntity {
             is_charging_crossbow: AtomicBool::new(false),
             is_dancing: AtomicBool::new(false),
             inventory: Mutex::new(Vec::new()),
-            ambient_sound_time: AtomicI32::new(0),
         };
         let mob_arc = Arc::new(piglin);
         mob_arc.mob_entity.set_can_pick_up_loot(true);
@@ -260,40 +257,6 @@ impl PiglinEntity {
             && self.mob_entity.with_brain(self, |tick| {
                 <Self as Mob>::wants_to_pick_up(self, tick.brain, &stack)
             })
-    }
-    pub fn make_sound(&self, sound: Sound) {
-        let entity = &self.mob_entity.living_entity.entity;
-        let base_pitch = if self.is_baby() { 1.5 } else { 1.0 };
-        let pitch = (rand::random::<f32>() - rand::random::<f32>()).mul_add(0.2, base_pitch);
-        entity.world.load().play_sound_fine(
-            sound,
-            SoundCategory::Hostile,
-            &entity.pos.load(),
-            1.0,
-            pitch,
-        );
-    }
-
-    fn tick_ambient_sound(&self) {
-        let living = &self.mob_entity.living_entity;
-        let alive = living.entity.is_alive() && living.health.load() > 0.0;
-        if alive
-            && rand::random_range(0..1000) < self.ambient_sound_time.fetch_add(1, Ordering::Relaxed)
-        {
-            self.reset_ambient_sound_time();
-            let sound = self.mob_entity.with_brain(self, |tick| {
-                let converting = self.is_converting(tick.world);
-                piglin_ai::get_sound_for_current_activity(&tick.visibility(), converting)
-            });
-            if let Some(sound) = sound {
-                self.make_sound(sound);
-            }
-        }
-    }
-
-    fn reset_ambient_sound_time(&self) {
-        self.ambient_sound_time
-            .store(-Self::AMBIENT_SOUND_INTERVAL, Ordering::Relaxed);
     }
     fn pick_up_nearby_items(&self) {
         let living = &self.mob_entity.living_entity;
@@ -708,11 +671,23 @@ impl Mob for PiglinEntity {
         piglin_ai::wants_to_pickup(brain, self, stack)
     }
 
-    fn mob_tick(&self, _caller: &dyn EntityBase) {
-        if !crate::entity::ai::brain::behavior::utils::is_alive(self) {
-            return;
+    /// Vanilla `AbstractPiglin.playAmbientSound`: only while idle.
+    fn play_ambient_sound(&self) {
+        if self
+            .mob_entity
+            .with_brain(self, |tick| piglin_ai::is_idle(tick.brain))
+            && let Some(sound) = self.ambient_sound()
+        {
+            self.make_sound(sound);
         }
-        self.tick_ambient_sound();
+    }
+
+    /// Vanilla `Piglin.getAmbientSound`.
+    fn ambient_sound(&self) -> Option<Sound> {
+        self.mob_entity.with_brain(self, |tick| {
+            let converting = self.is_converting(tick.world);
+            piglin_ai::get_sound_for_current_activity(&tick.visibility(), converting)
+        })
     }
 
     fn post_tick(&self) {
@@ -724,7 +699,6 @@ impl Mob for PiglinEntity {
         _damage_type: pumpkin_data::damage::DamageType,
         source: Option<&dyn EntityBase>,
     ) {
-        self.reset_ambient_sound_time();
         if self.mob_entity.living_entity.dead.load(Ordering::Relaxed) {
             self.drop_inventory();
         }

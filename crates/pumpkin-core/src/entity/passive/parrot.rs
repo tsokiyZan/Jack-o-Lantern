@@ -23,6 +23,178 @@ const COOKIE_POISON_DURATION: i32 = 900;
 /// Represents a Parrot, a passive flying mob that can mimic nearby mob sounds.
 ///
 /// Wiki: <https://minecraft.wiki/w/Parrot>
+/// Vanilla `Parrot.MOB_SOUND_MAP`: the sound a parrot makes to imitate each mob.
+const PARROT_IMITATIONS: &[(&EntityType, pumpkin_data::sound::Sound)] = &[
+    (
+        &EntityType::BLAZE,
+        pumpkin_data::sound::Sound::EntityParrotImitateBlaze,
+    ),
+    (
+        &EntityType::BOGGED,
+        pumpkin_data::sound::Sound::EntityParrotImitateBogged,
+    ),
+    (
+        &EntityType::BREEZE,
+        pumpkin_data::sound::Sound::EntityParrotImitateBreeze,
+    ),
+    (
+        &EntityType::CAMEL_HUSK,
+        pumpkin_data::sound::Sound::EntityParrotImitateCamelHusk,
+    ),
+    (
+        &EntityType::CAVE_SPIDER,
+        pumpkin_data::sound::Sound::EntityParrotImitateSpider,
+    ),
+    (
+        &EntityType::CREAKING,
+        pumpkin_data::sound::Sound::EntityParrotImitateCreaking,
+    ),
+    (
+        &EntityType::CREEPER,
+        pumpkin_data::sound::Sound::EntityParrotImitateCreeper,
+    ),
+    (
+        &EntityType::DROWNED,
+        pumpkin_data::sound::Sound::EntityParrotImitateDrowned,
+    ),
+    (
+        &EntityType::ELDER_GUARDIAN,
+        pumpkin_data::sound::Sound::EntityParrotImitateElderGuardian,
+    ),
+    (
+        &EntityType::ENDER_DRAGON,
+        pumpkin_data::sound::Sound::EntityParrotImitateEnderDragon,
+    ),
+    (
+        &EntityType::ENDERMITE,
+        pumpkin_data::sound::Sound::EntityParrotImitateEndermite,
+    ),
+    (
+        &EntityType::EVOKER,
+        pumpkin_data::sound::Sound::EntityParrotImitateEvoker,
+    ),
+    (
+        &EntityType::GHAST,
+        pumpkin_data::sound::Sound::EntityParrotImitateGhast,
+    ),
+    (
+        &EntityType::HAPPY_GHAST,
+        pumpkin_data::sound::Sound::IntentionallyEmpty,
+    ),
+    (
+        &EntityType::GUARDIAN,
+        pumpkin_data::sound::Sound::EntityParrotImitateGuardian,
+    ),
+    (
+        &EntityType::HOGLIN,
+        pumpkin_data::sound::Sound::EntityParrotImitateHoglin,
+    ),
+    (
+        &EntityType::HUSK,
+        pumpkin_data::sound::Sound::EntityParrotImitateHusk,
+    ),
+    (
+        &EntityType::ILLUSIONER,
+        pumpkin_data::sound::Sound::EntityParrotImitateIllusioner,
+    ),
+    (
+        &EntityType::MAGMA_CUBE,
+        pumpkin_data::sound::Sound::EntityParrotImitateMagmaCube,
+    ),
+    (
+        &EntityType::PARCHED,
+        pumpkin_data::sound::Sound::EntityParrotImitateParched,
+    ),
+    (
+        &EntityType::PHANTOM,
+        pumpkin_data::sound::Sound::EntityParrotImitatePhantom,
+    ),
+    (
+        &EntityType::PIGLIN,
+        pumpkin_data::sound::Sound::EntityParrotImitatePiglin,
+    ),
+    (
+        &EntityType::PIGLIN_BRUTE,
+        pumpkin_data::sound::Sound::EntityParrotImitatePiglinBrute,
+    ),
+    (
+        &EntityType::PILLAGER,
+        pumpkin_data::sound::Sound::EntityParrotImitatePillager,
+    ),
+    (
+        &EntityType::RAVAGER,
+        pumpkin_data::sound::Sound::EntityParrotImitateRavager,
+    ),
+    (
+        &EntityType::SHULKER,
+        pumpkin_data::sound::Sound::EntityParrotImitateShulker,
+    ),
+    (
+        &EntityType::SILVERFISH,
+        pumpkin_data::sound::Sound::EntityParrotImitateSilverfish,
+    ),
+    (
+        &EntityType::SKELETON,
+        pumpkin_data::sound::Sound::EntityParrotImitateSkeleton,
+    ),
+    (
+        &EntityType::SLIME,
+        pumpkin_data::sound::Sound::EntityParrotImitateSlime,
+    ),
+    (
+        &EntityType::SPIDER,
+        pumpkin_data::sound::Sound::EntityParrotImitateSpider,
+    ),
+    (
+        &EntityType::STRAY,
+        pumpkin_data::sound::Sound::EntityParrotImitateStray,
+    ),
+    (
+        &EntityType::VEX,
+        pumpkin_data::sound::Sound::EntityParrotImitateVex,
+    ),
+    (
+        &EntityType::VINDICATOR,
+        pumpkin_data::sound::Sound::EntityParrotImitateVindicator,
+    ),
+    (
+        &EntityType::WARDEN,
+        pumpkin_data::sound::Sound::EntityParrotImitateWarden,
+    ),
+    (
+        &EntityType::WITCH,
+        pumpkin_data::sound::Sound::EntityParrotImitateWitch,
+    ),
+    (
+        &EntityType::WITHER,
+        pumpkin_data::sound::Sound::EntityParrotImitateWither,
+    ),
+    (
+        &EntityType::WITHER_SKELETON,
+        pumpkin_data::sound::Sound::EntityParrotImitateWitherSkeleton,
+    ),
+    (
+        &EntityType::ZOGLIN,
+        pumpkin_data::sound::Sound::EntityParrotImitateZoglin,
+    ),
+    (
+        &EntityType::ZOMBIE,
+        pumpkin_data::sound::Sound::EntityParrotImitateZombie,
+    ),
+    (
+        &EntityType::ZOMBIE_HORSE,
+        pumpkin_data::sound::Sound::EntityParrotImitateZombieHorse,
+    ),
+    (
+        &EntityType::ZOMBIE_NAUTILUS,
+        pumpkin_data::sound::Sound::EntityParrotImitateZombieNautilus,
+    ),
+    (
+        &EntityType::ZOMBIE_VILLAGER,
+        pumpkin_data::sound::Sound::EntityParrotImitateZombieVillager,
+    ),
+];
+
 pub struct ParrotEntity {
     pub mob_entity: MobEntity,
 }
@@ -88,6 +260,20 @@ impl ParrotEntity {
 }
 
 impl Mob for ParrotEntity {
+    /// Vanilla `Parrot.getAmbient`: one time in a thousand, outside peaceful, a parrot
+    /// imitates a mob.
+    fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
+        use rand::RngExt;
+        let entity = self.get_entity();
+        let mut random = self.get_random();
+        if entity.world.load().level_info.load().difficulty != pumpkin_util::Difficulty::Peaceful
+            && random.random_range(0..1000) == 0
+        {
+            return Some(PARROT_IMITATIONS[random.random_range(0..PARROT_IMITATIONS.len())].1);
+        }
+        Some(pumpkin_data::sound::Sound::EntityParrotAmbient)
+    }
+
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
     }

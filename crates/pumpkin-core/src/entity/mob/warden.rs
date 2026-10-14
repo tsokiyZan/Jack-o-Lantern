@@ -168,6 +168,14 @@ impl WardenEntity {
 }
 
 impl Mob for WardenEntity {
+    /// Vanilla `Warden.getAmbientSound`. Pumpkin's warden has no anger yet, so this is
+    /// `AngerLevel.CALM`'s sound.
+    fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
+        let pose = self.get_mob_entity().living_entity.entity.pose.load();
+        (pose != EntityPose::Roaring && !Self::is_digging_or_emerging(pose))
+            .then_some(pumpkin_data::sound::Sound::EntityWardenAmbient)
+    }
+
     /// Vanilla `Warden.getDefaultDimensions`: a fixed 1-block height while digging or
     /// emerging.
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {

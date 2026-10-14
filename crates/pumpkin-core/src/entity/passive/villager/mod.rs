@@ -1879,6 +1879,17 @@ const BABY_DIMENSIONS: EntityDimensions =
     EntityDimensions::scalable(0.49, 0.98).with_eye_height(0.63);
 
 impl Mob for VillagerEntity {
+    /// Vanilla `Villager.getAmbientSound`.
+    fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
+        if self.get_entity().pose.load() == EntityPose::Sleeping {
+            None
+        } else if self.is_trading.load(Ordering::Relaxed) {
+            Some(pumpkin_data::sound::Sound::EntityVillagerTrade)
+        } else {
+            Some(pumpkin_data::sound::Sound::EntityVillagerAmbient)
+        }
+    }
+
     /// Vanilla `Villager.getDefaultDimensions`.
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
         let entity = self.get_entity();

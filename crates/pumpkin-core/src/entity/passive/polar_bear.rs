@@ -143,6 +143,15 @@ const BABY_DIMENSIONS: EntityDimensions =
     EntityDimensions::scalable(0.7, 0.7).with_eye_height(0.343_75);
 
 impl Mob for PolarBearEntity {
+    /// Vanilla `PolarBear.getAmbientSound`.
+    fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
+        Some(if self.get_entity().is_baby() {
+            pumpkin_data::sound::Sound::EntityPolarBearAmbientBaby
+        } else {
+            pumpkin_data::sound::Sound::EntityPolarBearAmbient
+        })
+    }
+
     /// Vanilla `PolarBear.getDefaultDimensions`.
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
         let entity = self.get_entity();

@@ -184,6 +184,30 @@ const BABY_DIMENSIONS: EntityDimensions =
     EntityDimensions::scalable(0.3, 0.425).with_eye_height(0.343_75);
 
 impl Mob for WolfEntity {
+    /// Vanilla `Wolf.getAmbientSound`.
+    fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
+        use rand::RngExt;
+        let sounds = WolfSoundVariant::from_id(self.sound_variant.load(Ordering::Relaxed))
+            .unwrap_or_default();
+        let baby = self.get_entity().is_baby();
+        Some(
+            if self
+                .as_neutral()
+                .is_some_and(crate::entity::mob::neutral::NeutralMob::is_angry)
+            {
+                sounds.growl_sound(baby)
+            } else if self.get_random().random_range(0..3) == 0 {
+                if self.is_tame() && self.get_mob_entity().living_entity.health.load() < 20.0 {
+                    sounds.whine_sound(baby)
+                } else {
+                    sounds.pant_sound(baby)
+                }
+            } else {
+                sounds.ambient_sound(baby)
+            },
+        )
+    }
+
     /// Vanilla `Wolf.getDefaultDimensions`.
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
         let entity = self.get_entity();

@@ -97,6 +97,23 @@ impl AllayEntity {
 }
 
 impl Mob for AllayEntity {
+    /// Vanilla `Allay.getAmbientSound`.
+    fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
+        let holding = !self
+            .get_mob_entity()
+            .living_entity
+            .entity_equipment
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get(&pumpkin_data::data_component_impl::EquipmentSlot::MAIN_HAND)
+            .is_empty();
+        Some(if holding {
+            pumpkin_data::sound::Sound::EntityAllayAmbientWithItem
+        } else {
+            pumpkin_data::sound::Sound::EntityAllayAmbientWithoutItem
+        })
+    }
+
     fn mob_write_nbt(&self, nbt: &mut NbtCompound) {
         nbt.put_bool("CanDuplicate", self.can_duplicate());
         nbt.put_int(

@@ -305,6 +305,11 @@ const BABY_DIMENSIONS: EntityDimensions = Entity::type_dimensions(&EntityType::A
     .with_eye_height(0.218_75);
 
 impl Mob for ArmadilloEntity {
+    /// Vanilla `Armadillo.getAmbientSound`.
+    fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
+        (!self.is_scared()).then_some(pumpkin_data::sound::Sound::EntityArmadilloAmbient)
+    }
+
     /// Vanilla `Armadillo.getDefaultDimensions`.
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
         let entity = self.get_entity();

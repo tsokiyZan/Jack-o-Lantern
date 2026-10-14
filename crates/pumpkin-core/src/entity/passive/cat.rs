@@ -296,6 +296,23 @@ const BABY_DIMENSIONS: EntityDimensions =
     EntityDimensions::scalable(0.3, 0.35).with_eye_height(0.343_75);
 
 impl Mob for CatEntity {
+    /// Vanilla `Cat.getAmbientSound`.
+    fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
+        use rand::RngExt;
+        let sounds = CatSoundVariant::from_id(self.sound_variant.load(Ordering::Relaxed))
+            .unwrap_or_default();
+        let baby = self.get_entity().is_baby();
+        Some(if !self.is_tame() {
+            sounds.stray_ambient_sound()
+        } else if self.get_mob_entity().is_in_love() {
+            sounds.purr_sound(baby)
+        } else if self.get_random().random_range(0..4) == 0 {
+            sounds.purreow_sound(baby)
+        } else {
+            sounds.ambient_sound(baby)
+        })
+    }
+
     /// Vanilla `Cat.getDefaultDimensions`.
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
         let entity = self.get_entity();

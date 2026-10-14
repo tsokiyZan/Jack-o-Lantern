@@ -2062,13 +2062,7 @@ impl LivingEntity {
             self.update_death_stats(&*dyn_self, killer);
 
             // Plays the death sound
-            world.play_sound_fine(
-                self.death_sound(&*dyn_self),
-                SoundCategory::Players,
-                &self.entity.pos.load(),
-                1.0,
-                self.get_pitch(),
-            );
+            self.make_sound(&*dyn_self, self.death_sound(&*dyn_self));
             world.send_entity_status(&self.entity, EntityStatus::Death, Some(ActorEventID::Death));
             let looting_level;
             let tool = if let Some(cause_ent) = cause {
@@ -2691,6 +2685,30 @@ impl LivingEntity {
         Self::death_sound_for_entity(self.entity.entity_type)
     }
 
+    /// Vanilla `LivingEntity.makeSound`. Mobs use their own volume, pitch and sound
+    /// source; other living entities play at full volume.
+    fn make_sound(&self, entity: &dyn EntityBase, sound: Sound) {
+        if let Some(mob) = entity.get_mob() {
+            mob.make_sound(sound);
+            return;
+        }
+        if self.entity.is_silent() {
+            return;
+        }
+        let category = if self.is_player() {
+            SoundCategory::Players
+        } else {
+            SoundCategory::Neutral
+        };
+        self.entity.world.load().play_sound_fine(
+            sound,
+            category,
+            &self.entity.pos.load(),
+            1.0,
+            self.get_pitch(),
+        );
+    }
+
     fn hurt_sound(&self, entity: &dyn EntityBase) -> Sound {
         if let Some(sound_source) = entity.get_mob().and_then(|x| x.as_custom_sound())
             && let Some(audio) = sound_source.hurt_sound()
@@ -3240,13 +3258,11 @@ impl LivingEntity {
         );
 
         if play_sound {
-            world.play_sound_fine(
-                self.hurt_sound(caller),
-                SoundCategory::Players,
-                &self.entity.pos.load(),
-                1.0,
-                self.get_pitch(),
-            );
+            // Vanilla `Mob.playHurtSound` resets the ambient sound timer.
+            if let Some(mob) = caller.get_mob() {
+                mob.reset_ambient_sound_time();
+            }
+            self.make_sound(caller, self.hurt_sound(caller));
 
             if let Some(source) = source {
                 let source_pos = source.get_entity().pos.load();

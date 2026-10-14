@@ -261,6 +261,18 @@ const BABY_DIMENSIONS: EntityDimensions = Entity::type_dimensions(&EntityType::P
     .with_eye_height(0.281_25);
 
 impl Mob for PandaEntity {
+    /// Vanilla `Panda.getAmbientSound`. Pumpkin has no `Mob.isAggressive` flag yet,
+    /// so the aggressive sound is never chosen.
+    fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
+        let worried = self.get_main_gene() == PandaGene::Worried
+            && self.get_hidden_gene() == PandaGene::Worried;
+        Some(if worried {
+            pumpkin_data::sound::Sound::EntityPandaWorriedAmbient
+        } else {
+            pumpkin_data::sound::Sound::EntityPandaAmbient
+        })
+    }
+
     /// Vanilla `Panda.getDefaultDimensions`.
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
         let entity = self.get_entity();

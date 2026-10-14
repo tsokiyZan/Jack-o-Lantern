@@ -388,6 +388,11 @@ impl CreakingEntity {
 }
 
 impl Mob for CreakingEntity {
+    /// Vanilla `Creaking.getAmbientSound`.
+    fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
+        (!self.is_active()).then_some(pumpkin_data::sound::Sound::EntityCreakingAmbient)
+    }
+
     fn mob_write_nbt(&self, nbt: &mut NbtCompound) {
         if let Some(pos) = self.get_home_pos() {
             let mut sub = NbtCompound::new();

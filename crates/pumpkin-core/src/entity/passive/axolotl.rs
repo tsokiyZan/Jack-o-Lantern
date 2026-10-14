@@ -206,6 +206,24 @@ const BABY_DIMENSIONS: EntityDimensions =
     EntityDimensions::scalable(0.375, 0.21).with_eye_height(0.093_75);
 
 impl Mob for AxolotlEntity {
+    /// Vanilla `Axolotl.getAmbientSound`.
+    fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
+        Some(if self.get_entity().is_in_water() {
+            pumpkin_data::sound::Sound::EntityAxolotlIdleWater
+        } else {
+            pumpkin_data::sound::Sound::EntityAxolotlIdleAir
+        })
+    }
+
+    /// Vanilla `Axolotl.playAmbientSound`: silent while playing dead.
+    fn play_ambient_sound(&self) {
+        if !self.is_playing_dead()
+            && let Some(sound) = self.ambient_sound()
+        {
+            self.make_sound(sound);
+        }
+    }
+
     /// Vanilla `Axolotl.getDefaultDimensions`.
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
         let entity = self.get_entity();

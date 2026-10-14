@@ -139,6 +139,39 @@ const BABY_DIMENSIONS: EntityDimensions = Entity::type_dimensions(&EntityType::H
     .with_eye_height(0.468_75);
 
 impl Mob for HappyGhastEntity {
+    /// Vanilla `HappyGhast.getAmbientSound`.
+    fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
+        Some(if self.get_entity().is_baby() {
+            pumpkin_data::sound::Sound::EntityGhastlingAmbient
+        } else {
+            pumpkin_data::sound::Sound::EntityHappyGhastAmbient
+        })
+    }
+
+    /// Vanilla `HappyGhast.getAmbientSoundInterval`: six times as long while ridden.
+    fn ambient_sound_interval(&self) -> i32 {
+        let interval = super::super::mob::sounds::DEFAULT_AMBIENT_SOUND_INTERVAL;
+        if self.get_entity().has_passengers() {
+            interval * 6
+        } else {
+            interval
+        }
+    }
+
+    /// Vanilla `HappyGhast.getSoundVolume`.
+    fn sound_volume(&self) -> f32 {
+        if self.get_entity().is_baby() {
+            1.0
+        } else {
+            4.0
+        }
+    }
+
+    /// Vanilla `HappyGhast.getVoicePitch`.
+    fn voice_pitch(&self) -> f32 {
+        1.0
+    }
+
     /// Vanilla `HappyGhast.getDefaultDimensions`.
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
         let entity = self.get_entity();

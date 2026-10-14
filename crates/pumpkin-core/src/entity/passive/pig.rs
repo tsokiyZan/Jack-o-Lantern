@@ -148,6 +148,13 @@ const BABY_DIMENSIONS: EntityDimensions =
     EntityDimensions::scalable(0.45, 0.45).with_eye_height(0.406_25);
 
 impl Mob for PigEntity {
+    /// Vanilla `Pig.getAmbientSound`.
+    fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
+        let sounds = PigSoundVariant::from_id(self.sound_variant.load(Ordering::Relaxed))
+            .unwrap_or_default();
+        Some(sounds.ambient_sound(self.get_entity().is_baby()))
+    }
+
     /// Vanilla `Pig.getDefaultDimensions`.
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
         let entity = self.get_entity();
