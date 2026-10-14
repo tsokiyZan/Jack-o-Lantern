@@ -17,6 +17,24 @@ const RANDOM_SPAWN_BONUS_ID: &str = "minecraft:random_spawn_bonus";
 pub enum SpawnGroupData {
     /// The effect the first spider of a group rolled on hard difficulty.
     SpiderEffects(Option<&'static StatusEffect>),
+    /// Vanilla `AgeableMob.AgeableMobGroupData`.
+    Ageable {
+        group_size: i32,
+        should_spawn_baby: bool,
+        baby_spawn_chance: f32,
+    },
+}
+
+impl SpawnGroupData {
+    /// Vanilla `AgeableMobGroupData(babySpawnChance)`.
+    #[must_use]
+    pub const fn ageable(baby_spawn_chance: f32) -> Self {
+        Self::Ageable {
+            group_size: 0,
+            should_spawn_baby: true,
+            baby_spawn_chance,
+        }
+    }
 }
 
 impl MobEntity {

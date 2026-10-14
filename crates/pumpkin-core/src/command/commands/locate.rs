@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use pumpkin_data::biome::Biome;
-use pumpkin_data::structures::{StructureKeys, StructurePlacementType, StructureSet};
+use pumpkin_data::structures::StructureKeys;
 use pumpkin_data::tag::{self, RegistryKey};
 use pumpkin_data::translation;
 use pumpkin_util::PermissionLvl;
@@ -11,9 +11,6 @@ use pumpkin_util::text::click::ClickEvent;
 use pumpkin_util::text::hover::HoverEvent;
 use pumpkin_util::text::{TextComponent, color::NamedColor};
 use pumpkin_world::generation::generator::biome_finder::find_closest_biome_3d;
-use pumpkin_world::generation::generator::structure_finder::{
-    find_nearest_structure, find_nearest_structure_start,
-};
 use rustc_hash::FxHashSet;
 
 use crate::command::argument_builder::{ArgumentBuilder, argument, command, literal};
@@ -131,28 +128,11 @@ fn wanted_structures(searched: &ResourceOrTag) -> Option<Vec<StructureKeys>> {
     }
 }
 
-/// Index into [`StructureSet::ALL`] of the set a structure belongs to, whose
-/// placement decides where it may generate. Vanilla keeps this as a prepared
-/// reverse map (`ChunkGeneratorStructureState.placementsForStructure`); there
-/// are ~21 sets, so a scan is cheap enough for a command. An index rather than
-/// a reference because the sets are consts, whose addresses are not stable.
-fn structure_set_containing(key: StructureKeys) -> Option<usize> {
-    StructureSet::ALL
-        .iter()
-        .position(|set| set.structures.iter().any(|entry| entry.structure == key))
-}
-
-/// Unfloored horizontal distance, for picking the nearest of several hits
-/// without two candidates collapsing onto the same integer.
-fn horizontal_distance_exact(origin: &BlockPos, target: &BlockPos) -> f64 {
-    let dx = f64::from(target.0.x - origin.0.x);
-    let dz = f64::from(target.0.z - origin.0.z);
-    dx.hypot(dz)
-}
-
 /// Vanilla reports the horizontal block distance for structures and POIs.
 fn horizontal_distance(origin: &BlockPos, target: &BlockPos) -> i32 {
-    horizontal_distance_exact(origin, target).floor().max(0.0) as i32
+    crate::world::structure_locator::horizontal_distance_exact(origin, target)
+        .floor()
+        .max(0.0) as i32
 }
 
 /// ... and the full 3D block distance for biomes.
@@ -197,70 +177,12 @@ impl CommandExecutor for LocateStructureExecutor {
                 .create_without_context(TextComponent::text(searched.printable())));
         };
 
-        // A structure is located through the placement of the set that holds
-        // it, but only that structure counts as a hit: `minecraft:fortress`
-        // must not report a bastion just because both share
-        // `minecraft:nether_complexes`. Mirrors the `placementScans` map in
-        // vanilla's `ChunkGenerator.findNearestMapStructure`.
-        let mut scans: Vec<(usize, Vec<StructureKeys>)> = Vec::new();
-        for key in wanted {
-            let Some(set_index) = structure_set_containing(key) else {
-                continue;
-            };
-            if let Some((_, keys)) = scans.iter_mut().find(|(index, _)| *index == set_index) {
-                keys.push(key);
-            } else {
-                scans.push((set_index, vec![key]));
-            }
-        }
-
         let origin = BlockPos::floored_v(context.source.position);
-
-        let world = context.source.world();
-        let seed = world.level.seed.0;
-        let world_gen = world.level.world_gen.load_full();
-
-        let mut found: Option<(BlockPos, StructureKeys)> = None;
-        for (set_index, keys) in scans {
-            let set = &StructureSet::ALL[set_index];
-            let nearest = match &set.placement.placement_type {
-                // Strongholds come out of the pre-computed ring cache, which
-                // already holds positions they really occupy. A concentric-ring
-                // set holds exactly one structure, so the hit is unambiguous.
-                StructurePlacementType::ConcentricRings(_) => world_gen
-                    .global_structure_cache()
-                    .and_then(|global_cache| {
-                        find_nearest_structure(
-                            origin,
-                            &[&set.placement],
-                            STRUCTURE_SEARCH_RADIUS,
-                            seed as i64,
-                            global_cache,
-                        )
-                    })
-                    .map(|pos| (pos, keys[0])),
-                // Everything else is spread over a grid whose candidate chunks
-                // are only *possible* sites: the biome at a candidate can still
-                // reject every structure in the set. Resolving the start makes
-                // sure the reported position actually holds one, and says which.
-                StructurePlacementType::RandomSpread(_) => find_nearest_structure_start(
-                    origin,
-                    set,
-                    &keys,
-                    STRUCTURE_SEARCH_RADIUS,
-                    &world_gen,
-                ),
-            };
-
-            if let Some((pos, key)) = nearest
-                && found.as_ref().is_none_or(|(best, _)| {
-                    horizontal_distance_exact(&origin, &pos)
-                        < horizontal_distance_exact(&origin, best)
-                })
-            {
-                found = Some((pos, key));
-            }
-        }
+        let found = context.source.world().find_nearest_map_structure(
+            &wanted,
+            origin,
+            STRUCTURE_SEARCH_RADIUS,
+        );
 
         let Some((target, key)) = found else {
             return Err(STRUCTURE_NOT_FOUND_ERROR_TYPE
@@ -438,6 +360,8 @@ pub fn register(dispatcher: &mut CommandDispatcher, registry: &PermissionRegistr
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::world::structure_locator::structure_set_containing;
+    use pumpkin_data::structures::StructureSet;
     use pumpkin_util::identifier::Identifier;
 
     fn resource(path: &'static str) -> ResourceOrTag {

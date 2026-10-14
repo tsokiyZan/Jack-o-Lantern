@@ -3486,6 +3486,21 @@ impl Entity {
             .is_some()
     }
 
+    /// Vanilla `Entity.getFirstPassenger`.
+    pub fn get_first_passenger(&self) -> Option<Arc<dyn EntityBase>> {
+        self.passengers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .first()
+            .cloned()
+    }
+
+    /// Vanilla `Entity.hasMovedHorizontallyRecently`, from the movement measured at
+    /// the start of this entity's last tick (vanilla's `lastKnownSpeed`).
+    pub fn has_moved_horizontally_recently(&self) -> bool {
+        self.movement.load().horizontal_length() > f64::from(1.0E-5f32)
+    }
+
     pub fn get_vehicle(&self) -> Option<Arc<dyn EntityBase>> {
         self.vehicle
             .lock()

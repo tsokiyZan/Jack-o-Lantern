@@ -2,9 +2,12 @@ use pumpkin_data::tracked_data;
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering::Relaxed};
 
 use crate::entity::mob::Mob;
+use crate::entity::mob::spawn::SpawnGroupData;
 
 pub const BABY_START_AGE: i32 = -24000;
 pub const FORCED_AGE_PARTICLE_TICKS: i32 = 40;
+/// The baby chance of vanilla's `AgeableMobGroupData(boolean)`.
+const DEFAULT_BABY_SPAWN_CHANCE: f32 = 0.05;
 
 pub struct AgeableData {
     pub forced_age: AtomicI32,
@@ -117,6 +120,29 @@ pub trait AgeableMob: Mob {
                 .store(nbt.get_int("ForcedAge").unwrap_or(0), Relaxed);
             self.set_age_locked(nbt.get_bool("AgeLocked").unwrap_or(false));
         }
+    }
+
+    /// Vanilla `AgeableMob.finalizeSpawn`: after the first mob of a group, each may
+    /// spawn as a baby.
+    fn finalize_ageable_spawn(&self, group_data: Option<SpawnGroupData>) -> SpawnGroupData {
+        let mut group_data = match group_data {
+            Some(data @ SpawnGroupData::Ageable { .. }) => data,
+            // Vanilla's `AgeableMobGroupData(true)`.
+            _ => SpawnGroupData::ageable(DEFAULT_BABY_SPAWN_CHANCE),
+        };
+        if let SpawnGroupData::Ageable {
+            group_size,
+            should_spawn_baby,
+            baby_spawn_chance,
+        } = &mut group_data
+        {
+            if *should_spawn_baby && *group_size > 0 && rand::random::<f32>() <= *baby_spawn_chance
+            {
+                self.set_age(self.get_baby_start_age());
+            }
+            *group_size += 1;
+        }
+        group_data
     }
 
     fn can_be_a_baby(&self) -> bool {

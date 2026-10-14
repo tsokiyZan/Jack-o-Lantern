@@ -4,7 +4,6 @@ use crate::entity::mob::Mob;
 use pumpkin_data::attributes::Attributes;
 use pumpkin_util::math::vector3::Vector3;
 use pumpkin_util::math::wrap_degrees;
-use std::sync::atomic::Ordering;
 
 pub struct SmoothSwimmingMoveControl {
     pub wanted_x: f64,
@@ -42,6 +41,18 @@ impl SmoothSwimmingMoveControl {
         }
     }
 
+    /// Vanilla `MoveControl.rotlerp`, which keeps the result within 0 to 360.
+    fn rotlerp(a: f32, b: f32, max: f32) -> f32 {
+        let result = a + wrap_degrees(b - a).clamp(-max, max);
+        if result < 0.0 {
+            result + 360.0
+        } else if result > 360.0 {
+            result - 360.0
+        } else {
+            result
+        }
+    }
+
     fn get_turning_speed_factor(left_to_turn: f32) -> f32 {
         1.0 - ((left_to_turn - 10.0) / 50.0).clamp(0.0, 1.0)
     }
@@ -50,77 +61,81 @@ impl SmoothSwimmingMoveControl {
 impl Control for SmoothSwimmingMoveControl {}
 
 impl MoveControlTrait for SmoothSwimmingMoveControl {
+    /// Vanilla `SmoothSwimmingMoveControl.tick`. Pumpkin has no separate mob speed:
+    /// in water the input carries vanilla's `zza`/`yya`, whose length is the speed
+    /// before `inWaterSpeedModifier`; out of water its forward part is the speed.
     fn tick(&mut self, mob: &dyn Mob) {
         let mob_entity = mob.get_mob_entity();
         let living_entity = &mob_entity.living_entity;
         let entity = &living_entity.entity;
 
-        if self.apply_gravity && entity.touching_water.load(Ordering::Relaxed) {
+        if self.apply_gravity && entity.is_in_water() {
+            // A plain store: the tracker syncs motion, as vanilla's setDeltaMovement
+            // leaves to it.
             let vel = entity.velocity.load();
-            entity.set_velocity(Vector3::new(vel.x, vel.y + 0.005, vel.z));
+            entity
+                .velocity
+                .store(Vector3::new(vel.x, vel.y + 0.005, vel.z));
         }
 
-        let is_idle = mob_entity
+        let navigation_done = mob_entity
             .navigator
-            .try_lock()
-            .is_ok_and(|navigator| navigator.is_idle());
-
-        if self.operation == Operation::MoveTo && !is_idle {
-            let pos = entity.pos.load();
-            let xd = self.wanted_x - pos.x;
-            let yd = self.wanted_y - pos.y;
-            let zd = self.wanted_z - pos.z;
-            let dd = xd * xd + yd * yd + zd * zd;
-
-            if dd < 2.5000003E-7 {
-                living_entity
-                    .movement_input
-                    .store(Vector3::new(0.0, 0.0, 0.0));
-                return;
-            }
-
-            let y_rot_d = (zd.atan2(xd).to_degrees() as f32) - 90.0;
-            let current_yaw = entity.yaw.load();
-            let new_yaw = self.change_angle(current_yaw, y_rot_d, self.max_turn_y as f32);
-            entity.yaw.store(new_yaw);
-            entity.body_yaw.store(new_yaw);
-            entity.head_yaw.store(new_yaw);
-
-            let movement_speed = living_entity.get_attribute_value(&Attributes::MOVEMENT_SPEED);
-            let speed = (self.speed_modifier * movement_speed) as f32;
-
-            if entity.touching_water.load(Ordering::Relaxed) {
-                let water_speed = speed * self.in_water_speed_modifier;
-                let sqrt = xd.hypot(zd);
-                if yd.abs() > 1.0E-5 || sqrt > 1.0E-5 {
-                    let mut x_rot_d = -((yd.atan2(sqrt).to_degrees()) as f32);
-                    x_rot_d = wrap_degrees(x_rot_d)
-                        .clamp(-(self.max_turn_x as f32), self.max_turn_x as f32);
-                    entity
-                        .pitch
-                        .store(self.change_angle(entity.pitch.load(), x_rot_d, 5.0));
-                }
-
-                let pitch_rad = entity.pitch.load().to_radians();
-                let cos = pitch_rad.cos();
-                let sin = pitch_rad.sin();
-                living_entity.movement_input.store(Vector3::new(
-                    0.0,
-                    -(sin * water_speed) as f64,
-                    (cos * water_speed) as f64,
-                ));
-            } else {
-                let left_to_turn = wrap_degrees(entity.yaw.load() - y_rot_d).abs();
-                let factor = Self::get_turning_speed_factor(left_to_turn);
-                let land_speed = speed * self.outside_water_speed_modifier * factor;
-                living_entity
-                    .movement_input
-                    .store(Vector3::new(0.0, 0.0, land_speed as f64));
-            }
-        } else {
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .is_done();
+        if self.operation != Operation::MoveTo || navigation_done {
             living_entity
                 .movement_input
                 .store(Vector3::new(0.0, 0.0, 0.0));
+            return;
+        }
+
+        let pos = entity.pos.load();
+        let xd = self.wanted_x - pos.x;
+        let yd = self.wanted_y - pos.y;
+        let zd = self.wanted_z - pos.z;
+        let dd = xd * xd + yd * yd + zd * zd;
+        if dd < f64::from(2.500_000_3E-7f32) {
+            let input = living_entity.movement_input.load();
+            living_entity
+                .movement_input
+                .store(Vector3::new(input.x, input.y, 0.0));
+            return;
+        }
+
+        let y_rot_d = (zd.atan2(xd).to_degrees() as f32) - 90.0;
+        let new_yaw = Self::rotlerp(entity.yaw.load(), y_rot_d, self.max_turn_y as f32);
+        entity.yaw.store(new_yaw);
+        entity.body_yaw.store(new_yaw);
+        entity.head_yaw.store(new_yaw);
+
+        let movement_speed = living_entity.get_attribute_value(&Attributes::MOVEMENT_SPEED);
+        let speed = (self.speed_modifier * movement_speed) as f32;
+
+        if entity.is_in_water() {
+            let sqrt = xd.hypot(zd);
+            if yd.abs() > 1.0E-5 || sqrt.abs() > 1.0E-5 {
+                let x_rot_d = wrap_degrees(-(yd.atan2(sqrt).to_degrees() as f32))
+                    .clamp(-(self.max_turn_x as f32), self.max_turn_x as f32);
+                entity
+                    .pitch
+                    .store(self.change_angle(entity.pitch.load(), x_rot_d, 5.0));
+            }
+
+            let pitch = entity.pitch.load().to_radians();
+            living_entity.movement_input.store(Vector3::new(
+                0.0,
+                f64::from(-pitch.sin() * speed),
+                f64::from(pitch.cos() * speed),
+            ));
+        } else {
+            let left_to_turn = wrap_degrees(entity.yaw.load() - y_rot_d).abs();
+            let factor = Self::get_turning_speed_factor(left_to_turn);
+            living_entity.movement_input.store(Vector3::new(
+                0.0,
+                0.0,
+                f64::from(speed * self.outside_water_speed_modifier * factor),
+            ));
         }
     }
 

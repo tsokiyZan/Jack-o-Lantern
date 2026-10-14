@@ -416,6 +416,13 @@ pub trait PathNavigationTrait: Send + Sync {
     fn is_stable_destination(&self, world: &World, pos: &BlockPos) -> bool {
         world.get_block_state(&pos.down()).is_solid()
     }
+
+    /// The waypoint and speed this tick's navigation wants the mob's move control
+    /// to head for, for navigators that leave the steering to it as vanilla's
+    /// `PathNavigation.tick` does with `moveControl.setWantedPosition`.
+    fn take_wanted_position(&mut self) -> Option<(Vector3<f64>, f64)> {
+        None
+    }
 }
 
 pub struct PathNavigation {
@@ -1715,6 +1722,10 @@ impl PathNavigationTrait for FlyingPathNavigation {
 pub struct WaterBoundPathNavigation {
     pub inner: PathNavigation,
     pub allow_breaching: bool,
+    /// Follow the path like vanilla and leave the steering to the move control,
+    /// instead of turning the mob towards each node here.
+    steered_by_move_control: bool,
+    wanted_position: Option<(Vector3<f64>, f64)>,
 }
 
 impl Default for WaterBoundPathNavigation {
@@ -1731,13 +1742,136 @@ impl WaterBoundPathNavigation {
                 allow_breaching,
             ))),
             allow_breaching,
+            steered_by_move_control: false,
+            wanted_position: None,
         }
     }
+
+    /// Hands each waypoint to the mob's move control, like vanilla.
+    #[must_use]
+    pub const fn steered_by_move_control(mut self) -> Self {
+        self.steered_by_move_control = true;
+        self
+    }
+
+    /// Vanilla `PathNavigation.tick` past the path recomputation, with
+    /// `WaterBoundPathNavigation`'s overrides.
+    fn follow_for_move_control(&mut self, entity: &LivingEntity) {
+        self.wanted_position = None;
+        if self.is_done() {
+            self.inner.finish_navigation(entity);
+            return;
+        }
+        let pos = entity.entity.pos.load();
+        // `WaterBoundPathNavigation.getTempMobPos`.
+        let temp_mob_pos =
+            Vector3::new(pos.x, pos.y + f64::from(self.inner.mob_height) * 0.5, pos.z);
+        let world = entity.entity.world.load();
+        let Some(path) = self.inner.path.as_mut() else {
+            return;
+        };
+        let width = self.inner.mob_width;
+        // `WaterBoundPathNavigation.canUpdatePath`.
+        if self.allow_breaching
+            || entity.entity.is_in_water()
+            || entity.entity.touching_lava.load(Ordering::Relaxed)
+        {
+            // `PathNavigation.followThePath`.
+            let max_distance = f64::from(if width > 0.75 {
+                width / 2.0
+            } else {
+                0.75 - width / 2.0
+            });
+            if let Some(node) = path.get_next_node_pos() {
+                let close_enough = (pos.x - (f64::from(node.0.x) + 0.5)).abs() < max_distance
+                    && (pos.z - (f64::from(node.0.z) + 0.5)).abs() < max_distance
+                    && (pos.y - f64::from(node.0.y)).abs() < 1.0;
+                let can_cut_corner = path.get_next_node().is_some_and(|n| {
+                    n.path_type != PathType::DangerFire
+                        && n.path_type != PathType::DangerOther
+                        && n.path_type != PathType::WalkableDoor
+                });
+                if close_enough
+                    || can_cut_corner
+                        && Self::should_target_next_node_in_direction(
+                            &world,
+                            temp_mob_pos,
+                            path,
+                            width,
+                            self.inner.mob_height,
+                        )
+                {
+                    path.advance();
+                }
+            }
+        } else if let Some(next) = next_entity_pos(path, width)
+            && temp_mob_pos.y > next.y
+            && !entity.entity.on_ground.load(Ordering::Relaxed)
+            && temp_mob_pos.x.floor() == next.x.floor()
+            && temp_mob_pos.z.floor() == next.z.floor()
+        {
+            path.advance();
+        }
+
+        if path.is_done() {
+            self.inner.finish_navigation(entity);
+            return;
+        }
+        // `WaterBoundPathNavigation.getGroundY` keeps the node's own height.
+        self.wanted_position =
+            next_entity_pos(path, width).map(|target| (target, self.inner.speed_modifier));
+    }
+
+    /// Vanilla `PathNavigation.shouldTargetNextNodeInDirection`, whose
+    /// `canMoveDirectly` is `WaterBoundPathNavigation`'s.
+    fn should_target_next_node_in_direction(
+        world: &World,
+        mob_pos: Vector3<f64>,
+        path: &Path,
+        width: f32,
+        height: f32,
+    ) -> bool {
+        if path.get_next_node_index() + 1 >= path.get_node_count() {
+            return false;
+        }
+        let Some(current) = path.get_next_node_pos() else {
+            return false;
+        };
+        let current_node = Vector3::new(
+            f64::from(current.0.x) + 0.5,
+            f64::from(current.0.y),
+            f64::from(current.0.z) + 0.5,
+        );
+        if mob_pos.squared_distance_to_vec(&current_node) >= 4.0 {
+            return false;
+        }
+        if let Some(next) = next_entity_pos(path, width)
+            && PathNavigation::can_move_directly(world, mob_pos, next, height, false)
+        {
+            return true;
+        }
+        PathNavigation::should_target_next_node_in_direction(mob_pos, path)
+    }
+}
+
+/// Vanilla `Path.getNextEntityPos`.
+fn next_entity_pos(path: &Path, width: f32) -> Option<Vector3<f64>> {
+    let node = path.get_next_node_pos()?;
+    let offset = f64::from((width + 1.0) as i32) * 0.5;
+    Some(Vector3::new(
+        f64::from(node.0.x) + offset,
+        f64::from(node.0.y),
+        f64::from(node.0.z) + offset,
+    ))
 }
 
 impl PathNavigationTrait for WaterBoundPathNavigation {
     fn set_progress(&mut self, goal: NavigatorGoal) {
         self.inner.set_progress(goal);
+    }
+
+    fn take_wanted_position(&mut self) -> Option<(Vector3<f64>, f64)> {
+        self.wanted_position.take()
     }
 
     fn set_speed(&mut self, speed: f64) {
@@ -1820,6 +1954,11 @@ impl PathNavigationTrait for WaterBoundPathNavigation {
             entity.entity.pos.load().z,
         );
         self.inner.do_stuck_detection(mob_pos, entity);
+
+        if self.steered_by_move_control {
+            self.follow_for_move_control(entity);
+            return;
+        }
 
         if self.is_done() {
             self.inner.finish_navigation(entity);

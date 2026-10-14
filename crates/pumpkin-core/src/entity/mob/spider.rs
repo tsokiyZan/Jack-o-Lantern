@@ -130,8 +130,8 @@ pub fn finalize_spider_spawn(
         SpawnGroupData::SpiderEffects(effect)
     });
 
-    let SpawnGroupData::SpiderEffects(effect) = &group_data;
-    if let Some(effect_type) = effect {
+    // A spawn group is all one mob type, so a spider only ever gets spider data.
+    if let SpawnGroupData::SpiderEffects(Some(effect_type)) = &group_data {
         mob.living_entity.add_effect(Effect {
             effect_type,
             duration: -1,

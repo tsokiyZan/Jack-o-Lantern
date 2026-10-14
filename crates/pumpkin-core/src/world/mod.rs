@@ -174,6 +174,7 @@ pub mod entity_tracker;
 pub mod environment;
 pub mod natural_spawner;
 pub mod scoreboard;
+pub mod structure_locator;
 pub mod weather;
 
 pub use environment::EnvironmentAttributes;

@@ -1,9 +1,14 @@
 use crate::entity::EntityBase;
 use crate::entity::ai::control::Control;
 use crate::entity::mob::{Mob, MobEntity};
-use pumpkin_util::math::clamp_angle;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::math::{clamp_angle, wrap_degrees};
 use std::sync::Arc;
+
+/// Vanilla `SmoothSwimmingLookControl.HEAD_TILT_X`.
+const SMOOTH_SWIMMING_HEAD_TILT_X: f32 = 10.0;
+/// Vanilla `SmoothSwimmingLookControl.HEAD_TILT_Y`.
+const SMOOTH_SWIMMING_HEAD_TILT_Y: f32 = 20.0;
 
 // Please keep the atomic values out of here!!!
 #[derive(Default)]
@@ -12,18 +17,19 @@ pub struct LookControl {
     max_pitch_change: f32,
     look_at_timer: i32,
     position: Vector3<f64>,
-    keeps_pitch: bool,
+    /// Set for vanilla's `SmoothSwimmingLookControl`: its `maxYRotFromCenter`.
+    smooth_swimming_max_y_rot_from_center: Option<f32>,
 }
 
 impl Control for LookControl {}
 
 impl LookControl {
-    /// A look control that leaves the mob's pitch alone between looks, as vanilla's
-    /// `SmoothSwimmingLookControl` does by overriding `resetXRotOnTick` to false.
+    /// Vanilla `SmoothSwimmingLookControl`: the head leads the body while the pitch
+    /// is left to the swimming, easing back level once the mob stops.
     #[must_use]
-    pub fn keeping_pitch() -> Self {
+    pub fn smooth_swimming(max_y_rot_from_center: f32) -> Self {
         Self {
-            keeps_pitch: true,
+            smooth_swimming_max_y_rot_from_center: Some(max_y_rot_from_center),
             ..Self::default()
         }
     }
@@ -80,10 +86,12 @@ impl LookControl {
     }
 
     pub fn tick(&mut self, mob: &dyn Mob) {
-        let entity = mob.get_entity();
-        if self.reset_x_rot_on_tick() {
-            entity.set_pitch(0.0);
+        if let Some(max_y_rot_from_center) = self.smooth_swimming_max_y_rot_from_center {
+            self.tick_smooth_swimming(mob, max_y_rot_from_center);
+            return;
         }
+        let entity = mob.get_entity();
+        entity.set_pitch(0.0);
 
         if self.look_at_timer > 0 {
             self.look_at_timer -= 1;
@@ -112,9 +120,48 @@ impl LookControl {
         Self::clamp_head_yaw(mob);
     }
 
-    /// Vanilla `LookControl.resetXRotOnTick`.
-    const fn reset_x_rot_on_tick(&self) -> bool {
-        !self.keeps_pitch
+    /// Vanilla `SmoothSwimmingLookControl.tick`.
+    fn tick_smooth_swimming(&mut self, mob: &dyn Mob, max_y_rot_from_center: f32) {
+        let mob_entity = mob.get_mob_entity();
+        let entity = &mob_entity.living_entity.entity;
+        if self.look_at_timer > 0 {
+            self.look_at_timer -= 1;
+            if let Some(yaw) = self.get_target_yaw(mob_entity) {
+                entity.head_yaw.store(self.change_angle(
+                    entity.head_yaw.load(),
+                    yaw + SMOOTH_SWIMMING_HEAD_TILT_Y,
+                    self.max_yaw_change,
+                ));
+            }
+            if let Some(pitch) = self.get_target_pitch(mob_entity) {
+                entity.set_pitch(self.change_angle(
+                    entity.pitch.load(),
+                    pitch + SMOOTH_SWIMMING_HEAD_TILT_X,
+                    self.max_pitch_change,
+                ));
+            }
+        } else {
+            let navigation_done = mob_entity
+                .navigator
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .is_done();
+            if navigation_done {
+                entity.set_pitch(self.change_angle(entity.pitch.load(), 0.0, 5.0));
+            }
+            entity.head_yaw.store(self.change_angle(
+                entity.head_yaw.load(),
+                entity.body_yaw.load(),
+                self.max_yaw_change,
+            ));
+        }
+
+        let head_diff_body = wrap_degrees(entity.head_yaw.load() - entity.body_yaw.load());
+        if head_diff_body < -max_y_rot_from_center {
+            entity.body_yaw.store(entity.body_yaw.load() - 4.0);
+        } else if head_diff_body > max_y_rot_from_center {
+            entity.body_yaw.store(entity.body_yaw.load() + 4.0);
+        }
     }
 
     fn clamp_head_yaw(mob: &dyn Mob) {

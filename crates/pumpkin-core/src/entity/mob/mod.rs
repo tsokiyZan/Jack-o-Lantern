@@ -299,6 +299,12 @@ impl MobEntity {
         };
 
         navigator.tick(&self.living_entity);
+        if let Some((target, speed_modifier)) = navigator.take_wanted_position() {
+            self.move_control
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .set_wanted_position(target.x, target.y, target.z, speed_modifier);
+        }
 
         {
             *self
