@@ -25,7 +25,7 @@ use crate::entity::{
             look_at_entity::LookAtEntityGoal, melee_attack::MeleeAttackGoal, revenge::RevengeGoal,
             try_find_water::TryFindWaterGoal, wander_around::WanderAroundGoal,
         },
-        pathfinder::{Navigator, NavigatorGoal},
+        pathfinder::{Navigator, NavigatorGoal, node::PathType},
     },
     mob::{Mob, MobEntity},
     player::Player,
@@ -51,11 +51,14 @@ pub struct DolphinEntity {
 impl DolphinEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        // Vanilla `WaterBoundPathNavigation` allows breaching for dolphins only.
+        let mut navigator = Navigator::water_bound(true);
+        // Vanilla `AgeableWaterCreature`'s constructor.
+        navigator.set_pathfinding_malus(PathType::Water, 0.0);
         *mob_entity
             .navigator
             .lock()
-            // Vanilla `WaterBoundPathNavigation` allows breaching for dolphins only.
-            .unwrap_or_else(PoisonError::into_inner) = Navigator::water_bound(true);
+            .unwrap_or_else(PoisonError::into_inner) = navigator;
         *mob_entity
             .move_control
             .lock()
