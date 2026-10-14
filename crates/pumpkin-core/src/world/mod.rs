@@ -1293,8 +1293,29 @@ impl World {
         particle_count: i32,
         particle: Particle,
     ) {
+        self.spawn_particle_with_data(position, offset, max_speed, particle_count, particle, &[]);
+    }
+
+    /// Like [`Self::spawn_particle`], for particles whose type carries options.
+    /// `data` is those options in vanilla's stream encoding.
+    pub fn spawn_particle_with_data(
+        &self,
+        position: Vector3<f64>,
+        offset: Vector3<f32>,
+        max_speed: f32,
+        particle_count: i32,
+        particle: Particle,
+        data: &[u8],
+    ) {
         for player in self.players.load().iter() {
-            player.spawn_particle(position, offset, max_speed, particle_count, particle);
+            player.spawn_particle_with_data(
+                position,
+                offset,
+                max_speed,
+                particle_count,
+                particle,
+                data,
+            );
         }
     }
 

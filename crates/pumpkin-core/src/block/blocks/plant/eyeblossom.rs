@@ -7,6 +7,7 @@ use pumpkin_data::{
     particle::Particle,
     sound::{Sound, SoundCategory},
 };
+use pumpkin_protocol::{VarInt, ser::NetworkWriteExt};
 use pumpkin_util::{
     Difficulty,
     math::{position::BlockPos, vector3::Vector3},
@@ -24,6 +25,10 @@ use crate::{
 
 const EYEBLOSSOM_XZ_RANGE: i32 = 3;
 const EYEBLOSSOM_Y_RANGE: i32 = 2;
+/// The `particleColor` of vanilla's `EyeblossomBlock.Type.OPEN`.
+const OPEN_PARTICLE_COLOR: i32 = 16_545_810;
+/// The `particleColor` of vanilla's `EyeblossomBlock.Type.CLOSED`.
+const CLOSED_PARTICLE_COLOR: i32 = 6_250_335;
 
 pub struct EyeblossomBlock;
 
@@ -114,6 +119,40 @@ impl BlockBehaviour for EyeblossomBlock {
 
 impl PlantBlockBase for EyeblossomBlock {}
 
+/// Vanilla's `EyeblossomBlock.Type.spawnTransformParticle`.
+fn spawn_transform_particle(world: &World, pos: &BlockPos, particle_color: i32) {
+    let mut rng = rand::rng();
+    let start = pos.to_centered_f64();
+    let lifetime = 0.5 + rng.random::<f64>();
+    let velocity = Vector3::new(
+        rng.random::<f64>() - 0.5,
+        rng.random::<f64>() + 1.0,
+        rng.random::<f64>() - 0.5,
+    );
+    let target = start + velocity * lifetime;
+    let duration = (20.0 * lifetime) as i32;
+
+    // `TrailParticleOption.STREAM_CODEC`: target, color, duration.
+    let mut data = Vec::new();
+    let written = data
+        .write_f64_be(target.x)
+        .and_then(|()| data.write_f64_be(target.y))
+        .and_then(|()| data.write_f64_be(target.z))
+        .and_then(|()| data.write_i32_be(particle_color))
+        .and_then(|()| data.write_var_int(&VarInt(duration)));
+    if written.is_err() {
+        return;
+    }
+    world.spawn_particle_with_data(
+        start,
+        Vector3::new(0.0, 0.0, 0.0),
+        0.0,
+        1,
+        Particle::Trail,
+        &data,
+    );
+}
+
 pub fn try_changing_state(world: &Arc<World>, current_block: &Block, pos: &BlockPos) -> bool {
     let is_open = current_block == &Block::OPEN_EYEBLOSSOM;
     let should_be_open = world.eyeblossom_open(pos).unwrap_or(is_open);
@@ -130,13 +169,12 @@ pub fn try_changing_state(world: &Arc<World>, current_block: &Block, pos: &Block
 
     world.set_block_state(pos, new_block.default_state.id, BlockFlags::NOTIFY_ALL);
 
-    world.spawn_particle(
-        pos.to_centered_f64(),
-        Vector3::new(0.0, 0.0, 0.0),
-        0.0,
-        1,
-        Particle::Trail,
-    );
+    let particle_color = if is_open {
+        CLOSED_PARTICLE_COLOR
+    } else {
+        OPEN_PARTICLE_COLOR
+    };
+    spawn_transform_particle(world, pos, particle_color);
 
     let mut rng = rand::rng();
     for dx in -EYEBLOSSOM_XZ_RANGE..=EYEBLOSSOM_XZ_RANGE {
