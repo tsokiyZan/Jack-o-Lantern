@@ -586,6 +586,16 @@ impl Level {
             .map(|p| *p)
             .collect();
         for pos in scheduled_chunk_pos {
+            // Vanilla `LevelTicks` only drains chunks that pass its tick check
+            // (`ServerLevel.isPositionTickingWithEntitiesLoaded`). A chunk at the edge
+            // keeps its ticks until it is ticking again, instead of handing them out
+            // while it may unload before they run, which loses them for good.
+            if !active_chunks.contains(&pos) {
+                if !self.loaded_chunks.contains_key(&pos) {
+                    self.chunks_with_scheduled_ticks.remove(&pos);
+                }
+                continue;
+            }
             if let Some(chunk) = self.loaded_chunks.get(&pos) {
                 let chunk = chunk.value();
                 ticks.block_ticks.append(&mut chunk.block_ticks.step_tick());
@@ -1067,12 +1077,54 @@ mod tests {
         level.loaded_chunks.insert(chunk_pos, Arc::new(chunk));
         level.resume_scheduled_ticks(chunk_pos);
 
+        let ticking = FxHashSet::from_iter([chunk_pos]);
         let ran: Vec<_> = (0..=DELAY)
-            .flat_map(|_| level.get_tick_data(&FxHashSet::default(), 0).block_ticks)
+            .flat_map(|_| level.get_tick_data(&ticking, 0).block_ticks)
             .collect();
         assert_eq!(ran.len(), 1, "the saved tick should run exactly once");
         assert_eq!(ran[0].position, pos);
         assert_eq!(ran[0].value, &Block::FIRE);
+    }
+
+    /// Vanilla `LevelTicks.sortContainersToTick` skips chunks that fail its tick check,
+    /// so their ticks wait instead of being handed out where they may never run.
+    #[tokio::test]
+    async fn ticks_wait_while_their_chunk_is_not_ticking() {
+        let temp_dir = TempDir::new().unwrap();
+        let level = Level::from_root_folder(
+            &LevelConfig::default(),
+            temp_dir.path().to_path_buf(),
+            0,
+            Dimension::OVERWORLD,
+        );
+        let pos = BlockPos::new(1, 70, 1);
+        let chunk_pos = pos.chunk_position();
+        let mut chunk = ChunkData::empty(chunk_pos.x, chunk_pos.y);
+        chunk.block_ticks = std::iter::once(ScheduledTick {
+            delay: 1,
+            priority: TickPriority::Normal,
+            position: pos,
+            value: &Block::FIRE,
+        })
+        .collect();
+        level.loaded_chunks.insert(chunk_pos, Arc::new(chunk));
+        level.resume_scheduled_ticks(chunk_pos);
+
+        for _ in 0..10 {
+            assert!(
+                level
+                    .get_tick_data(&FxHashSet::default(), 0)
+                    .block_ticks
+                    .is_empty()
+            );
+        }
+        assert!(level.is_block_tick_scheduled(&pos, &Block::FIRE));
+
+        let ticking = FxHashSet::from_iter([chunk_pos]);
+        let ran = (0..2)
+            .flat_map(|_| level.get_tick_data(&ticking, 0).block_ticks)
+            .count();
+        assert_eq!(ran, 1, "the tick should run once its chunk ticks");
     }
 
     #[tokio::test]

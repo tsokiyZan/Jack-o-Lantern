@@ -2004,6 +2004,10 @@ impl World {
                 for scheduled_tick in batch {
                     let pos = scheduled_tick.position;
                     let block = world.get_block(&pos);
+                    // Vanilla `ServerLevel.tickBlock`: only if the block is still the tick's type.
+                    if block != scheduled_tick.value {
+                        continue;
+                    }
                     if let Some(pumpkin_block) = world.block_registry.get_pumpkin_block(block.id) {
                         pumpkin_block.on_scheduled_tick(OnScheduledTickArgs {
                             world: &world,
@@ -2026,6 +2030,10 @@ impl World {
                 for scheduled_tick in batch {
                     let pos = scheduled_tick.position;
                     let fluid = world.get_fluid(&pos);
+                    // Vanilla `ServerLevel.tickFluid`: only if the fluid is still the tick's type.
+                    if fluid.id != scheduled_tick.value.id {
+                        continue;
+                    }
                     if let Some(pumpkin_fluid) = world.block_registry.get_pumpkin_fluid(fluid.id) {
                         pumpkin_fluid.on_scheduled_tick(&world, fluid, &pos);
                     }
