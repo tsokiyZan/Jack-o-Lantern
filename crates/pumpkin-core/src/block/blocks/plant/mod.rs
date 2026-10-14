@@ -20,6 +20,7 @@ pub mod eyeblossom;
 pub mod flower;
 pub mod flowerbed;
 pub mod fungus;
+pub mod hanging_moss;
 pub mod hanging_roots;
 pub mod kelp;
 pub mod leaf_litter;
