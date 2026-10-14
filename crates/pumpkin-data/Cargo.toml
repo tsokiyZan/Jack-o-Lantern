@@ -52,6 +52,7 @@ default = [
     "bedrock_creative",
     "bedrock_biome",
     "map_color",
+    "block_sound_type",
     "map_decoration",
     "dye_color",
     "block_transformer",
@@ -105,6 +106,7 @@ test_instance = []
 trial_spawner = []
 block_transformer = ["block", "sound", "world", "tag"]
 map_color = []
+block_sound_type = ["sound"]
 map_decoration = []
 dye_color = []
 advancement = []

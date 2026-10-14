@@ -33,6 +33,7 @@ mod bedrock_creative;
 mod biome;
 mod bitsets;
 mod block;
+mod block_sound_type;
 mod block_transformer;
 mod carver;
 mod cat_variant;
@@ -163,6 +164,7 @@ pub fn main() {
         (message_type::build, "message_type.rs"),
         (spawn_egg::build, "spawn_egg.rs"),
         (block::build, "block.rs"),
+        (block_sound_type::build, "block_sound_type.rs"),
         (item::build, "item.rs"),
         (structures::build, "structures.rs"),
         (template_pool::build, "template_pool.rs"),
