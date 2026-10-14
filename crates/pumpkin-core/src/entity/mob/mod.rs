@@ -339,21 +339,18 @@ impl MobEntity {
         mob.custom_server_ai_step(caller);
 
         // Controllers are synchronous, so we can just use normal blocks
-        {
+        if !mob.controls_paused() {
             let mut look_control = self
                 .look_control
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             look_control.tick(mob);
-        };
-
-        {
             let mut move_control = self
                 .move_control
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             move_control.tick(mob);
-        };
+        }
     }
 
     pub fn clear_ai_goals(&self, mob: &dyn Mob) {
@@ -1116,6 +1113,28 @@ pub trait Mob: EntityBase + Send + Sync {
 
     fn on_damage(&self, _damage_type: DamageType, _source: Option<&dyn EntityBase>) {}
 
+    /// The start of a vanilla `hurtServer` override, before the damage is applied:
+    /// `source` is the direct entity, `cause` the one responsible.
+    fn before_hurt(
+        &self,
+        _amount: f32,
+        _damage_type: DamageType,
+        _source: Option<&dyn EntityBase>,
+        _cause: Option<&dyn EntityBase>,
+    ) {
+    }
+
+    /// The mob's own part of vanilla `LivingEntity.canBeSeenAsEnemy`.
+    fn can_be_seen_as_enemy(&self) -> bool {
+        true
+    }
+
+    /// Whether the move and look controls skip their tick, as vanilla's axolotl
+    /// controls do while it plays dead.
+    fn controls_paused(&self) -> bool {
+        false
+    }
+
     fn on_attack(&self, _target: &dyn EntityBase) {}
 
     fn on_eating_grass(&self) {}
@@ -1625,7 +1644,6 @@ impl<T: Mob + Send + 'static> EntityBase for T {
         // Wither `tick_wither` invulnerable countdown, healing, boss bar, head attacks
         // (not the movement towards the target, that is vanilla `aiStep`)
         // ZombifiedPiglin `maybe_alert_others`
-        // Axolotl `play_dead_ticks`
         // Piglin timers, `tick_sensors`, admiring, dancing (conversion already checks NoAI)
         // Bee and ZombifiedPiglin `update_persistent_anger` (Enderman, Wolf, IronGolem and
         // PolarBear run it outside the AI step, so the shared call stays for them).
@@ -1659,6 +1677,7 @@ impl<T: Mob + Send + 'static> EntityBase for T {
         if !self.pre_damage(damage_type, source) {
             return false;
         }
+        self.before_hurt(amount, damage_type, source, cause);
         // Mob-specific damage modifier (e.g. shulker armor when closed).
         let amount = self.modify_incoming_damage(amount, damage_type);
         let damaged = self.get_mob_entity().living_entity.damage_with_context(

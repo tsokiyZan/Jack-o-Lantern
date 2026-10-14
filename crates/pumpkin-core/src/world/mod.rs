@@ -5971,6 +5971,24 @@ impl World {
         Self::get_fluid_from_state_id(id)
     }
 
+    /// Vanilla `FluidState.getType`: `water` or `lava` for a source block or a
+    /// waterlogged one, the flowing fluid otherwise. `get_fluid` always reports the
+    /// flowing family, which fluid ticks key on, but tags such as
+    /// `axolotl_tries_to_find` name only the source fluid.
+    pub fn get_fluid_type(&self, position: &BlockPos) -> &'static pumpkin_data::fluid::Fluid {
+        let (fluid, state) = self.get_fluid_and_fluid_state(position);
+        if !state.is_source {
+            return fluid;
+        }
+        if fluid.id == Fluid::FLOWING_WATER.id {
+            &Fluid::WATER
+        } else if fluid.id == Fluid::FLOWING_LAVA.id {
+            &Fluid::LAVA
+        } else {
+            fluid
+        }
+    }
+
     pub fn get_block_and_fluid(
         &self,
         position: &BlockPos,

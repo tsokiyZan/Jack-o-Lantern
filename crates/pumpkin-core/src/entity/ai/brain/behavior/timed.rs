@@ -31,6 +31,12 @@ pub trait Behavior: Send + Sync {
         false
     }
 
+    /// Vanilla `Behavior.timedOut`; behaviours that override it to `false` run for as
+    /// long as `can_still_use` holds.
+    fn times_out(&self) -> bool {
+        true
+    }
+
     fn debug_name(&self) -> &'static str;
 }
 
@@ -102,7 +108,8 @@ impl<B: Behavior> BehaviorControl for Timed<B> {
     }
 
     fn tick_or_stop(&mut self, tick: &mut BrainTick<'_>) {
-        if !self.has_timed_out(tick.time) && self.inner.can_still_use(tick) {
+        let timed_out = self.inner.times_out() && self.has_timed_out(tick.time);
+        if !timed_out && self.inner.can_still_use(tick) {
             self.inner.tick(tick);
         } else {
             self.do_stop(tick);

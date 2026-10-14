@@ -201,6 +201,9 @@ pub fn can_be_seen_as_enemy(target: &dyn EntityBase) -> bool {
             target
                 .get_living_entity()
                 .is_some_and(LivingEntity::can_take_damage)
+                && target
+                    .get_mob()
+                    .is_none_or(crate::entity::mob::Mob::can_be_seen_as_enemy)
         },
         crate::entity::player::Player::can_be_seen_as_enemy,
     )

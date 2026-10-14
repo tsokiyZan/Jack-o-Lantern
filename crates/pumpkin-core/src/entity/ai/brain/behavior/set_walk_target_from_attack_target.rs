@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use super::super::BrainTick;
 use super::super::memory::position_tracker::{EntityTracker, PositionTracker};
 use super::super::memory::walk_target::WalkTarget;
 use super::super::memory::{MemoryStatus, types};
@@ -10,6 +11,15 @@ const PROJECTILE_ATTACK_RANGE_BUFFER: i32 = 1;
 
 #[must_use]
 pub fn set_walk_target_from_attack_target_if_target_out_of_reach(speed_modifier: f32) -> OneShot {
+    set_walk_target_from_attack_target_if_target_out_of_reach_with(move |_| speed_modifier)
+}
+
+/// The `Function<LivingEntity, Float>` overload, for mobs whose chase speed depends
+/// on where they are.
+#[must_use]
+pub fn set_walk_target_from_attack_target_if_target_out_of_reach_with(
+    speed_modifier: impl Fn(&BrainTick<'_>) -> f32 + Send + Sync + 'static,
+) -> OneShot {
     OneShot::with_required(
         "SetWalkTargetFromAttackTargetIfTargetOutOfReach",
         vec![(types::ATTACK_TARGET.id(), MemoryStatus::ValuePresent)],
@@ -45,6 +55,7 @@ pub fn set_walk_target_from_attack_target_if_target_out_of_reach(speed_modifier:
                     Arc::new(EntityTracker::new(Arc::clone(&target), true))
                         as Arc<dyn PositionTracker>,
                 );
+                let speed_modifier = speed_modifier(tick);
                 tick.brain.set(
                     types::WALK_TARGET,
                     WalkTarget::new(

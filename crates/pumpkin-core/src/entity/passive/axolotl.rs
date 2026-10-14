@@ -4,11 +4,10 @@ use pumpkin_data::damage::DamageType;
 use pumpkin_data::entity::EntityPose;
 use pumpkin_util::math::boundingbox::EntityDimensions;
 use std::sync::{
-    Arc, Weak,
+    Arc,
     atomic::{AtomicBool, AtomicI32, Ordering},
 };
 
-use pumpkin_data::entity::EntityType;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::{Sound, SoundCategory};
@@ -20,19 +19,31 @@ use rand::RngExt;
 use crate::entity::{
     Entity, EntityBase,
     ageable::{AgeableData, AgeableMob},
-    ai::goal::{
-        active_target::ActiveTargetGoal, breed::BreedGoal, escape_danger::EscapeDangerGoal,
-        follow_parent::FollowParentGoal, look_around::RandomLookAroundGoal,
-        look_at_entity::LookAtEntityGoal, melee_attack::MeleeAttackGoal, revenge::RevengeGoal,
-        swim::SwimGoal, tempt::TemptGoal, try_find_water::TryFindWaterGoal,
-        wander_around::WanderAroundGoal,
+    ai::brain::{BrainTick, memory::types},
+    ai::control::{
+        look_control::LookControl, smooth_swimming_move_control::SmoothSwimmingMoveControl,
     },
+    ai::pathfinder::{AmphibiousPathNavigation, Navigator},
     mob::{Mob, MobEntity},
-    passive::animal::Animal,
+    passive::{animal::Animal, axolotl_ai},
     player::Player,
 };
+use pumpkin_data::effect::StatusEffect;
+use pumpkin_data::potion::Effect;
+use std::sync::PoisonError;
 
-const TEMPT_ITEMS: &[&Item] = &[&Item::TROPICAL_FISH_BUCKET];
+/// The `inWaterSpeedModifier` and `outsideWaterSpeedModifier` of vanilla's
+/// `AxolotlMoveControl`.
+const IN_WATER_SPEED_MODIFIER: f32 = 0.1;
+const OUTSIDE_WATER_SPEED_MODIFIER: f32 = 0.5;
+/// Vanilla `Axolotl.TOTAL_PLAYDEAD_TIME`.
+pub const TOTAL_PLAYDEAD_TIME: i32 = 200;
+/// Vanilla `Axolotl.PLAYER_REGEN_DETECTION_RANGE`.
+const PLAYER_REGEN_DETECTION_RANGE: f64 = 20.0;
+/// Vanilla `Axolotl.REGEN_BUFF_MAX_DURATION`.
+const REGEN_BUFF_MAX_DURATION: i32 = 2400;
+/// Vanilla `Axolotl.REGEN_BUFF_BASE_DURATION`.
+const REGEN_BUFF_BASE_DURATION: i32 = 100;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[repr(i32)]
@@ -84,14 +95,11 @@ pub struct AxolotlEntity {
     pub variant: AtomicI32,
     pub playing_dead: AtomicBool,
     pub from_bucket: AtomicBool,
-    pub play_dead_ticks: AtomicI32,
 }
 
 impl AxolotlEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
-        // Vanilla `Axolotl`'s constructor.
-        mob_entity.set_pathfinding_malus(PathType::Water, 0.0);
         let variant = AxolotlVariant::random_variant();
         let axolotl = Self {
             mob_entity,
@@ -99,89 +107,37 @@ impl AxolotlEntity {
             variant: AtomicI32::new(variant.id()),
             playing_dead: AtomicBool::new(false),
             from_bucket: AtomicBool::new(false),
-            play_dead_ticks: AtomicI32::new(0),
         };
+        *axolotl
+            .mob_entity
+            .navigator
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) =
+            Navigator::new(AmphibiousPathNavigation::new(false).steered_by_move_control());
+        // Vanilla `Axolotl`'s constructor; after the navigator, which holds the maluses.
+        axolotl
+            .mob_entity
+            .set_pathfinding_malus(PathType::Water, 0.0);
+        // Vanilla `AxolotlMoveControl` and `AxolotlLookControl`; both pause while the
+        // axolotl plays dead (`controls_paused`).
+        *axolotl
+            .mob_entity
+            .move_control
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = Box::new(SmoothSwimmingMoveControl::new(
+            85,
+            10,
+            IN_WATER_SPEED_MODIFIER,
+            OUTSIDE_WATER_SPEED_MODIFIER,
+            false,
+        ));
+        *axolotl
+            .mob_entity
+            .look_control
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = LookControl::smooth_swimming(20.0);
         let mob_arc = Arc::new(axolotl);
-        let mob_weak: Weak<dyn Mob> = {
-            let mob_arc: Arc<dyn Mob> = mob_arc.clone();
-            Arc::downgrade(&mob_arc)
-        };
-
-        {
-            let mut goal_selector = mob_arc
-                .mob_entity
-                .goals_selector
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-
-            goal_selector.add_goal(0, Box::new(TryFindWaterGoal));
-            goal_selector.add_goal(0, Box::new(SwimGoal::default()));
-            goal_selector.add_goal(1, EscapeDangerGoal::new(1.5));
-            goal_selector.add_goal(2, BreedGoal::new(1.0));
-            goal_selector.add_goal(3, Box::new(TemptGoal::new(1.25, TEMPT_ITEMS, false)));
-            goal_selector.add_goal(4, Box::new(FollowParentGoal::new(1.25)));
-            goal_selector.add_goal(5, Box::new(MeleeAttackGoal::new(1.2, false)));
-            goal_selector.add_goal(
-                6,
-                Box::new(WanderAroundGoal::new(1.0).ignoring_no_action_time()),
-            );
-            goal_selector.add_goal(
-                7,
-                LookAtEntityGoal::with_default(mob_weak, &EntityType::PLAYER, 6.0),
-            );
-            goal_selector.add_goal(8, Box::new(RandomLookAroundGoal::default()));
-        };
-
-        {
-            let mut target_selector = mob_arc
-                .mob_entity
-                .target_selector
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-
-            target_selector.add_goal(1, Box::new(RevengeGoal::new(true)));
-            target_selector.add_goal(
-                2,
-                ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::DROWNED, false),
-            );
-            target_selector.add_goal(
-                2,
-                ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::GUARDIAN, false),
-            );
-            target_selector.add_goal(
-                2,
-                ActiveTargetGoal::with_default(
-                    &mob_arc.mob_entity,
-                    &EntityType::ELDER_GUARDIAN,
-                    false,
-                ),
-            );
-            target_selector.add_goal(
-                3,
-                ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::SQUID, false),
-            );
-            target_selector.add_goal(
-                3,
-                ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::GLOW_SQUID, false),
-            );
-            target_selector.add_goal(
-                3,
-                ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::COD, false),
-            );
-            target_selector.add_goal(
-                3,
-                ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::SALMON, false),
-            );
-            target_selector.add_goal(
-                3,
-                ActiveTargetGoal::with_default(
-                    &mob_arc.mob_entity,
-                    &EntityType::TROPICAL_FISH,
-                    false,
-                ),
-            );
-        };
-
+        mob_arc.mob_entity.init_brain(mob_arc.as_ref());
         mob_arc
     }
 
@@ -235,10 +191,13 @@ impl AgeableMob for AxolotlEntity {
 }
 
 impl Animal for AxolotlEntity {
+    /// Vanilla `Axolotl.getWalkTargetValue`: no spot is better than another.
+    fn animal_walk_target_value(&self, _pos: &pumpkin_util::math::position::BlockPos) -> f32 {
+        0.0
+    }
+
     fn is_food(&self, item_stack: &ItemStack) -> bool {
         item_stack.item.has_tag(&tag::Item::MINECRAFT_AXOLOTL_FOOD)
-            || item_stack.item == &Item::TROPICAL_FISH_BUCKET
-            || item_stack.item == &Item::TROPICAL_FISH
     }
 }
 
@@ -306,15 +265,90 @@ impl Mob for AxolotlEntity {
 
     fn mob_tick(&self, _caller: &dyn EntityBase) {
         self.ageable_ai_step();
+    }
 
-        let play_dead_ticks = self.play_dead_ticks.load(Ordering::Relaxed);
-        if play_dead_ticks > 0 {
-            let remaining = play_dead_ticks - 1;
-            self.play_dead_ticks.store(remaining, Ordering::Relaxed);
-            if remaining == 0 {
-                self.set_playing_dead(false);
+    fn make_brain(
+        &self,
+        packed: &crate::entity::ai::brain::memory::PackedMemories,
+    ) -> crate::entity::ai::brain::Brain {
+        axolotl_ai::AXOLOTL_PROVIDER.make_brain(self, packed)
+    }
+
+    /// The rest of vanilla `Axolotl.customServerAiStep`: the activity update, and
+    /// playing dead while its ticks last.
+    fn after_brain_tick(&self, tick: &mut BrainTick<'_>) {
+        axolotl_ai::update_activity(tick);
+        if !self.mob_entity.is_no_ai() {
+            let playing_dead = tick
+                .brain
+                .get(types::PLAY_DEAD_TICKS)
+                .is_some_and(|ticks| *ticks > 0);
+            if playing_dead != self.is_playing_dead() {
+                self.set_playing_dead(playing_dead);
             }
         }
+    }
+
+    fn custom_server_ai_step(&self, _caller: &dyn EntityBase) {
+        if !crate::entity::ai::brain::behavior::utils::is_alive(self) {
+            self.mob_entity.apply_brain_inbox(self);
+            return;
+        }
+        self.mob_entity.tick_brain(self);
+    }
+
+    /// Vanilla `Axolotl.travelInWater`.
+    fn custom_travel(&self, caller: &dyn EntityBase) -> bool {
+        let living = &self.mob_entity.living_entity;
+        let entity = &living.entity;
+        if !entity.is_in_water() {
+            return false;
+        }
+        entity.update_velocity_from_input(living.movement_input.load(), living.get_speed(caller));
+        living.make_move(caller);
+        entity.velocity.store(entity.velocity.load() * 0.9);
+        true
+    }
+
+    /// Vanilla `Axolotl.isPushedByFluid`.
+    fn mob_is_pushed_by_fluids(&self) -> bool {
+        false
+    }
+
+    /// Vanilla `Axolotl.hurtServer`: one hit in three, in water, from an attacker,
+    /// that is heavy or lands below half health, makes the axolotl play dead.
+    fn before_hurt(
+        &self,
+        amount: f32,
+        _damage_type: DamageType,
+        source: Option<&dyn EntityBase>,
+        cause: Option<&dyn EntityBase>,
+    ) {
+        let living = &self.mob_entity.living_entity;
+        let current_health = living.health.load();
+        let max_health = living.get_max_health();
+        let mut random = rand::rng();
+        if !self.mob_entity.is_no_ai()
+            && random.random_range(0..3) == 0
+            && ((random.random_range(0..3) as f32) < amount || current_health / max_health < 0.5)
+            && amount < current_health
+            && living.entity.is_in_water()
+            && (cause.is_some() || source.is_some())
+            && !self.is_playing_dead()
+        {
+            self.mob_entity.post_to_brain(Box::new(|tick| {
+                tick.brain.set(types::PLAY_DEAD_TICKS, TOTAL_PLAYDEAD_TIME);
+            }));
+        }
+    }
+
+    /// Vanilla `Axolotl.canBeSeenAsEnemy`.
+    fn can_be_seen_as_enemy(&self) -> bool {
+        !self.is_playing_dead()
+    }
+
+    fn controls_paused(&self) -> bool {
+        self.is_playing_dead()
     }
 
     fn mob_init_data_tracker(&self) {
@@ -364,4 +398,54 @@ impl Mob for AxolotlEntity {
 
         self.animal_interact(player, item_stack, Sound::EntityAxolotlIdleAir)
     }
+}
+
+/// Vanilla `Axolotl.onStopAttacking`: when a target the axolotl was fighting dies to a
+/// player within 20 blocks, that player gets the axolotl's support.
+pub(crate) fn on_stop_attacking(tick: &mut BrainTick<'_>, target: &Arc<dyn EntityBase>) {
+    if !crate::entity::ai::brain::behavior::utils::is_dead_or_dying(target.as_ref()) {
+        return;
+    }
+    let Some(living) = target.get_living_entity() else {
+        return;
+    };
+    if living.get_last_damage_type().is_none() {
+        return;
+    }
+    let Some(player) = tick
+        .world
+        .get_player_by_id(living.last_attacker_id.load(Ordering::Relaxed))
+    else {
+        return;
+    };
+    let range = tick.mob.get_entity().bounding_box.load().expand(
+        PLAYER_REGEN_DETECTION_RANGE,
+        PLAYER_REGEN_DETECTION_RANGE,
+        PLAYER_REGEN_DETECTION_RANGE,
+    );
+    if player.get_entity().bounding_box.load().intersects(&range) {
+        apply_supporting_effects(&player);
+    }
+}
+
+/// Vanilla `Axolotl.applySupportingEffects`: regeneration that stacks to two minutes,
+/// and mining fatigue lifted.
+fn apply_supporting_effects(player: &Player) {
+    let regen = player.living_entity.get_effect(&StatusEffect::REGENERATION);
+    let ends_within = regen
+        .as_ref()
+        .is_none_or(|effect| effect.duration != -1 && effect.duration < REGEN_BUFF_MAX_DURATION);
+    if ends_within {
+        let previous = regen.map_or(0, |effect| effect.duration);
+        player.add_effect(Effect {
+            effect_type: &StatusEffect::REGENERATION,
+            duration: REGEN_BUFF_MAX_DURATION.min(REGEN_BUFF_BASE_DURATION + previous),
+            amplifier: 0,
+            ambient: false,
+            show_particles: true,
+            show_icon: true,
+            blend: false,
+        });
+    }
+    player.remove_effect(&StatusEffect::MINING_FATIGUE);
 }

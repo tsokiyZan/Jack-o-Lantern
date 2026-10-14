@@ -9,6 +9,8 @@ use crate::world::World;
 use super::memory::{MemoryModuleId, types};
 use super::{BrainTick, VisibilityContext};
 
+pub mod adult;
+pub mod axolotl_attackables;
 pub mod dummy;
 pub mod hurt_by;
 pub mod nearest_items;
@@ -16,7 +18,10 @@ pub mod nearest_living_entities;
 pub mod nearest_players;
 pub mod piglin_brute_specific;
 pub mod piglin_specific;
+pub mod tempting;
 
+pub use adult::AdultSensor;
+pub use axolotl_attackables::AxolotlAttackablesSensor;
 pub use dummy::DummySensor;
 pub use hurt_by::HurtBySensor;
 pub use nearest_items::NearestItemSensor;
@@ -24,6 +29,7 @@ pub use nearest_living_entities::NearestLivingEntitySensor;
 pub use nearest_players::PlayerSensor;
 pub use piglin_brute_specific::PiglinBruteSpecificSensor;
 pub use piglin_specific::PiglinSpecificSensor;
+pub use tempting::FoodTemptationsSensor;
 
 pub const DEFAULT_SCAN_RATE: i32 = 20;
 
@@ -41,6 +47,9 @@ pub enum SensorType {
     HurtBy,
     PiglinSpecific,
     PiglinBruteSpecific,
+    NearestAdult,
+    AxolotlAttackables,
+    FoodTemptations,
 }
 
 impl SensorType {
@@ -54,6 +63,9 @@ impl SensorType {
             Self::HurtBy => "minecraft:hurt_by",
             Self::PiglinSpecific => "minecraft:piglin_specific_sensor",
             Self::PiglinBruteSpecific => "minecraft:piglin_brute_specific_sensor",
+            Self::NearestAdult => "minecraft:nearest_adult",
+            Self::AxolotlAttackables => "minecraft:axolotl_attackables",
+            Self::FoodTemptations => "minecraft:food_temptations",
         }
     }
 
@@ -66,7 +78,10 @@ impl SensorType {
             | Self::NearestItems
             | Self::HurtBy
             | Self::PiglinSpecific
-            | Self::PiglinBruteSpecific => DEFAULT_SCAN_RATE,
+            | Self::PiglinBruteSpecific
+            | Self::NearestAdult
+            | Self::AxolotlAttackables
+            | Self::FoodTemptations => DEFAULT_SCAN_RATE,
         }
     }
 
@@ -79,6 +94,9 @@ impl SensorType {
             Self::HurtBy => Box::new(HurtBySensor),
             Self::PiglinSpecific => Box::new(PiglinSpecificSensor),
             Self::PiglinBruteSpecific => Box::new(PiglinBruteSpecificSensor),
+            Self::NearestAdult => Box::new(AdultSensor),
+            Self::AxolotlAttackables => Box::new(AxolotlAttackablesSensor),
+            Self::FoodTemptations => Box::new(FoodTemptationsSensor),
         }
     }
 
