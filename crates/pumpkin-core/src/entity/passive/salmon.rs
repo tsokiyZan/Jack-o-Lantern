@@ -5,21 +5,32 @@ use pumpkin_data::sound::Sound;
 use crate::entity::{
     Entity, EntityBase,
     mob::{Mob, MobEntity},
-    passive::fish,
+    passive::{
+        fish,
+        schooling_fish::{self, SchoolingFish},
+    },
 };
 
 /// Represents a Salmon, a passive fish of rivers and cold oceans.
 ///
 /// Wiki: <https://minecraft.wiki/w/Salmon>
+/// Vanilla `Salmon.getMaxSchoolSize`.
+const MAX_SCHOOL_SIZE: i32 = 5;
+
 pub struct SalmonEntity {
     pub mob_entity: MobEntity,
+    pub school: SchoolingFish,
 }
 
 impl SalmonEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
         fish::init(&mob_entity);
-        Arc::new(Self { mob_entity })
+        schooling_fish::init(&mob_entity);
+        Arc::new(Self {
+            mob_entity,
+            school: SchoolingFish::new(MAX_SCHOOL_SIZE),
+        })
     }
 }
 
@@ -30,6 +41,11 @@ impl Mob for SalmonEntity {
 
     fn mob_tick(&self, _caller: &dyn EntityBase) {
         fish::flop(self, Sound::EntitySalmonFlop);
+        self.school.tick(self);
+    }
+
+    fn as_schooling_fish(&self) -> Option<&SchoolingFish> {
+        Some(&self.school)
     }
 
     fn custom_travel(&self, caller: &dyn EntityBase) -> bool {

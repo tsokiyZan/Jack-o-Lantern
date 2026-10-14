@@ -11,7 +11,8 @@ use rand::RngExt;
 use crate::entity::EntityBase;
 use crate::entity::ai::control::fish_move_control::FishMoveControl;
 use crate::entity::ai::goal::{
-    avoid_entity::AvoidEntityGoal, escape_danger::EscapeDangerGoal, wander_around::WanderAroundGoal,
+    Controls, Goal, avoid_entity::AvoidEntityGoal, escape_danger::EscapeDangerGoal,
+    wander_around::WanderAroundGoal,
 };
 use crate::entity::ai::pathfinder::Navigator;
 use crate::entity::ai::pathfinder::node::PathType;
@@ -41,7 +42,53 @@ pub fn init(mob_entity: &MobEntity) {
         2,
         Box::new(AvoidEntityGoal::new(&EntityType::PLAYER, 8.0, 1.6, 1.4)),
     );
-    goals.add_goal(4, Box::new(WanderAroundGoal::swimming(1.0, 40)));
+    goals.add_goal(4, Box::new(FishSwimGoal::new()));
+}
+
+/// Vanilla's `AbstractFish.FishSwimGoal`: random swimming, unless the fish is
+/// following a school leader (`canRandomSwim`).
+pub struct FishSwimGoal {
+    swim: WanderAroundGoal,
+}
+
+impl FishSwimGoal {
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            swim: WanderAroundGoal::swimming(1.0, 40),
+        }
+    }
+}
+
+impl Default for FishSwimGoal {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Goal for FishSwimGoal {
+    fn can_start(&mut self, mob: &dyn Mob) -> bool {
+        let can_random_swim = mob
+            .as_schooling_fish()
+            .is_none_or(|school| !school.is_follower());
+        can_random_swim && self.swim.can_start(mob)
+    }
+
+    fn should_continue(&mut self, mob: &dyn Mob) -> bool {
+        self.swim.should_continue(mob)
+    }
+
+    fn start(&mut self, mob: &dyn Mob) {
+        self.swim.start(mob);
+    }
+
+    fn stop(&mut self, mob: &dyn Mob) {
+        self.swim.stop(mob);
+    }
+
+    fn controls(&self) -> Controls {
+        self.swim.controls()
+    }
 }
 
 /// Vanilla's `AbstractFish.travel`: in water a fish swims at a fraction of the

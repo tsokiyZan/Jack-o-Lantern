@@ -1094,6 +1094,10 @@ pub trait Mob: EntityBase + Send + Sync {
         None
     }
 
+    fn as_schooling_fish(&self) -> Option<&crate::entity::passive::schooling_fish::SchoolingFish> {
+        None
+    }
+
     fn as_patrolling_monster(&self) -> Option<&dyn patrol::PatrollingMonster> {
         None
     }

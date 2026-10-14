@@ -16,6 +16,7 @@ pub mod door_interact;
 pub mod eat_grass;
 pub mod escape_danger;
 pub mod flee_sun;
+pub mod follow_flock_leader;
 pub mod follow_mob;
 pub mod follow_owner;
 pub mod follow_parent;
