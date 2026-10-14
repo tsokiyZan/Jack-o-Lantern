@@ -447,6 +447,12 @@ pub trait PathNavigationTrait: Send + Sync {
     fn take_wanted_position(&mut self) -> Option<(Vector3<f64>, f64)> {
         None
     }
+
+    /// Whether this tick's navigation asked the mob to jump, which vanilla's
+    /// `MoveControl` passes on to the `JumpControl`.
+    fn take_jump(&mut self) -> bool {
+        false
+    }
 }
 
 pub struct PathNavigation {
@@ -486,6 +492,8 @@ pub struct PathNavigation {
     pub open_set: BinaryHeap,
     pub neighbors_buf: Vec<Node>,
     pub is_idle: AtomicBool,
+    /// A jump this tick's steering asked for, taken by [`PathNavigationTrait::take_jump`].
+    pub jump: bool,
 }
 
 impl Default for PathNavigation {
@@ -534,6 +542,7 @@ impl PathNavigation {
             open_set: BinaryHeap::new(),
             neighbors_buf: Vec::new(),
             is_idle: AtomicBool::new(true),
+            jump: false,
         }
     }
 
@@ -626,7 +635,6 @@ impl PathNavigation {
     pub fn finish_navigation(&mut self, entity: &LivingEntity) {
         self.stop();
         entity.movement_input.store(Vector3::new(0.0, 0.0, 0.0));
-        entity.jumping.store(false, Ordering::Relaxed);
     }
 
     pub fn set_pathfinding_malus(&mut self, path_type: PathType, malus: f32) {
@@ -1257,9 +1265,7 @@ impl PathNavigation {
                 if (dy > step_height || f64::from(next_block.0.y) > current_pos.y)
                     && horizontal_dist_sq < jump_distance * jump_distance
                 {
-                    entity.jumping.store(true, Ordering::SeqCst);
-                } else {
-                    entity.jumping.store(false, Ordering::SeqCst);
+                    self.jump = true;
                 }
             } else {
                 self.finish_navigation(entity);
@@ -1350,6 +1356,10 @@ impl PathNavigationTrait for GroundPathNavigation {
 
     fn tick(&mut self, entity: &LivingEntity) {
         self.inner.tick_ground(entity);
+    }
+
+    fn take_jump(&mut self) -> bool {
+        std::mem::take(&mut self.inner.jump)
     }
 
     fn move_to_coords(
@@ -2235,6 +2245,10 @@ impl WallClimberNavigation {
 }
 
 impl PathNavigationTrait for WallClimberNavigation {
+    fn take_jump(&mut self) -> bool {
+        self.inner.take_jump()
+    }
+
     fn set_progress(&mut self, goal: NavigatorGoal) {
         self.path_to_position = Some(BlockPos::floored_v(goal.destination));
         self.inner.set_progress(goal);
@@ -2330,9 +2344,7 @@ impl PathNavigationTrait for WallClimberNavigation {
                 entity.speed.store(speed as f32);
                 entity.movement_input.store(Vector3::new(0.0, 0.0, speed));
                 if dy > 0.0 {
-                    entity.jumping.store(true, Ordering::SeqCst);
-                } else {
-                    entity.jumping.store(false, Ordering::SeqCst);
+                    self.inner.inner.jump = true;
                 }
             }
         }
@@ -2655,6 +2667,10 @@ impl PathNavigationTrait for AmphibiousPathNavigation {
 
     fn take_wanted_position(&mut self) -> Option<(Vector3<f64>, f64)> {
         self.wanted_position.take()
+    }
+
+    fn take_jump(&mut self) -> bool {
+        std::mem::take(&mut self.inner.jump)
     }
 
     fn tick(&mut self, entity: &LivingEntity) {

@@ -1389,9 +1389,17 @@ impl LivingEntity {
 
         self.entity.check_zero_velo();
 
-        // Mobs run this before their AI step, where vanilla has it.
-        if caller.get_mob().is_none() {
-            self.apply_input();
+        self.apply_input();
+        // Vanilla `isImmobile`, then `serverAiStep` for mobs with AI. It runs here, after
+        // `baseTick` updated the fluid state, so goals see this tick's water height.
+        if self.health.load() <= 0.0 {
+            self.jumping.store(false, SeqCst);
+            let input = self.movement_input.load();
+            self.movement_input.store(Vector3::new(0.0, input.y, 0.0));
+        } else if let Some(mob) = caller.get_mob()
+            && !mob.get_mob_entity().is_no_ai()
+        {
+            mob.get_mob_entity().server_ai_step(mob, caller);
         }
 
         if self.jumping.load(SeqCst) && should_swim_in_fluids {
@@ -1414,7 +1422,7 @@ impl LivingEntity {
 
                 let mut velo = self.entity.velocity.load();
 
-                velo.y += 0.04;
+                velo.y += f64::from(0.04f32);
 
                 self.entity.velocity.store(velo);
             } else if (on_ground || in_water && fluid_height <= swim_height)
@@ -1634,33 +1642,33 @@ impl LivingEntity {
         let effective_speed = self.get_speed(caller);
 
         if water {
-            let mut friction = if self.entity.sprinting.load(Relaxed) {
+            // Vanilla `travelInWater` works in floats.
+            let mut friction: f32 = if self.entity.sprinting.load(Relaxed) {
                 0.9
             } else {
-                f64::from(self.water_movement_speed_multiplier)
+                self.water_movement_speed_multiplier
             };
 
-            let mut speed = 0.02;
+            let mut speed: f32 = 0.02;
 
-            // Apply water movement efficiency attribute
             let mut water_movement_efficiency =
-                self.get_attribute_value(&Attributes::WATER_MOVEMENT_EFFICIENCY);
+                self.get_attribute_value(&Attributes::WATER_MOVEMENT_EFFICIENCY) as f32;
+            if !self.entity.on_ground.load(SeqCst) {
+                water_movement_efficiency *= 0.5;
+            }
 
             if water_movement_efficiency > 0.0 {
-                if !self.entity.on_ground.load(SeqCst) {
-                    water_movement_efficiency *= 0.5;
-                }
-
                 friction += (0.546_000_06 - friction) * water_movement_efficiency;
-                speed += (effective_speed - speed) * water_movement_efficiency;
+                speed += (effective_speed as f32 - speed) * water_movement_efficiency;
             }
 
             if self.has_effect(&StatusEffect::DOLPHINS_GRACE) {
                 friction = 0.96;
             }
+            let friction = f64::from(friction);
 
             self.entity
-                .update_velocity_from_input(movement_input, speed);
+                .update_velocity_from_input(movement_input, f64::from(speed));
 
             self.make_move(caller);
 
@@ -1669,12 +1677,13 @@ impl LivingEntity {
                 velo.y = 0.2;
             }
 
-            velo = velo.multiply(friction, 0.8, friction);
+            velo = velo.multiply(friction, f64::from(0.8f32), friction);
 
             self.apply_fluid_moving_speed(&mut velo.y, gravity, falling);
             self.entity.velocity.store(velo);
         } else {
-            self.entity.update_velocity_from_input(movement_input, 0.02);
+            self.entity
+                .update_velocity_from_input(movement_input, f64::from(0.02f32));
 
             self.make_move(caller);
 
@@ -1683,7 +1692,7 @@ impl LivingEntity {
             if self.entity.lava_height.load() <= self.get_swim_height() {
                 velo.x *= 0.5;
                 velo.z *= 0.5;
-                velo.y *= 0.8;
+                velo.y *= f64::from(0.8f32);
 
                 self.apply_fluid_moving_speed(&mut velo.y, gravity, falling);
             } else {

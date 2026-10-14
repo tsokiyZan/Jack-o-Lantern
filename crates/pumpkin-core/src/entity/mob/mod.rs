@@ -5,6 +5,7 @@ use super::{
 use crate::entity::ai::brain::memory::PackedMemories;
 use crate::entity::ai::brain::{Brain, BrainTick};
 use crate::entity::ai::control::MoveControlTrait;
+use crate::entity::ai::control::jump_control::JumpControl;
 use crate::entity::ai::control::look_control::LookControl;
 use crate::entity::ai::control::move_control::MoveControl;
 use crate::entity::ai::goal::goal_selector::GoalSelector;
@@ -97,6 +98,7 @@ pub struct MobEntity {
     pub look_control: std::sync::Mutex<LookControl>,
     pub sensing: std::sync::Mutex<Sensing>,
     pub move_control: std::sync::Mutex<Box<dyn MoveControlTrait>>,
+    pub jump_control: std::sync::Mutex<JumpControl>,
     pub brain: std::sync::Mutex<Brain>,
     pub brain_inbox: std::sync::Mutex<Vec<BrainMessage>>,
     pub position_target: AtomicCell<BlockPos>,
@@ -206,6 +208,7 @@ impl MobEntity {
             look_control: std::sync::Mutex::new(LookControl::default()),
             sensing: std::sync::Mutex::new(Sensing::default()),
             move_control: std::sync::Mutex::new(Box::new(MoveControl::default())),
+            jump_control: std::sync::Mutex::new(JumpControl::default()),
             brain: std::sync::Mutex::new(Brain::default()),
             brain_inbox: std::sync::Mutex::new(Vec::new()),
             position_target: AtomicCell::new(BlockPos::ZERO),
@@ -334,6 +337,9 @@ impl MobEntity {
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
                 .set_wanted_position(target.x, target.y, target.z, speed_modifier);
         }
+        if navigator.take_jump() {
+            self.jump();
+        }
 
         {
             *self
@@ -357,6 +363,18 @@ impl MobEntity {
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             move_control.tick(mob);
         }
+        self.jump_control
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .tick(mob);
+    }
+
+    /// Vanilla `mob.getJumpControl().jump()`: jump at the end of this AI step.
+    pub fn jump(&self) {
+        self.jump_control
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .jump();
     }
 
     pub fn clear_ai_goals(&self, mob: &dyn Mob) {
@@ -1708,7 +1726,8 @@ impl<T: Mob + Send + 'static> EntityBase for T {
 
         self.mob_tick(caller);
 
-        // Vanilla Mob.isEffectiveAi: NoAI skips the whole serverAiStep.
+        // Vanilla Mob.isEffectiveAi: NoAI skips the whole serverAiStep, which
+        // `LivingEntity::tick_movement` runs at its vanilla place in `aiStep`.
         //
         // TODO NoAI: move these vanilla `customServerAiStep` parts of `mob_tick`
         // into `custom_server_ai_step`:
@@ -1723,11 +1742,6 @@ impl<T: Mob + Send + 'static> EntityBase for T {
         // Piglin timers, `tick_sensors`, admiring, dancing (conversion already checks NoAI)
         // Bee and ZombifiedPiglin `update_persistent_anger` (Enderman, Wolf, IronGolem and
         // PolarBear run it outside the AI step, so the shared call stays for them).
-        mob_entity.living_entity.apply_input();
-        if !mob_entity.is_no_ai() {
-            mob_entity.server_ai_step(self, caller);
-        }
-
         mob_entity.living_entity.tick(caller, server);
         self.post_tick();
     }

@@ -444,7 +444,7 @@ impl MoveControlTrait for SlimeMoveControl {
                         next_delay /= 3;
                     }
                     slime.jump_delay.store(next_delay, Ordering::Relaxed);
-                    living_entity.jumping.store(true, Ordering::SeqCst);
+                    mob_entity.jump();
                     if slime.do_play_jump_sound() {
                         let world = entity.world.load();
                         world.play_sound_fine(
@@ -459,11 +459,8 @@ impl MoveControlTrait for SlimeMoveControl {
                     movement_input.z = f64::from(walk_speed);
                 } else {
                     slime.jump_delay.store(current_delay - 1, Ordering::Relaxed);
-                    living_entity.jumping.store(false, Ordering::SeqCst);
                     living_entity.speed.store(0.0);
                 }
-            } else {
-                living_entity.jumping.store(false, Ordering::SeqCst);
             }
         } else {
             // In air: move forward but don't "jump" again
@@ -471,7 +468,6 @@ impl MoveControlTrait for SlimeMoveControl {
                 living_entity.speed.store(walk_speed);
                 movement_input.z = f64::from(walk_speed);
             }
-            living_entity.jumping.store(false, Ordering::SeqCst);
         }
         living_entity.movement_input.store(movement_input);
     }
@@ -494,13 +490,9 @@ impl Goal for SlimeFloatGoal {
             || entity.touching_lava.load(Ordering::Relaxed)
     }
 
-    fn tick(&mut self, _mob: &dyn Mob) {
+    fn tick(&mut self, mob: &dyn Mob) {
         if rand::random_range(0.0..1.0) < 0.8 {
-            self.slime
-                .entity
-                .living_entity
-                .jumping
-                .store(true, Ordering::SeqCst);
+            mob.get_mob_entity().jump();
         }
         self.slime.speed_modifier.store(1.2);
     }
