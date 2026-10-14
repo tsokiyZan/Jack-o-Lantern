@@ -435,6 +435,27 @@ impl World {
         }
     }
 
+    /// Vanilla `TicketType.FORCED` at `ChunkMap.FORCED_TICKET_LEVEL`, entity-ticking: two
+    /// levels below a full chunk. Without the ticket a forced chunk never loads.
+    fn update_forced_tickets(&self, unforced: Vec<Vector2<i32>>, forced: Vec<Vector2<i32>>) {
+        if unforced.is_empty() && forced.is_empty() {
+            return;
+        }
+        let level = pumpkin_world::chunk_system::ChunkLoading::FULL_CHUNK_LEVEL - 2;
+        let mut chunk_loading = self
+            .level
+            .chunk_loading
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        for pos in unforced {
+            chunk_loading.remove_ticket(pos, level);
+        }
+        for pos in forced {
+            chunk_loading.add_ticket(pos, level);
+        }
+        chunk_loading.send_change();
+    }
+
     pub fn update_active_chunks(&self) {
         let sim_dist = self.server.upgrade().map_or(10, |s| {
             s.advanced_config.networking.java.simulation_distance.get()
@@ -484,7 +505,9 @@ impl World {
         for id in removed_players {
             tracker.remove_player(id, &mut active_chunks);
         }
-        tracker.sync_forced_chunks(&forced_chunks, &mut active_chunks, &mut newly_active);
+        let (unforced, forced) =
+            tracker.sync_forced_chunks(&forced_chunks, &mut active_chunks, &mut newly_active);
+        self.update_forced_tickets(unforced, forced);
 
         for pos in newly_active {
             if self.level.is_chunk_loaded(&pos) && tracker.loaded_active_chunks.insert(pos) {
