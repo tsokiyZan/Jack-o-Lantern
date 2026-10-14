@@ -13,7 +13,7 @@ const VERTICAL_RANGE: i32 = 7;
 
 pub struct AvoidEntityGoal {
     goal_control: Controls,
-    flee_type: &'static EntityType,
+    flee_types: Vec<&'static EntityType>,
     flee_distance: f64,
     slow_speed: f64,
     fast_speed: f64,
@@ -31,7 +31,27 @@ impl AvoidEntityGoal {
     ) -> Self {
         Self {
             goal_control: Controls::MOVE,
-            flee_type,
+            flee_types: vec![flee_type],
+            flee_distance,
+            slow_speed,
+            fast_speed,
+            target: None,
+            flee_pos: None,
+        }
+    }
+
+    /// Flees from any of `flee_types`, as vanilla does for a class and its subclasses
+    /// (`Guardian` also matches the elder guardian).
+    #[must_use]
+    pub fn new_for_types(
+        flee_types: &[&'static EntityType],
+        flee_distance: f64,
+        slow_speed: f64,
+        fast_speed: f64,
+    ) -> Self {
+        Self {
+            goal_control: Controls::MOVE,
+            flee_types: flee_types.to_vec(),
             flee_distance,
             slow_speed,
             fast_speed,
@@ -45,14 +65,14 @@ impl AvoidEntityGoal {
         let pos = entity.pos.load();
         let world = entity.world.load();
 
-        if self.flee_type == &EntityType::PLAYER {
+        if self.flee_types == [&EntityType::PLAYER] {
             world
                 .get_nearest_player(pos, self.flee_distance, |player| {
                     EntityPredicate::ExceptCreativeOrSpectator.test(player.get_entity())
                 })
                 .map(|p| p as Arc<dyn EntityBase>)
         } else {
-            world.get_nearest_entity(pos, self.flee_distance, Some(&[self.flee_type]), |entity| {
+            world.get_nearest_entity(pos, self.flee_distance, Some(&self.flee_types), |entity| {
                 EntityPredicate::ExceptCreativeOrSpectator.test(entity.get_entity())
             })
         }

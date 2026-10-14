@@ -12,11 +12,22 @@ pub struct LookControl {
     max_pitch_change: f32,
     look_at_timer: i32,
     position: Vector3<f64>,
+    keeps_pitch: bool,
 }
 
 impl Control for LookControl {}
 
 impl LookControl {
+    /// A look control that leaves the mob's pitch alone between looks, as vanilla's
+    /// `SmoothSwimmingLookControl` does by overriding `resetXRotOnTick` to false.
+    #[must_use]
+    pub fn keeping_pitch() -> Self {
+        Self {
+            keeps_pitch: true,
+            ..Self::default()
+        }
+    }
+
     pub fn look_at_position(&mut self, mob: &dyn Mob, position: Vector3<f64>) {
         self.look_at(mob, position.x, position.y, position.z);
     }
@@ -70,7 +81,7 @@ impl LookControl {
 
     pub fn tick(&mut self, mob: &dyn Mob) {
         let entity = mob.get_entity();
-        if Self::should_stay_horizontal() {
+        if self.reset_x_rot_on_tick() {
             entity.set_pitch(0.0);
         }
 
@@ -101,8 +112,9 @@ impl LookControl {
         Self::clamp_head_yaw(mob);
     }
 
-    const fn should_stay_horizontal() -> bool {
-        true
+    /// Vanilla `LookControl.resetXRotOnTick`.
+    const fn reset_x_rot_on_tick(&self) -> bool {
+        !self.keeps_pitch
     }
 
     fn clamp_head_yaw(mob: &dyn Mob) {
