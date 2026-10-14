@@ -1002,6 +1002,20 @@ impl Level {
         }
     }
 
+    /// Registers a freshly loaded chunk's saved block and fluid ticks so the tick
+    /// loop runs them; otherwise they wait until something schedules a new tick
+    /// in the same chunk.
+    pub fn resume_scheduled_ticks(&self, chunk_pos: Vector2<i32>) {
+        let has_ticks = self
+            .read_chunk_sync(&chunk_pos, |chunk| {
+                chunk.block_ticks.has_ticks() || chunk.fluid_ticks.has_ticks()
+            })
+            .unwrap_or(false);
+        if has_ticks {
+            self.chunks_with_scheduled_ticks.insert(chunk_pos);
+        }
+    }
+
     pub fn is_block_tick_scheduled(&self, block_pos: &BlockPos, block: &Block) -> bool {
         self.read_chunk_sync(&block_pos.chunk_position(), |chunk| {
             chunk.block_ticks.is_scheduled(*block_pos, block)

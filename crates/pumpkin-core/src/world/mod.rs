@@ -494,6 +494,9 @@ impl World {
         for change in self.level.loaded_chunk_changes() {
             match change {
                 pumpkin_world::level::LoadedChunkChange::Loaded(pos) => {
+                    // Handled here, on the same thread as the tick loop, so the
+                    // loop cannot drop the entry for a chunk it has not seen yet.
+                    self.level.resume_scheduled_ticks(pos);
                     if active_chunks.contains(&pos)
                         && self.level.is_chunk_loaded(&pos)
                         && tracker.loaded_active_chunks.insert(pos)
