@@ -84,6 +84,9 @@ pub struct LivingEntity {
     /// Vanilla `LivingEntity.noActionTime`: ticks since a mob last had a player nearby
     /// or got hurt.
     pub no_action_time: AtomicI32,
+    /// Vanilla `LivingEntity.speed`: the speed the move control last set, which travel
+    /// moves the entity by. Players use their movement speed attribute instead.
+    pub speed: AtomicCell<f32>,
     /// The `scale` attribute the current dimensions were built with, so a change can
     /// refresh them like vanilla's `onAttributeUpdated`.
     applied_scale: AtomicCell<f32>,
@@ -293,6 +296,7 @@ impl LivingEntity {
             hurt_cooldown: AtomicI32::new(0),
             no_action_time: AtomicI32::new(0),
             applied_scale: AtomicCell::new(1.0),
+            speed: AtomicCell::new(0.0),
             last_damage_taken: AtomicCell::new(0.0),
             absorption: AtomicCell::new(0.0),
             fall_distance: AtomicCell::new(0.0),
@@ -907,6 +911,17 @@ impl LivingEntity {
             .map_or(attribute.default_value, AttributeInstance::value)
     }
 
+    /// Vanilla `LivingEntity.getSpeed`, which `Player.getSpeed` replaces with the
+    /// movement speed attribute.
+    #[must_use]
+    pub fn get_speed(&self, caller: &dyn EntityBase) -> f64 {
+        if caller.get_player().is_some() {
+            self.get_attribute_value(&Attributes::MOVEMENT_SPEED)
+        } else {
+            f64::from(self.speed.load())
+        }
+    }
+
     /// Vanilla `LivingEntity.getScale`: the `scale` attribute.
     #[must_use]
     pub fn get_scale(&self) -> f32 {
@@ -1371,15 +1386,10 @@ impl LivingEntity {
 
         self.entity.check_zero_velo();
 
-        let mut movement_input = self.movement_input.load();
-
-        movement_input.x *= 0.98;
-
-        movement_input.z *= 0.98;
-
-        self.movement_input.store(movement_input);
-
-        // TODO: Tick AI
+        // Mobs run this before their AI step, where vanilla has it.
+        if caller.get_mob().is_none() {
+            self.apply_input();
+        }
 
         if self.jumping.load(SeqCst) && should_swim_in_fluids {
             let in_lava = self.entity.touching_lava.load(SeqCst);
@@ -1457,6 +1467,16 @@ impl LivingEntity {
         self.push_entities(caller);
     }
 
+    /// Vanilla `LivingEntity.applyInput`: the last tick's movement input decays. Vanilla
+    /// runs it just before `serverAiStep`, so input the AI sets this tick is used at
+    /// full strength.
+    pub fn apply_input(&self) {
+        let mut movement_input = self.movement_input.load();
+        movement_input.x *= f64::from(INPUT_FRICTION);
+        movement_input.z *= f64::from(INPUT_FRICTION);
+        self.movement_input.store(movement_input);
+    }
+
     fn push_entities(&self, dyn_self: &dyn EntityBase) {
         let world = self.entity.world.load();
         let entity_bb = self.entity.bounding_box.load();
@@ -1529,7 +1549,7 @@ impl LivingEntity {
     fn travel_in_air(&self, caller: &dyn EntityBase) {
         // applyMovementInput
 
-        let effective_speed = self.get_attribute_value(&Attributes::MOVEMENT_SPEED);
+        let effective_speed = self.get_speed(caller);
 
         let (speed, friction) = if self.entity.on_ground.load(Relaxed) {
             // getVelocityAffectingPos
@@ -1608,7 +1628,7 @@ impl LivingEntity {
 
         let falling = self.entity.velocity.load().y <= 0.0;
         let gravity = self.get_effective_gravity(caller);
-        let effective_speed = self.get_attribute_value(&Attributes::MOVEMENT_SPEED);
+        let effective_speed = self.get_speed(caller);
 
         if water {
             let mut friction = if self.entity.sprinting.load(Relaxed) {
@@ -3662,6 +3682,9 @@ impl EntityBase for LivingEntity {
         self
     }
 }
+
+/// Vanilla `LivingEntity.INPUT_FRICTION`.
+const INPUT_FRICTION: f32 = 0.98;
 
 pub const SPEED_MODIFIER_SPRINTING_ID: &str = "minecraft:sprinting";
 pub const SPEED_MODIFIER_SPRINTING_AMOUNT: f64 = 0.300_000_011_920_928_96;

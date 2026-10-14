@@ -46,12 +46,15 @@ impl MoveControlTrait for MoveControl {
         let entity = &living_entity.entity;
         if self.operation == Operation::Strafe {
             // TODO: is_walkable check
+            let movement_speed = living_entity.get_attribute_value(&Attributes::MOVEMENT_SPEED);
+            living_entity
+                .speed
+                .store(self.speed_modifier as f32 * movement_speed as f32);
             living_entity.movement_input.store(Vector3::new(
                 self.strafe_right as f64,
                 0.0,
                 self.strafe_forwards as f64,
             ));
-            // Vanilla sets speed here too
             self.operation = Operation::Wait;
         } else if self.operation == Operation::MoveTo {
             self.operation = Operation::Wait;
@@ -74,10 +77,7 @@ impl MoveControlTrait for MoveControl {
                 .store(self.change_angle(entity.yaw.load(), y_rot_d, 90.0));
 
             let movement_speed = living_entity.get_attribute_value(&Attributes::MOVEMENT_SPEED);
-            let speed = self.speed_modifier * movement_speed;
-            living_entity
-                .movement_input
-                .store(Vector3::new(0.0, 0.0, speed));
+            mob_entity.set_speed((self.speed_modifier * movement_speed) as f32);
 
             // TODO: Jump if needed (based on collision and height difference)
             let step_height = living_entity.get_attribute_value(&Attributes::STEP_HEIGHT);
@@ -89,10 +89,7 @@ impl MoveControlTrait for MoveControl {
             }
         } else if self.operation == Operation::Jumping {
             let movement_speed = living_entity.get_attribute_value(&Attributes::MOVEMENT_SPEED);
-            let speed = self.speed_modifier * movement_speed;
-            living_entity
-                .movement_input
-                .store(Vector3::new(0.0, 0.0, speed));
+            mob_entity.set_speed((self.speed_modifier * movement_speed) as f32);
 
             if entity.on_ground.load(Ordering::Relaxed) {
                 self.operation = Operation::Wait;

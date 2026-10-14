@@ -84,6 +84,7 @@ impl MoveControlTrait for SmoothSwimmingMoveControl {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .is_done();
         if self.operation != Operation::MoveTo || navigation_done {
+            living_entity.speed.store(0.0);
             living_entity
                 .movement_input
                 .store(Vector3::new(0.0, 0.0, 0.0));
@@ -122,6 +123,9 @@ impl MoveControlTrait for SmoothSwimmingMoveControl {
                     .store(self.change_angle(entity.pitch.load(), x_rot_d, 5.0));
             }
 
+            living_entity
+                .speed
+                .store(speed * self.in_water_speed_modifier);
             let pitch = entity.pitch.load().to_radians();
             living_entity.movement_input.store(Vector3::new(
                 0.0,
@@ -131,11 +135,7 @@ impl MoveControlTrait for SmoothSwimmingMoveControl {
         } else {
             let left_to_turn = wrap_degrees(entity.yaw.load() - y_rot_d).abs();
             let factor = Self::get_turning_speed_factor(left_to_turn);
-            living_entity.movement_input.store(Vector3::new(
-                0.0,
-                0.0,
-                f64::from(speed * self.outside_water_speed_modifier * factor),
-            ));
+            mob_entity.set_speed(speed * self.outside_water_speed_modifier * factor);
         }
     }
 

@@ -1242,12 +1242,13 @@ impl PathNavigation {
                 entity.entity.head_yaw.store(target_yaw);
                 entity.entity.body_yaw.store(target_yaw);
 
+                // Vanilla `MoveControl` `MOVE_TO`: `Mob.setSpeed`, also the forward input.
                 let mob_speed =
-                    goal.speed * entity.get_attribute_value(&Attributes::MOVEMENT_SPEED);
-
+                    (goal.speed * entity.get_attribute_value(&Attributes::MOVEMENT_SPEED)) as f32;
+                entity.speed.store(mob_speed);
                 entity
                     .movement_input
-                    .store(Vector3::new(0.0, 0.0, mob_speed));
+                    .store(Vector3::new(0.0, 0.0, f64::from(mob_speed)));
 
                 let step_height = entity.get_attribute_value(&Attributes::STEP_HEIGHT);
                 let jump_distance = 1.0f64.max(f64::from(self.mob_width));
@@ -1640,6 +1641,7 @@ impl PathNavigationTrait for FlyingPathNavigation {
                 } else {
                     0.0
                 };
+                entity.speed.store(speed as f32);
                 entity
                     .movement_input
                     .store(Vector3::new(0.0, y_input, speed));
@@ -2076,6 +2078,7 @@ impl PathNavigationTrait for WaterBoundPathNavigation {
                 } else {
                     0.0
                 };
+                entity.speed.store(speed as f32);
                 entity
                     .movement_input
                     .store(Vector3::new(0.0, y_input, speed));
@@ -2323,6 +2326,7 @@ impl PathNavigationTrait for WallClimberNavigation {
 
                 let speed = self.inner.inner.speed_modifier
                     * entity.get_attribute_value(&Attributes::MOVEMENT_SPEED);
+                entity.speed.store(speed as f32);
                 entity.movement_input.store(Vector3::new(0.0, 0.0, speed));
                 if dy > 0.0 {
                     entity.jumping.store(true, Ordering::SeqCst);
@@ -2596,6 +2600,7 @@ impl PathNavigationTrait for AmphibiousPathNavigation {
                     } else {
                         0.0
                     };
+                    entity.speed.store(speed as f32);
                     entity
                         .movement_input
                         .store(Vector3::new(0.0, y_input, speed));

@@ -81,10 +81,12 @@ impl MoveControlTrait for FlyingMoveControl {
                 } else {
                     -(speed as f64)
                 };
+                living_entity.speed.store(speed);
                 living_entity
                     .movement_input
                     .store(Vector3::new(0.0, yya, speed as f64));
             } else {
+                living_entity.speed.store(speed);
                 living_entity
                     .movement_input
                     .store(Vector3::new(0.0, 0.0, speed as f64));

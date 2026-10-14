@@ -125,6 +125,16 @@ impl MobEntity {
         EquipmentSlot::FEET,
     ];
 
+    /// Vanilla `Mob.setSpeed`: the speed travel uses, also set as the forward input.
+    pub fn set_speed(&self, speed: f32) {
+        let living = &self.living_entity;
+        living.speed.store(speed);
+        let input = living.movement_input.load();
+        living
+            .movement_input
+            .store(Vector3::new(input.x, input.y, f64::from(speed)));
+    }
+
     /// Vanilla `Mob.setPathfindingMalus`: what this mob pays to path through
     /// `path_type`, or `-1` to never enter it.
     pub fn set_pathfinding_malus(&self, path_type: PathType, malus: f32) {
@@ -1619,6 +1629,7 @@ impl<T: Mob + Send + 'static> EntityBase for T {
         // Piglin timers, `tick_sensors`, admiring, dancing (conversion already checks NoAI)
         // Bee and ZombifiedPiglin `update_persistent_anger` (Enderman, Wolf, IronGolem and
         // PolarBear run it outside the AI step, so the shared call stays for them).
+        mob_entity.living_entity.apply_input();
         if !mob_entity.is_no_ai() {
             mob_entity.server_ai_step(self, caller);
         }

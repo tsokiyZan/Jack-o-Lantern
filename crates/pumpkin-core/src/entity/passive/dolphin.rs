@@ -393,11 +393,8 @@ impl Mob for DolphinEntity {
         if !entity.is_in_water() {
             return false;
         }
-        // `getSpeed()`, which the move control sets to the swim speed times its
-        // in-water modifier; that swim speed is the length of the input it leaves.
-        let input = living.movement_input.load();
-        entity
-            .update_velocity_from_input(input, input.length() * f64::from(IN_WATER_SPEED_MODIFIER));
+        // Vanilla `Dolphin.travelInWater`: `moveRelative(getSpeed(), input)`.
+        entity.update_velocity_from_input(living.movement_input.load(), living.get_speed(caller));
         living.make_move(caller);
 
         let mut velocity = entity.velocity.load() * 0.9;
