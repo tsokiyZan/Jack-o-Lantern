@@ -1,5 +1,6 @@
 use pumpkin_data::translation;
 use pumpkin_data::{Block, BlockStateId};
+use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::PermissionLvl;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector2::Vector2;
@@ -11,9 +12,10 @@ use pumpkin_world::world::BlockFlags;
 use crate::command::argument_builder::{
     ArgumentBuilder, RequiredArgumentBuilder, argument, command, literal,
 };
-use crate::command::argument_types::block::BlockArgumentType;
+use crate::command::argument_types::block::{BlockArgumentType, BlockInput};
 use crate::command::argument_types::block_predicate::{BlockPredicate, BlockPredicateArgumentType};
 use crate::command::argument_types::coordinates::block_pos::BlockPosArgumentType;
+use crate::command::commands::setblock::load_block_entity_nbt;
 use crate::command::context::command_context::CommandContext;
 use crate::command::context::command_source::CommandSource;
 use crate::command::errors::command_syntax_error::CommandSyntaxError;
@@ -55,7 +57,7 @@ fn fill_blocks(
     source: &CommandSource,
     from: BlockPos,
     to: BlockPos,
-    target_block: &'static Block,
+    input: &BlockInput,
     mode: FillMode,
     filter: Option<&BlockPredicate>,
     _strict: bool,
@@ -85,8 +87,31 @@ fn fill_blocks(
         ));
     }
 
-    let target_state_id = target_block.default_state.id;
+    let target_state_id = input.state;
     let mut changed_positions = Vec::new();
+
+    // Positions whose block entity matches the filter's NBT, gathered before the chunk
+    // locks are taken.
+    let nbt_matches: Option<std::collections::HashSet<BlockPos>> =
+        filter.filter(|filter| filter.requires_nbt()).map(|filter| {
+            let mut matches = std::collections::HashSet::new();
+            for x in min_x..=max_x {
+                for y in min_y..=max_y {
+                    for z in min_z..=max_z {
+                        let pos = BlockPos::new(x, y, z);
+                        let saved = world.get_block_entity(&pos).map(|block_entity| {
+                            let mut nbt = NbtCompound::new();
+                            block_entity.write_internal(&mut nbt);
+                            nbt
+                        });
+                        if filter.test_nbt(saved.as_ref()) {
+                            matches.insert(pos);
+                        }
+                    }
+                }
+            }
+            matches
+        });
 
     let min_chunk_x = min_x >> 4;
     let max_chunk_x = max_x >> 4;
@@ -143,7 +168,10 @@ fn fill_blocks(
                                     }
                                     _ => {
                                         if let Some(f) = filter
-                                            && !f.test(current_block)
+                                            && (!f.test(current_state_id)
+                                                || nbt_matches
+                                                    .as_ref()
+                                                    .is_some_and(|set| !set.contains(&pos)))
                                         {
                                             continue;
                                         }
@@ -218,6 +246,14 @@ fn fill_blocks(
         }
     }
 
+    if let Some(tag) = &input.nbt {
+        for (pos, state) in &changed_positions {
+            if *state == target_state_id {
+                load_block_entity_nbt(&world, pos, tag);
+            }
+        }
+    }
+
     let count = changed_positions.len() as i32;
     if count == 0 {
         return Err(ERROR_FAILED.create_without_context());
@@ -248,7 +284,7 @@ impl CommandExecutor for FillExecutor {
     fn execute(&self, context: &CommandContext) -> CommandExecutorResult {
         let from = BlockPosArgumentType::get_loaded_block_pos(context, "from")?;
         let to = BlockPosArgumentType::get_loaded_block_pos(context, "to")?;
-        let block = BlockArgumentType::get(context, "block")?;
+        let input = BlockArgumentType::get(context, "block")?;
 
         let filter = if matches!(self.filter_mode, FilterMode::WithFilter) {
             Some(BlockPredicateArgumentType::get(context, "filter")?)
@@ -260,7 +296,7 @@ impl CommandExecutor for FillExecutor {
             &context.source,
             from,
             to,
-            block,
+            &input,
             self.mode,
             filter.as_ref(),
             self.strict,

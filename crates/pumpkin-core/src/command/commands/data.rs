@@ -288,8 +288,12 @@ impl BlockDataAccessor {
 
 impl DataAccessor for BlockDataAccessor {
     fn set_data(&self, tag: &NbtCompound) -> Result<(), CommandSyntaxError> {
-        if self.world.get_block_entity(&self.pos).is_some() {
-            self.world.add_block_entity_nbt(self.pos, tag);
+        // `add_block_entity_nbt` only queues data for a block entity that is not loaded
+        // yet, so the live one is rebuilt from the merged tag instead.
+        if self.world.get_block_entity(&self.pos).is_some()
+            && let Some(loaded) = crate::block::entities::block_entity_from_nbt(tag)
+        {
+            self.world.add_block_entity(loaded);
             Ok(())
         } else {
             Err(ERROR_BLOCK_INVALID.create_without_context())

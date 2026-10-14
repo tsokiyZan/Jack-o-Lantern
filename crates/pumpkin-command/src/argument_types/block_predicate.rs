@@ -1,13 +1,15 @@
-use std::collections::HashMap;
-
 use pumpkin_data::tag::{RegistryKey, get_tag_ids};
-use pumpkin_data::{Block, translation};
+use pumpkin_data::{Block, BlockStateId, translation};
 use pumpkin_nbt::compound::NbtCompound;
+use pumpkin_nbt::tag::NbtTag;
 use pumpkin_util::text::TextComponent;
 
 use crate::argument_types::argument_type::{ArgumentType, JavaClientArgumentType};
-use crate::argument_types::block::INVALID_BLOCK_ERROR_TYPE;
-use crate::argument_types::nbt::NbtCompoundArgumentType;
+use crate::argument_types::block::{
+    ERROR_DUPLICATE_PROPERTY, ERROR_EXPECTED_END_OF_PROPERTIES, ERROR_EXPECTED_VALUE,
+    properties_match, read_block, read_nbt, read_properties,
+};
+use crate::argument_types::nbt_path::compare_nbt;
 use crate::context::command_context::CommandContext;
 use crate::errors::command_syntax_error::CommandSyntaxError;
 use crate::errors::error_types::CommandErrorType;
@@ -19,110 +21,139 @@ pub const ERROR_UNKNOWN_TAG: CommandErrorType<1> = CommandErrorType::new(
     translation::java::ARGUMENTS_BLOCK_TAG_UNKNOWN,
 );
 
-pub const ERROR_NO_VALUE: CommandErrorType<1> = CommandErrorType::new(
-    translation::java::ARGUMENT_BLOCK_PROPERTY_NOVALUE,
-    translation::java::ARGUMENT_BLOCK_PROPERTY_NOVALUE,
-);
-
-pub const ERROR_UNCLOSED_PROPERTIES: CommandErrorType<0> = CommandErrorType::new(
-    translation::java::ARGUMENT_BLOCK_PROPERTY_UNCLOSED,
-    translation::java::ARGUMENT_BLOCK_PROPERTY_UNCLOSED,
-);
-
+/// Vanilla `BlockPredicateArgument`'s result: a block with the properties it names, or a
+/// block tag with property strings checked against each block.
 #[derive(Clone, Debug)]
 pub enum BlockPredicate {
     Block {
-        block: &'static Block,
-        properties: HashMap<String, String>,
+        state: BlockStateId,
+        properties: Vec<&'static str>,
         nbt: Option<NbtCompound>,
     },
     Tag {
         tag_name: String,
         block_ids: Vec<u16>,
-        properties: HashMap<String, String>,
+        properties: Vec<(String, String)>,
         nbt: Option<NbtCompound>,
     },
 }
 
 impl BlockPredicate {
+    /// The block and property part of the vanilla predicate's `test`.
     #[must_use]
-    pub fn test(&self, block: &Block) -> bool {
+    pub fn test(&self, state: BlockStateId) -> bool {
+        let block = Block::from_state_id(state);
         match self {
             Self::Block {
-                block: expected, ..
-            } => block.id == expected.id,
-            Self::Tag { block_ids, .. } => block_ids.contains(&block.id.as_u16()),
+                state: expected,
+                properties,
+                ..
+            } => {
+                let expected_block = Block::from_state_id(*expected);
+                block.id == expected_block.id
+                    && properties_match(expected_block, *expected, state, properties)
+            }
+            // Vanilla `TagPredicate.test`: a property the block lacks, or a value it
+            // cannot take, fails the test.
+            Self::Tag {
+                block_ids,
+                properties,
+                ..
+            } => {
+                if !block_ids.contains(&block.id.as_u16()) {
+                    return false;
+                }
+                if properties.is_empty() {
+                    return true;
+                }
+                let Some(actual) = block.properties(state) else {
+                    return false;
+                };
+                let actual = actual.to_props();
+                properties.iter().all(|(name, value)| {
+                    actual.iter().any(|(key, set)| key == name && set == value)
+                })
+            }
+        }
+    }
+
+    /// The block entity part of the vanilla predicate's `test`: a partial match of the
+    /// predicate's NBT against the block entity's saved data.
+    #[must_use]
+    pub fn test_nbt(&self, block_entity: Option<&NbtCompound>) -> bool {
+        self.nbt().is_none_or(|expected| {
+            block_entity.is_some_and(|saved| {
+                compare_nbt(
+                    &NbtTag::Compound(expected.clone()),
+                    &NbtTag::Compound(saved.clone()),
+                )
+            })
+        })
+    }
+
+    #[must_use]
+    pub const fn nbt(&self) -> Option<&NbtCompound> {
+        match self {
+            Self::Block { nbt, .. } | Self::Tag { nbt, .. } => nbt.as_ref(),
         }
     }
 
     #[must_use]
     pub const fn requires_nbt(&self) -> bool {
-        match self {
-            Self::Block { nbt, .. } | Self::Tag { nbt, .. } => nbt.is_some(),
-        }
+        self.nbt().is_some()
     }
 }
 
-fn parse_properties(
+/// Vanilla `BlockStateParser.readVagueProperties`: property strings for a tag, checked
+/// only when a block is tested.
+fn read_vague_properties(
     reader: &mut StringReader,
-) -> Result<HashMap<String, String>, CommandSyntaxError> {
-    let mut properties = HashMap::new();
-    if reader.peek() == Some('[') {
+    tag_name: &str,
+) -> Result<Vec<(String, String)>, CommandSyntaxError> {
+    let mut properties: Vec<(String, String)> = Vec::new();
+    if reader.peek() != Some('[') {
+        return Ok(properties);
+    }
+    reader.skip();
+    reader.skip_whitespace();
+    let tag_text = || TextComponent::text(tag_name.to_string());
+    while reader.can_read_char() && reader.peek() != Some(']') {
+        reader.skip_whitespace();
+        let key_start = reader.cursor();
+        let key = reader.read_string()?;
+        if properties.iter().any(|(name, _)| *name == key) {
+            reader.set_cursor(key_start);
+            return Err(ERROR_DUPLICATE_PROPERTY.create(
+                reader,
+                TextComponent::text(key),
+                tag_text(),
+            ));
+        }
+        reader.skip_whitespace();
+        if reader.peek() != Some('=') {
+            return Err(ERROR_EXPECTED_VALUE.create(reader, TextComponent::text(key), tag_text()));
+        }
         reader.skip();
         reader.skip_whitespace();
-        while reader.can_read_char() && reader.peek() != Some(']') {
-            let start_key = reader.cursor();
-            while let Some(c) = reader.peek() {
-                if c.is_alphanumeric() || c == '_' || c == '-' {
-                    reader.skip();
-                } else {
-                    break;
+        let value = reader.read_string()?;
+        properties.push((key, value));
+        reader.skip_whitespace();
+        if reader.can_read_char() {
+            if reader.peek() != Some(',') {
+                if reader.peek() != Some(']') {
+                    return Err(ERROR_EXPECTED_END_OF_PROPERTIES.create(reader));
                 }
-            }
-            let key = reader.string()[start_key..reader.cursor()].to_string();
-            reader.skip_whitespace();
-            if reader.peek() != Some('=') {
-                return Err(ERROR_NO_VALUE.create(reader, TextComponent::text(key)));
-            }
-            reader.skip();
-            reader.skip_whitespace();
-            let start_val = reader.cursor();
-            while let Some(c) = reader.peek() {
-                if c.is_alphanumeric() || c == '_' || c == '-' {
-                    reader.skip();
-                } else {
-                    break;
-                }
-            }
-            let val = reader.string()[start_val..reader.cursor()].to_string();
-            properties.insert(key, val);
-            reader.skip_whitespace();
-            if reader.peek() == Some(',') {
-                reader.skip();
-                reader.skip_whitespace();
-            } else if reader.peek() == Some(']') {
                 break;
-            } else {
-                return Err(ERROR_UNCLOSED_PROPERTIES.create_without_context());
             }
-        }
-        if reader.peek() == Some(']') {
             reader.skip();
-        } else {
-            return Err(ERROR_UNCLOSED_PROPERTIES.create_without_context());
         }
+    }
+    if reader.can_read_char() {
+        reader.skip();
+    } else {
+        return Err(ERROR_EXPECTED_END_OF_PROPERTIES.create(reader));
     }
     Ok(properties)
-}
-
-fn parse_nbt(reader: &mut StringReader) -> Result<Option<NbtCompound>, CommandSyntaxError> {
-    if reader.peek() == Some('{') {
-        let tag =
-            ArgumentType::<crate::source::DummySource>::parse(&NbtCompoundArgumentType, reader)?;
-        Ok(Some(tag))
-    } else {
-        Ok(None)
-    }
 }
 
 pub struct BlockPredicateArgumentType;
@@ -159,8 +190,8 @@ impl<S: crate::source::CommandSource> ArgumentType<S> for BlockPredicateArgument
                 }
             };
 
-            let properties = parse_properties(reader)?;
-            let nbt = parse_nbt(reader)?;
+            let properties = read_vague_properties(reader, &normalized)?;
+            let nbt = read_nbt(reader)?;
 
             Ok(BlockPredicate::Tag {
                 tag_name: normalized,
@@ -169,30 +200,11 @@ impl<S: crate::source::CommandSource> ArgumentType<S> for BlockPredicateArgument
                 nbt,
             })
         } else {
-            let start = reader.cursor();
-            while let Some(c) = reader.peek() {
-                if c.is_alphanumeric() || c == '_' || c == ':' || c == '/' || c == '.' || c == '-' {
-                    reader.skip();
-                } else {
-                    break;
-                }
-            }
-            let block_str = &reader.string()[start..reader.cursor()];
-            let normalized = if block_str.contains(':') {
-                block_str.to_string()
-            } else {
-                format!("minecraft:{block_str}")
-            };
-
-            let block = Block::from_name(&normalized).ok_or_else(|| {
-                INVALID_BLOCK_ERROR_TYPE.create(reader, TextComponent::text(normalized))
-            })?;
-
-            let properties = parse_properties(reader)?;
-            let nbt = parse_nbt(reader)?;
-
+            let block = read_block(reader)?;
+            let (state, properties) = read_properties(reader, block)?;
+            let nbt = read_nbt(reader)?;
             Ok(BlockPredicate::Block {
-                block,
+                state,
                 properties,
                 nbt,
             })
