@@ -1037,6 +1037,44 @@ mod tests {
     use pumpkin_config::world::LevelConfig;
     use tempfile::TempDir;
 
+    /// Ticks saved with a chunk must run once the chunk is loaded again. In vanilla,
+    /// `ChunkStatusTasks` calls `LevelChunk.registerTickContainerInLevel`, which hands the
+    /// chunk's block and fluid ticks to `LevelTicks.addContainer`, so a loaded chunk's
+    /// saved ticks are always visible to the tick loop.
+    #[tokio::test]
+    async fn saved_ticks_run_after_chunk_load() {
+        const DELAY: u8 = 3;
+        let temp_dir = TempDir::new().unwrap();
+        let level = Level::from_root_folder(
+            &LevelConfig::default(),
+            temp_dir.path().to_path_buf(),
+            0,
+            Dimension::OVERWORLD,
+        );
+        let pos = BlockPos::new(1, 70, 1);
+        let chunk_pos = pos.chunk_position();
+
+        // The chunk as read back from disk: one fire tick still pending, and
+        // nothing else in the level has scheduled a tick in it.
+        let mut chunk = ChunkData::empty(chunk_pos.x, chunk_pos.y);
+        chunk.block_ticks = std::iter::once(ScheduledTick {
+            delay: DELAY,
+            priority: TickPriority::Normal,
+            position: pos,
+            value: &Block::FIRE,
+        })
+        .collect();
+        level.loaded_chunks.insert(chunk_pos, Arc::new(chunk));
+        level.resume_scheduled_ticks(chunk_pos);
+
+        let ran: Vec<_> = (0..=DELAY)
+            .flat_map(|_| level.get_tick_data(&FxHashSet::default(), 0).block_ticks)
+            .collect();
+        assert_eq!(ran.len(), 1, "the saved tick should run exactly once");
+        assert_eq!(ran[0].position, pos);
+        assert_eq!(ran[0].value, &Block::FIRE);
+    }
+
     #[tokio::test]
     async fn dimension_paths_26_2() {
         let temp_dir = TempDir::new().unwrap();
