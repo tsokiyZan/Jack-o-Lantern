@@ -4,13 +4,14 @@ use std::sync::{
 };
 
 use crate::entity::ai::pathfinder::node::PathType;
-use pumpkin_data::entity::{EntityStatus, EntityType};
+use pumpkin_data::entity::{EntityPose, EntityStatus, EntityType};
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::codec::var_int::VarInt;
+use pumpkin_util::math::boundingbox::EntityDimensions;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
 
@@ -131,6 +132,8 @@ impl SnifferEntity {
             pumpkin_data::tracked_data::sniffer::STATE,
             VarInt(state.id()),
         );
+        // Vanilla `Sniffer.onSyncedDataUpdated` on `DATA_STATE`.
+        self.refresh_dimensions();
     }
 
     pub fn transition_to(&self, state: SnifferState) {
@@ -326,7 +329,25 @@ impl Animal for SnifferEntity {
     }
 }
 
+/// Vanilla `Sniffer.DIGGING_DIMENSIONS`.
+const DIGGING_DIMENSIONS: EntityDimensions = EntityDimensions::scalable(
+    EntityType::SNIFFER.dimension[0],
+    EntityType::SNIFFER.dimension[1] - 0.4,
+)
+.with_eye_height(0.81);
+
 impl Mob for SnifferEntity {
+    /// Vanilla `Sniffer.getDefaultDimensions`: lower while digging.
+    fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
+        if self.get_state() == SnifferState::Digging {
+            DIGGING_DIMENSIONS.scale(self.age_scale())
+        } else {
+            self.get_entity()
+                .get_dimensions(pose)
+                .scale(self.age_scale())
+        }
+    }
+
     fn as_ageable(&self) -> Option<&dyn AgeableMob> {
         Some(self)
     }

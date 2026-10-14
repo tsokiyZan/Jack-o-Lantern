@@ -254,6 +254,41 @@ pub trait EntityBase: Send + Sync + std::any::Any {
             .add_raw(0.0, self.bedrock_y_offset(), 0.0)
     }
 
+    /// Vanilla `getDimensions(pose)`: a sleeping living entity is a 0.2 cube, a mob uses
+    /// its own `default_dimensions`, and living entities scale with the `scale`
+    /// attribute.
+    fn dimensions_for_pose(&self, pose: EntityPose) -> EntityDimensions {
+        let entity = self.get_entity();
+        let Some(living) = self.get_living_entity() else {
+            return entity.get_dimensions(pose);
+        };
+        if pose == EntityPose::Sleeping {
+            return entity.get_dimensions(pose);
+        }
+        let Some(mob) = self.get_mob() else {
+            return entity.get_dimensions(pose).scale(living.get_scale());
+        };
+        let dimensions = mob.default_dimensions(pose);
+        if mob.has_fixed_dimensions(pose) {
+            dimensions
+        } else {
+            dimensions.scale(living.get_scale())
+        }
+    }
+
+    /// Vanilla `Entity.refreshDimensions`, for when something the dimensions depend on
+    /// changed: baby state, the `scale` attribute, a mob's size or state.
+    fn refresh_dimensions(&self) {
+        let entity = self.get_entity();
+        entity.apply_dimensions(self.dimensions_for_pose(entity.pose.load()));
+    }
+
+    /// Vanilla `Entity.setPose`, which refreshes the dimensions for the new pose.
+    fn set_pose(&self, pose: EntityPose) {
+        self.get_entity()
+            .set_pose_with_dimensions(pose, self.dimensions_for_pose(pose));
+    }
+
     fn get_mob(&self) -> Option<&dyn mob::Mob> {
         None
     }
@@ -1313,6 +1348,23 @@ impl Entity {
             }
         }
         Self::type_dimensions(self.entity_type)
+    }
+
+    /// Whether the entity is a baby. Pumpkin keeps that as a negative age for every
+    /// mob that has babies.
+    #[must_use]
+    pub fn is_baby(&self) -> bool {
+        self.age.load(Ordering::Relaxed) < 0
+    }
+
+    /// Stores new dimensions and rebuilds the bounding box around the current position,
+    /// the core of vanilla `Entity.refreshDimensions`.
+    pub fn apply_dimensions(&self, dimension: EntityDimensions) {
+        let position = self.pos.load();
+        self.bounding_box.store(BoundingBox::new_from_pos(
+            position.x, position.y, position.z, &dimension,
+        ));
+        self.entity_dimension.store(dimension);
     }
 
     pub fn get_eye_height(&self) -> f64 {
@@ -3038,7 +3090,9 @@ impl Entity {
         self.synched_data.clear_dirty();
     }
 
-    pub fn set_pose(&self, pose: EntityPose) {
+    /// Vanilla `Entity.setPose` with the dimensions the owning entity has in that pose,
+    /// which only `EntityBase::set_pose` can work out. Call that instead.
+    pub fn set_pose_with_dimensions(&self, pose: EntityPose, dimension: EntityDimensions) {
         if self.pose.load() == pose {
             return;
         }
@@ -3057,12 +3111,8 @@ impl Entity {
             }
         }
 
-        let dimension = self.get_dimensions(pose);
-        let position = self.pos.load();
-        let aabb = BoundingBox::new_from_pos(position.x, position.y, position.z, &dimension);
         self.pose.store(pose);
-        self.bounding_box.store(aabb);
-        self.entity_dimension.store(dimension);
+        self.apply_dimensions(dimension);
         let pose = pose as i32;
         let mut bedrock_meta = SyncedActorDataList::new();
         bedrock_meta.set(entity_data_key::POSE_INDEX, MetadataValue::Int(pose));
@@ -3798,7 +3848,7 @@ impl Entity {
                 let mut found = None;
 
                 'search: for (pose, y_offsets) in poses_and_heights {
-                    let dims = passenger_entity.get_dimensions(pose);
+                    let dims = passenger.dimensions_for_pose(pose);
 
                     for y_offset in y_offsets {
                         for &(ox, oz) in &offsets {
@@ -3834,7 +3884,7 @@ impl Entity {
 
                 if let Some((pos, pose)) = found {
                     if pose != EntityPose::Standing {
-                        passenger_entity.set_pose(pose);
+                        passenger.set_pose(pose);
                     }
                     pos
                 } else {
@@ -3849,7 +3899,7 @@ impl Entity {
                     ];
 
                     for pose in poses {
-                        let dims = passenger_entity.get_dimensions(pose);
+                        let dims = passenger.dimensions_for_pose(pose);
                         let bbox = BoundingBox::new_from_pos(
                             self.pos.load().x,
                             vehicle_top,
@@ -3867,7 +3917,7 @@ impl Entity {
 
                     if let Some((pos, pose)) = found_fallback {
                         if pose != EntityPose::Standing {
-                            passenger_entity.set_pose(pose);
+                            passenger.set_pose(pose);
                         }
                         pos
                     } else {

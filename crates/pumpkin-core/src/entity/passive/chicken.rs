@@ -6,11 +6,13 @@ use std::sync::{
 use crate::entity::ai::pathfinder::node::PathType;
 use pumpkin_data::chicken_sound_variant::ChickenSoundVariant;
 use pumpkin_data::chicken_variant::ChickenVariant;
+use pumpkin_data::entity::EntityPose;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::Sound;
 use pumpkin_data::{entity::EntityType, item::Item};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::codec::var_int::VarInt;
+use pumpkin_util::math::boundingbox::EntityDimensions;
 use rand::RngExt;
 
 use crate::entity::custom_sound::CustomSound;
@@ -146,7 +148,21 @@ impl Animal for ChickenEntity {
     }
 }
 
+/// Vanilla `Chicken.BABY_DIMENSIONS`.
+const BABY_DIMENSIONS: EntityDimensions =
+    EntityDimensions::scalable(0.3, 0.4).with_eye_height(0.281_25);
+
 impl Mob for ChickenEntity {
+    /// Vanilla `Chicken.getDefaultDimensions`.
+    fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
+        let entity = self.get_entity();
+        if entity.is_baby() {
+            BABY_DIMENSIONS
+        } else {
+            entity.get_dimensions(pose)
+        }
+    }
+
     fn as_ageable(&self) -> Option<&dyn AgeableMob> {
         Some(self)
     }

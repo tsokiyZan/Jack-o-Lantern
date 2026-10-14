@@ -2162,7 +2162,7 @@ impl Player {
     pub fn sleep(&self, bed_head_pos: BlockPos) {
         // TODO: Stop riding
 
-        self.get_entity().set_pose(EntityPose::Sleeping);
+        self.set_pose(EntityPose::Sleeping);
         self.living_entity
             .entity
             .set_pos(bed_head_pos.to_f64().add_raw(0.5, 0.6875, 0.5));
@@ -2301,13 +2301,13 @@ impl Player {
             EntityPose::Swimming
         };
 
-        self.get_entity().set_pose(actual_pose);
+        self.set_pose(actual_pose);
     }
 
     pub fn wake_up(&self) {
         let world = self.world();
         let Some(bed_pos) = self.sleeping_bed_pos.load() else {
-            self.living_entity.entity.set_pose(EntityPose::Standing);
+            self.set_pose(EntityPose::Standing);
             self.sleeping_since.store(None);
             return;
         };
@@ -2331,7 +2331,7 @@ impl Player {
             );
         }
 
-        self.living_entity.entity.set_pose(EntityPose::Standing);
+        self.set_pose(EntityPose::Standing);
         self.living_entity.entity.set_pos(self.position());
         self.living_entity.entity.set_synced_data(
             pumpkin_data::tracked_data::player::SLEEPING_POS_ID,

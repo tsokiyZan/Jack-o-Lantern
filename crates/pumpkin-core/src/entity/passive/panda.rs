@@ -3,6 +3,7 @@ use std::sync::{
     atomic::{AtomicI32, AtomicU8, Ordering},
 };
 
+use pumpkin_data::entity::EntityPose;
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
@@ -10,6 +11,7 @@ use pumpkin_data::sound::Sound;
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::codec::var_int::VarInt;
+use pumpkin_util::math::boundingbox::EntityDimensions;
 use rand::RngExt;
 
 use crate::entity::{
@@ -253,7 +255,22 @@ impl Animal for PandaEntity {
     }
 }
 
+/// Vanilla `Panda.BABY_DIMENSIONS`.
+const BABY_DIMENSIONS: EntityDimensions = Entity::type_dimensions(&EntityType::PANDA)
+    .scale(0.5)
+    .with_eye_height(0.281_25);
+
 impl Mob for PandaEntity {
+    /// Vanilla `Panda.getDefaultDimensions`.
+    fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
+        let entity = self.get_entity();
+        if entity.is_baby() {
+            BABY_DIMENSIONS
+        } else {
+            entity.get_dimensions(pose)
+        }
+    }
+
     fn as_ageable(&self) -> Option<&dyn AgeableMob> {
         Some(self)
     }

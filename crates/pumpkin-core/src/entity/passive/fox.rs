@@ -3,6 +3,7 @@ use std::sync::{
     atomic::{AtomicI32, AtomicU8, Ordering},
 };
 
+use pumpkin_data::entity::EntityPose;
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
@@ -10,6 +11,7 @@ use pumpkin_data::sound::Sound;
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::codec::var_int::VarInt;
+use pumpkin_util::math::boundingbox::EntityDimensions;
 
 use crate::entity::{
     Entity, EntityBase,
@@ -229,7 +231,22 @@ impl Animal for FoxEntity {
     }
 }
 
+/// Vanilla `Fox.BABY_DIMENSIONS`.
+const BABY_DIMENSIONS: EntityDimensions = Entity::type_dimensions(&EntityType::FOX)
+    .scale(0.6)
+    .with_eye_height(0.343_75);
+
 impl Mob for FoxEntity {
+    /// Vanilla `Fox.getDefaultDimensions`.
+    fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
+        let entity = self.get_entity();
+        if entity.is_baby() {
+            BABY_DIMENSIONS
+        } else {
+            entity.get_dimensions(pose)
+        }
+    }
+
     fn as_ageable(&self) -> Option<&dyn AgeableMob> {
         Some(self)
     }

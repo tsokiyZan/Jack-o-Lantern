@@ -1,3 +1,5 @@
+use pumpkin_data::entity::EntityPose;
+use pumpkin_util::math::boundingbox::EntityDimensions;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, Ordering};
 
@@ -59,7 +61,8 @@ impl ZombieVillagerEntity {
 
     #[must_use]
     pub fn with_can_break_doors(entity: Entity, can_break_doors: bool) -> Arc<Self> {
-        let mob_entity = ZombieEntityBase::with_can_break_doors(entity, can_break_doors);
+        let mob_entity =
+            ZombieEntityBase::with_can_break_doors(entity, can_break_doors, BABY_DIMENSIONS);
         Arc::new(Self {
             mob_entity,
             villager_data: std::sync::Mutex::new(VillagerData::new(
@@ -256,7 +259,15 @@ impl ZombieVillagerEntity {
     }
 }
 
+/// Vanilla `ZombieVillager.BABY_DIMENSIONS`.
+const BABY_DIMENSIONS: EntityDimensions =
+    EntityDimensions::scalable(0.49, 0.98).with_eye_height(0.67);
+
 impl Mob for ZombieVillagerEntity {
+    fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
+        self.mob_entity.default_dimensions(pose)
+    }
+
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity.mob_entity
     }

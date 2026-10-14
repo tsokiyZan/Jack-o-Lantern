@@ -3,10 +3,12 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 
+use pumpkin_data::entity::EntityPose;
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::Sound;
 use pumpkin_nbt::compound::NbtCompound;
+use pumpkin_util::math::boundingbox::EntityDimensions;
 
 use crate::entity::{
     Entity, EntityBase,
@@ -136,7 +138,21 @@ impl NeutralMob for PolarBearEntity {
     }
 }
 
+/// Vanilla `PolarBear.BABY_DIMENSIONS`.
+const BABY_DIMENSIONS: EntityDimensions =
+    EntityDimensions::scalable(0.7, 0.7).with_eye_height(0.343_75);
+
 impl Mob for PolarBearEntity {
+    /// Vanilla `PolarBear.getDefaultDimensions`.
+    fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
+        let entity = self.get_entity();
+        if entity.is_baby() {
+            BABY_DIMENSIONS
+        } else {
+            entity.get_dimensions(pose)
+        }
+    }
+
     fn as_ageable(&self) -> Option<&dyn AgeableMob> {
         Some(self)
     }

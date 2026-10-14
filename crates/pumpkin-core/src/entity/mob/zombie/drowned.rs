@@ -1,3 +1,5 @@
+use pumpkin_data::entity::EntityPose;
+use pumpkin_util::math::boundingbox::EntityDimensions;
 use std::sync::Arc;
 
 use crate::entity::ai::goal::active_target::ActiveTargetGoal;
@@ -32,6 +34,7 @@ impl DrownedEntity {
         let entity = ZombieEntityBase::with_behaviour_goals(
             entity,
             can_break_doors,
+            BABY_DIMENSIONS,
             Self::add_behaviour_goals,
         );
         // Vanilla `Drowned`'s constructor.
@@ -107,7 +110,15 @@ fn ok_target(target: &LivingEntity, world: &World) -> bool {
     !world.is_bright_outside() || target.is_in_water()
 }
 
+/// Vanilla `Drowned.BABY_DIMENSIONS`.
+const BABY_DIMENSIONS: EntityDimensions =
+    EntityDimensions::scalable(0.49, 0.98).with_eye_height(0.775);
+
 impl Mob for DrownedEntity {
+    fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
+        self.entity.default_dimensions(pose)
+    }
+
     fn get_mob_entity(&self) -> &MobEntity {
         &self.entity.mob_entity
     }

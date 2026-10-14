@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
 
 use pumpkin_data::attributes::Attributes;
-use pumpkin_data::entity::EntityType;
+use pumpkin_data::entity::{EntityPose, EntityType};
 use pumpkin_data::tracked_data;
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::math::boundingbox::EntityDimensions;
@@ -128,12 +128,8 @@ impl ZoglinEntity {
     pub fn set_baby(&self, baby: bool) {
         self.mob_entity
             .set_baby_flag(&self.is_baby, tracked_data::zoglin::DATA_BABY_ID, baby);
+        self.refresh_dimensions();
         let living = &self.mob_entity.living_entity;
-        living.entity.entity_dimension.store(if baby {
-            Self::BABY_DIMENSIONS
-        } else {
-            Entity::type_dimensions(living.entity.entity_type)
-        });
         if baby {
             living.set_attribute_base(&Attributes::ATTACK_DAMAGE, Self::BABY_ATTACK_DAMAGE);
         }
@@ -141,6 +137,16 @@ impl ZoglinEntity {
 }
 
 impl Mob for ZoglinEntity {
+    /// Vanilla `Zoglin.getDefaultDimensions`.
+    fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
+        let entity = self.get_entity();
+        if entity.is_baby() {
+            Self::BABY_DIMENSIONS
+        } else {
+            entity.get_dimensions(pose)
+        }
+    }
+
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
     }

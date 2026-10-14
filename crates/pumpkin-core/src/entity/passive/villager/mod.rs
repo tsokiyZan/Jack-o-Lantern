@@ -1,3 +1,4 @@
+use pumpkin_util::math::boundingbox::EntityDimensions;
 use rustc_hash::FxHashMap;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicI64, Ordering};
 use std::sync::{Arc, Weak};
@@ -1678,7 +1679,7 @@ impl VillagerEntity {
                     .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
                 if is_sleeping {
                     // Wake up if bed was broken
-                    self.get_entity().set_pose(EntityPose::Standing);
+                    self.set_pose(EntityPose::Standing);
                     self.get_entity().set_synced_data(
                         pumpkin_data::tracked_data::villager::SLEEPING_POS_ID,
                         None::<BlockPos>,
@@ -1774,7 +1775,7 @@ impl VillagerEntity {
                                 // Make bed occupied
                                 BedBlock::set_occupied(true, &world, block, &home_pos, state.id);
 
-                                self.get_entity().set_pose(EntityPose::Sleeping);
+                                self.set_pose(EntityPose::Sleeping);
                                 self.get_entity().set_synced_data(
                                     pumpkin_data::tracked_data::villager::SLEEPING_POS_ID,
                                     Some(home_pos),
@@ -1793,7 +1794,7 @@ impl VillagerEntity {
                     }
                 }
 
-                self.get_entity().set_pose(EntityPose::Standing);
+                self.set_pose(EntityPose::Standing);
                 self.get_entity().set_synced_data(
                     pumpkin_data::tracked_data::villager::SLEEPING_POS_ID,
                     None::<BlockPos>,
@@ -1801,7 +1802,7 @@ impl VillagerEntity {
             }
         } else if is_sleeping {
             // Wake up during the day
-            self.get_entity().set_pose(EntityPose::Standing);
+            self.set_pose(EntityPose::Standing);
             self.get_entity().set_synced_data(
                 pumpkin_data::tracked_data::villager::SLEEPING_POS_ID,
                 None::<BlockPos>,
@@ -1873,7 +1874,21 @@ impl VillagerEntity {
     }
 }
 
+/// Vanilla `Villager.BABY_DIMENSIONS`.
+const BABY_DIMENSIONS: EntityDimensions =
+    EntityDimensions::scalable(0.49, 0.98).with_eye_height(0.63);
+
 impl Mob for VillagerEntity {
+    /// Vanilla `Villager.getDefaultDimensions`.
+    fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
+        let entity = self.get_entity();
+        if entity.is_baby() {
+            BABY_DIMENSIONS
+        } else {
+            entity.get_dimensions(pose)
+        }
+    }
+
     #[expect(clippy::too_many_lines)]
     fn mob_write_nbt(&self, nbt: &mut NbtCompound) {
         {

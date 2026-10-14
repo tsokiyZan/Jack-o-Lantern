@@ -18,7 +18,7 @@ use crossbeam::atomic::AtomicCell;
 use pumpkin_data::attributes::Attributes;
 use pumpkin_data::damage::DamageType;
 use pumpkin_data::data_component_impl::EquipmentSlot;
-use pumpkin_data::entity::EntityType;
+use pumpkin_data::entity::{EntityPose, EntityType};
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::tag::{self, Taggable};
@@ -26,7 +26,7 @@ use pumpkin_data::tracked_data;
 use pumpkin_data::{Block, BlockDirection};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::Difficulty;
-use pumpkin_util::math::boundingbox::BoundingBox;
+use pumpkin_util::math::boundingbox::{BoundingBox, EntityDimensions};
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
 use pumpkin_util::random::xoroshiro128::Xoroshiro;
@@ -898,6 +898,30 @@ impl MobEntity {
 }
 
 pub trait Mob: EntityBase + Send + Sync {
+    /// Vanilla `LivingEntity.getAgeScale`: babies are half size unless a mob says
+    /// otherwise.
+    fn age_scale(&self) -> f32 {
+        if self.get_entity().is_baby() {
+            0.5
+        } else {
+            1.0
+        }
+    }
+
+    /// Vanilla `LivingEntity.getDefaultDimensions`: the type's size for the pose, times
+    /// the age scale. Mobs with their own baby size or size states override it.
+    fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
+        self.get_entity()
+            .get_dimensions(pose)
+            .scale(self.age_scale())
+    }
+
+    /// Whether `default_dimensions` is a vanilla `EntityDimensions.fixed` in this pose,
+    /// which the `scale` attribute leaves alone.
+    fn has_fixed_dimensions(&self, _pose: EntityPose) -> bool {
+        false
+    }
+
     fn get_random(&self) -> rand::rngs::ThreadRng {
         rand::rng()
     }

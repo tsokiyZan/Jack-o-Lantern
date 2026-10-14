@@ -3,7 +3,9 @@ use crate::entity::mob::equipment::RegionalDifficulty;
 use crate::entity::mob::zombie::ZombieEntityBase;
 use crate::entity::mob::{Mob, MobEntity};
 use crate::world::World;
+use pumpkin_data::entity::EntityPose;
 use pumpkin_nbt::compound::NbtCompound;
+use pumpkin_util::math::boundingbox::EntityDimensions;
 use std::sync::Arc;
 
 pub struct ZombieEntity {
@@ -19,13 +21,18 @@ impl ZombieEntity {
 
     #[must_use]
     pub fn with_can_break_doors(entity: Entity, can_break_doors: bool) -> Arc<Self> {
-        let entity = ZombieEntityBase::with_can_break_doors(entity, can_break_doors);
+        let entity =
+            ZombieEntityBase::with_can_break_doors(entity, can_break_doors, super::BABY_DIMENSIONS);
         let zombie = Self { entity };
         Arc::new(zombie)
     }
 }
 
 impl Mob for ZombieEntity {
+    fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
+        self.entity.default_dimensions(pose)
+    }
+
     fn get_mob_entity(&self) -> &MobEntity {
         &self.entity.mob_entity
     }

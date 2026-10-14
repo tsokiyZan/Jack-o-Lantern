@@ -1,4 +1,6 @@
 use crate::entity::breath::BreathManager;
+use pumpkin_data::entity::EntityPose;
+use pumpkin_util::math::boundingbox::EntityDimensions;
 use std::f32::consts::{PI, TAU};
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
@@ -36,7 +38,21 @@ impl SquidEntity {
     }
 }
 
+/// Vanilla `Squid.BABY_DIMENSIONS`.
+const BABY_DIMENSIONS: EntityDimensions =
+    EntityDimensions::scalable(0.5, 0.5).with_eye_height(0.37);
+
 impl Mob for SquidEntity {
+    /// Vanilla `Squid.getDefaultDimensions`.
+    fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
+        let entity = self.get_entity();
+        if entity.is_baby() {
+            BABY_DIMENSIONS
+        } else {
+            entity.get_dimensions(pose)
+        }
+    }
+
     /// Vanilla `AgeableWaterCreature.handleAirSupply`.
     fn handle_air_supply(&self, pre_tick_air: i32) {
         BreathManager::water_animal_handle_air_supply(self, pre_tick_air);

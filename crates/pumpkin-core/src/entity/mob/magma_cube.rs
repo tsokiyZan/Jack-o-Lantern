@@ -1,7 +1,8 @@
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
-use pumpkin_data::{attributes::Attributes, sound::Sound};
+use pumpkin_data::{attributes::Attributes, entity::EntityPose, sound::Sound};
+use pumpkin_util::math::boundingbox::EntityDimensions;
 
 use crate::entity::{
     Entity, EntityBase,
@@ -61,6 +62,10 @@ impl CustomSound for MagmaCubeEntity {
 }
 
 impl Mob for MagmaCubeEntity {
+    fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
+        self.slime.default_dimensions(pose)
+    }
+
     fn get_mob_entity(&self) -> &MobEntity {
         self.slime.get_mob_entity()
     }

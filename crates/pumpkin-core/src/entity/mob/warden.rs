@@ -1,3 +1,4 @@
+use pumpkin_util::math::boundingbox::EntityDimensions;
 use std::sync::{
     Arc, Weak,
     atomic::{AtomicI32, Ordering},
@@ -49,9 +50,8 @@ impl Goal for EmergeGoal {
     }
 
     fn stop(&mut self, mob: &dyn Mob) {
-        let entity = &mob.get_mob_entity().living_entity.entity;
-        if entity.pose.load() == EntityPose::Emerging {
-            entity.set_pose(EntityPose::Standing);
+        if mob.get_entity().pose.load() == EntityPose::Emerging {
+            mob.set_pose(EntityPose::Standing);
         }
     }
 
@@ -73,6 +73,11 @@ impl Goal for EmergeGoal {
 }
 
 impl WardenEntity {
+    /// Vanilla `Warden.isDiggingOrEmerging`, for a given pose.
+    const fn is_digging_or_emerging(pose: EntityPose) -> bool {
+        matches!(pose, EntityPose::Digging | EntityPose::Emerging)
+    }
+
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
         let emerge_ticks = Arc::new(AtomicI32::new(0));
@@ -121,8 +126,8 @@ impl WardenEntity {
     }
 
     pub fn emerge(&self) {
+        crate::entity::EntityBase::set_pose(self, EntityPose::Emerging);
         let entity = &self.mob_entity.living_entity.entity;
-        entity.set_pose(EntityPose::Emerging);
         self.emerge_ticks.store(EMERGE_DURATION, Ordering::Relaxed);
         entity.world.load().play_sound_fine(
             Sound::EntityWardenAgitated,
@@ -163,6 +168,26 @@ impl WardenEntity {
 }
 
 impl Mob for WardenEntity {
+    /// Vanilla `Warden.getDefaultDimensions`: a fixed 1-block height while digging or
+    /// emerging.
+    fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
+        let dimensions = self
+            .mob_entity
+            .living_entity
+            .entity
+            .get_dimensions(pose)
+            .scale(self.age_scale());
+        if Self::is_digging_or_emerging(pose) {
+            EntityDimensions::scalable(dimensions.width, 1.0)
+        } else {
+            dimensions
+        }
+    }
+
+    fn has_fixed_dimensions(&self, pose: EntityPose) -> bool {
+        Self::is_digging_or_emerging(pose)
+    }
+
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
     }

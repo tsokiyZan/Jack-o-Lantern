@@ -4,11 +4,13 @@ use std::sync::{
 };
 
 use crossbeam::atomic::AtomicCell;
+use pumpkin_data::entity::EntityPose;
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_nbt::compound::NbtCompound;
+use pumpkin_util::math::boundingbox::EntityDimensions;
 use uuid::Uuid;
 
 use crate::entity::{
@@ -120,7 +122,21 @@ impl Animal for ZombieHorseEntity {
     }
 }
 
+/// Vanilla `ZombieHorse.BABY_DIMENSIONS`.
+const BABY_DIMENSIONS: EntityDimensions =
+    Entity::type_dimensions(&EntityType::ZOMBIE_HORSE).scale(0.7);
+
 impl Mob for ZombieHorseEntity {
+    /// Vanilla `ZombieHorse.getDefaultDimensions`.
+    fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
+        let entity = self.get_entity();
+        if entity.is_baby() {
+            BABY_DIMENSIONS
+        } else {
+            entity.get_dimensions(pose)
+        }
+    }
+
     fn as_ageable(&self) -> Option<&dyn AgeableMob> {
         Some(self)
     }

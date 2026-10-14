@@ -1,6 +1,9 @@
 use crate::entity::breath::BreathManager;
 use crossbeam::atomic::AtomicCell;
 use pumpkin_data::damage::DamageType;
+use pumpkin_data::entity::EntityPose;
+use pumpkin_data::entity::EntityType;
+use pumpkin_util::math::boundingbox::EntityDimensions;
 use std::sync::{
     Arc, Mutex,
     atomic::{AtomicBool, AtomicI32, Ordering},
@@ -205,7 +208,20 @@ impl CustomSound for NautilusEntity {
     }
 }
 
+/// Vanilla `Nautilus.BABY_DIMENSIONS`.
+const BABY_DIMENSIONS: EntityDimensions = Entity::type_dimensions(&EntityType::NAUTILUS).scale(0.5);
+
 impl Mob for NautilusEntity {
+    /// Vanilla `Nautilus.getDefaultDimensions`.
+    fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
+        let entity = self.get_entity();
+        if entity.is_baby() {
+            BABY_DIMENSIONS
+        } else {
+            entity.get_dimensions(pose)
+        }
+    }
+
     /// Vanilla `Nautilus.handleAirSupply`, which `Nautilus.baseTick` skips for
     /// mobs without AI.
     fn handle_air_supply(&self, pre_tick_air: i32) {

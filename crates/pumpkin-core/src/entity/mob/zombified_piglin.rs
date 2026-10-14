@@ -1,3 +1,5 @@
+use pumpkin_data::entity::EntityPose;
+use pumpkin_util::math::boundingbox::EntityDimensions;
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 use std::sync::{Arc, Weak};
 
@@ -109,13 +111,28 @@ impl ZombifiedPiglinEntity {
 
 crate::impl_neutral_mob!(ZombifiedPiglinEntity, neutral_data);
 
+/// Vanilla `ZombifiedPiglin.BABY_DIMENSIONS`.
+const BABY_DIMENSIONS: EntityDimensions =
+    EntityDimensions::scalable(0.49, 0.98).with_eye_height(0.78);
+
 impl Mob for ZombifiedPiglinEntity {
+    /// Vanilla `ZombifiedPiglin.getDefaultDimensions`.
+    fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
+        let entity = self.get_entity();
+        if entity.is_baby() {
+            BABY_DIMENSIONS
+        } else {
+            entity.get_dimensions(pose)
+        }
+    }
+
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
     }
 
     fn spawn_as_baby(&self) -> bool {
         self.mob_entity.set_baby_by_age();
+        self.refresh_dimensions();
         true
     }
 

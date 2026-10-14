@@ -156,6 +156,7 @@ impl EntityBase for EggEntity {
                 let new_entity = mob.get_entity();
                 new_entity.set_rotation(yaw, 0.0);
                 new_entity.set_age(-24000);
+                mob.refresh_dimensions();
                 if let Some(name) = &variant_name {
                     mob.set_variant_name(name);
                 }

@@ -84,6 +84,9 @@ pub struct LivingEntity {
     /// Vanilla `LivingEntity.noActionTime`: ticks since a mob last had a player nearby
     /// or got hurt.
     pub no_action_time: AtomicI32,
+    /// The `scale` attribute the current dimensions were built with, so a change can
+    /// refresh them like vanilla's `onAttributeUpdated`.
+    applied_scale: AtomicCell<f32>,
     /// Stores the amount of damage the entity last received.
     pub last_damage_taken: AtomicCell<f32>,
     /// The current health level of the entity.
@@ -289,6 +292,7 @@ impl LivingEntity {
             entity,
             hurt_cooldown: AtomicI32::new(0),
             no_action_time: AtomicI32::new(0),
+            applied_scale: AtomicCell::new(1.0),
             last_damage_taken: AtomicCell::new(0.0),
             absorption: AtomicCell::new(0.0),
             fall_distance: AtomicCell::new(0.0),
@@ -901,6 +905,12 @@ impl LivingEntity {
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         map.get(&attribute.id)
             .map_or(attribute.default_value, AttributeInstance::value)
+    }
+
+    /// Vanilla `LivingEntity.getScale`: the `scale` attribute.
+    #[must_use]
+    pub fn get_scale(&self) -> f32 {
+        self.get_attribute_value(&Attributes::SCALE) as f32
     }
 
     /// Returns the base attribute value for `attribute` for this entity's type.
@@ -3369,6 +3379,13 @@ impl EntityBase for LivingEntity {
     /// death-animation completion.
     #[allow(clippy::too_many_lines)]
     fn tick(&self, caller: &dyn EntityBase, server: &Server) {
+        // Vanilla `LivingEntity.onAttributeUpdated` refreshes the dimensions when the
+        // `scale` attribute changes. Attributes change from places that cannot reach the
+        // owning entity here, so the change is picked up before the entity next moves.
+        let scale = self.get_scale();
+        if self.applied_scale.swap(scale) != scale {
+            caller.refresh_dimensions();
+        }
         self.entity.tick(caller, server);
 
         // Only tick movement if the entity is alive. This prevents a dead "corpse"

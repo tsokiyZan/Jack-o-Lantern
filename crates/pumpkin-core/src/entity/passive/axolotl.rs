@@ -1,6 +1,8 @@
 use crate::entity::ai::pathfinder::node::PathType;
 use crate::entity::breath::BreathManager;
 use pumpkin_data::damage::DamageType;
+use pumpkin_data::entity::EntityPose;
+use pumpkin_util::math::boundingbox::EntityDimensions;
 use std::sync::{
     Arc, Weak,
     atomic::{AtomicBool, AtomicI32, Ordering},
@@ -240,7 +242,21 @@ impl Animal for AxolotlEntity {
     }
 }
 
+/// Vanilla `Axolotl.BABY_DIMENSIONS`.
+const BABY_DIMENSIONS: EntityDimensions =
+    EntityDimensions::scalable(0.375, 0.21).with_eye_height(0.093_75);
+
 impl Mob for AxolotlEntity {
+    /// Vanilla `Axolotl.getDefaultDimensions`.
+    fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
+        let entity = self.get_entity();
+        if entity.is_baby() {
+            BABY_DIMENSIONS
+        } else {
+            entity.get_dimensions(pose)
+        }
+    }
+
     /// Vanilla `Axolotl.handleAirSupply`, which `Axolotl.baseTick` skips for
     /// mobs without AI.
     fn handle_air_supply(&self, pre_tick_air: i32) {

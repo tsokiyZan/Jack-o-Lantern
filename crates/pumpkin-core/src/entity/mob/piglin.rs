@@ -6,7 +6,7 @@ use std::sync::{
 use pumpkin_data::Block;
 use pumpkin_data::Enchantment;
 use pumpkin_data::data_component_impl::EquipmentSlot;
-use pumpkin_data::entity::EntityType;
+use pumpkin_data::entity::{EntityPose, EntityType};
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::{Sound, SoundCategory};
@@ -47,11 +47,6 @@ impl PiglinEntity {
     /// `CrossbowItem.getDefaultProjectileRange`.
     const CROSSBOW_PROJECTILE_RANGE: i32 = 8;
 
-    pub const ADULT_DIMENSIONS: EntityDimensions = EntityDimensions {
-        width: 0.6,
-        height: 1.95,
-        eye_height: 1.79,
-    };
     pub const BABY_DIMENSIONS: EntityDimensions = EntityDimensions {
         width: 0.49,
         height: 0.98,
@@ -116,12 +111,7 @@ impl PiglinEntity {
     pub fn set_baby(&self, baby: bool) {
         self.mob_entity
             .set_baby_flag(&self.is_baby, tracked_data::piglin::DATA_BABY_ID, baby);
-        let entity = &self.mob_entity.living_entity.entity;
-        if baby {
-            entity.entity_dimension.store(Self::BABY_DIMENSIONS);
-        } else {
-            entity.entity_dimension.store(Self::ADULT_DIMENSIONS);
-        }
+        self.refresh_dimensions();
     }
 
     #[must_use]
@@ -510,6 +500,16 @@ impl abstract_piglin::AbstractPiglin for PiglinEntity {
 }
 
 impl Mob for PiglinEntity {
+    /// Vanilla `Piglin.getDefaultDimensions`.
+    fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
+        let entity = self.get_entity();
+        if entity.is_baby() {
+            Self::BABY_DIMENSIONS
+        } else {
+            entity.get_dimensions(pose)
+        }
+    }
+
     fn spawn_as_baby(&self) -> bool {
         self.set_baby(true);
         true

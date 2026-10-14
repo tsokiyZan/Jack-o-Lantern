@@ -437,4 +437,36 @@ impl EntityDimensions {
             eye_height,
         }
     }
+
+    /// Vanilla `EntityDimensions.scalable`: the eye defaults to 85% of the height.
+    #[must_use]
+    pub const fn scalable(width: f32, height: f32) -> Self {
+        Self::new(width, height, height * 0.85)
+    }
+
+    /// Vanilla `EntityDimensions.withEyeHeight`.
+    #[must_use]
+    pub const fn with_eye_height(self, eye_height: f32) -> Self {
+        Self { eye_height, ..self }
+    }
+
+    /// Vanilla `EntityDimensions.scale(factor)`.
+    #[must_use]
+    pub const fn scale(self, factor: f32) -> Self {
+        self.scale_xy(factor, factor)
+    }
+
+    /// Vanilla `EntityDimensions.scale(widthFactor, heightFactor)`; the eye follows the
+    /// height.
+    #[must_use]
+    pub const fn scale_xy(self, width_factor: f32, height_factor: f32) -> Self {
+        if width_factor == 1.0 && height_factor == 1.0 {
+            return self;
+        }
+        Self {
+            width: self.width * width_factor,
+            height: self.height * height_factor,
+            eye_height: self.eye_height * height_factor,
+        }
+    }
 }

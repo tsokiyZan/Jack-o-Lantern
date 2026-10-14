@@ -3,12 +3,14 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 
+use pumpkin_data::entity::EntityPose;
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_nbt::compound::NbtCompound;
+use pumpkin_util::math::boundingbox::EntityDimensions;
 
 use crate::entity::{
     Entity, EntityBase,
@@ -131,7 +133,26 @@ impl Animal for GoatEntity {
     }
 }
 
+/// Vanilla `Goat.BABY_DIMENSIONS`.
+const BABY_DIMENSIONS: EntityDimensions =
+    EntityDimensions::scalable(0.45, 0.65).with_eye_height(0.593_75);
+
 impl Mob for GoatEntity {
+    /// Vanilla `Goat.getDefaultDimensions`: long jumps shrink the goat.
+    fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
+        let entity = self.get_entity();
+        let dimensions = if entity.is_baby() {
+            BABY_DIMENSIONS
+        } else {
+            entity.get_dimensions(pose)
+        };
+        if pose == EntityPose::LongJumping {
+            dimensions.scale(0.7)
+        } else {
+            dimensions
+        }
+    }
+
     fn as_ageable(&self) -> Option<&dyn AgeableMob> {
         Some(self)
     }

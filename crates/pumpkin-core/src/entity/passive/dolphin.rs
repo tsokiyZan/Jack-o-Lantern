@@ -6,6 +6,7 @@ use std::sync::{
 use pumpkin_data::damage::DamageType;
 use pumpkin_data::data_component_impl::EquipmentSlot;
 use pumpkin_data::effect::StatusEffect;
+use pumpkin_data::entity::EntityPose;
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::entity_status::EntityStatus;
 use pumpkin_data::item_stack::ItemStack;
@@ -22,7 +23,7 @@ use crate::entity::ageable::{AgeableData, AgeableMob};
 use crate::entity::mob::spawn::SpawnGroupData;
 use crate::world::World;
 use crate::world::structure_locator::structures_in_tag;
-use pumpkin_util::math::boundingbox::{BoundingBox, EntityDimensions};
+use pumpkin_util::math::boundingbox::EntityDimensions;
 
 use crate::entity::{
     Entity, EntityBase,
@@ -62,10 +63,6 @@ const SWIM_WITH_PLAYER_RANGE: f64 = 10.0;
 const GUARDIANS: [&EntityType; 2] = [&EntityType::GUARDIAN, &EntityType::ELDER_GUARDIAN];
 /// Vanilla `AgeableWaterCreature.getAmbientSoundInterval`.
 const AMBIENT_SOUND_INTERVAL: i32 = 120;
-/// Vanilla `Dolphin.BABY_SCALE`.
-const BABY_SCALE: f32 = 0.65;
-/// The eye height of vanilla's `Dolphin.BABY_DIMENSIONS`.
-const BABY_EYE_HEIGHT: f32 = 0.093_75;
 /// The baby chance of the `AgeableMobGroupData` vanilla's `Dolphin.finalizeSpawn` makes.
 const BABY_SPAWN_CHANCE: f32 = 0.1;
 /// `DolphinSwimToTreasureGoal` needs at least this much air to set off or keep going.
@@ -80,8 +77,6 @@ const THROWN_ITEM_PICKUP_DELAY: u8 = 40;
 pub struct DolphinEntity {
     pub mob_entity: MobEntity,
     ageable_data: AgeableData,
-    /// Whether the dimensions are currently a baby's.
-    baby_dimensions: AtomicBool,
     /// Vanilla `Mob.ambientSoundTime`.
     ambient_sound_time: AtomicI32,
     pub got_fish: AtomicBool,
@@ -118,7 +113,6 @@ impl DolphinEntity {
         let dolphin = Self {
             mob_entity,
             ageable_data: AgeableData::default(),
-            baby_dimensions: AtomicBool::new(false),
             ambient_sound_time: AtomicI32::new(0),
             got_fish: AtomicBool::new(false),
             moistness_level: AtomicI32::new(TOTAL_MOISTNESS_LEVEL),
@@ -229,35 +223,6 @@ impl DolphinEntity {
             .get(&EquipmentSlot::MAIN_HAND)
     }
 
-    /// Vanilla `Dolphin.getDefaultDimensions`, applied when the dolphin grows up or
-    /// becomes a baby.
-    fn refresh_dimensions(&self) {
-        let baby = self.is_baby();
-        if self.baby_dimensions.swap(baby, Ordering::Relaxed) == baby {
-            return;
-        }
-        let entity = self.get_entity();
-        let dimension = entity.entity_type.dimension;
-        let dimensions = if baby {
-            EntityDimensions {
-                width: dimension[0] * BABY_SCALE,
-                height: dimension[1] * BABY_SCALE,
-                eye_height: BABY_EYE_HEIGHT,
-            }
-        } else {
-            EntityDimensions {
-                width: dimension[0],
-                height: dimension[1],
-                eye_height: entity.entity_type.eye_height,
-            }
-        };
-        entity.entity_dimension.store(dimensions);
-        let pos = entity.pos.load();
-        entity
-            .bounding_box
-            .store(BoundingBox::new_from_pos(pos.x, pos.y, pos.z, &dimensions));
-    }
-
     /// The ambient-sound part of vanilla `Mob.baseTick`.
     fn tick_ambient_sound(&self) {
         if !self.get_entity().is_alive() {
@@ -312,7 +277,22 @@ impl AgeableMob for DolphinEntity {
     }
 }
 
+/// Vanilla `Dolphin.BABY_DIMENSIONS`.
+const BABY_DIMENSIONS: EntityDimensions = Entity::type_dimensions(&EntityType::DOLPHIN)
+    .scale(0.65)
+    .with_eye_height(0.093_75);
+
 impl Mob for DolphinEntity {
+    /// Vanilla `Dolphin.getDefaultDimensions`.
+    fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
+        let entity = self.get_entity();
+        if entity.is_baby() {
+            BABY_DIMENSIONS
+        } else {
+            entity.get_dimensions(pose)
+        }
+    }
+
     fn as_ageable(&self) -> Option<&dyn AgeableMob> {
         Some(self)
     }
@@ -330,7 +310,6 @@ impl Mob for DolphinEntity {
         self.get_entity().set_pitch(0.0);
         let group_data = group_data.or(Some(SpawnGroupData::ageable(BABY_SPAWN_CHANCE)));
         let group_data = self.finalize_ageable_spawn(group_data);
-        self.refresh_dimensions();
         self.mob_entity.finalize_spawn_base();
         Some(group_data)
     }
@@ -381,7 +360,6 @@ impl Mob for DolphinEntity {
         if entity.is_alive() {
             self.ageable_ai_step();
         }
-        self.refresh_dimensions();
         if self.mob_entity.is_no_ai() {
             living.breath.set_air_supply(caller, TOTAL_AIR_SUPPLY);
             return;

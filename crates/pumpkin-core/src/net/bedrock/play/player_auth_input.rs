@@ -166,7 +166,7 @@ impl BedrockClient {
         }
 
         if input_data.get(InputData::StartCrawling as usize) {
-            entity.set_pose(EntityPose::Swimming);
+            player.set_pose(EntityPose::Swimming);
         } else if input_data.get(InputData::StopCrawling as usize) {
             player.update_player_pose();
         }

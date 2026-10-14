@@ -3,11 +3,11 @@ use std::sync::{Arc, Weak};
 
 use crossbeam::atomic::AtomicCell;
 use pumpkin_data::attributes::Attributes;
-use pumpkin_data::entity::EntityType;
+use pumpkin_data::entity::{EntityPose, EntityType};
 use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::Difficulty;
-use pumpkin_util::math::boundingbox::{BoundingBox, EntityDimensions};
+use pumpkin_util::math::boundingbox::EntityDimensions;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
 
@@ -135,17 +135,7 @@ impl SlimeEntity {
             self.entity.living_entity.health.store(max_health);
         }
 
-        // Refresh dimensions
-        let scaled_dimensions = EntityDimensions {
-            width: entity.entity_type.dimension[0] * actual_size as f32,
-            height: entity.entity_type.dimension[1] * actual_size as f32,
-            eye_height: entity.entity_type.eye_height * actual_size as f32,
-        };
-        entity.entity_dimension.store(scaled_dimensions);
-
-        let pos = entity.pos.load();
-        let new_bb = BoundingBox::new_from_pos(pos.x, pos.y, pos.z, &scaled_dimensions);
-        entity.bounding_box.store(new_bb);
+        self.refresh_dimensions();
     }
 
     pub fn get_size(&self) -> i32 {
@@ -277,6 +267,11 @@ impl CustomSound for SlimeEntity {
 }
 
 impl Mob for SlimeEntity {
+    /// Vanilla `AbstractCubeMob.getDefaultDimensions`: the type's size times the slime's.
+    fn default_dimensions(&self, _pose: EntityPose) -> EntityDimensions {
+        Entity::type_dimensions(self.get_entity().entity_type).scale(self.get_size() as f32)
+    }
+
     fn as_custom_sound(&self) -> Option<&dyn crate::entity::custom_sound::CustomSound> {
         Some(self)
     }

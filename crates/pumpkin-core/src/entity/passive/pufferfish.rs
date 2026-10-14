@@ -5,6 +5,7 @@ use std::sync::atomic::{AtomicI32, Ordering};
 
 use pumpkin_data::damage::DamageType;
 use pumpkin_data::effect::StatusEffect;
+use pumpkin_data::entity::EntityPose;
 use pumpkin_data::sound::Sound;
 use pumpkin_data::tag;
 use pumpkin_data::tag::Taggable;
@@ -12,7 +13,7 @@ use pumpkin_data::tracked_data::pufferfish::PUFF_STATE;
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::VarInt;
 use pumpkin_protocol::java::client::play::{CGameEvent, GameEvent};
-use pumpkin_util::math::boundingbox::{BoundingBox, EntityDimensions};
+use pumpkin_util::math::boundingbox::EntityDimensions;
 
 use crate::entity::{
     Entity, EntityBase,
@@ -75,21 +76,6 @@ impl PufferfishEntity {
             STATE_MID => 0.7,
             _ => 1.0,
         }
-    }
-
-    fn refresh_dimensions(&self) {
-        let entity = &self.mob_entity.living_entity.entity;
-        let scale = Self::get_scale(self.get_puff_state());
-        let dimensions = EntityDimensions {
-            width: entity.entity_type.dimension[0] * scale,
-            height: entity.entity_type.dimension[1] * scale,
-            eye_height: entity.entity_type.eye_height * scale,
-        };
-        entity.entity_dimension.store(dimensions);
-        let pos = entity.pos.load();
-        entity
-            .bounding_box
-            .store(BoundingBox::new_from_pos(pos.x, pos.y, pos.z, &dimensions));
     }
 
     /// Vanilla's `TARGETING_CONDITIONS` with the `SCARY_MOB` selector.
@@ -204,6 +190,14 @@ const fn poison(puff_state: i32) -> pumpkin_data::potion::Effect {
 }
 
 impl Mob for PufferfishEntity {
+    /// Vanilla `Pufferfish.getDefaultDimensions`: the puff state scales the fish.
+    fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
+        self.get_entity()
+            .get_dimensions(pose)
+            .scale(self.age_scale())
+            .scale(Self::get_scale(self.get_puff_state()))
+    }
+
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
     }

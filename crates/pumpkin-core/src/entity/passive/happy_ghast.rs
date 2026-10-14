@@ -3,12 +3,14 @@ use std::sync::{
     atomic::{AtomicBool, AtomicI32, Ordering},
 };
 
+use pumpkin_data::entity::EntityPose;
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::Sound;
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_nbt::compound::NbtCompound;
+use pumpkin_util::math::boundingbox::EntityDimensions;
 
 use crate::entity::{
     Entity, EntityBase,
@@ -131,7 +133,22 @@ impl Animal for HappyGhastEntity {
     }
 }
 
+/// Vanilla `HappyGhast.BABY_DIMENSIONS`.
+const BABY_DIMENSIONS: EntityDimensions = Entity::type_dimensions(&EntityType::HAPPY_GHAST)
+    .scale(0.2375)
+    .with_eye_height(0.468_75);
+
 impl Mob for HappyGhastEntity {
+    /// Vanilla `HappyGhast.getDefaultDimensions`.
+    fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
+        let entity = self.get_entity();
+        if entity.is_baby() {
+            BABY_DIMENSIONS
+        } else {
+            entity.get_dimensions(pose)
+        }
+    }
+
     /// Vanilla `HappyGhast.canBreatheUnderwater`: ghastlings always can.
     fn can_breathe_underwater(&self) -> bool {
         self.is_baby()

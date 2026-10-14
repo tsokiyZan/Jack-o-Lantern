@@ -9,16 +9,18 @@ use crate::entity::ai::goal::zombie_attack::ZombieAttackGoal;
 use crate::entity::living::LivingEntity;
 use crate::entity::mob::equipment::RegionalDifficulty;
 use crate::entity::{
-    Entity,
+    Entity, EntityBase,
     ai::goal::{Goal, active_target::ActiveTargetGoal, look_at_entity::LookAtEntityGoal},
 };
 use crate::world::World;
 use pumpkin_data::data_component_impl::EquipmentSlot;
+use pumpkin_data::entity::EntityPose;
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::Difficulty;
+use pumpkin_util::math::boundingbox::EntityDimensions;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
 
@@ -32,15 +34,30 @@ pub struct ZombieEntityBase {
     pub mob_entity: MobEntity,
     pub can_break_doors: AtomicBool,
     pub is_baby: AtomicBool,
+    /// The kind's own `BABY_DIMENSIONS`, which vanilla gives each zombie class.
+    baby_dimensions: EntityDimensions,
 }
+
+/// Vanilla `Zombie.BABY_DIMENSIONS`.
+pub const BABY_DIMENSIONS: EntityDimensions =
+    EntityDimensions::scalable(0.49, 0.98).with_eye_height(0.775);
 
 impl ZombieEntityBase {
     pub fn new(entity: Entity) -> Arc<Self> {
-        Self::with_can_break_doors(entity, false)
+        Self::with_can_break_doors(entity, false, BABY_DIMENSIONS)
     }
 
-    pub fn with_can_break_doors(entity: Entity, can_break_doors: bool) -> Arc<Self> {
-        Self::with_behaviour_goals(entity, can_break_doors, Self::add_behaviour_goals)
+    pub fn with_can_break_doors(
+        entity: Entity,
+        can_break_doors: bool,
+        baby_dimensions: EntityDimensions,
+    ) -> Arc<Self> {
+        Self::with_behaviour_goals(
+            entity,
+            can_break_doors,
+            baby_dimensions,
+            Self::add_behaviour_goals,
+        )
     }
 
     /// Vanilla `Zombie.registerGoals`, with `add_behaviour_goals` standing in for the
@@ -48,6 +65,7 @@ impl ZombieEntityBase {
     pub fn with_behaviour_goals(
         entity: Entity,
         can_break_doors: bool,
+        baby_dimensions: EntityDimensions,
         add_behaviour_goals: fn(&MobEntity, &mut GoalSelector, &mut GoalSelector),
     ) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
@@ -55,6 +73,7 @@ impl ZombieEntityBase {
             mob_entity,
             can_break_doors: AtomicBool::new(false),
             is_baby: AtomicBool::new(false),
+            baby_dimensions,
         };
         let mob_arc = Arc::new(zombie);
         let mob_weak: Weak<dyn Mob> = {
@@ -200,6 +219,7 @@ impl ZombieEntityBase {
             pumpkin_data::tracked_data::zombie::BABY,
             baby,
         );
+        self.refresh_dimensions();
     }
 
     #[must_use]
@@ -209,6 +229,16 @@ impl ZombieEntityBase {
 }
 
 impl Mob for ZombieEntityBase {
+    /// Vanilla `Zombie.getDefaultDimensions`, with the kind's own baby size.
+    fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
+        let entity = self.get_entity();
+        if entity.is_baby() {
+            self.baby_dimensions
+        } else {
+            entity.get_dimensions(pose)
+        }
+    }
+
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
     }

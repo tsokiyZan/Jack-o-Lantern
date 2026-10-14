@@ -1,4 +1,6 @@
 use crate::entity::ai::pathfinder::node::PathType;
+use pumpkin_data::entity::EntityPose;
+use pumpkin_util::math::boundingbox::EntityDimensions;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
 
@@ -105,7 +107,21 @@ impl Animal for StriderEntity {
     }
 }
 
+/// Vanilla `Strider.BABY_DIMENSIONS`.
+const BABY_DIMENSIONS: EntityDimensions =
+    EntityDimensions::scalable(0.45, 0.85).with_eye_height(0.4375);
+
 impl Mob for StriderEntity {
+    /// Vanilla `Strider.getDefaultDimensions`.
+    fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
+        let entity = self.get_entity();
+        if entity.is_baby() {
+            BABY_DIMENSIONS
+        } else {
+            entity.get_dimensions(pose)
+        }
+    }
+
     fn as_ageable(&self) -> Option<&dyn AgeableMob> {
         Some(self)
     }
