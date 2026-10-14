@@ -1,5 +1,5 @@
 use super::{Controls, Goal, to_goal_ticks};
-use crate::entity::ai::util::default_random_pos;
+use crate::entity::ai::util::{default_random_pos, land_random_pos};
 use crate::entity::{ai::pathfinder::NavigatorGoal, mob::Mob};
 use pumpkin_util::math::vector3::Vector3;
 use rand::RngExt;
@@ -7,6 +7,8 @@ use rand::RngExt;
 pub const DEFAULT_INTERVAL: i32 = 120;
 /// The `noActionTime` at which vanilla's `RandomStrollGoal` stops starting.
 const NO_ACTION_TIME_LIMIT: i32 = 100;
+/// Vanilla `WaterAvoidingRandomStrollGoal.PROBABILITY`: the chance of an ordinary stroll.
+const WATER_AVOIDING_PROBABILITY: f32 = 0.001;
 
 pub struct WanderAroundGoal {
     goal_control: Controls,
@@ -47,6 +49,16 @@ impl WanderAroundGoal {
         }
     }
 
+    /// Vanilla's `WaterAvoidingRandomStrollGoal`: strolls to spots on land, and out of
+    /// water when in it.
+    #[must_use]
+    pub const fn avoiding_water(speed: f64) -> Self {
+        Self {
+            position: water_avoiding_position,
+            ..Self::new(speed)
+        }
+    }
+
     /// Keeps wandering however long the mob has gone without a player nearby, like
     /// vanilla's brain-driven strolls and `GolemRandomStrollInVillageGoal`.
     #[must_use]
@@ -67,6 +79,17 @@ impl WanderAroundGoal {
 
 fn land_position(mob: &dyn Mob) -> Option<Vector3<f64>> {
     default_random_pos::get_pos(mob, 10, 7)
+}
+
+fn water_avoiding_position(mob: &dyn Mob) -> Option<Vector3<f64>> {
+    if mob.get_mob_entity().living_entity.is_in_water() {
+        return land_random_pos::get_pos(mob, 15, 7).or_else(|| land_position(mob));
+    }
+    if mob.get_random().random::<f32>() >= WATER_AVOIDING_PROBABILITY {
+        land_random_pos::get_pos(mob, 10, 7)
+    } else {
+        land_position(mob)
+    }
 }
 
 fn swimmable_position(mob: &dyn Mob) -> Option<Vector3<f64>> {

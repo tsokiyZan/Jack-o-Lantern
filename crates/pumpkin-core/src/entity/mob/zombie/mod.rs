@@ -1,11 +1,12 @@
 use super::{Mob, MobEntity};
 use crate::entity::ai::goal::break_door::BreakDoorGoal;
 use crate::entity::ai::goal::destroy_egg::DestroyEggGoal;
+use crate::entity::ai::goal::goal_selector::GoalSelector;
 use crate::entity::ai::goal::look_around::RandomLookAroundGoal;
 use crate::entity::ai::goal::revenge::RevengeGoal;
-use crate::entity::ai::goal::swim::SwimGoal;
 use crate::entity::ai::goal::wander_around::WanderAroundGoal;
 use crate::entity::ai::goal::zombie_attack::ZombieAttackGoal;
+use crate::entity::living::LivingEntity;
 use crate::entity::mob::equipment::RegionalDifficulty;
 use crate::entity::{
     Entity,
@@ -39,10 +40,20 @@ impl ZombieEntityBase {
     }
 
     pub fn with_can_break_doors(entity: Entity, can_break_doors: bool) -> Arc<Self> {
+        Self::with_behaviour_goals(entity, can_break_doors, Self::add_behaviour_goals)
+    }
+
+    /// Vanilla `Zombie.registerGoals`, with `add_behaviour_goals` standing in for the
+    /// `addBehaviourGoals` that drowned and zombified piglins override.
+    pub fn with_behaviour_goals(
+        entity: Entity,
+        can_break_doors: bool,
+        add_behaviour_goals: fn(&MobEntity, &mut GoalSelector, &mut GoalSelector),
+    ) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
         let zombie = Self {
             mob_entity,
-            can_break_doors: AtomicBool::new(can_break_doors),
+            can_break_doors: AtomicBool::new(false),
             is_baby: AtomicBool::new(false),
         };
         let mob_arc = Arc::new(zombie);
@@ -63,46 +74,54 @@ impl ZombieEntityBase {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
 
-            goal_selector.add_goal(0, Box::new(SwimGoal::default()));
-            if can_break_doors {
-                goal_selector.add_goal(1, Box::new(BreakDoorGoal::default()));
-            }
-            goal_selector.add_goal(2, ZombieAttackGoal::new(1.0, false));
             goal_selector.add_goal(4, DestroyEggGoal::new(1.0, 3));
-            goal_selector.add_goal(7, Box::new(WanderAroundGoal::new(1.0)));
             goal_selector.add_goal(
                 8,
                 LookAtEntityGoal::with_default(mob_weak, &EntityType::PLAYER, 8.0),
             );
             goal_selector.add_goal(8, Box::new(RandomLookAroundGoal::default()));
-
-            target_selector.add_goal(
-                1,
-                Box::new(
-                    RevengeGoal::new(true).alerting_others_except(|entity_type| {
-                        entity_type == &EntityType::ZOMBIFIED_PIGLIN
-                    }),
-                ),
-            );
-            target_selector.add_goal(
-                2,
-                ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::PLAYER, true),
-            );
-            target_selector.add_goal(
-                3,
-                ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::VILLAGER, true),
-            );
-            target_selector.add_goal(
-                3,
-                ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::IRON_GOLEM, true),
-            );
-            target_selector.add_goal(
-                5,
-                ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::TURTLE, true),
+            add_behaviour_goals(
+                &mob_arc.mob_entity,
+                &mut goal_selector,
+                &mut target_selector,
             );
         };
 
+        mob_arc.set_can_break_doors(can_break_doors, &*mob_arc);
         mob_arc
+    }
+
+    /// Vanilla `Zombie.addBehaviourGoals`. The spear (2) and move-through-village (6)
+    /// goals are not ported yet.
+    fn add_behaviour_goals(
+        mob: &MobEntity,
+        goal_selector: &mut GoalSelector,
+        target_selector: &mut GoalSelector,
+    ) {
+        goal_selector.add_goal(3, ZombieAttackGoal::new(1.0, false));
+        goal_selector.add_goal(7, Box::new(WanderAroundGoal::avoiding_water(1.0)));
+
+        target_selector.add_goal(
+            1,
+            Box::new(
+                RevengeGoal::new(true).alerting_others_except(|entity_type| {
+                    entity_type == &EntityType::ZOMBIFIED_PIGLIN
+                }),
+            ),
+        );
+        target_selector.add_goal(
+            2,
+            ActiveTargetGoal::with_default(mob, &EntityType::PLAYER, true),
+        );
+        target_selector.add_goal(
+            3,
+            ActiveTargetGoal::predicated(mob, 10, false, is_abstract_villager),
+        );
+        target_selector.add_goal(
+            3,
+            ActiveTargetGoal::with_default(mob, &EntityType::IRON_GOLEM, true),
+        );
+        target_selector.add_goal(5, Box::new(baby_turtle_on_land_target(mob)));
     }
 
     #[must_use]
@@ -110,7 +129,21 @@ impl ZombieEntityBase {
         self.can_break_doors.load(Ordering::Relaxed)
     }
 
+    /// Vanilla `Zombie.setCanBreakDoors`: door breaking needs ground navigation, which
+    /// is also told it may path through doors.
     pub fn set_can_break_doors(&self, can_break_doors: bool, mob: &dyn Mob) {
+        let can_break_doors = {
+            let mut navigator = self
+                .mob_entity
+                .navigator
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let can_break_doors = can_break_doors && navigator.can_navigate_ground();
+            if navigator.can_navigate_ground() {
+                navigator.set_can_open_doors(can_break_doors);
+            }
+            can_break_doors
+        };
         if self
             .can_break_doors
             .swap(can_break_doors, Ordering::Relaxed)
@@ -134,6 +167,27 @@ impl ZombieEntityBase {
             }
         }
     }
+}
+
+/// Vanilla targets `AbstractVillager`: villagers and wandering traders.
+pub(crate) fn is_abstract_villager(target: &LivingEntity, _world: &World) -> bool {
+    let entity_type = target.entity.entity_type;
+    entity_type == &EntityType::VILLAGER || entity_type == &EntityType::WANDERING_TRADER
+}
+
+/// Vanilla's turtle target for zombies and drowned: only baby turtles on land
+/// (`Turtle.BABY_ON_LAND_SELECTOR`), checked one tick in ten.
+pub(crate) fn baby_turtle_on_land_target(mob: &MobEntity) -> ActiveTargetGoal {
+    ActiveTargetGoal::new(
+        mob,
+        &EntityType::TURTLE,
+        10,
+        true,
+        false,
+        Some(|target: &LivingEntity, _world: &World| {
+            target.entity.age.load(Ordering::Relaxed) < 0 && !target.is_in_water()
+        }),
+    )
 }
 
 impl ZombieEntityBase {

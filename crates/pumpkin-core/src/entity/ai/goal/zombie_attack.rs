@@ -1,3 +1,4 @@
+use super::revenge::MobFilter;
 use super::{Controls, Goal};
 
 use crate::entity::ai::goal::melee_attack::MeleeAttackGoal;
@@ -6,6 +7,7 @@ use crate::entity::mob::Mob;
 pub struct ZombieAttackGoal {
     melee_attack_goal: MeleeAttackGoal,
     ticks: i32,
+    gate: Option<MobFilter>,
 }
 
 impl ZombieAttackGoal {
@@ -14,17 +16,30 @@ impl ZombieAttackGoal {
         Box::new(Self {
             melee_attack_goal: MeleeAttackGoal::new(speed, pause_when_mob_idle),
             ticks: 0,
+            gate: None,
         })
+    }
+
+    /// Extra condition for starting and for continuing, like vanilla's
+    /// `DrownedAttackGoal` requiring `Drowned.okTarget`.
+    #[must_use]
+    pub fn gated_by(mut self: Box<Self>, gate: MobFilter) -> Box<Self> {
+        self.gate = Some(gate);
+        self
+    }
+
+    fn gate_allows(&self, mob: &dyn Mob) -> bool {
+        self.gate.is_none_or(|gate| gate(mob))
     }
 }
 
 impl Goal for ZombieAttackGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
-        self.melee_attack_goal.can_start(mob)
+        self.melee_attack_goal.can_start(mob) && self.gate_allows(mob)
     }
 
     fn should_continue(&mut self, mob: &dyn Mob) -> bool {
-        self.melee_attack_goal.should_continue(mob)
+        self.melee_attack_goal.should_continue(mob) && self.gate_allows(mob)
     }
 
     fn start(&mut self, mob: &dyn Mob) {
