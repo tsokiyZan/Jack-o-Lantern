@@ -1,4 +1,5 @@
 use pumpkin_data::BlockStateId;
+use pumpkin_data::fluid::Fluid;
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_macros::pumpkin_block;
 use pumpkin_util::math::position::BlockPos;
@@ -7,6 +8,7 @@ use pumpkin_world::world::{BlockAccessor, BlockFlags};
 use crate::block::{GetStateForNeighborUpdateArgs, blocks::plant::PlantBlockBase};
 
 use crate::block::{BlockBehaviour, CanPlaceAtArgs, OnEntityCollisionArgs};
+use crate::world::World;
 
 #[pumpkin_block("minecraft:lily_pad")]
 pub struct LilyPadBlock;
@@ -46,12 +48,16 @@ impl BlockBehaviour for LilyPadBlock {
 }
 
 impl PlantBlockBase for LilyPadBlock {
+    /// Vanilla `LilyPadBlock.mayPlaceOn`.
     fn can_plant_on_top(&self, block_accessor: &dyn BlockAccessor, pos: &BlockPos) -> bool {
-        // TODO: get and use fluids not blocks
-        let block = block_accessor.get_block(pos);
-        let above_fluid = block_accessor.get_block(&pos.up());
-        (block.has_tag(&tag::Fluid::MINECRAFT_SUPPORTS_LILY_PAD)
-            || block.has_tag(&tag::Block::MINECRAFT_SUPPORTS_LILY_PAD))
-            && above_fluid.is_air()
+        let state_id = block_accessor.get_block_state_id(pos);
+        let fluid = World::fluid_type_from_state_id(state_id);
+        let fluid_above =
+            World::fluid_type_from_state_id(block_accessor.get_block_state_id(&pos.up()));
+        (fluid.has_tag(&tag::Fluid::MINECRAFT_SUPPORTS_LILY_PAD)
+            || state_id
+                .to_block()
+                .has_tag(&tag::Block::MINECRAFT_SUPPORTS_LILY_PAD))
+            && fluid_above == &Fluid::EMPTY
     }
 }

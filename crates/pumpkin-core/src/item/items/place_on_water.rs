@@ -3,9 +3,9 @@ use std::any::Any;
 use crate::entity::player::Player;
 use crate::item::{ItemBehaviour, ItemMetadata};
 use crate::world::BlockFlags;
-use pumpkin_data::Block;
 use pumpkin_data::item::Item;
 use pumpkin_data::sound::Sound;
+use pumpkin_data::{Block, BlockDirection};
 
 pub struct PlaceOnWaterBlockItem;
 
@@ -33,13 +33,25 @@ impl ItemBehaviour for PlaceOnWaterBlockItem {
 
         let above_pos = hit_pos.up();
         let above_state = world.get_block_state(&above_pos);
-        if above_state.is_air() {
-            let (placed_block, sound) = if item.id == Item::LILY_PAD.id {
-                (&Block::LILY_PAD, Sound::BlockLilyPadPlace)
-            } else {
-                (&Block::FROGSPAWN, Sound::BlockFrogspawnPlace)
-            };
-
+        let (placed_block, sound) = if item.id == Item::LILY_PAD.id {
+            (&Block::LILY_PAD, Sound::BlockLilyPadPlace)
+        } else {
+            (&Block::FROGSPAWN, Sound::BlockFrogspawnPlace)
+        };
+        // Vanilla places through `BlockItem.place`, which checks `canSurvive`.
+        if above_state.is_air()
+            && world.block_registry.can_place_at(
+                None,
+                Some(&world),
+                world.as_ref(),
+                Some(player),
+                placed_block,
+                placed_block.default_state,
+                &above_pos,
+                Some(BlockDirection::Up),
+                None,
+            )
+        {
             world.set_block_state(
                 &above_pos,
                 placed_block.default_state.id,

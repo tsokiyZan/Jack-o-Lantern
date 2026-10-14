@@ -5976,7 +5976,13 @@ impl World {
     /// flowing family, which fluid ticks key on, but tags such as
     /// `axolotl_tries_to_find` name only the source fluid.
     pub fn get_fluid_type(&self, position: &BlockPos) -> &'static pumpkin_data::fluid::Fluid {
-        let (fluid, state) = self.get_fluid_and_fluid_state(position);
+        Self::fluid_type_from_state_id(self.get_block_state_id(position))
+    }
+
+    /// `get_fluid_type` for a block state, for code that only has a `BlockAccessor`.
+    #[must_use]
+    pub fn fluid_type_from_state_id(id: BlockStateId) -> &'static pumpkin_data::fluid::Fluid {
+        let (fluid, state) = Self::fluid_state_from_block_state(id);
         if !state.is_source {
             return fluid;
         }
