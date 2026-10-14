@@ -129,7 +129,10 @@ impl CopperGolemEntity {
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
 
             goal_selector.add_goal(0, Box::new(SwimGoal::default()));
-            goal_selector.add_goal(1, Box::new(WanderAroundGoal::new(1.0)));
+            goal_selector.add_goal(
+                1,
+                Box::new(WanderAroundGoal::new(1.0).ignoring_no_action_time()),
+            );
             goal_selector.add_goal(
                 2,
                 LookAtEntityGoal::with_default(mob_weak, &EntityType::PLAYER, 6.0),

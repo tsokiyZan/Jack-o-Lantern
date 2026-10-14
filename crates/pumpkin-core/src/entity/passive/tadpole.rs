@@ -53,7 +53,10 @@ impl TadpoleEntity {
             goal_selector.add_goal(0, Box::new(SwimGoal::default()));
             goal_selector.add_goal(1, EscapeDangerGoal::new(1.5));
             goal_selector.add_goal(2, Box::new(TemptGoal::new(1.25, TEMPT_ITEMS, false)));
-            goal_selector.add_goal(3, Box::new(WanderAroundGoal::new(1.0)));
+            goal_selector.add_goal(
+                3,
+                Box::new(WanderAroundGoal::new(1.0).ignoring_no_action_time()),
+            );
             goal_selector.add_goal(
                 4,
                 LookAtEntityGoal::with_default(mob_weak, &EntityType::PLAYER, 6.0),

@@ -244,6 +244,7 @@ impl MobEntity {
 
     /// Vanilla `Mob.serverAiStep`: sensing, goals, navigation and controls.
     pub fn server_ai_step(&self, mob: &dyn Mob, caller: &dyn EntityBase) {
+        self.living_entity.no_action_time.fetch_add(1, Relaxed);
         let age = self.living_entity.entity.age.load(Relaxed);
         let entity_id = self.living_entity.entity.entity_id;
 
@@ -555,9 +556,8 @@ impl MobEntity {
         if let Some(left_handed) = nbt.get_bool("LeftHanded") {
             self.set_left_handed(left_handed);
         }
-        if let Some(can_pick_up_loot) = nbt.get_bool("CanPickUpLoot") {
-            self.set_can_pick_up_loot(can_pick_up_loot);
-        }
+        // Vanilla getBooleanOr: a summoned mob only picks up loot when its NBT says so.
+        self.set_can_pick_up_loot(nbt.get_bool("CanPickUpLoot").unwrap_or(false));
         if let Some(persistence_required) = nbt.get_bool("PersistenceRequired") {
             self.persistence_required
                 .store(persistence_required, Relaxed);
@@ -840,50 +840,47 @@ impl MobEntity {
         false
     }
 
+    /// Vanilla `Mob.checkDespawn`. With no player in the world nothing despawns, and a
+    /// player within the no-despawn distance resets the mob's `noActionTime`.
     pub fn check_despawn(&self, mob: &dyn Mob) {
         let entity = &self.living_entity.entity;
-
-        if self.persistence_required.load(Relaxed) {
-            return;
-        }
-
-        if (**entity.custom_name.load()).is_some() {
-            return;
-        }
+        // Pumpkin also keeps named mobs, which vanilla does by making a name tag set
+        // persistence.
+        let is_persistent = self.persistence_required.load(Relaxed)
+            || mob.requires_custom_persistence()
+            || (**entity.custom_name.load()).is_some();
 
         let world = entity.world.load();
         let pos = entity.pos.load();
         let players = world.players.load();
-
-        let nearest_dist_sq = players
+        let Some(dist_sqr) = players
             .iter()
             .filter(|p| p.gamemode.load() != pumpkin_util::GameMode::Spectator)
-            .map(|p| {
-                let pp = p.get_entity().pos.load();
-                let dx = pp.x - pos.x;
-                let dy = pp.y - pos.y;
-                let dz = pp.z - pos.z;
-                dx * dx + dy * dy + dz * dz
-            })
-            .fold(f64::MAX, f64::min);
+            .map(|p| p.get_entity().pos.load().squared_distance_to_vec(&pos))
+            .min_by(f64::total_cmp)
+        else {
+            return;
+        };
 
-        // Mobs like a converting zombie villager refuse to despawn (`removeWhenFarAway`).
-        if !mob.remove_when_far_away(nearest_dist_sq) {
+        let despawn_distance = f64::from(entity.entity_type.category.despawn_distance);
+        if !is_persistent
+            && dist_sqr > despawn_distance * despawn_distance
+            && mob.remove_when_far_away(dist_sqr)
+        {
+            entity.remove();
             return;
         }
 
-        if nearest_dist_sq == f64::MAX {
-            mob.get_entity().remove();
-            return;
-        }
-
-        if nearest_dist_sq > 128.0 * 128.0 {
-            mob.get_entity().remove();
-            return;
-        }
-
-        if nearest_dist_sq > 32.0 * 32.0 && rand::random::<i32>().wrapping_abs() % 800 == 0 {
-            mob.get_entity().remove();
+        let no_despawn_distance = f64::from(NO_DESPAWN_DISTANCE);
+        if !is_persistent
+            && self.living_entity.no_action_time.load(Relaxed) > 600
+            && rand::random_range(0..800) == 0
+            && dist_sqr > no_despawn_distance * no_despawn_distance
+            && mob.remove_when_far_away(dist_sqr)
+        {
+            entity.remove();
+        } else if dist_sqr < no_despawn_distance * no_despawn_distance {
+            self.living_entity.no_action_time.store(0, Relaxed);
         }
     }
 }
@@ -924,8 +921,10 @@ pub trait Mob: EntityBase + Send + Sync {
             .has_line_of_sight(&mob_entity.living_entity.entity, target)
     }
 
+    /// Vanilla `Mob.requiresCustomPersistence`: riding or leashed mobs stay.
     fn requires_custom_persistence(&self) -> bool {
-        false
+        let entity = self.get_entity();
+        entity.has_vehicle() || entity.is_leashed()
     }
 
     /// Whether daylight burns this mob. Default: entity tag `burn_in_daylight`.
@@ -1754,6 +1753,8 @@ impl<T: Mob + Send + 'static> EntityBase for T {
 
 #[expect(dead_code)]
 const DEFAULT_PATHFINDING_FAVOR: f32 = 0.0;
+/// Vanilla `MobCategory.noDespawnDistance`, the same for every category.
+const NO_DESPAWN_DISTANCE: i32 = 32;
 
 pub trait PathAwareEntity: Mob + Send + Sync {
     fn get_pathfinding_favor(&self, _block_pos: BlockPos, _world: Arc<World>) -> f32 {

@@ -81,6 +81,9 @@ pub struct LivingEntity {
     pub breath: BreathManager,
     /// Tracks the remaining time until the entity can regenerate health.
     pub hurt_cooldown: AtomicI32,
+    /// Vanilla `LivingEntity.noActionTime`: ticks since a mob last had a player nearby
+    /// or got hurt.
+    pub no_action_time: AtomicI32,
     /// Stores the amount of damage the entity last received.
     pub last_damage_taken: AtomicCell<f32>,
     /// The current health level of the entity.
@@ -285,6 +288,7 @@ impl LivingEntity {
             health: AtomicCell::new(max_health), // Initial health value from attributes
             entity,
             hurt_cooldown: AtomicI32::new(0),
+            no_action_time: AtomicI32::new(0),
             last_damage_taken: AtomicCell::new(0.0),
             absorption: AtomicCell::new(0.0),
             fall_distance: AtomicCell::new(0.0),
@@ -3039,6 +3043,8 @@ impl LivingEntity {
                 return false;
             }
         }
+
+        self.no_action_time.store(0, Relaxed);
 
         // Vanilla parity: entities in FREEZE_HURTS_EXTRA_TYPES take 5x freezing damage.
         if damage_type == DamageType::FREEZE

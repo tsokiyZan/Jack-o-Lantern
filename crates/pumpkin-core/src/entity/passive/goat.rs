@@ -61,7 +61,10 @@ impl GoatEntity {
             goal_selector.add_goal(2, BreedGoal::new(1.0));
             goal_selector.add_goal(3, Box::new(TemptGoal::new(1.25, TEMPT_ITEMS, false)));
             goal_selector.add_goal(4, Box::new(FollowParentGoal::new(1.25)));
-            goal_selector.add_goal(6, Box::new(WanderAroundGoal::new(1.0)));
+            goal_selector.add_goal(
+                6,
+                Box::new(WanderAroundGoal::new(1.0).ignoring_no_action_time()),
+            );
             goal_selector.add_goal(
                 7,
                 LookAtEntityGoal::with_default(mob_weak, &EntityType::PLAYER, 6.0),

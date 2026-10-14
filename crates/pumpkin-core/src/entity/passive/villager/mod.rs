@@ -496,7 +496,10 @@ impl VillagerEntity {
             goal_selector.add_goal(2, Box::new(TradeWithPlayerGoal::new()));
             // Basic movement and looking (Vanilla uses 0.5 speed)
             goal_selector.add_goal(3, Box::new(WorkAtJobSiteGoal::new(0.5)));
-            goal_selector.add_goal(4, Box::new(WanderAroundGoal::new(0.5)));
+            goal_selector.add_goal(
+                4,
+                Box::new(WanderAroundGoal::new(0.5).ignoring_no_action_time()),
+            );
             goal_selector.add_goal(
                 5,
                 LookAtEntityGoal::with_default(mob_weak.clone(), &EntityType::PLAYER, 8.0),

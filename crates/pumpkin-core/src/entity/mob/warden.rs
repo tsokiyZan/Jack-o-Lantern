@@ -96,7 +96,10 @@ impl WardenEntity {
             goal_selector.add_goal(0, Box::new(EmergeGoal { emerge_ticks }));
             goal_selector.add_goal(0, Box::new(SwimGoal::default()));
             goal_selector.add_goal(4, Box::new(MeleeAttackGoal::new(1.0, true)));
-            goal_selector.add_goal(5, Box::new(WanderAroundGoal::new(0.5)));
+            goal_selector.add_goal(
+                5,
+                Box::new(WanderAroundGoal::new(0.5).ignoring_no_action_time()),
+            );
             goal_selector.add_goal(
                 6,
                 LookAtEntityGoal::with_default(mob_weak.clone(), &EntityType::PLAYER, 8.0),

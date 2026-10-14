@@ -5,6 +5,8 @@ use pumpkin_util::math::vector3::Vector3;
 use rand::RngExt;
 
 pub const DEFAULT_INTERVAL: i32 = 120;
+/// The `noActionTime` at which vanilla's `RandomStrollGoal` stops starting.
+const NO_ACTION_TIME_LIMIT: i32 = 100;
 
 pub struct WanderAroundGoal {
     goal_control: Controls,
@@ -12,6 +14,8 @@ pub struct WanderAroundGoal {
     target: Option<Vector3<f64>>,
     interval: i32,
     force_trigger: bool,
+    /// Vanilla `RandomStrollGoal.checkNoActionTime`.
+    check_no_action_time: bool,
     position: fn(&dyn Mob) -> Option<Vector3<f64>>,
 }
 
@@ -29,6 +33,7 @@ impl WanderAroundGoal {
             target: None,
             interval,
             force_trigger: false,
+            check_no_action_time: true,
             position: land_position,
         }
     }
@@ -40,6 +45,14 @@ impl WanderAroundGoal {
             position: swimmable_position,
             ..Self::with_interval(speed, interval)
         }
+    }
+
+    /// Keeps wandering however long the mob has gone without a player nearby, like
+    /// vanilla's brain-driven strolls and `GolemRandomStrollInVillageGoal`.
+    #[must_use]
+    pub const fn ignoring_no_action_time(mut self) -> Self {
+        self.check_no_action_time = false;
+        self
     }
 
     /// Run once on the next check, ignoring the interval.
@@ -68,7 +81,16 @@ impl Goal for WanderAroundGoal {
         }
 
         if !self.force_trigger {
-            // TODO: also bail out on a long no-action time, which needs the despawn bookkeeping.
+            if self.check_no_action_time
+                && mob
+                    .get_mob_entity()
+                    .living_entity
+                    .no_action_time
+                    .load(std::sync::atomic::Ordering::Relaxed)
+                    >= NO_ACTION_TIME_LIMIT
+            {
+                return false;
+            }
             if mob
                 .get_random()
                 .random_range(0..to_goal_ticks(self.interval))

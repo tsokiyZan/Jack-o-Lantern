@@ -67,7 +67,10 @@ impl IronGolemEntity {
 
             goal_selector.add_goal(1, Box::new(MeleeAttackGoal::new(1.0, true)));
             goal_selector.add_goal(2, Box::new(MoveTowardsTargetGoal::new(0.9, 32.0)));
-            goal_selector.add_goal(4, Box::new(WanderAroundGoal::new(0.6)));
+            goal_selector.add_goal(
+                4,
+                Box::new(WanderAroundGoal::new(0.6).ignoring_no_action_time()),
+            );
             goal_selector.add_goal(5, Box::new(OfferFlowerGoal::new()));
             goal_selector.add_goal(
                 7,
