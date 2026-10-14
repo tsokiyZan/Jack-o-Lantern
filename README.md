@@ -1,3 +1,54 @@
+# Pumpkin, tsokiyZan's fork
+
+> [!WARNING]
+> This is a personal fork of [Pumpkin](https://github.com/Pumpkin-MC/Pumpkin), pushed toward
+> vanilla parity as fast as possible. Almost all of the code added here is written by an AI
+> coding agent (Claude Code) and playtested by one person. Expect bugs. If you need something
+> dependable, use upstream.
+
+## What this fork does
+
+- Merges open upstream pull requests early, after playing them on a real 26.3 client.
+- Ports missing behaviour from the decompiled vanilla server, method by method.
+- Fixes whatever turns up while playing.
+- Merges upstream `master` regularly, so it stays a superset of upstream.
+
+## What is different from upstream
+
+| Change | Source |
+| :-- | :-- |
+| Piglins and piglin brutes run on the brain system | Upstream PR 3630 by wiflow, merged here; barter plugin event restored |
+| Fish and squid swim instead of walking | Upstream PR 3718 by KBDL, merged here |
+| Squid and glow squid squirt ink when hurt | Ported here from `Squid.spawnInk` |
+| Cod, salmon and tropical fish school | Ported here from `AbstractSchoolingFish` and `FollowFlockLeaderGoal` |
+| Pufferfish puff up, sting and poison | Ported here from `Pufferfish` |
+| Eyeblossoms no longer disconnect nearby players | Fixed here; the trail particle now carries its options |
+
+## Issues
+
+Open issues from upstream are mirrored into this repository, with `[upstream N]` at the end
+of the title and a link back to the original. An issue is closed here when it is fixed in
+this fork, which says nothing about its state upstream. Please report upstream bugs upstream.
+
+## Running a debug build
+
+Debug builds currently overflow the stack during chunk generation unless threads get a
+larger stack:
+
+```bash
+RUST_MIN_STACK=33554432 cargo run -p pumpkin
+```
+
+## Credit and license
+
+Pumpkin is the work of the [Pumpkin-MC contributors](https://github.com/Pumpkin-MC/Pumpkin/graphs/contributors).
+This fork is not affiliated with or endorsed by them. Everything here stays under the same
+license as upstream, GPL-3.0 for the server.
+
+The rest of this file is upstream's README, unchanged.
+
+---
+
 <div align="center">
 
 # Pumpkin
