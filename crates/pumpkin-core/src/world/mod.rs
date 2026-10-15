@@ -2655,11 +2655,25 @@ impl World {
         }
     }
 
+    /// Vanilla `Level.isThundering`: the thunder level, not the thunder flag, so a storm
+    /// only counts once it has rolled in.
     pub fn is_thundering(&self) -> bool {
-        self.weather
+        if !self.can_have_weather() {
+            return false;
+        }
+        let weather = self
+            .weather
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .thundering
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        // `getThunderLevel(1.0F)`, which scales the thunder by the rain.
+        f64::from(weather.thunder_level * weather.rain_level) > 0.9
+    }
+
+    /// Vanilla `Level.canHaveWeather`.
+    fn can_have_weather(&self) -> bool {
+        self.dimension.has_skylight
+            && !self.dimension.has_ceiling
+            && self.dimension.minecraft_name != Dimension::THE_END.minecraft_name
     }
 
     pub fn set_thundering(&self, thundering: bool) {
