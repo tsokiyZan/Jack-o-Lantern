@@ -1,10 +1,11 @@
 use std::sync::atomic::AtomicBool;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, PoisonError, RwLock};
 
 use crate::{
     entity::{Entity, EntityBase, projectile::ThrownItemEntity},
     server::Server,
 };
+use pumpkin_data::damage::DamageType;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::{Block, BlockId};
 use pumpkin_protocol::java::client::play::CWorldEvent;
@@ -98,6 +99,101 @@ pub(crate) fn extinguish_fire_if_water_potion(
     }
 }
 
+/// Whether the potion in `stack` is in a potion `tag` (vanilla `PotionContents.is`).
+fn potion_is(stack: &ItemStack, tag: &pumpkin_data::tag::Tag) -> bool {
+    stack
+        .get_data_component::<pumpkin_data::data_component_impl::PotionContentsImpl>()
+        .and_then(|pc| pc.potion_id)
+        .is_some_and(|id| tag.1.contains(&(id as u16)))
+}
+
+/// Whether `stack` hurts water-sensitive entities (vanilla `Enderman.hurtWithCleanWater`).
+#[must_use]
+pub fn hurts_water_sensitive_entities(stack: &ItemStack) -> bool {
+    potion_is(
+        stack,
+        &pumpkin_data::tag::Potion::MINECRAFT_HURTS_WATER_SENSITIVE_ENTITIES,
+    )
+}
+
+/// The item of a thrown splash or lingering potion (vanilla `AbstractThrownPotion.getItem`).
+#[must_use]
+pub fn thrown_potion_item(entity: &dyn EntityBase) -> Option<ItemStack> {
+    let any = entity.cast_any();
+    let lock = if let Some(splash) = any.downcast_ref::<SplashPotionEntity>() {
+        &splash.item_stack
+    } else {
+        &any.downcast_ref::<super::lingering_potion::LingeringPotionEntity>()?
+            .item_stack
+    };
+    Some(lock.read().unwrap_or_else(PoisonError::into_inner).clone())
+}
+
+/// Vanilla `AbstractThrownPotion.affectEntitiesAround`, run on every hit before the effects.
+pub(crate) fn affect_entities_around(potion: &dyn EntityBase, stack: &ItemStack) {
+    let hurts = hurts_water_sensitive_entities(stack);
+    let extinguishes = potion_is(
+        stack,
+        &pumpkin_data::tag::Potion::MINECRAFT_EXTINGUISHES_ENTITIES,
+    );
+    let entity = potion.get_entity();
+    let world = entity.world.load_full();
+    let pos = entity.pos.load();
+    let aabb = entity.bounding_box.load().expand(4.0, 2.0, 4.0);
+    let mut nearby = world.get_entities_at_box(&aabb);
+    nearby.extend(
+        world
+            .get_players_at_box(&aabb)
+            .into_iter()
+            .map(|p| p as Arc<dyn EntityBase>),
+    );
+    if hurts || extinguishes {
+        let owner = potion
+            .get_owner_id()
+            .and_then(|id| world.get_entity_by_id(id));
+        for target in &nearby {
+            if target.get_living_entity().is_none() {
+                continue;
+            }
+            let sensitive = target
+                .get_mob()
+                .is_some_and(crate::entity::mob::Mob::is_sensitive_to_water);
+            let target_entity = target.get_entity();
+            if !sensitive && !target_entity.is_on_fire() {
+                continue;
+            }
+            if pos.squared_distance_to_vec(&target_entity.pos.load()) < 16.0 {
+                if hurts && sensitive {
+                    target.damage_with_context(
+                        target.as_ref(),
+                        1.0,
+                        DamageType::INDIRECT_MAGIC,
+                        None,
+                        Some(potion),
+                        owner.as_deref(),
+                    );
+                }
+                if extinguishes && target_entity.is_on_fire() && target_entity.is_alive() {
+                    target_entity.extinguish();
+                }
+            }
+        }
+    }
+    if potion_is(
+        stack,
+        &pumpkin_data::tag::Potion::MINECRAFT_REHYDRATES_AXOLOTLS,
+    ) {
+        for target in &nearby {
+            if let Some(axolotl) = target
+                .cast_any()
+                .downcast_ref::<crate::entity::passive::axolotl::AxolotlEntity>()
+            {
+                axolotl.rehydrate();
+            }
+        }
+    }
+}
+
 impl EntityBase for SplashPotionEntity {
     fn get_owner_id(&self) -> Option<i32> {
         self.thrown.owner_id.load()
@@ -144,6 +240,7 @@ impl EntityBase for SplashPotionEntity {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone();
         extinguish_fire_if_water_potion(&world, hit_pos, &stack);
+        affect_entities_around(self, &stack);
 
         // Send impact entity status (plays break particles)
         world.send_entity_status(

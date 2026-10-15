@@ -1424,12 +1424,25 @@ pub trait Mob: EntityBase + Send + Sync {
     }
 
     /// Called before damage is applied. Return `false` to cancel the damage entirely.
-    /// Used by endermen to dodge projectiles via teleportation.
     fn pre_damage(&self, _damage_type: DamageType, _source: Option<&dyn EntityBase>) -> bool {
         true
     }
 
     fn on_damage(&self, _damage_type: DamageType, _source: Option<&dyn EntityBase>) {}
+
+    /// Vanilla `hurtServer`, for mobs whose override reorders it; `mob_hurt_server` is the
+    /// shared path (vanilla `super.hurtServer`).
+    fn hurt_server(
+        &self,
+        caller: &dyn EntityBase,
+        amount: f32,
+        damage_type: DamageType,
+        position: Option<Vector3<f64>>,
+        source: Option<&dyn EntityBase>,
+        cause: Option<&dyn EntityBase>,
+    ) -> bool {
+        mob_hurt_server(self, caller, amount, damage_type, position, source, cause)
+    }
 
     /// The start of a vanilla `hurtServer` override, before the damage is applied:
     /// `source` is the direct entity, `cause` the one responsible.
@@ -2013,6 +2026,37 @@ pub fn is_player_holding(passenger: &dyn EntityBase, item: &Item) -> bool {
     })
 }
 
+/// The shared mob `hurtServer`, which `Mob::hurt_server` overrides call as `super`.
+pub fn mob_hurt_server<M: Mob + ?Sized>(
+    mob: &M,
+    caller: &dyn EntityBase,
+    amount: f32,
+    damage_type: DamageType,
+    position: Option<Vector3<f64>>,
+    source: Option<&dyn EntityBase>,
+    cause: Option<&dyn EntityBase>,
+) -> bool {
+    // pre_damage hook: allows mobs to cancel damage (e.g. shulker, witch).
+    if !mob.pre_damage(damage_type, source) {
+        return false;
+    }
+    mob.before_hurt(amount, damage_type, source, cause);
+    // Mob-specific damage modifier (e.g. shulker armor when closed).
+    let amount = mob.modify_incoming_damage(amount, damage_type);
+    let damaged = mob.get_mob_entity().living_entity.damage_with_context(
+        caller,
+        amount,
+        damage_type,
+        position,
+        source,
+        cause,
+    );
+    if damaged {
+        mob.on_damage(damage_type, source);
+    }
+    damaged
+}
+
 impl<T: Mob + Send + 'static> EntityBase for T {
     fn get_mob(&self) -> Option<&dyn Mob> {
         Some(self)
@@ -2139,25 +2183,7 @@ impl<T: Mob + Send + 'static> EntityBase for T {
         source: Option<&dyn EntityBase>,
         cause: Option<&dyn EntityBase>,
     ) -> bool {
-        // pre_damage hook: allows mobs to dodge/cancel damage (e.g. enderman projectile dodge)
-        if !self.pre_damage(damage_type, source) {
-            return false;
-        }
-        self.before_hurt(amount, damage_type, source, cause);
-        // Mob-specific damage modifier (e.g. shulker armor when closed).
-        let amount = self.modify_incoming_damage(amount, damage_type);
-        let damaged = self.get_mob_entity().living_entity.damage_with_context(
-            caller,
-            amount,
-            damage_type,
-            position,
-            source,
-            cause,
-        );
-        if damaged {
-            self.on_damage(damage_type, source);
-        }
-        damaged
+        self.hurt_server(caller, amount, damage_type, position, source, cause)
     }
 
     fn interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {

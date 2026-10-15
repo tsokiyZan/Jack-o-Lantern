@@ -189,6 +189,14 @@ impl AxolotlEntity {
     }
 }
 
+impl AxolotlEntity {
+    /// Vanilla `Axolotl.rehydrate`.
+    pub fn rehydrate(&self) {
+        let breath = &self.mob_entity.living_entity.breath;
+        breath.set_air_supply(self, breath.air() + 1800);
+    }
+}
+
 impl AgeableMob for AxolotlEntity {
     fn get_ageable_data(&self) -> &AgeableData {
         &self.ageable_data

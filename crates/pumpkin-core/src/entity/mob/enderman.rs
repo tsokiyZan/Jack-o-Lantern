@@ -126,6 +126,17 @@ impl EndermanEntity {
         mob_arc
     }
 
+    /// Vanilla `Enderman.repeatedlyTryToTeleport`.
+    fn repeatedly_try_to_teleport(&self) {
+        if !self.mob_entity.living_entity.entity.is_passenger() {
+            for _ in 0..64 {
+                if self.teleport_randomly() {
+                    return;
+                }
+            }
+        }
+    }
+
     pub fn teleport_randomly(&self) -> bool {
         let entity = &self.mob_entity.living_entity.entity;
         let pos = entity.pos.load();
@@ -503,28 +514,57 @@ impl Mob for EndermanEntity {
         }
     }
 
-    fn pre_damage(&self, damage_type: DamageType, _source: Option<&dyn EntityBase>) -> bool {
-        // Vanilla `hurtServer`: projectiles make it teleport instead, unless it is riding.
-        let is_projectile = damage_type
-            .has_tag(&pumpkin_data::tag::DamageType::MINECRAFT_IS_PROJECTILE)
-            && !self.mob_entity.living_entity.entity.is_passenger();
-        if is_projectile {
-            for _ in 0..64 {
-                if self.teleport_randomly() {
-                    return false;
-                }
-            }
+    /// Vanilla `Enderman.hurtServer`.
+    fn hurt_server(
+        &self,
+        caller: &dyn EntityBase,
+        amount: f32,
+        damage_type: DamageType,
+        position: Option<Vector3<f64>>,
+        source: Option<&dyn EntityBase>,
+        cause: Option<&dyn EntityBase>,
+    ) -> bool {
+        let entity = &self.mob_entity.living_entity.entity;
+        if entity.is_invulnerable_to(&damage_type, cause) {
+            return false;
         }
-        true
-    }
-
-    fn on_damage(&self, _damage_type: DamageType, source: Option<&dyn EntityBase>) {
-        if source.is_some_and(|s| s.get_living_entity().is_some()) {
-            return;
+        if damage_type.has_tag(&tag::DamageType::MINECRAFT_IS_PROJECTILE) && !entity.is_passenger()
+        {
+            self.repeatedly_try_to_teleport();
+            return false;
         }
-        let should_teleport = self.get_random().random_range(0..10) != 0;
-        if should_teleport {
+        if let Some(potion) =
+            source.and_then(crate::entity::projectile::splash_potion::thrown_potion_item)
+        {
+            // `hurtWithCleanWater`.
+            let hurt =
+                crate::entity::projectile::splash_potion::hurts_water_sensitive_entities(&potion)
+                    && crate::entity::mob::mob_hurt_server(
+                        self,
+                        caller,
+                        amount,
+                        damage_type,
+                        position,
+                        source,
+                        cause,
+                    );
+            self.repeatedly_try_to_teleport();
+            return hurt;
+        }
+        let result = crate::entity::mob::mob_hurt_server(
+            self,
+            caller,
+            amount,
+            damage_type,
+            position,
+            source,
+            cause,
+        );
+        if cause.is_none_or(|cause| cause.get_living_entity().is_none())
+            && self.get_random().random_range(0..10) != 0
+        {
             self.teleport_randomly();
         }
+        result
     }
 }

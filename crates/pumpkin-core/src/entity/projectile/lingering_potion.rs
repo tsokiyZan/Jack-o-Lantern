@@ -1,7 +1,9 @@
 use std::sync::RwLock;
 use std::sync::atomic::AtomicBool;
 
-use crate::entity::projectile::splash_potion::extinguish_fire_if_water_potion;
+use crate::entity::projectile::splash_potion::{
+    affect_entities_around, extinguish_fire_if_water_potion,
+};
 use crate::{
     entity::{Entity, EntityBase, projectile::ThrownItemEntity},
     server::Server,
@@ -116,6 +118,7 @@ impl EntityBase for LingeringPotionEntity {
             Some(ActorEventID::Death),
         );
 
+        affect_entities_around(self, &stack);
         let effects = crate::item::potion::PotionContents::read_potion_effects(&stack);
 
         // If no effects, just splash (like water bottles)
