@@ -1017,6 +1017,10 @@ pub struct Entity {
     pub touching_water: AtomicBool,
     /// Indicates the fluid height
     pub water_height: AtomicCell<f64>,
+    /// Vanilla `fluidInteraction.isEyeInFluid(WATER)`, from the last fluid update.
+    pub eye_in_water: AtomicBool,
+    /// Vanilla `wasEyeInWater`: `eye_in_water` from before this tick's fluid update.
+    pub was_eye_in_water: AtomicBool,
     /// Indicates whether the entity is touching lava
     pub touching_lava: AtomicBool,
     /// Indicates the fluid height
@@ -1169,6 +1173,8 @@ impl Entity {
             on_ground: AtomicBool::new(false),
             touching_water: AtomicBool::new(false),
             water_height: AtomicCell::new(0.0),
+            eye_in_water: AtomicBool::new(false),
+            was_eye_in_water: AtomicBool::new(false),
             touching_lava: AtomicBool::new(false),
             lava_height: AtomicCell::new(0.0),
             horizontal_collision: AtomicBool::new(false),
@@ -2047,6 +2053,8 @@ impl Entity {
         self.water_height.store(water_height);
 
         self.touching_water.store(in_water, Ordering::SeqCst);
+        self.eye_in_water
+            .store(self.is_submerged_in_water(), Ordering::Relaxed);
 
         let lava_height = fluid_height[1];
 
@@ -2794,9 +2802,10 @@ impl Entity {
                     + f64::from(world.get_fluid_height(&eye_pos, fluid, &state))
     }
 
+    /// Vanilla `Entity.isUnderWater`, which reads the eyes from the previous fluid update.
     #[must_use]
     pub fn is_under_water(&self) -> bool {
-        self.is_in_water() && self.is_submerged_in_water()
+        self.was_eye_in_water.load(Ordering::Relaxed) && self.is_in_water()
     }
 
     #[must_use]
@@ -4443,6 +4452,8 @@ impl EntityBase for Entity {
 
         self.update_last_pos();
         self.tick_portal(caller);
+        self.was_eye_in_water
+            .store(self.eye_in_water.load(Ordering::Relaxed), Ordering::Relaxed);
         self.update_fluid_state(caller);
         self.check_out_of_world(caller);
         let fire_ticks = self.fire_ticks.load(Ordering::Relaxed);
