@@ -4020,8 +4020,8 @@ impl LivingEntity {
         let mut rng = rand::rng();
         // `Consumable.emitParticlesAndSounds`, through `Entity.playSound`.
         let eat_volume = if rng.random::<bool>() { 0.5 } else { 1.0 };
-        let eat_pitch = (rng.random::<f32>() - rng.random::<f32>()).mul_add(0.2, 1.0);
-        let drink_pitch = rng.random::<f32>().mul_add(0.1, 0.9);
+        let eat_pitch = (rng.random::<f32>() - rng.random::<f32>()) * 0.2 + 1.0;
+        let drink_pitch = rng.random::<f32>() * 0.1 + 0.9;
         let drinks = consumable.animation == ConsumeAnimation::Drink;
         if !self.entity.is_silent() {
             if drinks {
@@ -4032,7 +4032,7 @@ impl LivingEntity {
         }
         // `FoodProperties.onConsume`, the consume listener of food.
         if stack.get_data_component::<FoodImpl>().is_some() {
-            let pitch = (rng.random::<f32>() - rng.random::<f32>()).mul_add(0.4, 1.0);
+            let pitch = (rng.random::<f32>() - rng.random::<f32>()) * 0.4 + 1.0;
             play(1.0, pitch, SoundCategory::Neutral);
         }
         self.apply_consumable_effects(caller, &stack);

@@ -92,7 +92,7 @@ pub fn spawn_sweep_particle(attacker_entity: &Entity, world: &World, pos: &Vecto
     let e = f64::from((yaw.to_radians()).cos());
 
     let scale = 0.5;
-    let body_y = f64::from(attacker_entity.height()).mul_add(scale, pos.y);
+    let body_y = f64::from(attacker_entity.height()) * scale + pos.y;
 
     world.spawn_particle(
         Vector3::new(pos.x + d, body_y, pos.z + e),

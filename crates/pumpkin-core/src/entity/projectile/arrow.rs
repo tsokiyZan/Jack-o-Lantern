@@ -292,7 +292,7 @@ impl ArrowEntity {
 
     pub fn set_velocity(&self, x: f64, y: f64, z: f64, power: f64, uncertainty: f64) {
         fn next_triangular(mode: f64, deviation: f64) -> f64 {
-            deviation.mul_add(rand::random::<f64>() - rand::random::<f64>(), mode)
+            deviation * (rand::random::<f64>() - rand::random::<f64>()) + mode
         }
 
         let velocity = Vector3::new(x, y, z)
@@ -344,7 +344,7 @@ impl ArrowEntity {
 
     pub fn set_base_damage_from_mob(&self, power: f64, difficulty_id: i32) {
         fn next_triangular(mode: f64, deviation: f64) -> f64 {
-            deviation.mul_add(rand::random::<f64>() - rand::random::<f64>(), mode)
+            deviation * (rand::random::<f64>() - rand::random::<f64>()) + mode
         }
         let diff_factor = f64::from(difficulty_id) * 0.11;
         let base = power * 2.0 + next_triangular(diff_factor, 0.57425);

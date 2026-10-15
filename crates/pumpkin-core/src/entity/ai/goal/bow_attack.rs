@@ -125,7 +125,7 @@ impl BowAttackGoal {
 
         arrow.set_velocity(
             dx,
-            horizontal_distance.mul_add(0.2, dy),
+            horizontal_distance * 0.2 + dy,
             dz,
             Self::ARROW_SPEED,
             divergence,

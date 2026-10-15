@@ -202,7 +202,7 @@ impl Mob for BatEntity {
             1.0
         };
         let mut random = self.get_random();
-        (random.random::<f32>() - random.random::<f32>()).mul_add(0.2, base) * 0.95
+        ((random.random::<f32>() - random.random::<f32>()) * 0.2 + base) * 0.95
     }
 
     fn mob_init_data_tracker(&self) {

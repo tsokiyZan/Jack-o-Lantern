@@ -68,10 +68,7 @@ impl TntMinecart {
             );
         } else if fuse == 0 {
             let velocity = entity.velocity.load();
-            self.explode(
-                entity,
-                velocity.x.mul_add(velocity.x, velocity.z * velocity.z),
-            );
+            self.explode(entity, velocity.x * velocity.x + velocity.z * velocity.z);
             return true;
         }
         false

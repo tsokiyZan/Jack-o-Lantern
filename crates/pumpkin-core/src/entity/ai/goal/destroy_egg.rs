@@ -75,7 +75,7 @@ impl Stepping for DestroyEggGoal {
             SoundCategory::Hostile,
             &pos_f64,
             0.7,
-            random.mul_add(0.2, 0.9),
+            random * 0.2 + 0.9,
         );
     }
 
@@ -87,7 +87,7 @@ impl Stepping for DestroyEggGoal {
             SoundCategory::Blocks,
             &pos_f64,
             0.7,
-            random.mul_add(0.2, 0.9),
+            random * 0.2 + 0.9,
         );
     }
 }

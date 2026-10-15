@@ -60,8 +60,8 @@ impl FurnaceMinecart {
 
     pub(super) fn velocity(&self, entity: &Entity, velocity: Vector3<f64>) -> Vector3<f64> {
         let mut push = self.push.load();
-        let push_length_squared = push.x.mul_add(push.x, push.z * push.z);
-        let velocity_length_squared = velocity.x.mul_add(velocity.x, velocity.z * velocity.z);
+        let push_length_squared = push.x * push.x + push.z * push.z;
+        let velocity_length_squared = velocity.x * velocity.x + velocity.z * velocity.z;
 
         let mut next = if push_length_squared > 1.0e-7 {
             if push_length_squared > 1.0e-4 && velocity_length_squared > 0.001 {

@@ -1387,7 +1387,7 @@ impl Player {
         // Only reduce attack damage if in cooldown
         // TODO: Enchantments are reduced in the same way, just without the square.
         if attack_cooldown_progress < 1.0 {
-            damage_multiplier = attack_cooldown_progress.powi(2).mul_add(0.8, 0.2);
+            damage_multiplier = attack_cooldown_progress.powi(2) * 0.8 + 0.2;
         }
 
         // Modify the added damage based on the multiplier.
@@ -5036,7 +5036,7 @@ impl Player {
         if self.living_entity.has_effect(&StatusEffect::HASTE)
             || self.living_entity.has_effect(&StatusEffect::CONDUIT_POWER)
         {
-            speed *= ((self.get_haste_amplifier() + 1) as f32).mul_add(0.2, 1.0);
+            speed *= ((self.get_haste_amplifier() + 1) as f32) * 0.2 + 1.0;
         }
         // Fatigue
         if let Some(fatigue) = self.living_entity.get_effect(&StatusEffect::MINING_FATIGUE) {
@@ -5106,10 +5106,10 @@ impl Player {
         let l = 0.02 * rand::random::<f64>();
 
         let velocity = Vector3::new(
-            (-yaw_sin * pitch_cos).mul_add(0.3, horizontal_offset.cos() * l),
-            (rand::random::<f64>() - rand::random::<f64>())
-                .mul_add(0.1, (-pitch_sin).mul_add(0.3, 0.1)),
-            (yaw_cos * pitch_cos).mul_add(0.3, horizontal_offset.sin() * l),
+            // Vanilla's term order, unfused.
+            -yaw_sin * pitch_cos * 0.3 + horizontal_offset.cos() * l,
+            -pitch_sin * 0.3 + 0.1 + (rand::random::<f64>() - rand::random::<f64>()) * 0.1,
+            yaw_cos * pitch_cos * 0.3 + horizontal_offset.sin() * l,
         );
 
         // TODO: Merge stacks together

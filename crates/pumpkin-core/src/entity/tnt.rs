@@ -126,7 +126,7 @@ impl EntityBase for TNTEntity {
             if world.level_info.load().game_rules.tnt_explodes {
                 // Vanilla `PrimedTnt.explode`: `getY(0.0625)`.
                 let pos = entity.pos.load();
-                let y = f64::from(entity.entity_type.dimension[1]).mul_add(0.0625, pos.y);
+                let y = f64::from(entity.entity_type.dimension[1]) * 0.0625 + pos.y;
                 world.explode(
                     Vector3::new(pos.x, y, pos.z),
                     self.power.load(),

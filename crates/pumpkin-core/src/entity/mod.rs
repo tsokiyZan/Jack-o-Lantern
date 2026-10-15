@@ -1754,7 +1754,8 @@ impl Entity {
 
         // This has some vanilla magic
 
-        while x.mul_add(x, z * z) < 1.0E-5 {
+        // `xd * xd + zd * zd < 1.0E-5F`, rounded like vanilla, no fused multiply-add.
+        while x * x + z * z < f64::from(1.0e-5f32) {
             x = (rand::random::<f64>() - rand::random::<f64>()) * 0.01;
 
             z = (rand::random::<f64>() - rand::random::<f64>()) * 0.01;
@@ -2431,7 +2432,7 @@ impl Entity {
             }
         }
 
-        let amplitude = rand::random::<f64>().mul_add(0.2, 0.1);
+        let amplitude = rand::random::<f64>() * 0.2 + 0.1;
 
         let axis = direction.to_axis().into();
 
@@ -2832,7 +2833,8 @@ impl Entity {
         // This has some vanilla magic
         let mut x = x;
         let mut z = z;
-        while x.mul_add(x, z * z) < 1.0E-5 {
+        // `xd * xd + zd * zd < 1.0E-5F`, rounded like vanilla.
+        while x * x + z * z < f64::from(1.0e-5f32) {
             x = (rand::random::<f64>() - rand::random::<f64>()) * 0.01;
             z = (rand::random::<f64>() - rand::random::<f64>()) * 0.01;
         }

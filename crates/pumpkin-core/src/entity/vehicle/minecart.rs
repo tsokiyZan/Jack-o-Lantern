@@ -431,11 +431,11 @@ impl EntityBase for MinecartEntity {
                     .entity
                     .horizontal_collision
                     .load(Ordering::Relaxed)
-                && velocity.x.mul_add(velocity.x, velocity.z * velocity.z) >= 0.01
+                && (velocity.x * velocity.x + velocity.z * velocity.z) >= 0.01
             {
                 minecart.explode(
                     &self.vehicle.entity,
-                    velocity.x.mul_add(velocity.x, velocity.z * velocity.z),
+                    velocity.x * velocity.x + velocity.z * velocity.z,
                 );
                 return;
             }
@@ -708,7 +708,7 @@ impl EntityBase for MinecartEntity {
             && !creative
         {
             let velocity = self.vehicle.entity.velocity.load();
-            let speed_squared = velocity.x.mul_add(velocity.x, velocity.z * velocity.z);
+            let speed_squared = velocity.x * velocity.x + velocity.z * velocity.z;
             let ignites = damage_type.has_tag(&tag::DamageType::MINECRAFT_IS_FIRE)
                 || damage_type.has_tag(&tag::DamageType::MINECRAFT_IS_EXPLOSION)
                 || self.vehicle.entity.fire_ticks.load(Ordering::Relaxed) > 0;

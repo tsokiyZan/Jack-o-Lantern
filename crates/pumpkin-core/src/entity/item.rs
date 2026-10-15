@@ -94,9 +94,9 @@ impl ItemEntity {
 
     pub fn new(entity: Entity, item_stack: ItemStack) -> Self {
         entity.velocity.store(Vector3::new(
-            rand::random::<f64>().mul_add(0.2, -0.1),
+            rand::random::<f64>() * 0.2 - 0.1,
             0.2,
-            rand::random::<f64>().mul_add(0.2, -0.1),
+            rand::random::<f64>() * 0.2 - 0.1,
         ));
         entity.yaw.store(rand::random::<f32>() * 360.0);
         Self::update_fire_immune(&entity, &item_stack);
