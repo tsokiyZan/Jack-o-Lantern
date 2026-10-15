@@ -12,7 +12,7 @@ use pumpkin_util::{
 };
 use rayon::prelude::*;
 use std::f64::consts::PI;
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 
 use crate::biome::{BiomeSupplier, MultiNoiseBiomeSupplier};
 use crate::generation::noise::router::{
@@ -22,6 +22,10 @@ use dashmap::DashMap;
 use pumpkin_data::structures::StructureKeys;
 
 use super::structures::StructurePosition;
+
+type StructureStartCache =
+    DashMap<(StructureKeys, i32, i32), Arc<OnceLock<Option<StructurePosition>>>>;
+
 /// A thread-safe global cache for structures that require world-wide placement calculations
 /// rather than localized chunk-based math (e.g., Strongholds using Concentric Rings).
 ///
@@ -35,7 +39,7 @@ pub struct GlobalStructureCache {
     /// A jigsaw structure's placement is fully determined by its start chunk and the
     /// world seed, so it is computed once here instead of being recomputed for every
     /// surrounding chunk whose structure references overlap it.
-    structure_starts: OnceLock<DashMap<(StructureKeys, i32, i32), Option<StructurePosition>>>,
+    structure_starts: OnceLock<StructureStartCache>,
 }
 
 struct RingTask {
@@ -78,12 +82,17 @@ impl GlobalStructureCache {
         compute: impl FnOnce() -> Option<StructurePosition>,
     ) -> Option<StructurePosition> {
         let cache = self.structure_starts.get_or_init(DashMap::new);
-        if let Some(cached) = cache.get(&(key, chunk_x, chunk_z)) {
-            return cached.value().clone();
+        let key = (key, chunk_x, chunk_z);
+        if let Some(cell) = cache.get(&key)
+            && let Some(start) = cell.get()
+        {
+            return start.clone();
         }
-        let computed = compute();
-        cache.insert((key, chunk_x, chunk_z), computed.clone());
-        computed
+        // Chunks generated in parallel often reach the same uncached start at once. The
+        // first one computes it and the others wait for that result instead of repeating
+        // it. The cell is cloned out so no shard lock is held while computing.
+        let cell = cache.entry(key).or_default().clone();
+        cell.get_or_init(compute).clone()
     }
 
     /// Calculates the 128 ring positions matching vanilla Minecraft's
