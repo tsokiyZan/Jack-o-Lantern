@@ -1376,10 +1376,40 @@ impl LivingEntity {
         false
     }
 
+    /// Vanilla `LivingEntity.knockback`, or the mob's override of it. `attacker` is the
+    /// damage source's responsible entity.
+    #[expect(clippy::too_many_arguments)]
+    pub fn knockback(
+        &self,
+        caller: &dyn EntityBase,
+        power: f64,
+        xd: f64,
+        zd: f64,
+        attacker: Option<&dyn EntityBase>,
+        damage: f32,
+        comes_from_effect: bool,
+    ) {
+        if caller.get_mob().is_some_and(|mob| {
+            mob.custom_knockback(
+                power,
+                xd,
+                zd,
+                attacker.map(EntityBase::get_entity),
+                damage,
+                comes_from_effect,
+            )
+        }) {
+            return;
+        }
+        let resistance = self.get_attribute_value(&Attributes::KNOCKBACK_RESISTANCE);
+        self.entity
+            .apply_knockback(knockback_after_resistance(power, resistance), xd, zd);
+    }
+
     /// The `xd`/`zd` of vanilla `dealDefaultKnockback`: a projectile pushes along its own
     /// motion (fireworks and thrown potions from where they are), anything else from the
     /// damage source's position.
-    fn default_knockback_direction(
+    pub(crate) fn default_knockback_direction(
         &self,
         direct: Option<&dyn EntityBase>,
         position: Option<Vector3<f64>>,
@@ -1501,7 +1531,7 @@ impl LivingEntity {
             };
             let in_water_and_has_fluid_height =
                 self.entity.touching_water.load(SeqCst) && fluid_height > 0.0;
-            let fluid_jump_threshold = self.get_swim_height();
+            let fluid_jump_threshold = self.fluid_jump_threshold(caller);
             let on_ground = self.entity.on_ground.load(SeqCst);
             if in_water_and_has_fluid_height && !(on_ground && fluid_height <= fluid_jump_threshold)
             {
@@ -1553,6 +1583,9 @@ impl LivingEntity {
             && self.entity.entity_type != &EntityType::STRIDER
         {
             self.travel_in_fluid(caller, touching_water);
+            if let Some(mob) = caller.get_mob() {
+                mob.travel_in_fluid_end(touching_water);
+            }
         } else {
             // TODO: Gliding
 
@@ -1639,6 +1672,9 @@ impl LivingEntity {
 
         for entity in pushable {
             entity.push(dyn_self);
+            if let Some(mob) = dyn_self.get_mob() {
+                mob.do_push(entity.as_ref());
+            }
         }
     }
 
@@ -1850,7 +1886,7 @@ impl LivingEntity {
 
             let mut velo = self.entity.velocity.load();
 
-            if self.entity.lava_height.load() <= self.get_swim_height() {
+            if self.entity.lava_height.load() <= self.fluid_jump_threshold(caller) {
                 velo.x *= 0.5;
                 velo.z *= 0.5;
                 velo.y *= f64::from(0.8f32);
@@ -2003,6 +2039,14 @@ impl LivingEntity {
 
             self.entity.velocity.store(velo);
         }
+    }
+
+    /// Vanilla `getFluidJumpThreshold`, with the mob's override.
+    fn fluid_jump_threshold(&self, caller: &dyn EntityBase) -> f64 {
+        caller
+            .get_mob()
+            .and_then(super::mob::Mob::fluid_jump_threshold)
+            .unwrap_or_else(|| self.get_swim_height())
     }
 
     pub fn get_swim_height(&self) -> f64 {
@@ -3678,9 +3722,7 @@ impl LivingEntity {
         // Vanilla `hurtServer`: `dealDefaultKnockback` on every full-damage hit.
         if took_full_damage && !damage_type.has_tag(&tag::DamageType::MINECRAFT_NO_KNOCKBACK) {
             let (dx, dz) = self.default_knockback_direction(source, position);
-            let resistance = self.get_attribute_value(&Attributes::KNOCKBACK_RESISTANCE);
-            self.entity
-                .apply_knockback(knockback_after_resistance(0.4, resistance), dx, dz);
+            self.knockback(caller, 0.4, dx, dz, cause, amount, false);
         }
 
         // Vanilla parity: actuallyHurt
