@@ -13,6 +13,28 @@ pub enum ModifierOperation {
     MultiplyTotal = 2, // multiply total (applied last)
 }
 
+impl ModifierOperation {
+    /// Vanilla `AttributeModifier.Operation.getSerializedName`.
+    #[must_use]
+    pub const fn serialized_name(self) -> &'static str {
+        match self {
+            Self::Add => "add_value",
+            Self::MultiplyBase => "add_multiplied_base",
+            Self::MultiplyTotal => "add_multiplied_total",
+        }
+    }
+
+    #[must_use]
+    pub fn from_serialized_name(name: &str) -> Option<Self> {
+        match name {
+            "add_value" => Some(Self::Add),
+            "add_multiplied_base" => Some(Self::MultiplyBase),
+            "add_multiplied_total" => Some(Self::MultiplyTotal),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Modifier {
     pub id: String,
@@ -25,6 +47,8 @@ pub struct Modifier {
 pub struct AttributeInstance {
     pub base_value: f64,
     pub modifiers: Vec<Modifier>,
+    /// Ids of the modifiers vanilla saves with the entity (`permanentModifiers`).
+    pub permanent_modifiers: Vec<String>,
     pub cached_value: AtomicU64,
     pub dirty: AtomicBool,
 }
@@ -35,6 +59,7 @@ impl AttributeInstance {
         Self {
             base_value,
             modifiers: Vec::new(),
+            permanent_modifiers: Vec::new(),
             cached_value: AtomicU64::new(base_value.to_bits()),
             dirty: AtomicBool::new(false),
         }
@@ -89,7 +114,29 @@ impl AttributeInstance {
         if let Some(pos) = self.modifiers.iter().position(|m| m.id == id) {
             self.modifiers.remove(pos);
         }
+        self.permanent_modifiers.retain(|permanent| permanent != id);
         self.dirty.store(true, Ordering::Relaxed);
+    }
+
+    /// Vanilla `addOrReplacePermanentModifier`: replaces any modifier with the same id, at the
+    /// end of the order, and keeps it in the entity's save.
+    pub fn add_or_replace_permanent_modifier(&mut self, modifier: Modifier) {
+        self.remove_modifier(&modifier.id);
+        self.permanent_modifiers.push(modifier.id.clone());
+        self.modifiers.push(modifier);
+        self.dirty.store(true, Ordering::Relaxed);
+    }
+
+    #[must_use]
+    pub fn get_modifier(&self, id: &str) -> Option<&Modifier> {
+        self.modifiers.iter().find(|m| m.id == id)
+    }
+
+    /// The modifiers vanilla's `AttributeInstance.pack` saves.
+    pub fn permanent_modifiers(&self) -> impl Iterator<Item = &Modifier> {
+        self.modifiers
+            .iter()
+            .filter(|m| self.permanent_modifiers.contains(&m.id))
     }
 }
 
@@ -191,6 +238,7 @@ impl Clone for AttributeInstance {
         Self {
             base_value: self.base_value,
             modifiers: self.modifiers.clone(),
+            permanent_modifiers: self.permanent_modifiers.clone(),
             cached_value: AtomicU64::new(self.cached_value.load(Ordering::Relaxed)),
             dirty: AtomicBool::new(self.dirty.load(Ordering::Relaxed)),
         }

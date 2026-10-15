@@ -2247,6 +2247,10 @@ impl LivingEntity {
 
             // Plays the death sound
             self.make_sound(&*dyn_self, self.death_sound(&*dyn_self));
+            // Vanilla `die`: the attacker's `killedEntity` can claim the body, leaving no loot.
+            let perished = cause
+                .and_then(EntityBase::get_mob)
+                .is_none_or(|mob| mob.killed_entity(&*dyn_self));
             world.send_entity_status(&self.entity, EntityStatus::Death, Some(ActorEventID::Death));
             let looting_level;
             let tool = if let Some(cause_ent) = cause {
@@ -2301,26 +2305,30 @@ impl LivingEntity {
                 ..Default::default()
             };
 
-            if let Some(mob) = dyn_self.get_mob() {
-                mob.before_drop_all_death_loot();
-            }
-            // Drop loot
-            self.drop_loot(&params);
+            if perished {
+                if let Some(mob) = dyn_self.get_mob() {
+                    mob.before_drop_all_death_loot();
+                }
+                // Drop loot
+                self.drop_loot(&params);
 
-            // Award experience
-            if params.killed_by_player.unwrap_or(false)
-                && world.level_info.load().game_rules.mob_drops
-            {
-                let amount = dyn_self.get_experience_reward(killer);
-                if amount > 0 {
-                    ExperienceOrbEntity::spawn(&world, self.entity.pos.load(), amount);
+                // Award experience
+                if params.killed_by_player.unwrap_or(false)
+                    && world.level_info.load().game_rules.mob_drops
+                {
+                    let amount = dyn_self.get_experience_reward(killer);
+                    if amount > 0 {
+                        ExperienceOrbEntity::spawn(&world, self.entity.pos.load(), amount);
+                    }
                 }
             }
             self.entity.pose.store(EntityPose::Dying);
 
-            self.drop_equipment(looting_level);
-            if let Some(mob) = dyn_self.get_mob() {
-                mob.drop_custom_death_loot();
+            if perished {
+                self.drop_equipment(looting_level);
+                if let Some(mob) = dyn_self.get_mob() {
+                    mob.drop_custom_death_loot();
+                }
             }
 
             // Broadcast death message if it's a player and the gamerule is enabled
@@ -3082,9 +3090,8 @@ impl LivingEntity {
         }
     }
 
-    /// Vanilla `AttributeMap.pack` under `attributes`: each instance's id and base value.
-    /// Pumpkin's modifiers all come back on their own (equipment, sprinting, effects), which
-    /// vanilla keeps out of the save as transient, so none are written.
+    /// Vanilla `AttributeMap.pack` under `attributes`: each instance's id, base value and
+    /// permanent modifiers.
     fn write_attributes_nbt(&self, nbt: &mut NbtCompound) {
         let map = self
             .attributes
@@ -3096,9 +3103,26 @@ impl LivingEntity {
             .into_iter()
             .filter_map(|id| {
                 let attribute = attributes_by_id(id)?;
+                let instance = map.get(&id)?;
                 let mut packed = NbtCompound::new();
                 packed.put_string("id", attribute.name.to_string());
-                packed.put("base", NbtTag::Double(map.get(&id)?.base_value));
+                packed.put("base", NbtTag::Double(instance.base_value));
+                let modifiers: Vec<NbtTag> = instance
+                    .permanent_modifiers()
+                    .map(|modifier| {
+                        let mut packed_modifier = NbtCompound::new();
+                        packed_modifier.put_string("id", modifier.id.clone());
+                        packed_modifier.put("amount", NbtTag::Double(modifier.amount));
+                        packed_modifier.put_string(
+                            "operation",
+                            modifier.operation.serialized_name().to_string(),
+                        );
+                        NbtTag::Compound(packed_modifier)
+                    })
+                    .collect();
+                if !modifiers.is_empty() {
+                    packed.put("modifiers", NbtTag::List(modifiers));
+                }
                 Some(NbtTag::Compound(packed))
             })
             .collect();
@@ -3119,11 +3143,33 @@ impl LivingEntity {
             } else {
                 format!("minecraft:{id}")
             };
-            if let Some(attribute) = Attributes::ALL.iter().find(|attr| attr.name == name)
-                && let Some(base) = packed.get_double("base")
-            {
+            let Some(attribute) = Attributes::ALL.iter().find(|attr| attr.name == name) else {
+                continue;
+            };
+            if let Some(base) = packed.get_double("base") {
                 self.set_attribute_base(attribute, base);
             }
+            let Some(modifiers) = packed.get_list("modifiers") else {
+                continue;
+            };
+            let modifiers: Vec<Modifier> = modifiers
+                .iter()
+                .filter_map(NbtTag::extract_compound)
+                .filter_map(|modifier| {
+                    Some(Modifier {
+                        id: modifier.get_string("id")?.to_string(),
+                        amount: modifier.get_double("amount")?,
+                        operation: ModifierOperation::from_serialized_name(
+                            modifier.get_string("operation")?,
+                        )?,
+                    })
+                })
+                .collect();
+            self.update_attribute(attribute, |instance| {
+                for modifier in modifiers {
+                    instance.add_or_replace_permanent_modifier(modifier);
+                }
+            });
         }
     }
 
@@ -3959,6 +4005,8 @@ impl EntityBase for LivingEntity {
                         .on_use_tick(item, player, remaining_use_ticks);
                 }
             }
+        } else if let Some(mob) = caller.get_mob() {
+            crate::item::items::spear::SpearItem::mob_use_tick(mob);
         }
 
         // Current active item

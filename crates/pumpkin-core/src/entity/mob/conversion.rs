@@ -9,6 +9,8 @@ use pumpkin_nbt::compound::NbtCompound;
 
 use crate::entity::EntityBase;
 use crate::entity::mob::{Mob, convert_common};
+use pumpkin_data::item_stack::ItemStack;
+use uuid::Uuid;
 
 /// Vanilla `ConversionTracker`: a mob that stays afflicted long enough starts converting,
 /// and converts once the conversion time runs out.
@@ -109,9 +111,119 @@ impl ConversionTracker {
     }
 }
 
-/// Vanilla `Mob.convertTo` with `ConversionParams.single`: replaces `from` with a new
-/// `to_type` mob in the same spot. `after_conversion` sees the new mob before it is added
-/// to the world.
+/// Vanilla `ConversionParams`, without the scoreboard team, which Pumpkin does not carry over.
+#[derive(Clone, Copy)]
+pub struct ConversionParams {
+    pub keep_equipment: bool,
+    pub preserve_can_pick_up_loot: bool,
+}
+
+/// Vanilla `Mob.convertTo` for a `ConversionType.SINGLE` conversion: builds the new mob,
+/// moves everything over, lets `after_conversion` finish it, adds it to the world and
+/// discards `from`.
+pub fn convert_to(
+    from: &dyn Mob,
+    entity_type: &'static EntityType,
+    params: ConversionParams,
+    after_conversion: impl FnOnce(&dyn Mob),
+) -> Option<Arc<dyn EntityBase>> {
+    let old_entity = from.get_entity();
+    if old_entity.is_removed() {
+        return None;
+    }
+    let world = old_entity.world.load_full();
+    let converted = crate::entity::r#type::from_type(
+        entity_type,
+        old_entity.pos.load(),
+        &world,
+        Uuid::new_v4(),
+    );
+    let to = converted.get_mob()?;
+    convert_single_type(from, to, params);
+    after_conversion(to);
+    world.spawn_entity(converted.clone());
+    old_entity.remove();
+    Some(converted)
+}
+
+/// Vanilla `ConversionType.SINGLE.convert`.
+fn convert_single_type(from: &dyn Mob, to: &dyn Mob, params: ConversionParams) {
+    let (old, new) = (from.get_mob_entity(), to.get_mob_entity());
+    let (old_living, new_living) = (&old.living_entity, &new.living_entity);
+    let (old_entity, new_entity) = (&old_living.entity, &new_living.entity);
+
+    let root_passenger = old_entity.get_first_passenger();
+    // `copyPosition`.
+    new_entity.set_pos(old_entity.pos.load());
+    new_entity.set_rotation(old_entity.yaw.load(), old_entity.pitch.load());
+    new_entity.velocity.store(old_entity.velocity.load());
+    if let Some(rider) = root_passenger {
+        old_entity.remove_passenger(rider.get_entity().entity_id);
+        new.add_pending_rider(rider);
+    }
+    if let Some(vehicle) = old_entity.get_vehicle() {
+        vehicle.get_entity().remove_passenger(old_entity.entity_id);
+        new.set_pending_vehicle(vehicle);
+    }
+
+    if params.keep_equipment {
+        let mut old_equipment = old_living
+            .entity_equipment
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let old_chances = old_living
+            .equipment_drop_chances
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut new_equipment = new_living
+            .entity_equipment
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut new_chances = new_living
+            .equipment_drop_chances
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        for (slot, stack) in &mut old_equipment.equipment {
+            if stack.is_empty() {
+                continue;
+            }
+            // `copyAndClear`.
+            new_equipment.put(slot, std::mem::replace(stack, ItemStack::EMPTY.clone()));
+            match old_chances.get(slot) {
+                Some(chance) => new_chances.insert(slot.clone(), *chance),
+                None => new_chances.remove(slot),
+            };
+        }
+    }
+
+    new_living
+        .fall_distance
+        .store(old_living.fall_distance.load());
+    new_entity.set_fall_flying(old_entity.is_fall_flying());
+    new_living.set_last_hurt_by_player(
+        old_living.last_hurt_by_player.load(),
+        old_living.last_hurt_by_player_memory_time.load(Relaxed),
+    );
+    new_living
+        .hurt_time
+        .store(old_living.hurt_time.load(Relaxed), Relaxed);
+    new_entity.body_yaw.store(old_entity.body_yaw.load());
+    new_entity
+        .on_ground
+        .store(old_entity.on_ground.load(Relaxed), Relaxed);
+    let leash_holder = old_entity
+        .leashed_to
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone();
+    if let Some(holder) = leash_holder {
+        new_entity.leash_to(holder);
+    }
+
+    convert_common(from, to, params);
+}
+
+/// `convert_to` with `ConversionParams.single(keep_equipment, preserve_can_pick_up_loot)`.
 pub fn convert_single(
     from: &dyn Mob,
     to_type: &'static EntityType,
@@ -119,95 +231,13 @@ pub fn convert_single(
     preserve_can_pick_up_loot: bool,
     after_conversion: impl FnOnce(&dyn Mob),
 ) -> Option<Arc<dyn EntityBase>> {
-    let from_mob = from.get_mob_entity();
-    let from_living = &from_mob.living_entity;
-    let from_entity = &from_living.entity;
-    if from_entity.is_removed() {
-        return None;
-    }
-    let world = from_entity.world.load_full();
-    let converted = crate::entity::r#type::from_type(
+    convert_to(
+        from,
         to_type,
-        from_entity.pos.load(),
-        &world,
-        uuid::Uuid::new_v4(),
-    );
-    let to = converted.get_mob()?;
-    let to_mob = to.get_mob_entity();
-    let to_living = &to_mob.living_entity;
-    let to_entity = &to_living.entity;
-
-    // `ConversionType.SINGLE.convert`.
-    let root_passenger = from_entity.get_first_passenger();
-    to_entity.set_rotation(from_entity.yaw.load(), from_entity.pitch.load());
-    to_entity.velocity.store(from_entity.velocity.load());
-    if let Some(passenger) = &root_passenger {
-        from_entity.remove_passenger(passenger.get_entity().entity_id);
-    }
-    let vehicle = from_entity.get_vehicle();
-    if let Some(vehicle) = &vehicle {
-        vehicle.get_entity().remove_passenger(from_entity.entity_id);
-    }
-    if keep_equipment {
-        // `copyAndClear` empties the old mob's slots.
-        let equipment = std::mem::take(
-            &mut from_living
-                .entity_equipment
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .equipment,
-        );
-        for (slot, stack) in equipment {
-            if stack.is_empty() {
-                continue;
-            }
-            let drop_chance = from_mob.drop_chance(&slot);
-            to_mob.set_item_slot(&slot, stack);
-            to_living
-                .equipment_drop_chances
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .insert(slot.clone(), drop_chance);
-            to.on_equip_item(&slot);
-        }
-    }
-    to_living
-        .fall_distance
-        .store(from_living.fall_distance.load());
-    to_living.set_last_hurt_by_player(
-        from_living.last_hurt_by_player.load(),
-        from_living.last_hurt_by_player_memory_time.load(Relaxed),
-    );
-    to_living
-        .hurt_time
-        .store(from_living.hurt_time.load(Relaxed), Relaxed);
-    to_entity.body_yaw.store(from_entity.body_yaw.load());
-    to_entity
-        .on_ground
-        .store(from_entity.on_ground.load(Relaxed), Relaxed);
-    let leash_holder = from_entity
-        .leashed_to
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .clone();
-    if let Some(holder) = leash_holder {
-        to_entity.leash_to(holder);
-    }
-    convert_common(from, to);
-    if preserve_can_pick_up_loot {
-        to_mob.set_can_pick_up_loot(from_mob.can_pick_up_loot());
-    }
-
-    after_conversion(to);
-    world.spawn_entity(converted.clone());
-    if let Some(vehicle) = vehicle {
-        vehicle
-            .get_entity()
-            .add_passenger(vehicle.clone(), converted.clone());
-    }
-    if let Some(passenger) = root_passenger {
-        to_entity.add_passenger(converted.clone(), passenger);
-    }
-    from_entity.remove();
-    Some(converted)
+        ConversionParams {
+            keep_equipment,
+            preserve_can_pick_up_loot,
+        },
+        after_conversion,
+    )
 }
