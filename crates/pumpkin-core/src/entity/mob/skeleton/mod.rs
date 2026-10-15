@@ -9,11 +9,13 @@ use pumpkin_util::Difficulty;
 use crate::entity::{
     Entity,
     ai::goal::{
-        active_target::ActiveTargetGoal, avoid_entity::AvoidEntityGoal, bow_attack::BowAttackGoal,
-        look_around::RandomLookAroundGoal, look_at_entity::LookAtEntityGoal,
-        melee_attack::MeleeAttackGoal, revenge::RevengeGoal, wander_around::WanderAroundGoal,
+        Goal, active_target::ActiveTargetGoal, avoid_entity::AvoidEntityGoal,
+        bow_attack::BowAttackGoal, flee_sun::FleeSunGoal, look_around::RandomLookAroundGoal,
+        look_at_entity::LookAtEntityGoal, melee_attack::MeleeAttackGoal,
+        restrict_sun::RestrictSunGoal, revenge::RevengeGoal, wander_around::WanderAroundGoal,
     },
-    mob::{Mob, MobEntity, equipment::RegionalDifficulty},
+    living::LivingEntity,
+    mob::{Mob, MobEntity, equipment::RegionalDifficulty, zombie::baby_turtle_on_land_target},
 };
 use crate::world::World;
 
@@ -49,27 +51,95 @@ impl SkeletonEntityBase {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
 
-            goal_selector.add_goal(2, Box::new(BowAttackGoal::new(1.0, 20, 15.0)));
-            goal_selector.add_goal(3, Box::new(MeleeAttackGoal::new(1.2, false)));
+            // Vanilla `AbstractSkeleton.registerGoals`; the weapon goal (priority 4) comes from
+            // `reassess_weapon_goal`.
+            goal_selector.add_goal(2, Box::new(RestrictSunGoal::new()));
+            goal_selector.add_goal(3, Box::new(FleeSunGoal::new(1.0)));
             goal_selector.add_goal(
                 3,
                 Box::new(AvoidEntityGoal::new(&EntityType::WOLF, 6.0, 1.0, 1.2)),
             );
-            goal_selector.add_goal(7, Box::new(WanderAroundGoal::new(1.0)));
+            goal_selector.add_goal(5, Box::new(WanderAroundGoal::avoiding_water(1.0)));
             goal_selector.add_goal(
-                8,
+                6,
                 LookAtEntityGoal::with_default(mob_weak, &EntityType::PLAYER, 8.0),
             );
-            goal_selector.add_goal(8, Box::new(RandomLookAroundGoal::default()));
+            goal_selector.add_goal(6, Box::new(RandomLookAroundGoal::default()));
 
+            let mob_entity = &mob_arc.mob_entity;
+            if mob_entity.living_entity.entity.entity_type == &EntityType::WITHER_SKELETON {
+                // Vanilla `WitherSkeleton.registerGoals`, added before the shared targets.
+                target_selector.add_goal(
+                    3,
+                    ActiveTargetGoal::predicated(mob_entity, 10, true, is_abstract_piglin),
+                );
+            }
             target_selector.add_goal(1, Box::new(RevengeGoal::new(true)));
             target_selector.add_goal(
                 2,
-                ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::PLAYER, true),
+                ActiveTargetGoal::with_default(mob_entity, &EntityType::PLAYER, true),
             );
+            target_selector.add_goal(
+                3,
+                ActiveTargetGoal::with_default(mob_entity, &EntityType::IRON_GOLEM, true),
+            );
+            target_selector.add_goal(3, Box::new(baby_turtle_on_land_target(mob_entity)));
         };
+        // The `AbstractSkeleton` constructor already picks a weapon goal.
+        reassess_weapon_goal(mob_arc.as_ref());
 
         mob_arc
+    }
+}
+
+/// Vanilla `AbstractPiglin`: piglins and piglin brutes.
+fn is_abstract_piglin(target: &LivingEntity, _world: &World) -> bool {
+    let entity_type = target.entity.entity_type;
+    entity_type == &EntityType::PIGLIN || entity_type == &EntityType::PIGLIN_BRUTE
+}
+
+/// Vanilla `AbstractSkeleton.reassessWeaponGoal`: a bow in either hand gives the ranged goal,
+/// anything else the melee one, both at priority 4. Runs on spawn, on load and when the mob
+/// equips a new item.
+pub fn reassess_weapon_goal(mob: &dyn Mob) {
+    let mob_entity = mob.get_mob_entity();
+    let living = &mob_entity.living_entity;
+    let holds_bow = {
+        let equipment = living
+            .entity_equipment
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        // `ProjectileUtil.getWeaponHoldingHand` prefers the main hand.
+        equipment.get(&EquipmentSlot::MAIN_HAND).item == &Item::BOW
+            || equipment.get(&EquipmentSlot::OFF_HAND).item == &Item::BOW
+    };
+    let entity_type = living.entity.entity_type;
+    let slow_bow = entity_type == &EntityType::BOGGED || entity_type == &EntityType::PARCHED;
+    let hard = living.entity.world.load().level_info.load().difficulty == Difficulty::Hard;
+    // `getHardAttackInterval` / `getAttackInterval`.
+    let attack_interval = match (slow_bow, hard) {
+        (false, true) => 20,
+        (false, false) => 40,
+        (true, true) => 50,
+        (true, false) => 70,
+    };
+
+    let mut stopped = {
+        let mut goal_selector = mob_entity
+            .goals_selector
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut stopped = goal_selector.remove_goals::<MeleeAttackGoal>();
+        stopped.extend(goal_selector.remove_goals::<BowAttackGoal>());
+        if holds_bow {
+            goal_selector.add_goal(4, Box::new(BowAttackGoal::new(1.0, attack_interval, 15.0)));
+        } else {
+            goal_selector.add_goal(4, Box::new(MeleeAttackGoal::new(1.2, false)));
+        }
+        stopped
+    };
+    for goal in &mut stopped {
+        goal.stop(mob);
     }
 }
 

@@ -1507,6 +1507,10 @@ pub trait Mob: EntityBase + Send + Sync {
 
     fn mob_read_nbt(&self, _nbt: &NbtCompound) {}
 
+    /// Vanilla `LivingEntity.onEquipItem`: an equipment slot changed. Skeletons re-pick their
+    /// weapon goal here.
+    fn on_equip_item(&self, _slot: &EquipmentSlot) {}
+
     /// Drops a target the mob is not allowed to attack, such as a creative player.
     fn as_valid_target(&self, target: Option<Arc<dyn EntityBase>>) -> Option<Arc<dyn EntityBase>> {
         let target = target?;
@@ -1720,6 +1724,7 @@ impl<T: Mob + Send + 'static> EntityBase for T {
         self.mob_init_data_tracker();
         let world = self.get_mob_entity().living_entity.entity.world.load();
         crate::entity::mob::equipment::equip_mob_on_spawn(self as &dyn EntityBase, &world);
+        self.on_equip_item(&EquipmentSlot::MAIN_HAND);
 
         let entity_name = self.get_entity().entity_type.resource_name;
         if let Some(def) = crate::entity::mob::equipment::EQUIPMENT_REGISTRY.get(entity_name)
