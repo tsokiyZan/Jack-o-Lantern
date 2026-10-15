@@ -28,6 +28,8 @@ pub struct TridentEntity {
     pub life: AtomicU32,
     pub shake_time: AtomicU8,
     pub has_hit: AtomicBool,
+    /// Vanilla `ThrownTrident.dealtDamage`: once it has hurt something, it hits no more entities.
+    pub dealt_damage: AtomicBool,
     pub last_block_pos: Arc<std::sync::RwLock<Option<BlockPos>>>,
 }
 
@@ -49,6 +51,7 @@ impl TridentEntity {
             life: AtomicU32::new(0),
             shake_time: AtomicU8::new(0),
             has_hit: AtomicBool::new(false),
+            dealt_damage: AtomicBool::new(false),
             last_block_pos: Arc::new(std::sync::RwLock::new(None)),
         }
     }
@@ -60,7 +63,9 @@ impl TridentEntity {
         pickup: ArrowPickup,
     ) -> Self {
         let mut owner_pos = shooter.pos.load();
-        owner_pos.y = owner_pos.y + f64::from(shooter.entity_dimension.load().eye_height) - 0.1;
+        // Vanilla `AbstractArrow`'s owner constructor: `getEyeY() - 0.1F`.
+        owner_pos.y =
+            owner_pos.y + f64::from(shooter.entity_dimension.load().eye_height) - f64::from(0.1f32);
         entity.pos.store(owner_pos);
         entity.set_velocity(Vector3::new(0.0, 0.1, 0.0));
 
@@ -74,6 +79,7 @@ impl TridentEntity {
             life: AtomicU32::new(0),
             shake_time: AtomicU8::new(0),
             has_hit: AtomicBool::new(false),
+            dealt_damage: AtomicBool::new(false),
             last_block_pos: Arc::new(std::sync::RwLock::new(None)),
         }
     }
@@ -261,7 +267,11 @@ impl EntityBase for TridentEntity {
         }
 
         // Entity collisions
-        let candidates = world.get_entities_at_box(&search_box);
+        let candidates = if self.dealt_damage.load(Ordering::Relaxed) {
+            Vec::new()
+        } else {
+            world.get_entities_at_box(&search_box)
+        };
         for cand in candidates {
             if self.should_skip_collision(entity, &cand) {
                 continue;
@@ -363,7 +373,16 @@ impl EntityBase for TridentEntity {
                 }
 
                 let damage_val = damage as f32;
-                target.damage(&*target, damage_val, DamageType::TRIDENT);
+                self.dealt_damage.store(true, Ordering::Relaxed);
+                let owner = self.owner_id.and_then(|id| world.get_entity_by_id(id));
+                target.damage_with_context(
+                    target.as_ref(),
+                    damage_val,
+                    DamageType::TRIDENT,
+                    Some(hit_pos),
+                    owner.as_deref(),
+                    None,
+                );
 
                 // Play hit sound
                 let sound_packet = CSoundEffect::new(
