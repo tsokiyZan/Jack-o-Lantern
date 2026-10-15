@@ -2534,22 +2534,39 @@ impl World {
             if true {
                 // TODO biome.getPrecipitationAt(pos, this.getSeaLevel()) == Biome.Precipitation.RAIN
                 // TODO this.getCurrentDifficultyAt(blockPos);
-                if rng().random::<f32>() < 0.0675
-                    && self.get_block(&random_pos.to_block_pos().down()) != &Block::LIGHTNING_ROD
-                {
-                    let entity = Entity::new(
-                        self.clone(),
-                        random_pos.to_f64(),
+                // Vanilla `tickThunder`: a skeleton trap, rarer at low local difficulty, never on a
+                // lightning rod; its bolt is only visual.
+                let block_pos = random_pos.to_block_pos();
+                let difficulty =
+                    crate::entity::mob::equipment::RegionalDifficulty::at(self, block_pos.to_f64());
+                let is_trap = self.level_info.load().game_rules.spawn_mobs
+                    && rng().random::<f64>() < f64::from(difficulty.effective_difficulty) * 0.01
+                    && !self
+                        .get_block(&block_pos.down())
+                        .has_tag(&pumpkin_data::tag::Block::MINECRAFT_LIGHTNING_RODS);
+                if is_trap {
+                    let horse = crate::entity::r#type::from_type(
                         &EntityType::SKELETON_HORSE,
+                        block_pos.to_f64(),
+                        self,
+                        uuid::Uuid::new_v4(),
                     );
-                    self.spawn_entity_non_save(Arc::new(entity));
+                    if let Some(skeleton_horse) = horse
+                        .cast_any()
+                        .downcast_ref::<crate::entity::passive::skeleton_horse::SkeletonHorseEntity>()
+                    {
+                        skeleton_horse.set_trap(true);
+                        crate::entity::ageable::AgeableMob::set_age(skeleton_horse, 0);
+                    }
+                    self.spawn_entity(horse);
                 }
-                let entity = Entity::new(
+                let bolt = crate::entity::lightning::LightningBoltEntity::new(Entity::new(
                     self.clone(),
                     random_pos.to_f64().add_raw(0.5, 0., 0.5),
                     &EntityType::LIGHTNING_BOLT,
-                );
-                self.spawn_entity_non_save(Arc::new(entity));
+                ));
+                bolt.set_visual_only(is_trap);
+                self.spawn_entity(Arc::new(bolt));
             }
         }
 
@@ -4653,6 +4670,18 @@ impl World {
                 (player_pos.squared_distance_to_vec(&pos) <= radius_squared).then(|| player.clone())
             })
             .collect()
+    }
+
+    /// Vanilla `EntityGetter.hasNearbyAlivePlayer`: a living, non-spectator player closer
+    /// than `range` (any distance when negative).
+    #[must_use]
+    pub fn has_nearby_alive_player(&self, pos: Vector3<f64>, range: f64) -> bool {
+        self.players.load().iter().any(|player| {
+            !player.is_spectator()
+                && player.living_entity.health.load() > 0.0
+                && (range < 0.0
+                    || player.get_entity().pos.load().squared_distance_to_vec(&pos) < range * range)
+        })
     }
 
     pub fn get_nearby_entities(

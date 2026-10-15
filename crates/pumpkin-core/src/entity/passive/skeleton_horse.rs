@@ -3,7 +3,7 @@ use crate::entity::passive::abstract_horse::AbstractHorse;
 use crate::entity::passive::abstract_horse::add_abstract_horse_goals;
 use std::sync::{
     Arc, Weak,
-    atomic::{AtomicI32, AtomicU8, Ordering},
+    atomic::{AtomicBool, AtomicI32, AtomicU8, Ordering},
 };
 
 use crossbeam::atomic::AtomicCell;
@@ -40,6 +40,10 @@ pub struct SkeletonHorseEntity {
     pub owner: AtomicCell<Option<Uuid>>,
     /// Vanilla `AbstractHorse.standCounter`.
     pub stand_counter: AtomicI32,
+    /// Vanilla `isTrap`: lightning spawned it and it waits for a player.
+    is_trap: AtomicBool,
+    /// Vanilla `trapTime`.
+    trap_time: AtomicI32,
 }
 
 impl SkeletonHorseEntity {
@@ -54,6 +58,8 @@ impl SkeletonHorseEntity {
             gallop_sound_counter: AtomicI32::new(0),
             owner: AtomicCell::new(None),
             stand_counter: AtomicI32::new(0),
+            is_trap: AtomicBool::new(false),
+            trap_time: AtomicI32::new(0),
         };
         let mob_arc = Arc::new(horse);
         let mob_weak: Weak<dyn Mob> = {
@@ -70,7 +76,9 @@ impl SkeletonHorseEntity {
 
             // `addBehaviourGoals` is empty for skeleton horses.
             add_abstract_horse_goals(&mut goal_selector, mob_arc.as_ref(), mob_weak, true);
-            // TODO: SkeletonTrapGoal while it is a trap.
+            // Vanilla adds `SkeletonTrapGoal` at 1 in `setTrap(true)` and removes it after; here
+            // it is always present and only starts while the horse is a trap.
+            goal_selector.add_goal(1, Box::new(SkeletonTrapGoal));
         };
 
         mob_arc
@@ -108,6 +116,155 @@ impl SkeletonHorseEntity {
 
     pub fn set_saddled(&self, val: bool) {
         self.set_flag(FLAG_SADDLE, val);
+    }
+}
+
+/// Vanilla `SkeletonHorse.TRAP_MAX_LIFE`.
+const TRAP_MAX_LIFE: i32 = 18000;
+
+impl SkeletonHorseEntity {
+    #[must_use]
+    pub fn is_trap(&self) -> bool {
+        self.is_trap.load(Ordering::Relaxed)
+    }
+
+    pub fn set_trap(&self, trap: bool) {
+        self.is_trap.store(trap, Ordering::Relaxed);
+    }
+
+    /// Vanilla `SkeletonTrapGoal.createHorse`.
+    fn create_trap_horse(&self, world: &Arc<crate::world::World>) -> Arc<dyn EntityBase> {
+        let pos = self.get_entity().pos.load();
+        let horse = crate::entity::r#type::from_type(
+            &EntityType::SKELETON_HORSE,
+            pos,
+            world,
+            Uuid::new_v4(),
+        );
+        crate::entity::mob::spawn::finalize_spawn(&horse, world, None);
+        let entity = horse.get_entity();
+        entity.set_pos(pos);
+        if let Some(living) = horse.get_living_entity() {
+            living.hurt_cooldown.store(60, Ordering::Relaxed);
+        }
+        if let Some(mob) = horse.get_mob() {
+            mob.get_mob_entity()
+                .persistence_required
+                .store(true, Ordering::Relaxed);
+        }
+        if let Some(skeleton_horse) = horse.cast_any().downcast_ref::<Self>() {
+            skeleton_horse.set_tame(true);
+            skeleton_horse.set_age(0);
+        }
+        horse
+    }
+
+    /// Vanilla `SkeletonTrapGoal.createSkeleton`: an armoured, enchanted rider.
+    fn create_trap_skeleton(
+        world: &Arc<crate::world::World>,
+        horse: &Arc<dyn EntityBase>,
+    ) -> Arc<dyn EntityBase> {
+        let pos = horse.get_entity().pos.load();
+        let skeleton =
+            crate::entity::r#type::from_type(&EntityType::SKELETON, pos, world, Uuid::new_v4());
+        crate::entity::mob::spawn::finalize_spawn(&skeleton, world, None);
+        skeleton.get_entity().set_pos(pos);
+        if let Some(living) = skeleton.get_living_entity() {
+            living.hurt_cooldown.store(60, Ordering::Relaxed);
+        }
+        if let Some(mob) = skeleton.get_mob() {
+            let mob_entity = mob.get_mob_entity();
+            mob_entity
+                .persistence_required
+                .store(true, Ordering::Relaxed);
+            let head = pumpkin_data::data_component_impl::EquipmentSlot::HEAD;
+            let main_hand = pumpkin_data::data_component_impl::EquipmentSlot::MAIN_HAND;
+            if mob_entity.get_item_slot(&head).is_empty() {
+                mob_entity.set_item_slot(&head, ItemStack::new(1, &Item::IRON_HELMET));
+            }
+            // `enchant`: cleared, then `MOB_SPAWN_EQUIPMENT` for the local difficulty.
+            let special_multiplier =
+                crate::entity::mob::equipment::RegionalDifficulty::at(world, pos)
+                    .special_multiplier;
+            for slot in [main_hand, head] {
+                let mut stack = mob_entity.get_item_slot(&slot);
+                stack.patch.retain(|(id, _)| {
+                    *id != pumpkin_data::data_component::DataComponent::Enchantments
+                });
+                crate::entity::mob::equipment::apply_vanilla_enchantments(
+                    &mut stack,
+                    &slot,
+                    special_multiplier,
+                );
+                mob_entity.set_item_slot(&slot, stack);
+            }
+        }
+        skeleton
+    }
+}
+
+/// Vanilla `SkeletonTrapGoal`: a player within 10 blocks springs the trap.
+struct SkeletonTrapGoal;
+
+impl crate::entity::ai::goal::Goal for SkeletonTrapGoal {
+    fn can_start(&mut self, mob: &dyn Mob) -> bool {
+        let Some(horse) = mob.cast_any().downcast_ref::<SkeletonHorseEntity>() else {
+            return false;
+        };
+        let entity = mob.get_entity();
+        horse.is_trap()
+            && entity
+                .world
+                .load()
+                .has_nearby_alive_player(entity.pos.load(), 10.0)
+    }
+
+    fn tick(&mut self, mob: &dyn Mob) {
+        let Some(horse) = mob.cast_any().downcast_ref::<SkeletonHorseEntity>() else {
+            return;
+        };
+        let entity = mob.get_entity();
+        let world = entity.world.load_full();
+        horse.set_trap(false);
+        horse.set_tame(true);
+        horse.set_age(0);
+
+        let pos = entity.pos.load();
+        let bolt = crate::entity::lightning::LightningBoltEntity::new(crate::entity::Entity::new(
+            world.clone(),
+            pos,
+            &EntityType::LIGHTNING_BOLT,
+        ));
+        bolt.set_visual_only(true);
+        world.spawn_entity(Arc::new(bolt));
+
+        let Some(this) = world.get_entity_by_id(entity.entity_id) else {
+            return;
+        };
+        let skeleton = SkeletonHorseEntity::create_trap_skeleton(&world, &this);
+        world.spawn_entity(skeleton.clone());
+        entity.add_passenger(this.clone(), skeleton);
+
+        for _ in 0..3 {
+            let other_horse = horse.create_trap_horse(&world);
+            let other_skeleton = SkeletonHorseEntity::create_trap_skeleton(&world, &other_horse);
+            // `horse.push(triangle(0, 1.1485), 0, triangle(0, 1.1485))`.
+            let mut rng = rand::rng();
+            let triangle = |rng: &mut rand::rngs::ThreadRng| {
+                1.1485 * (rand::RngExt::random::<f64>(rng) - rand::RngExt::random::<f64>(rng))
+            };
+            let push = pumpkin_util::math::vector3::Vector3::new(
+                triangle(&mut rng),
+                0.0,
+                triangle(&mut rng),
+            );
+            other_horse.get_entity().push_impulse(push);
+            world.spawn_entity(other_horse.clone());
+            world.spawn_entity(other_skeleton.clone());
+            other_horse
+                .get_entity()
+                .add_passenger(other_horse.clone(), other_skeleton);
+        }
     }
 }
 
@@ -211,6 +368,8 @@ impl Mob for SkeletonHorseEntity {
         if let Some(owner) = self.owner.load() {
             nbt.put_uuid("Owner", owner);
         }
+        nbt.put_bool("SkeletonTrap", self.is_trap());
+        nbt.put_int("SkeletonTrapTime", self.trap_time.load(Ordering::Relaxed));
     }
 
     fn mob_read_nbt(&self, nbt: &NbtCompound) {
@@ -224,6 +383,11 @@ impl Mob for SkeletonHorseEntity {
         if let Some(owner) = nbt.get_uuid("Owner") {
             self.owner.store(Some(owner));
         }
+        self.set_trap(nbt.get_bool("SkeletonTrap").unwrap_or(false));
+        self.trap_time.store(
+            nbt.get_int("SkeletonTrapTime").unwrap_or(0),
+            Ordering::Relaxed,
+        );
     }
 
     fn get_mob_entity(&self) -> &MobEntity {
@@ -243,6 +407,13 @@ impl Mob for SkeletonHorseEntity {
     fn mob_tick(&self, _caller: &dyn EntityBase) {
         AbstractHorse::tick_standing(self);
         self.ageable_ai_step();
+        // Vanilla `SkeletonHorse.aiStep`: an untriggered trap goes after 18000 ticks.
+        if !self.mob_entity.persistence_required.load(Ordering::Relaxed)
+            && self.is_trap()
+            && self.trap_time.fetch_add(1, Ordering::Relaxed) >= TRAP_MAX_LIFE
+        {
+            self.get_entity().remove();
+        }
     }
 
     fn mob_init_data_tracker(&self) {
