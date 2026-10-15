@@ -1448,7 +1448,11 @@ impl LivingEntity {
             } else if (on_ground || in_water && fluid_height <= swim_height)
                 && self.jumping_cooldown.load(SeqCst) == 0
             {
-                self.jump();
+                if let Some(mob) = caller.get_mob() {
+                    mob.jump_from_ground();
+                } else {
+                    self.jump();
+                }
 
                 self.jumping_cooldown.store(10, SeqCst);
             }
@@ -1940,7 +1944,11 @@ impl LivingEntity {
 
     /// Vanilla `LivingEntity.jumpFromGround`, in vanilla's float maths.
     pub fn jump(&self) {
-        let jump = self.get_jump_velocity(1.0);
+        self.jump_with_power(self.get_jump_velocity(1.0));
+    }
+
+    /// Vanilla `LivingEntity.jumpFromGround` with a mob's own `getJumpPower()` override.
+    pub fn jump_with_power(&self, jump: f32) {
         if jump <= 1.0E-5 {
             return;
         }
@@ -1958,7 +1966,7 @@ impl LivingEntity {
 
     /// Vanilla `getJumpPower(multiplier)`: jump strength times the block jump factor, plus
     /// jump boost, all floats.
-    fn get_jump_velocity(&self, multiplier: f32) -> f32 {
+    pub fn get_jump_velocity(&self, multiplier: f32) -> f32 {
         let boost = self
             .get_effect(&StatusEffect::JUMP_BOOST)
             .map_or(0.0, |effect| 0.1 * (effect.amplifier as f32 + 1.0));

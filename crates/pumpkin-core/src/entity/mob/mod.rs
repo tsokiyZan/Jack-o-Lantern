@@ -8,7 +8,7 @@ use crate::entity::ai::control::MoveControlTrait;
 use crate::entity::ai::control::body_rotation_control::{
     BodyRotationControl, BodyRotationControlTrait,
 };
-use crate::entity::ai::control::jump_control::JumpControl;
+use crate::entity::ai::control::jump_control::{JumpControl, JumpControlTrait};
 use crate::entity::ai::control::look_control::LookControl;
 use crate::entity::ai::control::move_control::MoveControl;
 use crate::entity::ai::goal::escape_danger::EscapeDangerGoal;
@@ -105,7 +105,7 @@ pub struct MobEntity {
     pub look_control: std::sync::Mutex<LookControl>,
     pub sensing: std::sync::Mutex<Sensing>,
     pub move_control: std::sync::Mutex<Box<dyn MoveControlTrait>>,
-    pub jump_control: std::sync::Mutex<JumpControl>,
+    pub jump_control: std::sync::Mutex<Box<dyn JumpControlTrait>>,
     /// Vanilla `Mob.bodyRotationControl`.
     pub body_rotation_control: std::sync::Mutex<Box<dyn BodyRotationControlTrait>>,
     pub brain: std::sync::Mutex<Brain>,
@@ -272,7 +272,7 @@ impl MobEntity {
             look_control: std::sync::Mutex::new(LookControl::default()),
             sensing: std::sync::Mutex::new(Sensing::default()),
             move_control: std::sync::Mutex::new(Box::new(MoveControl::default())),
-            jump_control: std::sync::Mutex::new(JumpControl::default()),
+            jump_control: std::sync::Mutex::new(Box::new(JumpControl::default())),
             body_rotation_control: std::sync::Mutex::new(Box::new(BodyRotationControl::new())),
             brain: std::sync::Mutex::new(Brain::default()),
             brain_inbox: std::sync::Mutex::new(Vec::new()),
@@ -1388,6 +1388,11 @@ pub trait Mob: EntityBase + Send + Sync {
     fn ai_step(&self, _caller: &dyn EntityBase) {}
 
     fn post_tick(&self) {}
+
+    /// Vanilla `LivingEntity.jumpFromGround` as `aiStep` calls it, which a mob may override.
+    fn jump_from_ground(&self) {
+        self.get_mob_entity().living_entity.jump();
+    }
 
     fn get_preferred_weapon_type(&self) -> Option<&'static pumpkin_data::tag::Tag> {
         None

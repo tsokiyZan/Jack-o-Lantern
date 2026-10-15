@@ -1,6 +1,7 @@
 use crate::entity::mob::Mob;
 use pumpkin_util::math::vector3::Vector3;
 use pumpkin_util::math::{subtract_angles, wrap_degrees};
+use std::any::Any;
 
 pub mod body_rotation_control;
 pub mod fish_move_control;
@@ -33,7 +34,8 @@ pub trait Control: Send + Sync {
     }
 }
 
-pub trait MoveControlTrait: Control {
+/// `Any` lets a mob reach its own control's extra state, as vanilla casts `mob.moveControl`.
+pub trait MoveControlTrait: Control + Any {
     fn tick(&mut self, mob: &dyn Mob);
 
     fn set_wanted_position(&mut self, _x: f64, _y: f64, _z: f64, _speed_modifier: f64) {}

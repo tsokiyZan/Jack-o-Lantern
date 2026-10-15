@@ -27,6 +27,8 @@ pub struct EscapeDangerGoal {
     panic_causes: &'static Tag,
     /// What a vanilla subclass adds to `canContinueToUse`, like `PandaPanicGoal`.
     continue_while: Option<MobFilter>,
+    /// What a vanilla subclass does in `tick`, given the speed, like `RabbitPanicGoal`.
+    on_tick: Option<fn(&dyn Mob, f64)>,
 }
 
 impl EscapeDangerGoal {
@@ -41,6 +43,7 @@ impl EscapeDangerGoal {
             gate: None,
             panic_causes: &tag::DamageType::MINECRAFT_PANIC_CAUSES,
             continue_while: None,
+            on_tick: None,
         })
     }
 
@@ -67,6 +70,14 @@ impl EscapeDangerGoal {
         let mut goal = Self::new(speed);
         goal.always_seek_water = Some(range);
         goal
+    }
+
+    /// Runs `on_tick` with the goal's speed each time the goal ticks, like vanilla's
+    /// `RabbitPanicGoal.tick`.
+    #[must_use]
+    pub fn ticking_with(mut self: Box<Self>, on_tick: fn(&dyn Mob, f64)) -> Box<Self> {
+        self.on_tick = Some(on_tick);
+        self
     }
 
     /// Only panics while `gate` holds, like vanilla's `FoxPanicGoal.shouldPanic`.
@@ -157,6 +168,12 @@ impl Goal for EscapeDangerGoal {
     fn stop(&mut self, _mob: &dyn Mob) {
         self.target = None;
         self.running = false;
+    }
+
+    fn tick(&mut self, mob: &dyn Mob) {
+        if let Some(on_tick) = self.on_tick {
+            on_tick(mob, self.speed);
+        }
     }
 
     fn controls(&self) -> Controls {
