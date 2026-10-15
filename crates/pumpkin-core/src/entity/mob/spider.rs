@@ -1,3 +1,5 @@
+use crate::entity::ai::goal::avoid_entity::AvoidEntityGoal;
+use crate::entity::passive::armadillo::armadillo_not_scared;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
 
@@ -60,7 +62,13 @@ impl SpiderEntity {
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
 
             goal_selector.add_goal(1, SwimGoal::new(&mob_arc.mob_entity));
-            // TODO: 2 AvoidEntityGoal(Armadillo, 6, 1.0, 1.2, not scared) needs predicate support.
+            goal_selector.add_goal(
+                2,
+                Box::new(
+                    AvoidEntityGoal::new(&EntityType::ARMADILLO, 6.0, 1.0, 1.2)
+                        .avoiding_only(armadillo_not_scared),
+                ),
+            );
             goal_selector.add_goal(3, Box::new(LeapAtTargetGoal::new(0.4)));
             goal_selector.add_goal(4, SpiderAttackGoal::new(1.0, true));
             goal_selector.add_goal(5, Box::new(WanderAroundGoal::avoiding_water(0.8)));

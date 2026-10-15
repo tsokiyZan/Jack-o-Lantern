@@ -452,3 +452,18 @@ impl Mob for ArmadilloEntity {
         self.animal_interact(player, item_stack, Sound::EntityArmadilloAmbient)
     }
 }
+
+/// Vanilla `armadillo -> !armadillo.isScared()`, the predicate spiders flee armadillos by.
+pub fn armadillo_not_scared(target: &crate::entity::living::LivingEntity) -> bool {
+    target
+        .entity
+        .world
+        .load()
+        .get_entity_by_id(target.entity.entity_id)
+        .is_some_and(|entity| {
+            entity
+                .cast_any()
+                .downcast_ref::<ArmadilloEntity>()
+                .is_some_and(|armadillo| !armadillo.is_scared())
+        })
+}
