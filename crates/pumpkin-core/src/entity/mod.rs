@@ -2647,8 +2647,11 @@ impl Entity {
         self.set_pitch(pitch);
     }
 
+    /// Vanilla `Entity.setXRot`: ignores non-finite values, wraps then clamps.
     pub fn set_pitch(&self, pitch: f32) {
-        self.pitch.store(pitch.clamp(-90.0, 90.0) % 360.0);
+        if pitch.is_finite() {
+            self.pitch.store((pitch % 360.0).clamp(-90.0, 90.0));
+        }
     }
 
     /// Removes the `Entity` from their current `World`

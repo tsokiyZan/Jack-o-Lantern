@@ -1,6 +1,7 @@
 use crate::entity::EntityBase;
 use crate::entity::ai::control::Control;
 use crate::entity::mob::{Mob, MobEntity};
+use pumpkin_util::math;
 use pumpkin_util::math::vector3::Vector3;
 use pumpkin_util::math::{clamp_angle, wrap_degrees};
 use std::sync::Arc;
@@ -166,8 +167,11 @@ impl LookControl {
 
     fn clamp_head_yaw(mob: &dyn Mob) {
         let mob_entity = mob.get_mob_entity();
-        if let Ok(navigator) = mob_entity.navigator.try_lock()
-            && navigator.is_in_progress()
+        if mob_entity
+            .navigator
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .is_in_progress()
         {
             let entity = &mob_entity.living_entity.entity;
             let max_head_rotation = mob.get_max_head_rotation();
@@ -185,11 +189,19 @@ impl LookControl {
         let d = position.x - mob_position.x;
         let e = position.y - mob.living_entity.entity.get_eye_y();
         let f = position.z - mob_position.z;
-        let g = d.hypot(f);
-        if e.abs() <= 1.0E-5 && g.abs() <= 1.0E-5 {
+        #[expect(
+            clippy::imprecise_flops,
+            reason = "vanilla rounds Math.sqrt(xd * xd + zd * zd), not a hypot"
+        )]
+        let g = (d * d + f * f).sqrt();
+        let epsilon = f64::from(1.0E-5f32);
+        if e.abs() <= epsilon && g.abs() <= epsilon {
             None
         } else {
-            Some(-(e.atan2(g) as f32).to_degrees())
+            Some(
+                (-(math::atan2(e, g) * f64::from(180.0f32) / f64::from(std::f32::consts::PI)))
+                    as f32,
+            )
         }
     }
 
@@ -198,10 +210,14 @@ impl LookControl {
         let mob_position = mob.living_entity.entity.pos.load();
         let d = position.x - mob_position.x;
         let e = position.z - mob_position.z;
-        if e.abs() <= 1.0E-5 && d.abs() <= 1.0E-5 {
+        let epsilon = f64::from(1.0E-5f32);
+        if e.abs() <= epsilon && d.abs() <= epsilon {
             None
         } else {
-            Some((e.atan2(d) as f32).to_degrees() - 90.0)
+            Some(
+                (math::atan2(e, d) * f64::from(180.0f32) / f64::from(std::f32::consts::PI)) as f32
+                    - 90.0,
+            )
         }
     }
 }

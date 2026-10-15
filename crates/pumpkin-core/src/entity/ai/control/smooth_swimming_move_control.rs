@@ -2,6 +2,7 @@ use crate::entity::ai::control::move_control::Operation;
 use crate::entity::ai::control::{Control, MoveControlTrait, rotlerp};
 use crate::entity::mob::Mob;
 use pumpkin_data::attributes::Attributes;
+use pumpkin_util::math;
 use pumpkin_util::math::vector3::Vector3;
 use pumpkin_util::math::wrap_degrees;
 
@@ -93,7 +94,9 @@ impl MoveControlTrait for SmoothSwimmingMoveControl {
             return;
         }
 
-        let y_rot_d = (zd.atan2(xd).to_degrees() as f32) - 90.0;
+        let y_rot_d = (math::atan2(zd, xd) * f64::from(180.0f32) / f64::from(std::f32::consts::PI))
+            as f32
+            - 90.0;
         let new_yaw = rotlerp(entity.yaw.load(), y_rot_d, self.max_turn_y as f32);
         entity.yaw.store(new_yaw);
         entity.body_yaw.store(new_yaw);
@@ -103,23 +106,30 @@ impl MoveControlTrait for SmoothSwimmingMoveControl {
         let speed = (self.speed_modifier * movement_speed) as f32;
 
         if entity.is_in_water() {
-            let sqrt = xd.hypot(zd);
-            if yd.abs() > 1.0E-5 || sqrt.abs() > 1.0E-5 {
-                let x_rot_d = wrap_degrees(-(yd.atan2(sqrt).to_degrees() as f32))
-                    .clamp(-(self.max_turn_x as f32), self.max_turn_x as f32);
-                entity
-                    .pitch
-                    .store(self.change_angle(entity.pitch.load(), x_rot_d, 5.0));
+            mob_entity.set_speed(speed * self.in_water_speed_modifier);
+            #[expect(
+                clippy::imprecise_flops,
+                reason = "vanilla rounds Math.sqrt(xd * xd + zd * zd), not a hypot"
+            )]
+            let sqrt = (xd * xd + zd * zd).sqrt();
+            let epsilon = f64::from(1.0E-5f32);
+            if yd.abs() > epsilon || sqrt.abs() > epsilon {
+                let x_rot_d = -((math::atan2(yd, sqrt) * f64::from(180.0f32)
+                    / f64::from(std::f32::consts::PI)) as f32);
+                let x_rot_d =
+                    wrap_degrees(x_rot_d).clamp(-(self.max_turn_x as f32), self.max_turn_x as f32);
+                entity.set_pitch(self.change_angle(entity.pitch.load(), x_rot_d, 5.0));
             }
 
-            living_entity
-                .speed
-                .store(speed * self.in_water_speed_modifier);
-            let pitch = entity.pitch.load().to_radians();
+            // Vanilla sets `zza` and `yya` and leaves `xxa`.
+            let pitch_radians = entity.pitch.load() * (std::f64::consts::PI / 180.0) as f32;
+            let cos = math::cos(pitch_radians);
+            let sin = math::sin(pitch_radians);
+            let input = living_entity.movement_input.load();
             living_entity.movement_input.store(Vector3::new(
-                0.0,
-                f64::from(-pitch.sin() * speed),
-                f64::from(pitch.cos() * speed),
+                input.x,
+                f64::from(-sin * speed),
+                f64::from(cos * speed),
             ));
         } else {
             let left_to_turn = wrap_degrees(entity.yaw.load() - y_rot_d).abs();
