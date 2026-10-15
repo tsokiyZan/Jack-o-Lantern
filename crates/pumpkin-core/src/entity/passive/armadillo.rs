@@ -1,44 +1,59 @@
 use std::sync::{
-    Arc, Weak,
+    Arc, PoisonError,
     atomic::{AtomicI32, AtomicU64, Ordering},
 };
 
 use pumpkin_data::damage::DamageType;
 use pumpkin_data::entity::EntityPose;
 use pumpkin_data::entity::EntityType;
+use pumpkin_data::game_event::GameEvent;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
-use pumpkin_data::sound::{Sound, SoundCategory};
+use pumpkin_data::sound::Sound;
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::codec::var_int::VarInt;
+use pumpkin_util::GameMode;
 use pumpkin_util::math::boundingbox::EntityDimensions;
+use rand::RngExt;
 
 use crate::entity::{
     Entity, EntityBase,
     ageable::{AgeableData, AgeableMob},
-    ai::goal::{
-        breed::BreedGoal, escape_danger::EscapeDangerGoal, follow_parent::FollowParentGoal,
-        look_around::RandomLookAroundGoal, look_at_entity::LookAtEntityGoal, swim::SwimGoal,
-        tempt::TemptGoal, wander_around::WanderAroundGoal,
-    },
-    item::ItemEntity,
+    ai::brain::{Brain, BrainTick, behavior::utils::is_alive, memory::types},
+    ai::control::Control,
+    ai::control::body_rotation_control::{BodyRotationControl, BodyRotationControlTrait},
+    custom_sound::CustomSound,
     mob::{Mob, MobEntity},
     passive::animal::{Animal, set_animal_pathfinding_malus},
     player::Player,
 };
 
-pub const ARMADILLO_FOOD: &[&Item] = &[&Item::SPIDER_EYE];
+use super::armadillo_ai;
+
 pub const ARMADILLO_BABY_START_AGE: i32 = -48000;
+/// Vanilla `Armadillo.BABY_SCALE`.
+const BABY_SCALE: f32 = 0.6;
+/// Vanilla `Armadillo.SCARE_CHECK_INTERVAL`, which vanilla writes out as 80 wherever the
+/// danger memory is set.
 pub const SCARE_CHECK_INTERVAL: i32 = 80;
-pub const SCARE_DISTANCE_HORIZONTAL: f64 = 7.0;
-pub const SCARE_DISTANCE_VERTICAL: f64 = 2.0;
+/// Vanilla `Armadillo.SCARE_DISTANCE_HORIZONTAL`.
+const SCARE_DISTANCE_HORIZONTAL: f64 = 7.0;
+/// Vanilla `Armadillo.SCARE_DISTANCE_VERTICAL`.
+const SCARE_DISTANCE_VERTICAL: f64 = 2.0;
+/// Vanilla `Armadillo.getMaxHeadYRot` while not scared.
+const MAX_HEAD_Y_ROT: f32 = 32.0;
+/// Vanilla `BuiltInLootTables.ARMADILLO_SHED`.
+const ARMADILLO_SHED: &str = "minecraft:gameplay/armadillo_shed";
+/// Vanilla `BuiltInLootTables.ARMADILLO_BRUSH`.
+const ARMADILLO_BRUSH: &str = "minecraft:brush/armadillo";
+/// Durability a brush loses per vanilla `Armadillo.mobInteract`.
+const BRUSH_DURABILITY_COST: i32 = 16;
+/// Vanilla `20 * TimeUtil.SECONDS_PER_MINUTE * 5`: the shortest wait between sheds, and
+/// the size of the random part on top.
+const SCUTE_DROP_TIME: i32 = 20 * 60 * 5;
 
-fn pick_next_scute_drop_time() -> i32 {
-    let rand_ticks = (rand::random::<u32>() % 6000) as i32;
-    rand_ticks + 6000
-}
-
+/// Vanilla `Armadillo.ArmadilloState`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[repr(i32)]
 pub enum ArmadilloState {
@@ -50,6 +65,7 @@ pub enum ArmadilloState {
 }
 
 impl ArmadilloState {
+    /// Vanilla `BY_ID`, which reads an unknown id as `IDLE`.
     #[must_use]
     pub const fn from_id(id: i32) -> Self {
         match id {
@@ -71,7 +87,7 @@ impl ArmadilloState {
     }
 
     #[must_use]
-    pub const fn animation_duration(self) -> u64 {
+    pub const fn animation_duration(self) -> i32 {
         match self {
             Self::Idle => 0,
             Self::Rolling => 10,
@@ -90,6 +106,7 @@ impl ArmadilloState {
         }
     }
 
+    /// Vanilla `getSerializedName`.
     #[must_use]
     pub const fn name(self) -> &'static str {
         match self {
@@ -101,12 +118,13 @@ impl ArmadilloState {
     }
 
     #[must_use]
-    pub fn from_name(name: &str) -> Self {
+    pub fn from_name(name: &str) -> Option<Self> {
         match name {
-            "rolling" => Self::Rolling,
-            "scared" => Self::Scared,
-            "unrolling" => Self::Unrolling,
-            _ => Self::Idle,
+            "idle" => Some(Self::Idle),
+            "rolling" => Some(Self::Rolling),
+            "scared" => Some(Self::Scared),
+            "unrolling" => Some(Self::Unrolling),
+            _ => None,
         }
     }
 }
@@ -117,54 +135,59 @@ impl ArmadilloState {
 pub struct ArmadilloEntity {
     pub mob_entity: MobEntity,
     pub ageable_data: AgeableData,
-    pub state: AtomicI32,
-    pub in_state_ticks: AtomicU64,
-    pub scute_time: AtomicI32,
-    pub danger_detected_recently_ticks: AtomicI32,
+    state: AtomicI32,
+    in_state_ticks: AtomicU64,
+    scute_time: AtomicI32,
 }
 
 impl ArmadilloEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
         set_animal_pathfinding_malus(&mob_entity);
+        mob_entity
+            .navigator
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .set_can_float(true);
+        *mob_entity
+            .body_rotation_control
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) =
+            Box::new(ArmadilloBodyRotationControl(BodyRotationControl::new()));
         let armadillo = Self {
             mob_entity,
             ageable_data: AgeableData::default(),
             state: AtomicI32::new(ArmadilloState::Idle.id()),
             in_state_ticks: AtomicU64::new(0),
-            scute_time: AtomicI32::new(pick_next_scute_drop_time()),
-            danger_detected_recently_ticks: AtomicI32::new(0),
+            scute_time: AtomicI32::new(0),
         };
+        armadillo
+            .scute_time
+            .store(armadillo.pick_next_scute_drop_time(), Ordering::Relaxed);
         let mob_arc = Arc::new(armadillo);
-        let mob_weak: Weak<dyn Mob> = {
-            let mob_arc: Arc<dyn Mob> = mob_arc.clone();
-            Arc::downgrade(&mob_arc)
-        };
-
-        {
-            let mut goal_selector = mob_arc
-                .mob_entity
-                .goals_selector
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-
-            goal_selector.add_goal(0, SwimGoal::new(&mob_arc.mob_entity));
-            goal_selector.add_goal(1, EscapeDangerGoal::new(2.0));
-            goal_selector.add_goal(2, BreedGoal::new(1.0));
-            goal_selector.add_goal(3, Box::new(TemptGoal::new(1.25, ARMADILLO_FOOD, false)));
-            goal_selector.add_goal(4, Box::new(FollowParentGoal::new(1.1)));
-            goal_selector.add_goal(
-                5,
-                Box::new(WanderAroundGoal::new(1.0).ignoring_no_action_time()),
-            );
-            goal_selector.add_goal(
-                6,
-                LookAtEntityGoal::with_default(mob_weak, &EntityType::PLAYER, 6.0),
-            );
-            goal_selector.add_goal(7, Box::new(RandomLookAroundGoal::default()));
-        };
-
+        mob_arc.mob_entity.init_brain(mob_arc.as_ref());
         mob_arc
+    }
+
+    /// Vanilla `Armadillo.isScared`.
+    #[must_use]
+    pub fn is_scared(&self) -> bool {
+        self.get_state() != ArmadilloState::Idle
+    }
+
+    /// Vanilla `Armadillo.shouldHideInShell`.
+    #[must_use]
+    pub fn should_hide_in_shell(&self) -> bool {
+        self.get_state()
+            .should_hide_in_shell(self.in_state_ticks.load(Ordering::Relaxed))
+    }
+
+    /// Vanilla `Armadillo.shouldSwitchToScaredState`.
+    #[must_use]
+    pub fn should_switch_to_scared_state(&self) -> bool {
+        self.get_state() == ArmadilloState::Rolling
+            && self.in_state_ticks.load(Ordering::Relaxed)
+                > ArmadilloState::Rolling.animation_duration() as u64
     }
 
     #[must_use]
@@ -172,112 +195,147 @@ impl ArmadilloEntity {
         ArmadilloState::from_id(self.state.load(Ordering::Relaxed))
     }
 
+    /// Vanilla `Armadillo.switchToState`, with `onSyncedDataUpdated`: only a real change
+    /// restarts the state's tick count.
     pub fn switch_to_state(&self, state: ArmadilloState) {
-        self.state.store(state.id(), Ordering::Relaxed);
-        self.in_state_ticks.store(0, Ordering::Relaxed);
-        let entity = self.get_entity();
-        entity.set_synced_data(
+        let previous = self.state.swap(state.id(), Ordering::Relaxed);
+        self.get_entity().set_synced_data(
             pumpkin_data::tracked_data::armadillo::ARMADILLO_STATE,
             VarInt(state.id()),
         );
+        if previous != state.id() {
+            self.in_state_ticks.store(0, Ordering::Relaxed);
+        }
     }
 
+    /// Vanilla `Armadillo.pickNextScuteDropTime`.
+    fn pick_next_scute_drop_time(&self) -> i32 {
+        self.get_random().random_range(0..SCUTE_DROP_TIME) + SCUTE_DROP_TIME
+    }
+
+    /// Vanilla `Armadillo.isScaredBy`.
     #[must_use]
-    pub fn is_scared(&self) -> bool {
-        self.get_state() != ArmadilloState::Idle
+    pub fn is_scared_by(&self, living_entity: &dyn EntityBase) -> bool {
+        let target = living_entity.get_entity();
+        if !self
+            .get_entity()
+            .bounding_box
+            .load()
+            .expand(
+                SCARE_DISTANCE_HORIZONTAL,
+                SCARE_DISTANCE_VERTICAL,
+                SCARE_DISTANCE_HORIZONTAL,
+            )
+            .intersects(&target.bounding_box.load())
+        {
+            return false;
+        }
+        if target
+            .entity_type
+            .has_tag(&tag::EntityType::MINECRAFT_UNDEAD)
+        {
+            return true;
+        }
+        if self
+            .mob_entity
+            .living_entity
+            .get_last_hurt_by_mob()
+            .is_some_and(|hurt_by| hurt_by.get_entity().entity_id == target.entity_id)
+        {
+            return true;
+        }
+        if target.entity_type == &EntityType::PLAYER {
+            return !living_entity.is_spectator()
+                && (target.is_sprinting() || target.has_vehicle());
+        }
+        false
     }
 
+    /// Vanilla `Armadillo.canStayRolledUp`, reading `isPanicking` from `brain`.
     #[must_use]
-    pub fn should_hide_in_shell(&self) -> bool {
-        self.get_state()
-            .should_hide_in_shell(self.in_state_ticks.load(Ordering::Relaxed))
+    pub fn can_stay_rolled_up_with(&self, brain: &Brain) -> bool {
+        let entity = self.get_entity();
+        !brain.has_memory_value(types::IS_PANICKING.id())
+            && !entity.is_in_liquid()
+            && !entity.is_leashed()
+            && !entity.has_vehicle()
+            && !entity.has_passengers()
     }
 
-    #[must_use]
-    pub fn should_switch_to_scared_state(&self) -> bool {
-        self.get_state() == ArmadilloState::Rolling
-            && self.in_state_ticks.load(Ordering::Relaxed)
-                > ArmadilloState::Rolling.animation_duration()
-    }
-
-    pub fn can_stay_rolled_up(&self) -> bool {
-        !self.is_panicking()
-            && !self.mob_entity.living_entity.is_in_water()
-            && !self.get_entity().has_vehicle()
-    }
-
+    /// Vanilla `Armadillo.rollUp`.
     pub fn roll_up(&self) {
         if !self.is_scared() {
+            self.mob_entity.stop_in_place();
             self.mob_entity.reset_love_ticks();
-            let entity = self.get_entity();
-            let world = entity.world.load();
-            world.play_sound(
-                Sound::EntityArmadilloRoll,
-                SoundCategory::Neutral,
-                &entity.pos.load(),
-            );
+            self.game_event(GameEvent::EntityAction);
+            self.make_sound(Sound::EntityArmadilloRoll);
             self.switch_to_state(ArmadilloState::Rolling);
         }
     }
 
+    /// Vanilla `Armadillo.rollOut`.
     pub fn roll_out(&self) {
         if self.is_scared() {
-            let entity = self.get_entity();
-            let world = entity.world.load();
-            world.play_sound(
-                Sound::EntityArmadilloUnrollFinish,
-                SoundCategory::Neutral,
-                &entity.pos.load(),
-            );
+            self.game_event(GameEvent::EntityAction);
+            self.make_sound(Sound::EntityArmadilloUnrollFinish);
             self.switch_to_state(ArmadilloState::Idle);
         }
     }
 
-    pub fn brush_off_scute(&self, player: &Arc<Player>) -> bool {
+    /// Vanilla `Armadillo.brushOffScute`.
+    pub fn brush_off_scute(&self, tool: &ItemStack) -> bool {
         if self.is_baby() {
             return false;
         }
-        let entity = self.get_entity();
-        let world = entity.world.load();
-        let pos = entity.pos.load();
-        let item_entity = Arc::new(ItemEntity::new(
-            Entity::new(world.clone(), pos, &EntityType::ITEM),
-            ItemStack::new(1, &Item::ARMADILLO_SCUTE),
-        ));
-        world.spawn_entity(item_entity);
-        world.play_sound(Sound::EntityArmadilloBrush, SoundCategory::Neutral, &pos);
-        player.damage_held_item(16);
+        self.mob_entity
+            .living_entity
+            .drop_from_entity_interact_loot_table(ARMADILLO_BRUSH, tool);
+        self.play_sound_at_self(Sound::EntityArmadilloBrush, 1.0, 1.0);
+        self.game_event(GameEvent::EntityInteract);
         true
     }
 
-    pub fn is_scared_by(&self, living_entity: &dyn EntityBase) -> bool {
+    fn game_event(&self, event: GameEvent) {
         let entity = self.get_entity();
-        let pos = entity.pos.load();
-        let target_pos = living_entity.get_entity().pos.load();
-        let dx = (pos.x - target_pos.x).abs();
-        let dy = (pos.y - target_pos.y).abs();
-        let dz = (pos.z - target_pos.z).abs();
+        entity
+            .world
+            .load()
+            .emit_game_event(event.name(), entity.pos.load());
+    }
+}
 
-        if dx > SCARE_DISTANCE_HORIZONTAL
-            || dz > SCARE_DISTANCE_HORIZONTAL
-            || dy > SCARE_DISTANCE_VERTICAL
-        {
-            return false;
+/// Vanilla `Armadillo.BRAIN_PROVIDER`'s `ARMADILLO_SCARE_DETECTED` mob test.
+#[must_use]
+pub fn is_scared_by(tick: &BrainTick<'_>, living_entity: &dyn EntityBase) -> bool {
+    tick.mob
+        .cast_any()
+        .downcast_ref::<ArmadilloEntity>()
+        .is_some_and(|armadillo| armadillo.is_scared_by(living_entity))
+}
+
+/// Vanilla `Armadillo.canStayRolledUp`, from inside the armadillo's brain tick.
+#[must_use]
+pub fn can_stay_rolled_up(tick: &BrainTick<'_>) -> bool {
+    tick.mob
+        .cast_any()
+        .downcast_ref::<ArmadilloEntity>()
+        .is_some_and(|armadillo| armadillo.can_stay_rolled_up_with(tick.brain))
+}
+
+/// Vanilla `Armadillo.createBodyControl`: the body stays put while scared.
+struct ArmadilloBodyRotationControl(BodyRotationControl);
+
+impl Control for ArmadilloBodyRotationControl {}
+
+impl BodyRotationControlTrait for ArmadilloBodyRotationControl {
+    fn client_tick(&mut self, mob: &dyn Mob) {
+        let scared = mob
+            .cast_any()
+            .downcast_ref::<ArmadilloEntity>()
+            .is_some_and(ArmadilloEntity::is_scared);
+        if !scared {
+            self.0.client_tick(mob);
         }
-
-        let target_type = living_entity.get_entity().entity_type;
-        if target_type.has_tag(&tag::EntityType::MINECRAFT_UNDEAD) {
-            return true;
-        }
-
-        if target_type == &EntityType::PLAYER {
-            let target_ent = living_entity.get_entity();
-            if target_ent.is_sprinting() || target_ent.has_vehicle() {
-                return true;
-            }
-        }
-
-        false
     }
 }
 
@@ -292,23 +350,44 @@ impl AgeableMob for ArmadilloEntity {
 }
 
 impl Animal for ArmadilloEntity {
+    /// Vanilla `Armadillo.isFood`.
     fn is_food(&self, item_stack: &ItemStack) -> bool {
         item_stack
             .item
             .has_tag(&tag::Item::MINECRAFT_ARMADILLO_FOOD)
-            || ARMADILLO_FOOD.iter().any(|i| i.id == item_stack.item.id)
+    }
+}
+
+impl CustomSound for ArmadilloEntity {
+    /// Vanilla `Armadillo.getDeathSound`.
+    fn death_sound(&self) -> Option<Sound> {
+        Some(Sound::EntityArmadilloDeath)
+    }
+
+    /// Vanilla `Armadillo.getHurtSound`.
+    fn hurt_sound(&self) -> Option<Sound> {
+        Some(if self.is_scared() {
+            Sound::EntityArmadilloHurtReduced
+        } else {
+            Sound::EntityArmadilloHurt
+        })
     }
 }
 
 /// Vanilla `Armadillo.BABY_DIMENSIONS`.
 const BABY_DIMENSIONS: EntityDimensions = Entity::type_dimensions(&EntityType::ARMADILLO)
-    .scale(0.6)
+    .scale(BABY_SCALE)
     .with_eye_height(0.218_75);
 
 impl Mob for ArmadilloEntity {
     /// Vanilla `Armadillo.getAmbientSound`.
-    fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
-        (!self.is_scared()).then_some(pumpkin_data::sound::Sound::EntityArmadilloAmbient)
+    fn ambient_sound(&self) -> Option<Sound> {
+        (!self.is_scared()).then_some(Sound::EntityArmadilloAmbient)
+    }
+
+    /// Vanilla `Armadillo.getAgeScale`.
+    fn age_scale(&self) -> f32 {
+        if self.is_baby() { BABY_SCALE } else { 1.0 }
     }
 
     /// Vanilla `Armadillo.getDefaultDimensions`.
@@ -317,7 +396,16 @@ impl Mob for ArmadilloEntity {
         if entity.is_baby() {
             BABY_DIMENSIONS
         } else {
-            entity.get_dimensions(pose)
+            entity.get_dimensions(pose).scale(self.age_scale())
+        }
+    }
+
+    /// Vanilla `Armadillo.getMaxHeadYRot`.
+    fn get_max_head_rotation(&self) -> f32 {
+        if self.is_scared() {
+            0.0
+        } else {
+            MAX_HEAD_Y_ROT
         }
     }
 
@@ -329,104 +417,115 @@ impl Mob for ArmadilloEntity {
         Some(self)
     }
 
-    fn mob_write_nbt(&self, nbt: &mut NbtCompound) {
-        nbt.put_string("state", self.get_state().name().to_string());
-        nbt.put_int("scute_time", self.scute_time.load(Ordering::Relaxed));
-    }
-
-    fn mob_read_nbt(&self, nbt: &NbtCompound) {
-        if let Some(state_name) = nbt.get_string("state") {
-            self.switch_to_state(ArmadilloState::from_name(state_name));
-        } else if let Some(state_id) = nbt.get_int("state") {
-            self.switch_to_state(ArmadilloState::from_id(state_id));
-        }
-        if let Some(scute_time) = nbt.get_int("scute_time") {
-            self.scute_time.store(scute_time, Ordering::Relaxed);
-        }
+    fn as_custom_sound(&self) -> Option<&dyn CustomSound> {
+        Some(self)
     }
 
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
     }
 
+    fn make_brain(&self, packed: &crate::entity::ai::brain::memory::PackedMemories) -> Brain {
+        armadillo_ai::ARMADILLO_PROVIDER.make_brain(self, packed)
+    }
+
+    /// Vanilla `Armadillo.customServerAiStep`'s `ArmadilloAi.updateActivity`.
+    fn after_brain_tick(&self, tick: &mut BrainTick<'_>) {
+        armadillo_ai::update_activity(tick);
+    }
+
+    /// Vanilla `Armadillo.customServerAiStep`: the brain, then shedding a scute.
+    fn custom_server_ai_step(&self, _caller: &dyn EntityBase) {
+        if !is_alive(self) {
+            self.mob_entity.apply_brain_inbox(self);
+            return;
+        }
+        self.mob_entity.tick_brain(self);
+        let scute_time = self.scute_time.fetch_sub(1, Ordering::Relaxed) - 1;
+        if scute_time <= 0 && self.should_drop_loot() {
+            if self
+                .mob_entity
+                .living_entity
+                .drop_from_gift_loot_table(ARMADILLO_SHED)
+            {
+                let mut random = self.get_random();
+                let pitch = (random.random::<f32>() - random.random::<f32>()) * 0.2 + 1.0;
+                self.play_sound_at_self(Sound::EntityArmadilloScuteDrop, 1.0, pitch);
+                self.game_event(GameEvent::EntityPlace);
+            }
+            self.scute_time
+                .store(self.pick_next_scute_drop_time(), Ordering::Relaxed);
+        }
+    }
+
+    /// Vanilla `AgeableMob.aiStep`, the end of `Armadillo`'s `super.aiStep()`.
+    fn ai_step_end(&self, _caller: &dyn EntityBase) {
+        if self.get_entity().is_alive() {
+            self.ageable_ai_step();
+        }
+    }
+
+    /// The rest of vanilla `Armadillo.tick`, after `super.tick()`.
+    fn post_tick(&self) {
+        if self.is_scared() {
+            self.clamp_head_rotation_to_body();
+        }
+        self.in_state_ticks.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Vanilla `Armadillo.hurtServer`; `LivingEntity.hurtServer` then raises a negative
+    /// amount to zero.
     fn modify_incoming_damage(&self, amount: f32, _damage_type: DamageType) -> f32 {
         if self.is_scared() {
-            (amount - 1.0).max(0.0) / 2.0
+            ((amount - 1.0) / 2.0).max(0.0)
         } else {
             amount
         }
     }
 
-    fn on_damage(&self, _damage_type: DamageType, source: Option<&dyn EntityBase>) {
-        if self.get_entity().is_alive()
-            && let Some(src) = source
-            && src.get_entity().entity_type != &EntityType::ITEM
+    /// Vanilla `Armadillo.actuallyHurt`.
+    fn actually_hurt(
+        &self,
+        damage_type: DamageType,
+        source: Option<&dyn EntityBase>,
+        cause: Option<&dyn EntityBase>,
+    ) {
+        if self.mob_entity.is_no_ai() || self.mob_entity.living_entity.health.load() <= 0.0 {
+            return;
+        }
+        if cause
+            .or(source)
+            .is_some_and(|attacker| attacker.get_living_entity().is_some())
         {
-            self.danger_detected_recently_ticks
-                .store(SCARE_CHECK_INTERVAL, Ordering::Relaxed);
-            if self.can_stay_rolled_up() {
-                self.danger_detected_recently_ticks
-                    .store(80, Ordering::Relaxed);
+            let can_stay_rolled_up = self.mob_entity.with_brain(self, |tick| {
+                tick.brain.set_with_expiry(
+                    types::DANGER_DETECTED_RECENTLY,
+                    true,
+                    i64::from(SCARE_CHECK_INTERVAL),
+                );
+                self.can_stay_rolled_up_with(tick.brain)
+            });
+            if can_stay_rolled_up {
+                self.roll_up();
             }
+        } else if damage_type.has_tag(&tag::DamageType::MINECRAFT_PANIC_ENVIRONMENTAL_CAUSES) {
+            self.roll_out();
         }
     }
 
-    fn mob_tick(&self, _caller: &dyn EntityBase) {
-        self.ageable_ai_step();
+    fn mob_write_nbt(&self, nbt: &mut NbtCompound) {
+        nbt.put_string("state", self.get_state().name().to_string());
+        nbt.put_int("scute_time", self.scute_time.load(Ordering::Relaxed));
+    }
 
-        self.in_state_ticks.fetch_add(1, Ordering::Relaxed);
-        let danger_ticks = self.danger_detected_recently_ticks.load(Ordering::Relaxed);
-        if danger_ticks > 0 {
-            self.danger_detected_recently_ticks
-                .store(danger_ticks - 1, Ordering::Relaxed);
-        }
-
-        let entity = self.get_entity();
-        let world = entity.world.load();
-
-        if entity.is_alive() && !self.is_baby() {
-            let scute_time = self.scute_time.fetch_sub(1, Ordering::Relaxed) - 1;
-            if scute_time <= 0 {
-                let pos = entity.pos.load();
-                let item_entity = Arc::new(ItemEntity::new(
-                    Entity::new(world.clone(), pos, &EntityType::ITEM),
-                    ItemStack::new(1, &Item::ARMADILLO_SCUTE),
-                ));
-                world.spawn_entity_non_save(item_entity as Arc<dyn EntityBase>);
-                world.play_sound(
-                    Sound::EntityArmadilloScuteDrop,
-                    SoundCategory::Neutral,
-                    &pos,
-                );
-                self.scute_time
-                    .store(pick_next_scute_drop_time(), Ordering::Relaxed);
-            }
-        }
-
-        let state = self.get_state();
-        let ticks_in_state = self.in_state_ticks.load(Ordering::Relaxed);
-
-        match state {
-            ArmadilloState::Rolling => {
-                if ticks_in_state > ArmadilloState::Rolling.animation_duration() {
-                    self.switch_to_state(ArmadilloState::Scared);
-                }
-            }
-            ArmadilloState::Scared => {
-                if !self.can_stay_rolled_up() {
-                    self.roll_out();
-                } else if ticks_in_state > ArmadilloState::Scared.animation_duration()
-                    && self.danger_detected_recently_ticks.load(Ordering::Relaxed) == 0
-                {
-                    self.switch_to_state(ArmadilloState::Unrolling);
-                }
-            }
-            ArmadilloState::Unrolling => {
-                if ticks_in_state > ArmadilloState::Unrolling.animation_duration() {
-                    self.roll_out();
-                }
-            }
-            ArmadilloState::Idle => {}
+    fn mob_read_nbt(&self, nbt: &NbtCompound) {
+        self.switch_to_state(
+            nbt.get_string("state")
+                .and_then(ArmadilloState::from_name)
+                .unwrap_or_default(),
+        );
+        if let Some(scute_time) = nbt.get_int("scute_time") {
+            self.scute_time.store(scute_time, Ordering::Relaxed);
         }
     }
 
@@ -442,14 +541,34 @@ impl Mob for ArmadilloEntity {
         );
     }
 
+    /// Vanilla `Armadillo.mobInteract`.
     fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
-        if item_stack.item == &Item::BRUSH && self.brush_off_scute(player) {
+        if item_stack.item == &Item::BRUSH && self.brush_off_scute(item_stack) {
+            // Vanilla `hurtAndBreak`: a player with infinite materials keeps the brush whole.
+            if player.gamemode.load() != GameMode::Creative {
+                let _ = item_stack.damage_item(BRUSH_DURABILITY_COST);
+            }
             return true;
         }
         if self.is_scared() {
             return false;
         }
-        self.animal_interact(player, item_stack, Sound::EntityArmadilloAmbient)
+        self.animal_interact(player, item_stack, Sound::EntityArmadilloEat)
+    }
+}
+
+impl ArmadilloEntity {
+    /// Vanilla `LivingEntity.shouldDropLoot`.
+    fn should_drop_loot(&self) -> bool {
+        !self.is_baby()
+            && self
+                .get_entity()
+                .world
+                .load()
+                .level_info
+                .load()
+                .game_rules
+                .mob_drops
     }
 }
 

@@ -1,14 +1,16 @@
-use crate::entity::mob::spawn::SpawnGroupData;
-use crate::world::World;
-use pumpkin_data::data_component_impl::EquipmentSlot;
-use pumpkin_nbt::compound::NbtCompound;
 use std::sync::Arc;
 
-use crate::entity::{
-    Entity,
-    mob::{Mob, MobEntity, skeleton::SkeletonEntityBase},
-};
+use pumpkin_data::data_component_impl::EquipmentSlot;
+use pumpkin_nbt::compound::NbtCompound;
 
+use crate::entity::mob::spawn::SpawnGroupData;
+use crate::entity::{
+    Entity, EntityBase,
+    mob::{Mob, MobEntity, equipment::RegionalDifficulty, skeleton::SkeletonEntityBase},
+};
+use crate::world::World;
+
+/// Vanilla `Parched`.
 pub struct ParchedSkeletonEntity {
     entity: Arc<SkeletonEntityBase>,
 }
@@ -16,8 +18,7 @@ pub struct ParchedSkeletonEntity {
 impl ParchedSkeletonEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let entity = SkeletonEntityBase::new(entity);
-        let parched = Self { entity };
-        Arc::new(parched)
+        Arc::new(Self { entity })
     }
 }
 
@@ -27,20 +28,35 @@ impl Mob for ParchedSkeletonEntity {
     }
 
     fn on_equip_item(&self, _slot: &EquipmentSlot) {
-        super::reassess_weapon_goal(self);
+        self.entity.reassess_weapon_goal(self);
     }
 
     fn mob_read_nbt(&self, _nbt: &NbtCompound) {
-        super::reassess_weapon_goal(self);
+        self.entity.reassess_weapon_goal(self);
     }
 
     fn finalize_spawn(
         &self,
-        _world: &Arc<World>,
+        world: &Arc<World>,
         group_data: Option<SpawnGroupData>,
     ) -> Option<SpawnGroupData> {
-        self.get_mob_entity().finalize_spawn_base();
-        super::reassess_weapon_goal(self);
-        group_data
+        self.entity.finalize_spawn(self, world, group_data)
+    }
+
+    fn populate_default_equipment_slots(
+        &self,
+        world: &Arc<World>,
+        difficulty: &RegionalDifficulty,
+    ) {
+        self.entity
+            .populate_default_equipment_slots(world, difficulty);
+    }
+
+    fn ai_step_end(&self, _caller: &dyn EntityBase) {
+        self.entity.pick_up_loot(self);
+    }
+
+    fn get_preferred_weapon_type(&self) -> Option<&'static pumpkin_data::tag::Tag> {
+        Some(&pumpkin_data::tag::Item::MINECRAFT_SKELETON_PREFERRED_WEAPONS)
     }
 }

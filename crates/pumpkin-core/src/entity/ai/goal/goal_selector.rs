@@ -43,7 +43,26 @@ impl GoalSelector {
     }
 
     pub fn remove_goal_by_type_id(&mut self, type_id: TypeId) -> Vec<PrioritizedGoal> {
-        let mut stopped = Vec::new();
+        let mut stopped = self.take_goals_by_type_id(type_id);
+        stopped.retain(|goal| goal.running);
+        stopped
+    }
+
+    /// Removes every goal of type `G`, running or not, so the mob can add the same instance
+    /// back later, like vanilla's `removeGoal` and `addGoal` on a goal kept in a field.
+    /// Running goals still need stopping.
+    pub fn take_goals<G: Goal + 'static>(&mut self) -> Vec<PrioritizedGoal> {
+        self.take_goals_by_type_id(TypeId::of::<G>())
+    }
+
+    /// Adds back a goal from [`Self::take_goals`].
+    pub fn add_prioritized_goal(&mut self, mut goal: PrioritizedGoal) {
+        goal.running = false;
+        self.goals.push(goal);
+    }
+
+    fn take_goals_by_type_id(&mut self, type_id: TypeId) -> Vec<PrioritizedGoal> {
+        let mut removed = Vec::new();
         let mut i = 0;
         while i < self.goals.len() {
             if self.goals[i].type_id == type_id {
@@ -60,14 +79,12 @@ impl GoalSelector {
                         *slot -= 1;
                     }
                 }
-                if goal.running {
-                    stopped.push(goal);
-                }
+                removed.push(goal);
             } else {
                 i += 1;
             }
         }
-        stopped
+        removed
     }
 
     pub fn clear(&mut self) -> Vec<PrioritizedGoal> {

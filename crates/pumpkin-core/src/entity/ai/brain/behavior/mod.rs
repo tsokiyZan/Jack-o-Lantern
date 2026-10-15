@@ -27,6 +27,7 @@ pub mod move_to_target_sink;
 pub mod one_shot;
 pub mod prepare_ram_nearest_target;
 pub mod ram_target;
+pub mod random_look_around;
 pub mod random_stroll;
 pub mod set_entity_look_target;
 pub mod set_entity_look_target_sometimes;
@@ -70,6 +71,7 @@ pub use move_to_target_sink::MoveToTargetSink;
 pub use one_shot::{OneShot, Trigger};
 pub use prepare_ram_nearest_target::PrepareRamNearestTarget;
 pub use ram_target::RamTarget;
+pub use random_look_around::RandomLookAround;
 pub use random_stroll::{fly, stroll, stroll_with_range, swim};
 pub use set_entity_look_target::{
     set_entity_look_target, set_entity_look_target_any, set_entity_look_target_of_type,

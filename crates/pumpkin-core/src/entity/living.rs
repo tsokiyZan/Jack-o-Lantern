@@ -999,8 +999,43 @@ impl LivingEntity {
         self.entity.entity_id
     }
 
+    /// Vanilla `LivingEntity.canBeAffected`, with the `Spider`, `WitherSkeleton`, `Parched`,
+    /// `WitherBoss` and `AbstractNautilus` overrides.
+    #[must_use]
+    pub fn can_be_affected(&self, effect: &StatusEffect) -> bool {
+        let entity_type = self.entity.entity_type;
+        let immune_to = if entity_type == &EntityType::SPIDER
+            || entity_type == &EntityType::CAVE_SPIDER
+            || entity_type == &EntityType::NAUTILUS
+            || entity_type == &EntityType::ZOMBIE_NAUTILUS
+        {
+            Some(&StatusEffect::POISON)
+        } else if entity_type == &EntityType::WITHER_SKELETON || entity_type == &EntityType::WITHER
+        {
+            Some(&StatusEffect::WITHER)
+        } else if entity_type == &EntityType::PARCHED {
+            Some(&StatusEffect::WEAKNESS)
+        } else {
+            None
+        };
+        if immune_to == Some(effect) {
+            return false;
+        }
+        if entity_type.has_tag(&tag::EntityType::MINECRAFT_IMMUNE_TO_INFESTED) {
+            effect != &StatusEffect::INFESTED
+        } else if entity_type.has_tag(&tag::EntityType::MINECRAFT_IMMUNE_TO_OOZING) {
+            effect != &StatusEffect::OOZING
+        } else {
+            !entity_type.has_tag(&tag::EntityType::MINECRAFT_IGNORES_POISON_AND_REGEN)
+                || effect != &StatusEffect::REGENERATION && effect != &StatusEffect::POISON
+        }
+    }
+
     #[expect(clippy::too_many_lines)]
     pub fn add_effect(&self, effect: Effect) {
+        if !self.can_be_affected(effect.effect_type) {
+            return;
+        }
         let mut effect_event =
             crate::plugin::api::events::entity::entity_potion_effect::EntityPotionEffectEvent::new(
                 self.entity.entity_id,
@@ -1444,7 +1479,11 @@ impl LivingEntity {
         self.apply_input();
         // Vanilla `isImmobile`, then `serverAiStep` for mobs with AI. It runs here, after
         // `baseTick` updated the fluid state, so goals see this tick's water height.
-        if self.health.load() <= 0.0 {
+        if self.health.load() <= 0.0
+            || caller
+                .get_mob()
+                .is_some_and(super::mob::Mob::mob_is_immobile)
+        {
             self.jumping.store(false, SeqCst);
             let input = self.movement_input.load();
             self.movement_input.store(Vector3::new(0.0, input.y, 0.0));
@@ -1528,7 +1567,12 @@ impl LivingEntity {
             caller.damage(caller, 1.0, DamageType::IN_WALL);
         }
 
-        self.push_entities(caller);
+        if caller
+            .get_mob()
+            .is_none_or(super::mob::Mob::pushes_entities)
+        {
+            self.push_entities(caller);
+        }
 
         if caller
             .get_mob()
@@ -2216,6 +2260,10 @@ impl LivingEntity {
 
             // Plays the death sound
             self.make_sound(&*dyn_self, self.death_sound(&*dyn_self));
+            // Vanilla `die`: the attacker's `killedEntity` can claim the body, leaving no loot.
+            let perished = cause
+                .and_then(EntityBase::get_mob)
+                .is_none_or(|mob| mob.killed_entity(&*dyn_self));
             world.send_entity_status(&self.entity, EntityStatus::Death, Some(ActorEventID::Death));
             let looting_level;
             let tool = if let Some(cause_ent) = cause {
@@ -2270,26 +2318,30 @@ impl LivingEntity {
                 ..Default::default()
             };
 
-            if let Some(mob) = dyn_self.get_mob() {
-                mob.before_drop_all_death_loot();
-            }
-            // Drop loot
-            self.drop_loot(&params);
+            if perished {
+                if let Some(mob) = dyn_self.get_mob() {
+                    mob.before_drop_all_death_loot();
+                }
+                // Drop loot
+                self.drop_loot(&params);
 
-            // Award experience
-            if params.killed_by_player.unwrap_or(false)
-                && world.level_info.load().game_rules.mob_drops
-            {
-                let amount = dyn_self.get_experience_reward(killer);
-                if amount > 0 {
-                    ExperienceOrbEntity::spawn(&world, self.entity.pos.load(), amount);
+                // Award experience
+                if params.killed_by_player.unwrap_or(false)
+                    && world.level_info.load().game_rules.mob_drops
+                {
+                    let amount = dyn_self.get_experience_reward(killer);
+                    if amount > 0 {
+                        ExperienceOrbEntity::spawn(&world, self.entity.pos.load(), amount);
+                    }
                 }
             }
             self.entity.pose.store(EntityPose::Dying);
 
-            self.drop_equipment(looting_level);
-            if let Some(mob) = dyn_self.get_mob() {
-                mob.drop_custom_death_loot();
+            if perished {
+                self.drop_equipment(looting_level);
+                if let Some(mob) = dyn_self.get_mob() {
+                    mob.drop_custom_death_loot();
+                }
             }
 
             // Broadcast death message if it's a player and the gamerule is enabled
@@ -2493,6 +2545,45 @@ impl LivingEntity {
                 self.entity.spawn_at_location(stack);
             }
         }
+    }
+
+    /// Vanilla `LivingEntity.dropFromLootTable`: spawns what `key` rolls where this entity
+    /// stands and says whether anything dropped.
+    fn drop_from_loot_table(&self, key: &str, params: &LootContextParameters) -> bool {
+        let Some(loot_table) = self.entity.world.load().get_loot_table(key) else {
+            return false;
+        };
+        let drops =
+            crate::world::loot::generate_loot_from_handle(&loot_table, rand::random(), params);
+        let dropped = !drops.is_empty();
+        for stack in drops {
+            self.entity.spawn_at_location(stack);
+        }
+        dropped
+    }
+
+    /// Vanilla `LivingEntity.dropFromGiftLootTable`.
+    pub fn drop_from_gift_loot_table(&self, key: &str) -> bool {
+        self.drop_from_loot_table(
+            key,
+            &LootContextParameters {
+                this_entity: Some(self.entity.entity_type),
+                position: Some(self.entity.pos.load()),
+                ..Default::default()
+            },
+        )
+    }
+
+    /// Vanilla `LivingEntity.dropFromEntityInteractLootTable`.
+    pub fn drop_from_entity_interact_loot_table(&self, key: &str, tool: &ItemStack) -> bool {
+        self.drop_from_loot_table(
+            key,
+            &LootContextParameters {
+                this_entity: Some(self.entity.entity_type),
+                tool: Some(tool.clone()),
+                ..Default::default()
+            },
+        )
     }
 
     fn tick_effects(&self) {
@@ -3012,9 +3103,8 @@ impl LivingEntity {
         }
     }
 
-    /// Vanilla `AttributeMap.pack` under `attributes`: each instance's id and base value.
-    /// Pumpkin's modifiers all come back on their own (equipment, sprinting, effects), which
-    /// vanilla keeps out of the save as transient, so none are written.
+    /// Vanilla `AttributeMap.pack` under `attributes`: each instance's id, base value and
+    /// permanent modifiers.
     fn write_attributes_nbt(&self, nbt: &mut NbtCompound) {
         let map = self
             .attributes
@@ -3026,9 +3116,26 @@ impl LivingEntity {
             .into_iter()
             .filter_map(|id| {
                 let attribute = attributes_by_id(id)?;
+                let instance = map.get(&id)?;
                 let mut packed = NbtCompound::new();
                 packed.put_string("id", attribute.name.to_string());
-                packed.put("base", NbtTag::Double(map.get(&id)?.base_value));
+                packed.put("base", NbtTag::Double(instance.base_value));
+                let modifiers: Vec<NbtTag> = instance
+                    .permanent_modifiers()
+                    .map(|modifier| {
+                        let mut packed_modifier = NbtCompound::new();
+                        packed_modifier.put_string("id", modifier.id.clone());
+                        packed_modifier.put("amount", NbtTag::Double(modifier.amount));
+                        packed_modifier.put_string(
+                            "operation",
+                            modifier.operation.serialized_name().to_string(),
+                        );
+                        NbtTag::Compound(packed_modifier)
+                    })
+                    .collect();
+                if !modifiers.is_empty() {
+                    packed.put("modifiers", NbtTag::List(modifiers));
+                }
                 Some(NbtTag::Compound(packed))
             })
             .collect();
@@ -3049,11 +3156,33 @@ impl LivingEntity {
             } else {
                 format!("minecraft:{id}")
             };
-            if let Some(attribute) = Attributes::ALL.iter().find(|attr| attr.name == name)
-                && let Some(base) = packed.get_double("base")
-            {
+            let Some(attribute) = Attributes::ALL.iter().find(|attr| attr.name == name) else {
+                continue;
+            };
+            if let Some(base) = packed.get_double("base") {
                 self.set_attribute_base(attribute, base);
             }
+            let Some(modifiers) = packed.get_list("modifiers") else {
+                continue;
+            };
+            let modifiers: Vec<Modifier> = modifiers
+                .iter()
+                .filter_map(NbtTag::extract_compound)
+                .filter_map(|modifier| {
+                    Some(Modifier {
+                        id: modifier.get_string("id")?.to_string(),
+                        amount: modifier.get_double("amount")?,
+                        operation: ModifierOperation::from_serialized_name(
+                            modifier.get_string("operation")?,
+                        )?,
+                    })
+                })
+                .collect();
+            self.update_attribute(attribute, |instance| {
+                for modifier in modifiers {
+                    instance.add_or_replace_permanent_modifier(modifier);
+                }
+            });
         }
     }
 
@@ -3376,9 +3505,12 @@ impl LivingEntity {
         }
 
         // Check for shield blocking before armor/magic/cooldown
+        // Vanilla `DamageSource.getSourcePosition`: the given position, else the direct
+        // entity's.
         if self.is_blocking()
             && !damage_type.has_tag(&tag::DamageType::MINECRAFT_BYPASSES_SHIELD)
-            && let Some(pos) = position
+            && let Some(pos) =
+                position.or_else(|| source.map(|source| source.get_entity().pos.load()))
         {
             let player_pos = self.entity.pos.load();
             let look_vec = Vector3::rotation_vector(0.0, self.entity.yaw.load() as f64);
@@ -3441,6 +3573,13 @@ impl LivingEntity {
                             self.clear_active_hand();
                         }
                     }
+                }
+
+                // Vanilla `blockUsingItem`: a mob whose melee hit was blocked reacts to it.
+                if !damage_type.has_tag(&tag::DamageType::MINECRAFT_IS_PROJECTILE)
+                    && let Some(attacker) = source.and_then(EntityBase::get_mob)
+                {
+                    attacker.blocked_by_item(caller, damage_type, amount, true);
                 }
 
                 return false;
@@ -3529,14 +3668,6 @@ impl LivingEntity {
             self.entity.sync_velocity.store(true, SeqCst);
         }
 
-        if play_sound {
-            // Vanilla `Mob.playHurtSound` resets the ambient sound timer.
-            if let Some(mob) = caller.get_mob() {
-                mob.reset_ambient_sound_time();
-            }
-            self.make_sound(caller, self.hurt_sound(caller));
-        }
-
         // Vanilla `hurtServer`: `dealDefaultKnockback` on every full-damage hit.
         if took_full_damage && !damage_type.has_tag(&tag::DamageType::MINECRAFT_NO_KNOCKBACK) {
             let (dx, dz) = self.default_knockback_direction(source, position);
@@ -3621,8 +3752,21 @@ impl LivingEntity {
             }
         }
 
+        if let Some(mob) = caller.get_mob() {
+            mob.actually_hurt(damage_type, source, cause);
+        }
+
         self.resolve_mob_responsible_for_damage(damage_type, cause.or(source));
         self.resolve_player_responsible_for_damage(cause.or(source));
+
+        // After `actuallyHurt`, like vanilla, so the sound sees what the hit changed.
+        if play_sound {
+            // Vanilla `Mob.playHurtSound` resets the ambient sound timer.
+            if let Some(mob) = caller.get_mob() {
+                mob.reset_ambient_sound_time();
+            }
+            self.make_sound(caller, self.hurt_sound(caller));
+        }
 
         if new_health <= 0.0 {
             let mut death_event =
@@ -3874,6 +4018,8 @@ impl EntityBase for LivingEntity {
                         .on_use_tick(item, player, remaining_use_ticks);
                 }
             }
+        } else if let Some(mob) = caller.get_mob() {
+            crate::item::items::spear::SpearItem::mob_use_tick(mob);
         }
 
         // Current active item

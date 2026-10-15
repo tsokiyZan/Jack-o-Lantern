@@ -476,7 +476,14 @@ impl Mob for CubeMobEntity {
             let Some(cube) = child.cast_any().downcast_ref::<Self>() else {
                 continue;
             };
-            convert_common(self, cube);
+            convert_common(
+                self,
+                cube,
+                crate::entity::mob::conversion::ConversionParams {
+                    keep_equipment: false,
+                    preserve_can_pick_up_loot: false,
+                },
+            );
             // `setUpSplitCube`.
             cube.set_size(half_size, true);
             let child_entity = cube.get_entity();
