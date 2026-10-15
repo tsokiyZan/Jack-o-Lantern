@@ -22,7 +22,7 @@ use crate::entity::{
         tempt::TemptGoal, wander_around::WanderAroundGoal,
     },
     mob::{Mob, MobEntity},
-    passive::animal::Animal,
+    passive::animal::{Animal, set_animal_pathfinding_malus},
     player::Player,
 };
 
@@ -39,6 +39,7 @@ pub struct OcelotEntity {
 impl OcelotEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        set_animal_pathfinding_malus(&mob_entity);
         let ocelot = Self {
             mob_entity,
             is_trusting: AtomicBool::new(false),

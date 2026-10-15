@@ -6,6 +6,7 @@ use pumpkin_data::entity::EntityType;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::tag::{self, Taggable};
 
+use crate::entity::ai::pathfinder::node::PathType;
 use crate::entity::{
     Entity, EntityBase,
     ai::goal::{
@@ -13,6 +14,7 @@ use crate::entity::{
         wander_around::WanderAroundGoal,
     },
     mob::{Mob, MobEntity},
+    passive::animal::set_animal_pathfinding_malus,
     player::Player,
 };
 
@@ -202,6 +204,11 @@ pub struct ParrotEntity {
 impl ParrotEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        set_animal_pathfinding_malus(&mob_entity);
+        // Vanilla `Parrot`'s constructor.
+        mob_entity.set_pathfinding_malus(PathType::DangerFire, -1.0);
+        mob_entity.set_pathfinding_malus(PathType::DamageFire, -1.0);
+        mob_entity.set_pathfinding_malus(PathType::Cocoa, -1.0);
         let parrot = Self { mob_entity };
         let mob_arc = Arc::new(parrot);
         let mob_weak: Weak<dyn Mob> = {

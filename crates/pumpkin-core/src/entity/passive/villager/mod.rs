@@ -5,6 +5,7 @@ use std::sync::{Arc, Weak};
 use uuid::Uuid;
 
 use crate::block::blocks::bed::BedBlock;
+use crate::entity::ai::pathfinder::node::PathType;
 use pumpkin_data::Enchantment;
 use pumpkin_data::attributes::Attributes;
 use pumpkin_data::block_properties::{BedPart, WhiteBedLikeProperties as BedProperties};
@@ -397,6 +398,9 @@ impl VillagerEntity {
     #[allow(clippy::too_many_lines)]
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        // Vanilla `AbstractVillager`'s constructor.
+        mob_entity.set_pathfinding_malus(PathType::DangerFire, 16.0);
+        mob_entity.set_pathfinding_malus(PathType::DamageFire, -1.0);
         let villager_data = VillagerData::new(VillagerType::Plains, VillagerProfession::None, 1);
         let inventory = std::sync::Mutex::new((0..8).map(|_| ItemStack::EMPTY.clone()).collect());
 

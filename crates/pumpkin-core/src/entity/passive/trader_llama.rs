@@ -26,7 +26,7 @@ use crate::entity::{
         swim::SwimGoal, tempt::TemptGoal, wander_around::WanderAroundGoal,
     },
     mob::{Mob, MobEntity, RangedAttackMob},
-    passive::animal::{Animal, get_carpet_color_from_item},
+    passive::animal::{Animal, get_carpet_color_from_item, set_animal_pathfinding_malus},
     player::Player,
     projectile::llama_spit::LlamaSpitEntity,
 };
@@ -92,6 +92,7 @@ pub struct TraderLlamaEntity {
 impl TraderLlamaEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        set_animal_pathfinding_malus(&mob_entity);
         let mut rng = rand::rng();
         let variant = TraderLlamaVariant::random_variant();
         let strength = rng.random_range(1..=5);

@@ -42,6 +42,7 @@ use crate::entity::ai::goal::trade_with_player::TradeWithPlayerGoal;
 use crate::entity::ai::goal::wander_around::WanderAroundGoal;
 use crate::entity::ai::goal::{Controls, Goal};
 use crate::entity::ai::pathfinder::NavigatorGoal;
+use crate::entity::ai::pathfinder::node::PathType;
 use crate::entity::experience_orb::ExperienceOrbEntity;
 use crate::entity::mob::{Mob, MobEntity};
 use crate::entity::player::Player;
@@ -138,6 +139,9 @@ impl WanderingTraderEntity {
     #[must_use]
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        // Vanilla `AbstractVillager`'s constructor.
+        mob_entity.set_pathfinding_malus(PathType::DangerFire, 16.0);
+        mob_entity.set_pathfinding_malus(PathType::DamageFire, -1.0);
         let trader = Self {
             mob_entity,
             despawn_delay: AtomicI32::new(DEFAULT_DESPAWN_DELAY),

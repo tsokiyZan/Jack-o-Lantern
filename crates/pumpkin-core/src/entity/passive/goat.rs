@@ -12,6 +12,7 @@ use pumpkin_data::tag::{self, Taggable};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::math::boundingbox::EntityDimensions;
 
+use crate::entity::ai::pathfinder::node::PathType;
 use crate::entity::{
     Entity, EntityBase,
     ageable::{AgeableData, AgeableMob},
@@ -21,7 +22,7 @@ use crate::entity::{
         tempt::TemptGoal, wander_around::WanderAroundGoal,
     },
     mob::{Mob, MobEntity},
-    passive::animal::Animal,
+    passive::animal::{Animal, set_animal_pathfinding_malus},
     player::Player,
 };
 
@@ -38,6 +39,10 @@ pub struct GoatEntity {
 impl GoatEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        set_animal_pathfinding_malus(&mob_entity);
+        // Vanilla `Goat`'s constructor.
+        mob_entity.set_pathfinding_malus(PathType::PowderSnow, -1.0);
+        mob_entity.set_pathfinding_malus(PathType::DangerPowderSnow, -1.0);
         let goat = Self {
             mob_entity,
             ageable_data: AgeableData::default(),

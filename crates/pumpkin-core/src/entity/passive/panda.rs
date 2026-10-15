@@ -23,7 +23,7 @@ use crate::entity::{
         tempt::TemptGoal, wander_around::WanderAroundGoal,
     },
     mob::{Mob, MobEntity},
-    passive::animal::Animal,
+    passive::animal::{Animal, set_animal_pathfinding_malus},
     player::Player,
 };
 
@@ -119,6 +119,7 @@ pub struct PandaEntity {
 impl PandaEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        set_animal_pathfinding_malus(&mob_entity);
         let gene = PandaGene::random_gene();
         let hidden = PandaGene::random_gene();
         let panda = Self {

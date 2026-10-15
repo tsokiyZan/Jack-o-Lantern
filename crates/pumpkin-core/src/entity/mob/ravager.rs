@@ -4,6 +4,7 @@ use pumpkin_data::entity::EntityType;
 use pumpkin_data::sound::Sound;
 use pumpkin_nbt::compound::NbtCompound;
 
+use crate::entity::ai::pathfinder::node::PathType;
 use crate::entity::{
     Entity,
     ai::goal::{
@@ -30,6 +31,8 @@ impl RavagerEntity {
     #[must_use]
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        // Vanilla `Ravager`'s constructor.
+        mob_entity.set_pathfinding_malus(PathType::Leaves, 0.0);
         let ravager = Self {
             mob_entity,
             raider_data: RaiderData::default(),

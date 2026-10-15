@@ -1,3 +1,4 @@
+use crate::entity::ai::pathfinder::node::PathType;
 use crate::entity::mob::spawn::SpawnGroupData;
 use crate::world::World;
 use pumpkin_data::attributes::Attributes;
@@ -17,6 +18,8 @@ pub struct WitherSkeletonEntity {
 impl WitherSkeletonEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let entity = SkeletonEntityBase::new(entity);
+        // Vanilla `WitherSkeleton`'s constructor.
+        entity.mob_entity.set_pathfinding_malus(PathType::Lava, 8.0);
         let skeleton = Self { entity };
         Arc::new(skeleton)
     }

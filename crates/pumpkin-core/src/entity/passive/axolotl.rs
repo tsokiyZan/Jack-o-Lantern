@@ -25,7 +25,10 @@ use crate::entity::{
     },
     ai::pathfinder::{AmphibiousPathNavigation, Navigator},
     mob::{Mob, MobEntity},
-    passive::{animal::Animal, axolotl_ai},
+    passive::{
+        animal::{Animal, set_animal_pathfinding_malus},
+        axolotl_ai,
+    },
     player::Player,
 };
 use pumpkin_data::effect::StatusEffect;
@@ -114,7 +117,9 @@ impl AxolotlEntity {
             .lock()
             .unwrap_or_else(PoisonError::into_inner) =
             Navigator::new(AmphibiousPathNavigation::new(false).steered_by_move_control());
-        // Vanilla `Axolotl`'s constructor; after the navigator, which holds the maluses.
+        // Vanilla `Animal`'s and `Axolotl`'s constructors; after the navigator, which
+        // holds the maluses.
+        set_animal_pathfinding_malus(&axolotl.mob_entity);
         axolotl
             .mob_entity
             .set_pathfinding_malus(PathType::Water, 0.0);

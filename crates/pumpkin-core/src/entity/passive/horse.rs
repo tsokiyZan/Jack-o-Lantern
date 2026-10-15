@@ -27,7 +27,7 @@ use crate::entity::{
         tempt::TemptGoal, wander_around::WanderAroundGoal,
     },
     mob::{Mob, MobEntity},
-    passive::animal::Animal,
+    passive::animal::{Animal, set_animal_pathfinding_malus},
     player::Player,
 };
 
@@ -118,6 +118,7 @@ pub struct HorseEntity {
 impl HorseEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        set_animal_pathfinding_malus(&mob_entity);
         let mut rng = rand::rng();
         let color = rng.random_range(0..7);
         let style = rng.random_range(0..5);

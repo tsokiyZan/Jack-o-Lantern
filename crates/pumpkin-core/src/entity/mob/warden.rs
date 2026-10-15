@@ -12,6 +12,7 @@ use pumpkin_data::{
 };
 use pumpkin_util::{GameMode, math::vector3::Vector3};
 
+use crate::entity::ai::pathfinder::node::PathType;
 use crate::entity::{
     Entity,
     ai::goal::{
@@ -80,6 +81,13 @@ impl WardenEntity {
 
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        // Vanilla `Warden`'s constructor.
+        mob_entity.set_pathfinding_malus(PathType::UnpassableRail, 0.0);
+        mob_entity.set_pathfinding_malus(PathType::DamageOther, 8.0);
+        mob_entity.set_pathfinding_malus(PathType::PowderSnow, 8.0);
+        mob_entity.set_pathfinding_malus(PathType::Lava, 8.0);
+        mob_entity.set_pathfinding_malus(PathType::DamageFire, 0.0);
+        mob_entity.set_pathfinding_malus(PathType::DangerFire, 0.0);
         let emerge_ticks = Arc::new(AtomicI32::new(0));
         let warden = Self {
             mob_entity,

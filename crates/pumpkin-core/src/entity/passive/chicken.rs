@@ -25,7 +25,7 @@ use crate::entity::{
         tempt::TemptGoal, wander_around::WanderAroundGoal,
     },
     mob::{Mob, MobEntity},
-    passive::animal::Animal,
+    passive::animal::{Animal, set_animal_pathfinding_malus},
     player::Player,
 };
 
@@ -55,6 +55,7 @@ impl ChickenEntity {
         let biome = world.get_biome(&entity.block_pos.load());
         let variant = ChickenVariant::select_for_biome(biome.registry_id);
         let mob_entity = MobEntity::new(entity);
+        set_animal_pathfinding_malus(&mob_entity);
         // Vanilla `Chicken`'s constructor.
         mob_entity.set_pathfinding_malus(PathType::Water, 0.0);
         let egg_lay_time = rand::rng().random_range(6000..12000);

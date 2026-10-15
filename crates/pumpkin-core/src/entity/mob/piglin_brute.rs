@@ -12,6 +12,7 @@ use pumpkin_util::math::position::BlockPos;
 
 use pumpkin_data::data_component_impl::EquipmentSlot;
 
+use crate::entity::ai::pathfinder::node::PathType;
 use crate::entity::mob::{abstract_piglin, piglin_brute_ai};
 use crate::entity::{
     Entity, EntityBase,
@@ -31,6 +32,9 @@ impl PiglinBruteEntity {
 
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        // Vanilla `AbstractPiglin`'s constructor.
+        mob_entity.set_pathfinding_malus(PathType::DangerFire, 16.0);
+        mob_entity.set_pathfinding_malus(PathType::DamageFire, -1.0);
         let piglin = Self {
             mob_entity,
             immune_to_zombification: AtomicBool::new(false),

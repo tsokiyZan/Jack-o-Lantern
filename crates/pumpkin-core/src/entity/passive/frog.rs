@@ -20,7 +20,7 @@ use crate::entity::{
         wander_around::WanderAroundGoal,
     },
     mob::{Mob, MobEntity},
-    passive::animal::Animal,
+    passive::animal::{Animal, set_animal_pathfinding_malus},
     player::Player,
 };
 
@@ -41,6 +41,7 @@ pub struct FrogEntity {
 impl FrogEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        set_animal_pathfinding_malus(&mob_entity);
         // Vanilla `Frog`'s constructor.
         mob_entity.set_pathfinding_malus(PathType::Water, 4.0);
         mob_entity.set_pathfinding_malus(PathType::Trapdoor, -1.0);

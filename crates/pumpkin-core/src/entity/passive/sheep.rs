@@ -19,7 +19,7 @@ use crate::entity::{
         wander_around::WanderAroundGoal,
     },
     mob::{Mob, MobEntity},
-    passive::animal::Animal,
+    passive::animal::{Animal, set_animal_pathfinding_malus},
     player::Player,
 };
 
@@ -37,6 +37,7 @@ pub struct SheepEntity {
 impl SheepEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        set_animal_pathfinding_malus(&mob_entity);
         let sheep = Self {
             mob_entity,
             color_and_sheared: AtomicU8::new(0),

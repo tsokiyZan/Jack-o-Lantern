@@ -1,3 +1,4 @@
+use crate::entity::ai::pathfinder::node::PathType;
 use crate::entity::breath::BreathManager;
 use pumpkin_data::entity::EntityPose;
 use pumpkin_util::math::boundingbox::EntityDimensions;
@@ -31,8 +32,11 @@ pub struct SquidEntity {
 
 impl SquidEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
+        let mob_entity = MobEntity::new(entity);
+        // Vanilla `AgeableWaterCreature`'s constructor.
+        mob_entity.set_pathfinding_malus(PathType::Water, 0.0);
         Arc::new(Self {
-            mob_entity: MobEntity::new(entity),
+            mob_entity,
             movement: SquidMovement::new(),
         })
     }

@@ -29,7 +29,7 @@ use crate::entity::{
         Mob, MobEntity,
         neutral::{NeutralData, NeutralMob},
     },
-    passive::animal::Animal,
+    passive::animal::{Animal, set_animal_pathfinding_malus},
     player::Player,
 };
 
@@ -47,6 +47,7 @@ pub struct PolarBearEntity {
 impl PolarBearEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        set_animal_pathfinding_malus(&mob_entity);
         let polar_bear = Self {
             mob_entity,
             ageable_data: AgeableData::default(),

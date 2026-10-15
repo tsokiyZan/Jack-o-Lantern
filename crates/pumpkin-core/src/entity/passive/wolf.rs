@@ -15,6 +15,7 @@ use pumpkin_protocol::codec::var_int::VarInt;
 use pumpkin_util::math::boundingbox::EntityDimensions;
 use rand::RngExt;
 
+use crate::entity::ai::pathfinder::node::PathType;
 use crate::entity::custom_sound::CustomSound;
 use crate::entity::{
     Entity, EntityBase,
@@ -34,7 +35,7 @@ use crate::entity::{
         neutral::{NeutralData, NeutralMob},
     },
     passive::{
-        animal::Animal,
+        animal::{Animal, set_animal_pathfinding_malus},
         tamable::{TamableAnimal, TamableData},
     },
     player::Player,
@@ -53,6 +54,10 @@ pub struct WolfEntity {
 impl WolfEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        set_animal_pathfinding_malus(&mob_entity);
+        // Vanilla `Wolf`'s constructor.
+        mob_entity.set_pathfinding_malus(PathType::PowderSnow, -1.0);
+        mob_entity.set_pathfinding_malus(PathType::DangerPowderSnow, -1.0);
         let wolf = Self {
             mob_entity,
             variant: AtomicU8::new(WolfVariant::Pale.id()),

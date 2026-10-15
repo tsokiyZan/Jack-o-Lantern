@@ -11,6 +11,7 @@ use pumpkin_data::tag::{self, Taggable};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::codec::var_int::VarInt;
 
+use crate::entity::ai::pathfinder::node::PathType;
 use crate::entity::{
     Entity, EntityBase,
     ai::goal::{
@@ -109,6 +110,10 @@ pub struct CopperGolemEntity {
 impl CopperGolemEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        // Vanilla `CopperGolem`'s constructor.
+        mob_entity.set_pathfinding_malus(PathType::DangerFire, 16.0);
+        mob_entity.set_pathfinding_malus(PathType::DangerOther, 16.0);
+        mob_entity.set_pathfinding_malus(PathType::DamageFire, -1.0);
         let golem = Self {
             mob_entity,
             weather_state: AtomicI32::new(WeatherState::Unaffected.id()),

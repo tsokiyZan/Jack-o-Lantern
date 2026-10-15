@@ -21,7 +21,7 @@ use crate::entity::{
         look_at_entity::LookAtEntityGoal, swim::SwimGoal, wander_around::WanderAroundGoal,
     },
     mob::{Mob, MobEntity},
-    passive::animal::Animal,
+    passive::animal::{Animal, set_animal_pathfinding_malus},
     player::Player,
 };
 
@@ -44,6 +44,7 @@ pub struct ZombieHorseEntity {
 impl ZombieHorseEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        set_animal_pathfinding_malus(&mob_entity);
         let horse = Self {
             mob_entity,
             ageable_data: AgeableData::default(),

@@ -30,7 +30,7 @@ use crate::entity::{
         Mob, MobEntity,
         neutral::{NeutralData, NeutralMob},
     },
-    passive::animal::Animal,
+    passive::animal::{Animal, set_animal_pathfinding_malus},
     player::Player,
 };
 
@@ -65,6 +65,7 @@ pub struct BeeEntity {
 impl BeeEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        set_animal_pathfinding_malus(&mob_entity);
         // Vanilla `Bee`'s constructor.
         mob_entity.set_pathfinding_malus(PathType::DamageFire, -1.0);
         mob_entity.set_pathfinding_malus(PathType::Water, -1.0);

@@ -17,6 +17,7 @@ use pumpkin_nbt::tag::NbtTag;
 use pumpkin_util::math::boundingbox::EntityDimensions;
 use pumpkin_util::math::position::BlockPos;
 
+use crate::entity::ai::pathfinder::node::PathType;
 use crate::entity::item::ItemEntity;
 use crate::entity::mob::equipment as mob_equipment;
 use crate::entity::mob::{abstract_piglin, piglin_ai};
@@ -53,6 +54,9 @@ impl PiglinEntity {
 
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        // Vanilla `AbstractPiglin`'s constructor.
+        mob_entity.set_pathfinding_malus(PathType::DangerFire, 16.0);
+        mob_entity.set_pathfinding_malus(PathType::DamageFire, -1.0);
         let piglin = Self {
             mob_entity,
             immune_to_zombification: AtomicBool::new(false),

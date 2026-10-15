@@ -29,7 +29,7 @@ use crate::entity::{
     },
     mob::{Mob, MobEntity},
     passive::{
-        animal::Animal,
+        animal::{Animal, set_animal_pathfinding_malus},
         tamable::{TamableAnimal, TamableData},
     },
     player::Player,
@@ -89,6 +89,7 @@ pub struct CatEntity {
 impl CatEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        set_animal_pathfinding_malus(&mob_entity);
         let cat = Self {
             mob_entity,
             variant: AtomicU8::new(CatVariant::Black.id()),

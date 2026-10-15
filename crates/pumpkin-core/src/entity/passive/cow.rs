@@ -23,7 +23,7 @@ use crate::entity::{
     },
     custom_sound::CustomSound,
     mob::{Mob, MobEntity},
-    passive::animal::Animal,
+    passive::animal::{Animal, set_animal_pathfinding_malus},
     player::Player,
 };
 
@@ -45,6 +45,7 @@ impl CowEntity {
         let biome = world.get_biome(&entity.block_pos.load());
         let variant = CowVariant::select_for_biome(biome.registry_id);
         let mob_entity = MobEntity::new(entity);
+        set_animal_pathfinding_malus(&mob_entity);
         let cow = Self {
             mob_entity,
             ageable_data: crate::entity::ageable::AgeableData::default(),

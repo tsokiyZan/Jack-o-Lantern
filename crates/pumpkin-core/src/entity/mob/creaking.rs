@@ -17,6 +17,7 @@ use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
 
 use crate::block::entities::creaking_heart::CreakingHeartBlockEntity;
+use crate::entity::ai::pathfinder::node::PathType;
 use crate::entity::{
     Entity, EntityBase,
     ai::goal::{
@@ -146,6 +147,15 @@ impl CreakingEntity {
 
     pub fn set_transient(&self, pos: BlockPos) {
         self.set_home_pos(Some(pos));
+        self.mob_entity
+            .set_pathfinding_malus(PathType::DamageOther, 8.0);
+        self.mob_entity
+            .set_pathfinding_malus(PathType::PowderSnow, 8.0);
+        self.mob_entity.set_pathfinding_malus(PathType::Lava, 8.0);
+        self.mob_entity
+            .set_pathfinding_malus(PathType::DamageFire, 0.0);
+        self.mob_entity
+            .set_pathfinding_malus(PathType::DangerFire, 0.0);
     }
 
     pub fn is_heart_bound(&self) -> bool {

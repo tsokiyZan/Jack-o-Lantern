@@ -25,7 +25,7 @@ use crate::entity::{
         wander_around::WanderAroundGoal,
     },
     mob::{Mob, MobEntity},
-    passive::animal::Animal,
+    passive::animal::{Animal, set_animal_pathfinding_malus},
     player::Player,
 };
 
@@ -87,6 +87,7 @@ pub struct RabbitEntity {
 impl RabbitEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        set_animal_pathfinding_malus(&mob_entity);
         let variant = RabbitVariant::random_variant();
         let rabbit = Self {
             mob_entity,

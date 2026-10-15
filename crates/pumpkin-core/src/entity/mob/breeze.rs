@@ -2,6 +2,7 @@ use std::sync::{Arc, Weak};
 
 use pumpkin_data::entity::EntityType;
 
+use crate::entity::ai::pathfinder::node::PathType;
 use crate::entity::{
     Entity,
     ai::goal::{
@@ -18,6 +19,9 @@ pub struct BreezeEntity {
 impl BreezeEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        // Vanilla `Breeze`'s constructor.
+        mob_entity.set_pathfinding_malus(PathType::DangerTrapdoor, -1.0);
+        mob_entity.set_pathfinding_malus(PathType::DamageFire, -1.0);
         let breeze = Self { mob_entity };
         let mob_arc = Arc::new(breeze);
         let mob_weak: Weak<dyn Mob> = {

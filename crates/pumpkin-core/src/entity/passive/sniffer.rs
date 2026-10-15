@@ -25,7 +25,7 @@ use crate::entity::{
     },
     item::ItemEntity,
     mob::{Mob, MobEntity},
-    passive::animal::Animal,
+    passive::animal::{Animal, set_animal_pathfinding_malus},
     player::Player,
 };
 
@@ -80,8 +80,11 @@ pub struct SnifferEntity {
 impl SnifferEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        set_animal_pathfinding_malus(&mob_entity);
         // Vanilla `Sniffer`'s constructor.
         mob_entity.set_pathfinding_malus(PathType::Water, -1.0);
+        mob_entity.set_pathfinding_malus(PathType::DangerPowderSnow, -1.0);
+        mob_entity.set_pathfinding_malus(PathType::DamageCautious, -1.0);
         let sniffer = Self {
             mob_entity,
             ageable_data: AgeableData::default(),

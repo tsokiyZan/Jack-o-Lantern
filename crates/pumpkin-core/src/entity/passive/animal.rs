@@ -4,9 +4,19 @@ use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::particle::Particle;
 use pumpkin_data::sound::{Sound, SoundCategory};
 
-use crate::entity::{mob::Mob, player::Player};
+use crate::entity::{
+    ai::pathfinder::node::PathType,
+    mob::{Mob, MobEntity},
+    player::Player,
+};
 use pumpkin_protocol::bedrock::server::actor_event::ActorEventID;
 use pumpkin_util::math::vector3::Vector3;
+
+/// Vanilla `Animal`'s constructor: animals keep clear of fire.
+pub fn set_animal_pathfinding_malus(mob_entity: &MobEntity) {
+    mob_entity.set_pathfinding_malus(PathType::DangerFire, 16.0);
+    mob_entity.set_pathfinding_malus(PathType::DamageFire, -1.0);
+}
 
 pub trait Animal: Mob {
     fn is_food(&self, item_stack: &ItemStack) -> bool;

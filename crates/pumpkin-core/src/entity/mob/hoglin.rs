@@ -34,6 +34,8 @@ impl HoglinEntity {
 
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        // Vanilla `Animal`'s constructor, which `Hoglin` extends.
+        crate::entity::passive::animal::set_animal_pathfinding_malus(&mob_entity);
         {
             let mut attributes = mob_entity
                 .living_entity

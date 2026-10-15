@@ -27,7 +27,7 @@ use crate::entity::{
     },
     item::ItemEntity,
     mob::{Mob, MobEntity},
-    passive::animal::Animal,
+    passive::animal::{Animal, set_animal_pathfinding_malus},
     player::Player,
 };
 
@@ -83,6 +83,7 @@ pub struct MooshroomEntity {
 impl MooshroomEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        set_animal_pathfinding_malus(&mob_entity);
         let mooshroom = Self {
             mob_entity,
             ageable_data: AgeableData::default(),

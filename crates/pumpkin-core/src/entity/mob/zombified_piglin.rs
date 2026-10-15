@@ -8,6 +8,7 @@ use pumpkin_data::entity::EntityType;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 
+use crate::entity::ai::pathfinder::node::PathType;
 use crate::entity::ai::util::goal_utils;
 use crate::entity::{
     Entity, EntityBase,
@@ -40,6 +41,8 @@ impl ZombifiedPiglinEntity {
 
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        // Vanilla `ZombifiedPiglin`'s constructor.
+        mob_entity.set_pathfinding_malus(PathType::Lava, 8.0);
         let piglin = Self {
             mob_entity,
             neutral_data: NeutralData::default(),
