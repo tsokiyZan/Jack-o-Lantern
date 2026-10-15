@@ -29,7 +29,7 @@ impl EnderPearlEntity {
 
         let thrown = ThrownItemEntity {
             entity,
-            owner_id: None,
+            owner_id: crossbeam::atomic::AtomicCell::new(None),
             collides_with_projectiles: false,
             has_hit: AtomicBool::new(false),
             gravity: GRAVITY,
@@ -47,7 +47,7 @@ impl EnderPearlEntity {
 
 impl EntityBase for EnderPearlEntity {
     fn get_owner_id(&self) -> Option<i32> {
-        self.thrown.owner_id
+        self.thrown.owner_id.load()
     }
 
     fn tick(&self, caller: &dyn EntityBase, _server: &Server) {
@@ -72,6 +72,7 @@ impl EntityBase for EnderPearlEntity {
         let attacker = self
             .thrown
             .owner_id
+            .load()
             .and_then(|id| world.get_entity_by_id(id));
 
         // Spawn portal particles at hit position
@@ -97,7 +98,7 @@ impl EntityBase for EnderPearlEntity {
             );
         }
 
-        let owner_id = self.thrown.owner_id;
+        let owner_id = self.thrown.owner_id.load();
         let teleport_pos = entity.last_pos.load();
 
         if let (

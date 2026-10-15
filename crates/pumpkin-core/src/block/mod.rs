@@ -290,10 +290,12 @@ pub struct SpawnAfterBreakArgs<'a> {
     pub tool: Option<&'a ItemStack>,
 }
 
+/// Vanilla `Block.wasExploded`: the block was blown away by `explosion`.
 pub struct ExplodeArgs<'a> {
     pub world: &'a Arc<World>,
     pub block: &'a Block,
     pub position: &'a BlockPos,
+    pub explosion: &'a crate::world::explosion::Explosion,
 }
 
 pub struct OnSyncedBlockEventArgs<'a> {
@@ -474,58 +476,87 @@ pub fn drop_loot(
     experience: bool,
     params: &LootContextParameters,
 ) {
+    for stack in block_loot_stacks(world, block, pos, params) {
+        world.drop_stack(pos, stack);
+    }
+    if experience {
+        drop_block_experience(world, block, pos, params.tool.as_ref());
+    }
+}
+
+/// The block's loot-table drops, after the plugin drop event and with the block entity's
+/// components copied onto its own item.
+pub fn block_loot_stacks(
+    world: &Arc<World>,
+    block: &Block,
+    pos: &BlockPos,
+    params: &LootContextParameters,
+) -> Vec<ItemStack> {
     let key = format!("minecraft:blocks/{}", block.name);
-    if let Some(loot_table) = world.get_loot_table(&key) {
-        let seed: i64 = rand::random();
-        let items = crate::world::loot::generate_loot_from_handle(&loot_table, seed, params);
-        if !items.is_empty() {
-            let mut event = crate::plugin::block::block_drop_item::BlockDropItemEvent {
-                block_pos: *pos,
-                world: world.clone(),
-                player: None,
-                items,
-                cancelled: false,
-            };
-            if let Some(server) = world.server.upgrade() {
-                server.plugin_manager.fire_blocking(&server, &mut event);
-            }
-            if !event.cancelled {
-                let block_entity = world.get_block_entity(pos);
-                for mut stack in event.items {
-                    if let Some(block_entity) = &block_entity
-                        && Block::from_item_id(stack.item.id) == Some(block)
-                    {
-                        block_entity.collect_item_components(&mut stack);
-                    }
-                    world.drop_stack(pos, stack);
-                }
-            }
+    let Some(loot_table) = world.get_loot_table(&key) else {
+        return Vec::new();
+    };
+    let seed: i64 = rand::random();
+    let items = crate::world::loot::generate_loot_from_handle(&loot_table, seed, params);
+    if items.is_empty() {
+        return Vec::new();
+    }
+    let mut event = crate::plugin::block::block_drop_item::BlockDropItemEvent {
+        block_pos: *pos,
+        world: world.clone(),
+        player: None,
+        items,
+        cancelled: false,
+    };
+    if let Some(server) = world.server.upgrade() {
+        server.plugin_manager.fire_blocking(&server, &mut event);
+    }
+    if event.cancelled {
+        return Vec::new();
+    }
+    let block_entity = world.get_block_entity(pos);
+    let mut stacks = event.items;
+    for stack in &mut stacks {
+        if let Some(block_entity) = &block_entity
+            && Block::from_item_id(stack.item.id) == Some(block)
+        {
+            block_entity.collect_item_components(stack);
         }
     }
+    stacks
+}
 
-    let has_silk_touch = params.tool.as_ref().is_some_and(|tool| {
+/// The block's experience drop (`dropExperience` in `spawnAfterBreak`), unless the tool has
+/// silk touch.
+pub fn drop_block_experience(
+    world: &Arc<World>,
+    block: &Block,
+    pos: &BlockPos,
+    tool: Option<&ItemStack>,
+) {
+    let has_silk_touch = tool.is_some_and(|tool| {
         pumpkin_data::Enchantment::from_name("silk_touch")
             .is_some_and(|e| tool.get_enchantment_level(e) > 0)
     });
-
-    if experience
-        && !has_silk_touch
-        && let Some(experience) = &block.experience
-    {
-        let mut random = RandomGenerator::Xoroshiro(Xoroshiro::from_seed(get_seed()));
-        let amount = experience.experience.get(&mut random);
-        if amount > 0 {
-            let mut event = crate::plugin::block::block_exp::BlockExpEvent {
-                block_pos: *pos,
-                world: world.clone(),
-                exp: amount,
-            };
-            if let Some(server) = world.server.upgrade() {
-                server.plugin_manager.fire_blocking(&server, &mut event);
-            }
-            if event.exp > 0 {
-                ExperienceOrbEntity::spawn(world, pos.to_f64(), event.exp as u32);
-            }
+    if has_silk_touch {
+        return;
+    }
+    let Some(experience) = &block.experience else {
+        return;
+    };
+    let mut random = RandomGenerator::Xoroshiro(Xoroshiro::from_seed(get_seed()));
+    let amount = experience.experience.get(&mut random);
+    if amount > 0 {
+        let mut event = crate::plugin::block::block_exp::BlockExpEvent {
+            block_pos: *pos,
+            world: world.clone(),
+            exp: amount,
+        };
+        if let Some(server) = world.server.upgrade() {
+            server.plugin_manager.fire_blocking(&server, &mut event);
+        }
+        if event.exp > 0 {
+            ExperienceOrbEntity::spawn(world, pos.to_f64(), event.exp as u32);
         }
     }
 }

@@ -111,6 +111,32 @@ impl MinecartEntity {
 }
 
 impl EntityBase for MinecartEntity {
+    fn get_block_explosion_resistance(
+        &self,
+        world: &crate::world::World,
+        pos: &pumpkin_util::math::position::BlockPos,
+        block: &pumpkin_data::Block,
+        resistance: f32,
+    ) -> f32 {
+        match &self.kind {
+            MinecartKind::Tnt(minecart) if minecart.spares_block(world, pos, block) => 0.0,
+            _ => resistance,
+        }
+    }
+
+    fn should_block_explode(
+        &self,
+        world: &crate::world::World,
+        pos: &pumpkin_util::math::position::BlockPos,
+        block: &pumpkin_data::Block,
+        _power: f32,
+    ) -> bool {
+        match &self.kind {
+            MinecartKind::Tnt(minecart) => !minecart.spares_block(world, pos, block),
+            _ => true,
+        }
+    }
+
     fn write_custom_nbt(&self, nbt: &mut NbtCompound) {
         match &self.kind {
             MinecartKind::Chest(minecart) => minecart.write_nbt(nbt),
@@ -435,6 +461,7 @@ impl EntityBase for MinecartEntity {
             {
                 minecart.explode(
                     &self.vehicle.entity,
+                    None,
                     velocity.x * velocity.x + velocity.z * velocity.z,
                 );
                 return;
@@ -687,14 +714,27 @@ impl EntityBase for MinecartEntity {
             .and_then(EntityBase::get_player)
             .is_some_and(|player| player.gamemode.load() == GameMode::Creative);
 
+        // Vanilla `MinecartTNT.hurtServer`: a burning arrow sets it off, credited to the shooter.
         if let MinecartKind::Tnt(minecart) = &self.kind
-            && damage_type == DamageType::ARROW
-            && self.vehicle.entity.fire_ticks.load(Ordering::Relaxed) > 0
+            && let Some(arrow) = source
+            // `instanceof AbstractArrow`: arrows, spectral arrows and tridents.
+            && (arrow
+                .get_entity()
+                .entity_type
+                .has_tag(&tag::EntityType::MINECRAFT_ARROWS)
+                || arrow.get_entity().entity_type == &EntityType::TRIDENT)
+            && arrow.get_entity().is_on_fire()
         {
-            let projectile_speed_squared = cause
-                .map(|entity| entity.get_entity().velocity.load().length_squared())
-                .unwrap_or_default();
-            minecart.explode(&self.vehicle.entity, projectile_speed_squared);
+            let world = self.vehicle.entity.world.load();
+            let damage_source = crate::world::ExplosionDamageSource::explosion(
+                world.get_entity_by_id(self.vehicle.entity.entity_id),
+                cause.and_then(|cause| world.get_entity_by_id(cause.get_entity().entity_id)),
+            );
+            minecart.explode(
+                &self.vehicle.entity,
+                Some(damage_source),
+                arrow.get_entity().velocity.load().length_squared(),
+            );
             if self.vehicle.entity.is_removed() {
                 return true;
             }

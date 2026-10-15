@@ -26,6 +26,27 @@ impl TntMinecart {
         }
     }
 
+    /// Vanilla `MinecartTNT.isPrimed`.
+    pub(super) fn is_primed(&self) -> bool {
+        self.fuse.load(Ordering::Relaxed) > -1
+    }
+
+    /// Vanilla `MinecartTNT.shouldBlockExplode` and the matching resistance override: a primed
+    /// cart spares rails and the block under them.
+    pub(super) fn spares_block(
+        &self,
+        world: &crate::world::World,
+        pos: &pumpkin_util::math::position::BlockPos,
+        block: &pumpkin_data::Block,
+    ) -> bool {
+        use pumpkin_data::tag::Taggable;
+        self.is_primed()
+            && (block.has_tag(&pumpkin_data::tag::Block::MINECRAFT_RAILS)
+                || world
+                    .get_block(&pos.up())
+                    .has_tag(&pumpkin_data::tag::Block::MINECRAFT_RAILS))
+    }
+
     pub(super) fn prime(&self, entity: &Entity, fuse: i32) {
         if self.fuse.load(Ordering::Relaxed) >= 0
             || !entity
@@ -68,13 +89,23 @@ impl TntMinecart {
             );
         } else if fuse == 0 {
             let velocity = entity.velocity.load();
-            self.explode(entity, velocity.x * velocity.x + velocity.z * velocity.z);
+            self.explode(
+                entity,
+                None,
+                velocity.x * velocity.x + velocity.z * velocity.z,
+            );
             return true;
         }
         false
     }
 
-    pub(super) fn explode(&self, entity: &Entity, horizontal_speed_squared: f64) {
+    /// Vanilla `MinecartTNT.explode(damageSource, speedSqr)`.
+    pub(super) fn explode(
+        &self,
+        entity: &Entity,
+        damage_source: Option<crate::world::ExplosionDamageSource>,
+        horizontal_speed_squared: f64,
+    ) {
         let world = entity.world.load();
         if !world.level_info.load().game_rules.tnt_explodes {
             if self.fuse.load(Ordering::Relaxed) > -1 {
@@ -89,14 +120,20 @@ impl TntMinecart {
             horizontal_speed_squared,
             rand::rng().random_range(0.0..1.0),
         );
-        let pos = entity.pos.load();
-        let primed = self.fuse.load(Ordering::Relaxed) > -1;
+        // The cart itself is the source, and goes only after the explosion, while it still
+        // spares rails as primed.
+        let source = world.get_entity_by_id(entity.entity_id);
+        world.explode_full(
+            source,
+            damage_source,
+            None,
+            entity.pos.load(),
+            power,
+            false,
+            crate::world::ExplosionInteraction::Tnt,
+            crate::world::ExplosionEffects::DEFAULT,
+        );
         entity.remove();
-        if primed {
-            world.explode_tnt_minecart(pos, power);
-        } else {
-            world.explode(pos, power, crate::world::ExplosionInteraction::Tnt);
-        }
     }
 
     pub(super) fn set_fuse(&self, fuse: i32) {

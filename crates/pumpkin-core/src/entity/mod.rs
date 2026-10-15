@@ -283,6 +283,31 @@ pub trait EntityBase: Send + Sync + std::any::Any {
         true
     }
 
+    /// Vanilla `Entity.getBlockExplosionResistance`, for an explosion this entity causes.
+    fn get_block_explosion_resistance(
+        &self,
+        _world: &crate::world::World,
+        _pos: &BlockPos,
+        _block: &pumpkin_data::Block,
+        resistance: f32,
+    ) -> f32 {
+        resistance
+    }
+
+    /// Vanilla `Entity.shouldBlockExplode`, for an explosion this entity causes.
+    fn should_block_explode(
+        &self,
+        _world: &crate::world::World,
+        _pos: &BlockPos,
+        _block: &pumpkin_data::Block,
+        _power: f32,
+    ) -> bool {
+        true
+    }
+
+    /// Vanilla `Projectile.setOwner`, for projectiles an explosion redirects.
+    fn set_owner_id(&self, _owner: Option<i32>) {}
+
     /// Whether the entity is immune from explosion knockback and damage
     fn is_immune_to_explosion(&self) -> bool {
         false
@@ -1271,6 +1296,15 @@ impl Entity {
             last_sent_pos: AtomicCell::new(position),
             last_sent_velocity: AtomicCell::new(Vector3::default()),
             custom_data: std::sync::Mutex::new(NbtCompound::new()),
+        }
+    }
+
+    /// Vanilla `Entity.push(x, y, z)`: adds an impulse that viewers pick up through
+    /// `needsSync`.
+    pub fn push_impulse(&self, impulse: Vector3<f64>) {
+        if impulse.x.is_finite() && impulse.y.is_finite() && impulse.z.is_finite() {
+            self.velocity.store(self.velocity.load() + impulse);
+            self.velocity_dirty.store(true, Ordering::SeqCst);
         }
     }
 

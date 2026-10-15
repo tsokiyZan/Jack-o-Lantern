@@ -25,7 +25,7 @@ impl SplashPotionEntity {
         entity.set_velocity(Vector3::new(0.0, 0.1, 0.0));
         let thrown = ThrownItemEntity {
             entity,
-            owner_id: None,
+            owner_id: crossbeam::atomic::AtomicCell::new(None),
             collides_with_projectiles: false,
             has_hit: AtomicBool::new(false),
             gravity: GRAVITY,
@@ -100,7 +100,7 @@ pub(crate) fn extinguish_fire_if_water_potion(
 
 impl EntityBase for SplashPotionEntity {
     fn get_owner_id(&self) -> Option<i32> {
-        self.thrown.owner_id
+        self.thrown.owner_id.load()
     }
 
     fn init_data_tracker(&self) {

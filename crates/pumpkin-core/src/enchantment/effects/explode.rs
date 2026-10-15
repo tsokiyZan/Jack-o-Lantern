@@ -67,23 +67,60 @@ impl ExplodeEffect {
 }
 
 impl super::EnchantmentEntityEffectExt for ExplodeEffect {
+    /// Vanilla `ExplodeEffect.apply`.
     fn apply(
         &self,
         world: &std::sync::Arc<crate::world::World>,
         enchantment_level: i32,
         _owner: Option<&std::sync::Arc<crate::entity::player::Player>>,
-        _entity: Option<&crate::entity::Entity>,
+        entity: Option<&crate::entity::Entity>,
         position: Vector3<f64>,
     ) {
-        let r = self.calculate_radius(enchantment_level);
-        let center = position + self.offset;
-        world.explode(
-            center,
-            r,
-            if self.create_fire {
-                self.block_interaction
+        let pos = position + self.offset;
+        let user = entity.and_then(|entity| world.get_entity_by_id(entity.entity_id));
+        // `getDamageSource`: the type attributed to the user, or placed at the explosion.
+        let damage_source = self.damage_type.map(|damage_type| {
+            if self.attribute_to_user {
+                crate::world::ExplosionDamageSource {
+                    damage_type: *damage_type,
+                    direct: user.clone(),
+                    causing: user.clone(),
+                    position: None,
+                }
             } else {
-                ExplosionInteraction::None
+                crate::world::ExplosionDamageSource {
+                    damage_type: *damage_type,
+                    direct: None,
+                    causing: None,
+                    position: Some(pos),
+                }
+            }
+        });
+        let immune_blocks = self.immune_blocks.and_then(|tag| {
+            pumpkin_data::tag::get_latest_map(pumpkin_data::tag::RegistryKey::Block)
+                .get(tag.trim_start_matches('#'))
+                .copied()
+        });
+        let calculator = std::sync::Arc::new(crate::world::SimpleExplosionDamageCalculator::new(
+            self.block_interaction != ExplosionInteraction::None,
+            self.damage_type.is_some(),
+            self.calculate_knockback(enchantment_level),
+            immune_blocks,
+        ));
+        let defaults = crate::world::ExplosionEffects::DEFAULT;
+        world.explode_full(
+            if self.attribute_to_user { user } else { None },
+            damage_source,
+            Some(calculator),
+            pos,
+            self.calculate_radius(enchantment_level),
+            self.create_fire,
+            self.block_interaction,
+            crate::world::ExplosionEffects {
+                small_particle: self.small_particle.unwrap_or(defaults.small_particle),
+                large_particle: self.large_particle.unwrap_or(defaults.large_particle),
+                block_particles: &[],
+                sound: self.sound.unwrap_or(defaults.sound),
             },
         );
     }

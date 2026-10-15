@@ -197,16 +197,26 @@ impl BedBlock {
         };
 
         // Explode if bed rule explodes (EnvironmentAttributes.BED_RULE)
+        // Vanilla `BedBlock.destroyOnUse`: `removeBlock` both halves, then a fiery
+        // `badRespawnPointExplosion` at the head.
         if world.dimension.bed_rule.explodes {
-            world.break_block(&bed_head_pos, None, BlockFlags::SKIP_DROPS);
-            world.break_block(&bed_foot_pos, None, BlockFlags::SKIP_DROPS);
-
-            world.explode(
-                bed_head_pos.to_centered_f64(),
+            world.set_block_state(&bed_head_pos, BlockStateId::AIR, BlockFlags::NOTIFY_ALL);
+            if world.get_block(&bed_foot_pos) == block {
+                world.set_block_state(&bed_foot_pos, BlockStateId::AIR, BlockFlags::NOTIFY_ALL);
+            }
+            let boom_pos = bed_head_pos.to_centered_f64();
+            world.explode_full(
+                None,
+                Some(crate::world::ExplosionDamageSource::bad_respawn_point(
+                    boom_pos,
+                )),
+                None,
+                boom_pos,
                 5.0,
+                true,
                 crate::world::ExplosionInteraction::Block,
+                crate::world::ExplosionEffects::DEFAULT,
             );
-
             return BlockActionResult::SuccessServer;
         }
 

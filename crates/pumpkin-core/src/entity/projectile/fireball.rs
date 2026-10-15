@@ -35,7 +35,7 @@ impl FireballEntity {
     pub fn new(entity: Entity) -> Self {
         let thrown = ThrownItemEntity {
             entity,
-            owner_id: None,
+            owner_id: crossbeam::atomic::AtomicCell::new(None),
             collides_with_projectiles: false,
             has_hit: AtomicBool::new(false),
             gravity: 0.0,
@@ -72,7 +72,7 @@ impl FireballEntity {
     ) -> Self {
         let thrown = ThrownItemEntity {
             entity,
-            owner_id: None,
+            owner_id: crossbeam::atomic::AtomicCell::new(None),
             collides_with_projectiles: false,
             has_hit: AtomicBool::new(false),
             gravity: 0.0,
@@ -169,7 +169,11 @@ impl FireballEntity {
 
 impl EntityBase for FireballEntity {
     fn get_owner_id(&self) -> Option<i32> {
-        self.thrown.owner_id
+        self.thrown.owner_id.load()
+    }
+
+    fn set_owner_id(&self, owner: Option<i32>) {
+        self.thrown.owner_id.store(owner);
     }
 
     fn write_custom_nbt(&self, nbt: &mut NbtCompound) {
@@ -241,17 +245,33 @@ impl EntityBase for FireballEntity {
     fn on_hit(&self, hit: ProjectileHit) {
         let world = self.get_entity().world.load();
 
+        let this = world.get_entity_by_id(self.get_entity().entity_id);
+        // Vanilla `LargeFireball.onHitEntity`: `fireball(this, owner)` for 6.
         if let ProjectileHit::Entity { ref entity, .. } = hit {
-            entity.get_entity().set_on_fire_for(5.0);
-            let _ = entity.damage(
+            let owner = self
+                .get_owner_id()
+                .and_then(|id| world.get_entity_by_id(id));
+            let _ = entity.damage_with_context(
                 entity.as_ref(),
                 6.0,
                 pumpkin_data::damage::DamageType::FIREBALL,
+                None,
+                this.as_deref(),
+                owner.as_deref(),
             );
         }
 
-        let hit_pos = hit.hit_pos();
-        let power = self.get_explosion_power();
-        world.explode(hit_pos, power, crate::world::ExplosionInteraction::Mob);
+        // Vanilla `LargeFireball.onHit`: at its own position, setting fire with mob griefing.
+        let grief = world.level_info.load().game_rules.mob_griefing;
+        world.explode_full(
+            this,
+            None,
+            None,
+            self.get_entity().pos.load(),
+            self.get_explosion_power(),
+            grief,
+            crate::world::ExplosionInteraction::Mob,
+            crate::world::ExplosionEffects::DEFAULT,
+        );
     }
 }

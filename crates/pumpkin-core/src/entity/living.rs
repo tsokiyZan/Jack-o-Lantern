@@ -76,6 +76,29 @@ use std::sync::RwLock;
 /// Represents a living entity within the game world.
 ///
 /// This struct encapsulates the core properties and behaviors of living entities, including players, mobs, and other creatures.
+/// The entity types whose classes extend vanilla `Projectile`.
+const PROJECTILE_TYPES: [&EntityType; 19] = [
+    &EntityType::ARROW,
+    &EntityType::SPECTRAL_ARROW,
+    &EntityType::TRIDENT,
+    &EntityType::EGG,
+    &EntityType::SNOWBALL,
+    &EntityType::ENDER_PEARL,
+    &EntityType::EXPERIENCE_BOTTLE,
+    &EntityType::SPLASH_POTION,
+    &EntityType::LINGERING_POTION,
+    &EntityType::FIREBALL,
+    &EntityType::SMALL_FIREBALL,
+    &EntityType::DRAGON_FIREBALL,
+    &EntityType::WITHER_SKULL,
+    &EntityType::WIND_CHARGE,
+    &EntityType::BREEZE_WIND_CHARGE,
+    &EntityType::FIREWORK_ROCKET,
+    &EntityType::LLAMA_SPIT,
+    &EntityType::SHULKER_BULLET,
+    &EntityType::FISHING_BOBBER,
+];
+
 pub struct LivingEntity {
     /// The underlying entity object, providing basic entity information and functionality.
     pub entity: Entity,
@@ -1340,6 +1363,38 @@ impl LivingEntity {
         }
 
         false
+    }
+
+    /// The `xd`/`zd` of vanilla `dealDefaultKnockback`: a projectile pushes along its own
+    /// motion (fireworks and thrown potions from where they are), anything else from the
+    /// damage source's position.
+    fn default_knockback_direction(
+        &self,
+        direct: Option<&dyn EntityBase>,
+        position: Option<Vector3<f64>>,
+    ) -> (f64, f64) {
+        let here = self.entity.pos.load();
+        if let Some(direct) = direct {
+            let entity = direct.get_entity();
+            if PROJECTILE_TYPES.contains(&entity.entity_type) {
+                if [
+                    &EntityType::FIREWORK_ROCKET,
+                    &EntityType::SPLASH_POTION,
+                    &EntityType::LINGERING_POTION,
+                ]
+                .contains(&entity.entity_type)
+                {
+                    let from = entity.pos.load();
+                    return (-(here.x - from.x), -(here.z - from.z));
+                }
+                let motion = entity.velocity.load();
+                return (-motion.x, -motion.z);
+            }
+        }
+        // `DamageSource.getSourcePosition`: an explicit position, else the direct entity's.
+        position
+            .or_else(|| direct.map(|direct| direct.get_entity().pos.load()))
+            .map_or((0.0, 0.0), |from| (from.x - here.x, from.z - here.z))
     }
 
     /// Vanilla `LivingEntity.wasHurtRecently`.
@@ -3479,16 +3534,14 @@ impl LivingEntity {
                 mob.reset_ambient_sound_time();
             }
             self.make_sound(caller, self.hurt_sound(caller));
+        }
 
-            if let Some(source) = source {
-                let source_pos = source.get_entity().pos.load();
-                let target_pos = self.entity.pos.load();
-                let dx = source_pos.x - target_pos.x;
-                let dz = source_pos.z - target_pos.z;
-                let resistance = self.get_attribute_value(&Attributes::KNOCKBACK_RESISTANCE);
-                self.entity
-                    .apply_knockback(knockback_after_resistance(0.4, resistance), dx, dz);
-            }
+        // Vanilla `hurtServer`: `dealDefaultKnockback` on every full-damage hit.
+        if took_full_damage && !damage_type.has_tag(&tag::DamageType::MINECRAFT_NO_KNOCKBACK) {
+            let (dx, dz) = self.default_knockback_direction(source, position);
+            let resistance = self.get_attribute_value(&Attributes::KNOCKBACK_RESISTANCE);
+            self.entity
+                .apply_knockback(knockback_after_resistance(0.4, resistance), dx, dz);
         }
 
         // Vanilla parity: actuallyHurt

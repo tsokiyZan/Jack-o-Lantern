@@ -21,7 +21,7 @@ impl SmallFireballEntity {
     pub const fn new(entity: Entity) -> Self {
         let thrown = ThrownItemEntity {
             entity,
-            owner_id: None,
+            owner_id: crossbeam::atomic::AtomicCell::new(None),
             collides_with_projectiles: false,
             has_hit: AtomicBool::new(false),
             gravity: GRAVITY,
@@ -44,7 +44,7 @@ impl SmallFireballEntity {
 
 impl EntityBase for SmallFireballEntity {
     fn get_owner_id(&self) -> Option<i32> {
-        self.thrown.owner_id
+        self.thrown.owner_id.load()
     }
 
     fn tick(&self, caller: &dyn EntityBase, _server: &Server) {

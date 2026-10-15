@@ -73,7 +73,8 @@ pub fn apply_on_projectile_spawned(
 
 pub struct ThrownItemEntity {
     pub entity: Entity,
-    pub owner_id: Option<i32>,
+    /// Vanilla `Projectile.owner`; an explosion can hand a redirectable projectile over.
+    pub owner_id: crossbeam::atomic::AtomicCell<Option<i32>>,
     pub collides_with_projectiles: bool,
     pub has_hit: AtomicBool,
     pub gravity: f64,
@@ -86,7 +87,7 @@ impl ThrownItemEntity {
         entity.pos.store(owner_pos);
         Self {
             entity,
-            owner_id: Some(owner.entity_id),
+            owner_id: crossbeam::atomic::AtomicCell::new(Some(owner.entity_id)),
             collides_with_projectiles: false,
             has_hit: AtomicBool::new(false),
             gravity,
@@ -265,7 +266,9 @@ impl ThrownItemEntity {
         }
 
         // Skip owner for initial frames
-        if Some(other_ent.entity_id) == self.owner_id && self_ent.age.load(Ordering::Relaxed) < 5 {
+        if Some(other_ent.entity_id) == self.owner_id.load()
+            && self_ent.age.load(Ordering::Relaxed) < 5
+        {
             return true;
         }
 

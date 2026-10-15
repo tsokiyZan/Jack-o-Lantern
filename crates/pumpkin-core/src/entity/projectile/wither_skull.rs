@@ -25,7 +25,7 @@ impl WitherSkullEntity {
     pub const fn new(entity: Entity) -> Self {
         let thrown = ThrownItemEntity {
             entity,
-            owner_id: None,
+            owner_id: crossbeam::atomic::AtomicCell::new(None),
             collides_with_projectiles: false,
             has_hit: AtomicBool::new(false),
             gravity: GRAVITY,
@@ -76,7 +76,23 @@ impl WitherSkullEntity {
 
 impl EntityBase for WitherSkullEntity {
     fn get_owner_id(&self) -> Option<i32> {
-        self.thrown.owner_id
+        self.thrown.owner_id.load()
+    }
+
+    /// Vanilla `WitherSkull.getBlockExplosionResistance`: a blue skull breaks what the wither
+    /// can.
+    fn get_block_explosion_resistance(
+        &self,
+        _world: &crate::world::World,
+        _pos: &pumpkin_util::math::position::BlockPos,
+        block: &pumpkin_data::Block,
+        resistance: f32,
+    ) -> f32 {
+        if self.is_dangerous() && crate::entity::boss::wither::WitherEntity::can_destroy(block) {
+            resistance.min(0.8)
+        } else {
+            resistance
+        }
     }
 
     fn write_custom_nbt(&self, nbt: &mut NbtCompound) {
@@ -119,9 +135,35 @@ impl EntityBase for WitherSkullEntity {
         if let ProjectileHit::Entity { ref entity, .. } = hit {
             let difficulty = world.level_info.load().difficulty;
 
-            let _ = entity.damage(entity.as_ref(), 8.0, DamageType::WITHER_SKULL);
+            // Vanilla `WitherSkull.onHitEntity`: `witherSkull(this, owner)` for 8 with a living
+            // owner, who heals 5 on a kill; plain `magic` for 5 without one.
+            let this = world.get_entity_by_id(self.get_entity().entity_id);
+            let owner = self
+                .get_owner_id()
+                .and_then(|id| world.get_entity_by_id(id))
+                .filter(|owner| owner.get_living_entity().is_some());
+            let was_hurt = owner.as_ref().map_or_else(
+                || entity.damage(entity.as_ref(), 5.0, DamageType::MAGIC),
+                |owner| {
+                    let hurt = entity.damage_with_context(
+                        entity.as_ref(),
+                        8.0,
+                        DamageType::WITHER_SKULL,
+                        None,
+                        this.as_deref(),
+                        Some(owner.as_ref()),
+                    );
+                    if hurt
+                        && !entity.get_entity().is_alive()
+                        && let Some(living_owner) = owner.get_living_entity()
+                    {
+                        living_owner.heal(5.0);
+                    }
+                    hurt
+                },
+            );
 
-            if let Some(living) = entity.get_living_entity() {
+            if was_hurt && let Some(living) = entity.get_living_entity() {
                 let duration = match difficulty {
                     Difficulty::Hard => 800,   // 40 seconds
                     Difficulty::Normal => 200, // 10 seconds
@@ -147,7 +189,13 @@ impl EntityBase for WitherSkullEntity {
             }
         }
 
-        let hit_pos = hit.hit_pos();
-        world.explode(hit_pos, 1.0, ExplosionInteraction::Mob);
+        // Vanilla `WitherSkull.onHit`: at the skull's own position, with the skull as source.
+        let this = world.get_entity_by_id(self.get_entity().entity_id);
+        world.explode(
+            this,
+            self.get_entity().pos.load(),
+            1.0,
+            ExplosionInteraction::Mob,
+        );
     }
 }

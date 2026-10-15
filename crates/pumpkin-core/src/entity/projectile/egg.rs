@@ -28,7 +28,7 @@ impl EggEntity {
         entity.set_velocity(Vector3::new(0.0, 0.1, 0.0));
         let thrown = ThrownItemEntity {
             entity,
-            owner_id: None,
+            owner_id: crossbeam::atomic::AtomicCell::new(None),
             collides_with_projectiles: false,
             has_hit: AtomicBool::new(false),
             gravity: GRAVITY,
@@ -63,7 +63,7 @@ impl EggEntity {
 
 impl EntityBase for EggEntity {
     fn get_owner_id(&self) -> Option<i32> {
-        self.thrown.owner_id
+        self.thrown.owner_id.load()
     }
 
     fn init_data_tracker(&self) {
@@ -115,7 +115,7 @@ impl EntityBase for EggEntity {
         let mut hatching = to_spawn > 0;
         let mut hatching_type: &'static EntityType = &EntityType::CHICKEN;
 
-        let owner_id = self.thrown.owner_id;
+        let owner_id = self.thrown.owner_id.load();
         let entity_uuid = self.get_entity().entity_uuid;
         let variant_name = {
             let stack = self

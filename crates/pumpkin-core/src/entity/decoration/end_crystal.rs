@@ -81,17 +81,42 @@ impl EntityBase for EndCrystalEntity {
         damage_type: DamageType,
         _position: Option<Vector3<f64>>,
         _source: Option<&dyn EntityBase>,
-        _cause: Option<&dyn EntityBase>,
+        cause: Option<&dyn EntityBase>,
     ) -> bool {
         if self.is_invulnerable() {
             return false;
         }
+        // Vanilla `EndCrystal.hurtServer`: the dragon can't break its own crystals.
+        if cause.is_some_and(|cause| {
+            cause.get_entity().entity_type == &pumpkin_data::entity::EntityType::ENDER_DRAGON
+        }) {
+            return false;
+        }
+        if self.entity.is_removed() {
+            return true;
+        }
 
-        self.entity.remove();
         let world = self.entity.world.load();
+        let this = world.get_entity_by_id(self.entity.entity_id);
+        self.entity.remove();
         if !damage_type.has_tag(&tag::DamageType::MINECRAFT_IS_EXPLOSION) {
-            let pos = self.entity.pos.load();
-            world.explode(pos, 6.0, crate::world::ExplosionInteraction::Block);
+            // Credited to whoever broke it, when anyone did.
+            let damage_source = cause.map(|cause| {
+                crate::world::ExplosionDamageSource::explosion(
+                    this.clone(),
+                    world.get_entity_by_id(cause.get_entity().entity_id),
+                )
+            });
+            world.explode_full(
+                this,
+                damage_source,
+                None,
+                self.entity.pos.load(),
+                6.0,
+                false,
+                crate::world::ExplosionInteraction::Block,
+                crate::world::ExplosionEffects::DEFAULT,
+            );
         }
 
         if let Some(ref fight_mutex) = world.dragon_fight

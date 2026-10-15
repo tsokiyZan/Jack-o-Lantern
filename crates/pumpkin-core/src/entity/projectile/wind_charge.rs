@@ -86,15 +86,28 @@ impl WindChargeEntity {
     }
 
     pub fn create_explosion(&self, position: Vector3<f64>) {
-        let (power, calculator) = match self.kind {
-            WindChargeKind::Normal { .. } => (1.2, WIND_CHARGE_EXPLOSION_DAMAGE_CALCULATOR.clone()),
-            WindChargeKind::Breeze => (3.0, BREEZE_WIND_CHARGE_EXPLOSION_DAMAGE_CALCULATOR.clone()),
+        let (power, calculator, effects) = match self.kind {
+            WindChargeKind::Normal { .. } => (
+                1.2,
+                WIND_CHARGE_EXPLOSION_DAMAGE_CALCULATOR.clone(),
+                crate::world::ExplosionEffects::WIND_CHARGE,
+            ),
+            WindChargeKind::Breeze => (
+                3.0,
+                BREEZE_WIND_CHARGE_EXPLOSION_DAMAGE_CALCULATOR.clone(),
+                crate::world::ExplosionEffects::BREEZE_WIND_CHARGE,
+            ),
         };
-        self.get_entity().world.load().explode_with_calculator(
+        let world = self.get_entity().world.load();
+        world.explode_full(
+            world.get_entity_by_id(self.get_entity().entity_id),
+            None,
+            Some(calculator),
             position,
             power,
+            false,
             crate::world::ExplosionInteraction::Trigger,
-            Some(calculator),
+            effects,
         );
     }
 
@@ -116,7 +129,11 @@ impl WindChargeEntity {
 
 impl EntityBase for WindChargeEntity {
     fn get_owner_id(&self) -> Option<i32> {
-        self.thrown_item_entity.owner_id
+        self.thrown_item_entity.owner_id.load()
+    }
+
+    fn set_owner_id(&self, owner: Option<i32>) {
+        self.thrown_item_entity.owner_id.store(owner);
     }
 
     fn tick(&self, caller: &dyn EntityBase, _server: &Server) {
@@ -146,7 +163,7 @@ impl EntityBase for WindChargeEntity {
         let hit_pos = hit.hit_pos();
         if let ProjectileHit::Entity { ref entity, .. } = hit {
             let world = self.get_entity().world.load();
-            let owner_id = self.thrown_item_entity.owner_id;
+            let owner_id = self.thrown_item_entity.owner_id.load();
             let owner = owner_id.and_then(|id| world.get_entity_by_id(id));
 
             let _ = entity.damage_with_context(

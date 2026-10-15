@@ -1,7 +1,16 @@
 use pumpkin_data::block_properties::RespawnAnchorLikeProperties;
 use pumpkin_data::item::Item;
 use pumpkin_data::sound::{Sound, SoundCategory};
-use pumpkin_data::{BlockState, translation};
+use std::sync::Arc;
+
+use pumpkin_data::tag::{self, Taggable};
+use pumpkin_data::{Block, BlockDirection, BlockState, BlockStateId, translation};
+use pumpkin_util::math::position::BlockPos;
+
+use crate::world::{
+    DefaultExplosionDamageCalculator, Explosion, ExplosionDamageCalculator, ExplosionDamageSource,
+    ExplosionEffects, ExplosionInteraction, World,
+};
 use pumpkin_macros::pumpkin_block;
 use pumpkin_world::world::BlockFlags;
 
@@ -53,21 +62,13 @@ impl BlockBehaviour for RespawnAnchorBlock {
         let state_id = args.world.get_block_state_id(args.position);
         let props = RespawnAnchorLikeProperties::from_state_id(state_id);
 
-        if !args.world.dimension.respawn_anchor_works {
-            args.world
-                .break_block(args.position, None, BlockFlags::SKIP_DROPS);
-            let center_pos = args.position.to_centered_f64();
-            args.world
-                .explode(center_pos, 5.0, crate::world::ExplosionInteraction::Block);
-            return BlockActionResult::SuccessServer;
+        // Vanilla `useWithoutItem`: an empty anchor does nothing, anywhere.
+        if props.charges == 0 {
+            return BlockActionResult::Pass;
         }
 
-        if props.charges == 0 {
-            args.player
-                .send_system_message(&pumpkin_macros::translate_cross!(
-                    translation::java::BLOCK_MINECRAFT_BED_NO_SLEEP,
-                    translation::bedrock::TILE_BED_NOSLEEP
-                ));
+        if !args.world.dimension.respawn_anchor_works {
+            Self::explode(args.world, args.position);
             return BlockActionResult::SuccessServer;
         }
 
@@ -104,5 +105,82 @@ impl BlockBehaviour for RespawnAnchorBlock {
 
     fn is_pathfindable(&self, _state: &BlockState, _computation_type: PathComputationType) -> bool {
         false
+    }
+}
+
+impl RespawnAnchorBlock {
+    /// Vanilla `RespawnAnchorBlock.isWaterThatWouldFlow`.
+    fn is_water_that_would_flow(world: &World, pos: &BlockPos) -> bool {
+        let (fluid, state) = world.get_fluid_and_fluid_state(pos);
+        if !fluid.has_tag(&tag::Fluid::MINECRAFT_WATER) {
+            return false;
+        }
+        if state.is_source {
+            return true;
+        }
+        if state.level < 2 {
+            return false;
+        }
+        let (below, _) = world.get_fluid_and_fluid_state(&pos.down());
+        !below.has_tag(&tag::Fluid::MINECRAFT_WATER)
+    }
+
+    /// Vanilla `RespawnAnchorBlock.explode`: removed, then a fiery `badRespawnPointExplosion`
+    /// whose own block counts as water when water would flow in.
+    fn explode(world: &Arc<World>, pos: &BlockPos) {
+        world.set_block_state(pos, BlockStateId::AIR, BlockFlags::NOTIFY_ALL);
+        let any_water_neighbors = [
+            BlockDirection::North,
+            BlockDirection::East,
+            BlockDirection::South,
+            BlockDirection::West,
+        ]
+        .iter()
+        .any(|direction| Self::is_water_that_would_flow(world, &pos.offset(direction.to_offset())));
+        let in_water = any_water_neighbors
+            || world
+                .get_fluid_and_fluid_state(&pos.up())
+                .0
+                .has_tag(&tag::Fluid::MINECRAFT_WATER);
+        let calculator = Arc::new(AnchorExplosionCalculator {
+            pos: *pos,
+            in_water,
+        });
+        let boom_pos = pos.to_centered_f64();
+        world.explode_full(
+            None,
+            Some(ExplosionDamageSource::bad_respawn_point(boom_pos)),
+            Some(calculator),
+            boom_pos,
+            5.0,
+            true,
+            ExplosionInteraction::Block,
+            ExplosionEffects::DEFAULT,
+        );
+    }
+}
+
+/// The anonymous calculator in vanilla `RespawnAnchorBlock.explode`.
+struct AnchorExplosionCalculator {
+    pos: BlockPos,
+    in_water: bool,
+}
+
+impl ExplosionDamageCalculator for AnchorExplosionCalculator {
+    fn get_block_explosion_resistance(
+        &self,
+        explosion: &Explosion,
+        world: &World,
+        pos: &BlockPos,
+        block: &Block,
+        state: &BlockState,
+        fluid: &pumpkin_data::fluid::FluidState,
+    ) -> Option<f32> {
+        if *pos == self.pos && self.in_water {
+            Some(Block::WATER.blast_resistance)
+        } else {
+            DefaultExplosionDamageCalculator
+                .get_block_explosion_resistance(explosion, world, pos, block, state, fluid)
+        }
     }
 }

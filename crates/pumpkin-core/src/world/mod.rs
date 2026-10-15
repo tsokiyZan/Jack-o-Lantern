@@ -63,7 +63,7 @@ use border::Worldborder;
 use bytes::BufMut;
 pub use explosion::{
     BlockInteraction, DefaultExplosionDamageCalculator, Explosion, ExplosionDamageCalculator,
-    ExplosionInteraction, SimpleExplosionDamageCalculator,
+    ExplosionDamageSource, ExplosionEffects, ExplosionInteraction, SimpleExplosionDamageCalculator,
 };
 use pumpkin_config::BasicConfiguration;
 use pumpkin_data::block_properties::{blocks_movement, is_air};
@@ -3861,34 +3861,55 @@ impl World {
         player.set_health(20.0);
     }
 
+    /// Vanilla `ServerLevel.explode(source, x, y, z, r, interaction)`: default damage source,
+    /// calculator and effects, no fire.
     pub fn explode(
         self: &Arc<Self>,
+        source: Option<Arc<dyn EntityBase>>,
         position: Vector3<f64>,
         power: f32,
         interaction: ExplosionInteraction,
     ) {
-        self.explode_with_calculator(position, power, interaction, None);
+        self.explode_full(
+            source,
+            None,
+            None,
+            position,
+            power,
+            false,
+            interaction,
+            ExplosionEffects::DEFAULT,
+        );
     }
 
-    pub fn explode_with_calculator(
+    /// Vanilla `ServerLevel.explode` with every parameter.
+    #[expect(clippy::too_many_arguments)]
+    pub fn explode_full(
         self: &Arc<Self>,
+        source: Option<Arc<dyn EntityBase>>,
+        damage_source: Option<explosion::ExplosionDamageSource>,
+        damage_calculator: Option<Arc<dyn ExplosionDamageCalculator>>,
         position: Vector3<f64>,
         power: f32,
+        fire: bool,
         interaction: ExplosionInteraction,
-        damage_calculator: Option<Arc<dyn ExplosionDamageCalculator>>,
+        effects: ExplosionEffects,
     ) {
         let block_interaction = self.get_block_interaction(interaction);
-        let mut explosion = Explosion::new(power, position, block_interaction);
-        if let Some(calc) = damage_calculator {
-            explosion = explosion.with_damage_calculator(calc);
-        }
-        self.run_explosion(&explosion, position, power);
-    }
-
-    pub fn explode_tnt_minecart(self: &Arc<Self>, position: Vector3<f64>, power: f32) {
-        let block_interaction = self.get_block_interaction(ExplosionInteraction::Tnt);
-        let explosion = Explosion::new(power, position, block_interaction).preserving_rails();
-        self.run_explosion(&explosion, position, power);
+        let play_sound = source
+            .as_ref()
+            .is_none_or(|source| !source.get_entity().is_silent());
+        let source_id = source.as_ref().map_or(0, |s| s.get_entity().entity_id);
+        let explosion = Explosion::new(
+            source,
+            damage_source,
+            damage_calculator,
+            position,
+            power,
+            fire,
+            block_interaction,
+        );
+        self.run_explosion(&explosion, source_id, position, power, play_sound, effects);
     }
 
     #[must_use]
@@ -3922,9 +3943,17 @@ impl World {
         }
     }
 
-    fn run_explosion(self: &Arc<Self>, explosion: &Explosion, position: Vector3<f64>, power: f32) {
+    fn run_explosion(
+        self: &Arc<Self>,
+        explosion: &Explosion,
+        source_id: i32,
+        position: Vector3<f64>,
+        power: f32,
+        play_sound: bool,
+        effects: ExplosionEffects,
+    ) {
         let mut event = crate::plugin::api::events::entity::entity_explode::EntityExplodeEvent::new(
-            0, position, power,
+            source_id, position, power,
         );
         if let Some(server) = self.server.upgrade() {
             server.plugin_manager.fire_blocking(&server, &mut event);
@@ -3934,23 +3963,37 @@ impl World {
         }
 
         let block_count = explosion.explode(self);
-        let particle = if power < 2.0 {
-            Particle::Explosion
+        let particle = if explosion.is_small() {
+            effects.small_particle
         } else {
-            Particle::ExplosionEmitter
+            effects.large_particle
         };
-        let sound = IdOr::<SoundEvent>::Id(Sound::EntityGenericExplode as u16);
+        let sound = IdOr::<SoundEvent>::Id(effects.sound as u16);
+        let block_particles: Vec<_> = effects
+            .block_particles
+            .iter()
+            .map(
+                |info| pumpkin_protocol::java::client::play::ExplosionParticleInfo {
+                    particle: VarInt(info.particle as i32),
+                    scaling: info.scaling,
+                    speed: info.speed,
+                    weight: VarInt(info.weight),
+                },
+            )
+            .collect();
         for player in self.players.load().iter() {
-            if player.position().squared_distance_to_vec(&position) > 4096.0 {
+            if player.position().squared_distance_to_vec(&position) >= 4096.0 {
                 continue;
             }
             player.try_send_client_packet(&CExplosion::new(
                 position,
                 power,
                 block_count as i32,
-                None,
+                explosion.player_knockback(player.entity_id()),
                 VarInt(particle as i32),
                 sound.clone(),
+                block_particles.clone(),
+                play_sound,
             ));
         }
     }

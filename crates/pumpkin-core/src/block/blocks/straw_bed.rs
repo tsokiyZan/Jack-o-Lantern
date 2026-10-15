@@ -287,14 +287,10 @@ impl StrawBedBlock {
             (position.offset(bed_props.facing.to_offset()), *position)
         };
 
+        // Vanilla `StrawBedBlock.destroyOnUse`: straw beds never explode, they fall apart
+        // (`destroy_on_use` in the same dimensions where beds explode).
         if world.dimension.bed_rule.explodes {
-            world.break_block(&bed_head_pos, None, BlockFlags::SKIP_DROPS);
-            world.break_block(&bed_foot_pos, None, BlockFlags::SKIP_DROPS);
-            world.explode(
-                bed_head_pos.to_centered_f64(),
-                5.0,
-                crate::world::ExplosionInteraction::Block,
-            );
+            Self::destroy_after_use(world, bed_head_pos);
             return BlockActionResult::SuccessServer;
         }
 

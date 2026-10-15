@@ -583,7 +583,7 @@ impl DispenserBlock {
         let _ = item.split(1);
         let target = Self::target_position(ctx);
 
-        let tnt = TNTEntity::primed(ctx.world, &target, TNTEntity::DEFAULT_FUSE);
+        let tnt = TNTEntity::primed(ctx.world, &target, TNTEntity::DEFAULT_FUSE, None);
         let spawn_pos = tnt.get_entity().pos.load();
         ctx.world.spawn_entity(tnt);
         ctx.world
@@ -739,7 +739,7 @@ impl DispenserBlock {
         );
         let thrown = ThrownItemEntity {
             entity,
-            owner_id: None,
+            owner_id: crossbeam::atomic::AtomicCell::new(None),
             collides_with_projectiles: false,
             has_hit: AtomicBool::new(false),
             gravity: WIND_CHARGE_GRAVITY,
@@ -859,7 +859,7 @@ impl DispenserBlock {
         let front_block = ctx.world.get_block(&front);
 
         let ignited = if front_block == &Block::TNT {
-            TNTBlock::prime(ctx.world, &front)
+            TNTBlock::prime(ctx.world, &front, None)
         } else {
             Ignition::ignite_block(
                 |world: Arc<World>, pos: BlockPos, new_state_id: BlockStateId| {

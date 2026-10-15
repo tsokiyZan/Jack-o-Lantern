@@ -122,6 +122,7 @@ impl CreeperEntity {
         let world = entity.world.load();
         let pos = entity.pos.load();
         world.explode(
+            world.get_entity_by_id(entity.entity_id),
             pos,
             radius * multiplier,
             crate::world::ExplosionInteraction::Mob,

@@ -32,7 +32,7 @@ impl FireworkRocketEntity {
         Self {
             entity: ThrownItemEntity {
                 entity,
-                owner_id: None,
+                owner_id: crossbeam::atomic::AtomicCell::new(None),
                 collides_with_projectiles: false,
                 has_hit: AtomicBool::new(false),
                 gravity: GRAVITY,
@@ -93,7 +93,7 @@ impl FireworkRocketEntity {
 
 impl EntityBase for FireworkRocketEntity {
     fn get_owner_id(&self) -> Option<i32> {
-        self.entity.owner_id
+        self.entity.owner_id.load()
     }
 
     fn tick(&self, caller: &dyn EntityBase, _server: &Server) {
@@ -103,7 +103,7 @@ impl EntityBase for FireworkRocketEntity {
         let world = entity.world.load();
         let mut velocity = entity.velocity.load();
 
-        if let Some(shooter_id) = self.entity.owner_id {
+        if let Some(shooter_id) = self.entity.owner_id.load() {
             if let Some(shooter) = world.get_entity_by_id(shooter_id) {
                 let shooter = shooter.get_entity();
 

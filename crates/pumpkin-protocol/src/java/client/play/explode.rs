@@ -27,12 +27,28 @@ pub struct CExplosion {
     pub particle: VarInt,
     /// The sound to play (e.g., `minecraft:entity.generic.explode`).
     pub sound: IdOr<SoundEvent>,
-    /// The size of the block particles pool, used for debris visuals in 1.21.9+.
-    pub block_particles_pool_size: VarInt,
+    /// Vanilla `blockParticles`: weighted debris particles, 1.21.9+.
+    pub block_particles: Vec<ExplosionParticleInfo>,
+    /// Whether the client plays the sound (silent sources don't), 26.3+.
+    pub play_sound: bool,
+}
+
+/// Vanilla `ExplosionParticleInfo` with its `Weighted` weight.
+#[derive(Clone, Copy, PartialEq)]
+pub struct ExplosionParticleInfo {
+    /// A particle type without options.
+    pub particle: VarInt,
+    pub scaling: f32,
+    pub speed: f32,
+    pub weight: VarInt,
 }
 
 impl CExplosion {
     #[must_use]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "mirrors the vanilla packet's fields"
+    )]
     pub const fn new(
         center: Vector3<f64>,
         radius: f32,
@@ -40,6 +56,8 @@ impl CExplosion {
         knockback: Option<Vector3<f64>>,
         particle: VarInt,
         sound: IdOr<SoundEvent>,
+        block_particles: Vec<ExplosionParticleInfo>,
+        play_sound: bool,
     ) -> Self {
         Self {
             center,
@@ -48,7 +66,8 @@ impl CExplosion {
             knockback,
             particle,
             sound,
-            block_particles_pool_size: VarInt(0),
+            block_particles,
+            play_sound,
         }
     }
 }
@@ -90,12 +109,17 @@ impl ClientPacket for CExplosion {
             })?;
 
             if *version >= JavaMinecraftVersion::V_1_21_9 {
-                write.write_var_int(&self.block_particles_pool_size)?;
+                write.write_var_int(&VarInt(self.block_particles.len() as i32))?;
+                for info in &self.block_particles {
+                    write.write_var_int(&info.particle)?;
+                    write.write_f32_be(info.scaling)?;
+                    write.write_f32_be(info.speed)?;
+                    write.write_var_int(&info.weight)?;
+                }
             }
 
-            // Whether the explosion sound is played, added in 26.3
             if *version >= JavaMinecraftVersion::V_26_3 {
-                write.write_bool(true)?;
+                write.write_bool(self.play_sound)?;
             }
         } else {
             write.write_f32_be(self.radius)?;
@@ -173,6 +197,8 @@ mod tests {
             None,
             VarInt(Particle::ExplosionEmitter as i32),
             IdOr::Id(0),
+            Vec::new(),
+            true,
         );
         let mut bytes = Vec::new();
         packet.write_packet_data(&mut bytes, &version).unwrap();

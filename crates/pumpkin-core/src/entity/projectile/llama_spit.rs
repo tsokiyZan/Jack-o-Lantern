@@ -23,7 +23,7 @@ impl LlamaSpitEntity {
     pub const fn new(entity: Entity) -> Self {
         let thrown = ThrownItemEntity {
             entity,
-            owner_id: None,
+            owner_id: crossbeam::atomic::AtomicCell::new(None),
             collides_with_projectiles: false,
             has_hit: AtomicBool::new(false),
             gravity: LLAMA_SPIT_GRAVITY,
@@ -45,7 +45,7 @@ impl LlamaSpitEntity {
 
         let thrown = ThrownItemEntity {
             entity,
-            owner_id: Some(shooter.entity_id),
+            owner_id: crossbeam::atomic::AtomicCell::new(Some(shooter.entity_id)),
             collides_with_projectiles: false,
             has_hit: AtomicBool::new(false),
             gravity: LLAMA_SPIT_GRAVITY,
@@ -57,7 +57,7 @@ impl LlamaSpitEntity {
 
 impl EntityBase for LlamaSpitEntity {
     fn get_owner_id(&self) -> Option<i32> {
-        self.thrown.owner_id
+        self.thrown.owner_id.load()
     }
 
     fn tick(&self, caller: &dyn EntityBase, _server: &Server) {
@@ -88,7 +88,7 @@ impl EntityBase for LlamaSpitEntity {
         } = hit
         {
             let world = self.get_entity().world.load();
-            let owner_id = self.thrown.owner_id;
+            let owner_id = self.thrown.owner_id.load();
             let owner = owner_id.and_then(|id| world.get_entity_by_id(id));
 
             let _ = entity.damage_with_context(

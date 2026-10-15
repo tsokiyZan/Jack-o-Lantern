@@ -205,7 +205,7 @@ use super::blocks::plant::crop::gourds::attached_stem::AttachedStemBlock;
 use super::blocks::plant::crop::gourds::stem::StemBlock;
 use super::fluid::FluidBehaviour;
 use super::{
-    AttackArgs, BrokenArgs, CanPlaceAtArgs, CanUpdateAtArgs, EmitsRedstonePowerArgs, ExplodeArgs,
+    AttackArgs, BrokenArgs, CanPlaceAtArgs, CanUpdateAtArgs, EmitsRedstonePowerArgs,
     GetRedstonePowerArgs, GetStateForNeighborUpdateArgs, NormalUseArgs, OnNeighborUpdateArgs,
     OnPlaceArgs, OnStateReplacedArgs, OnSyncedBlockEventArgs, PlacedArgs, PlayerPlacedArgs,
     PrepareArgs, SpawnAfterBreakArgs, UseWithItemArgs,
@@ -1005,17 +1005,6 @@ impl BlockRegistry {
                 block,
                 position,
                 tool,
-            });
-        }
-    }
-
-    pub fn explode(&self, block: &Block, world: &Arc<World>, position: &BlockPos) {
-        let pumpkin_block = self.get_pumpkin_block(block.id);
-        if let Some(pumpkin_block) = pumpkin_block {
-            pumpkin_block.explode(ExplodeArgs {
-                world,
-                block,
-                position,
             });
         }
     }

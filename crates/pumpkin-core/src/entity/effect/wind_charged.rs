@@ -1,5 +1,4 @@
 use pumpkin_data::damage::DamageType;
-use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_util::math::vector3::Vector3;
 
 use crate::entity::effect::MobEffect;
@@ -19,17 +18,15 @@ impl MobEffect for WindChargedMobEffect {
         // gustStrength = 3.0 + random * 2.0
         let gust_strength = 3.0 + rand::random::<f32>() * 2.0;
 
-        world.explode_with_calculator(
+        world.explode_full(
+            world.get_entity_by_id(living.entity.entity_id),
+            None,
+            Some(BREEZE_WIND_CHARGE_EXPLOSION_DAMAGE_CALCULATOR.clone()),
             center,
             gust_strength,
+            false,
             ExplosionInteraction::Trigger,
-            Some(BREEZE_WIND_CHARGE_EXPLOSION_DAMAGE_CALCULATOR.clone()),
-        );
-
-        world.play_sound(
-            Sound::EntityBreezeWindBurst,
-            SoundCategory::Hostile,
-            &center,
+            crate::world::ExplosionEffects::BREEZE_WIND_CHARGE,
         );
     }
 }
