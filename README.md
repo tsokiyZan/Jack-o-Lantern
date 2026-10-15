@@ -50,6 +50,22 @@ Jack o'Lantern is tsokiyZan's fork of Pumpkin, a Minecraft server written in Rus
 | Every item data component encodes, decodes and hashes like vanilla (goat horns, paintings, trims and banners no longer disconnect) | Ported here |
 | Dappled forest trees, vegetation patches and feature order generate like vanilla | Fixed here |
 | Structure starts are computed once and biome-checked before their pieces are built (about 25% faster chunk loading) | Fixed here |
+| Explosions follow vanilla's ray casting, block resistance, damage and knockback; block clipping matches `VoxelShape.clip`; wind charges burst where vanilla puts them | Ported here from `ServerExplosion` and `ServerLevel.explode` |
+| Shoves sync like 26.3: being pushed by mobs no longer launches players, real hits still knock back | Fixed here |
+| Damage events name the causing entity and the direct one the right way round; arrows hit as the direct source with their shooter responsible | Fixed here |
+| Kill credit remembers a player's hit for 100 ticks (it used the day time, which stands still with the day cycle off) | Ported here from `lastHurtByPlayerMemoryTime` |
+| Mob loot and dropped equipment spawn at the mob, like `spawnAtLocation` | Fixed here |
+| Effects that trigger on death (oozing, weaving, wind charged) fire when the body is removed, like vanilla; effect clouds tick like `AreaEffectCloud` and creepers leave one | Ported here |
+| Water potions hurt endermen, blazes and other water-sensitive mobs, put out burning entities and rehydrate axolotls | Ported here from `AbstractThrownPotion` |
+| Slimes and magma cubes: vanilla `AbstractCubeMob` (sizes reach clients, splitting after the death animation, magma jumps and lava jumps) | Ported here |
+| Squid and glow squid: vanilla goals, babies, dark ticks; stranded fish flop like vanilla | Ported here from `Squid`, `GlowSquid` and `AbstractFish` |
+| Skeletons, strays, bogged, parched and wither skeletons: vanilla bow goal, tipped arrows per type, stray conversion in powder snow, bogged shearing, wither effect on hit | Ported here from `AbstractSkeleton` and subclasses |
+| Zombie family: spear and move-through-village goals, hard-mode reinforcements, drowning conversions, villager infection, chicken jockeys and leaders; zombified piglins share the zombie base | Ported here from `Zombie`, `Husk`, `Drowned`, `ZombieVillager` and `ZombifiedPiglin` |
+| Ravagers are stunned by shields and roar; shields block melee hits | Ported here from `Ravager` |
+| Endermen teleport by day, drop their carried block and dodge projectiles; bats fly and roost like vanilla; giants have no AI | Ported here |
+| Llamas, iron golems (village defence), polar bears, the wither and skeleton horse traps follow vanilla | Ported here from each mob's class and goals |
+| Armadillos run on vanilla's brain (rolling up, scutes, brushing) | Ported here from `Armadillo` and `ArmadilloAi` |
+| `/effect` targets any entity | Fixed here |
 
 ## Issues
 

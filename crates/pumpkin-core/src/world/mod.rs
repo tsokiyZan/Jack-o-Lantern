@@ -5032,7 +5032,8 @@ impl World {
         self.add_pending_riders(&entity);
     }
 
-    /// Adds the riders a mob queued while being finalized (vanilla `addFreshEntityWithPassengers`).
+    /// Adds the riders a mob queued while being finalized (vanilla `addFreshEntityWithPassengers`)
+    /// and mounts the mob on the vehicle it picked.
     fn add_pending_riders(&self, vehicle: &Arc<dyn EntityBase>) {
         let Some(mob) = vehicle.get_mob() else {
             return;
@@ -5041,6 +5042,13 @@ impl World {
             rider.init_data_tracker();
             self.add_entity_silent(rider.clone());
             vehicle.get_entity().add_passenger(vehicle.clone(), rider);
+        }
+        if let Some(mount) = mob.get_mob_entity().take_pending_vehicle()
+            && !mount.get_entity().is_removed()
+        {
+            mount
+                .get_entity()
+                .add_passenger(mount.clone(), vehicle.clone());
         }
     }
 

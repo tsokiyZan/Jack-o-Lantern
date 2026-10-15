@@ -1,4 +1,3 @@
-use pumpkin_data::entity::EntityPose;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::Sound;
@@ -23,6 +22,8 @@ use crate::entity::ai::pathfinder::node::PathType;
 use crate::entity::ai::pathfinder::{AmphibiousPathNavigation, Navigator, NavigatorGoal};
 use crate::entity::ai::util::default_random_pos;
 use crate::entity::living::LivingEntity;
+use crate::entity::mob::equipment::RegionalDifficulty;
+use crate::entity::mob::spawn::SpawnGroupData;
 use crate::entity::mob::zombie::{
     ZombieEntityBase, baby_turtle_on_land_target, is_abstract_villager,
 };
@@ -196,17 +197,86 @@ fn ok_target(target: &LivingEntity, world: &World) -> bool {
     !world.is_bright_outside() || target.is_in_water()
 }
 
+/// Vanilla `Drowned.NAUTILUS_SHELL_CHANCE`.
+const NAUTILUS_SHELL_CHANCE: f32 = 0.03;
+
 /// Vanilla `Drowned.BABY_DIMENSIONS`.
 const BABY_DIMENSIONS: EntityDimensions =
     EntityDimensions::scalable(0.49, 0.98).with_eye_height(0.775);
 
 impl Mob for DrownedEntity {
-    /// Vanilla `Zombie.getBaseExperienceReward`.
-    fn get_base_experience_reward(&self) -> u32 {
-        super::zombie_experience_reward(
-            self.get_entity().entity_type.experience_reward,
-            self.entity.is_baby(),
-        )
+    crate::impl_zombie_mob!(entity);
+
+    /// Vanilla `Drowned.finalizeSpawn`.
+    fn finalize_spawn(
+        &self,
+        world: &Arc<World>,
+        group_data: Option<SpawnGroupData>,
+    ) -> Option<SpawnGroupData> {
+        let group_data = self
+            .entity
+            .finalize_zombie_spawn(self, world, group_data, false);
+        let mob_entity = &self.entity.mob_entity;
+        if mob_entity
+            .get_item_slot(&EquipmentSlot::OFF_HAND)
+            .is_empty()
+            && self.get_random().random::<f32>() < NAUTILUS_SHELL_CHANCE
+        {
+            mob_entity.set_item_slot(
+                &EquipmentSlot::OFF_HAND,
+                ItemStack::new(1, &Item::NAUTILUS_SHELL),
+            );
+            mob_entity.set_guaranteed_drop(&EquipmentSlot::OFF_HAND);
+        }
+        // TODO: the zombie nautilus jockey needs `ZombieNautilus` and the `NATURAL` and
+        // `STRUCTURE` spawn reasons.
+        group_data
+    }
+
+    /// Vanilla `Drowned.populateDefaultEquipmentSlots`: no armor, sometimes a trident or
+    /// a fishing rod.
+    fn populate_default_equipment_slots(
+        &self,
+        _world: &Arc<World>,
+        _difficulty: &RegionalDifficulty,
+    ) {
+        let mut random = self.get_random();
+        if f64::from(random.random::<f32>()) > 0.9 {
+            let item = if random.random_range(0..16) < 10 {
+                &Item::TRIDENT
+            } else {
+                &Item::FISHING_ROD
+            };
+            self.entity
+                .mob_entity
+                .set_item_slot(&EquipmentSlot::MAIN_HAND, ItemStack::new(1, item));
+        }
+    }
+
+    /// Vanilla `Drowned.getPreferredWeaponType`.
+    fn get_preferred_weapon_type(&self) -> Option<&'static pumpkin_data::tag::Tag> {
+        Some(&pumpkin_data::tag::Item::MINECRAFT_DROWNED_PREFERRED_WEAPONS)
+    }
+
+    /// Vanilla `Drowned.canReplaceCurrentItem`: the nautilus shell stays.
+    fn can_replace_current_item(
+        &self,
+        new_item: &ItemStack,
+        current_item: &ItemStack,
+        slot: &EquipmentSlot,
+    ) -> bool {
+        current_item.get_item() != &Item::NAUTILUS_SHELL
+            && crate::entity::mob::equipment::can_replace_current_item(
+                &self.entity.mob_entity,
+                self.get_preferred_weapon_type(),
+                new_item,
+                current_item,
+                slot,
+            )
+    }
+
+    fn on_attack(&self, target: &dyn EntityBase) {
+        self.entity.on_attack(self, target);
     }
 
     /// Vanilla `Drowned.getAmbientSound`.
@@ -220,16 +290,8 @@ impl Mob for DrownedEntity {
         )
     }
 
-    fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
-        self.entity.default_dimensions(pose)
-    }
-
     fn get_mob_entity(&self) -> &MobEntity {
         &self.entity.mob_entity
-    }
-
-    fn spawn_as_baby(&self) -> bool {
-        self.entity.spawn_as_baby()
     }
 
     /// Vanilla `Drowned.travelInWater`: a drowned that wants to swim drifts on its
@@ -260,11 +322,11 @@ impl Mob for DrownedEntity {
     }
 
     fn mob_write_nbt(&self, nbt: &mut NbtCompound) {
-        self.entity.mob_write_nbt(nbt);
+        self.entity.write_zombie_nbt(nbt);
     }
 
     fn mob_read_nbt(&self, nbt: &NbtCompound) {
-        self.entity.mob_read_nbt(nbt);
+        self.entity.read_zombie_nbt(self, nbt);
     }
 }
 
@@ -523,25 +585,7 @@ impl Goal for DrownedTridentAttackGoal {
         self.goal.start(mob);
         let mob_entity = mob.get_mob_entity();
         mob_entity.set_attacking(true);
-        // `startUsingItem(MAIN_HAND)`.
-        let living = &mob_entity.living_entity;
-        let stack = main_hand_item(mob);
-        let using_item = living
-            .item_in_use
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .is_some();
-        if !stack.is_empty() && !using_item {
-            let duration = mob
-                .get_entity()
-                .world
-                .load()
-                .server
-                .upgrade()
-                .and_then(|server| server.item_registry.get_use_duration(stack.item.id))
-                .unwrap_or(0);
-            living.set_active_hand(Hand::Right, stack, duration);
-        }
+        mob_entity.start_using_item(Hand::Right);
     }
 
     fn stop(&mut self, mob: &dyn Mob) {

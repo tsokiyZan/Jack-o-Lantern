@@ -2722,7 +2722,10 @@ impl Entity {
     /// Mirrors vanilla `LivingEntity#canFreeze`: spectators and entities wearing
     /// freeze-immune wearables (e.g. leather armor) cannot freeze.
     fn can_freeze(&self, caller: &dyn EntityBase) -> bool {
-        if caller.is_spectator() || self.is_freeze_immune() {
+        if caller.is_spectator()
+            || self.is_freeze_immune()
+            || caller.get_mob().is_some_and(|mob| !mob.can_freeze())
+        {
             return false;
         }
 
@@ -2930,6 +2933,12 @@ impl Entity {
     #[must_use]
     pub fn is_in_water(&self) -> bool {
         self.touching_water.load(Ordering::Relaxed)
+    }
+
+    /// Vanilla `Entity.isInLiquid`.
+    #[must_use]
+    pub fn is_in_liquid(&self) -> bool {
+        self.is_in_water() || self.touching_lava.load(Ordering::Relaxed)
     }
 
     /// Vanilla `Entity.collidedWithShapeMovingFrom`: whether this entity's box, moved

@@ -407,7 +407,8 @@ pub fn check_spawn_rules(
         if !mob::MobEntity::check_monster_spawn_rules(world, pos, is_thundering) {
             return false;
         }
-        let mut check_sky_pos = *pos;
+        // Vanilla's do-while starts one block up.
+        let mut check_sky_pos = pos.up();
         while world.get_block(&check_sky_pos) == &pumpkin_data::Block::POWDER_SNOW {
             check_sky_pos = check_sky_pos.up();
         }

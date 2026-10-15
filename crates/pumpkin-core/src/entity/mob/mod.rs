@@ -51,6 +51,7 @@ pub mod bat;
 pub mod blaze;
 pub mod breeze;
 pub mod cave_spider;
+pub mod conversion;
 pub mod creaking;
 pub mod creeper;
 pub mod crossbow_attack_mob;
@@ -103,6 +104,8 @@ pub struct MobEntity {
     pub navigator: std::sync::Mutex<Navigator>,
     pub target: std::sync::Mutex<Option<Arc<dyn EntityBase>>>,
     pub look_control: std::sync::Mutex<LookControl>,
+    /// How much a vanilla `getAttackBoundingBox` override shrinks the attack box sideways.
+    pub attack_box_deflate: f64,
     pub sensing: std::sync::Mutex<Sensing>,
     pub move_control: std::sync::Mutex<Box<dyn MoveControlTrait>>,
     pub jump_control: std::sync::Mutex<Box<dyn JumpControlTrait>>,
@@ -119,6 +122,7 @@ pub struct MobEntity {
     pub breeder: AtomicCell<Option<Uuid>>,
     pub persistence_required: AtomicBool,
     pending_riders: std::sync::Mutex<Vec<Arc<dyn EntityBase>>>,
+    pending_vehicle: std::sync::Mutex<Option<Arc<dyn EntityBase>>>,
     mob_flags: AtomicU8,
 }
 impl MobEntity {
@@ -270,6 +274,7 @@ impl MobEntity {
             navigator: std::sync::Mutex::new(Navigator::default()),
             target: std::sync::Mutex::new(None),
             look_control: std::sync::Mutex::new(LookControl::default()),
+            attack_box_deflate: 0.0,
             sensing: std::sync::Mutex::new(Sensing::default()),
             move_control: std::sync::Mutex::new(Box::new(MoveControl::default())),
             jump_control: std::sync::Mutex::new(Box::new(JumpControl::default())),
@@ -284,6 +289,7 @@ impl MobEntity {
             breeder: AtomicCell::new(None),
             persistence_required: AtomicBool::new(false),
             pending_riders: std::sync::Mutex::new(Vec::new()),
+            pending_vehicle: std::sync::Mutex::new(None),
             mob_flags: AtomicU8::new(0),
         }
     }
@@ -536,6 +542,34 @@ impl MobEntity {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .insert(slot.clone(), Self::GUARANTEED_DROP_CHANCE);
+    }
+
+    /// Vanilla `LivingEntity.startUsingItem` for a mob, whose hands are its equipment slots.
+    pub fn start_using_item(&self, hand: pumpkin_util::Hand) {
+        let slot = if hand == pumpkin_util::Hand::Right {
+            EquipmentSlot::MAIN_HAND
+        } else {
+            EquipmentSlot::OFF_HAND
+        };
+        let stack = self.get_item_slot(&slot);
+        let living = &self.living_entity;
+        let using_item = living
+            .item_in_use
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .is_some();
+        if stack.is_empty() || using_item {
+            return;
+        }
+        let duration = living
+            .entity
+            .world
+            .load()
+            .server
+            .upgrade()
+            .and_then(|server| server.item_registry.get_use_duration(stack.item.id))
+            .unwrap_or(0);
+        living.set_active_hand(hand, stack, duration);
     }
 
     /// Vanilla `getItemBySlot`.
@@ -987,7 +1021,11 @@ impl MobEntity {
             },
         );
 
-        base_box.expand(attack_range, 0.0, attack_range)
+        base_box.expand(attack_range, 0.0, attack_range).expand(
+            -self.attack_box_deflate,
+            0.0,
+            -self.attack_box_deflate,
+        )
     }
 
     /// Brightness at the mob's eye (sky and block light) reaches daylight.
@@ -1315,6 +1353,17 @@ pub trait Mob: EntityBase + Send + Sync {
         75.0
     }
 
+    /// Vanilla `Mob.clampHeadRotationToBody`.
+    fn clamp_head_rotation_to_body(&self) {
+        let entity = self.get_entity();
+        let limit = self.get_max_head_rotation();
+        let head_y_rot = entity.head_yaw.load();
+        let body_y_rot = entity.body_yaw.load();
+        let delta = pumpkin_util::math::wrap_degrees(body_y_rot - head_y_rot);
+        let target_delta = delta.clamp(-limit, limit);
+        entity.head_yaw.store(head_y_rot + delta - target_delta);
+    }
+
     fn get_mob_entity(&self) -> &MobEntity;
 
     fn mob_bedrock_identifier(&self) -> Option<&'static str> {
@@ -1452,6 +1501,16 @@ pub trait Mob: EntityBase + Send + Sync {
 
     fn on_damage(&self, _damage_type: DamageType, _source: Option<&dyn EntityBase>) {}
 
+    /// The end of a vanilla `actuallyHurt` override, after the health is taken: `source` is
+    /// the direct entity, `cause` the one responsible.
+    fn actually_hurt(
+        &self,
+        _damage_type: DamageType,
+        _source: Option<&dyn EntityBase>,
+        _cause: Option<&dyn EntityBase>,
+    ) {
+    }
+
     /// Vanilla `hurtServer`, for mobs whose override reorders it; `mob_hurt_server` is the
     /// shared path (vanilla `super.hurtServer`).
     fn hurt_server(
@@ -1484,6 +1543,12 @@ pub trait Mob: EntityBase + Send + Sync {
     /// What a vanilla `dropCustomDeathLoot` override adds after the equipment drops.
     fn drop_custom_death_loot(&self) {}
 
+    /// Vanilla `killedEntity`, run on the attacker as `victim` dies. `false` keeps the
+    /// victim's loot, equipment and experience from dropping.
+    fn killed_entity(&self, _victim: &dyn EntityBase) -> bool {
+        true
+    }
+
     /// Vanilla `LivingEntity.isSleeping`, for mobs that sleep without a bed.
     fn is_sleeping(&self) -> bool {
         false
@@ -1497,6 +1562,11 @@ pub trait Mob: EntityBase + Send + Sync {
     /// Vanilla `LivingEntity.isSensitiveToWater`: takes drowning damage in water or rain.
     fn is_sensitive_to_water(&self) -> bool {
         false
+    }
+
+    /// A vanilla `canFreeze` override that rules freezing out, like `Skeleton`'s.
+    fn can_freeze(&self) -> bool {
+        true
     }
 
     /// Whether the move and look controls skip their tick, as vanilla's axolotl
@@ -1620,6 +1690,11 @@ pub trait Mob: EntityBase + Send + Sync {
     }
 
     /// Must return `Some(self)` for every `NeutralMob` implementor. Not compiler-enforced.
+    /// Vanilla `instanceof Zombie`.
+    fn as_zombie(&self) -> Option<&zombie::ZombieEntityBase> {
+        None
+    }
+
     fn as_neutral(&self) -> Option<&dyn neutral::NeutralMob> {
         None
     }
@@ -1775,6 +1850,23 @@ pub trait Mob: EntityBase + Send + Sync {
     /// `NoAI` mob's anger stands still, instead of the shared call every tick.
     fn updates_anger_in_ai_step(&self) -> bool {
         false
+    }
+
+    /// Extra conditions for vanilla `isImmobile` on top of dying: an immobile mob skips its
+    /// AI step and loses its movement input.
+    fn mob_is_immobile(&self) -> bool {
+        false
+    }
+
+    /// Vanilla `blockedByItem`: `defender` blocked this mob's attack with an item. Pumpkin
+    /// only blocks fully, where vanilla's default does nothing.
+    fn blocked_by_item(
+        &self,
+        _defender: &dyn EntityBase,
+        _damage_type: DamageType,
+        _damage: f32,
+        _fully_blocked: bool,
+    ) {
     }
 
     /// Vanilla `isPushable`, which some mobs turn off.
@@ -2077,7 +2169,7 @@ pub fn is_player_holding(passenger: &dyn EntityBase, item: &Item) -> bool {
 
 /// Vanilla `ConversionType.convertCommon`: what a converted mob takes over from the old one.
 /// Scoreboard teams are not carried over.
-pub fn convert_common(from: &dyn Mob, to: &dyn Mob) {
+pub fn convert_common(from: &dyn Mob, to: &dyn Mob, params: conversion::ConversionParams) {
     let (old, new) = (from.get_mob_entity(), to.get_mob_entity());
     let (old_living, new_living) = (&old.living_entity, &new.living_entity);
     let (old_entity, new_entity) = (&old_living.entity, &new_living.entity);
@@ -2092,10 +2184,15 @@ pub fn convert_common(from: &dyn Mob, to: &dyn Mob) {
     for effect in effects {
         new_living.add_effect(effect);
     }
-    if let (Some(old_ageable), Some(new_ageable)) = (from.as_ageable(), to.as_ageable()) {
-        if old_ageable.is_baby() {
-            new_ageable.set_baby(true);
+    if old_entity.is_baby() {
+        match to.as_ageable() {
+            Some(new_ageable) => new_ageable.set_baby(true),
+            None => {
+                to.spawn_as_baby();
+            }
         }
+    }
+    if let (Some(old_ageable), Some(new_ageable)) = (from.as_ageable(), to.as_ageable()) {
         new_ageable.set_age(old_ageable.get_age());
         let (old_data, new_data) = (
             old_ageable.get_ageable_data(),
@@ -2107,6 +2204,9 @@ pub fn convert_common(from: &dyn Mob, to: &dyn Mob) {
         new_data
             .forced_age_timer
             .store(old_data.forced_age_timer.load(Relaxed), Relaxed);
+    }
+    if params.preserve_can_pick_up_loot {
+        new.set_can_pick_up_loot(old.can_pick_up_loot());
     }
     new.set_left_handed(old.is_left_handed());
     new.set_no_ai(old.is_no_ai());
@@ -2135,6 +2235,11 @@ pub fn convert_common(from: &dyn Mob, to: &dyn Mob) {
         .extend(tags);
     if let Some(name) = &**old_entity.custom_name.load() {
         new_entity.set_custom_name(name.clone());
+    }
+    if let (Some(old_zombie), Some(new_zombie)) = (from.as_zombie(), to.as_zombie())
+        && old_zombie.can_break_doors()
+    {
+        new_zombie.set_can_break_doors(true, to);
     }
 }
 
@@ -2264,13 +2369,6 @@ impl<T: Mob + Send + 'static> EntityBase for T {
 
         // Vanilla Mob.isEffectiveAi: NoAI skips the whole serverAiStep, which
         // `LivingEntity::tick_movement` runs at its vanilla place in `aiStep`.
-        //
-        // TODO NoAI: move these vanilla `customServerAiStep` parts of `mob_tick`
-        // into `custom_server_ai_step`:
-        // Armadillo scute drop, state switching, `danger_detected_recently_ticks`
-        // (not `in_state_ticks`, that is vanilla `tick`)
-        // ZombifiedPiglin `maybe_alert_others`
-        // ZombifiedPiglin `update_persistent_anger` (see `updates_anger_in_ai_step`).
         mob_entity.living_entity.tick(caller, server);
         self.post_tick();
     }
@@ -2461,11 +2559,10 @@ impl<T: Mob + Send + 'static> EntityBase for T {
     }
 
     fn get_experience_reward(&self, _killer: Option<&dyn EntityBase>) -> u32 {
-        if self
-            .get_entity()
-            .age
-            .load(std::sync::atomic::Ordering::Relaxed)
-            < 0
+        // Vanilla `shouldDropExperience`: no babies, though `Monster` drops it for its babies too.
+        let entity = self.get_entity();
+        if entity.age.load(std::sync::atomic::Ordering::Relaxed) < 0
+            && !is_monster(entity.entity_type)
         {
             return 0;
         }
