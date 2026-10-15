@@ -2,6 +2,12 @@ use crate::entity::ai::control::Control;
 use crate::entity::mob::Mob;
 use pumpkin_util::math::rotate_if_necessary;
 
+/// Vanilla `BodyRotationControl`, which a mob swaps for its own in `createBodyControl`.
+pub trait BodyRotationControlTrait: Control {
+    /// Vanilla `clientTick`, run from `Mob.tickHeadTurn` after the AI step and travel.
+    fn client_tick(&mut self, mob: &dyn Mob);
+}
+
 pub struct BodyRotationControl {
     head_stable_time: i32,
     last_stable_y_head_rot: f32,
@@ -19,29 +25,6 @@ impl BodyRotationControl {
         Self {
             head_stable_time: 0,
             last_stable_y_head_rot: 0.0,
-        }
-    }
-
-    pub fn client_tick(&mut self, mob: &dyn Mob) {
-        let mob_entity = mob.get_mob_entity();
-        let entity = &mob_entity.living_entity.entity;
-
-        if Self::is_moving(mob) {
-            entity.body_yaw.store(entity.yaw.load());
-            Self::rotate_head_if_necessary(mob);
-            self.last_stable_y_head_rot = entity.head_yaw.load();
-            self.head_stable_time = 0;
-        } else if Self::not_carrying_mob_passengers(mob) {
-            if (entity.head_yaw.load() - self.last_stable_y_head_rot).abs() > 15.0 {
-                self.head_stable_time = 0;
-                self.last_stable_y_head_rot = entity.head_yaw.load();
-                Self::rotate_body_if_necessary(mob);
-            } else {
-                self.head_stable_time += 1;
-                if self.head_stable_time > 10 {
-                    self.rotate_head_towards_front(mob);
-                }
-            }
         }
     }
 
@@ -94,3 +77,28 @@ impl BodyRotationControl {
 }
 
 impl Control for BodyRotationControl {}
+
+impl BodyRotationControlTrait for BodyRotationControl {
+    fn client_tick(&mut self, mob: &dyn Mob) {
+        let mob_entity = mob.get_mob_entity();
+        let entity = &mob_entity.living_entity.entity;
+
+        if Self::is_moving(mob) {
+            entity.body_yaw.store(entity.yaw.load());
+            Self::rotate_head_if_necessary(mob);
+            self.last_stable_y_head_rot = entity.head_yaw.load();
+            self.head_stable_time = 0;
+        } else if Self::not_carrying_mob_passengers(mob) {
+            if (entity.head_yaw.load() - self.last_stable_y_head_rot).abs() > 15.0 {
+                self.head_stable_time = 0;
+                self.last_stable_y_head_rot = entity.head_yaw.load();
+                Self::rotate_body_if_necessary(mob);
+            } else {
+                self.head_stable_time += 1;
+                if self.head_stable_time > 10 {
+                    self.rotate_head_towards_front(mob);
+                }
+            }
+        }
+    }
+}
