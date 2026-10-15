@@ -976,8 +976,10 @@ impl EntityBase for ArrowEntity {
                     damage as f32,
                     DamageType::ARROW,
                     Some(hit_pos),
+                    // Vanilla `damageSources().arrow(this, owner)`: the arrow hits, its owner
+                    // is responsible.
+                    Some(self),
                     owner_entity.as_deref(),
-                    None,
                 );
 
                 if let Some(living) = target.get_living_entity() {

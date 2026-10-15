@@ -174,12 +174,10 @@ pub fn convert_single(
     to_living
         .fall_distance
         .store(from_living.fall_distance.load());
-    to_living
-        .last_hurt_by_player_id
-        .store(from_living.last_hurt_by_player_id.load(Relaxed), Relaxed);
-    to_living
-        .last_hurt_by_player_time
-        .store(from_living.last_hurt_by_player_time.load(Relaxed), Relaxed);
+    to_living.set_last_hurt_by_player(
+        from_living.last_hurt_by_player.load(),
+        from_living.last_hurt_by_player_memory_time.load(Relaxed),
+    );
     to_living
         .hurt_time
         .store(from_living.hurt_time.load(Relaxed), Relaxed);
