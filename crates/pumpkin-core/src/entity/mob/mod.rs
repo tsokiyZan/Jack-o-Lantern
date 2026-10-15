@@ -1719,6 +1719,11 @@ pub trait Mob: EntityBase + Send + Sync {
     /// The end of a vanilla `LivingEntity.travelInFluid` override.
     fn travel_in_fluid_end(&self, _water: bool) {}
 
+    /// Vanilla `calculateFallDamage` overrides, given `LivingEntity`'s result.
+    fn calculate_fall_damage(&self, damage: i32) -> i32 {
+        damage
+    }
+
     /// Whether vanilla `checkFallDamage` runs after a move, adding up the fall and landing
     /// on the block below. Flyers such as the phantom override it to do nothing.
     fn checks_fall_damage(&self) -> bool {

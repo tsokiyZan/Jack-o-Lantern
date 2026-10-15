@@ -41,6 +41,12 @@ pub struct AnimalPanic {
 }
 
 impl AnimalPanic {
+    /// Vanilla `AnimalPanic(speedMultiplier)`, which runs to `LandRandomPos` spots.
+    #[must_use]
+    pub const fn new(speed_multiplier: f32) -> Self {
+        Self::with_damage_types(speed_multiplier, &tag::DamageType::MINECRAFT_PANIC_CAUSES)
+    }
+
     /// Vanilla `AnimalPanic(speedMultiplier, flyHeight)`.
     #[must_use]
     pub const fn flying(speed_multiplier: f32, fly_height: i32) -> Self {

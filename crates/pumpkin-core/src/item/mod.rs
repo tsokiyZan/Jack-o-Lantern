@@ -13,9 +13,27 @@ use pumpkin_data::Block;
 use pumpkin_data::BlockDirection;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
+use pumpkin_inventory::screen_handler::InventoryPlayer;
 use pumpkin_util::Hand;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
+
+/// Vanilla `ItemUtils.createFilledResult(stack, player, newStack)`: `stack` becomes what the
+/// hand holds once one of it was filled into `new_stack`.
+pub fn create_filled_result(stack: &mut ItemStack, player: &Player, mut new_stack: ItemStack) {
+    if player.has_infinite_materials() {
+        if !player.inventory.contains_item(new_stack.item) {
+            player.inventory.insert_stack_anywhere(&mut new_stack);
+        }
+        return;
+    }
+    stack.decrement(1);
+    if stack.is_empty() {
+        *stack = new_stack;
+    } else if !player.inventory.insert_stack_anywhere(&mut new_stack) {
+        player.drop_item(new_stack);
+    }
+}
 
 pub trait ItemMetadata {
     fn ids() -> Box<[u16]>;
