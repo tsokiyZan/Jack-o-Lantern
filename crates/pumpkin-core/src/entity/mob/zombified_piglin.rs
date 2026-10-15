@@ -1,3 +1,4 @@
+use crate::entity::ai::goal::spear_use::SpearUseGoal;
 use crate::entity::ai::goal::zombie_attack::ZombieAttackGoal;
 use pumpkin_data::attributes::Attributes;
 use pumpkin_util::math::boundingbox::EntityDimensions;
@@ -64,12 +65,13 @@ impl ZombifiedPiglinEntity {
         })
     }
 
-    /// Vanilla `ZombifiedPiglin.addBehaviourGoals`. The spear goal (1) is not ported yet.
+    /// Vanilla `ZombifiedPiglin.addBehaviourGoals`.
     fn add_behaviour_goals(
         mob: &MobEntity,
         goal_selector: &mut GoalSelector,
         target_selector: &mut GoalSelector,
     ) {
+        goal_selector.add_goal(1, SpearUseGoal::new(1.0, 1.0, 10.0, 2.0));
         goal_selector.add_goal(2, ZombieAttackGoal::new(1.0, false));
         goal_selector.add_goal(7, Box::new(WanderAroundGoal::avoiding_water(1.0)));
 

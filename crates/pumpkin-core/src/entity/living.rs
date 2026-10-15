@@ -3915,6 +3915,8 @@ impl EntityBase for LivingEntity {
                         .on_use_tick(item, player, remaining_use_ticks);
                 }
             }
+        } else if let Some(mob) = caller.get_mob() {
+            crate::item::items::spear::SpearItem::mob_use_tick(mob);
         }
 
         // Current active item

@@ -585,25 +585,7 @@ impl Goal for DrownedTridentAttackGoal {
         self.goal.start(mob);
         let mob_entity = mob.get_mob_entity();
         mob_entity.set_attacking(true);
-        // `startUsingItem(MAIN_HAND)`.
-        let living = &mob_entity.living_entity;
-        let stack = main_hand_item(mob);
-        let using_item = living
-            .item_in_use
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .is_some();
-        if !stack.is_empty() && !using_item {
-            let duration = mob
-                .get_entity()
-                .world
-                .load()
-                .server
-                .upgrade()
-                .and_then(|server| server.item_registry.get_use_duration(stack.item.id))
-                .unwrap_or(0);
-            living.set_active_hand(Hand::Right, stack, duration);
-        }
+        mob_entity.start_using_item(Hand::Right);
     }
 
     fn stop(&mut self, mob: &dyn Mob) {

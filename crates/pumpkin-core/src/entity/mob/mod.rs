@@ -541,6 +541,34 @@ impl MobEntity {
             .insert(slot.clone(), Self::GUARANTEED_DROP_CHANCE);
     }
 
+    /// Vanilla `LivingEntity.startUsingItem` for a mob, whose hands are its equipment slots.
+    pub fn start_using_item(&self, hand: pumpkin_util::Hand) {
+        let slot = if hand == pumpkin_util::Hand::Right {
+            EquipmentSlot::MAIN_HAND
+        } else {
+            EquipmentSlot::OFF_HAND
+        };
+        let stack = self.get_item_slot(&slot);
+        let living = &self.living_entity;
+        let using_item = living
+            .item_in_use
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .is_some();
+        if stack.is_empty() || using_item {
+            return;
+        }
+        let duration = living
+            .entity
+            .world
+            .load()
+            .server
+            .upgrade()
+            .and_then(|server| server.item_registry.get_use_duration(stack.item.id))
+            .unwrap_or(0);
+        living.set_active_hand(hand, stack, duration);
+    }
+
     /// Vanilla `getItemBySlot`.
     #[must_use]
     pub fn get_item_slot(&self, slot: &EquipmentSlot) -> ItemStack {

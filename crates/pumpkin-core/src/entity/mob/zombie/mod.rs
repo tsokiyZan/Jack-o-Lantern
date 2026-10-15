@@ -4,6 +4,7 @@ use crate::entity::ai::goal::destroy_egg::DestroyEggGoal;
 use crate::entity::ai::goal::goal_selector::GoalSelector;
 use crate::entity::ai::goal::look_around::RandomLookAroundGoal;
 use crate::entity::ai::goal::revenge::RevengeGoal;
+use crate::entity::ai::goal::spear_use::SpearUseGoal;
 use crate::entity::ai::goal::wander_around::WanderAroundGoal;
 use crate::entity::ai::goal::zombie_attack::ZombieAttackGoal;
 use crate::entity::attributes::{Modifier, ModifierOperation};
@@ -155,13 +156,14 @@ impl ZombieEntityBase {
         mob_arc
     }
 
-    /// Vanilla `Zombie.addBehaviourGoals`. The spear (2) and move-through-village (6)
-    /// goals are not ported yet.
+    /// Vanilla `Zombie.addBehaviourGoals`. The move-through-village goal (6) is not ported
+    /// yet.
     fn add_behaviour_goals(
         mob: &MobEntity,
         goal_selector: &mut GoalSelector,
         target_selector: &mut GoalSelector,
     ) {
+        goal_selector.add_goal(2, SpearUseGoal::new(1.0, 1.0, 10.0, 2.0));
         goal_selector.add_goal(3, ZombieAttackGoal::new(1.0, false));
         goal_selector.add_goal(7, Box::new(WanderAroundGoal::avoiding_water(1.0)));
 
