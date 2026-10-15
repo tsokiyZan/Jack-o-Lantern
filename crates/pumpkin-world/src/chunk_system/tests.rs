@@ -460,3 +460,41 @@ fn cancelled_out_of_range_task_clears_holder_task_slot() {
         "All task slots must be null when idle"
     );
 }
+
+#[test]
+fn equal_priority_tasks_pop_in_the_same_order_whatever_the_push_order() {
+    let positions = [
+        ChunkPos::new(1, 0),
+        ChunkPos::new(0, 2),
+        ChunkPos::new(-3, 1),
+        ChunkPos::new(0, 1),
+        ChunkPos::new(2, -2),
+    ];
+    let pop_order = |push_order: &mut dyn Iterator<Item = &ChunkPos>| {
+        let mut graph = DAG::default();
+        let mut queue = BinaryHeap::new();
+        let dependency_task = graph
+            .nodes
+            .insert(Node::new(ChunkPos::new(10, 10), StagedChunkEnum::Features));
+        for &pos in push_order {
+            GenerationSchedule::ensure_dependency_chain(
+                &mut graph,
+                &mut queue,
+                &HashMapType::default(),
+                &[],
+                dependency_task,
+                pos,
+                &mut ChunkHolder::default(),
+                StagedChunkEnum::Empty,
+            );
+        }
+        std::iter::from_fn(|| queue.pop())
+            .map(|task| graph.nodes.get(task.node_key()).unwrap().pos)
+            .collect::<Vec<_>>()
+    };
+
+    assert_eq!(
+        pop_order(&mut positions.iter()),
+        pop_order(&mut positions.iter().rev())
+    );
+}

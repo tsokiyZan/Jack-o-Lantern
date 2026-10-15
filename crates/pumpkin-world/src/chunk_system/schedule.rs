@@ -23,10 +23,10 @@ use std::thread;
 use std::time::Duration;
 use tracing::{debug, error, info, trace, warn};
 
-pub(crate) struct TaskHeapNode(i8, NodeKey);
+pub(crate) struct TaskHeapNode(i8, NodeKey, ChunkPos);
 impl PartialEq for TaskHeapNode {
     fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
+        self.cmp(other) == Ordering::Equal
     }
 }
 impl TaskHeapNode {
@@ -43,7 +43,12 @@ impl PartialOrd for TaskHeapNode {
 }
 impl Ord for TaskHeapNode {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.0.cmp(&other.0).reverse()
+        // Equal priorities pop in chunk order. Push order follows IO and worker completion
+        // timing, so breaking ties by it would make the generation order differ every run.
+        self.0
+            .cmp(&other.0)
+            .then_with(|| (self.2.x, self.2.y).cmp(&(other.2.x, other.2.y)))
+            .reverse()
     }
 }
 
@@ -77,6 +82,13 @@ pub struct GenerationSchedule {
     lighting_config: LightingEngineConfig,
     last_unload: std::time::Instant,
     generation_pool: Arc<rayon::ThreadPool>,
+    /// Chunk whose features task is running. Vanilla runs FEATURES on `ChunkMap`'s single
+    /// consecutive `worldgen` executor, and neighbouring chunks' features overwrite each
+    /// other at their borders, so running them concurrently makes the result depend on
+    /// thread timing.
+    features_in_flight: Option<ChunkPos>,
+    /// Features tasks that were ready while another one was running.
+    parked_features: Vec<NodeKey>,
 }
 
 impl GenerationSchedule {
@@ -168,6 +180,8 @@ impl GenerationSchedule {
                     send_chunk,
                     listener,
                     chunk_map: HashMap::default(),
+                    features_in_flight: None,
+                    parked_features: Vec::new(),
                     lighting_config,
                     last_unload: std::time::Instant::now(),
                     generation_pool,
@@ -317,6 +331,7 @@ impl GenerationSchedule {
                                 target_node.stage,
                             ),
                             cur.to,
+                            target_node.pos,
                         ));
                     }
                 }
@@ -333,6 +348,7 @@ impl GenerationSchedule {
                 queue.push(TaskHeapNode(
                     Self::calc_priority(last_level, last_high_priority, pos, stage),
                     key,
+                    pos,
                 ));
             }
         }
@@ -438,6 +454,7 @@ impl GenerationSchedule {
                         StagedChunkEnum::from(start as u8),
                     ),
                     entry_task,
+                    chunk_pos,
                 ));
             }
         }
@@ -528,7 +545,7 @@ impl GenerationSchedule {
                 n.in_queue = true;
                 let priority =
                     Self::calc_priority(&self.last_level, &self.last_high_priority, n.pos, n.stage);
-                self.queue.push(TaskHeapNode(priority, node_key));
+                self.queue.push(TaskHeapNode(priority, node_key, n.pos));
             }
         }
     }
@@ -660,7 +677,7 @@ impl GenerationSchedule {
                     let node = self.graph.nodes.get_mut(task).expect("node exists");
                     if node.in_degree == 0 && !node.in_queue {
                         node.in_queue = true;
-                        self.queue.push(TaskHeapNode(0, task));
+                        self.queue.push(TaskHeapNode(0, task, pos));
                     }
                 }
             }
@@ -988,6 +1005,7 @@ impl GenerationSchedule {
                             node.stage,
                         ),
                         cur.to,
+                        node.pos,
                     ));
                     node.in_queue = true;
                 }
@@ -1011,6 +1029,20 @@ impl GenerationSchedule {
 
     #[expect(clippy::too_many_lines)]
     fn receive_chunk(&mut self, pos: ChunkPos, data: RecvChunk) {
+        if self.features_in_flight == Some(pos) {
+            self.features_in_flight = None;
+            for key in std::mem::take(&mut self.parked_features) {
+                if let Some(node) = self.graph.nodes.get(key) {
+                    let priority = Self::calc_priority(
+                        &self.last_level,
+                        &self.last_high_priority,
+                        node.pos,
+                        node.stage,
+                    );
+                    self.queue.push(TaskHeapNode(priority, key, node.pos));
+                }
+            }
+        }
         match data {
             RecvChunk::IO(chunk) => {
                 let mut holder = self.chunk_map.remove(&pos).expect("holder exists");
@@ -1231,6 +1263,7 @@ impl GenerationSchedule {
                                 StagedChunkEnum::from(1),
                             ) - 50,
                             first_task,
+                            pos,
                         ));
                     }
 
@@ -1450,6 +1483,19 @@ impl GenerationSchedule {
                                 self.check_waiting_tasks();
                                 continue;
                             }
+                        }
+
+                        if node.stage == StagedChunkEnum::Features {
+                            if self.features_in_flight.is_some() {
+                                // Stays marked as queued so nothing pushes it twice.
+                                if let Some(n) = self.graph.nodes.get_mut(task.1) {
+                                    n.in_queue = true;
+                                    n.in_flight = false;
+                                }
+                                self.parked_features.push(task.1);
+                                continue;
+                            }
+                            self.features_in_flight = Some(node.pos);
                         }
 
                         let mut cache = Cache::new(
