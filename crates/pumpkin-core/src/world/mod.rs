@@ -766,11 +766,12 @@ impl World {
         cause_entity_id: Option<i32>,
         position: Option<Vector3<f64>>,
     ) {
+        // `ClientboundDamageEventPacket`: the causing entity, then the direct one.
         let je_packet = CDamageEvent::new(
             entity.entity_id.into(),
             damage_type_id.into(),
-            source_entity_id.map(Into::into),
             cause_entity_id.map(Into::into),
+            source_entity_id.map(Into::into),
             position,
         );
         self.send_to_tracking_players_and_self(entity, &je_packet);
