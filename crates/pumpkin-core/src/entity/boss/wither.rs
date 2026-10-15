@@ -51,7 +51,6 @@ pub struct WitherEntity {
     pub next_head_update: [AtomicI32; 2],
     pub idle_head_updates: [AtomicI32; 2],
     pub alternative_targets: [AtomicI32; 3],
-    pub main_attack_timer: AtomicI32,
     pub bossbar_uuid: Uuid,
     pub bossbar_players: Mutex<Vec<Uuid>>,
     pub dropped_loot: AtomicBool,
@@ -67,7 +66,6 @@ impl WitherEntity {
             next_head_update: [AtomicI32::new(0), AtomicI32::new(0)],
             idle_head_updates: [AtomicI32::new(0), AtomicI32::new(0)],
             alternative_targets: [AtomicI32::new(0), AtomicI32::new(0), AtomicI32::new(0)],
-            main_attack_timer: AtomicI32::new(0),
             bossbar_uuid: Uuid::new_v4(),
             bossbar_players: Mutex::new(Vec::new()),
             dropped_loot: AtomicBool::new(false),
@@ -106,8 +104,19 @@ impl WitherEntity {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
 
-            // TODO: 0 WitherDoNothingGoal and 2 RangedAttackGoal(1.0, 40, 20) run through the
-            // wither's own head attacks here.
+            goal_selector.add_goal(0, Box::new(WitherDoNothingGoal));
+            let ranged: Weak<dyn crate::entity::mob::RangedAttackMob> = {
+                let ranged: Arc<dyn crate::entity::mob::RangedAttackMob> = mob_arc.clone();
+                Arc::downgrade(&ranged)
+            };
+            goal_selector.add_goal(
+                2,
+                Box::new(
+                    crate::entity::ai::goal::ranged_attack::RangedAttackGoal::new(
+                        ranged, 1.0, 40, 20.0,
+                    ),
+                ),
+            );
             goal_selector.add_goal(5, Box::new(WaterAvoidingRandomFlyingGoal::new(1.0)));
             goal_selector.add_goal(
                 6,
@@ -116,6 +125,15 @@ impl WitherEntity {
             goal_selector.add_goal(7, Box::new(RandomLookAroundGoal::default()));
 
             target_selector.add_goal(1, Box::new(RevengeGoal::new(true)));
+            target_selector.add_goal(
+                2,
+                crate::entity::ai::goal::active_target::ActiveTargetGoal::predicated(
+                    &mob_arc.mob_entity,
+                    0,
+                    false,
+                    living_entity_selector,
+                ),
+            );
         };
 
         mob_arc
@@ -173,41 +191,76 @@ impl WitherEntity {
             .set_health(self.mob_entity.living_entity.get_max_health() / 3.0);
     }
 
+    /// Vanilla `WitherBoss.canDestroy`.
     #[must_use]
     pub fn can_destroy(block: &Block) -> bool {
-        block != &Block::AIR && !block.has_tag(&tag::Block::MINECRAFT_WITHER_IMMUNE)
+        !block.default_state.is_air() && !block.has_tag(&tag::Block::MINECRAFT_WITHER_IMMUNE)
     }
 
+    fn scale(&self) -> f32 {
+        self.mob_entity
+            .living_entity
+            .get_attribute_value(&pumpkin_data::attributes::Attributes::SCALE) as f32
+    }
+
+    /// The side heads' angle: vanilla `(yBodyRot + 180 * (index - 1)) * (PI / 180)`.
+    fn head_angle(&self, head: usize) -> f32 {
+        (self.mob_entity.living_entity.entity.body_yaw.load() + 180.0 * (head as f32 - 1.0))
+            * (std::f32::consts::PI / 180.0)
+    }
+
+    /// Vanilla `WitherBoss.getHeadX`.
     #[must_use]
     pub fn get_head_x(&self, head: usize) -> f64 {
+        let x = self.mob_entity.living_entity.entity.pos.load().x;
         if head == 0 {
-            return self.mob_entity.living_entity.entity.pos.load().x;
+            return x;
         }
-        let yaw = self.mob_entity.living_entity.entity.yaw.load();
-        let angle = (yaw + 180.0 * (head as f32 - 1.0)).to_radians();
-        self.mob_entity.living_entity.entity.pos.load().x + (angle.cos() as f64) * 1.3
+        x + f64::from(pumpkin_util::math::cos(self.head_angle(head)))
+            * 1.3
+            * f64::from(self.scale())
     }
 
+    /// Vanilla `WitherBoss.getHeadY`.
     #[must_use]
     pub fn get_head_y(&self, head: usize) -> f64 {
-        let base_y = self.mob_entity.living_entity.entity.pos.load().y;
+        let y = self.mob_entity.living_entity.entity.pos.load().y;
+        let head_height = f64::from(self.scale());
         if head == 0 {
-            base_y + 3.0
+            y + 3.0 * head_height
         } else {
-            base_y + 2.2
+            y + 2.2 * head_height
         }
     }
 
+    /// Vanilla `WitherBoss.getHeadZ`.
     #[must_use]
     pub fn get_head_z(&self, head: usize) -> f64 {
+        let z = self.mob_entity.living_entity.entity.pos.load().z;
         if head == 0 {
-            return self.mob_entity.living_entity.entity.pos.load().z;
+            return z;
         }
-        let yaw = self.mob_entity.living_entity.entity.yaw.load();
-        let angle = (yaw + 180.0 * (head as f32 - 1.0)).to_radians();
-        self.mob_entity.living_entity.entity.pos.load().z + (angle.sin() as f64) * 1.3
+        z + f64::from(pumpkin_util::math::sin(self.head_angle(head)))
+            * 1.3
+            * f64::from(self.scale())
     }
 
+    /// Vanilla `performRangedAttack(head, target)`: at half the target's eye height, the main
+    /// head's skull rarely blue.
+    fn perform_ranged_attack_at(&self, head: usize, target: &dyn EntityBase) {
+        let entity = target.get_entity();
+        let pos = entity.pos.load();
+        let dangerous = head == 0 && rand::random::<f32>() < 0.001;
+        self.perform_ranged_attack(
+            head,
+            pos.x,
+            pos.y + entity.get_eye_height() * 0.5,
+            pos.z,
+            dangerous,
+        );
+    }
+
+    /// Vanilla `performRangedAttack(head, x, y, z, dangerous)`.
     pub fn perform_ranged_attack(
         &self,
         head: usize,
@@ -226,26 +279,19 @@ impl WitherEntity {
         let hx = self.get_head_x(head);
         let hy = self.get_head_y(head);
         let hz = self.get_head_z(head);
-        let head_pos = Vector3::new(hx, hy, hz);
-
-        let dir = Vector3::new(target_x - hx, target_y - hy, target_z - hz);
-        let normalized_dir = if dir.length_squared() > 1e-6 {
-            dir.normalize()
-        } else {
-            Vector3::new(0.0, 0.0, 1.0)
-        };
+        let direction = Vector3::new(target_x - hx, target_y - hy, target_z - hz).normalize();
 
         let skull_entity = Entity::from_uuid(
             Uuid::new_v4(),
             (*world).clone(),
-            head_pos,
+            Vector3::new(hx, hy, hz),
             &EntityType::WITHER_SKULL,
         );
         let skull = Arc::new(WitherSkullEntity::new_shot(
             skull_entity,
             entity,
             dangerous,
-            normalized_dir,
+            direction,
         ));
         world.spawn_entity(skull);
     }
@@ -341,259 +387,198 @@ impl WitherEntity {
         bossbar_players.clear();
     }
 
-    #[expect(clippy::too_many_lines)]
-    fn tick_wither(&self) {
+    /// The start of vanilla `WitherBoss.aiStep`: fly towards the main target.
+    fn steer(&self) {
         let entity = &self.mob_entity.living_entity.entity;
-        let world = entity.world.load();
-
-        if world.level_info.load().difficulty == Difficulty::Peaceful {
-            self.remove_all_bossbar(&world);
-            entity.remove();
-            return;
-        }
-
-        if !entity.is_alive() || self.mob_entity.living_entity.health.load() <= 0.0 {
-            self.remove_all_bossbar(&world);
-            if !self.dropped_loot.swap(true, Ordering::SeqCst) {
-                let pos = entity.block_pos.load();
-                world.drop_stack(&pos, ItemStack::new(1, &Item::NETHER_STAR));
+        let mut delta_movement = entity.velocity.load().multiply(1.0, 0.6, 1.0);
+        let main_target = self.get_alternative_target(0);
+        if main_target > 0
+            && let Some(target) = entity.world.load().get_entity_by_id(main_target)
+        {
+            let target_pos = target.get_entity().pos.load();
+            let pos = entity.pos.load();
+            let mut yd = delta_movement.y;
+            if pos.y < target_pos.y || (!self.is_powered() && pos.y < target_pos.y + 5.0) {
+                yd = yd.max(0.0);
+                yd += 0.3 - yd * f64::from(0.6f32);
             }
-            return;
+            delta_movement.y = yd;
+            let delta = Vector3::new(target_pos.x - pos.x, 0.0, target_pos.z - pos.z);
+            if delta.horizontal_length_squared() > 9.0 {
+                let scale = delta.normalize();
+                delta_movement.x += scale.x * 0.3 - delta_movement.x * 0.6;
+                delta_movement.z += scale.z * 0.3 - delta_movement.z * 0.6;
+            }
         }
+        entity.velocity.store(delta_movement);
+        if delta_movement.horizontal_length_squared() > 0.05 {
+            let yaw = pumpkin_util::math::atan2(delta_movement.z, delta_movement.x) as f32
+                * (180.0 / std::f32::consts::PI)
+                - 90.0;
+            entity.yaw.store(yaw);
+        }
+    }
 
-        let invul = self.get_invulnerable_ticks();
+    /// Vanilla `WitherBoss.customServerAiStep`.
+    #[expect(clippy::too_many_lines)]
+    fn server_ai_step(&self) {
+        let entity = &self.mob_entity.living_entity.entity;
+        let world = entity.world.load_full();
+        let living = &self.mob_entity.living_entity;
         let tick_count = entity.tick_count.load(Ordering::Relaxed);
 
-        if invul > 0 {
-            let new_count = invul - 1;
-            let progress = (1.0 - (new_count as f32) / 220.0).clamp(0.0, 1.0);
-            self.update_bossbar(&world, progress);
-
+        let invulnerable = self.get_invulnerable_ticks();
+        if invulnerable > 0 {
+            let new_count = invulnerable - 1;
+            self.update_bossbar(&world, 1.0 - new_count as f32 / 220.0);
             if new_count <= 0 {
                 let pos = entity.pos.load();
-                let eye_y = pos.y + entity.get_eye_height();
                 world.explode(
                     world.get_entity_by_id(entity.entity_id),
-                    Vector3::new(pos.x, eye_y, pos.z),
+                    Vector3::new(pos.x, entity.get_eye_y(), pos.z),
                     7.0,
                     ExplosionInteraction::Mob,
                 );
-
                 if !entity.silent.load(Ordering::Relaxed) {
-                    world.sync_world_event(
+                    world.sync_global_world_event(
                         WorldEvent::SoundWitherBossSpawn,
                         entity.block_pos.load(),
                         0,
                     );
                 }
             }
-
             self.set_invulnerable_ticks(new_count);
             if tick_count % 10 == 0 {
-                self.mob_entity.living_entity.heal(10.0);
+                living.heal(10.0);
             }
-        } else {
-            let living = &self.mob_entity.living_entity;
-            let max_health = living.get_max_health();
-            let health = living.health.load();
-            let progress = if max_health > 0.0 {
-                (health / max_health).clamp(0.0, 1.0)
-            } else {
-                0.0
-            };
-            self.update_bossbar(&world, progress);
+            return;
+        }
 
-            if tick_count % 20 == 0 {
-                living.heal(1.0);
+        let difficulty = world.level_info.load().difficulty;
+        for i in 1..3 {
+            if tick_count < self.next_head_update[i - 1].load(Ordering::Relaxed) {
+                continue;
+            }
+            self.next_head_update[i - 1].store(
+                tick_count + 10 + rand::random_range(0..10),
+                Ordering::Relaxed,
+            );
+            if matches!(difficulty, Difficulty::Normal | Difficulty::Hard)
+                && self.idle_head_updates[i - 1].fetch_add(1, Ordering::Relaxed) > 15
+            {
+                let pos = entity.pos.load();
+                // `Mth.nextDouble(random, min, max)`.
+                let xt = pos.x - 10.0 + rand::random::<f64>() * 20.0;
+                let yt = pos.y - 5.0 + rand::random::<f64>() * 10.0;
+                let zt = pos.z - 10.0 + rand::random::<f64>() * 20.0;
+                self.perform_ranged_attack(i + 1, xt, yt, zt, true);
+                self.idle_head_updates[i - 1].store(0, Ordering::Relaxed);
             }
 
-            // AI step - movement towards main target
-            let mut delta_movement = entity.velocity.load().multiply(1.0, 0.6, 1.0);
-            let target_opt = self.mob_entity.get_target();
-
-            if let Some(ref target) = target_opt {
-                if target.get_entity().is_alive() {
-                    let target_pos = target.get_entity().pos.load();
-                    let wither_pos = entity.pos.load();
-                    let mut yd = delta_movement.y;
-
-                    if wither_pos.y < target_pos.y
-                        || (!self.is_powered() && wither_pos.y < target_pos.y + 5.0)
-                    {
-                        yd = yd.max(0.0);
-                        yd += 0.3 - yd * 0.6;
-                    }
-
-                    delta_movement.y = yd;
-                    let delta = Vector3::new(
-                        target_pos.x - wither_pos.x,
-                        0.0,
-                        target_pos.z - wither_pos.z,
+            let head_target = self.get_alternative_target(i);
+            if head_target > 0 {
+                let current = world
+                    .get_entity_by_id(head_target)
+                    .filter(|current| current.get_living_entity().is_some());
+                if let Some(current) = current
+                    && self.can_attack(current.as_ref())
+                    && entity
+                        .pos
+                        .load()
+                        .squared_distance_to_vec(&current.get_entity().pos.load())
+                        <= 900.0
+                    && self.has_line_of_sight(current.get_entity())
+                {
+                    self.perform_ranged_attack_at(i + 1, current.as_ref());
+                    self.next_head_update[i - 1].store(
+                        tick_count + 40 + rand::random_range(0..20),
+                        Ordering::Relaxed,
                     );
-
-                    if delta.horizontal_length_squared() > 9.0 {
-                        let scale = delta.normalize();
-                        delta_movement.x += scale.x * 0.3 - delta_movement.x * 0.6;
-                        delta_movement.z += scale.z * 0.3 - delta_movement.z * 0.6;
-                    }
-
-                    self.set_alternative_target(0, target.get_entity().entity_id);
-
-                    // Main head attack
-                    let dist_sq = (wither_pos - target_pos).length_squared();
-                    if dist_sq <= 400.0 {
-                        let attack_timer = self.main_attack_timer.load(Ordering::Relaxed);
-                        if attack_timer <= 0 {
-                            self.main_attack_timer.store(40, Ordering::Relaxed);
-                            let dangerous = rand::random_range(0.0..1.0) < 0.001;
-                            let eye_h = target.get_entity().get_eye_height();
-                            self.perform_ranged_attack(
-                                0,
-                                target_pos.x,
-                                target_pos.y + eye_h * 0.5,
-                                target_pos.z,
-                                dangerous,
-                            );
-                        } else {
-                            self.main_attack_timer
-                                .store(attack_timer - 1, Ordering::Relaxed);
-                        }
-                    }
+                    self.idle_head_updates[i - 1].store(0, Ordering::Relaxed);
                 } else {
-                    self.set_alternative_target(0, 0);
-                    self.mob_entity.set_target(None);
+                    self.set_alternative_target(i, 0);
                 }
             } else {
-                self.set_alternative_target(0, 0);
-            }
-
-            entity.velocity.store(delta_movement);
-            if delta_movement.horizontal_length_squared() > 0.05 {
-                let yaw = (delta_movement.z.atan2(delta_movement.x).to_degrees() as f32) - 90.0;
-                entity.set_rotation(yaw, entity.pitch.load());
-            }
-
-            // Side heads attack logic
-            let difficulty = world.level_info.load().difficulty;
-            let wither_pos = entity.pos.load();
-
-            for i in 1..=2 {
-                let next_update = self.next_head_update[i - 1].load(Ordering::Relaxed);
-                if tick_count >= next_update {
-                    let rand_delay = rand::random_range(0..10);
-                    self.next_head_update[i - 1]
-                        .store(tick_count + 10 + rand_delay, Ordering::Relaxed);
-
-                    if (difficulty == Difficulty::Normal || difficulty == Difficulty::Hard)
-                        && self.idle_head_updates[i - 1].fetch_add(1, Ordering::Relaxed) > 15
-                    {
-                        let (xt, yt, zt) = (
-                            wither_pos.x + rand::random_range(-10.0..10.0),
-                            wither_pos.y + rand::random_range(-5.0..5.0),
-                            wither_pos.z + rand::random_range(-10.0..10.0),
-                        );
-                        self.perform_ranged_attack(i, xt, yt, zt, true);
-                        self.idle_head_updates[i - 1].store(0, Ordering::Relaxed);
-                    }
-
-                    let head_target_id = self.get_alternative_target(i);
-                    if head_target_id > 0 {
-                        let head_target = world.get_entity_by_id(head_target_id);
-                        if let Some(target) = head_target {
-                            let t_pos = target.get_entity().pos.load();
-                            if target.get_entity().is_alive()
-                                && (wither_pos - t_pos).length_squared() <= 900.0
-                            {
-                                let eye_h = target.get_entity().get_eye_height();
-                                self.perform_ranged_attack(
-                                    i,
-                                    t_pos.x,
-                                    t_pos.y + eye_h * 0.5,
-                                    t_pos.z,
-                                    false,
-                                );
-                                let next_delay = 40 + rand::random_range(0..20);
-                                self.next_head_update[i - 1]
-                                    .store(tick_count + next_delay, Ordering::Relaxed);
-                                self.idle_head_updates[i - 1].store(0, Ordering::Relaxed);
-                            } else {
-                                self.set_alternative_target(i, 0);
-                            }
-                        } else {
-                            self.set_alternative_target(i, 0);
-                        }
-                    } else {
-                        let search_box = entity.bounding_box.load().expand(20.0, 8.0, 20.0);
-                        let entities = world.get_entities_at_box(&search_box);
-                        let candidates: Vec<_> = entities
-                            .into_iter()
-                            .filter(|e| {
-                                e.get_entity().entity_id != entity.entity_id
-                                    && e.get_living_entity().is_some()
-                                    && e.get_entity().is_alive()
-                                    && !e
-                                        .get_entity()
-                                        .entity_type
-                                        .has_tag(&tag::EntityType::MINECRAFT_WITHER_FRIENDS)
-                            })
-                            .collect();
-
-                        if !candidates.is_empty() {
-                            let idx = rand::random_range(0..candidates.len());
-                            self.set_alternative_target(i, candidates[idx].get_entity().entity_id);
-                        }
-                    }
-                }
-            }
-
-            // Block destruction
-            let destroy_tick = self.destroy_blocks_tick.load(Ordering::Relaxed);
-            if destroy_tick > 0 {
-                let next_destroy = destroy_tick - 1;
-                self.destroy_blocks_tick
-                    .store(next_destroy, Ordering::Relaxed);
-
-                if next_destroy == 0 && world.level_info.load().game_rules.mob_griefing {
-                    let bb = entity.bounding_box.load();
-                    let bb_width = bb.max.x - bb.min.x;
-                    let bb_height = bb.max.y - bb.min.y;
-                    let width = (bb_width as f32 / 2.0 + 1.0).floor() as i32;
-                    let height = (bb_height as f32).floor() as i32;
-                    let min_pos = entity.block_pos.load();
-                    let mut destroyed = false;
-
-                    for dx in -width..=width {
-                        for dy in 0..=height {
-                            for dz in -width..=width {
-                                let bpos = BlockPos::new(
-                                    min_pos.0.x + dx,
-                                    min_pos.0.y + dy,
-                                    min_pos.0.z + dz,
-                                );
-                                let block = world.get_block(&bpos);
-                                if Self::can_destroy(block) {
-                                    world.set_block_state(
-                                        &bpos,
-                                        Block::AIR.default_state.id,
-                                        BlockFlags::NOTIFY_ALL,
-                                    );
-                                    destroyed = true;
-                                }
-                            }
-                        }
-                    }
-
-                    if destroyed && !entity.silent.load(Ordering::Relaxed) {
-                        world.sync_world_event(
-                            WorldEvent::SoundWitherBlockBreak,
-                            entity.block_pos.load(),
-                            0,
-                        );
-                    }
+                // `getNearbyEntities(LivingEntity.class, TARGETING_CONDITIONS, this, box)`.
+                let mut conditions =
+                    crate::entity::ai::target_predicate::TargetPredicate::create_attackable()
+                        .set_base_max_distance(20.0);
+                conditions.set_predicate(living_entity_selector);
+                let area = entity.bounding_box.load().expand(20.0, 8.0, 20.0);
+                let candidates: Vec<_> = world
+                    .get_all_at_box(&area)
+                    .into_iter()
+                    .filter(|candidate| candidate.get_living_entity().is_some())
+                    .filter(|candidate| {
+                        conditions.test(&world, Some(self as &dyn EntityBase), candidate.as_ref())
+                    })
+                    .collect();
+                if !candidates.is_empty() {
+                    let selected = &candidates[rand::random_range(0..candidates.len())];
+                    self.set_alternative_target(i, selected.get_entity().entity_id);
                 }
             }
         }
+
+        self.set_alternative_target(
+            0,
+            self.mob_entity
+                .get_target()
+                .map_or(0, |target| target.get_entity().entity_id),
+        );
+
+        let destroy_tick = self.destroy_blocks_tick.load(Ordering::Relaxed);
+        if destroy_tick > 0 {
+            self.destroy_blocks_tick
+                .store(destroy_tick - 1, Ordering::Relaxed);
+            if destroy_tick - 1 == 0 && world.level_info.load().game_rules.mob_griefing {
+                let dims = entity.entity_dimension.load();
+                let width = (dims.width / 2.0 + 1.0).floor() as i32;
+                let height = dims.height.floor() as i32;
+                let origin = entity.block_pos.load();
+                let mut destroyed = false;
+                // `BlockPos.betweenClosed`: x fastest, then y, then z.
+                for z in origin.0.z - width..=origin.0.z + width {
+                    for y in origin.0.y..=origin.0.y + height {
+                        for x in origin.0.x - width..=origin.0.x + width {
+                            let pos = BlockPos::new(x, y, z);
+                            if Self::can_destroy(world.get_block(&pos)) {
+                                // `destroyBlock(pos, true, this)`.
+                                destroyed |= world
+                                    .break_block(&pos, None, BlockFlags::NOTIFY_ALL)
+                                    .is_some();
+                            }
+                        }
+                    }
+                }
+                if destroyed {
+                    world.sync_world_event(
+                        WorldEvent::SoundWitherBlockBreak,
+                        entity.block_pos.load(),
+                        0,
+                    );
+                }
+            }
+        }
+
+        if tick_count % 20 == 0 {
+            living.heal(1.0);
+        }
+        let max_health = living.get_max_health();
+        self.update_bossbar(&world, living.health.load() / max_health);
     }
+}
+
+/// Vanilla `WitherBoss.LIVING_ENTITY_SELECTOR`.
+fn living_entity_selector(
+    target: &crate::entity::living::LivingEntity,
+    _world: &crate::world::World,
+) -> bool {
+    !target
+        .entity
+        .entity_type
+        .has_tag(&tag::EntityType::MINECRAFT_WITHER_FRIENDS)
+        && target.entity.entity_type.attackable.unwrap_or(true)
 }
 
 impl Mob for WitherEntity {
@@ -622,7 +607,22 @@ impl Mob for WitherEntity {
     }
 
     fn mob_tick(&self, _caller: &dyn EntityBase) {
-        self.tick_wither();
+        let entity = &self.mob_entity.living_entity.entity;
+        let world = entity.world.load();
+        if world.level_info.load().difficulty == Difficulty::Peaceful {
+            self.remove_all_bossbar(&world);
+            entity.remove();
+        }
+    }
+
+    fn ai_step(&self, _caller: &dyn EntityBase) {
+        self.steer();
+    }
+
+    fn custom_server_ai_step(&self, _caller: &dyn EntityBase) {
+        if self.mob_entity.living_entity.entity.is_alive() {
+            self.server_ai_step();
+        }
     }
 
     fn pre_damage(&self, damage_type: DamageType, source: Option<&dyn EntityBase>) -> bool {
@@ -687,5 +687,29 @@ impl Mob for WitherEntity {
         if let Some(invul) = nbt.get_int("Invul") {
             self.set_invulnerable_ticks(invul);
         }
+    }
+}
+
+impl crate::entity::mob::RangedAttackMob for WitherEntity {
+    /// Vanilla `WitherBoss.performRangedAttack(target, power)`: the main head fires.
+    fn perform_ranged_attack(&self, target: &Arc<dyn EntityBase>, _power: f32) {
+        self.perform_ranged_attack_at(0, target.as_ref());
+    }
+}
+
+/// Vanilla `WitherBoss.WitherDoNothingGoal`: holds still while the wither charges up.
+struct WitherDoNothingGoal;
+
+impl crate::entity::ai::goal::Goal for WitherDoNothingGoal {
+    fn can_start(&mut self, mob: &dyn Mob) -> bool {
+        mob.cast_any()
+            .downcast_ref::<WitherEntity>()
+            .is_some_and(|wither| wither.get_invulnerable_ticks() > 0)
+    }
+
+    fn controls(&self) -> crate::entity::ai::goal::Controls {
+        crate::entity::ai::goal::Controls::MOVE
+            | crate::entity::ai::goal::Controls::JUMP
+            | crate::entity::ai::goal::Controls::LOOK
     }
 }
