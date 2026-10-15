@@ -45,22 +45,24 @@ impl AttributeInstance {
             return f64::from_bits(self.cached_value.load(Ordering::Relaxed));
         }
 
-        let mut value = self.base_value;
-
-        let mut add_sum = 0.0;
-        let mut mul_base = 0.0;
-        let mut mul_total = 1.0;
-        for m in &self.modifiers {
-            match m.operation {
-                ModifierOperation::Add => add_sum += m.amount,
-                ModifierOperation::MultiplyBase => mul_base += m.amount,
-                ModifierOperation::MultiplyTotal => mul_total *= 1.0 + m.amount,
-            }
+        // Vanilla `AttributeInstance.calculateValue`, operation by operation in insertion order.
+        let modifiers = |operation| {
+            self.modifiers
+                .iter()
+                .filter(move |m| m.operation == operation)
+                .map(|m| m.amount)
+        };
+        let mut base = self.base_value;
+        for amount in modifiers(ModifierOperation::Add) {
+            base += amount;
         }
-
-        value += add_sum;
-        value *= 1.0 + mul_base;
-        value *= mul_total;
+        let mut value = base;
+        for amount in modifiers(ModifierOperation::MultiplyBase) {
+            value += base * amount;
+        }
+        for amount in modifiers(ModifierOperation::MultiplyTotal) {
+            value *= 1.0 + amount;
+        }
 
         if value.is_nan() || value.is_infinite() {
             value = self.base_value;
@@ -72,17 +74,20 @@ impl AttributeInstance {
         value
     }
 
+    /// Vanilla `addOrUpdateTransientModifier`: a modifier with the same id is replaced in
+    /// place, keeping its position in the order.
     pub fn add_or_replace_modifier(&mut self, modifier: Modifier) {
-        if let Some(pos) = self.modifiers.iter().position(|m| m.id == modifier.id) {
-            self.modifiers.remove(pos);
+        if let Some(existing) = self.modifiers.iter_mut().find(|m| m.id == modifier.id) {
+            *existing = modifier;
+        } else {
+            self.modifiers.push(modifier);
         }
-        self.modifiers.push(modifier);
         self.dirty.store(true, Ordering::Relaxed);
     }
 
     pub fn remove_modifier(&mut self, id: &str) {
         if let Some(pos) = self.modifiers.iter().position(|m| m.id == id) {
-            self.modifiers.swap_remove(pos);
+            self.modifiers.remove(pos);
         }
         self.dirty.store(true, Ordering::Relaxed);
     }
