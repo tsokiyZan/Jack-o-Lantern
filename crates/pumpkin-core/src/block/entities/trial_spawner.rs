@@ -576,8 +576,17 @@ impl TrialSpawnerFullConfig {
         self.ominous.write_nbt(&mut ominous_cmp);
         nbt.put_compound("ominous_config", ominous_cmp);
 
-        nbt.put_long("target_cooldown_length", self.target_cooldown_length);
-        nbt.put_int("required_player_range", self.required_player_range);
+        // Vanilla `FullConfig.MAP_CODEC`: a non-negative int and an int, both left out at their
+        // defaults.
+        if self.target_cooldown_length != 36000 {
+            nbt.put_int(
+                "target_cooldown_length",
+                i32::try_from(self.target_cooldown_length).unwrap_or(i32::MAX),
+            );
+        }
+        if self.required_player_range != 14 {
+            nbt.put_int("required_player_range", self.required_player_range);
+        }
     }
 }
 
@@ -751,13 +760,20 @@ impl TrialSpawnerStateData {
 }
 
 /// Core Trial Spawner engine and state machine logic.
-#[derive(Default)]
 pub struct TrialSpawner {
     pub data: TrialSpawnerStateData,
+    /// The block's `trial_spawner_state`, for the client update tag.
+    state: TrialSpawnerState,
     pub config: TrialSpawnerFullConfig,
     pub player_detector: PlayerDetector,
     pub override_peaceful_and_mob_spawn_rule: bool,
     pub is_ominous: bool,
+}
+
+impl Default for TrialSpawner {
+    fn default() -> Self {
+        Self::new(TrialSpawnerFullConfig::default(), PlayerDetector::default())
+    }
 }
 
 impl TrialSpawner {
@@ -772,6 +788,7 @@ impl TrialSpawner {
     pub fn new(config: TrialSpawnerFullConfig, player_detector: PlayerDetector) -> Self {
         Self {
             data: TrialSpawnerStateData::default(),
+            state: TrialSpawnerState::Inactive,
             config,
             player_detector,
             override_peaceful_and_mob_spawn_rule: false,
@@ -929,7 +946,13 @@ impl TrialSpawner {
         }
     }
 
-    pub fn set_state(&self, world: &Arc<World>, spawner_pos: BlockPos, state: TrialSpawnerState) {
+    pub fn set_state(
+        &mut self,
+        world: &Arc<World>,
+        spawner_pos: BlockPos,
+        state: TrialSpawnerState,
+    ) {
+        self.state = state;
         let block_id = world.get_block_state_id(&spawner_pos);
         let block = world.get_block(&spawner_pos);
         if block.id == pumpkin_data::BlockId::TRIAL_SPAWNER {
@@ -1156,6 +1179,7 @@ impl TrialSpawner {
     pub fn tick_server(&mut self, world: &Arc<World>, spawner_pos: BlockPos, is_ominous: bool) {
         self.is_ominous = is_ominous;
         let current_state = self.get_state(world, spawner_pos);
+        self.state = current_state;
 
         let max_dist_sq = Self::MAX_MOB_TRACKING_DISTANCE_SQR;
         let center = spawner_pos.to_centered_f64();
@@ -1412,9 +1436,18 @@ impl BlockEntity for TrialSpawnerBlockEntity {
     }
 
     fn chunk_data_nbt(&self) -> Option<NbtCompound> {
+        // Vanilla `TrialSpawnerStateData.getUpdateTag`: the configs are references into a
+        // registry the client doesn't have, so only the spin timing and the displayed mob go out.
         self.trial_spawner.try_lock().ok().map(|spawner| {
             let mut nbt = NbtCompound::new();
-            spawner.store(&mut nbt);
+            if spawner.state == TrialSpawnerState::Active {
+                nbt.put_long("next_mob_spawns_at", spawner.data.next_mob_spawns_at);
+            }
+            if let Some(spawn_data) = &spawner.data.next_spawn_data {
+                let mut spawn_cmp = NbtCompound::new();
+                spawn_data.write_nbt(&mut spawn_cmp);
+                nbt.put_compound("spawn_data", spawn_cmp);
+            }
             nbt
         })
     }
