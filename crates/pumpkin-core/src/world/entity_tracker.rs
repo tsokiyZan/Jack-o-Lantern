@@ -191,6 +191,37 @@ impl TrackedEntity {
             self.send_to_tracking_players(&CHeadRot::new(VarInt(self.entity_id), head_yaw), world);
             entity.last_sent_head_yaw.store(head_yaw, Relaxed);
         }
+
+        self.send_sync_velocity(world);
+    }
+
+    /// The end of vanilla `ServerEntity.sendChanges`: `syncVelocity` (`markHurt` and friends)
+    /// sends the current velocity to the trackers and the entity's own client, every tick.
+    fn send_sync_velocity(&self, world: &World) {
+        let entity = self.entity.get_entity();
+        if entity.sync_velocity.swap(false, Ordering::SeqCst) {
+            let velocity = entity.velocity.load();
+            self.send_to_tracking_players_and_self_editioned(
+                &CEntityVelocity::new(VarInt(self.entity_id), velocity),
+                &CSetActorMotion {
+                    target_runtime_id: VarULong(self.entity_id as u64),
+                    motion: Vector3::new(velocity.x as f32, velocity.y as f32, velocity.z as f32),
+                    tick: VarULong(0),
+                },
+                world,
+            );
+        }
+    }
+
+    /// The velocity half of `sendChanges` for a player, whose moves are broadcast from the
+    /// movement packets instead: `needsSync` goes to trackers only (a player's `trackDelta` is
+    /// off), and `syncVelocity` to the player as well.
+    fn send_player_velocity(&self, world: &World) {
+        let entity = self.entity.get_entity();
+        if entity.velocity_dirty.swap(false, Ordering::SeqCst) {
+            self.send_motion(entity, world);
+        }
+        self.send_sync_velocity(world);
     }
 
     fn pick_move(
@@ -984,8 +1015,11 @@ impl EntityTracker {
             let tracked = entry.value();
             if tracked.entity.get_player().is_none() {
                 tracked.send_changes(world);
-            } else if tracked.entity.get_entity().synched_data.is_dirty() {
-                tracked.entity.get_entity().send_dirty_entity_data();
+            } else {
+                tracked.send_player_velocity(world);
+                if tracked.entity.get_entity().synched_data.is_dirty() {
+                    tracked.entity.get_entity().send_dirty_entity_data();
+                }
             }
         }
     }

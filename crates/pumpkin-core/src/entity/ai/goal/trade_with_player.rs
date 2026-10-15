@@ -22,7 +22,7 @@ impl Goal for TradeWithPlayerGoal {
         if !entity.is_alive()
             || entity.touching_water.load(Ordering::Relaxed)
             || !entity.on_ground.load(Ordering::Relaxed)
-            || entity.velocity_dirty.load(Ordering::Relaxed)
+            || mob.get_mob_entity().living_entity.was_hurt_recently()
         {
             return false;
         }

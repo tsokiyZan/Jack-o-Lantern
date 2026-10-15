@@ -3408,16 +3408,20 @@ impl LivingEntity {
 
         // Apply hurt cooldown logic
         let last_damage = self.last_damage_taken.load();
-        let (damage_amount, play_sound) =
+        let (damage_amount, play_sound, took_full_damage) =
             if self.hurt_cooldown.load(Relaxed) > 10 && !bypasses_cooldown_protection {
                 if effective_amount <= last_damage {
                     return false;
                 }
-                (effective_amount - last_damage, false)
+                (effective_amount - last_damage, false, false)
             } else {
                 self.hurt_cooldown.store(20, Relaxed);
                 self.hurt_time.store(HURT_DURATION, Relaxed);
-                (effective_amount, self.health.load() > effective_amount)
+                (
+                    effective_amount,
+                    self.health.load() > effective_amount,
+                    true,
+                )
             };
 
         // Finalize state
@@ -3464,6 +3468,10 @@ impl LivingEntity {
             cause.map(|e| e.get_entity().entity_id),
             position,
         );
+        // Vanilla `hurtServer`: `markHurt` (the velocity also goes to the hurt entity's client).
+        if took_full_damage && !damage_type.has_tag(&tag::DamageType::MINECRAFT_NO_IMPACT) {
+            self.entity.sync_velocity.store(true, SeqCst);
+        }
 
         if play_sound {
             // Vanilla `Mob.playHurtSound` resets the ambient sound timer.
@@ -3723,11 +3731,6 @@ impl EntityBase for LivingEntity {
             self.push_entities(caller);
 
             self.entity.tick_frozen(caller);
-        }
-
-        // Coalesce velocity sends to once per tick.
-        if self.entity.velocity_dirty.swap(false, Ordering::SeqCst) {
-            self.entity.send_velocity();
         }
 
         // Fetch supporting blocks for players or other entities
