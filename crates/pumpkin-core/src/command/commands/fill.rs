@@ -113,6 +113,32 @@ fn fill_blocks(
             matches
         });
 
+    // Vanilla `Mode.DESTROY`: `destroyBlock(pos, true)` on every position that passes the
+    // filter, dropping items, before the new block is placed. Done before any chunk lock is
+    // taken, since breaking a block writes to its chunk.
+    let destroyed: Option<std::collections::HashSet<BlockPos>> =
+        (mode == FillMode::Destroy).then(|| {
+            let mut destroyed = std::collections::HashSet::new();
+            for x in min_x..=max_x {
+                for y in min_y..=max_y {
+                    for z in min_z..=max_z {
+                        let pos = BlockPos::new(x, y, z);
+                        if let Some(f) = filter
+                            && (!f.test(world.get_block_state_id(&pos))
+                                || nbt_matches.as_ref().is_some_and(|set| !set.contains(&pos)))
+                        {
+                            continue;
+                        }
+                        if !world.get_block_state(&pos).is_air() {
+                            world.break_block(&pos, None, BlockFlags::NOTIFY_ALL);
+                        }
+                        destroyed.insert(pos);
+                    }
+                }
+            }
+            destroyed
+        });
+
     let min_chunk_x = min_x >> 4;
     let max_chunk_x = max_x >> 4;
     let min_chunk_z = min_z >> 4;
@@ -166,6 +192,13 @@ fn fill_blocks(
                                             continue;
                                         }
                                     }
+                                    // Already filtered, and broken, before the chunk was locked.
+                                    FillMode::Destroy => {
+                                        if destroyed.as_ref().is_some_and(|set| !set.contains(&pos))
+                                        {
+                                            continue;
+                                        }
+                                    }
                                     _ => {
                                         if let Some(f) = filter
                                             && (!f.test(current_state_id)
@@ -194,19 +227,9 @@ fn fill_blocks(
                                             Some(BlockStateId::AIR)
                                         }
                                     }
-                                    FillMode::Destroy => {
-                                        if current_state_id != target_state_id {
-                                            world.break_block(
-                                                &pos,
-                                                None,
-                                                BlockFlags::SKIP_DROPS
-                                                    | BlockFlags::NOTIFY_ALL
-                                                    | BlockFlags::FORCE_STATE,
-                                            );
-                                        }
+                                    FillMode::Destroy | FillMode::Replace | FillMode::Keep => {
                                         Some(target_state_id)
                                     }
-                                    FillMode::Replace | FillMode::Keep => Some(target_state_id),
                                 };
 
                                 if let Some(state_id) = block_to_place {
