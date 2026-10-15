@@ -42,7 +42,7 @@ use crate::world::World;
 use crate::world::chunker::get_view_distance;
 
 /// Vanilla `VecDeltaCodec.encode`: Java `Math.round` on the 1/4096
-fn encode_pos(value: f64) -> i64 {
+pub(crate) fn encode_pos(value: f64) -> i64 {
     (value * 4096.0 + 0.5).floor() as i64
 }
 
@@ -409,7 +409,7 @@ impl TrackedEntity {
         let entity_pos = self.entity.get_entity().pos.load();
         let dx = player_pos.x - entity_pos.x;
         let dz = player_pos.z - entity_pos.z;
-        let dist_sq = dx.mul_add(dx, dz * dz);
+        let dist_sq = dx * dx + dz * dz;
 
         let player_vd = get_view_distance(player).get() as i32;
         let visible_range_blocks = f64::from((effective_range as i32).min(player_vd) * 16);

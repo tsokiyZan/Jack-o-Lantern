@@ -1,5 +1,6 @@
 #[allow(clippy::wildcard_imports)]
 use super::*;
+use crate::world::entity_tracker::encode_pos;
 use pumpkin_data::entity::EntityPose;
 
 impl BedrockClient {
@@ -54,11 +55,12 @@ impl BedrockClient {
             let je_yaw = (new_yaw * 256.0 / 360.0).rem_euclid(256.0);
             let je_pitch = (new_pitch * 256.0 / 360.0).rem_euclid(256.0);
 
-            let delta = pumpkin_util::math::vector3::Vector3::new(
-                new_pos.x - old_pos.x,
-                new_pos.y - old_pos.y,
-                new_pos.z - old_pos.z,
-            );
+            // Vanilla `ServerEntity.sendChanges`: a relative move while every encoded delta
+            // fits in a short.
+            let fits = |a: f64, b: f64| i16::try_from(encode_pos(a) - encode_pos(b)).is_ok();
+            let fits_short = fits(new_pos.x, old_pos.x)
+                && fits(new_pos.y, old_pos.y)
+                && fits(new_pos.z, old_pos.z);
 
             let bedrock_move_packet = pumpkin_protocol::bedrock::client::CMovePlayer::new(
                 pumpkin_protocol::codec::var_ulong::VarULong(player.entity_id() as u64),
@@ -78,7 +80,7 @@ impl BedrockClient {
                 pumpkin_protocol::codec::var_ulong::VarULong(0),
             );
 
-            if pos_changed && delta.length_squared() >= 64.0 {
+            if pos_changed && !fits_short {
                 world.broadcast_packet_except(
                     &[player.gameprofile.id],
                     &pumpkin_protocol::java::client::play::CEntityPositionSync::new(
@@ -96,9 +98,9 @@ impl BedrockClient {
                     &pumpkin_protocol::java::client::play::CUpdateEntityPosRot::new(
                         player.entity_id().into(),
                         pumpkin_util::math::vector3::Vector3::new(
-                            new_pos.x.mul_add(4096.0, -(old_pos.x * 4096.0)) as i16,
-                            new_pos.y.mul_add(4096.0, -(old_pos.y * 4096.0)) as i16,
-                            new_pos.z.mul_add(4096.0, -(old_pos.z * 4096.0)) as i16,
+                            (encode_pos(new_pos.x) - encode_pos(old_pos.x)) as i16,
+                            (encode_pos(new_pos.y) - encode_pos(old_pos.y)) as i16,
+                            (encode_pos(new_pos.z) - encode_pos(old_pos.z)) as i16,
                         ),
                         je_yaw as u8,   // Use converted Java byte
                         je_pitch as u8, // Use converted Java byte
@@ -112,9 +114,9 @@ impl BedrockClient {
                     &pumpkin_protocol::java::client::play::CUpdateEntityPos::new(
                         player.entity_id().into(),
                         pumpkin_util::math::vector3::Vector3::new(
-                            new_pos.x.mul_add(4096.0, -(old_pos.x * 4096.0)) as i16,
-                            new_pos.y.mul_add(4096.0, -(old_pos.y * 4096.0)) as i16,
-                            new_pos.z.mul_add(4096.0, -(old_pos.z * 4096.0)) as i16,
+                            (encode_pos(new_pos.x) - encode_pos(old_pos.x)) as i16,
+                            (encode_pos(new_pos.y) - encode_pos(old_pos.y)) as i16,
+                            (encode_pos(new_pos.z) - encode_pos(old_pos.z)) as i16,
                         ),
                         on_ground,
                     ),
@@ -147,7 +149,7 @@ impl BedrockClient {
             if pos_changed {
                 chunker::update_position(player);
                 player.check_location_enchantments(new_pos, on_ground);
-                player.progress_motion(delta);
+                player.progress_motion(new_pos - old_pos);
             }
         }
 

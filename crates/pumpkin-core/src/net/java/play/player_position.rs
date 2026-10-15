@@ -1,5 +1,6 @@
 #[allow(clippy::wildcard_imports)]
 use super::*;
+use crate::world::entity_tracker::encode_pos;
 
 impl JavaClient {
     const fn clamp_horizontal(pos: f64) -> f64 {
@@ -19,11 +20,12 @@ impl JavaClient {
         last_pos: Vector3<f64>,
         on_ground: bool,
     ) -> bool {
-        let delta = Vector3::new(pos.x - last_pos.x, pos.y - last_pos.y, pos.z - last_pos.z);
         let entity_id = player.entity_id();
 
-        // Teleport when more than 8 blocks (-8..=7.999755859375)
-        if delta.length_squared() < 64.0 {
+        // Vanilla `ServerEntity.sendChanges`: a relative move while every encoded delta
+        // fits in a short, otherwise a position sync.
+        let fits = |a: f64, b: f64| i16::try_from(encode_pos(a) - encode_pos(b)).is_ok();
+        if fits(pos.x, last_pos.x) && fits(pos.y, last_pos.y) && fits(pos.z, last_pos.z) {
             return false;
         }
         // Sync position with tracking players only.
@@ -158,9 +160,9 @@ impl JavaClient {
                         &CUpdateEntityPos::new(
                             player.entity_id().into(),
                             Vector3::new(
-                                pos.x.mul_add(4096.0, -(last_pos.x * 4096.0)) as i16,
-                                pos.y.mul_add(4096.0, -(last_pos.y * 4096.0)) as i16,
-                                pos.z.mul_add(4096.0, -(last_pos.z * 4096.0)) as i16,
+                                (encode_pos(pos.x) - encode_pos(last_pos.x)) as i16,
+                                (encode_pos(pos.y) - encode_pos(last_pos.y)) as i16,
+                                (encode_pos(pos.z) - encode_pos(last_pos.z)) as i16,
                             ),
                             packet.collision & FLAG_ON_GROUND != 0,
                         ),
@@ -315,9 +317,9 @@ impl JavaClient {
                         &CUpdateEntityPosRot::new(
                             entity_id.into(),
                             Vector3::new(
-                                pos.x.mul_add(4096.0, -(last_pos.x * 4096.0)) as i16,
-                                pos.y.mul_add(4096.0, -(last_pos.y * 4096.0)) as i16,
-                                pos.z.mul_add(4096.0, -(last_pos.z * 4096.0)) as i16,
+                                (encode_pos(pos.x) - encode_pos(last_pos.x)) as i16,
+                                (encode_pos(pos.y) - encode_pos(last_pos.y)) as i16,
+                                (encode_pos(pos.z) - encode_pos(last_pos.z)) as i16,
                             ),
                             yaw as u8,
                             pitch as u8,

@@ -58,49 +58,40 @@ impl LpVector3d {
         Ok(())
     }
 
+    /// Vanilla `LpVec3.read`: a zero lowest byte is the whole zero vector.
     pub fn read<R: std::io::Read>(reader: &mut R) -> Result<Self, ReadingError> {
-        let mut low_16 = [0u8; 2];
+        let mut lowest = [0u8; 1];
         reader
-            .read_exact(&mut low_16)
+            .read_exact(&mut lowest)
             .map_err(|e| ReadingError::Message(e.to_string()))?;
-
-        if low_16[0] == 0 && low_16[1] == 0 {
+        if lowest[0] == 0 {
             return Ok(Self(Vector3::new(0.0, 0.0, 0.0)));
         }
 
-        let mut mid_32 = [0u8; 4];
+        let mut middle_highest = [0u8; 5];
         reader
-            .read_exact(&mut mid_32)
+            .read_exact(&mut middle_highest)
             .map_err(|e| ReadingError::Message(e.to_string()))?;
+        let lowest = i64::from(lowest[0]);
+        let middle = i64::from(middle_highest[0]);
+        let highest = i64::from(u32::from_be_bytes([
+            middle_highest[1],
+            middle_highest[2],
+            middle_highest[3],
+            middle_highest[4],
+        ]));
+        let buffer = (highest << 16) | (middle << 8) | lowest;
 
-        let low = u16::from_le_bytes(low_16) as i64;
-        let mid = i32::from_be_bytes(mid_32) as i64;
-        let packed_data = low | (mid << 16);
-
-        let header = packed_data & 0x07;
-        let is_extended = (header & 4) != 0;
-
-        let scale_factor = if is_extended {
-            let scale_tail = VarInt::decode(reader)?;
-            ((scale_tail.0 as i64) << 2) | (header & 3)
-        } else {
-            header & 3
-        };
-
-        if scale_factor == 0 && !is_extended {
-            return Ok(Self(Vector3::new(0.0, 0.0, 0.0)));
+        let mut scale = lowest & 3;
+        if (lowest & 4) == 4 {
+            scale |= (i64::from(VarInt::decode(reader)?.0) & 0xFFFF_FFFF) << 2;
         }
-
-        let q_x = (packed_data >> 3) & 0x7FFF;
-        let q_y = (packed_data >> 18) & 0x7FFF;
-        let q_z = (packed_data >> 33) & 0x7FFF;
-
-        let scale = scale_factor as f64;
+        let scale = scale as f64;
 
         Ok(Self(Vector3::new(
-            from_long(q_x, scale),
-            from_long(q_y, scale),
-            from_long(q_z, scale),
+            from_long(buffer >> 3) * scale,
+            from_long(buffer >> 18) * scale,
+            from_long(buffer >> 33) * scale,
         )))
     }
 
@@ -137,13 +128,13 @@ const fn abs_max(a: f64, b: f64) -> f64 {
 }
 
 fn to_long(value: f64) -> i64 {
-    ((value.mul_add(0.5, 0.5) * MAX_15_BIT_VALUE).round() as i64).clamp(0, 32766)
+    // Vanilla `LpVec3.pack`: `Math.round((value * 0.5 + 0.5) * 32766.0)`.
+    ((value * 0.5 + 0.5) * MAX_15_BIT_VALUE).round() as i64
 }
 
-fn from_long(quantized: i64, scale: f64) -> f64 {
-    // Reverse: ((v * 0.5 + 0.5) * 32766) -> v
-    let normalized = (quantized as f64 / MAX_15_BIT_VALUE) - 0.5;
-    (normalized / 0.5) * scale
+/// Vanilla `LpVec3.unpack`.
+fn from_long(value: i64) -> f64 {
+    ((value & 0x7FFF) as f64).min(MAX_15_BIT_VALUE) * 2.0 / MAX_15_BIT_VALUE - 1.0
 }
 
 #[cfg(test)]
@@ -166,5 +157,29 @@ mod tests {
         velocity.write_legacy(&mut buf)?;
         assert_eq!(buf, vec![0x0F, 0xA0, 0xF0, 0x60, 0x00, 0x00]);
         Ok(())
+    }
+
+    #[test]
+    fn zero_vector_reads_one_byte() {
+        let bytes = [0u8, 0xAB];
+        let mut cursor = std::io::Cursor::new(&bytes[..]);
+        let vector = LpVector3d::read(&mut cursor).unwrap();
+        assert_eq!(vector.0, Vector3::new(0.0, 0.0, 0.0));
+        assert_eq!(cursor.position(), 1);
+    }
+
+    #[test]
+    fn round_trips_through_vanilla_quantization() {
+        for velocity in [
+            Vector3::new(0.25, -0.0784, 0.5),
+            Vector3::new(5.5, -12.0, 0.001),
+        ] {
+            let mut bytes = Vec::new();
+            LpVector3d(velocity).write(&mut bytes).unwrap();
+            let decoded = LpVector3d::read(&mut std::io::Cursor::new(&bytes[..])).unwrap();
+            assert!((decoded.0.x - velocity.x).abs() < 1e-3);
+            assert!((decoded.0.y - velocity.y).abs() < 1e-3);
+            assert!((decoded.0.z - velocity.z).abs() < 1e-3);
+        }
     }
 }
