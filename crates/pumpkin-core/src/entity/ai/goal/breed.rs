@@ -3,6 +3,7 @@ use std::sync::Arc;
 use pumpkin_data::entity::EntityStatus;
 use rand::RngExt;
 
+use crate::entity::ageable::BABY_START_AGE;
 use crate::entity::ai::goal::revenge::EntityTypeFilter;
 use crate::entity::ai::target_predicate::TargetPredicate;
 use crate::entity::ai::util::goal_utils;
@@ -134,7 +135,11 @@ impl BreedGoal {
         if let Some(offspring) = offspring {
             offspring(mob, mate, baby.as_ref());
         }
-        baby.get_entity().set_age(-24000);
+        // Vanilla `setBaby(true)`, through `AgeableMob.setAge` so `ageBoundaryReached` runs.
+        match baby.get_mob().and_then(Mob::as_ageable) {
+            Some(ageable) => ageable.set_age(BABY_START_AGE),
+            None => baby.get_entity().set_age(BABY_START_AGE),
+        }
         baby.refresh_dimensions();
 
         award_breeding(mob, mate);

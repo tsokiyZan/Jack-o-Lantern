@@ -6,7 +6,7 @@ use super::super::memory::walk_target::WalkTarget;
 use super::super::memory::{MemoryModuleId, MemoryStatus, types};
 use super::timed::Behavior;
 use crate::entity::ai::goal::try_find_water::TryFindWaterGoal;
-use crate::entity::ai::util::{air_and_water_random_pos, goal_utils};
+use crate::entity::ai::util::{air_and_water_random_pos, goal_utils, land_random_pos};
 use crate::entity::mob::Mob;
 use pumpkin_util::math::position::BlockPos;
 
@@ -24,19 +24,29 @@ const ENTRY_CONDITIONS: [(MemoryModuleId, MemoryStatus); 2] = [
     (types::HURT_BY.id(), MemoryStatus::Registered),
 ];
 
-/// Vanilla `AnimalPanic(speedMultiplier, flyHeight)`: after a panic-causing hit, flies
-/// to random spots near the ground, or to water when on fire.
+/// Vanilla `AnimalPanic`: after a panic-causing hit, runs (or with a fly height, flies) to
+/// random spots nearby, or to water when on fire.
 pub struct AnimalPanic {
     speed_multiplier: f32,
-    fly_height: i32,
+    fly_height: Option<i32>,
 }
 
 impl AnimalPanic {
+    /// Vanilla `AnimalPanic(speedMultiplier)`, which runs to `LandRandomPos` spots.
+    #[must_use]
+    pub const fn new(speed_multiplier: f32) -> Self {
+        Self {
+            speed_multiplier,
+            fly_height: None,
+        }
+    }
+
+    /// Vanilla `AnimalPanic(speedMultiplier, flyHeight)`.
     #[must_use]
     pub const fn flying(speed_multiplier: f32, fly_height: i32) -> Self {
         Self {
             speed_multiplier,
-            fly_height,
+            fly_height: Some(fly_height),
         }
     }
 
@@ -46,6 +56,13 @@ impl AnimalPanic {
         {
             return Some(water.to_f64() + Vector3::new(0.5, 0.0, 0.5));
         }
+        let Some(fly_height) = self.fly_height else {
+            return land_random_pos::get_pos(
+                mob,
+                PANIC_DISTANCE_HORIZONTAL,
+                PANIC_DISTANCE_VERTICAL,
+            );
+        };
         // `getViewVector(0.0F)` is last tick's head rotation, which Pumpkin doesn't keep.
         let entity = mob.get_entity();
         let view = crate::entity::Entity::calculate_view_vector(
@@ -56,7 +73,7 @@ impl AnimalPanic {
             mob,
             PANIC_DISTANCE_HORIZONTAL,
             PANIC_DISTANCE_VERTICAL,
-            self.fly_height,
+            fly_height,
             view.x,
             view.z,
             f64::from(std::f32::consts::FRAC_PI_2),

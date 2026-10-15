@@ -131,6 +131,9 @@ pub struct LivingEntity {
     pub death_time: AtomicU8,
     /// Indicates whether the entity is dead. (`on_death` called)
     pub dead: AtomicBool,
+    /// Vanilla `LivingEntity.discardFriction`: travel in air keeps the horizontal and
+    /// vertical speed undamped, as a long jump needs.
+    pub discard_friction: AtomicBool,
     /// The distance the entity has been falling.
     pub fall_distance: AtomicCell<f32>,
     pub active_effects: std::sync::Mutex<FxHashMap<&'static StatusEffect, Effect>>,
@@ -331,6 +334,7 @@ impl LivingEntity {
             fall_distance: AtomicCell::new(0.0),
             death_time: AtomicU8::new(0),
             dead: AtomicBool::new(false),
+            discard_friction: AtomicBool::new(false),
             item_use_time: AtomicI32::new(0),
             item_in_use: std::sync::Mutex::new(None),
             active_hand: std::sync::Mutex::new(None),
@@ -1724,7 +1728,10 @@ impl LivingEntity {
             // if below world's bottom y then -0.1, else 0.0
         }
 
-        // If entity has no drag: store velo and return
+        if self.discard_friction.load(Relaxed) {
+            self.entity.velocity.store(velo);
+            return;
+        }
 
         let air_drag_modifier = self.get_attribute_value(&Attributes::AIR_DRAG_MODIFIER) as f32;
         let air_drag = Self::compute_modified_friction(0.91, air_drag_modifier);
@@ -2008,13 +2015,16 @@ impl LivingEntity {
     /// Vanilla `getJumpPower(multiplier)`: jump strength times the block jump factor, plus
     /// jump boost, all floats.
     pub fn get_jump_velocity(&self, multiplier: f32) -> f32 {
-        let boost = self
-            .get_effect(&StatusEffect::JUMP_BOOST)
-            .map_or(0.0, |effect| 0.1 * (effect.amplifier as f32 + 1.0));
         self.get_attribute_value(&Attributes::JUMP_STRENGTH) as f32
             * multiplier
             * self.entity.get_jump_velocity_multiplier()
-            + boost
+            + self.get_jump_boost_power()
+    }
+
+    /// Vanilla `LivingEntity.getJumpBoostPower`.
+    pub fn get_jump_boost_power(&self) -> f32 {
+        self.get_effect(&StatusEffect::JUMP_BOOST)
+            .map_or(0.0, |effect| 0.1 * (effect.amplifier as f32 + 1.0))
     }
 
     pub fn fall(
@@ -2106,18 +2116,21 @@ impl LivingEntity {
         let safe_fall_distance = self.get_attribute_value(&Attributes::SAFE_FALL_DISTANCE) as f32;
         let unsafe_fall_distance = fall_distance + 1.0E-6 - safe_fall_distance;
 
-        let damage = (unsafe_fall_distance * damage_per_distance).floor();
-        if damage > 0.0 {
-            let check_damage = self.damage(caller, damage, DamageType::FALL); // Fall
+        let damage = (unsafe_fall_distance * damage_per_distance).floor() as i32;
+        let damage = caller
+            .get_mob()
+            .map_or(damage, |mob| mob.calculate_fall_damage(damage));
+        if damage > 0 {
+            let check_damage = self.damage(caller, damage as f32, DamageType::FALL); // Fall
             if check_damage {
-                self.entity
-                    .play_sound(Self::get_fall_sound(fall_distance as i32));
+                // Vanilla `getFallDamageSound(dmg)` picks by the damage, not the distance.
+                self.entity.play_sound(Self::get_fall_sound(damage));
             }
         }
     }
 
-    const fn get_fall_sound(distance: i32) -> Sound {
-        if distance > 4 {
+    const fn get_fall_sound(damage: i32) -> Sound {
+        if damage > 4 {
             Sound::EntityGenericBigFall
         } else {
             Sound::EntityGenericSmallFall

@@ -2,6 +2,7 @@ use pumpkin_protocol::java::client::play::{
     CInitializeWorldBorder, CSetBorderCenter, CSetBorderLerpSize, CSetBorderSize,
     CSetBorderWarningDelay, CSetBorderWarningDistance,
 };
+use pumpkin_util::math::boundingbox::BoundingBox;
 
 use crate::net::java::JavaClient;
 
@@ -140,6 +141,14 @@ impl Worldborder {
         let min_z = self.center_z - half;
         let max_z = self.center_z + half;
         x >= min_x && x < max_x && z >= min_z && z < max_z
+    }
+
+    /// Vanilla `WorldBorder.isWithinBounds(AABB)`.
+    #[must_use]
+    pub fn contains_box(&self, bounding_box: &BoundingBox) -> bool {
+        let inset = f64::from(1.0E-5f32);
+        self.contains(bounding_box.min.x, bounding_box.min.z)
+            && self.contains(bounding_box.max.x - inset, bounding_box.max.z - inset)
     }
 
     #[must_use]
