@@ -289,6 +289,9 @@ impl ProtoChunk {
         generator: &super::generator::WorldGenerator,
     ) -> Self {
         let mut proto_chunk = Self::new(chunk_data.x, chunk_data.z, generator);
+        // Only a chunk whose terrain is complete carries blocks and heightmaps
+        // (vanilla MergeTerrainChunkStatusFix strips both from intermediate ones).
+        let has_terrain = StagedChunkEnum::from(chunk_data.status) >= StagedChunkEnum::Carvers;
 
         proto_chunk.light = chunk_data
             .light_engine
@@ -333,6 +336,9 @@ impl ProtoChunk {
             }
 
             for x in 0..16 {
+                if !has_terrain {
+                    break;
+                }
                 for y in 0..16 {
                     for z in 0..16 {
                         let block_state_id = block_palette.get(x, y, z);
@@ -365,6 +371,9 @@ impl ProtoChunk {
         drop(biome_sections_guard);
 
         for z in 0..16 {
+            if !has_terrain {
+                break;
+            }
             for x in 0..16 {
                 let index = Self::local_position_to_height_map_index(x, z);
 

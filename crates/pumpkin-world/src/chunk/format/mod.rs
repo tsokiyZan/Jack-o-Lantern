@@ -34,6 +34,10 @@ pub mod anvil;
 pub mod linear;
 pub mod pump;
 
+/// Pumpkin-only marker on chunks saved with finished terrain. Earlier Pumpkin builds also saved
+/// half-built terrain as `minecraft:terrain`; vanilla ignores the extra tag.
+const TERRAIN_COMPLETE_TAG: &str = "pumpkin:terrain_complete";
+
 impl SingleChunkDataSerializer for ChunkData {
     #[inline]
     fn from_bytes(bytes: &Bytes, pos: Vector2<i32>) -> Result<Self, ChunkReadingError> {
@@ -433,10 +437,18 @@ impl ChunkData {
         let status = match status_str {
             "minecraft:structure_starts" => ChunkStatus::StructureStarts,
             "minecraft:structure_references" => ChunkStatus::StructureReferences,
-            "minecraft:biomes" => ChunkStatus::Biomes,
-            "minecraft:terrain" | "minecraft:noise" | "minecraft:surface" | "minecraft:carvers" => {
-                ChunkStatus::Terrain
+            // MergeTerrainChunkStatusFix: carvers -> terrain, noise/surface -> biomes.
+            // Pumpkin used to save its half-built noise and surface stages as `terrain` too;
+            // those saves (Pumpkin's data version, no completeness marker) start over from
+            // biomes rather than load as finished terrain.
+            "minecraft:terrain"
+                if root_tag.get_int("DataVersion") == Some(WORLD_DATA_VERSION)
+                    && root_tag.get_bool(TERRAIN_COMPLETE_TAG) != Some(true) =>
+            {
+                ChunkStatus::Biomes
             }
+            "minecraft:terrain" | "minecraft:carvers" => ChunkStatus::Terrain,
+            "minecraft:biomes" | "minecraft:noise" | "minecraft:surface" => ChunkStatus::Biomes,
             "minecraft:features" => ChunkStatus::Features,
             "minecraft:initialize_light" => ChunkStatus::InitializeLight,
             "minecraft:light" => ChunkStatus::Light,
@@ -533,6 +545,9 @@ impl ChunkData {
             ChunkStatus::Full => "minecraft:full",
         };
         root_compound.put_string("Status", status_str.to_string());
+        if self.status == ChunkStatus::Terrain {
+            root_compound.put_bool(TERRAIN_COMPLETE_TAG, true);
+        }
 
         let mut heightmaps_compound = NbtCompound::new();
         if let Some(ref arr) = heightmap_lock.world_surface {
@@ -1029,6 +1044,54 @@ mod tests {
             NbtTag::List(sections.into_iter().map(NbtTag::Compound).collect()),
         );
         pumpkin_nbt::Nbt::new(String::new(), root)
+    }
+
+    fn terrain_chunk_status(data_version: i32, complete_marker: bool) -> ChunkStatus {
+        use crate::chunk::ChunkData;
+        use pumpkin_util::math::vector2::Vector2;
+
+        let mut nbt = test_chunk(vec![test_section(-4, "minecraft:stone", true)]);
+        nbt.root_tag.put_int("DataVersion", data_version);
+        nbt.root_tag
+            .put_string("Status", "minecraft:terrain".to_string());
+        if complete_marker {
+            nbt.root_tag.put_bool(TERRAIN_COMPLETE_TAG, true);
+        }
+        ChunkData::from_bytes(&nbt.write(), Vector2::new(0, 0))
+            .expect("terrain chunk parses")
+            .status
+    }
+
+    // Before the marker, Pumpkin saved its half-built noise and surface stages as `terrain`
+    // too; only chunks it marks complete, or that another server wrote, are carved terrain.
+    #[test]
+    fn unmarked_pumpkin_terrain_chunk_restarts_from_biomes() {
+        assert_eq!(
+            terrain_chunk_status(WORLD_DATA_VERSION, false),
+            ChunkStatus::Biomes
+        );
+        assert_eq!(
+            terrain_chunk_status(WORLD_DATA_VERSION, true),
+            ChunkStatus::Terrain
+        );
+        assert_eq!(
+            terrain_chunk_status(WORLD_DATA_VERSION + 1, false),
+            ChunkStatus::Terrain
+        );
+    }
+
+    #[test]
+    fn saved_terrain_chunk_keeps_its_status() {
+        use crate::chunk::ChunkData;
+        use pumpkin_util::math::vector2::Vector2;
+
+        let mut nbt = test_chunk(vec![test_section(-4, "minecraft:stone", true)]);
+        nbt.root_tag
+            .put_string("Status", "minecraft:carvers".to_string());
+        let chunk = ChunkData::from_bytes(&nbt.write(), Vector2::new(0, 0)).expect("parses");
+        let saved = chunk.to_bytes().expect("serializes");
+        let reloaded = ChunkData::from_bytes(&saved, Vector2::new(0, 0)).expect("reparses");
+        assert_eq!(reloaded.status, ChunkStatus::Terrain);
     }
 
     #[test]

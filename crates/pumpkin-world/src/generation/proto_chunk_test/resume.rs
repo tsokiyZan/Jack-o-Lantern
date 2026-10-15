@@ -7,6 +7,7 @@ use crate::chunk_system::{
 use crate::generation::{
     biome_coords, generator::WorldGenerator, get_world_gen, proto_chunk::ProtoChunk,
 };
+use pumpkin_data::chunk::ChunkStatus;
 use pumpkin_data::dimension::Dimension;
 use pumpkin_util::world_seed::Seed;
 
@@ -202,12 +203,104 @@ fn block_entities_survive_chunk_data_resume() {
     assert_eq!(chunk_again.pending_block_entities.lock().unwrap().len(), 1);
 }
 
-// Regression test for transposed heightmaps during Noise-stage chunk resume.
-// Flat terrain cannot expose this bug, so use a sloped chunk.
-#[test]
-fn heightmap_roundtrip_through_chunk_data_resume() {
-    use crate::chunk_system::chunk_state::Chunk;
+fn chunk_at_stage(
+    world_gen: &WorldGenerator,
+    cx: i32,
+    cz: i32,
+    stage: StagedChunkEnum,
+) -> ProtoChunk {
+    let WorldGenerator::Noise(generator) = world_gen else {
+        unreachable!()
+    };
+    let mut proto = ProtoChunk::new(cx, cz, world_gen);
+    proto.step_to_biomes(generator);
+    proto.set_structure_starts(generator);
+    proto.set_structure_references(generator);
+    proto.step_to_noise(generator);
+    if stage >= StagedChunkEnum::Surface {
+        proto.step_to_surface(generator, &surface_biomes(world_gen, cx, cz));
+    }
+    if stage >= StagedChunkEnum::Carvers {
+        proto.step_to_carvers(generator);
+    }
+    assert_eq!(proto.stage, stage);
+    proto
+}
+
+fn save_and_load(proto: ProtoChunk, world_gen: &WorldGenerator) -> (ChunkStatus, ProtoChunk) {
     use pumpkin_config::lighting::LightingEngineConfig;
+    let mut staged = Chunk::Proto(Box::new(proto));
+    staged.upgrade_to_level_chunk(&Dimension::OVERWORLD, &LightingEngineConfig::Default);
+    let Chunk::Level(chunk_data) = staged else {
+        unreachable!()
+    };
+    (
+        chunk_data.status,
+        ProtoChunk::from_chunk_data(&chunk_data, world_gen),
+    )
+}
+
+// Vanilla 26.3 builds noise, surface and carvers in one TERRAIN step, so "terrain" on
+// disk always means carved terrain. A neighbour's features write into a chunk at this
+// stage (write radius 1); resuming it at Noise rebuilt its surface over those blocks and
+// turned tree leaves into grass and dirt.
+#[test]
+fn carved_chunk_resumes_at_carvers_and_keeps_neighbour_blocks() {
+    use pumpkin_data::Block;
+    use pumpkin_util::math::vector3::Vector3;
+
+    let seed = Seed(1779920288596261407);
+    let (cx, cz) = (67i32, 63i32);
+    let world_gen = get_world_gen(seed, Dimension::OVERWORLD, false, Vec::new(), String::new());
+    let mut proto = chunk_at_stage(&world_gen, cx, cz, StagedChunkEnum::Carvers);
+
+    // A leaf placed on top of the terrain by a neighbouring chunk's tree.
+    let (wx, wz) = (cx * 16 + 3, cz * 16 + 5);
+    let leaf_y = proto.top_block_height_exclusive(3, 5);
+    proto.set_block_state(wx, leaf_y, wz, Block::OAK_LEAVES.default_state);
+
+    let mut expected = [[0i32; 16]; 16];
+    for z in 0..16i32 {
+        for x in 0..16i32 {
+            expected[z as usize][x as usize] = proto.top_block_height_exclusive(x, z);
+        }
+    }
+    let blocks_before: Vec<_> = (proto.bottom_y() as i32
+        ..proto.bottom_y() as i32 + proto.height() as i32)
+        .flat_map(|y| (0..16).flat_map(move |x| (0..16).map(move |z| (x, y, z))))
+        .map(|(x, y, z)| proto.get_block_state(&Vector3::new(cx * 16 + x, y, cz * 16 + z)))
+        .collect();
+
+    let (status, resumed) = save_and_load(proto, &world_gen);
+    assert_eq!(status, ChunkStatus::Terrain);
+    assert_eq!(resumed.stage, StagedChunkEnum::Carvers);
+    assert_eq!(
+        resumed.get_block_state(&Vector3::new(wx, leaf_y, wz)),
+        Block::OAK_LEAVES.default_state.id
+    );
+    let blocks_after: Vec<_> = (resumed.bottom_y() as i32
+        ..resumed.bottom_y() as i32 + resumed.height() as i32)
+        .flat_map(|y| (0..16).flat_map(move |x| (0..16).map(move |z| (x, y, z))))
+        .map(|(x, y, z)| resumed.get_block_state(&Vector3::new(cx * 16 + x, y, cz * 16 + z)))
+        .collect();
+    assert!(blocks_before == blocks_after, "blocks changed by save/load");
+
+    // Regression for transposed heightmaps on resume; flat terrain cannot expose it.
+    for z in 0..16i32 {
+        for x in 0..16i32 {
+            assert_eq!(
+                resumed.top_block_height_exclusive(x, z),
+                expected[z as usize][x as usize],
+                "heightmap corrupted by save/load roundtrip (transposed or lost)"
+            );
+        }
+    }
+}
+
+// MergeTerrainChunkStatusFix: an intermediate terrain chunk is persisted as "biomes"
+// without blocks and regenerates its terrain from scratch.
+#[test]
+fn intermediate_terrain_is_saved_as_biomes_and_regenerates() {
     use pumpkin_util::math::vector3::Vector3;
 
     let seed = Seed(1779920288596261407);
@@ -216,76 +309,35 @@ fn heightmap_roundtrip_through_chunk_data_resume() {
     let WorldGenerator::Noise(generator) = &*world_gen else {
         unreachable!()
     };
+    let fresh = chunk_at_stage(&world_gen, cx, cz, StagedChunkEnum::Carvers);
 
-    let mut proto = ProtoChunk::new(cx, cz, &world_gen);
-    proto.step_to_biomes(generator);
-    proto.set_structure_starts(generator);
-    proto.set_structure_references(generator);
-    proto.step_to_noise(generator);
-
-    let mut expected_heights = [[0i32; 16]; 16];
-    for z in 0..16i32 {
-        for x in 0..16i32 {
-            expected_heights[z as usize][x as usize] = proto.top_block_height_exclusive(x, z);
+    for stage in [StagedChunkEnum::Noise, StagedChunkEnum::Surface] {
+        let (status, mut resumed) =
+            save_and_load(chunk_at_stage(&world_gen, cx, cz, stage), &world_gen);
+        assert_eq!(status, ChunkStatus::Biomes);
+        assert_eq!(resumed.stage, StagedChunkEnum::Biomes);
+        let bottom = resumed.bottom_y() as i32;
+        for y in bottom..bottom + resumed.height() as i32 {
+            assert!(
+                resumed
+                    .get_block_state(&Vector3::new(cx * 16, y, cz * 16))
+                    .to_state()
+                    .is_air()
+            );
         }
-    }
 
-    let mut staged = Chunk::Proto(Box::new(proto));
-    staged.upgrade_to_level_chunk(&Dimension::OVERWORLD, &LightingEngineConfig::Default);
-    let Chunk::Level(chunk_data) = staged else {
-        unreachable!()
-    };
-    assert_eq!(chunk_data.status, pumpkin_data::chunk::ChunkStatus::Terrain);
-
-    let mut resumed = ProtoChunk::from_chunk_data(&chunk_data, &world_gen);
-    assert_eq!(resumed.stage, StagedChunkEnum::Noise);
-
-    let mut height_mismatches = 0;
-    for z in 0..16i32 {
-        for x in 0..16i32 {
-            let expected = expected_heights[z as usize][x as usize];
-            let got = resumed.top_block_height_exclusive(x, z);
-            if got != expected {
-                height_mismatches += 1;
+        resumed.set_structure_starts(generator);
+        resumed.set_structure_references(generator);
+        resumed.step_to_noise(generator);
+        resumed.step_to_surface(generator, &surface_biomes(&world_gen, cx, cz));
+        resumed.step_to_carvers(generator);
+        for z in 0..16 {
+            for x in 0..16 {
+                for y in bottom..bottom + resumed.height() as i32 {
+                    let pos = Vector3::new(cx * 16 + x, y, cz * 16 + z);
+                    assert_eq!(resumed.get_block_state(&pos), fresh.get_block_state(&pos));
+                }
             }
         }
     }
-    assert_eq!(
-        height_mismatches, 0,
-        "heightmap corrupted by save/load roundtrip (transposed or lost)"
-    );
-
-    let surface_biomes = surface_biomes(&world_gen, cx, cz);
-    resumed.step_to_surface(generator, &surface_biomes);
-
-    let mut fresh = ProtoChunk::new(cx, cz, &world_gen);
-    fresh.step_to_biomes(generator);
-    fresh.set_structure_starts(generator);
-    fresh.set_structure_references(generator);
-    fresh.step_to_noise(generator);
-    fresh.step_to_surface(generator, &surface_biomes);
-
-    let bottom = fresh.bottom_y() as i32;
-    let top = bottom + fresh.height() as i32;
-    let mut surface_mismatches = 0;
-    for lz in 0..16i32 {
-        for lx in 0..16i32 {
-            let (wx, wz) = (cx * 16 + lx, cz * 16 + lz);
-            for y in (bottom..top).rev() {
-                let f = fresh.get_block_state(&Vector3::new(wx, y, wz)).to_state();
-                if f.is_air() || f.is_liquid() {
-                    continue;
-                }
-                let r = resumed.get_block_state(&Vector3::new(wx, y, wz)).to_state();
-                if f.id != r.id {
-                    surface_mismatches += 1;
-                }
-                break;
-            }
-        }
-    }
-    assert_eq!(
-        surface_mismatches, 0,
-        "resumed chunk surface differs from uninterrupted generation (stone-trail bug)"
-    );
 }

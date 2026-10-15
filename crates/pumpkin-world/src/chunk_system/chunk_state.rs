@@ -71,7 +71,8 @@ impl From<ChunkStatus> for StagedChunkEnum {
             ChunkStatus::StructureStarts => Self::StructureStart,
             ChunkStatus::StructureReferences => Self::StructureReferences,
             ChunkStatus::Biomes => Self::Biomes,
-            ChunkStatus::Terrain => Self::Noise,
+            // Vanilla's TERRAIN (noise + surface + carvers) is only ever persisted complete.
+            ChunkStatus::Terrain => Self::Carvers,
             ChunkStatus::Features => Self::Features,
             ChunkStatus::InitializeLight | ChunkStatus::Light => Self::Lighting,
             ChunkStatus::Spawn => Self::Spawn,
@@ -87,10 +88,13 @@ impl From<StagedChunkEnum> for ChunkStatus {
             StagedChunkEnum::Empty => Self::Empty,
             StagedChunkEnum::StructureStart => Self::StructureStarts,
             StagedChunkEnum::StructureReferences => Self::StructureReferences,
-            StagedChunkEnum::Biomes => Self::Biomes,
-            StagedChunkEnum::Noise | StagedChunkEnum::Surface | StagedChunkEnum::Carvers => {
-                Self::Terrain
+            // Intermediate terrain is not a vanilla status: persist it as the last
+            // complete one (vanilla MergeTerrainChunkStatusFix: noise/surface -> biomes,
+            // carvers -> terrain). Its blocks are dropped in `build_level_sections`.
+            StagedChunkEnum::Biomes | StagedChunkEnum::Noise | StagedChunkEnum::Surface => {
+                Self::Biomes
             }
+            StagedChunkEnum::Carvers => Self::Terrain,
             StagedChunkEnum::Features => Self::Features,
             StagedChunkEnum::Lighting => Self::Light,
             StagedChunkEnum::Spawn => Self::Spawn,
@@ -216,7 +220,10 @@ impl Chunk {
         let biome_min_y = biome_coords::from_block(dimension.min_y);
         let block_sections = (0..total_sections)
             .map(|section_index| {
-                if section_index * BlockPalette::VOLUME >= proto_chunk.flat_block_map.len() {
+                if section_index * BlockPalette::VOLUME >= proto_chunk.flat_block_map.len()
+                    || (StagedChunkEnum::Noise..StagedChunkEnum::Carvers)
+                        .contains(&proto_chunk.stage)
+                {
                     return BlockPalette::Homogeneous(BlockStateId::AIR);
                 }
                 BlockPalette::from_fn(|x, y, z| {
