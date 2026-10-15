@@ -10,6 +10,7 @@ use crate::{
 use bytes::BufMut;
 use pumpkin_data::damage::DamageType;
 use pumpkin_data::data_component_impl::PotionDurationScaleImpl;
+use pumpkin_data::effect::StatusEffect;
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
@@ -231,38 +232,84 @@ impl ArrowEntity {
         damage_succeeded
     }
 
+    /// Vanilla `Arrow.updateColor`: no color without potion contents, otherwise
+    /// `PotionContents.getColor`.
     #[must_use]
     pub fn get_effect_color(item_stack: &ItemStack) -> i32 {
-        if let Some(pc) =
-            item_stack.get_data_component::<pumpkin_data::data_component_impl::PotionContentsImpl>()
+        /// Vanilla `PotionContents.BASE_POTION_COLOR`.
+        const BASE_POTION_COLOR: i32 = -13_083_194;
+        let Some(pc) = item_stack
+            .get_data_component::<pumpkin_data::data_component_impl::PotionContentsImpl>()
+        else {
+            return -1;
+        };
+        if pc.potion_id.is_none()
+            && pc.custom_color.is_none()
+            && pc.custom_effects.is_empty()
+            && pc.custom_name.is_none()
         {
-            if let Some(color) = pc.custom_color {
-                return color;
-            }
-            let effects = crate::item::potion::PotionContents::read_potion_effects(item_stack);
-            if effects.is_empty() {
-                return -1;
-            }
-            let mut r = 0;
-            let mut g = 0;
-            let mut b = 0;
-            let mut total = 0;
-            for (effect, _, amplifier, _, _, _) in effects {
-                let color = effect.color;
-                let weight = (amplifier as i32) + 1;
-                r += weight * ((color >> 16) & 0xFF);
-                g += weight * ((color >> 8) & 0xFF);
-                b += weight * (color & 0xFF);
-                total += weight;
-            }
-            if total == 0 {
-                -1
-            } else {
-                ((r / total) << 16) | ((g / total) << 8) | (b / total)
-            }
-        } else {
-            -1
+            return -1;
         }
+        if let Some(color) = pc.custom_color {
+            return color;
+        }
+        // `PotionContents.getColorOptional`: visible effects, weighted by level.
+        let mut r = 0;
+        let mut g = 0;
+        let mut b = 0;
+        let mut total = 0;
+        for (effect, _, amplifier, _, show_particles, _) in
+            crate::item::potion::PotionContents::read_potion_effects(item_stack)
+        {
+            if !show_particles {
+                continue;
+            }
+            let color = effect.color;
+            let weight = i32::from(amplifier) + 1;
+            r += weight * ((color >> 16) & 0xFF);
+            g += weight * ((color >> 8) & 0xFF);
+            b += weight * (color & 0xFF);
+            total += weight;
+        }
+        if total == 0 {
+            BASE_POTION_COLOR
+        } else {
+            // `ARGB.color(r, g, b)` is opaque.
+            (0xFF << 24) | ((r / total) << 16) | ((g / total) << 8) | (b / total)
+        }
+    }
+
+    /// Vanilla `Arrow.addEffect`: the effect joins the potion contents of the item the arrow
+    /// carries.
+    pub fn add_effect(&self, effect: &'static StatusEffect, duration: i32) {
+        use pumpkin_data::data_component_impl::{PotionContentsImpl, StatusEffectInstance};
+        let mut item_stack = self
+            .item_stack
+            .write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut contents = item_stack
+            .get_data_component::<PotionContentsImpl>()
+            .cloned()
+            .unwrap_or(PotionContentsImpl {
+                potion_id: None,
+                custom_color: None,
+                custom_effects: Vec::new(),
+                custom_name: None,
+            });
+        contents.custom_effects.push(StatusEffectInstance {
+            effect_id: effect.minecraft_name.into(),
+            amplifier: 0,
+            duration,
+            ambient: false,
+            show_particles: true,
+            show_icon: true,
+            hidden_effect: None,
+        });
+        item_stack.set_data_component(contents);
+        self.entity.set_synced_data(
+            pumpkin_data::tracked_data::arrow::ID_EFFECT_COLOR,
+            Self::get_effect_color(&item_stack),
+        );
     }
 
     pub fn set_velocity_from_rotation(
