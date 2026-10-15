@@ -9,6 +9,7 @@ use crate::entity::ai::control::body_rotation_control::BodyRotationControl;
 use crate::entity::ai::control::jump_control::JumpControl;
 use crate::entity::ai::control::look_control::LookControl;
 use crate::entity::ai::control::move_control::MoveControl;
+use crate::entity::ai::goal::escape_danger::EscapeDangerGoal;
 use crate::entity::ai::goal::goal_selector::GoalSelector;
 use crate::entity::ai::sensing::Sensing;
 use crate::entity::movement_emission::MovementEmission;
@@ -1952,9 +1953,15 @@ impl<T: Mob + Send + 'static> EntityBase for T {
             .store(ticks, Relaxed);
     }
 
+    /// Vanilla `PathfinderMob.isPanicking` for goal-driven mobs: a running `PanicGoal`.
+    /// Inside the mob's own AI tick its selector is detached and this answers `false`.
+    // TODO: brain mobs answer from their `is_panicking` memory, which needs the brain lock.
     fn is_panicking(&self) -> bool {
-        self.get_path_aware_entity()
-            .is_some_and(PathAwareEntity::is_panicking)
+        self.get_mob_entity()
+            .goals_selector
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .is_running::<EscapeDangerGoal>()
     }
 
     fn get_job_site_pos(&self) -> Option<pumpkin_util::math::position::BlockPos> {
@@ -2108,11 +2115,6 @@ pub trait PathAwareEntity: Mob + Send + Sync {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         !navigator.is_idle()
-    }
-
-    // TODO: implement
-    fn is_panicking(&self) -> bool {
-        false
     }
 
     fn should_follow_leash(&self) -> bool {
