@@ -46,29 +46,20 @@ pub trait FluidMetadata {
     fn ids() -> Box<[u16]>;
 }
 
-pub(crate) fn stop_vertical_movement_after_fall(entity: &dyn EntityBase) {
-    let entity = entity.get_entity();
-    let mut velocity = entity.velocity.load();
-    velocity.y = 0.0;
-    entity.velocity.store(velocity);
-}
-
-pub(crate) fn bounce_entity_after_fall(entity: &dyn EntityBase, bounce_multiplier: f64) {
-    let base_entity = entity.get_entity();
-    let mut velocity = base_entity.velocity.load();
-
-    if base_entity.is_sneaking() {
-        velocity.y = 0.0;
-    } else if velocity.y < 0.0 {
-        let entity_factor = if entity.get_living_entity().is_some() {
-            1.0
-        } else {
-            0.8
-        };
-        velocity.y = -velocity.y * bounce_multiplier * entity_factor;
+/// Vanilla `Block.getBounceRestitution`, from the `bounceRestitution` the block's properties
+/// set in `Blocks`: slime blocks 1.0, beds and shelf mushrooms 0.75.
+// TODO: extract `bounceRestitution` with the other block properties.
+#[must_use]
+pub fn bounce_restitution(block: &Block) -> f32 {
+    if block == &Block::SLIME_BLOCK {
+        1.0
+    } else if block.has_tag(&pumpkin_data::tag::Block::MINECRAFT_BEDS)
+        || block == &Block::SHELF_MUSHROOM
+    {
+        0.75
+    } else {
+        0.0
     }
-
-    base_entity.velocity.store(velocity);
 }
 
 pub trait BlockBehaviour: Send + Sync {
@@ -143,9 +134,8 @@ pub trait BlockBehaviour: Send + Sync {
         }
     }
 
-    fn update_entity_movement_after_fall_on(&self, args: UpdateEntityMovementAfterFallOnArgs<'_>) {
-        stop_vertical_movement_after_fall(args.entity);
-    }
+    /// Vanilla `Block.bounceOn`: an entity bounced off this block.
+    fn bounce_on(&self, _args: BounceOnArgs<'_>) {}
 
     /// Called when a player starts digging this block, except in creative.
     fn attack(&self, _args: AttackArgs<'_>) {}
@@ -365,7 +355,9 @@ pub struct OnLandedUponArgs<'a> {
     pub entity: &'a dyn EntityBase,
 }
 
-pub struct UpdateEntityMovementAfterFallOnArgs<'a> {
+pub struct BounceOnArgs<'a> {
+    pub world: &'a Arc<World>,
+    pub position: &'a BlockPos,
     pub entity: &'a dyn EntityBase,
 }
 

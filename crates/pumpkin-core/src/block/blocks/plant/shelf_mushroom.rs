@@ -1,4 +1,5 @@
 use pumpkin_data::block_properties::{HorizontalFacing, ShelfMushroomLikeProperties};
+use pumpkin_data::entity::EntityType;
 use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_data::{
     Block, BlockDirection, BlockState, BlockStateId, FacingExt, HorizontalFacingExt, Mirror,
@@ -9,8 +10,8 @@ use pumpkin_util::math::position::BlockPos;
 use pumpkin_world::world::{BlockAccessor, BlockFlags};
 
 use crate::block::{
-    BlockBehaviour, BonemealArgs, CanPlaceAtArgs, GetStateForNeighborUpdateArgs, OnLandedUponArgs,
-    OnPlaceArgs, UpdateEntityMovementAfterFallOnArgs, bounce_entity_after_fall,
+    BlockBehaviour, BonemealArgs, BounceOnArgs, CanPlaceAtArgs, GetStateForNeighborUpdateArgs,
+    OnLandedUponArgs, OnPlaceArgs,
 };
 use crate::entity::EntityBase;
 
@@ -115,14 +116,14 @@ impl BlockBehaviour for ShelfMushroomBlock {
         }
     }
 
-    fn update_entity_movement_after_fall_on(&self, args: UpdateEntityMovementAfterFallOnArgs<'_>) {
-        bounce_entity_after_fall(args.entity, 0.8);
-        if args.entity.get_living_entity().is_some() {
-            let entity = args.entity.get_entity();
-            entity.world.load().play_sound(
+    /// Vanilla `ShelfMushroomBlock.bounceOn`: everything but items and TNT makes a sound.
+    fn bounce_on(&self, args: BounceOnArgs<'_>) {
+        let entity_type = args.entity.get_entity().entity_type;
+        if entity_type != &EntityType::ITEM && entity_type != &EntityType::TNT {
+            args.world.play_sound(
                 Sound::BlockShelfMushroomBounce,
                 SoundCategory::Blocks,
-                &entity.pos.load(),
+                &args.position.to_centered_f64(),
             );
         }
     }

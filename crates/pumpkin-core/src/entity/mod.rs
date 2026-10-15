@@ -2289,10 +2289,6 @@ impl Entity {
             );
         }
 
-        let velocity_multiplier = f64::from(caller.get_block_speed_factor());
-
-        self.velocity.store(final_move * velocity_multiplier);
-
         if let Some(living) = caller.get_living_entity()
             && caller.get_mob().is_none_or(mob::Mob::checks_fall_damage)
         {
@@ -2300,15 +2296,96 @@ impl Entity {
             living.fall(caller, final_move.y, on_ground, false);
         }
 
-        if motion.y != final_move.y {
-            let world = self.world.load();
-            let block = self.get_block_with_y_offset(0.2).1;
-            world
-                .block_registry
-                .update_entity_movement_after_fall_on(block, caller);
-        }
+        self.restitute_movement_after_collisions(caller, motion, final_move);
 
         self.apply_movement_emission_and_play_sound(caller, final_move);
+
+        let block_speed_factor = f64::from(caller.get_block_speed_factor());
+        let velocity = self.velocity.load();
+        self.velocity.store(Vector3::new(
+            velocity.x * block_speed_factor,
+            velocity.y,
+            velocity.z * block_speed_factor,
+        ));
+    }
+
+    /// Vanilla `restituteMovementAfterCollisions`: stops (or bounces) the movement along
+    /// each axis the move of `delta` collided on, ending up at `movement`.
+    fn restitute_movement_after_collisions(
+        &self,
+        caller: &dyn EntityBase,
+        delta: Vector3<f64>,
+        movement: Vector3<f64>,
+    ) {
+        // `Mth.equal`.
+        let x_collision = (movement.x - delta.x).abs() >= f64::from(1.0e-5f32);
+        let z_collision = (movement.z - delta.z).abs() >= f64::from(1.0e-5f32);
+        let vertical_collision = delta.y.abs() > 0.0 && delta.y != movement.y;
+        let vertical_collision_below = vertical_collision && delta.y < 0.0;
+        if !vertical_collision && !x_collision && !z_collision {
+            return;
+        }
+        let effect_block = self.get_block_with_y_offset(f64::from(0.2f32)).1;
+        let living = caller.get_living_entity();
+        let suppressing_bounce = self.is_sneaking();
+        // `getEntityBounciness`: the BOUNCINESS attribute for living entities.
+        let mut restitution = if suppressing_bounce {
+            0.0
+        } else {
+            living.map_or(0.0, |living| {
+                living.get_attribute_value(&pumpkin_data::attributes::Attributes::BOUNCINESS)
+            })
+        };
+        let current = self.velocity.load();
+        let mut after = current;
+        if x_collision {
+            after.x = -current.x * restitution;
+        }
+        if z_collision {
+            after.z = -current.z * restitution;
+        }
+        let mut bounced = restitution > 0.0 && (x_collision || z_collision);
+        if vertical_collision {
+            let gravity = living.map_or_else(
+                || caller.current_gravity(),
+                |living| living.get_effective_gravity(caller),
+            );
+            if vertical_collision_below {
+                restitution = if -current.y > gravity
+                    && !suppressing_bounce
+                    && !effect_block.has_tag(&tag::Block::MINECRAFT_SUPPRESSES_BOUNCE)
+                {
+                    // `getBlockBounciness`: non-living entities keep 80% of it.
+                    let mut block_bounciness = crate::block::bounce_restitution(effect_block);
+                    if living.is_none() {
+                        block_bounciness *= 0.8;
+                    }
+                    restitution.max(f64::from(block_bounciness))
+                } else {
+                    0.0
+                };
+            }
+            let (gravity_compensation, effective_drag) = if restitution > 0.0 {
+                let portion_with_movement = movement.y / current.y;
+                let air_drag = living.map_or(0.98f32, |living| living.get_air_drag(caller));
+                bounced = true;
+                (
+                    portion_with_movement * gravity,
+                    1.0 + portion_with_movement * (f64::from(air_drag) - 1.0),
+                )
+            } else {
+                (0.0, 1.0)
+            };
+            after.y = (gravity_compensation - current.y) * effective_drag * restitution;
+        }
+        if bounced {
+            let world = self.world.load_full();
+            let pos = self.get_block_pos_below_that_affects_my_movement();
+            let block = world.get_block(&pos);
+            world.block_registry.bounce_on(&world, block, &pos, caller);
+            self.velocity_dirty.store(true, Ordering::SeqCst);
+        }
+        self.velocity.store(after);
     }
 
     pub fn push_out_of_blocks(&self, center_pos: Vector3<f64>) {

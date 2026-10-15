@@ -1351,7 +1351,7 @@ impl LivingEntity {
             .has_tag(&tag::EntityType::MINECRAFT_FALL_DAMAGE_IMMUNE)
     }
 
-    fn get_effective_gravity(&self, caller: &dyn EntityBase) -> f64 {
+    pub(crate) fn get_effective_gravity(&self, caller: &dyn EntityBase) -> f64 {
         let final_gravity = caller.current_gravity();
 
         if self.entity.velocity.load().y <= 0.0 && self.has_effect(&StatusEffect::SLOW_FALLING) {
@@ -1620,6 +1620,14 @@ impl LivingEntity {
     /// Vanilla `LivingEntity.computeModifiedFriction`.
     fn compute_modified_friction(friction: f32, modifier: f32) -> f32 {
         (1.0 - (1.0 - friction) * modifier).clamp(0.0, 1.0)
+    }
+
+    /// Vanilla `LivingEntity.getAirDrag`.
+    pub(crate) fn get_air_drag(&self, caller: &dyn EntityBase) -> f32 {
+        Self::compute_modified_friction(
+            if caller.is_flutterer() { 0.91 } else { 0.98 },
+            self.get_attribute_value(&Attributes::AIR_DRAG_MODIFIER) as f32,
+        )
     }
 
     /// Vanilla `LivingEntity.travelInAir`, in vanilla's float maths.
