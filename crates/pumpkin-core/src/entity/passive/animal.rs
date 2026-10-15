@@ -88,6 +88,11 @@ pub trait Animal: Mob {
         1 + self.get_random().random_range(0..3)
     }
 
+    /// Vanilla `Mob.usePlayerItem`, short of the `use_remainder` component.
+    fn use_player_item(&self, player: &Player, item_stack: &mut ItemStack) {
+        item_stack.decrement_unless_creative(player.gamemode.load(), 1);
+    }
+
     fn play_eating_sound(&self, sound: Sound) {
         let mob_entity = self.get_mob_entity();
         let entity = &mob_entity.living_entity.entity;
@@ -128,7 +133,7 @@ pub trait Animal: Mob {
                 .load(std::sync::atomic::Ordering::Relaxed);
 
             if age >= 0 && mob_entity.is_breeding_ready() && self.can_fall_in_love() {
-                item_stack.decrement_unless_creative(player.gamemode.load(), 1);
+                self.use_player_item(player, item_stack);
 
                 mob_entity.set_love_ticks(600, Some(player.gameprofile.id));
                 let entity = &mob_entity.living_entity.entity;
@@ -155,7 +160,7 @@ pub trait Animal: Mob {
             if let Some(ageable) = self.as_ageable()
                 && ageable.can_age_up()
             {
-                item_stack.decrement_unless_creative(player.gamemode.load(), 1);
+                self.use_player_item(player, item_stack);
                 ageable.age_up(get_speed_up_seconds_when_feeding(-age), true);
                 self.play_eating_sound(ambient_sound);
                 return true;

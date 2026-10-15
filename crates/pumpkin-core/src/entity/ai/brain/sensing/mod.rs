@@ -67,6 +67,7 @@ pub enum SensorType {
     AxolotlAttackables,
     FoodTemptations,
     FrogTemptations,
+    NautilusTemptations,
     FrogAttackables,
     IsInWater,
     ArmadilloScareDetected,
@@ -90,6 +91,7 @@ impl SensorType {
             Self::AxolotlAttackables => "minecraft:axolotl_attackables",
             Self::FoodTemptations => "minecraft:food_temptations",
             Self::FrogTemptations => "minecraft:frog_temptations",
+            Self::NautilusTemptations => "minecraft:nautilus_temptations",
             Self::FrogAttackables => "minecraft:frog_attackables",
             Self::IsInWater => "minecraft:is_in_water",
             Self::ArmadilloScareDetected => "minecraft:armadillo_scare_detected",
@@ -113,6 +115,7 @@ impl SensorType {
             | Self::AxolotlAttackables
             | Self::FoodTemptations
             | Self::FrogTemptations
+            | Self::NautilusTemptations
             | Self::FrogAttackables
             | Self::IsInWater
             | Self::BreezeAttackEntitySensor => DEFAULT_SCAN_RATE,
@@ -136,6 +139,9 @@ impl SensorType {
             Self::FoodTemptations => Box::new(TemptingSensor::for_animal()),
             Self::FrogTemptations => Box::new(TemptingSensor::new(|_, stack| {
                 crate::entity::passive::frog_ai::get_temptations(stack)
+            })),
+            Self::NautilusTemptations => Box::new(TemptingSensor::new(|_, stack| {
+                crate::entity::passive::nautilus_ai::get_temptations(stack)
             })),
             Self::FrogAttackables => Box::new(FrogAttackablesSensor),
             Self::IsInWater => Box::new(IsInWaterSensor),
