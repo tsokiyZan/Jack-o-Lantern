@@ -24,10 +24,10 @@ use crate::entity::{
     ai::goal::{
         active_target::ActiveTargetGoal, avoid_entity::AvoidEntityGoal, beg::BegGoal,
         breed::BreedGoal, escape_danger::EscapeDangerGoal, follow_owner::FollowOwnerGoal,
-        follow_parent::FollowParentGoal, leap_at_target::LeapAtTargetGoal,
-        look_around::RandomLookAroundGoal, look_at_entity::LookAtEntityGoal,
-        melee_attack::MeleeAttackGoal, owner_hurt_by_target::OwnerHurtByTargetGoal,
-        owner_hurt_target::OwnerHurtTargetGoal, revenge::RevengeGoal, swim::SwimGoal,
+        leap_at_target::LeapAtTargetGoal, look_around::RandomLookAroundGoal,
+        look_at_entity::LookAtEntityGoal, melee_attack::MeleeAttackGoal,
+        owner_hurt_by_target::OwnerHurtByTargetGoal, owner_hurt_target::OwnerHurtTargetGoal,
+        revenge::RevengeGoal, sit_when_ordered_to::SitWhenOrderedToGoal, swim::SwimGoal,
         wander_around::WanderAroundGoal,
     },
     mob::{
@@ -85,6 +85,7 @@ impl WolfEntity {
             goal_selector.add_goal(1, SwimGoal::new(&mob_arc.mob_entity));
             // 1: EscapeDangerGoal (TamableAnimalPanicGoal)
             goal_selector.add_goal(1, EscapeDangerGoal::new(1.5));
+            goal_selector.add_goal(2, Box::new(SitWhenOrderedToGoal::new()));
             // 3: Avoid Llama
             goal_selector.add_goal(
                 3,
@@ -97,9 +98,8 @@ impl WolfEntity {
             goal_selector.add_goal(6, FollowOwnerGoal::new(1.0, 10.0, 2.0));
             // 7: BreedGoal
             goal_selector.add_goal(7, BreedGoal::new(1.0));
-            // 8: FollowParentGoal & WanderAroundGoal
-            goal_selector.add_goal(8, Box::new(FollowParentGoal::new(1.1)));
-            goal_selector.add_goal(8, Box::new(WanderAroundGoal::new(1.0)));
+            // 8: WaterAvoidingRandomStrollGoal
+            goal_selector.add_goal(8, Box::new(WanderAroundGoal::avoiding_water(1.0)));
             // 9: BegGoal
             goal_selector.add_goal(9, BegGoal::new(8.0));
             // 10: LookAtPlayer & RandomLookAround
@@ -139,10 +139,12 @@ impl WolfEntity {
                 5,
                 ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::FOX, false),
             );
-            // 7: NearestAttackableTarget (Skeleton)
+            // 7: NearestAttackableTarget (AbstractSkeleton)
             target_selector.add_goal(
                 7,
-                ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::SKELETON, false),
+                ActiveTargetGoal::predicated(&mob_arc.mob_entity, 10, false, |target, _| {
+                    is_abstract_skeleton(target.entity.entity_type)
+                }),
             );
         };
 
@@ -501,4 +503,16 @@ impl WolfEntity {
             VarInt(sound_variant as u8 as i32),
         );
     }
+}
+
+/// Vanilla `AbstractSkeleton` class membership.
+fn is_abstract_skeleton(entity_type: &EntityType) -> bool {
+    [
+        &EntityType::SKELETON,
+        &EntityType::STRAY,
+        &EntityType::WITHER_SKELETON,
+        &EntityType::BOGGED,
+        &EntityType::PARCHED,
+    ]
+    .contains(&entity_type)
 }
