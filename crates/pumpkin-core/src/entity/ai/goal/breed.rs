@@ -24,6 +24,8 @@ pub struct BreedGoal {
     partner_targeting: TargetPredicate,
     mate: Option<Arc<dyn EntityBase>>,
     timer: i32,
+    /// Vanilla `BreedGoal.breed`, which turtles override to carry an egg.
+    breed: fn(&dyn Mob, &dyn EntityBase),
 }
 
 impl BreedGoal {
@@ -37,7 +39,16 @@ impl BreedGoal {
                 .ignore_visibility(),
             mate: None,
             timer: 0,
+            breed: Self::breed,
         })
+    }
+
+    /// A breed goal whose `breed` is the mob's own, like `Turtle.TurtleBreedGoal`.
+    #[must_use]
+    pub fn with_breed(speed: f64, breed: fn(&dyn Mob, &dyn EntityBase)) -> Box<Self> {
+        let mut goal = Self::new(speed);
+        goal.breed = breed;
+        goal
     }
 
     /// Looks for partners of a wider class than the breeder's own, like `AbstractHorse`.
@@ -102,33 +113,7 @@ impl BreedGoal {
         baby.get_entity().set_age(-24000);
         baby.refresh_dimensions();
 
-        // Vanilla `getLoveCause`: the breeding player, only while they are online.
-        let love_cause = |animal: &MobEntity| {
-            animal
-                .breeder
-                .load()
-                .and_then(|uuid| world.get_player_by_uuid(uuid))
-        };
-        if let Some(player) = love_cause(mob_entity).or_else(|| {
-            mate.get_mob()
-                .and_then(|mate| love_cause(mate.get_mob_entity()))
-        }) {
-            let entity_type_name = entity.entity_type.resource_name;
-            player.increment_stat(
-                pumpkin_data::statistic::StatisticCategory::Custom,
-                pumpkin_data::statistic::CustomStatistic::AnimalsBred as i32,
-                1,
-            );
-
-            player.trigger_advancement_criterion(
-                pumpkin_data::advancement::Advancement::HUSBANDRY_BREED_AN_ANIMAL,
-                "bred",
-            );
-            player.trigger_advancement_criterion(
-                pumpkin_data::advancement::Advancement::HUSBANDRY_BRED_ALL_ANIMALS,
-                &format!("minecraft:{entity_type_name}"),
-            );
-        }
+        award_breeding(mob, mate);
 
         mob_entity
             .breeding_cooldown
@@ -143,6 +128,37 @@ impl BreedGoal {
         }
 
         world.spawn_entity(baby);
+    }
+}
+
+/// The love cause's stat and advancements from vanilla `spawnChildFromBreeding`.
+pub(crate) fn award_breeding(mob: &dyn Mob, mate: &dyn EntityBase) {
+    let entity = mob.get_entity();
+    let world = entity.world.load_full();
+    // Vanilla `getLoveCause`: the breeding player, only while they are online.
+    let love_cause = |animal: &MobEntity| {
+        animal
+            .breeder
+            .load()
+            .and_then(|uuid| world.get_player_by_uuid(uuid))
+    };
+    if let Some(player) = love_cause(mob.get_mob_entity()).or_else(|| {
+        mate.get_mob()
+            .and_then(|mate| love_cause(mate.get_mob_entity()))
+    }) {
+        player.increment_stat(
+            pumpkin_data::statistic::StatisticCategory::Custom,
+            pumpkin_data::statistic::CustomStatistic::AnimalsBred as i32,
+            1,
+        );
+        player.trigger_advancement_criterion(
+            pumpkin_data::advancement::Advancement::HUSBANDRY_BREED_AN_ANIMAL,
+            "bred",
+        );
+        player.trigger_advancement_criterion(
+            pumpkin_data::advancement::Advancement::HUSBANDRY_BRED_ALL_ANIMALS,
+            &format!("minecraft:{}", entity.entity_type.resource_name),
+        );
     }
 }
 
@@ -202,7 +218,7 @@ impl Goal for BreedGoal {
             .load()
             .squared_distance_to_vec(&mate.get_entity().pos.load());
         if self.timer >= self.get_tick_count(60) && dist_sq < 9.0 {
-            Self::breed(mob, mate.as_ref());
+            (self.breed)(mob, mate.as_ref());
         }
     }
 

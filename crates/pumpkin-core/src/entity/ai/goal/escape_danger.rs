@@ -18,6 +18,8 @@ pub struct EscapeDangerGoal {
     goal_control: Controls,
     target: Option<Vector3<f64>>,
     running: bool,
+    /// Vanilla `TurtlePanicGoal`: always looks for water this far first, not only on fire.
+    always_seek_water: Option<i32>,
 }
 
 impl EscapeDangerGoal {
@@ -28,7 +30,16 @@ impl EscapeDangerGoal {
             goal_control: Controls::MOVE,
             target: None,
             running: false,
+            always_seek_water: None,
         })
+    }
+
+    /// Vanilla `Turtle.TurtlePanicGoal`: heads for water within `range` blocks first.
+    #[must_use]
+    pub fn seeking_water(speed: f64, range: i32) -> Box<Self> {
+        let mut goal = Self::new(speed);
+        goal.always_seek_water = Some(range);
+        goal
     }
 
     #[must_use]
@@ -47,9 +58,9 @@ impl EscapeDangerGoal {
             })
     }
 
-    /// Vanilla `PanicGoal.lookForWater`: the first water in Manhattan order within 5 blocks
-    /// horizontally and 1 vertically, only when the mob is not stuck in a block.
-    fn look_for_water(mob: &dyn Mob) -> Option<BlockPos> {
+    /// Vanilla `PanicGoal.lookForWater`: the first water in Manhattan order within `range` blocks
+    /// horizontally (5 for most mobs) and 1 vertically, only when the mob is not stuck in a block.
+    fn look_for_water(mob: &dyn Mob, range: i32) -> Option<BlockPos> {
         let entity = mob.get_entity();
         let world = entity.world.load();
         let mob_pos = entity.block_pos.load();
@@ -63,14 +74,9 @@ impl EscapeDangerGoal {
             return None;
         }
 
-        goal_utils::within_box_by_manhattan_distance(
-            mob_pos,
-            WATER_SEARCH_XZ,
-            WATER_SEARCH_Y,
-            WATER_SEARCH_XZ,
-        )
-        .into_iter()
-        .find(|pos| TryFindWaterGoal::is_water(&world, pos))
+        goal_utils::within_box_by_manhattan_distance(mob_pos, range, WATER_SEARCH_Y, range)
+            .into_iter()
+            .find(|pos| TryFindWaterGoal::is_water(&world, pos))
     }
 
     fn find_random_position(mob: &dyn Mob) -> Option<Vector3<f64>> {
@@ -84,8 +90,11 @@ impl Goal for EscapeDangerGoal {
             return false;
         }
 
-        if mob.get_entity().fire_ticks.load(Relaxed) > 0
-            && let Some(water) = Self::look_for_water(mob)
+        let water_range = self
+            .always_seek_water
+            .or_else(|| (mob.get_entity().fire_ticks.load(Relaxed) > 0).then_some(WATER_SEARCH_XZ));
+        if let Some(range) = water_range
+            && let Some(water) = Self::look_for_water(mob, range)
         {
             self.target = Some(water.to_f64());
             return true;

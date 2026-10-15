@@ -22,6 +22,7 @@ use pumpkin_data::entity::EntityType;
 use pumpkin_data::tag::{self, Taggable};
 use rustc_hash::FxHashMap;
 use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 pub mod amphibious_node_evaluator;
@@ -2376,6 +2377,9 @@ pub struct AmphibiousPathNavigation {
     /// does, instead of steering the mob here.
     steered_by_move_control: bool,
     wanted_position: Option<(Vector3<f64>, f64)>,
+    /// Vanilla `TurtlePathNavigation`: while this is set (the turtle has a travel
+    /// target), only water is a stable destination.
+    water_destinations: Option<Arc<AtomicBool>>,
 }
 
 impl Default for AmphibiousPathNavigation {
@@ -2393,6 +2397,17 @@ impl AmphibiousPathNavigation {
             ))),
             steered_by_move_control: false,
             wanted_position: None,
+            water_destinations: None,
+        }
+    }
+
+    /// Vanilla `Turtle.TurtlePathNavigation`, with `travelling` standing for
+    /// `travelPos != null`.
+    #[must_use]
+    pub fn turtle(travelling: Arc<AtomicBool>) -> Self {
+        Self {
+            water_destinations: Some(travelling),
+            ..Self::new(false)
         }
     }
 
@@ -2579,6 +2594,13 @@ impl PathNavigationTrait for AmphibiousPathNavigation {
     #[allow(clippy::too_many_lines)]
     /// Vanilla `AmphibiousPathNavigation.isStableDestination`: anything but air below.
     fn is_stable_destination(&self, world: &World, pos: &BlockPos) -> bool {
+        if self
+            .water_destinations
+            .as_ref()
+            .is_some_and(|travelling| travelling.load(Ordering::Relaxed))
+        {
+            return world.get_block(pos) == &pumpkin_data::Block::WATER;
+        }
         !world.get_block_state(&pos.down()).is_air()
     }
 
