@@ -2302,6 +2302,9 @@ impl LivingEntity {
             .compare_exchange(false, true, Relaxed, Relaxed)
             .is_ok()
         {
+            if let Some(mob) = dyn_self.get_mob() {
+                mob.before_die();
+            }
             self.movement_input.store(Vector3::default());
             self.jumping.store(false, Relaxed);
 
@@ -2615,23 +2618,35 @@ impl LivingEntity {
         }
     }
 
-    /// Vanilla `LivingEntity.dropFromLootTable`: spawns what `key` rolls where this entity
-    /// stands and says whether anything dropped.
-    fn drop_from_loot_table(&self, key: &str, params: &LootContextParameters) -> bool {
+    /// Vanilla `LivingEntity.dropFromLootTable`: hands what `key` rolls to `consumer` and
+    /// says whether anything dropped.
+    fn drop_from_loot_table(
+        &self,
+        key: &str,
+        params: &LootContextParameters,
+        consumer: impl FnMut(ItemStack),
+    ) -> bool {
         let Some(loot_table) = self.entity.world.load().get_loot_table(key) else {
             return false;
         };
         let drops =
             crate::world::loot::generate_loot_from_handle(&loot_table, rand::random(), params);
         let dropped = !drops.is_empty();
-        for stack in drops {
-            self.entity.spawn_at_location(stack);
-        }
+        drops.into_iter().for_each(consumer);
         dropped
     }
 
     /// Vanilla `LivingEntity.dropFromGiftLootTable`.
     pub fn drop_from_gift_loot_table(&self, key: &str) -> bool {
+        self.drop_from_gift_loot_table_with(key, |stack| self.entity.spawn_at_location(stack))
+    }
+
+    /// Vanilla `LivingEntity.dropFromGiftLootTable` with its own consumer.
+    pub fn drop_from_gift_loot_table_with(
+        &self,
+        key: &str,
+        consumer: impl FnMut(ItemStack),
+    ) -> bool {
         self.drop_from_loot_table(
             key,
             &LootContextParameters {
@@ -2639,6 +2654,7 @@ impl LivingEntity {
                 position: Some(self.entity.pos.load()),
                 ..Default::default()
             },
+            consumer,
         )
     }
 
@@ -2651,6 +2667,7 @@ impl LivingEntity {
                 tool: Some(tool.clone()),
                 ..Default::default()
             },
+            |stack| self.entity.spawn_at_location(stack),
         )
     }
 

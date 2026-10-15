@@ -27,6 +27,12 @@ pub trait Behavior: Send + Sync {
 
     fn stop(&mut self, _tick: &mut BrainTick<'_>) {}
 
+    /// Vanilla `stop` for behaviours that read `timedOut(timestamp)` in it; `timed_out` is
+    /// that answer.
+    fn stop_with_timeout(&mut self, tick: &mut BrainTick<'_>, _timed_out: bool) {
+        self.stop(tick);
+    }
+
     fn can_still_use(&mut self, _tick: &BrainTick<'_>) -> bool {
         false
     }
@@ -66,6 +72,11 @@ impl<B: Behavior> Timed<B> {
     pub const fn start_at(&mut self, time: i64, duration: i32) {
         self.status = Status::Running;
         self.end_timestamp = time + duration as i64;
+    }
+
+    /// Vanilla `Behavior.timedOut`, with the inner behaviour's override.
+    fn timed_out(&self, time: i64) -> bool {
+        self.inner.times_out() && self.has_timed_out(time)
     }
 
     #[must_use]
@@ -108,8 +119,7 @@ impl<B: Behavior> BehaviorControl for Timed<B> {
     }
 
     fn tick_or_stop(&mut self, tick: &mut BrainTick<'_>) {
-        let timed_out = self.inner.times_out() && self.has_timed_out(tick.time);
-        if !timed_out && self.inner.can_still_use(tick) {
+        if !self.timed_out(tick.time) && self.inner.can_still_use(tick) {
             self.inner.tick(tick);
         } else {
             self.do_stop(tick);
@@ -118,7 +128,8 @@ impl<B: Behavior> BehaviorControl for Timed<B> {
 
     fn do_stop(&mut self, tick: &mut BrainTick<'_>) {
         self.status = Status::Stopped;
-        self.inner.stop(tick);
+        let timed_out = self.timed_out(tick.time);
+        self.inner.stop_with_timeout(tick, timed_out);
     }
 
     fn debug_string(&self) -> String {

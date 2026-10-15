@@ -1,6 +1,6 @@
 use super::{
     Entity, EntityBase, ai::pathfinder::Navigator, ai::pathfinder::node::PathType,
-    living::LivingEntity,
+    ai::pathfinder::node_evaluator::MobData, living::LivingEntity,
 };
 use crate::entity::ai::brain::memory::PackedMemories;
 use crate::entity::ai::brain::{Brain, BrainTick};
@@ -1490,6 +1490,13 @@ pub trait Mob: EntityBase + Send + Sync {
     fn tick_death(&self, _caller: &dyn EntityBase) -> bool {
         false
     }
+
+    /// The part of a vanilla `die` override that runs before `super.die`.
+    fn before_die(&self) {}
+
+    /// Vanilla `Mob.onPathfindingStart`, applied to the snapshot the search reads; vanilla's
+    /// `onPathfindingDone` then only undoes it, so it has no hook.
+    fn on_pathfinding_start(&self, _mob_data: &mut MobData) {}
 
     /// A vanilla `handleKillingBlow` override. Returns `true` when it replaces the default,
     /// which marks the mob dead.

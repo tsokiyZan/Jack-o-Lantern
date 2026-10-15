@@ -10,6 +10,7 @@ use super::utils::{
     entity_is_visible, look_at_entity, set_walk_and_look_target_memories_to_entity,
 };
 use crate::entity::EntityBase;
+use crate::entity::mob::Mob;
 
 /// Vanilla `AnimalMakeLove.BREED_RANGE`.
 const BREED_RANGE: f64 = 3.0;
@@ -53,12 +54,11 @@ impl AnimalMakeLove {
         }
     }
 
-    /// Vanilla `Animal.canMate` between `body` and a partner of the same type.
-    fn can_mate(body: &dyn EntityBase, partner: &dyn EntityBase) -> bool {
-        partner.get_entity().entity_id != body.get_entity().entity_id
-            && partner.get_entity().entity_type == body.get_entity().entity_type
-            && body.is_in_love()
-            && partner.is_in_love()
+    /// Vanilla `body.canMate(partner)`, with the body's `Animal.canMate` override.
+    fn can_mate(body: &dyn Mob, partner: &dyn EntityBase) -> bool {
+        body.as_animal()
+            .zip(partner.get_mob())
+            .is_some_and(|(animal, partner)| animal.can_mate(partner))
     }
 
     fn find_valid_breed_partner(&self, tick: &BrainTick<'_>) -> Option<Arc<dyn EntityBase>> {

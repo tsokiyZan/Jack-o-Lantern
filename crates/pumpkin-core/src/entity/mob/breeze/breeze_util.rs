@@ -6,9 +6,8 @@ use pumpkin_world::clip::{ClipBlock, ClipContext, ClipFluid};
 use rand::{Rng, RngExt};
 
 use super::breeze_ai::{JUMP_CIRCLE_INNER_RADIUS, JUMP_CIRCLE_MIDDLE_RADIUS};
-use crate::entity::EntityBase;
-use crate::entity::ai::brain::behavior::random_look_around::direction_from_rotation;
 use crate::entity::mob::Mob;
+use crate::entity::{Entity, EntityBase};
 
 /// Vanilla `BreezeUtil.MAX_LINE_OF_SIGHT_TEST_RANGE`.
 const MAX_LINE_OF_SIGHT_TEST_RANGE: f64 = 50.0;
@@ -39,7 +38,7 @@ pub fn random_point_behind_target(enemy: &dyn EntityBase, random: &mut impl Rng)
         JUMP_CIRCLE_INNER_RADIUS,
         JUMP_CIRCLE_MIDDLE_RADIUS,
     );
-    entity.pos.load() + direction_from_rotation(0.0, view_angle) * f64::from(r)
+    entity.pos.load() + Entity::direction_from_rotation(0.0, view_angle) * f64::from(r)
 }
 
 /// Vanilla `BreezeUtil.hasLineOfSight`: no block collider between the breeze's feet and
