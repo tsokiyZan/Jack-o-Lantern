@@ -49,6 +49,11 @@ impl TrackTargetGoal {
         self
     }
 
+    /// Vanilla `mustReach`: only targets the navigation can get close to.
+    pub const fn set_check_can_navigate(&mut self, check_can_navigate: bool) {
+        self.check_can_navigate = check_can_navigate;
+    }
+
     /// Set by goals that already know their target.
     pub fn set_target_mob(&mut self, target: Option<Arc<dyn EntityBase>>) {
         self.target_mob = target;

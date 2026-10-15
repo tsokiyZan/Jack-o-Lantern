@@ -126,6 +126,13 @@ impl ActiveTargetGoal {
         self
     }
 
+    /// Vanilla `mustReach`: skip targets the navigation can't get within reach of.
+    #[must_use]
+    pub fn must_reach(mut self: Box<Self>) -> Box<Self> {
+        self.track_target_goal.set_check_can_navigate(true);
+        self
+    }
+
     /// An extra condition in `canUse` only, like a subclass that checks before `super.canUse()`.
     #[must_use]
     pub fn starting_only_when(mut self: Box<Self>, gate: MobFilter) -> Box<Self> {

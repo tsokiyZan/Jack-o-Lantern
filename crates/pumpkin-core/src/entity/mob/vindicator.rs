@@ -1,4 +1,5 @@
-use std::sync::{Arc, Weak};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, PoisonError, Weak};
 
 use crate::entity::ai::goal::avoid_entity::AvoidEntityGoal;
 use crate::entity::ai::goal::break_door::BreakDoorGoal;
@@ -12,7 +13,7 @@ use pumpkin_util::Difficulty;
 use rand::RngExt;
 
 use crate::entity::{
-    Entity,
+    Entity, EntityBase,
     ai::goal::{
         active_target::ActiveTargetGoal, look_at_entity::LookAtEntityGoal,
         melee_attack::MeleeAttackGoal, swim::SwimGoal, wander_around::WanderAroundGoal,
@@ -27,6 +28,10 @@ use crate::entity::{
 pub struct VindicatorEntity {
     pub mob_entity: MobEntity,
     pub raider_data: RaiderData,
+    /// Vanilla `isJohnny`: named Johnny once, it attacks everything.
+    is_johnny: AtomicBool,
+    /// The custom name last seen, so only a rename counts as vanilla `setCustomName`.
+    seen_name: Mutex<Option<String>>,
 }
 
 impl VindicatorEntity {
@@ -36,6 +41,8 @@ impl VindicatorEntity {
         let vindicator = Self {
             mob_entity,
             raider_data: RaiderData::default(),
+            is_johnny: AtomicBool::new(false),
+            seen_name: Mutex::new(None),
         };
         let mob_arc = Arc::new(vindicator);
         let mob_weak: Weak<dyn Mob> = {
@@ -78,7 +85,15 @@ impl VindicatorEntity {
                 3,
                 ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::IRON_GOLEM, true),
             );
-            // TODO: 4 VindicatorJohnnyAttackGoal.
+            target_selector.add_goal(
+                4,
+                Box::new(VindicatorJohnnyAttackGoal(
+                    ActiveTargetGoal::predicated(&mob_arc.mob_entity, 0, true, |target, _| {
+                        target.entity.entity_type.attackable != Some(false)
+                    })
+                    .must_reach(),
+                )),
+            );
             goal_selector.add_goal(8, Box::new(WanderAroundGoal::new(0.6)));
             goal_selector.add_goal(
                 9,
@@ -112,10 +127,69 @@ impl Mob for VindicatorEntity {
 
     fn mob_write_nbt(&self, nbt: &mut NbtCompound) {
         self.write_raider_nbt(nbt);
+        if self.is_johnny.load(Ordering::Relaxed) {
+            nbt.put_bool("Johnny", true);
+        }
     }
 
+    /// Vanilla reads `Johnny` after `Entity.load` has set the custom name, so a loaded or
+    /// summoned name alone never makes a Johnny.
     fn mob_read_nbt(&self, nbt: &NbtCompound) {
         self.read_raider_nbt(nbt);
+        self.is_johnny
+            .store(nbt.get_bool("Johnny").unwrap_or(false), Ordering::Relaxed);
+        *self
+            .seen_name
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = self.custom_name_text();
+    }
+
+    /// Vanilla `Vindicator.setCustomName`: renamed Johnny, it stays Johnny.
+    fn mob_tick(&self, _caller: &dyn EntityBase) {
+        let name = self.custom_name_text();
+        let mut seen = self
+            .seen_name
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        if *seen != name {
+            if name.as_deref() == Some("Johnny") {
+                self.is_johnny.store(true, Ordering::Relaxed);
+            }
+            *seen = name;
+        }
+    }
+}
+
+/// Vanilla `Vindicator.VindicatorJohnnyAttackGoal`: Johnny goes for anything attackable it
+/// can see and reach.
+struct VindicatorJohnnyAttackGoal(Box<ActiveTargetGoal>);
+
+impl Goal for VindicatorJohnnyAttackGoal {
+    fn can_start(&mut self, mob: &dyn Mob) -> bool {
+        mob.cast_any()
+            .downcast_ref::<VindicatorEntity>()
+            .is_some_and(|vindicator| vindicator.is_johnny.load(Ordering::Relaxed))
+            && self.0.can_start(mob)
+    }
+
+    fn should_continue(&mut self, mob: &dyn Mob) -> bool {
+        self.0.should_continue(mob)
+    }
+
+    fn start(&mut self, mob: &dyn Mob) {
+        self.0.start(mob);
+        mob.get_mob_entity()
+            .living_entity
+            .no_action_time
+            .store(0, Ordering::Relaxed);
+    }
+
+    fn stop(&mut self, mob: &dyn Mob) {
+        self.0.stop(mob);
+    }
+
+    fn controls(&self) -> Controls {
+        self.0.controls()
     }
 }
 
@@ -132,6 +206,17 @@ impl Raider for VindicatorEntity {
 
     fn get_celebrate_sound(&self) -> Sound {
         Sound::EntityVindicatorCelebrate
+    }
+}
+
+impl VindicatorEntity {
+    fn custom_name_text(&self) -> Option<String> {
+        self.get_entity()
+            .custom_name
+            .load()
+            .as_ref()
+            .as_ref()
+            .map(|name| name.clone().get_text())
     }
 }
 
