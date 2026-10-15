@@ -146,7 +146,7 @@ impl Goal for PathfindToRaidGoal {
                 15,
                 4,
                 raid_center,
-                std::f64::consts::FRAC_PI_2,
+                f64::from(std::f32::consts::FRAC_PI_2),
             ) {
                 mob.get_mob_entity()
                     .navigator

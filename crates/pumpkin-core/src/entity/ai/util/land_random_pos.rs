@@ -71,7 +71,7 @@ pub fn get_pos_away(
                 0,
                 dir_away.x,
                 dir_away.z,
-                std::f64::consts::FRAC_PI_2,
+                f64::from(std::f32::consts::FRAC_PI_2),
             )?;
             let pos = toward_direction(
                 mob,

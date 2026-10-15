@@ -60,7 +60,7 @@ impl Goal for MoveTowardsTargetGoal {
             HORIZONTAL_RANGE,
             VERTICAL_RANGE,
             target_pos,
-            std::f64::consts::FRAC_PI_2,
+            f64::from(std::f32::consts::FRAC_PI_2),
         );
         let Some(pos) = pos else {
             self.target = None;

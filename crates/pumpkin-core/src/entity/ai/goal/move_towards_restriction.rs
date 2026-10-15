@@ -45,7 +45,7 @@ impl Goal for MoveTowardsRestrictionGoal {
             16,
             7,
             home_center,
-            std::f64::consts::FRAC_PI_2,
+            f64::from(std::f32::consts::FRAC_PI_2),
         ) else {
             return false;
         };

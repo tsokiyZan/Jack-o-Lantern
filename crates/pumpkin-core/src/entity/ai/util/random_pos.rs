@@ -5,7 +5,8 @@ use rand::RngExt;
 use crate::entity::mob::Mob;
 
 pub const RANDOM_POS_ATTEMPTS: usize = 10;
-const SQRT_OF_TWO: f64 = std::f64::consts::SQRT_2;
+/// Vanilla `Mth.SQRT_OF_TWO`, a float.
+const SQRT_OF_TWO: f32 = std::f32::consts::SQRT_2;
 
 pub fn generate_random_direction(
     rng: &mut impl RngExt,
@@ -30,12 +31,14 @@ pub fn generate_random_direction_within_radians(
     z_dir: f64,
     max_xz_radians_from_dir: f64,
 ) -> Option<Vector3<i32>> {
-    let y_radians_center = z_dir.atan2(x_dir) - std::f64::consts::FRAC_PI_2;
-    let y_radians = f64::from(2.0f32.mul_add(rng.random::<f32>(), -1.0))
-        .mul_add(max_xz_radians_from_dir, y_radians_center);
-    let lerped = (max_horizontal_dist - min_horizontal_dist)
-        .mul_add(rng.random::<f64>().sqrt(), min_horizontal_dist);
-    let dist = lerped * SQRT_OF_TWO;
+    // TODO: Mth.atan2
+    let y_radians_center = z_dir.atan2(x_dir) - f64::from(std::f32::consts::FRAC_PI_2);
+    // Separate multiplies and adds: a fused multiply-add rounds differently from Java.
+    let spread = 2.0f32 * rng.random::<f32>() - 1.0f32;
+    let y_radians = y_radians_center + f64::from(spread) * max_xz_radians_from_dir;
+    let lerped = min_horizontal_dist
+        + rng.random::<f64>().sqrt() * (max_horizontal_dist - min_horizontal_dist);
+    let dist = lerped * f64::from(SQRT_OF_TWO);
 
     let xt = -dist * y_radians.sin();
     let zt = dist * y_radians.cos();

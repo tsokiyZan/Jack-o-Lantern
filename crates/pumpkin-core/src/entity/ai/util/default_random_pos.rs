@@ -85,7 +85,7 @@ pub fn get_pos_away(
         horizontal_dist,
         vertical_dist,
         dir_away,
-        std::f64::consts::FRAC_PI_2,
+        f64::from(std::f32::consts::FRAC_PI_2),
     )
 }
 

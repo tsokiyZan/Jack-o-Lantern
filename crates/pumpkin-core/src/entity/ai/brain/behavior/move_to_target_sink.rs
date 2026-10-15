@@ -109,7 +109,7 @@ impl MoveToTargetSink {
             10,
             7,
             destination,
-            std::f64::consts::FRAC_PI_2,
+            f64::from(std::f32::consts::FRAC_PI_2),
         );
         let Some(partial_step) = partial_step else {
             return false;

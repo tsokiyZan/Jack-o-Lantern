@@ -33,7 +33,7 @@ impl WaterAvoidingRandomFlyingGoal {
             7,
             wander_direction.x,
             wander_direction.z,
-            std::f64::consts::FRAC_PI_2,
+            f64::from(std::f32::consts::FRAC_PI_2),
             3,
             1,
         )
@@ -45,7 +45,7 @@ impl WaterAvoidingRandomFlyingGoal {
                 -2,
                 wander_direction.x,
                 wander_direction.z,
-                std::f64::consts::FRAC_PI_2,
+                f64::from(std::f32::consts::FRAC_PI_2),
             )
         })
     }

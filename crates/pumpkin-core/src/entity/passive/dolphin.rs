@@ -846,17 +846,22 @@ impl Goal for DolphinSwimToTreasureGoal {
 
         let world = mob.get_entity().world.load();
         let treasure = treasure.to_centered_f64();
-        let mut next =
-            default_random_pos::get_pos_towards(mob, 16, 1, treasure, std::f64::consts::PI / 8.0)
-                .or_else(|| {
-                    default_random_pos::get_pos_towards(
-                        mob,
-                        8,
-                        4,
-                        treasure,
-                        std::f64::consts::FRAC_PI_2,
-                    )
-                });
+        let mut next = default_random_pos::get_pos_towards(
+            mob,
+            16,
+            1,
+            treasure,
+            f64::from(std::f32::consts::FRAC_PI_8),
+        )
+        .or_else(|| {
+            default_random_pos::get_pos_towards(
+                mob,
+                8,
+                4,
+                treasure,
+                f64::from(std::f32::consts::FRAC_PI_2),
+            )
+        });
         if let Some(pos) = next {
             let block_pos = BlockPos::floored_v(pos);
             let (block, state) = world.get_block_and_state(&block_pos);
@@ -870,7 +875,7 @@ impl Goal for DolphinSwimToTreasureGoal {
                     8,
                     5,
                     treasure,
-                    std::f64::consts::FRAC_PI_2,
+                    f64::from(std::f32::consts::FRAC_PI_2),
                 );
             }
         }
