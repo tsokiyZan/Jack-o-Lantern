@@ -18,7 +18,7 @@ use pumpkin_data::block_properties::blocks_movement;
 use pumpkin_data::data_component_impl::EquipmentSlot;
 use pumpkin_data::dimension::Dimension;
 use pumpkin_data::entity::EntityStatus;
-use pumpkin_data::fluid::Fluid;
+use pumpkin_data::fluid::{Fluid, FluidState};
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::packet::CURRENT_MC_VERSION;
 use pumpkin_data::tag::{self, Taggable};
@@ -2875,6 +2875,39 @@ impl Entity {
         self.touching_water.load(Ordering::Relaxed)
     }
 
+    /// Vanilla `Entity.collidedWithShapeMovingFrom`: whether this entity's box, moved
+    /// from `from` to `to`, touches any of `boxes`.
+    pub fn collided_with_shape_moving_from(
+        &self,
+        from: Vector3<f64>,
+        to: Vector3<f64>,
+        boxes: impl IntoIterator<Item = BoundingBox>,
+    ) -> bool {
+        BoundingBox::new_from_pos(from.x, from.y, from.z, &self.entity_dimension.load())
+            .collided_along_vector(to - from, boxes)
+    }
+
+    /// Vanilla `Entity.collidedWithFluid`, with `FluidState.getAABB`.
+    pub fn collided_with_fluid(
+        &self,
+        fluid: &Fluid,
+        fluid_state: &FluidState,
+        pos: &BlockPos,
+        from: Vector3<f64>,
+        to: Vector3<f64>,
+    ) -> bool {
+        if fluid_state.is_empty {
+            return false;
+        }
+        let height = self.world.load().get_fluid_height(pos, fluid, fluid_state);
+        let min = pos.0.to_f64();
+        let fluid_aabb = BoundingBox::new(
+            min,
+            Vector3::new(min.x + 1.0, min.y + f64::from(height), min.z + 1.0),
+        );
+        self.collided_with_shape_moving_from(from, to, [fluid_aabb])
+    }
+
     pub fn is_in_water_or_rain(&self) -> bool {
         let world = self.world.load();
         let pos = self.block_pos.load();
@@ -2958,11 +2991,17 @@ impl Entity {
         self.fire_ticks.load(Ordering::Relaxed) > 0 || self.has_visual_fire.load(Ordering::Relaxed)
     }
 
-    /// Vanilla `Entity.getLookAngle`, through `calculateViewVector`.
+    /// Vanilla `Entity.getLookAngle`.
     #[must_use]
     pub fn get_look_angle(&self) -> Vector3<f64> {
-        let x_rot = self.pitch.load() * (std::f64::consts::PI / 180.0) as f32;
-        let y_rot = -self.yaw.load() * (std::f64::consts::PI / 180.0) as f32;
+        Self::calculate_view_vector(self.pitch.load(), self.yaw.load())
+    }
+
+    /// Vanilla `Entity.calculateViewVector`, in vanilla's float trigonometry.
+    #[must_use]
+    pub fn calculate_view_vector(x_rot: f32, y_rot: f32) -> Vector3<f64> {
+        let x_rot = x_rot * (std::f64::consts::PI / 180.0) as f32;
+        let y_rot = -y_rot * (std::f64::consts::PI / 180.0) as f32;
         let y_cos = pumpkin_util::math::cos(y_rot);
         let y_sin = pumpkin_util::math::sin(y_rot);
         let x_cos = pumpkin_util::math::cos(x_rot);

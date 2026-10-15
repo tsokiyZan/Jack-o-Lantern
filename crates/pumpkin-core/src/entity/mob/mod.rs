@@ -185,6 +185,18 @@ impl MobEntity {
             .store(Vector3::new(input.x, input.y, f64::from(speed)));
     }
 
+    /// Vanilla `Mob.stopInPlace`. Pumpkin's leash has no angular momentum to reset.
+    pub fn stop_in_place(&self) {
+        self.navigator
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .stop();
+        let living = &self.living_entity;
+        living.movement_input.store(Vector3::new(0.0, 0.0, 0.0));
+        self.set_speed(0.0);
+        living.entity.velocity.store(Vector3::new(0.0, 0.0, 0.0));
+    }
+
     /// Vanilla `Mob.setPathfindingMalus`: what this mob pays to path through
     /// `path_type`, or `-1` to never enter it.
     pub fn set_pathfinding_malus(&self, path_type: PathType, malus: f32) {

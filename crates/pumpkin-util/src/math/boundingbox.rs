@@ -408,6 +408,81 @@ impl BoundingBox {
             && pos.z < self.max.z
     }
 
+    /// Vanilla `AABB.getCenter`.
+    #[must_use]
+    pub fn get_center(&self) -> Vector3<f64> {
+        let lerp = |min: f64, max: f64| min + 0.5 * (max - min);
+        Vector3::new(
+            lerp(self.min.x, self.max.x),
+            lerp(self.min.y, self.max.y),
+            lerp(self.min.z, self.max.z),
+        )
+    }
+
+    /// Vanilla `AABB.clip`: where the segment from `from` to `to` first enters this box.
+    #[must_use]
+    pub fn clip(&self, from: Vector3<f64>, to: Vector3<f64>) -> Option<Vector3<f64>> {
+        const EPSILON: f64 = 1.0E-7;
+        let min = [self.min.x, self.min.y, self.min.z];
+        let max = [self.max.x, self.max.y, self.max.z];
+        let origin = [from.x, from.y, from.z];
+        let delta = [to.x - from.x, to.y - from.y, to.z - from.z];
+        let mut scale = 1.0;
+        let mut hit = false;
+        // Vanilla `clipPoint`, with the other two axes taken in x, y, z rotation.
+        let mut clip_point = |axis: usize, plane: f64| {
+            let s = (plane - origin[axis]) / delta[axis];
+            let b = (axis + 1) % 3;
+            let c = (axis + 2) % 3;
+            let pb = origin[b] + s * delta[b];
+            let pc = origin[c] + s * delta[c];
+            if 0.0 < s
+                && s < scale
+                && min[b] - EPSILON < pb
+                && pb < max[b] + EPSILON
+                && min[c] - EPSILON < pc
+                && pc < max[c] + EPSILON
+            {
+                scale = s;
+                hit = true;
+            }
+        };
+        for axis in 0..3 {
+            if delta[axis] > EPSILON {
+                clip_point(axis, min[axis]);
+            } else if delta[axis] < -EPSILON {
+                clip_point(axis, max[axis]);
+            }
+        }
+        hit.then(|| {
+            Vector3::new(
+                from.x + scale * delta[0],
+                from.y + scale * delta[1],
+                from.z + scale * delta[2],
+            )
+        })
+    }
+
+    /// Vanilla `AABB.collidedAlongVector`: whether this box, moved along `vector`,
+    /// touches any of `boxes`.
+    #[must_use]
+    pub fn collided_along_vector(
+        &self,
+        vector: Vector3<f64>,
+        boxes: impl IntoIterator<Item = Self>,
+    ) -> bool {
+        let from = self.get_center();
+        let to = from + vector;
+        boxes.into_iter().any(|shape_part| {
+            let inflated = shape_part.expand(
+                (self.max.x - self.min.x) * 0.5 - 1.0E-7,
+                (self.max.y - self.min.y) * 0.5 - 1.0E-7,
+                (self.max.z - self.min.z) * 0.5 - 1.0E-7,
+            );
+            inflated.contains(to) || inflated.contains(from) || inflated.clip(from, to).is_some()
+        })
+    }
+
     /// Computes the squared magnitude from a point to the nearest point on this bounding box.
     ///
     /// # Arguments

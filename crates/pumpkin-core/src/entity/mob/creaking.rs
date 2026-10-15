@@ -220,14 +220,6 @@ impl CreakingEntity {
             .set_synced_data(pumpkin_data::tracked_data::creaking::HOME_POS, pos);
     }
 
-    pub fn stop_in_place(&self) {
-        let entity = &self.mob_entity.living_entity.entity;
-        entity.velocity.store(Vector3::default());
-        if let Ok(mut navigator) = self.mob_entity.navigator.lock() {
-            navigator.stop();
-        }
-    }
-
     pub fn activate(&self, player: &Arc<Player>) {
         self.mob_entity.set_target(Some(player.clone()));
         self.play_sound(Sound::EntityCreakingActivate);
@@ -469,7 +461,7 @@ impl Mob for CreakingEntity {
                     1.0,
                 );
             } else {
-                self.stop_in_place();
+                self.mob_entity.stop_in_place();
                 world.play_sound_fine(
                     Sound::EntityCreakingFreeze,
                     SoundCategory::Hostile,

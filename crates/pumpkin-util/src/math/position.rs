@@ -1,4 +1,5 @@
 use super::{
+    boundingbox::BoundingBox,
     get_section_cord,
     vector3::{self, Vector3},
 };
@@ -835,6 +836,162 @@ pub const fn pack_local_chunk_section(block_pos: &BlockPos) -> i16 {
     let y = get_local_cord(block_pos.0.y);
     let z = get_local_cord(block_pos.0.z);
     vector3::packed_local(&Vector3::new(x, y, z))
+}
+
+/// Vanilla `BlockGetter.forEachBlockIntersectedBetween`.
+///
+/// Visits every block a box sweeps through while moving from `from` to `to`, ending as
+/// `aabb_at_target`, with the sweep step it was reached at. Stops and returns false once
+/// `visitor` does. Vanilla walks each box in `betweenCornersInDirection` order; this walks them in plain
+/// order, which visits the same blocks and only changes which failing block ends the walk.
+pub fn for_each_block_intersected_between(
+    from: Vector3<f64>,
+    to: Vector3<f64>,
+    aabb_at_target: &BoundingBox,
+    mut visitor: impl FnMut(BlockPos, i32) -> bool,
+) -> bool {
+    let travel = to - from;
+    let threshold = 1.0E-5f32 * 1.0E-5f32;
+    if travel.length_squared() < f64::from(threshold) {
+        return between_corners(aabb_at_target).all(|pos| visitor(pos, 0));
+    }
+
+    let mut visited_blocks = std::collections::HashSet::new();
+    for pos in between_corners(&aabb_at_target.shift(travel * -1.0)) {
+        if !visitor(pos, 0) {
+            return false;
+        }
+        visited_blocks.insert(pos.as_long());
+    }
+
+    let Some(iterations) =
+        add_collisions_along_travel(&mut visited_blocks, travel, aabb_at_target, &mut visitor)
+    else {
+        return false;
+    };
+
+    between_corners(aabb_at_target)
+        .all(|pos| !visited_blocks.insert(pos.as_long()) || visitor(pos, iterations + 1))
+}
+
+/// The blocks `BlockPos.betweenCornersInDirection(AABB, Vec3)` covers.
+fn between_corners(aabb: &BoundingBox) -> BlockPosIterator {
+    BlockPos::between_closed(BlockPos::floored_v(aabb.min), BlockPos::floored_v(aabb.max))
+}
+
+/// Vanilla `BlockGetter.addCollisionsAlongTravel`: `None` where vanilla returns -1.
+fn add_collisions_along_travel(
+    visited_blocks: &mut std::collections::HashSet<i64>,
+    delta_move: Vector3<f64>,
+    aabb_at_target: &BoundingBox,
+    visitor: &mut impl FnMut(BlockPos, i32) -> bool,
+) -> Option<i32> {
+    let box_size = aabb_at_target.max - aabb_at_target.min;
+    let corner_dir = get_furthest_corner(delta_move);
+    let to_center = aabb_at_target.get_center();
+    let to_corner = Vector3::new(
+        to_center.x + box_size.x * 0.5 * f64::from(corner_dir.x),
+        to_center.y + box_size.y * 0.5 * f64::from(corner_dir.y),
+        to_center.z + box_size.z * 0.5 * f64::from(corner_dir.z),
+    );
+    let from_corner = to_corner - delta_move;
+    let mut corner_block = BlockPos::floored_v(from_corner).0;
+    let sign = |value: f64| -> i32 {
+        if value == 0.0 {
+            0
+        } else if value > 0.0 {
+            1
+        } else {
+            -1
+        }
+    };
+    let frac = |value: f64| value - value.floor();
+    let sign_x = sign(delta_move.x);
+    let sign_y = sign(delta_move.y);
+    let sign_z = sign(delta_move.z);
+    let t_delta = |sign: i32, delta: f64| {
+        if sign == 0 {
+            f64::MAX
+        } else {
+            f64::from(sign) / delta
+        }
+    };
+    let t_delta_x = t_delta(sign_x, delta_move.x);
+    let t_delta_y = t_delta(sign_y, delta_move.y);
+    let t_delta_z = t_delta(sign_z, delta_move.z);
+    let t_start = |sign: i32, t_delta: f64, from: f64| {
+        t_delta
+            * if sign > 0 {
+                1.0 - frac(from)
+            } else {
+                frac(from)
+            }
+    };
+    let mut t_x = t_start(sign_x, t_delta_x, from_corner.x);
+    let mut t_y = t_start(sign_y, t_delta_y, from_corner.y);
+    let mut t_z = t_start(sign_z, t_delta_z, from_corner.z);
+    let mut iterations = 0;
+    let epsilon = f64::from(1.0E-5f32);
+
+    while t_x <= 1.0 || t_y <= 1.0 || t_z <= 1.0 {
+        if t_x < t_y {
+            if t_x < t_z {
+                corner_block.x += sign_x;
+                t_x += t_delta_x;
+            } else {
+                corner_block.z += sign_z;
+                t_z += t_delta_z;
+            }
+        } else if t_y < t_z {
+            corner_block.y += sign_y;
+            t_y += t_delta_y;
+        } else {
+            corner_block.z += sign_z;
+            t_z += t_delta_z;
+        }
+
+        let corner = BlockPos(corner_block);
+        let Some(hit_point) = BoundingBox::from_block(&corner).clip(from_corner, to_corner) else {
+            continue;
+        };
+        iterations += 1;
+        let corner_hit = |hit: f64, block: i32| {
+            hit.clamp(f64::from(block) + epsilon, f64::from(block) + 1.0 - epsilon)
+        };
+        let opposite_corner = BlockPos::new(
+            (corner_hit(hit_point.x, corner_block.x) - box_size.x * f64::from(corner_dir.x)).floor()
+                as i32,
+            (corner_hit(hit_point.y, corner_block.y) - box_size.y * f64::from(corner_dir.y)).floor()
+                as i32,
+            (corner_hit(hit_point.z, corner_block.z) - box_size.z * f64::from(corner_dir.z)).floor()
+                as i32,
+        );
+        for pos in BlockPos::between_closed(corner, opposite_corner) {
+            if visited_blocks.insert(pos.as_long()) && !visitor(pos, iterations) {
+                return None;
+            }
+        }
+    }
+
+    Some(iterations)
+}
+
+/// Vanilla `BlockGetter.getFurthestCorner`.
+fn get_furthest_corner(direction: Vector3<f64>) -> Vector3<i32> {
+    let x_dot = direction.x.abs();
+    let y_dot = direction.y.abs();
+    let z_dot = direction.z.abs();
+    let sign = |value: f64| if value >= 0.0 { 1 } else { -1 };
+    let x_sign = sign(direction.x);
+    let y_sign = sign(direction.y);
+    let z_sign = sign(direction.z);
+    if x_dot <= y_dot && x_dot <= z_dot {
+        Vector3::new(-x_sign, -z_sign, y_sign)
+    } else if y_dot <= z_dot {
+        Vector3::new(z_sign, -y_sign, -x_sign)
+    } else {
+        Vector3::new(-y_sign, x_sign, -z_sign)
+    }
 }
 
 #[cfg(test)]

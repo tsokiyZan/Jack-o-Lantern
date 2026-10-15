@@ -1,15 +1,22 @@
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
-use std::sync::{Arc, Mutex, Weak};
 
+use pumpkin_data::attributes::Attributes;
 use pumpkin_data::damage::DamageType;
 use pumpkin_data::entity::EntityType;
-use pumpkin_data::sound::{Sound, SoundCategory};
+use pumpkin_data::tag::{self, Taggable};
 use pumpkin_data::tracked_data;
+use pumpkin_data::world::WorldEvent;
 use pumpkin_nbt::compound::NbtCompound;
-use pumpkin_util::math::position::BlockPos;
+use pumpkin_util::math::atan2;
+use pumpkin_util::math::boundingbox::BoundingBox;
+use pumpkin_util::math::position::{BlockPos, for_each_block_intersected_between};
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_world::chunk::ChunkHeightmapType;
 use rand::RngExt;
 
+use crate::entity::ai::control::move_control::Operation;
+use crate::entity::ai::control::{Control, MoveControlTrait};
 use crate::entity::ai::goal::active_target::ActiveTargetGoal;
 use crate::entity::living::LivingEntity;
 use crate::entity::projectile::fireball::FireballEntity;
@@ -20,76 +27,60 @@ use crate::entity::{
 };
 use crate::world::World;
 
+/// `180.0F / (float) Math.PI`, vanilla's float radians-to-degrees factor.
+const RAD_TO_DEG: f32 = 180.0 / std::f32::consts::PI;
+/// Vanilla's `maxDist = 64.0` in `faceMovementDirection` and the fireball goal, squared.
+const MAX_TARGET_DISTANCE_SQ: f64 = 4096.0;
+
 pub struct GhastEntity {
     pub mob_entity: MobEntity,
     pub is_charging: AtomicBool,
     pub explosion_power: AtomicU8,
-    pub wanted_fly_target: Mutex<Option<Vector3<f64>>>,
 }
 
 impl GhastEntity {
     pub const DEFAULT_EXPLOSION_POWER: u8 = 1;
     pub const XP_REWARD: u32 = 5;
-    pub const FLYING_SPEED: f64 = 0.06;
 
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        *mob_entity
+            .move_control
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) =
+            Box::new(GhastMoveControl::new(false, |_| false));
         let ghast = Self {
             mob_entity,
             is_charging: AtomicBool::new(false),
             explosion_power: AtomicU8::new(Self::DEFAULT_EXPLOSION_POWER),
-            wanted_fly_target: Mutex::new(None),
         };
 
         let mob_arc = Arc::new(ghast);
 
-        {
-            let mut goal_selector = mob_arc
-                .mob_entity
-                .goals_selector
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-
-            // Priority 5: Random floating around
-            goal_selector.add_goal(
-                5,
-                Box::new(RandomFloatAroundGoal::new(Arc::downgrade(&mob_arc))),
-            );
-
-            // Priority 7: Face target / movement direction
-            goal_selector.add_goal(7, Box::new(GhastLookGoal::new()));
-
-            // Priority 7: Shoot large fireballs at target
-            goal_selector.add_goal(
-                7,
-                Box::new(GhastShootFireballGoal::new(Arc::downgrade(&mob_arc))),
-            );
-
-            let mut target_selector = mob_arc
-                .mob_entity
-                .target_selector
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-
-            // Priority 1: Target nearest player within vertical proximity
-            let ghast = Arc::downgrade(&mob_arc);
-            target_selector.add_goal(
-                1,
-                Box::new(ActiveTargetGoal::new(
-                    &mob_arc.mob_entity,
-                    &EntityType::PLAYER,
-                    10,
-                    true,
-                    false,
-                    Some(move |target: &LivingEntity, _world: &World| {
-                        ghast.upgrade().is_some_and(|ghast| {
-                            (target.entity.pos.load().y - ghast.get_entity().pos.load().y).abs()
-                                <= 4.0
-                        })
-                    }),
-                )),
-            );
-        };
+        // Vanilla `Ghast.registerGoals`.
+        mob_arc
+            .mob_entity
+            .add_goal(5, RandomFloatAroundGoal::new(0));
+        mob_arc.mob_entity.add_goal(7, GhastLookGoal);
+        mob_arc
+            .mob_entity
+            .add_goal(7, GhastShootFireballGoal::default());
+        let ghast = Arc::downgrade(&mob_arc);
+        mob_arc.mob_entity.add_target_goal(
+            1,
+            ActiveTargetGoal::new(
+                &mob_arc.mob_entity,
+                &EntityType::PLAYER,
+                10,
+                true,
+                false,
+                Some(move |target: &LivingEntity, _world: &World| {
+                    ghast.upgrade().is_some_and(|ghast| {
+                        (target.entity.pos.load().y - ghast.get_entity().pos.load().y).abs() <= 4.0
+                    })
+                }),
+            ),
+        );
 
         mob_arc
     }
@@ -132,12 +123,15 @@ impl Mob for GhastEntity {
         &self.mob_entity
     }
 
-    fn get_mob_gravity(&self) -> f64 {
-        0.0 // Ghasts fly, no gravity applied in standard travel
+    /// Vanilla `Ghast.travel`.
+    fn custom_travel(&self, caller: &dyn EntityBase) -> bool {
+        self.mob_entity.living_entity.travel_flying(caller, 0.02);
+        true
     }
 
-    fn get_mob_y_velocity_drag(&self) -> Option<f64> {
-        Some(0.95)
+    /// Vanilla `Ghast.checkFallDamage` does nothing.
+    fn checks_fall_damage(&self) -> bool {
+        false
     }
 
     fn mob_init_data_tracker(&self) {
@@ -171,24 +165,211 @@ impl Mob for GhastEntity {
     }
 }
 
-pub struct GhastLookGoal {
-    goal_control: Controls,
+/// Vanilla `Ghast.faceMovementDirection`: face the target within 64 blocks, otherwise the
+/// way the mob is drifting.
+pub fn face_movement_direction(mob: &dyn Mob) {
+    let mob_entity = mob.get_mob_entity();
+    let entity = &mob_entity.living_entity.entity;
+    let pos = entity.pos.load();
+    let y_rot = if let Some(target) = mob_entity.get_target() {
+        let target_pos = target.get_entity().pos.load();
+        if target_pos.squared_distance_to_vec(&pos) >= MAX_TARGET_DISTANCE_SQ {
+            return;
+        }
+        -(atan2(target_pos.x - pos.x, target_pos.z - pos.z) as f32) * RAD_TO_DEG
+    } else {
+        let movement = entity.velocity.load();
+        -(atan2(movement.x, movement.z) as f32) * RAD_TO_DEG
+    };
+    entity.yaw.store(y_rot);
+    entity.body_yaw.store(y_rot);
 }
 
-impl Default for GhastLookGoal {
-    fn default() -> Self {
+/// Vanilla `Vec3.normalize`, which divides by the length and gives zero below `1.0E-5F`.
+fn normalize(vec: Vector3<f64>) -> Vector3<f64> {
+    let dist = (vec.x * vec.x + vec.y * vec.y + vec.z * vec.z).sqrt();
+    if dist < f64::from(1.0E-5f32) {
+        Vector3::new(0.0, 0.0, 0.0)
+    } else {
+        Vector3::new(vec.x / dist, vec.y / dist, vec.z / dist)
+    }
+}
+
+/// Vanilla `Ghast.GhastMoveControl`.
+///
+/// Every few ticks pushes the mob towards the wanted position, and gives up when the way
+/// there is blocked. The happy ghast uses it too, `careful` and stopped while on its
+/// still timeout.
+pub struct GhastMoveControl {
+    wanted_x: f64,
+    wanted_y: f64,
+    wanted_z: f64,
+    speed_modifier: f64,
+    operation: Operation,
+    float_duration: i32,
+    careful: bool,
+    should_be_stopped: fn(&dyn Mob) -> bool,
+}
+
+impl GhastMoveControl {
+    #[must_use]
+    pub fn new(careful: bool, should_be_stopped: fn(&dyn Mob) -> bool) -> Self {
         Self {
-            goal_control: Controls::LOOK,
+            wanted_x: 0.0,
+            wanted_y: 0.0,
+            wanted_z: 0.0,
+            speed_modifier: 0.0,
+            operation: Operation::Wait,
+            float_duration: 0,
+            careful,
+            should_be_stopped,
         }
     }
-}
 
-impl GhastLookGoal {
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
+    fn can_reach(&self, mob: &dyn Mob, travel: Vector3<f64>) -> bool {
+        let entity = mob.get_entity();
+        let world = entity.world.load();
+        let aabb = entity.bounding_box.load();
+        let aabb_at_destination = aabb.shift(travel);
+        if self.careful {
+            let inflated = aabb_at_destination.expand_all(1.0);
+            let all_possible = BlockPos::between_closed(
+                BlockPos::floored_v(inflated.min),
+                BlockPos::floored_v(inflated.max),
+            )
+            .all(|pos| self.block_traversal_possible(entity, &world, None, pos, false, false));
+            if !all_possible {
+                return false;
+            }
+        }
+
+        let is_in_water = entity.is_in_water();
+        let is_in_lava = entity.touching_lava.load(Ordering::Relaxed);
+        let start = entity.pos.load();
+        let end = start + travel;
+        for_each_block_intersected_between(start, end, &aabb_at_destination, |pos, _| {
+            aabb.intersects(&BoundingBox::from_block(&pos))
+                || self.block_traversal_possible(
+                    entity,
+                    &world,
+                    Some((start, end)),
+                    pos,
+                    is_in_water,
+                    is_in_lava,
+                )
+        })
+    }
+
+    /// `start_end` is vanilla's `start` and `end`, which are both null or both set.
+    fn block_traversal_possible(
+        &self,
+        entity: &Entity,
+        world: &World,
+        start_end: Option<(Vector3<f64>, Vector3<f64>)>,
+        pos: BlockPos,
+        can_path_through_water: bool,
+        can_path_through_lava: bool,
+    ) -> bool {
+        let (block, state) = world.get_block_and_state(&pos);
+        if state.is_air() {
+            return true;
+        }
+
+        let mut shapes = state
+            .get_block_collision_shapes_at(&pos)
+            .map(|shape| shape.at_pos(pos));
+        let path_no_collisions = match start_end {
+            Some((start, end)) => !entity.collided_with_shape_moving_from(start, end, shapes),
+            None => shapes.next().is_none(),
+        };
+        if !self.careful {
+            return path_no_collisions;
+        }
+
+        if block.has_tag(&tag::Block::MINECRAFT_HAPPY_GHAST_AVOIDS) {
+            return false;
+        }
+
+        let (fluid, fluid_state) = world.get_fluid_and_fluid_state(&pos);
+        if !fluid_state.is_empty
+            && start_end.is_none_or(|(start, end)| {
+                entity.collided_with_fluid(fluid, &fluid_state, &pos, start, end)
+            })
+        {
+            if fluid.has_tag(&tag::Fluid::MINECRAFT_WATER) {
+                return can_path_through_water;
+            }
+            if fluid.has_tag(&tag::Fluid::MINECRAFT_LAVA) {
+                return can_path_through_lava;
+            }
+        }
+
+        path_no_collisions
     }
 }
+
+impl Control for GhastMoveControl {}
+
+impl MoveControlTrait for GhastMoveControl {
+    fn tick(&mut self, mob: &dyn Mob) {
+        let mob_entity = mob.get_mob_entity();
+        if (self.should_be_stopped)(mob) {
+            self.operation = Operation::Wait;
+            mob_entity.stop_in_place();
+        }
+
+        if self.operation != Operation::MoveTo {
+            return;
+        }
+        let float_duration = self.float_duration;
+        self.float_duration -= 1;
+        if float_duration > 0 {
+            return;
+        }
+        self.float_duration += mob.get_random().random_range(0..5) + 2;
+        let living = &mob_entity.living_entity;
+        let entity = &living.entity;
+        let pos = entity.pos.load();
+        let travel = Vector3::new(
+            self.wanted_x - pos.x,
+            self.wanted_y - pos.y,
+            self.wanted_z - pos.z,
+        );
+        if self.can_reach(mob, travel) {
+            let speed = living.get_attribute_value(&Attributes::FLYING_SPEED) * 5.0 / 3.0;
+            entity
+                .velocity
+                .store(entity.velocity.load() + normalize(travel) * speed);
+        } else {
+            self.operation = Operation::Wait;
+        }
+    }
+
+    fn set_wanted_position(&mut self, x: f64, y: f64, z: f64, speed_modifier: f64) {
+        self.wanted_x = x;
+        self.wanted_y = y;
+        self.wanted_z = z;
+        self.speed_modifier = speed_modifier;
+        if self.operation != Operation::Jumping {
+            self.operation = Operation::MoveTo;
+        }
+    }
+
+    fn has_wanted(&self) -> bool {
+        self.operation == Operation::MoveTo
+    }
+
+    fn wanted_position(&self) -> Vector3<f64> {
+        Vector3::new(self.wanted_x, self.wanted_y, self.wanted_z)
+    }
+
+    fn set_wait(&mut self) {
+        self.operation = Operation::Wait;
+    }
+}
+
+/// Vanilla `Ghast.GhastLookGoal`.
+pub struct GhastLookGoal;
 
 impl Goal for GhastLookGoal {
     fn can_start(&mut self, _mob: &dyn Mob) -> bool {
@@ -200,73 +381,35 @@ impl Goal for GhastLookGoal {
     }
 
     fn tick(&mut self, mob: &dyn Mob) {
-        let mob_entity = mob.get_mob_entity();
-        let target_opt = mob_entity.get_target();
-
-        if let Some(target) = target_opt {
-            let mob_pos = mob_entity.living_entity.entity.pos.load();
-            let target_pos = target.get_entity().pos.load();
-
-            if mob_pos.squared_distance_to_vec(&target_pos) < 4096.0 {
-                let dx = target_pos.x - mob_pos.x;
-                let dz = target_pos.z - mob_pos.z;
-                let yaw = (-f64::atan2(dx, dz).to_degrees()) as f32;
-                mob_entity.living_entity.entity.yaw.store(yaw);
-                mob_entity.living_entity.entity.head_yaw.store(yaw);
-            }
-        } else {
-            let velocity = mob_entity.living_entity.entity.velocity.load();
-            if velocity.x != 0.0 || velocity.z != 0.0 {
-                let yaw = (-f64::atan2(velocity.x, velocity.z).to_degrees()) as f32;
-                mob_entity.living_entity.entity.yaw.store(yaw);
-                mob_entity.living_entity.entity.head_yaw.store(yaw);
-            }
-        }
+        face_movement_direction(mob);
     }
 
     fn controls(&self) -> Controls {
-        self.goal_control
+        Controls::LOOK
     }
 }
 
+/// Vanilla `Ghast.GhastShootFireballGoal`.
+#[derive(Default)]
 pub struct GhastShootFireballGoal {
-    ghast: Weak<GhastEntity>,
     charge_time: i32,
 }
 
-impl GhastShootFireballGoal {
-    #[must_use]
-    pub const fn new(ghast: Weak<GhastEntity>) -> Self {
-        Self {
-            ghast,
-            charge_time: 0,
-        }
-    }
+fn as_ghast(mob: &dyn Mob) -> Option<&GhastEntity> {
+    mob.cast_any().downcast_ref::<GhastEntity>()
 }
 
 impl Goal for GhastShootFireballGoal {
-    fn can_start(&mut self, _mob: &dyn Mob) -> bool {
-        let Some(ghast) = self.ghast.upgrade() else {
-            return false;
-        };
-        let target = ghast.mob_entity.get_target();
-        target.is_some_and(|t| t.get_entity().is_alive())
-    }
-
-    fn should_continue(&mut self, _mob: &dyn Mob) -> bool {
-        let Some(ghast) = self.ghast.upgrade() else {
-            return false;
-        };
-        let target = ghast.mob_entity.get_target();
-        target.is_some_and(|t| t.get_entity().is_alive())
+    fn can_start(&mut self, mob: &dyn Mob) -> bool {
+        mob.get_mob_entity().get_target().is_some()
     }
 
     fn start(&mut self, _mob: &dyn Mob) {
         self.charge_time = 0;
     }
 
-    fn stop(&mut self, _mob: &dyn Mob) {
-        if let Some(ghast) = self.ghast.upgrade() {
+    fn stop(&mut self, mob: &dyn Mob) {
+        if let Some(ghast) = as_ghast(mob) {
             ghast.set_charging(false);
         }
     }
@@ -275,74 +418,65 @@ impl Goal for GhastShootFireballGoal {
         true
     }
 
-    fn tick(&mut self, _mob: &dyn Mob) {
-        let Some(ghast) = self.ghast.upgrade() else {
+    fn tick(&mut self, mob: &dyn Mob) {
+        let Some(ghast) = as_ghast(mob) else {
             return;
         };
-
-        let target_opt = ghast.mob_entity.get_target();
-        let Some(target) = target_opt else {
+        let Some(target) = ghast.mob_entity.get_target() else {
             return;
         };
 
         let entity = &ghast.mob_entity.living_entity.entity;
+        let target_entity = target.get_entity();
         let ghast_pos = entity.pos.load();
-        let target_pos = target.get_entity().pos.load();
-        let dist_sq = ghast_pos.squared_distance_to_vec(&target_pos);
-
-        if dist_sq < 4096.0 {
-            let world = entity.world.load();
+        let target_pos = target_entity.pos.load();
+        if target_pos.squared_distance_to_vec(&ghast_pos) < MAX_TARGET_DISTANCE_SQ
+            && entity.has_line_of_sight(target_entity)
+        {
+            let world = entity.world.load_full();
             self.charge_time += 1;
-
-            if self.charge_time == 10 {
-                world.play_sound_fine(
-                    Sound::EntityGhastWarn,
-                    SoundCategory::Hostile,
-                    &ghast_pos,
-                    5.0,
-                    1.0,
-                );
+            if self.charge_time == 10 && !entity.is_silent() {
+                world.sync_world_event(WorldEvent::SoundGhastWarning, entity.block_pos.load(), 0);
             }
 
             if self.charge_time == 20 {
-                world.play_sound_fine(
-                    Sound::EntityGhastShoot,
-                    SoundCategory::Hostile,
-                    &ghast_pos,
-                    5.0,
-                    1.0,
+                // `getViewVector(1.0F)`, which for a living entity follows the head.
+                let view =
+                    Entity::calculate_view_vector(entity.pitch.load(), entity.head_yaw.load());
+                let ghast_half_y = ghast_pos.y + f64::from(entity.height()) * 0.5;
+                let direction = Vector3::new(
+                    target_pos.x - (ghast_pos.x + view.x * 4.0),
+                    target_pos.y + f64::from(target_entity.height()) * 0.5 - (0.5 + ghast_half_y),
+                    target_pos.z - (ghast_pos.z + view.z * 4.0),
                 );
+                if !entity.is_silent() {
+                    world.sync_world_event(
+                        WorldEvent::SoundGhastFireball,
+                        entity.block_pos.load(),
+                        0,
+                    );
+                }
 
-                let yaw_rad = f64::from(entity.yaw.load()).to_radians();
-                let pitch_rad = f64::from(entity.pitch.load()).to_radians();
-                let view_x = -pitch_rad.cos() * yaw_rad.sin();
-                let view_z = pitch_rad.cos() * yaw_rad.cos();
-
+                // Vanilla positions the fireball at the ghast, then offsets it by the view.
                 let spawn_pos = Vector3::new(
-                    ghast_pos.x + view_x * 4.0,
-                    ghast_pos.y + 2.5,
-                    ghast_pos.z + view_z * 4.0,
+                    ghast_pos.x + view.x * 4.0,
+                    ghast_half_y + 0.5,
+                    ghast_pos.z + view.z * 4.0,
                 );
-
-                let target_y = target_pos.y + target.get_entity().get_eye_height() * 0.5;
-                let dir_x = target_pos.x - spawn_pos.x;
-                let dir_y = target_y - spawn_pos.y;
-                let dir_z = target_pos.z - spawn_pos.z;
-                let direction = Vector3::new(dir_x, dir_y, dir_z);
-
                 let fireball_base = Entity::from_uuid(
                     uuid::Uuid::new_v4(),
                     world.clone(),
                     spawn_pos,
                     &EntityType::FIREBALL,
                 );
-
-                let fireball = FireballEntity::new_shot(fireball_base, entity, direction);
+                let fireball =
+                    FireballEntity::new_shot(fireball_base, entity, normalize(direction));
+                // `ThrownItemEntity::new` puts the projectile at the shooter's eye, re-anchor it.
+                fireball.thrown.entity.pos.store(spawn_pos);
                 fireball
                     .explosion_power
                     .store(f32::from(ghast.get_explosion_power()), Ordering::Relaxed);
-
-                world.spawn_entity_non_save(Arc::new(fireball));
+                world.spawn_entity(Arc::new(fireball));
                 self.charge_time = -40;
             }
         } else if self.charge_time > 0 {
@@ -357,111 +491,125 @@ impl Goal for GhastShootFireballGoal {
     }
 }
 
+/// Vanilla `Ghast.RandomFloatAroundGoal`: when the mob has nowhere to go, or its wanted
+/// position is under a block or over 60 blocks away, picks a new one within 16 blocks.
 pub struct RandomFloatAroundGoal {
-    ghast: Weak<GhastEntity>,
-    float_duration: i32,
+    distance_to_blocks: i32,
 }
 
 impl RandomFloatAroundGoal {
+    /// Vanilla `RandomFloatAroundGoal.MAX_ATTEMPTS`.
+    const MAX_ATTEMPTS: i32 = 64;
+
     #[must_use]
-    pub const fn new(ghast: Weak<GhastEntity>) -> Self {
-        Self {
-            ghast,
-            float_duration: 0,
+    pub const fn new(distance_to_blocks: i32) -> Self {
+        Self { distance_to_blocks }
+    }
+
+    /// Vanilla `getSuitableFlyToPosition`.
+    fn get_suitable_fly_to_position(mob: &dyn Mob, distance_to_blocks: i32) -> Vector3<f64> {
+        let entity = mob.get_entity();
+        let world = entity.world.load();
+        let mut random = mob.get_random();
+        let center = entity.pos.load();
+        let mut result = None;
+
+        for _ in 0..Self::MAX_ATTEMPTS {
+            result = Self::choose_random_position_with_restriction(mob, center, &mut random);
+            if let Some(result) = result
+                && Self::is_good_target(&world, result, distance_to_blocks)
+            {
+                return result;
+            }
         }
+
+        let mut result =
+            result.unwrap_or_else(|| Self::choose_random_position(center, &mut random));
+        let pos = BlockPos::floored_v(result);
+        // `level.getHeight` gives the first free block, one above Pumpkin's height.
+        let height_y =
+            world.get_heightmap_height(ChunkHeightmapType::MotionBlocking, pos.0.x, pos.0.z) + 1;
+        if height_y < pos.0.y && height_y > world.dimension.min_y {
+            result.y = center.y - (center.y - result.y).abs();
+        }
+        result
+    }
+
+    /// Vanilla `isGoodTarget`: an air block with a non-air block within
+    /// `distance_to_blocks - 1` blocks in some direction.
+    fn is_good_target(world: &World, target: Vector3<f64>, distance_to_blocks: i32) -> bool {
+        if distance_to_blocks <= 0 {
+            return true;
+        }
+
+        let pos = BlockPos::floored_v(target);
+        if !world.get_block_state(&pos).is_air() {
+            return false;
+        }
+
+        pumpkin_data::BlockDirection::all().iter().any(|direction| {
+            (1..distance_to_blocks).any(|i| {
+                !world
+                    .get_block_state(&pos.offset_dir(direction.to_offset(), i))
+                    .is_air()
+            })
+        })
+    }
+
+    /// Vanilla `chooseRandomPosition`, in vanilla's float offsets.
+    fn choose_random_position(center: Vector3<f64>, random: &mut impl rand::Rng) -> Vector3<f64> {
+        let mut offset = || f64::from((random.random::<f32>() * 2.0 - 1.0) * 16.0);
+        let x = center.x + offset();
+        let y = center.y + offset();
+        let z = center.z + offset();
+        Vector3::new(x, y, z)
+    }
+
+    /// Vanilla `chooseRandomPositionWithRestriction`: `None` outside the mob's home.
+    fn choose_random_position_with_restriction(
+        mob: &dyn Mob,
+        center: Vector3<f64>,
+        random: &mut impl rand::Rng,
+    ) -> Option<Vector3<f64>> {
+        let target = Self::choose_random_position(center, random);
+        let mob_entity = mob.get_mob_entity();
+        (!mob_entity.has_position_target()
+            || mob_entity.is_in_position_target_range_pos(&BlockPos::floored_v(target)))
+        .then_some(target)
     }
 }
 
 impl Goal for RandomFloatAroundGoal {
-    fn can_start(&mut self, _mob: &dyn Mob) -> bool {
-        let Some(ghast) = self.ghast.upgrade() else {
-            return false;
-        };
-        let wanted = *ghast
-            .wanted_fly_target
+    fn can_start(&mut self, mob: &dyn Mob) -> bool {
+        let move_control = mob
+            .get_mob_entity()
+            .move_control
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        wanted.is_none_or(|target| {
-            let pos = ghast.mob_entity.living_entity.entity.pos.load();
-            let dist_sq = pos.squared_distance_to_vec(&target);
-            !dist_sq.is_nan() && !(1.0..=3600.0).contains(&dist_sq)
-        })
-    }
+        if !move_control.has_wanted() {
+            return true;
+        }
 
-    fn start(&mut self, _mob: &dyn Mob) {
-        let Some(ghast) = self.ghast.upgrade() else {
-            return;
-        };
-        let pos = ghast.mob_entity.living_entity.entity.pos.load();
-        let new_target = {
-            let mut rng = rand::rng();
-            let target_x = pos.x + (rng.random::<f64>() * 2.0 - 1.0) * 16.0;
-            let target_y = pos.y + (rng.random::<f64>() * 2.0 - 1.0) * 16.0;
-            let target_z = pos.z + (rng.random::<f64>() * 2.0 - 1.0) * 16.0;
-            Vector3::new(target_x, target_y, target_z)
-        };
-        *ghast
-            .wanted_fly_target
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(new_target);
+        let wanted = move_control.wanted_position();
+        let pos = mob.get_entity().pos.load();
+        let xd = wanted.x - pos.x;
+        let yd = wanted.y - pos.y;
+        let zd = wanted.z - pos.z;
+        let dd = xd * xd + yd * yd + zd * zd;
+        dd < 1.0 || dd > 3600.0
     }
 
     fn should_continue(&mut self, _mob: &dyn Mob) -> bool {
-        let Some(ghast) = self.ghast.upgrade() else {
-            return false;
-        };
-        let wanted = *ghast
-            .wanted_fly_target
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        wanted.is_some_and(|target| {
-            let pos = ghast.mob_entity.living_entity.entity.pos.load();
-            let dist_sq = pos.squared_distance_to_vec(&target);
-            (1.0..=3600.0).contains(&dist_sq)
-        })
+        false
     }
 
-    fn should_run_every_tick(&self) -> bool {
-        true
-    }
-
-    fn tick(&mut self, _mob: &dyn Mob) {
-        let Some(ghast) = self.ghast.upgrade() else {
-            return;
-        };
-
-        let wanted = *ghast
-            .wanted_fly_target
+    fn start(&mut self, mob: &dyn Mob) {
+        let result = Self::get_suitable_fly_to_position(mob, self.distance_to_blocks);
+        mob.get_mob_entity()
+            .move_control
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let Some(target) = wanted else {
-            return;
-        };
-
-        let entity = &ghast.mob_entity.living_entity.entity;
-        let pos = entity.pos.load();
-        self.float_duration -= 1;
-
-        if self.float_duration <= 0 {
-            self.float_duration = rand::random_range(2..=6);
-            let travel = Vector3::new(target.x - pos.x, target.y - pos.y, target.z - pos.z);
-            let dist = travel.length();
-            if dist > 0.001 {
-                let move_scale = GhastEntity::FLYING_SPEED * 5.0 / 3.0; // 0.1
-                let norm = travel.normalize();
-                let delta = Vector3::new(
-                    norm.x * move_scale,
-                    norm.y * move_scale,
-                    norm.z * move_scale,
-                );
-                let current_vel = entity.velocity.load();
-                entity.velocity.store(Vector3::new(
-                    current_vel.x + delta.x,
-                    current_vel.y + delta.y,
-                    current_vel.z + delta.z,
-                ));
-            }
-        }
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .set_wanted_position(result.x, result.y, result.z, 1.0);
     }
 
     fn controls(&self) -> Controls {

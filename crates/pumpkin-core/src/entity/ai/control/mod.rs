@@ -1,4 +1,5 @@
 use crate::entity::mob::Mob;
+use pumpkin_util::math::vector3::Vector3;
 use pumpkin_util::math::{subtract_angles, wrap_degrees};
 
 pub mod body_rotation_control;
@@ -42,4 +43,12 @@ pub trait MoveControlTrait: Control {
     fn has_wanted(&self) -> bool {
         false
     }
+
+    /// Vanilla `getWantedX`/`Y`/`Z`; only the controls whose callers read it keep it.
+    fn wanted_position(&self) -> Vector3<f64> {
+        Vector3::new(0.0, 0.0, 0.0)
+    }
+
+    /// Vanilla `MoveControl.setWait`.
+    fn set_wait(&mut self) {}
 }
