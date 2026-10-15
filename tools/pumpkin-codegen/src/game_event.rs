@@ -29,6 +29,8 @@ pub fn build() -> TokenStream {
     }
 
     quote! {
+        use crate::tag::{RegistryKey, Taggable};
+
         #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
         pub enum GameEvent {
             #variants
@@ -48,6 +50,21 @@ pub fn build() -> TokenStream {
                     #from_name_match
                     _ => None,
                 }
+            }
+        }
+
+        impl Taggable for GameEvent {
+            #[inline]
+            fn tag_key() -> RegistryKey {
+                RegistryKey::GameEvent
+            }
+            #[inline]
+            fn registry_key(&self) -> &str {
+                self.name()
+            }
+            #[inline]
+            fn registry_id(&self) -> u16 {
+                *self as u16
             }
         }
     }
