@@ -26,30 +26,35 @@ impl FleeSunGoal {
         }
     }
 
-    fn find_hide_pos(mob: &dyn Mob) -> Option<Vector3<f64>> {
-        let mob_pos = mob.get_entity().block_pos.load();
+    /// Vanilla `setWantedPos`: picks a hiding spot, returning whether there was one.
+    pub fn set_wanted_pos(&mut self, mob: &dyn Mob) -> bool {
+        let Some(pos) = Self::get_hide_pos(mob) else {
+            return false;
+        };
+        self.wanted_x = pos.x;
+        self.wanted_y = pos.y;
+        self.wanted_z = pos.z;
+        true
+    }
+
+    /// Vanilla `getHidePos`: ten tries within 10/3/10 blocks for a spot out of the sky
+    /// that the mob values below zero.
+    fn get_hide_pos(mob: &dyn Mob) -> Option<Vector3<f64>> {
+        let pos = mob.get_entity().block_pos.load();
         let world = mob.get_entity().world.load();
         let mut rng = mob.get_random();
 
         for _ in 0..10 {
-            let offset_x = rng.random_range(-10..=10);
-            let offset_y = rng.random_range(-3..=3);
-            let offset_z = rng.random_range(-10..=10);
-            let check_pos = BlockPos::new(
-                mob_pos.0.x + offset_x,
-                mob_pos.0.y + offset_y,
-                mob_pos.0.z + offset_z,
+            let random_pos = BlockPos::new(
+                pos.0.x + rng.random_range(0..20) - 10,
+                pos.0.y + rng.random_range(0..6) - 3,
+                pos.0.z + rng.random_range(0..20) - 10,
             );
-
-            let block_at = world.get_block_state(&check_pos);
-            let block_above = world.get_block_state(&check_pos.up());
-            let block_below = world.get_block_state(&check_pos.down());
-
-            if !block_at.is_solid() && !block_above.is_solid() && block_below.is_solid() {
+            if !world.can_see_sky(&random_pos) && mob.get_walk_target_value(&random_pos) < 0.0 {
                 return Some(Vector3::new(
-                    f64::from(check_pos.0.x) + 0.5,
-                    f64::from(check_pos.0.y),
-                    f64::from(check_pos.0.z) + 0.5,
+                    f64::from(random_pos.0.x) + 0.5,
+                    f64::from(random_pos.0.y),
+                    f64::from(random_pos.0.z) + 0.5,
                 ));
             }
         }
@@ -63,23 +68,17 @@ impl Goal for FleeSunGoal {
         if mob.get_mob_entity().get_target().is_some() {
             return false;
         }
-
-        if !mob.get_mob_entity().living_entity.entity.is_on_fire() {
+        let entity = mob.get_entity();
+        let world = entity.world.load();
+        if !world.is_bright_outside()
+            || !entity.is_on_fire()
+            || !world.can_see_sky(&entity.block_pos.load())
+            || sun_burn::is_protected(mob)
+        {
             return false;
         }
 
-        if sun_burn::is_protected(mob) {
-            return false;
-        }
-
-        if let Some(pos) = Self::find_hide_pos(mob) {
-            self.wanted_x = pos.x;
-            self.wanted_y = pos.y;
-            self.wanted_z = pos.z;
-            true
-        } else {
-            false
-        }
+        self.set_wanted_pos(mob)
     }
 
     fn should_continue(&mut self, mob: &dyn Mob) -> bool {
