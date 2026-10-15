@@ -38,6 +38,14 @@ Jack o'Lantern is tsokiyZan's fork of Pumpkin, a Minecraft server written in Rus
 | Melee mobs walk right up to their target | Ported here; `MeleeAttackGoal` paths with reach 0 |
 | Babies have vanilla hitbox sizes, and the `scale` attribute resizes hitboxes | Ported here from `getDimensions` and each mob's `BABY_DIMENSIONS` |
 | Mobs walk at vanilla speed, and goal speeds (panicking, tempting) match | Fixed here: input decay order and `getSpeed` |
+| Ground mobs steer through vanilla's `MoveControl`; navigation follows paths like `PathNavigation` and bodies turn with `BodyRotationControl` | Ported here |
+| Path search matches vanilla: neighbour order, heap ties, per-mob costs, door and campfire states, real collision shapes | Ported here from `PathFinder` and the node evaluators |
+| Mob movement physics in vanilla's float maths, with a bit-exact `Mth.atan2` | Ported here from `LivingEntity.travel` and `Mth` |
+| Targeting scales with visibility, line of sight uses colliders, revenge memory expires | Ported here from `TargetingConditions` and `LivingEntity` |
+| Vanilla goal lists for spiders (leaps, armadillo avoidance), wolves (sitting), cats and ocelots (pouncing), illagers, ravagers, witches, vexes, snow golems, silverfish, slimes, ghasts, zombified piglins, farm animals | Ported here from each mob's `registerGoals` |
+| Every item data component encodes, decodes and hashes like vanilla (goat horns, paintings, trims and banners no longer disconnect) | Ported here |
+| Dappled forest trees, vegetation patches and feature order generate like vanilla | Fixed here |
+| Structure starts are computed once and biome-checked before their pieces are built (about 25% faster chunk loading) | Fixed here |
 
 ## Issues
 
