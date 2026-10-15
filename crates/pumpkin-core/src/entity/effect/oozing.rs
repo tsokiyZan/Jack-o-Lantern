@@ -45,7 +45,7 @@ impl MobEffect for OozingMobEffect {
                 })
                 .take(max_entity_cramming as usize)
                 .count() as i32;
-            (max_entity_cramming - nearby).max(0).min(SLIMES_REQUESTED)
+            (max_entity_cramming - nearby).clamp(0, SLIMES_REQUESTED)
         };
         let pos = entity.pos.load();
         for _ in 0..count {
