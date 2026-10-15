@@ -32,6 +32,7 @@ pub mod look_around;
 pub mod look_at_entity;
 pub mod melee_attack;
 pub mod move_back_to_village;
+pub mod move_through_village;
 pub mod move_to_target_pos;
 pub mod move_towards_restriction;
 pub mod move_towards_target;
