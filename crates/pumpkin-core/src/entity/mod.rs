@@ -442,6 +442,12 @@ pub trait EntityBase: Send + Sync + std::any::Any {
     }
 
     fn considers_entity_as_ally(&self, other: &dyn EntityBase) -> bool {
+        if self
+            .get_mob()
+            .is_some_and(|mob| mob.mob_considers_entity_as_ally(other))
+        {
+            return true;
+        }
         if let Some(tamable) = self.get_mob().and_then(mob::Mob::as_tamable)
             && let Some(considered) = tamable.tamable_considers_entity_as_ally(other)
         {
