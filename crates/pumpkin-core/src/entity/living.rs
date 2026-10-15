@@ -3409,13 +3409,6 @@ impl LivingEntity {
                     (absorbed_damage * 10.0).round() as i32,
                 );
             }
-
-            if let Some(attacker) = cause.or(source) {
-                self.last_attacker_id
-                    .store(attacker.get_entity().entity_id, Relaxed);
-                self.last_attacked_time
-                    .store(self.entity.tick_count.load(Relaxed), Relaxed);
-            }
         }
 
         let max_h = self.get_max_health();
@@ -3445,10 +3438,6 @@ impl LivingEntity {
 
             if let Some(attacker) = cause.or(source) {
                 let attacker_id = attacker.get_entity().entity_id;
-                self.last_attacker_id.store(attacker_id, Relaxed);
-                self.last_attacked_time
-                    .store(self.entity.tick_count.load(Relaxed), Relaxed);
-
                 let current_tick = world.level_info.load().day_time;
                 if attacker.get_player().is_some() {
                     self.last_hurt_by_player_id.store(attacker_id, Relaxed);
@@ -3483,6 +3472,8 @@ impl LivingEntity {
             }
         }
 
+        self.resolve_mob_responsible_for_damage(damage_type, cause.or(source));
+
         if new_health <= 0.0 {
             let mut death_event =
                 crate::plugin::api::events::entity::entity_death::EntityDeathEvent::new(
@@ -3502,6 +3493,53 @@ impl LivingEntity {
 
     pub fn damage(&self, caller: &dyn EntityBase, amount: f32, damage_type: DamageType) -> bool {
         self.damage_with_context(caller, amount, damage_type, None, None, None)
+    }
+
+    /// Vanilla `LivingEntity.setLastHurtByMob`, kept in `last_attacker_id` (0 for none).
+    pub fn set_last_hurt_by_mob(&self, hurt_by_id: i32) {
+        self.last_attacker_id.store(hurt_by_id, Relaxed);
+        self.last_attacked_time
+            .store(self.entity.tick_count.load(Relaxed), Relaxed);
+    }
+
+    /// Vanilla `LivingEntity.resolveMobResponsibleForDamage`.
+    fn resolve_mob_responsible_for_damage(
+        &self,
+        damage_type: DamageType,
+        attacker: Option<&dyn EntityBase>,
+    ) {
+        if let Some(attacker) = attacker
+            && attacker.get_living_entity().is_some()
+            && !damage_type.has_tag(&tag::DamageType::MINECRAFT_NO_ANGER)
+            && (damage_type != DamageType::WIND_CHARGE
+                || !self
+                    .entity
+                    .entity_type
+                    .has_tag(&tag::EntityType::MINECRAFT_NO_ANGER_FROM_WIND_CHARGE))
+        {
+            self.set_last_hurt_by_mob(attacker.get_entity().entity_id);
+        }
+    }
+
+    /// The `lastHurtByMob` part of vanilla `LivingEntity.baseTick`: forgotten once the
+    /// attacker dies or 100 ticks pass.
+    fn tick_last_hurt_by_mob(&self) {
+        let hurt_by_id = self.last_attacker_id.load(Relaxed);
+        if hurt_by_id == 0 {
+            return;
+        }
+        let Some(hurt_by) = self.entity.world.load().get_entity_by_id(hurt_by_id) else {
+            return;
+        };
+        let Some(hurt_by) = hurt_by.get_living_entity() else {
+            return;
+        };
+        let hurt_by_alive = !hurt_by.entity.is_removed() && hurt_by.health.load() > 0.0;
+        if !hurt_by_alive
+            || self.entity.tick_count.load(Relaxed) - self.last_attacked_time.load(Relaxed) > 100
+        {
+            self.set_last_hurt_by_mob(0);
+        }
     }
 }
 
@@ -3623,6 +3661,7 @@ impl EntityBase for LivingEntity {
             self.on_changed_block(caller, current_block_pos);
         }
 
+        self.tick_last_hurt_by_mob();
         self.tick_effects();
 
         if let Some(player) = caller.get_player() {
