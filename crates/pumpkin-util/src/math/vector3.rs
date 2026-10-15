@@ -422,21 +422,22 @@ impl<T: Math + Copy + Float> Vector3<T> {
     ///
     /// # Returns
     /// A new unit vector pointing in the same direction.
+    /// Vanilla `Vec3.normalize`: divides by the length, and is zero below `1.0E-5F`.
     #[must_use]
     pub fn normalize(&self) -> Self {
-        let length_recip = self.length().recip();
-
-        if length_recip.is_finite() && length_recip > T::zero() {
-            Self {
-                x: self.x * length_recip,
-                y: self.y * length_recip,
-                z: self.z * length_recip,
-            }
-        } else {
+        let length = self.length();
+        let threshold = T::from(1.0e-5f32).unwrap_or_else(T::zero);
+        if length < threshold {
             Self {
                 x: T::zero(),
                 y: T::zero(),
                 z: T::zero(),
+            }
+        } else {
+            Self {
+                x: self.x / length,
+                y: self.y / length,
+                z: self.z / length,
             }
         }
     }

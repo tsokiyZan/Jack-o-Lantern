@@ -185,16 +185,6 @@ pub fn face_movement_direction(mob: &dyn Mob) {
     entity.body_yaw.store(y_rot);
 }
 
-/// Vanilla `Vec3.normalize`, which divides by the length and gives zero below `1.0E-5F`.
-fn normalize(vec: Vector3<f64>) -> Vector3<f64> {
-    let dist = (vec.x * vec.x + vec.y * vec.y + vec.z * vec.z).sqrt();
-    if dist < f64::from(1.0E-5f32) {
-        Vector3::new(0.0, 0.0, 0.0)
-    } else {
-        Vector3::new(vec.x / dist, vec.y / dist, vec.z / dist)
-    }
-}
-
 /// Vanilla `Ghast.GhastMoveControl`.
 ///
 /// Every few ticks pushes the mob towards the wanted position, and gives up when the way
@@ -339,7 +329,7 @@ impl MoveControlTrait for GhastMoveControl {
             let speed = living.get_attribute_value(&Attributes::FLYING_SPEED) * 5.0 / 3.0;
             entity
                 .velocity
-                .store(entity.velocity.load() + normalize(travel) * speed);
+                .store(entity.velocity.load() + travel.normalize() * speed);
         } else {
             self.operation = Operation::Wait;
         }
@@ -470,7 +460,7 @@ impl Goal for GhastShootFireballGoal {
                     &EntityType::FIREBALL,
                 );
                 let fireball =
-                    FireballEntity::new_shot(fireball_base, entity, normalize(direction));
+                    FireballEntity::new_shot(fireball_base, entity, direction.normalize());
                 // `ThrownItemEntity::new` puts the projectile at the shooter's eye, re-anchor it.
                 fireball.thrown.entity.pos.store(spawn_pos);
                 fireball
