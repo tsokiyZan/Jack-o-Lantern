@@ -3,6 +3,7 @@ use std::sync::{
     atomic::{AtomicI32, Ordering},
 };
 
+use crate::entity::ai::goal::climb_on_top_of_powder_snow::ClimbOnTopOfPowderSnowGoal;
 use crate::entity::ai::goal::revenge::RevengeGoal;
 use pumpkin_data::entity::EntityPose;
 use pumpkin_data::entity::EntityType;
@@ -109,7 +110,8 @@ impl RabbitEntity {
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
 
             goal_selector.add_goal(1, SwimGoal::new(&mob_arc.mob_entity));
-            // TODO: 1 ClimbOnTopOfPowderSnowGoal and 5 RaidGardenGoal are not ported.
+            goal_selector.add_goal(1, Box::new(ClimbOnTopOfPowderSnowGoal));
+            // TODO: 5 RaidGardenGoal is not ported.
             // RabbitPanicGoal
             goal_selector.add_goal(1, EscapeDangerGoal::new(2.2));
             goal_selector.add_goal(2, BreedGoal::new(0.8));

@@ -1,3 +1,4 @@
+use crate::entity::ai::goal::climb_on_top_of_powder_snow::ClimbOnTopOfPowderSnowGoal;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, Ordering};
 
@@ -40,8 +41,9 @@ impl SilverfishEntity {
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
 
             goal_selector.add_goal(1, SwimGoal::new(&mob_arc.entity));
-            // TODO: 1 ClimbOnTopOfPowderSnowGoal, 3 SilverfishWakeUpFriendsGoal and
-            // 5 SilverfishMergeWithStoneGoal are not ported.
+            goal_selector.add_goal(1, Box::new(ClimbOnTopOfPowderSnowGoal));
+            // TODO: 3 SilverfishWakeUpFriendsGoal and 5 SilverfishMergeWithStoneGoal are not
+            // ported.
             goal_selector.add_goal(4, Box::new(MeleeAttackGoal::new(1.0, false)));
 
             target_selector.add_goal(1, Box::new(RevengeGoal::new(true).alerting_others()));

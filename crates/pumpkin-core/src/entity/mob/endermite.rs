@@ -1,3 +1,4 @@
+use crate::entity::ai::goal::climb_on_top_of_powder_snow::ClimbOnTopOfPowderSnowGoal;
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::{Arc, Weak};
 
@@ -40,7 +41,7 @@ impl EndermiteEntity {
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
 
             goal_selector.add_goal(1, SwimGoal::new(&mob_arc.mob_entity));
-            // TODO: 1 ClimbOnTopOfPowderSnowGoal is not ported.
+            goal_selector.add_goal(1, Box::new(ClimbOnTopOfPowderSnowGoal));
             goal_selector.add_goal(2, Box::new(MeleeAttackGoal::new(1.0, false)));
             goal_selector.add_goal(3, Box::new(WanderAroundGoal::avoiding_water(1.0)));
             goal_selector.add_goal(
