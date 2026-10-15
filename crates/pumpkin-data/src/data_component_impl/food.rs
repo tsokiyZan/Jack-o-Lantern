@@ -1,8 +1,9 @@
 use super::Digest;
 use crate::data_component_impl::basic::SoundEvent;
 use crate::data_component_impl::{
-    DataComponentImpl, IDSet, IdOr, get_f32_hash, get_i32_hash, get_idor, get_idor_hash,
-    get_idset_hash, get_str_hash, put_idor,
+    DataComponentImpl, IDSet, IdOr, MapHash, get_bool_hash, get_byte_hash, get_f32_hash,
+    get_i32_hash, get_idor, get_idor_hash, get_idset_hash, get_list_hash, get_str_hash, namespaced,
+    put_idor,
 };
 use crate::effect::StatusEffect;
 use crate::sound::Sound;
@@ -57,17 +58,54 @@ pub struct StatusEffectInstance {
     pub ambient: bool,
     pub show_particles: bool,
     pub show_icon: bool,
+    /// The weaker effect that comes back when this one runs out.
+    pub hidden_effect: Option<Box<Self>>,
 }
 
 impl StatusEffectInstance {
+    /// Bounds the `hidden_effect` chain read from NBT or the network.
+    pub const MAX_HIDDEN_EFFECT_DEPTH: usize = 32;
+
+    /// Reads `MobEffectInstance.CODEC`.
     pub fn read_data(nbt: &NbtTag) -> Option<Self> {
         let compound = nbt.extract_compound()?;
         let effect_id = Cow::Owned(compound.get_string("id")?.to_string());
-        let amplifier = compound.get_int("amplifier")?;
-        let duration = compound.get_int("duration")?;
-        let ambient = compound.get_bool("ambient")?;
-        let show_particles = compound.get_bool("show_particles")?;
-        let show_icon = compound.get_bool("show_icon")?;
+        Self::read_details(effect_id, compound, Self::MAX_HIDDEN_EFFECT_DEPTH)
+    }
+
+    /// Reads `MobEffectInstance.Details.MAP_CODEC`, where every field is optional.
+    fn read_details(
+        effect_id: Cow<'static, str>,
+        compound: &NbtCompound,
+        depth: usize,
+    ) -> Option<Self> {
+        let amplifier = match compound.get("amplifier") {
+            // `ExtraCodecs.UNSIGNED_BYTE`
+            Some(tag) => i32::from(tag.as_numeric_int()? as u8),
+            None => 0,
+        };
+        let duration = match compound.get("duration") {
+            Some(tag) => tag.as_numeric_int()?,
+            None => 0,
+        };
+        let flag = |name: &str, default: bool| match compound.get(name) {
+            Some(tag) => tag.as_numeric_int().map(|value| value != 0),
+            None => Some(default),
+        };
+        let ambient = flag("ambient", false)?;
+        let show_particles = flag("show_particles", true)?;
+        let show_icon = flag("show_icon", show_particles)?;
+        let hidden_effect = match compound.get("hidden_effect") {
+            Some(hidden) => {
+                let depth = depth.checked_sub(1)?;
+                Some(Box::new(Self::read_details(
+                    effect_id.clone(),
+                    hidden.extract_compound()?,
+                    depth,
+                )?))
+            }
+            None => None,
+        };
         Some(Self {
             effect_id,
             amplifier,
@@ -75,29 +113,66 @@ impl StatusEffectInstance {
             ambient,
             show_particles,
             show_icon,
+            hidden_effect,
         })
     }
 
+    /// Writes `MobEffectInstance.CODEC`.
     pub fn as_nbt(&self) -> NbtTag {
-        let mut compound = NbtCompound::new();
+        let mut compound = self.details_nbt();
         compound.put_string("id", self.effect_id.to_string());
-        compound.put_int("amplifier", self.amplifier);
-        compound.put_int("duration", self.duration);
-        compound.put_bool("ambient", self.ambient);
-        compound.put_bool("show_particles", self.show_particles);
-        compound.put_bool("show_icon", self.show_icon);
         NbtTag::Compound(compound)
     }
 
+    fn details_nbt(&self) -> NbtCompound {
+        let mut compound = NbtCompound::new();
+        if self.amplifier != 0 {
+            compound.put_byte("amplifier", self.amplifier as u8 as i8);
+        }
+        if self.duration != 0 {
+            compound.put_int("duration", self.duration);
+        }
+        if self.ambient {
+            compound.put_bool("ambient", true);
+        }
+        if !self.show_particles {
+            compound.put_bool("show_particles", false);
+        }
+        compound.put_bool("show_icon", self.show_icon);
+        if let Some(hidden) = &self.hidden_effect {
+            compound.put_compound("hidden_effect", hidden.details_nbt());
+        }
+        compound
+    }
+
     pub fn get_hash(&self) -> i32 {
-        let mut digest = Digest::new();
-        digest.update(&get_str_hash(self.effect_id.as_ref()).to_le_bytes());
-        digest.update(&get_i32_hash(self.amplifier).to_le_bytes());
-        digest.update(&get_i32_hash(self.duration).to_le_bytes());
-        digest.update(&[self.ambient as u8]);
-        digest.update(&[self.show_particles as u8]);
-        digest.update(&[self.show_icon as u8]);
-        digest.finalize() as i32
+        self.details_hash()
+            .field("id", get_str_hash(&namespaced(&self.effect_id)))
+            .finish() as i32
+    }
+
+    fn details_hash(&self) -> MapHash {
+        MapHash::new()
+            .optional_field(
+                "amplifier",
+                (self.amplifier != 0).then(|| get_byte_hash(self.amplifier as u8 as i8)),
+            )
+            .optional_field(
+                "duration",
+                (self.duration != 0).then(|| get_i32_hash(self.duration)),
+            )
+            .optional_field("ambient", self.ambient.then(|| get_bool_hash(true)))
+            .optional_field(
+                "show_particles",
+                (!self.show_particles).then(|| get_bool_hash(false)),
+            )
+            .field("show_icon", get_bool_hash(self.show_icon))
+            .optional_field(
+                "hidden_effect",
+                self.hidden_effect
+                    .as_ref()
+                    .map(|hidden| hidden.details_hash().finish()),
+            )
     }
 }
 
@@ -462,49 +537,46 @@ pub struct PotionContentsImpl {
     pub custom_name: Option<String>,
 }
 impl PotionContentsImpl {
+    /// Reads `PotionContents.CODEC`: the full record, or just a potion id.
     pub fn read_data(tag: &NbtTag) -> Option<Self> {
-        let compound = tag.extract_compound()?;
-        let potion_id = if let Some(id) = compound.get_int("potion") {
-            Some(id)
-        } else if let Some(name) = compound.get_string("potion") {
-            let name = name.strip_prefix("minecraft:").unwrap_or(name);
-            crate::potion::Potion::from_name(name).map(|p| p.id as i32)
-        } else {
-            None
+        let potion_from_name = |name: &str| {
+            crate::potion::Potion::from_name(name.strip_prefix("minecraft:").unwrap_or(name))
+                .map(|potion| i32::from(potion.id))
         };
-        let custom_color = compound.get_int("custom_color");
-        let custom_name = compound.get_string("custom_name").map(|s| s.to_string());
-        let custom_effects = compound
-            .get_list("custom_effects")
-            .map(|list| {
-                list.iter()
-                    .filter_map(|item| {
-                        let effect_tag = item.extract_compound()?;
-                        let id: Cow<'static, str> =
-                            Cow::Owned(effect_tag.get_string("id")?.to_string());
-                        let amplifier = effect_tag
-                            .get_int("amplifier")
-                            .or_else(|| effect_tag.get_byte("amplifier").map(i32::from))
-                            .unwrap_or(0);
-                        let duration = effect_tag
-                            .get_int("duration")
-                            .or_else(|| effect_tag.get_byte("duration").map(i32::from))
-                            .unwrap_or(0);
-                        let ambient = effect_tag.get_bool("ambient").unwrap_or(false);
-                        let show_particles = effect_tag.get_bool("show_particles").unwrap_or(true);
-                        let show_icon = effect_tag.get_bool("show_icon").unwrap_or(true);
-                        Some(StatusEffectInstance {
-                            effect_id: id,
-                            amplifier,
-                            duration,
-                            ambient,
-                            show_particles,
-                            show_icon,
-                        })
-                    })
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_default();
+        let compound = match tag {
+            NbtTag::String(name) => {
+                return Some(Self {
+                    potion_id: Some(potion_from_name(name)?),
+                    custom_color: None,
+                    custom_effects: Vec::new(),
+                    custom_name: None,
+                });
+            }
+            NbtTag::Compound(compound) => compound,
+            _ => return None,
+        };
+        let potion_id = match compound.get("potion") {
+            Some(NbtTag::String(name)) => Some(potion_from_name(name)?),
+            // Older Pumpkin saves stored the registry id.
+            Some(NbtTag::Int(id)) => Some(*id),
+            Some(_) => return None,
+            None => None,
+        };
+        let custom_color = match compound.get("custom_color") {
+            Some(tag) => Some(tag.as_numeric_int()?),
+            None => None,
+        };
+        let custom_effects = match compound.get_list("custom_effects") {
+            Some(list) => list
+                .iter()
+                .map(StatusEffectInstance::read_data)
+                .collect::<Option<Vec<_>>>()?,
+            None => Vec::new(),
+        };
+        let custom_name = match compound.get("custom_name") {
+            Some(tag) => Some(tag.extract_string()?.to_string()),
+            None => None,
+        };
         Some(Self {
             potion_id,
             custom_color,
@@ -512,29 +584,29 @@ impl PotionContentsImpl {
             custom_name,
         })
     }
+
+    fn potion_name(&self) -> Option<String> {
+        let potion = crate::potion::Potion::from_id(u8::try_from(self.potion_id?).ok()?)?;
+        Some(format!("minecraft:{}", potion.name))
+    }
 }
 impl DataComponentImpl for PotionContentsImpl {
     fn write_data(&self) -> NbtTag {
         let mut compound = NbtCompound::new();
-        if let Some(potion_id) = self.potion_id {
-            compound.put_int("potion", potion_id);
+        if let Some(potion) = self.potion_name() {
+            compound.put_string("potion", potion);
         }
         if let Some(color) = self.custom_color {
             compound.put_int("custom_color", color);
         }
         if !self.custom_effects.is_empty() {
-            let mut effects_list = Vec::new();
-            for effect in &self.custom_effects {
-                let mut effect_compound = NbtCompound::new();
-                effect_compound.put_string("id", effect.effect_id.to_string());
-                effect_compound.put_int("amplifier", effect.amplifier);
-                effect_compound.put_int("duration", effect.duration);
-                effect_compound.put_byte("ambient", effect.ambient as i8);
-                effect_compound.put_byte("show_particles", effect.show_particles as i8);
-                effect_compound.put_byte("show_icon", effect.show_icon as i8);
-                effects_list.push(NbtTag::Compound(effect_compound));
-            }
-            compound.put("custom_effects", NbtTag::List(effects_list));
+            compound.put_list(
+                "custom_effects",
+                self.custom_effects
+                    .iter()
+                    .map(StatusEffectInstance::as_nbt)
+                    .collect(),
+            );
         }
         if let Some(name) = &self.custom_name {
             compound.put_string("custom_name", name.clone());
@@ -542,26 +614,21 @@ impl DataComponentImpl for PotionContentsImpl {
         NbtTag::Compound(compound)
     }
     fn get_hash(&self) -> i32 {
-        let mut digest = Digest::new();
-        if let Some(id) = self.potion_id {
-            digest.update(&[1u8]);
-            digest.update(&get_i32_hash(id).to_le_bytes());
-        }
-        if let Some(color) = self.custom_color {
-            digest.update(&[2u8]);
-            digest.update(&get_i32_hash(color).to_le_bytes());
-        }
-        if let Some(name) = &self.custom_name {
-            digest.update(&[3u8]);
-            digest.update(&get_str_hash(name).to_le_bytes());
-        }
-        if !self.custom_effects.is_empty() {
-            digest.update(&[4u8]);
-            for effect in &self.custom_effects {
-                digest.update(&effect.get_hash().to_le_bytes());
-            }
-        }
-        digest.finalize() as i32
+        MapHash::new()
+            .optional_field("potion", self.potion_name().map(|name| get_str_hash(&name)))
+            .optional_field("custom_color", self.custom_color.map(get_i32_hash))
+            .optional_field(
+                "custom_effects",
+                (!self.custom_effects.is_empty()).then(|| {
+                    get_list_hash(
+                        self.custom_effects
+                            .iter()
+                            .map(|effect| effect.get_hash() as u32),
+                    )
+                }),
+            )
+            .optional_field("custom_name", self.custom_name.as_deref().map(get_str_hash))
+            .finish() as i32
     }
     default_impl!(PotionContents);
 }

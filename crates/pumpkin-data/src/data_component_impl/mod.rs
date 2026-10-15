@@ -1053,6 +1053,110 @@ mod tests {
         );
     }
 
+    fn strong_swiftness_contents() -> PotionContentsImpl {
+        PotionContentsImpl {
+            potion_id: Some(i32::from(crate::potion::Potion::STRONG_SWIFTNESS.id)),
+            custom_color: Some(0xFF00FF),
+            custom_effects: vec![StatusEffectInstance {
+                effect_id: Cow::Borrowed("minecraft:speed"),
+                amplifier: 1,
+                duration: 200,
+                ambient: false,
+                show_particles: false,
+                show_icon: true,
+                hidden_effect: None,
+            }],
+            custom_name: None,
+        }
+    }
+
+    #[test]
+    fn potion_contents_hash() {
+        assert_eq!(strong_swiftness_contents().get_hash(), -520_524_062);
+    }
+
+    #[test]
+    fn potion_contents_nbt_is_vanilla_shaped() {
+        // {custom_color:16711935,custom_effects:[{amplifier:1b,duration:200,
+        //  id:"minecraft:speed",show_icon:1b,show_particles:0b}],potion:"minecraft:strong_swiftness"}
+        let mut effect = NbtCompound::new();
+        effect.put_byte("amplifier", 1);
+        effect.put_int("duration", 200);
+        effect.put_string("id", "minecraft:speed".to_string());
+        effect.put_bool("show_icon", true);
+        effect.put_bool("show_particles", false);
+        let mut vanilla = NbtCompound::new();
+        vanilla.put_int("custom_color", 0xFF00FF);
+        vanilla.put_list("custom_effects", vec![NbtTag::Compound(effect)]);
+        vanilla.put_string("potion", "minecraft:strong_swiftness".to_string());
+        let vanilla = NbtTag::Compound(vanilla);
+
+        assert_eq!(strong_swiftness_contents().write_data(), vanilla);
+        assert_eq!(
+            PotionContentsImpl::read_data(&vanilla).expect("vanilla potion NBT should read"),
+            strong_swiftness_contents()
+        );
+        // The bare potion id form of `PotionContents.CODEC`.
+        let bare = PotionContentsImpl::read_data(&NbtTag::String("minecraft:water".into()))
+            .expect("a bare potion id should read");
+        assert_eq!(
+            bare.potion_id,
+            Some(i32::from(crate::potion::Potion::WATER.id))
+        );
+    }
+
+    #[test]
+    fn status_effect_with_hidden_effect() {
+        let effect = StatusEffectInstance {
+            effect_id: Cow::Borrowed("minecraft:speed"),
+            amplifier: 1,
+            duration: 200,
+            ambient: false,
+            show_particles: false,
+            show_icon: true,
+            hidden_effect: Some(Box::new(StatusEffectInstance {
+                effect_id: Cow::Borrowed("minecraft:speed"),
+                amplifier: 0,
+                duration: 100,
+                ambient: false,
+                show_particles: true,
+                show_icon: true,
+                hidden_effect: None,
+            })),
+        };
+        assert_eq!(effect.get_hash(), 2_145_254_872);
+
+        // {amplifier:1b,duration:200,hidden_effect:{duration:100,show_icon:1b},
+        //  id:"minecraft:speed",show_icon:1b,show_particles:0b}
+        let mut hidden = NbtCompound::new();
+        hidden.put_int("duration", 100);
+        hidden.put_bool("show_icon", true);
+        let mut vanilla = NbtCompound::new();
+        vanilla.put_byte("amplifier", 1);
+        vanilla.put_int("duration", 200);
+        vanilla.put_compound("hidden_effect", hidden);
+        vanilla.put_string("id", "minecraft:speed".to_string());
+        vanilla.put_bool("show_icon", true);
+        vanilla.put_bool("show_particles", false);
+        let vanilla = NbtTag::Compound(vanilla);
+
+        assert_eq!(effect.as_nbt(), vanilla);
+        assert_eq!(StatusEffectInstance::read_data(&vanilla), Some(effect));
+    }
+
+    #[test]
+    fn status_effect_reads_missing_fields_as_defaults() {
+        let mut nbt = NbtCompound::new();
+        nbt.put_string("id", "minecraft:regeneration".to_string());
+        nbt.put_bool("show_particles", false);
+        let effect = StatusEffectInstance::read_data(&NbtTag::Compound(nbt))
+            .expect("an effect with only an id should read");
+        assert_eq!((effect.amplifier, effect.duration), (0, 0));
+        assert!(!effect.ambient);
+        // `show_icon` falls back to `show_particles`.
+        assert!(!effect.show_icon);
+    }
+
     fn assert_round_trip<T: DataComponentImpl + Clone + 'static>(
         value: T,
         read: impl Fn(&NbtTag) -> Option<T>,

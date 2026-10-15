@@ -155,56 +155,78 @@ fn deserialize_status_effects(
         let effect_name = StatusEffect::from_id(effect_registry_id as u16)
             .ok_or(ReadingError::Message("Invalid effect_id!".into()))?
             .minecraft_name;
-        let effect_id = Cow::Borrowed(effect_name);
-
-        // Effect parameters
-        let amplifier = seq.get_var_int()?.0;
-        let duration = seq.get_var_int()?.0;
-        let ambient = seq.get_bool()?;
-        let show_particles = seq.get_bool()?;
-        let show_icon = seq.get_bool()?;
-
-        // Hidden effect (optional, recursive) - we skip it for now
-        let has_hidden = seq.get_bool()?;
-        if has_hidden {
-            // Skip hidden effect parameters recursively
-            skip_effect_parameters(seq)?;
-        }
-
-        custom_effects.push(StatusEffectInstance {
-            effect_id,
-            amplifier,
-            duration,
-            ambient,
-            show_particles,
-            show_icon,
-        });
+        custom_effects.push(deserialize_effect_details(
+            seq,
+            Cow::Borrowed(effect_name),
+            StatusEffectInstance::MAX_HIDDEN_EFFECT_DEPTH,
+        )?);
     }
 
     Ok(custom_effects)
 }
 
+/// `MobEffectInstance.Details.STREAM_CODEC`, which nests the hidden effect.
+fn deserialize_effect_details(
+    seq: &mut impl NetworkReadExt,
+    effect_id: Cow<'static, str>,
+    depth: usize,
+) -> Result<StatusEffectInstance, ReadingError> {
+    let amplifier = seq.get_var_int()?.0;
+    let duration = seq.get_var_int()?.0;
+    let ambient = seq.get_bool()?;
+    let show_particles = seq.get_bool()?;
+    let show_icon = seq.get_bool()?;
+    let hidden_effect = if seq.get_bool()? {
+        let depth = depth
+            .checked_sub(1)
+            .ok_or_else(|| ReadingError::TooLarge("Potion effect hidden depth exceeded".into()))?;
+        Some(Box::new(deserialize_effect_details(
+            seq,
+            effect_id.clone(),
+            depth,
+        )?))
+    } else {
+        None
+    };
+    Ok(StatusEffectInstance {
+        effect_id,
+        amplifier,
+        duration,
+        ambient,
+        show_particles,
+        show_icon,
+        hidden_effect,
+    })
+}
+
+fn serialize_effect_details(
+    seq: &mut impl NetworkWriteExt,
+    effect: &StatusEffectInstance,
+) -> Result<(), WritingError> {
+    seq.write_var_int(&VarInt::from(effect.amplifier))?;
+    seq.write_var_int(&VarInt::from(effect.duration))?;
+    seq.write_bool(effect.ambient)?;
+    seq.write_bool(effect.show_particles)?;
+    seq.write_bool(effect.show_icon)?;
+    seq.write_option(&effect.hidden_effect, |seq, hidden| {
+        serialize_effect_details(seq, hidden)
+    })
+}
+
 fn serialize_status_effects(
-    effects: &Vec<StatusEffectInstance>,
+    effects: &[StatusEffectInstance],
     seq: &mut impl NetworkWriteExt,
 ) -> Result<(), WritingError> {
     seq.write_var_int(&VarInt(effects.len() as i32))?;
 
     for effect in effects {
-        let effect_id = StatusEffect::from_minecraft_name(&effect.effect_id)
+        let effect_id = StatusEffect::from_minecraft_name(&namespaced(&effect.effect_id))
             .ok_or_else(|| {
                 WritingError::Message(format!("Invalid status effect: {}", effect.effect_id))
             })?
             .registry_id();
         seq.write_var_int(&VarInt(effect_id as i32))?;
-        // Effect parameters
-        seq.write_var_int(&VarInt::from(effect.amplifier))?;
-        seq.write_var_int(&VarInt::from(effect.duration))?;
-        seq.write_bool(effect.ambient)?;
-        seq.write_bool(effect.show_particles)?;
-        seq.write_bool(effect.show_icon)?;
-        // No hidden effect for now
-        seq.write_bool(false)?;
+        serialize_effect_details(seq, effect)?;
     }
     Ok(())
 }
@@ -262,7 +284,7 @@ fn serialize_consume_effect(
     seq.write_var_int(&VarInt(consume_effect.registry_id() as i32))?;
     match consume_effect {
         ConsumeEffect::ApplyEffects((effects, probability)) => {
-            serialize_status_effects(&effects.to_vec(), seq)?;
+            serialize_status_effects(effects, seq)?;
             seq.write_f32(*probability)?;
         }
         ConsumeEffect::RemoveEffects(idset) => serialize_idset(idset, seq)?,
@@ -751,36 +773,6 @@ impl DataComponentCodec<Self> for PotionContentsImpl {
             custom_name,
         })
     }
-}
-
-/// Helper to skip hidden effect parameters iteratively with a depth cap
-fn skip_effect_parameters(seq: &mut impl NetworkReadExt) -> Result<(), ReadingError> {
-    const MAX_EFFECT_DEPTH: usize = 32;
-    let mut depth = 0;
-    loop {
-        // amplifier
-        seq.get_var_int()?;
-        // duration
-        seq.get_var_int()?;
-        // ambient
-        seq.get_bool()?;
-        // show_particles
-        seq.get_bool()?;
-        // show_icon
-        seq.get_bool()?;
-        // has_hidden
-        let has_hidden = seq.get_bool()?;
-        if !has_hidden {
-            break;
-        }
-        depth += 1;
-        if depth > MAX_EFFECT_DEPTH {
-            return Err(ReadingError::TooLarge(
-                "Potion effect hidden depth exceeded".into(),
-            ));
-        }
-    }
-    Ok(())
 }
 
 impl DataComponentCodec<Self> for FireworkExplosionImpl {
@@ -3137,6 +3129,36 @@ mod tests {
                 patterns: IDSet::Tag(Cow::Borrowed("pattern_item/flower")),
             },
             &bytes,
+        );
+    }
+
+    #[test]
+    fn potion_contents_with_hidden_effect() {
+        let speed = |amplifier, duration, show_particles, hidden_effect| StatusEffectInstance {
+            effect_id: Cow::Borrowed("minecraft:speed"),
+            amplifier,
+            duration,
+            ambient: false,
+            show_particles,
+            show_icon: true,
+            hidden_effect,
+        };
+        assert_wire(
+            &PotionContentsImpl {
+                potion_id: Some(15),
+                custom_color: Some(0xFF00FF),
+                custom_effects: vec![speed(
+                    1,
+                    200,
+                    false,
+                    Some(Box::new(speed(0, 100, true, None))),
+                )],
+                custom_name: None,
+            },
+            &[
+                0x01, 0x0f, 0x01, 0x00, 0xff, 0x00, 0xff, 0x01, 0x00, 0x01, 0xc8, 0x01, 0x00, 0x00,
+                0x01, 0x01, 0x00, 0x64, 0x00, 0x01, 0x01, 0x00, 0x00,
+            ],
         );
     }
 }

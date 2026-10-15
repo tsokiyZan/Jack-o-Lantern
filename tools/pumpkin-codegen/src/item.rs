@@ -464,10 +464,10 @@ impl ToTokens for ItemComponents {
                             for status in status_effect_instances {
                                 let effect_id = status.id;
                                 let amplifier = status.amplifier.unwrap_or(0);
-                                let duration = status.duration.unwrap_or(1);
+                                let duration = status.duration.unwrap_or(0);
                                 let ambient = status.ambient.unwrap_or(false);
                                 let show_particles = status.show_particles.unwrap_or(true);
-                                let show_icon = status.show_icon.unwrap_or(true);
+                                let show_icon = status.show_icon.unwrap_or(show_particles);
                                 status_tokens.extend(quote! {
                                     StatusEffectInstance {
                                         effect_id: Cow::Borrowed(#effect_id),
@@ -475,7 +475,8 @@ impl ToTokens for ItemComponents {
                                         duration: #duration,
                                         ambient: #ambient,
                                         show_particles: #show_particles,
-                                        show_icon: #show_icon
+                                        show_icon: #show_icon,
+                                        hidden_effect: None,
                                     },
                                 });
                             }
