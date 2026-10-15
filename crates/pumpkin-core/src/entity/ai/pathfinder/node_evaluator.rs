@@ -1,3 +1,8 @@
+use pumpkin_data::{
+    Block, BlockState,
+    block_properties::CampfireLikeProperties,
+    tag::{self, Taggable},
+};
 use rustc_hash::FxHashMap;
 
 use pumpkin_util::math::{position::BlockPos, vector3::Vector3};
@@ -6,6 +11,17 @@ use crate::entity::ai::pathfinder::{
     node::{Node, PATH_TYPE_COUNT, PathType, Target},
     pathfinding_context::PathfindingContext,
 };
+
+/// Vanilla `NodeEvaluator.isBurningBlock`.
+#[must_use]
+pub fn is_burning_block(block: &Block, state: &BlockState) -> bool {
+    block.has_tag(&tag::Block::MINECRAFT_FIRE)
+        || block == &Block::LAVA
+        || block == &Block::MAGMA_BLOCK
+        || (block.has_tag(&tag::Block::MINECRAFT_CAMPFIRES)
+            && CampfireLikeProperties::from_state_id(state.id).lit)
+        || block == &Block::LAVA_CAULDRON
+}
 
 pub trait NodeEvaluator {
     fn prepare(&mut self, context: PathfindingContext, mob_data: MobData);

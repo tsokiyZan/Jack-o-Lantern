@@ -68,7 +68,9 @@ fn toggle_door(player: &Player, world: &Arc<World>, block_pos: &BlockPos) {
     );
 }
 
-fn can_open_door(block: &Block) -> bool {
+/// Vanilla `BlockSetType.canOpenByHand` for a door block.
+#[must_use]
+pub fn can_open_door(block: &Block) -> bool {
     if block == &Block::IRON_DOOR {
         return false;
     }
