@@ -53,7 +53,7 @@ impl WaterAvoidingRandomFlyingGoal {
 
 impl Goal for WaterAvoidingRandomFlyingGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
-        if mob.get_entity().has_passengers() {
+        if mob.get_controlling_passenger().is_some() {
             return false;
         }
 
@@ -67,7 +67,7 @@ impl Goal for WaterAvoidingRandomFlyingGoal {
 
     fn should_continue(&mut self, mob: &dyn Mob) -> bool {
         let is_idle = mob.is_navigator_idle();
-        !is_idle && !mob.get_entity().has_passengers()
+        !is_idle && mob.get_controlling_passenger().is_none()
     }
 
     fn start(&mut self, mob: &dyn Mob) {

@@ -1,5 +1,6 @@
 use crate::entity::ai::pathfinder::node::PathType;
 use crate::entity::breath::BreathManager;
+use crate::entity::mob::{first_passenger_player, mob_controlling_passenger};
 use crossbeam::atomic::AtomicCell;
 use pumpkin_data::damage::DamageType;
 use pumpkin_data::entity::EntityPose;
@@ -296,6 +297,16 @@ impl Mob for NautilusEntity {
 
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
+    }
+
+    /// Vanilla `AbstractNautilus.getControllingPassenger`.
+    fn get_controlling_passenger(&self) -> Option<Arc<dyn EntityBase>> {
+        if self.is_saddled.load(Ordering::Relaxed)
+            && let Some(player) = first_passenger_player(&self.mob_entity)
+        {
+            return Some(player);
+        }
+        mob_controlling_passenger(&self.mob_entity)
     }
 
     fn mob_init_data_tracker(&self) {

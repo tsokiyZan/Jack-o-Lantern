@@ -110,7 +110,7 @@ fn swimmable_position(mob: &dyn Mob, _probability: f32) -> Option<Vector3<f64>> 
 impl Goal for WanderAroundGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
         // Every mob that carries a passenger is controlled by it.
-        if mob.get_entity().has_passengers() {
+        if mob.get_controlling_passenger().is_some() {
             return false;
         }
 
@@ -144,7 +144,7 @@ impl Goal for WanderAroundGoal {
 
     fn should_continue(&mut self, mob: &dyn Mob) -> bool {
         let idle = mob.is_navigator_idle();
-        !idle && !mob.get_entity().has_passengers()
+        !idle && mob.get_controlling_passenger().is_none()
     }
 
     fn start(&mut self, mob: &dyn Mob) {

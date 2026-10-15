@@ -1,3 +1,6 @@
+use crate::entity::mob::equipment::is_equippable_in_slot;
+use crate::entity::mob::{first_passenger_player, mob_controlling_passenger};
+use pumpkin_data::data_component_impl::EquipmentSlot;
 use std::sync::{
     Arc, Weak,
     atomic::{AtomicBool, AtomicI32, Ordering},
@@ -90,6 +93,18 @@ impl HappyGhastEntity {
     pub fn set_server_still_timeout(&self, timeout: i32) {
         self.server_still_timeout.store(timeout, Ordering::Relaxed);
         self.sync_stay_still_flag();
+    }
+
+    /// Vanilla `Mob.isWearingBodyArmor`.
+    fn is_wearing_body_armor(&self) -> bool {
+        let living = &self.mob_entity.living_entity;
+        let stack = living
+            .entity_equipment
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get(&EquipmentSlot::BODY);
+        !stack.is_empty()
+            && is_equippable_in_slot(living.entity.entity_type, &stack, &EquipmentSlot::BODY)
     }
 
     #[must_use]
@@ -215,6 +230,17 @@ impl Mob for HappyGhastEntity {
 
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
+    }
+
+    /// Vanilla `HappyGhast.getControllingPassenger`.
+    fn get_controlling_passenger(&self) -> Option<Arc<dyn EntityBase>> {
+        if self.is_wearing_body_armor()
+            && !self.is_on_still_timeout()
+            && let Some(player) = first_passenger_player(&self.mob_entity)
+        {
+            return Some(player);
+        }
+        mob_controlling_passenger(&self.mob_entity)
     }
 
     fn mob_tick(&self, _caller: &dyn EntityBase) {

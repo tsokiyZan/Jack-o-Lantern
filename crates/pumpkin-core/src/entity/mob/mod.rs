@@ -1244,6 +1244,12 @@ pub trait Mob: EntityBase + Send + Sync {
         None
     }
 
+    /// Vanilla `getControllingPassenger`. Vehicles a player steers override it and fall back
+    /// to [`mob_controlling_passenger`].
+    fn get_controlling_passenger(&self) -> Option<Arc<dyn EntityBase>> {
+        mob_controlling_passenger(self.get_mob_entity())
+    }
+
     fn is_saddled(&self) -> bool {
         false
     }
@@ -1734,9 +1740,45 @@ pub trait Mob: EntityBase + Send + Sync {
             .on_lightning_strike(caller, lightning);
     }
 }
+/// Vanilla `Mob.getControllingPassenger`: a first passenger that is a mob able to steer,
+/// while this mob has AI.
+#[must_use]
+pub fn mob_controlling_passenger(mob: &MobEntity) -> Option<Arc<dyn EntityBase>> {
+    let passenger = mob.living_entity.entity.get_first_passenger()?;
+    (!mob.is_no_ai()
+        && passenger.get_mob().is_some()
+        && !passenger
+            .get_entity()
+            .entity_type
+            .has_tag(&tag::EntityType::MINECRAFT_NON_CONTROLLING_RIDER))
+    .then_some(passenger)
+}
+
+/// The first passenger when it is a player, the rider a saddled vehicle hands control to.
+#[must_use]
+pub fn first_passenger_player(mob: &MobEntity) -> Option<Arc<dyn EntityBase>> {
+    mob.living_entity
+        .entity
+        .get_first_passenger()
+        .filter(|passenger| passenger.get_player().is_some())
+}
+
+/// Vanilla `LivingEntity.isHolding(item)` for a player rider.
+#[must_use]
+pub fn is_player_holding(passenger: &dyn EntityBase, item: &Item) -> bool {
+    passenger.get_player().is_some_and(|player| {
+        let inventory = player.inventory();
+        inventory.held_item().item.id == item.id || inventory.off_hand_item().item.id == item.id
+    })
+}
+
 impl<T: Mob + Send + 'static> EntityBase for T {
     fn get_mob(&self) -> Option<&dyn Mob> {
         Some(self)
+    }
+
+    fn controlling_passenger(&self) -> Option<Arc<dyn EntityBase>> {
+        self.get_controlling_passenger()
     }
 
     fn is_pushed_by_fluids(&self) -> bool {

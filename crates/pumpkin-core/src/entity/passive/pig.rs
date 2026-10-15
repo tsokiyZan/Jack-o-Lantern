@@ -1,3 +1,4 @@
+use crate::entity::mob::{first_passenger_player, is_player_holding, mob_controlling_passenger};
 use std::sync::{
     Arc, Weak,
     atomic::{AtomicBool, AtomicU8, Ordering},
@@ -251,6 +252,17 @@ impl Mob for PigEntity {
 
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
+    }
+
+    /// Vanilla `Pig.getControllingPassenger`.
+    fn get_controlling_passenger(&self) -> Option<Arc<dyn EntityBase>> {
+        if self.is_saddled()
+            && let Some(player) = first_passenger_player(&self.mob_entity)
+            && is_player_holding(player.as_ref(), &Item::CARROT_ON_A_STICK)
+        {
+            return Some(player);
+        }
+        mob_controlling_passenger(&self.mob_entity)
     }
 
     fn get_item_steerable(&self) -> Option<&dyn ItemSteerable> {

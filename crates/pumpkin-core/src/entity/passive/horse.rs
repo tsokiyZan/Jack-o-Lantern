@@ -1,3 +1,4 @@
+use crate::entity::mob::{first_passenger_player, mob_controlling_passenger};
 use std::sync::{
     Arc, Weak,
     atomic::{AtomicI32, AtomicU8, Ordering},
@@ -300,6 +301,16 @@ impl Mob for HorseEntity {
 
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
+    }
+
+    /// Vanilla `AbstractHorse.getControllingPassenger`.
+    fn get_controlling_passenger(&self) -> Option<Arc<dyn EntityBase>> {
+        if self.is_saddled()
+            && let Some(player) = first_passenger_player(&self.mob_entity)
+        {
+            return Some(player);
+        }
+        mob_controlling_passenger(&self.mob_entity)
     }
 
     fn mob_tick(&self, _caller: &dyn EntityBase) {
