@@ -2147,6 +2147,11 @@ impl Entity {
         }
     }
 
+    /// Vanilla `getBlockStateOnLegacy`: the block 0.2 under the feet.
+    pub fn get_block_state_on_legacy(&self) -> &'static BlockState {
+        self.get_block_with_y_offset(f64::from(0.2f32)).2
+    }
+
     // Entity.updateVelocity in yarn
 
     pub(crate) fn update_velocity_from_input(&self, movement_input: Vector3<f64>, speed: f64) {

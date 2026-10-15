@@ -1,7 +1,17 @@
+use crate::entity::ai::goal::move_to_target_pos::{MoveToTargetPos, MoveToTargetPosGoal};
+use crate::entity::ai::goal::{Controls, Goal, ParentHandle};
+use crate::entity::ai::pathfinder::node::PathComputationType;
 use crate::entity::ai::pathfinder::node::PathType;
+use crate::entity::ai::pathfinder::{GroundPathNavigation, Navigator};
+use crate::entity::attributes::{Modifier, ModifierOperation, send_attribute_updates_for_living};
 use crate::entity::mob::{first_passenger_player, is_player_holding, mob_controlling_passenger};
+use crate::world::World;
+use pumpkin_data::Block;
+use pumpkin_data::BlockState;
+use pumpkin_data::attributes::Attributes;
 use pumpkin_data::entity::EntityPose;
 use pumpkin_util::math::boundingbox::EntityDimensions;
+use pumpkin_util::math::position::BlockPos;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
 
@@ -28,6 +38,9 @@ use crate::entity::{
 
 const TEMPT_ITEMS: &[&Item] = &[&Item::WARPED_FUNGUS, &Item::WARPED_FUNGUS_ON_A_STICK];
 
+/// Vanilla `Strider.SUFFOCATING_MODIFIER_ID`.
+const SUFFOCATING_MODIFIER_ID: &str = "minecraft:suffocating";
+
 pub struct StriderEntity {
     pub mob_entity: MobEntity,
     pub ageable_data: AgeableData,
@@ -39,6 +52,12 @@ pub struct StriderEntity {
 impl StriderEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        // Vanilla `createNavigation`, before the constructor's path costs.
+        *mob_entity
+            .navigator
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) =
+            Navigator::new(GroundPathNavigation::strider());
         set_animal_pathfinding_malus(&mob_entity);
         // Vanilla `Strider`'s constructor.
         mob_entity.set_pathfinding_malus(PathType::Water, -1.0);
@@ -68,7 +87,7 @@ impl StriderEntity {
             goal_selector.add_goal(1, EscapeDangerGoal::new(1.65));
             goal_selector.add_goal(2, BreedGoal::new(1.0));
             goal_selector.add_goal(3, Box::new(TemptGoal::new(1.4, TEMPT_ITEMS, false)));
-            // TODO: 4 StriderGoToLavaGoal is not ported.
+            goal_selector.add_goal(4, StriderGoToLavaGoal::new(1.0));
             goal_selector.add_goal(5, Box::new(FollowParentGoal::new(1.0)));
             goal_selector.add_goal(7, Box::new(WanderAroundGoal::with_interval(1.0, 60)));
             goal_selector.add_goal(
@@ -90,13 +109,49 @@ impl StriderEntity {
         self.suffocating.load(Ordering::Relaxed)
     }
 
+    /// Vanilla `setSuffocating`: a cold strider is slowed by `SUFFOCATING_MODIFIER`.
     pub fn set_suffocating(&self, suffocating: bool) {
-        self.suffocating.store(suffocating, Ordering::Relaxed);
+        let was_suffocating = self.suffocating.swap(suffocating, Ordering::Relaxed);
         let entity = self.get_entity();
         entity.set_synced_data(
             pumpkin_data::tracked_data::strider::DATA_SUFFOCATING,
             suffocating,
         );
+        if was_suffocating == suffocating {
+            return;
+        }
+        let living = &self.mob_entity.living_entity;
+        living.update_attribute(&Attributes::MOVEMENT_SPEED, |speed| {
+            if suffocating {
+                speed.add_or_replace_modifier(Modifier {
+                    id: SUFFOCATING_MODIFIER_ID.to_string(),
+                    amount: f64::from(-0.34f32),
+                    operation: ModifierOperation::MultiplyBase,
+                });
+            } else {
+                speed.remove_modifier(SUFFOCATING_MODIFIER_ID);
+            }
+        });
+        send_attribute_updates_for_living(living, vec![Attributes::MOVEMENT_SPEED]);
+    }
+
+    /// The start of vanilla `Strider.tick`: out of lava and warm blocks, a strider is cold.
+    fn update_suffocating(&self) {
+        let entity = self.get_entity();
+        let world = entity.world.load();
+        let warm = |state: &BlockState| {
+            Block::from_state_id(state.id).has_tag(&tag::Block::MINECRAFT_STRIDER_WARM_BLOCKS)
+        };
+        let in_warm_blocks = warm(world.get_block_state(&entity.block_pos.load()))
+            || warm(entity.get_block_state_on_legacy())
+            || entity.lava_height.load() > 0.0;
+        let on_warm_strider = entity.get_vehicle().is_some_and(|vehicle| {
+            vehicle
+                .get_mob()
+                .and_then(|mob| mob.cast_any().downcast_ref::<Self>())
+                .is_some_and(|strider| !strider.is_suffocating())
+        });
+        self.set_suffocating(!in_warm_blocks && !on_warm_strider);
     }
 }
 
@@ -225,6 +280,9 @@ impl Mob for StriderEntity {
     }
 
     fn mob_tick(&self, _caller: &dyn EntityBase) {
+        if !self.mob_entity.is_no_ai() {
+            self.update_suffocating();
+        }
         self.ageable_ai_step();
     }
 
@@ -275,5 +333,78 @@ impl ItemSteerable for StriderEntity {
 
     fn as_any(&self) -> &dyn std::any::Any {
         self
+    }
+}
+
+/// Vanilla `Strider.StriderGoToLavaGoal`: a strider out of lava heads for a lava block
+/// with room above it.
+struct StriderGoToLavaGoal {
+    goal: MoveToTargetPosGoal<Self>,
+}
+
+impl StriderGoToLavaGoal {
+    #[expect(
+        clippy::unnecessary_box_returns,
+        reason = "the goal's parent handle points into the box"
+    )]
+    fn new(speed_modifier: f64) -> Box<Self> {
+        let mut this = Box::new(Self {
+            goal: MoveToTargetPosGoal::new(ParentHandle::none(), speed_modifier, 8, 2),
+        });
+        // SAFETY: `this` heap allocation address is pinned in Box and outlives `ParentHandle` references.
+        this.goal.move_to_target_pos = unsafe { ParentHandle::new(&this) };
+        this
+    }
+
+    fn in_lava(mob: &dyn Mob) -> bool {
+        mob.get_entity().touching_lava.load(Ordering::Relaxed)
+    }
+}
+
+impl MoveToTargetPos for StriderGoToLavaGoal {
+    fn is_target_pos(&self, world: Arc<World>, block_pos: BlockPos) -> bool {
+        let above = block_pos.up();
+        let (above_block, above_state) = world.get_block_and_state(&above);
+        world.get_block(&block_pos) == &Block::LAVA
+            && world.block_registry.is_pathfindable(
+                above_block,
+                above_state,
+                PathComputationType::Land,
+            )
+    }
+
+    fn get_move_to_target(&self, target_pos: BlockPos) -> BlockPos {
+        target_pos
+    }
+
+    fn should_recalculate_path(&self, trying_time: i32) -> bool {
+        trying_time % 20 == 0
+    }
+}
+
+impl Goal for StriderGoToLavaGoal {
+    fn can_start(&mut self, mob: &dyn Mob) -> bool {
+        !Self::in_lava(mob) && self.goal.can_start(mob)
+    }
+
+    fn should_continue(&mut self, mob: &dyn Mob) -> bool {
+        !Self::in_lava(mob)
+            && self.is_target_pos(mob.get_entity().world.load_full(), self.goal.target_pos)
+    }
+
+    fn start(&mut self, mob: &dyn Mob) {
+        self.goal.start(mob);
+    }
+
+    fn tick(&mut self, mob: &dyn Mob) {
+        self.goal.tick(mob);
+    }
+
+    fn should_run_every_tick(&self) -> bool {
+        self.goal.should_run_every_tick()
+    }
+
+    fn controls(&self) -> Controls {
+        self.goal.controls()
     }
 }

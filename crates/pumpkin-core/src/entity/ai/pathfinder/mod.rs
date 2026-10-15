@@ -1262,6 +1262,8 @@ impl PathNavigation {
 
 pub struct GroundPathNavigation {
     pub inner: PathNavigation,
+    /// Vanilla `StriderPathNavigation.isStableDestination`: lava counts as standing room.
+    stable_on_lava: bool,
 }
 
 impl Default for GroundPathNavigation {
@@ -1275,11 +1277,26 @@ impl GroundPathNavigation {
     pub fn new() -> Self {
         Self {
             inner: PathNavigation::new(EvaluatorKind::Walk(WalkNodeEvaluator::default())),
+            stable_on_lava: false,
+        }
+    }
+
+    /// Vanilla `Strider.StriderPathNavigation`.
+    #[must_use]
+    pub fn strider() -> Self {
+        Self {
+            stable_on_lava: true,
+            ..Self::new()
         }
     }
 }
 
 impl PathNavigationTrait for GroundPathNavigation {
+    fn is_stable_destination(&self, world: &World, pos: &BlockPos) -> bool {
+        (self.stable_on_lava && world.get_block(pos) == &pumpkin_data::Block::LAVA)
+            || world.get_block_state(&pos.down()).is_solid_render()
+    }
+
     /// A goal's `moveTo(x, y, z, reachRange, speed)`, run at the start of this tick's
     /// navigation, before the path is followed, as in vanilla.
     fn set_progress(&mut self, goal: NavigatorGoal) {
