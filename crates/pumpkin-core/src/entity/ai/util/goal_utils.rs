@@ -138,9 +138,11 @@ pub fn is_solid(world: &World, pos: &BlockPos) -> bool {
 
 const ALERT_RANGE_Y: f64 = 10.0;
 
-/// Nearby mobs of the same type that are free to take over `mob`'s grievance.
-/// Anchored on a unit cube at the mob's feet, so a wide hitbox does not widen the call.
-pub fn nearby_same_type(mob: &dyn Mob) -> Vec<std::sync::Arc<dyn crate::entity::EntityBase>> {
+/// Nearby mobs of `mob`'s class that are free to take over its grievance.
+///
+/// Vanilla `getEntitiesOfClass(mob.getClass(), ...)`, so subclasses count too. Anchored on a
+/// unit cube at the mob's feet, so a wide hitbox does not widen the call.
+pub fn nearby_same_type(mob: &dyn Mob) -> Vec<Arc<dyn EntityBase>> {
     use crate::entity::predicate::EntityPredicate;
     use pumpkin_data::attributes::Attributes;
     use pumpkin_util::math::boundingbox::BoundingBox;
@@ -162,7 +164,7 @@ pub fn nearby_same_type(mob: &dyn Mob) -> Vec<std::sync::Arc<dyn crate::entity::
         .filter(|other| {
             let other_entity = other.get_entity();
             other_entity.entity_id != entity.entity_id
-                && other_entity.entity_type == entity.entity_type
+                && is_instance_of(entity.entity_type, other_entity.entity_type)
                 && EntityPredicate::ExceptSpectator.test(other_entity)
         })
         .collect()

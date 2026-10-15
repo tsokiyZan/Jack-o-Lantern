@@ -8,6 +8,8 @@ use crate::entity::ai::goal::track_target::TrackTargetGoal;
 use crate::entity::ai::target_predicate::TargetPredicate;
 use crate::entity::ai::util::goal_utils;
 use crate::entity::mob::Mob;
+use crate::entity::mob::neutral::find_by_uuid;
+use crate::world::World;
 use pumpkin_data::entity::EntityType;
 
 /// A function pointer also covers whole hierarchies, like every raider.
@@ -104,6 +106,7 @@ impl RevengeGoal {
         if self.alert_in_sight && !mob.has_line_of_sight(attacker.get_entity()) {
             return;
         }
+        let world = mob.get_entity().world.load();
         for other in goal_utils::nearby_same_type(mob) {
             let other_entity = other.get_entity();
             let Some(other_mob) = other.get_mob() else {
@@ -112,7 +115,9 @@ impl RevengeGoal {
             if other_mob.get_mob_entity().get_target().is_some() {
                 continue;
             }
-            if mob.as_tamable().is_some() && mob.get_owner_uuid() != other_mob.get_owner_uuid() {
+            if mob.as_tamable().is_some()
+                && resolved_owner_id(mob, &world) != resolved_owner_id(other_mob, &world)
+            {
                 continue;
             }
             if other.is_allied_to(attacker.as_ref()) {
@@ -211,4 +216,13 @@ impl Goal for RevengeGoal {
     fn controls(&self) -> Controls {
         self.track_target_goal.controls()
     }
+}
+
+/// Vanilla `OwnableEntity.getOwner`: the owner only while it resolves to a loaded living entity,
+/// so two mobs whose owners are both absent count as having the same owner.
+fn resolved_owner_id(mob: &dyn Mob, world: &World) -> Option<i32> {
+    mob.get_owner_uuid()
+        .and_then(|uuid| find_by_uuid(world, uuid))
+        .filter(|owner| owner.get_living_entity().is_some())
+        .map(|owner| owner.get_entity().entity_id)
 }
