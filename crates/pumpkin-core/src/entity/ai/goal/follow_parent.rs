@@ -2,6 +2,7 @@ use std::sync::Arc;
 use std::sync::atomic::Ordering::Relaxed;
 
 use super::{Controls, Goal, to_goal_ticks};
+use crate::entity::ai::util::goal_utils;
 use crate::entity::{EntityBase, ai::pathfinder::NavigatorGoal, mob::Mob};
 
 const SEARCH_RADIUS: f64 = 8.0;
@@ -27,30 +28,24 @@ impl FollowParentGoal {
     }
 
     fn find_parent(mob: &dyn Mob) -> Option<Arc<dyn EntityBase>> {
-        let mob_entity = mob.get_mob_entity();
-        let entity = &mob_entity.living_entity.entity;
+        let entity = &mob.get_mob_entity().living_entity.entity;
         let pos = entity.pos.load();
-        let my_type = entity.entity_type;
         let world = entity.world.load();
+        let area = entity
+            .bounding_box
+            .load()
+            .expand(SEARCH_RADIUS, SEARCH_Y_RANGE, SEARCH_RADIUS);
 
-        let nearby = world.get_nearby_entities(pos, SEARCH_RADIUS);
         let mut closest: Option<(f64, Arc<dyn EntityBase>)> = None;
-
-        for candidate in nearby.values() {
+        for candidate in goal_utils::get_entities_of_class(&world, Some(entity.entity_type), &area)
+        {
             let c_entity = candidate.get_entity();
-            if c_entity.entity_type != my_type {
-                continue;
-            }
             if c_entity.age.load(Relaxed) < 0 {
                 continue;
             }
-            let c_pos = c_entity.pos.load();
-            if (pos.y - c_pos.y).abs() > SEARCH_Y_RANGE {
-                continue;
-            }
-            let dist_sq = pos.squared_distance_to_vec(&c_pos);
+            let dist_sq = pos.squared_distance_to_vec(&c_entity.pos.load());
             if closest.as_ref().is_none_or(|(d, _)| dist_sq <= *d) {
-                closest = Some((dist_sq, candidate.clone()));
+                closest = Some((dist_sq, candidate));
             }
         }
 
