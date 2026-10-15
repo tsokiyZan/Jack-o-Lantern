@@ -142,16 +142,15 @@ pub fn push_apart(self_entity: &Entity, self_pushable: bool, entity: &dyn Entity
         return;
     }
 
-    if self_entity.has_passenger(other_entity.entity_id)
-        || other_entity.has_passenger(self_entity.entity_id)
-    {
+    // `isPassengerOfSameVehicle`: riders of one vehicle, or a rider and its mount.
+    if self_entity.root_vehicle_id() == other_entity.root_vehicle_id() {
         return;
     }
 
     let mut dx = other_entity.pos.load().x - self_entity.pos.load().x;
     let mut dz = other_entity.pos.load().z - self_entity.pos.load().z;
     let mut d = dx.abs().max(dz.abs());
-    if d >= 0.01 {
+    if d >= f64::from(0.01f32) {
         d = d.sqrt();
         dx /= d;
         dz /= d;
@@ -161,8 +160,8 @@ pub fn push_apart(self_entity: &Entity, self_pushable: bool, entity: &dyn Entity
         }
         dx *= d2;
         dz *= d2;
-        dx *= 0.05;
-        dz *= 0.05;
+        dx *= f64::from(0.05f32);
+        dz *= f64::from(0.05f32);
 
         if !self_entity.has_passengers() && self_pushable {
             let mut vel = self_entity.velocity.load();
@@ -3977,6 +3976,18 @@ impl Entity {
     /// the start of this entity's last tick (vanilla's `lastKnownSpeed`).
     pub fn has_moved_horizontally_recently(&self) -> bool {
         self.movement.load().horizontal_length() > f64::from(1.0E-5f32)
+    }
+
+    /// The id of vanilla's `getRootVehicle`: the bottom of the stack this entity rides in.
+    #[must_use]
+    pub fn root_vehicle_id(&self) -> i32 {
+        let mut root = self.get_vehicle();
+        let mut id = self.entity_id;
+        while let Some(vehicle) = root {
+            id = vehicle.get_entity().entity_id;
+            root = vehicle.get_entity().get_vehicle();
+        }
+        id
     }
 
     pub fn get_vehicle(&self) -> Option<Arc<dyn EntityBase>> {
