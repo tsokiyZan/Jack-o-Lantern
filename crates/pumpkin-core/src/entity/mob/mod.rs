@@ -1417,6 +1417,35 @@ pub trait Mob: EntityBase + Send + Sync {
     /// The end of a vanilla `aiStep` override, after `super.aiStep()`.
     fn ai_step_end(&self, _caller: &dyn EntityBase) {}
 
+    /// A vanilla `aiStep` override that never calls `super.aiStep()`. Returns `true` when it
+    /// ran in place of the shared one.
+    fn custom_ai_step(&self, _caller: &dyn EntityBase) -> bool {
+        false
+    }
+
+    /// A vanilla `tickDeath` override, called every tick where `baseTick` would call it.
+    /// Returns `true` when the mob runs its own (only while dead or dying, like vanilla)
+    /// instead of the shared removal after the 20-tick animation.
+    fn tick_death(&self, _caller: &dyn EntityBase) -> bool {
+        false
+    }
+
+    /// A vanilla `handleKillingBlow` override. Returns `true` when it replaces the default,
+    /// which marks the mob dead.
+    fn handle_killing_blow(&self) -> bool {
+        false
+    }
+
+    /// `false` while a vanilla `knockback` override ignores knockback.
+    fn takes_knockback(&self) -> bool {
+        true
+    }
+
+    /// Vanilla `Entity.kill`, which some mobs override.
+    fn mob_kill(&self, caller: &dyn EntityBase) {
+        caller.damage(caller, f32::MAX, DamageType::GENERIC_KILL);
+    }
+
     fn post_tick(&self) {}
 
     /// Vanilla `LivingEntity.jumpFromGround` as `aiStep` calls it, which a mob may override.
@@ -2267,6 +2296,10 @@ impl<T: Mob + Send + 'static> EntityBase for T {
 
     fn is_collidable(&self, _entity: Option<Box<dyn EntityBase>>) -> bool {
         true
+    }
+
+    fn kill(&self, caller: &dyn EntityBase) {
+        self.mob_kill(caller);
     }
 
     fn can_hit(&self) -> bool {

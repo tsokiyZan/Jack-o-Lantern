@@ -1454,6 +1454,9 @@ impl LivingEntity {
 
     fn tick_movement(&self, caller: &dyn EntityBase) {
         if let Some(mob) = caller.get_mob() {
+            if mob.custom_ai_step(caller) {
+                return;
+            }
             mob.ai_step(caller);
         }
         if self.jumping_cooldown.load(Relaxed) != 0 {
@@ -2227,6 +2230,14 @@ impl LivingEntity {
             let killer = cause.or(source).or(kill_credit.as_deref());
 
             self.update_death_stats(&*dyn_self, killer);
+
+            // Vanilla `handleKillingBlow`, which by default is what marks the entity dead.
+            if dyn_self
+                .get_mob()
+                .is_some_and(super::mob::Mob::handle_killing_blow)
+            {
+                self.dead.store(false, Relaxed);
+            }
 
             // Plays the death sound
             self.make_sound(&*dyn_self, self.death_sound(&*dyn_self));
@@ -3554,7 +3565,12 @@ impl LivingEntity {
         }
 
         // Vanilla `hurtServer`: `dealDefaultKnockback` on every full-damage hit.
-        if took_full_damage && !damage_type.has_tag(&tag::DamageType::MINECRAFT_NO_KNOCKBACK) {
+        if took_full_damage
+            && !damage_type.has_tag(&tag::DamageType::MINECRAFT_NO_KNOCKBACK)
+            && caller
+                .get_mob()
+                .is_none_or(super::mob::Mob::takes_knockback)
+        {
             let (dx, dz) = self.default_knockback_direction(source, position);
             let resistance = self.get_attribute_value(&Attributes::KNOCKBACK_RESISTANCE);
             self.entity
@@ -3780,6 +3796,7 @@ impl EntityBase for LivingEntity {
         if self.hurt_time.load(Relaxed) > 0 {
             self.hurt_time.fetch_sub(1, Relaxed);
         }
+        let own_tick_death = caller.get_mob().is_some_and(|mob| mob.tick_death(caller));
         let in_death_animation = self.health.load() <= 0.0 && self.death_time.load(Relaxed) < 20;
         let is_player = self.entity.entity_type == &EntityType::PLAYER;
         if (is_alive || in_death_animation) && !is_player {
@@ -3999,7 +4016,7 @@ impl EntityBase for LivingEntity {
             }
         }
 
-        if self.health.load() <= 0.0 {
+        if self.health.load() <= 0.0 && !own_tick_death {
             let time = self
                 .death_time
                 .fetch_update(Relaxed, Relaxed, |time| Some(time.saturating_add(1)))

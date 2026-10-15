@@ -73,7 +73,11 @@ pub fn handle_knockback(attacker: &Entity, victim: &dyn EntityBase, strength: f6
     });
     let strength = knockback_after_resistance(strength * 0.5, resistance);
 
-    if strength > 0.0 {
+    if strength > 0.0
+        && victim
+            .get_mob()
+            .is_none_or(super::mob::Mob::takes_knockback)
+    {
         let yaw = attacker.yaw.load();
         victim.get_entity().knockback(
             strength,
