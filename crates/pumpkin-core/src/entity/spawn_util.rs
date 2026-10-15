@@ -1,6 +1,10 @@
 use std::sync::Arc;
 
-use pumpkin_data::{BlockState, entity::EntityType};
+use pumpkin_data::{
+    Block, BlockState,
+    entity::EntityType,
+    tag::{self, Taggable},
+};
 use pumpkin_util::math::{
     boundingbox::{BoundingBox, EntityDimensions},
     position::BlockPos,
@@ -15,6 +19,7 @@ use crate::world::World;
 #[derive(Clone, Copy)]
 pub enum SpawnStrategy {
     OnTopOfCollider,
+    OnTopOfColliderNoLeaves,
 }
 
 impl SpawnStrategy {
@@ -22,6 +27,11 @@ impl SpawnStrategy {
         match self {
             Self::OnTopOfCollider => {
                 above_state.get_block_collision_shapes().next().is_none() && is_face_full_up(state)
+            }
+            Self::OnTopOfColliderNoLeaves => {
+                above_state.get_block_collision_shapes().next().is_none()
+                    && !Block::from_state_id(state.id).has_tag(&tag::Block::MINECRAFT_LEAVES)
+                    && is_face_full_up(state)
             }
         }
     }
@@ -98,6 +108,12 @@ pub fn try_spawn_mob<T: Mob + 'static>(
             position,
             entity_type,
         ));
+        // `EntityType.create` finalizes the spawn.
+        crate::entity::mob::spawn::finalize_spawn(
+            &(mob.clone() as Arc<dyn EntityBase>),
+            world,
+            None,
+        );
         if !mob.check_spawn_obstruction(world) {
             continue;
         }

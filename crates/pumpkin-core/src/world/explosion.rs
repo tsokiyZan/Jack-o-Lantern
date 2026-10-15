@@ -401,6 +401,12 @@ impl Explosion {
         self.indirect_source.clone()
     }
 
+    /// Vanilla `ServerExplosion.getDamageSource`.
+    #[must_use]
+    pub const fn damage_source(&self) -> &ExplosionDamageSource {
+        &self.damage_source
+    }
+
     /// Vanilla `isSmall`: picks the small particle.
     #[must_use]
     pub fn is_small(&self) -> bool {
@@ -705,6 +711,14 @@ impl Explosion {
             return;
         }
         let pumpkin_block = world.block_registry.get_pumpkin_block(block.id);
+        if let Some(pumpkin_block) = pumpkin_block {
+            pumpkin_block.on_explosion_hit(ExplodeArgs {
+                world,
+                block,
+                position: pos,
+                explosion: self,
+            });
+        }
         let drop_experience = self
             .indirect_source
             .as_ref()

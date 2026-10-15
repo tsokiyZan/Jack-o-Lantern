@@ -2286,12 +2286,32 @@ impl LivingEntity {
     /// flow: stop movement input, attribute the kill, drop loot, broadcast the
     /// `Death` (3) entity event, and hand out XP. Safe to call on every lethal
     /// damage event; only the first call has an effect.
-    #[allow(clippy::too_many_lines)]
     pub fn on_death(
         &self,
         damage_type: DamageType,
         source: Option<&dyn EntityBase>,
         cause: Option<&dyn EntityBase>,
+    ) {
+        self.die_with_sound(damage_type, source, cause, true);
+    }
+
+    /// Vanilla `LivingEntity.die`, without the death sound `hurtServer` plays before it.
+    pub fn die(
+        &self,
+        damage_type: DamageType,
+        source: Option<&dyn EntityBase>,
+        cause: Option<&dyn EntityBase>,
+    ) {
+        self.die_with_sound(damage_type, source, cause, false);
+    }
+
+    #[allow(clippy::too_many_lines)]
+    fn die_with_sound(
+        &self,
+        damage_type: DamageType,
+        source: Option<&dyn EntityBase>,
+        cause: Option<&dyn EntityBase>,
+        play_death_sound: bool,
     ) {
         let world = self.entity.world.load();
         let Some(dyn_self) = world.get_entity_by_id(self.entity.entity_id) else {
@@ -2321,8 +2341,9 @@ impl LivingEntity {
                 self.dead.store(false, Relaxed);
             }
 
-            // Plays the death sound
-            self.make_sound(&*dyn_self, self.death_sound(&*dyn_self));
+            if play_death_sound {
+                self.make_sound(&*dyn_self, self.death_sound(&*dyn_self));
+            }
             // Vanilla `die`: the attacker's `killedEntity` can claim the body, leaving no loot.
             let perished = cause
                 .and_then(EntityBase::get_mob)
@@ -3895,7 +3916,7 @@ impl LivingEntity {
 
     /// Vanilla `LivingEntity.resolvePlayerResponsibleForDamage`: a player, or a tame wolf's
     /// owner, is remembered for 100 ticks.
-    fn resolve_player_responsible_for_damage(&self, attacker: Option<&dyn EntityBase>) {
+    pub fn resolve_player_responsible_for_damage(&self, attacker: Option<&dyn EntityBase>) {
         let Some(attacker) = attacker else {
             return;
         };
@@ -3919,8 +3940,70 @@ impl LivingEntity {
             .store(time_to_remember, Relaxed);
     }
 
+    /// Vanilla `LivingEntity.isLookingAtMe`: whether `target` looks at one of this entity's
+    /// `gaze_heights` and can see it there. Pumpkin keeps a player's `yHeadRot` as its yaw.
+    #[must_use]
+    pub fn is_looking_at_me(
+        &self,
+        target: &Entity,
+        cone_size: f64,
+        adjust_for_distance: bool,
+        see_through_transparent_blocks: bool,
+        gaze_heights: &[f64],
+    ) -> bool {
+        let look =
+            Entity::calculate_view_vector(target.pitch.load(), target.yaw.load()).normalize();
+        let pos = self.entity.pos.load();
+        let target_pos = target.pos.load();
+        let target_eye_y = target.get_eye_y();
+        let world = self.entity.world.load_full();
+        for &gaze_height in gaze_heights {
+            let dir = Vector3::new(
+                pos.x - target_pos.x,
+                gaze_height - target_eye_y,
+                pos.z - target_pos.z,
+            );
+            let dist = dir.length();
+            let dot = look.dot(&dir.normalize());
+            let threshold = if adjust_for_distance {
+                1.0 - cone_size / dist
+            } else {
+                1.0 - cone_size
+            };
+            if dot <= threshold {
+                continue;
+            }
+            // `target.hasLineOfSight(this, block, Fluid.NONE, gazeHeight)`.
+            if !Arc::ptr_eq(&world, &target.world.load()) {
+                continue;
+            }
+            let from = Vector3::new(target_pos.x, target_eye_y, target_pos.z);
+            let to = Vector3::new(pos.x, gaze_height, pos.z);
+            if to.squared_distance_to_vec(&from).sqrt() > 128.0 {
+                continue;
+            }
+            let block = if see_through_transparent_blocks {
+                pumpkin_world::clip::ClipBlock::Visual
+            } else {
+                pumpkin_world::clip::ClipBlock::Collider
+            };
+            if world
+                .clip(&pumpkin_world::clip::ClipContext::new(
+                    from,
+                    to,
+                    block,
+                    pumpkin_world::clip::ClipFluid::None,
+                ))
+                .is_miss
+            {
+                return true;
+            }
+        }
+        false
+    }
+
     /// Vanilla `LivingEntity.resolveMobResponsibleForDamage`.
-    fn resolve_mob_responsible_for_damage(
+    pub fn resolve_mob_responsible_for_damage(
         &self,
         damage_type: DamageType,
         attacker: Option<&dyn EntityBase>,

@@ -5480,6 +5480,7 @@ impl World {
         replaced_block_state_id
     }
 
+    #[expect(clippy::too_many_lines)]
     pub fn break_block(
         self: &Arc<Self>,
         position: &BlockPos,
@@ -5530,6 +5531,16 @@ impl World {
             flags.remove(BlockFlags::SKIP_DROPS);
         } else {
             flags.insert(BlockFlags::SKIP_DROPS);
+        }
+
+        if let Some(player) = cause {
+            self.block_registry.player_will_destroy(
+                self,
+                broken_block,
+                broken_block_state,
+                position,
+                player,
+            );
         }
 
         if !flags.contains(BlockFlags::SKIP_DROPS) {
