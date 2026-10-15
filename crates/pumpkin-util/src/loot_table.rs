@@ -25,6 +25,20 @@ pub enum LootCondition {
     AnyOf(&'static [Self]),
     EntityOnFire,
     DirectAttackerWeaponEnchantment(&'static str),
+    /// `damage_source_properties` on the source entity's type, and its frog variant when
+    /// one is named.
+    DamageSourceEntity {
+        entity_type: &'static str,
+        frog_variant: Option<&'static str>,
+    },
+    /// `entity_properties` on `this` with a `type_specific/cube_mob` size range, both ends
+    /// inclusive.
+    ThisCubeMobSize {
+        min: i32,
+        max: i32,
+    },
+    /// `inverted` around a condition that has no dedicated inverse.
+    Inverted(&'static Self),
 }
 
 /// Bonus count formulas when tools have fortune or looting enchantments.
@@ -108,6 +122,14 @@ pub enum DynamicLootCondition {
     Inverted(Box<Self>),
     EntityOnFire,
     DirectAttackerWeaponEnchantment(String),
+    DamageSourceEntity {
+        entity_type: String,
+        frog_variant: Option<String>,
+    },
+    ThisCubeMobSize {
+        min: i32,
+        max: i32,
+    },
     WeatherCheck {
         raining: Option<bool>,
         thundering: Option<bool>,
@@ -148,6 +170,15 @@ impl From<LootCondition> for DynamicLootCondition {
             LootCondition::DirectAttackerWeaponEnchantment(tag) => {
                 Self::DirectAttackerWeaponEnchantment(tag.to_string())
             }
+            LootCondition::DamageSourceEntity {
+                entity_type,
+                frog_variant,
+            } => Self::DamageSourceEntity {
+                entity_type: entity_type.to_string(),
+                frog_variant: frog_variant.map(str::to_string),
+            },
+            LootCondition::ThisCubeMobSize { min, max } => Self::ThisCubeMobSize { min, max },
+            LootCondition::Inverted(cond) => Self::Inverted(Box::new(Self::from(*cond))),
         }
     }
 }

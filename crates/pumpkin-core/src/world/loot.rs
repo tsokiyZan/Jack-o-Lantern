@@ -31,6 +31,34 @@ pub struct LootContextParameters {
     /// Computed from `Entity.fire_ticks > 0`.
     pub is_on_fire: Option<bool>,
     pub direct_attacker_weapon: Option<ItemStack>,
+    /// Vanilla `DamageSource.getEntity`'s type, for `damage_source_properties`.
+    pub damage_source_entity: Option<&'static EntityType>,
+    /// The `minecraft:frog/variant` of that entity, when it is a frog.
+    pub damage_source_frog_variant: Option<&'static str>,
+    /// The size of the killed entity, when it is a slime or magma cube.
+    pub this_cube_mob_size: Option<i32>,
+}
+
+/// Vanilla `DamageSourcePredicate.sourceEntity` on its type and frog variant.
+fn damage_source_entity_matches(
+    params: &LootContextParameters,
+    entity_type: &str,
+    frog_variant: Option<&str>,
+) -> bool {
+    let entity_type = entity_type
+        .strip_prefix("minecraft:")
+        .unwrap_or(entity_type);
+    params
+        .damage_source_entity
+        .is_some_and(|source| source.resource_name == entity_type)
+        && frog_variant.is_none_or(|variant| params.damage_source_frog_variant == Some(variant))
+}
+
+/// Vanilla `CubeMobPredicate`'s size range.
+fn this_cube_mob_size_matches(params: &LootContextParameters, min: i32, max: i32) -> bool {
+    params
+        .this_cube_mob_size
+        .is_some_and(|size| (min..=max).contains(&size))
 }
 
 fn direct_attacker_weapon_has_enchantment(params: &LootContextParameters, tag: &str) -> bool {
@@ -122,6 +150,13 @@ fn check_dynamic_condition(
         DynamicLootCondition::DirectAttackerWeaponEnchantment(tag) => {
             direct_attacker_weapon_has_enchantment(params, tag)
         }
+        DynamicLootCondition::DamageSourceEntity {
+            entity_type,
+            frog_variant,
+        } => damage_source_entity_matches(params, entity_type, frog_variant.as_deref()),
+        DynamicLootCondition::ThisCubeMobSize { min, max } => {
+            this_cube_mob_size_matches(params, *min, *max)
+        }
         DynamicLootCondition::WeatherCheck {
             raining,
             thundering,
@@ -190,6 +225,19 @@ fn check_condition(
         LootCondition::DirectAttackerWeaponEnchantment(tag) => {
             direct_attacker_weapon_has_enchantment(params, tag)
         }
+        LootCondition::DamageSourceEntity {
+            entity_type,
+            frog_variant,
+        } => damage_source_entity_matches(params, entity_type, frog_variant),
+        LootCondition::ThisCubeMobSize { min, max } => this_cube_mob_size_matches(params, min, max),
+        LootCondition::Inverted(cond) => !check_condition(
+            *cond,
+            has_silk_touch,
+            has_shears,
+            fortune_level,
+            params,
+            rng,
+        ),
     }
 }
 
@@ -657,5 +705,52 @@ fn shuffle_and_split_items(
     for i in (1..n).rev() {
         let j = rng.next_bounded_i32((i + 1) as i32) as usize;
         result.swap(i, j);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use pumpkin_data::entity::EntityType;
+    use pumpkin_data::item::Item;
+    use pumpkin_data::loot_table::ENTITIES_MAGMA_CUBE;
+
+    use super::{LootContextParameters, generate_loot_with_context};
+
+    fn magma_cube_drops(
+        killer: &'static EntityType,
+        frog_variant: Option<&'static str>,
+    ) -> Vec<&'static Item> {
+        (0..64)
+            .flat_map(|seed| {
+                generate_loot_with_context(
+                    &ENTITIES_MAGMA_CUBE,
+                    seed,
+                    &LootContextParameters {
+                        this_entity: Some(&EntityType::MAGMA_CUBE),
+                        damage_source_entity: Some(killer),
+                        damage_source_frog_variant: frog_variant,
+                        this_cube_mob_size: Some(1),
+                        ..Default::default()
+                    },
+                )
+            })
+            .map(|stack| stack.item)
+            .collect()
+    }
+
+    #[test]
+    fn a_frog_eating_a_magma_cube_drops_its_variants_froglight() {
+        let drops = magma_cube_drops(&EntityType::FROG, Some("minecraft:warm"));
+        assert_eq!(drops.len(), 64);
+        assert!(
+            drops
+                .iter()
+                .all(|item| *item == &Item::PEARLESCENT_FROGLIGHT)
+        );
+    }
+
+    #[test]
+    fn a_tiny_magma_cube_killed_by_anything_else_drops_nothing() {
+        assert!(magma_cube_drops(&EntityType::ZOMBIE, None).is_empty());
     }
 }
