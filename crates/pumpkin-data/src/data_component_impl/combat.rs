@@ -6,8 +6,9 @@ use crate::damage::DamageType;
 use crate::data_component_impl::basic::SoundEvent;
 use crate::data_component_impl::food::ConsumeEffect;
 use crate::data_component_impl::{
-    DataComponentImpl, EquipmentSlot, IDSet, IdOr, MapHash, get_f32_hash, get_i32_hash, get_idor,
-    get_idor_hash, get_idset_hash, get_list_hash, get_map_hash, get_str_hash, namespaced, put_idor,
+    DataComponentImpl, EquipmentSlot, IDSet, IdOr, MapHash, get_codec_nbt_hash, get_f32_hash,
+    get_i32_hash, get_idor, get_idor_hash, get_idset_hash, get_list_hash, get_map_hash,
+    get_str_hash, namespaced, put_idor,
 };
 use crate::entity_type::EntityType;
 use crate::item::Item;
@@ -1519,12 +1520,27 @@ impl TrimImpl {
             .and_then(crate::trim_pattern::TrimPattern::from_name)
     }
 }
+impl TrimImpl {
+    /// A trim material or pattern holder: a registry id, or the inline definition.
+    fn holder_hash(holder: &NbtTag) -> u32 {
+        match holder {
+            NbtTag::String(id) => get_str_hash(&namespaced(id)),
+            inline => get_codec_nbt_hash(inline),
+        }
+    }
+}
 impl DataComponentImpl for TrimImpl {
     fn write_data(&self) -> NbtTag {
         let mut compound = NbtCompound::new();
         compound.put("material", self.material.clone());
         compound.put("pattern", self.pattern.clone());
         NbtTag::Compound(compound)
+    }
+    fn get_hash(&self) -> i32 {
+        MapHash::new()
+            .field("material", Self::holder_hash(&self.material))
+            .field("pattern", Self::holder_hash(&self.pattern))
+            .finish() as i32
     }
     default_impl!(Trim);
 }

@@ -756,25 +756,27 @@ pub fn synced_registry_entry(registry: &str, id: u32) -> Option<&'static str> {
         .map(|entry| entry.name)
 }
 
+/// Hash of NBT written by a codec whose only byte fields are booleans, such
+/// as text components or inline trim patterns: their bytes hash as booleans.
+#[must_use]
+pub fn get_codec_nbt_hash(tag: &NbtTag) -> u32 {
+    match tag {
+        NbtTag::Byte(value) => get_bool_hash(*value != 0),
+        NbtTag::List(values) => get_list_hash(values.iter().map(get_codec_nbt_hash)),
+        NbtTag::Compound(compound) => get_map_hash(
+            compound
+                .child_tags
+                .iter()
+                .map(|(key, value)| (get_str_hash(key), get_codec_nbt_hash(value))),
+        ),
+        other => get_nbt_hash(other),
+    }
+}
+
 /// Hash of a text component as `ComponentSerialization.CODEC` encodes it.
-/// Text component NBT only uses bytes for boolean style fields, which the
-/// codec writes as booleans.
 #[must_use]
 pub fn get_text_hash(text: &TextComponent) -> u32 {
-    fn hash(tag: &NbtTag) -> u32 {
-        match tag {
-            NbtTag::Byte(value) => get_bool_hash(*value != 0),
-            NbtTag::List(values) => get_list_hash(values.iter().map(hash)),
-            NbtTag::Compound(compound) => get_map_hash(
-                compound
-                    .child_tags
-                    .iter()
-                    .map(|(key, value)| (get_str_hash(key), hash(value))),
-            ),
-            other => get_nbt_hash(other),
-        }
-    }
-    hash(&text_to_nbt(text))
+    get_codec_nbt_hash(&text_to_nbt(text))
 }
 
 /// `ComponentSerialization.CODEC` NBT form of a text component.

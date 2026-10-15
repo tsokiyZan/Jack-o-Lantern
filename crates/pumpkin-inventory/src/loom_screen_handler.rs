@@ -11,7 +11,7 @@ use crate::slot::Slot;
 use crate::inventory::Inventory;
 use crate::inventory::SimpleInventory;
 use crate::window_property::PropertyDelegate;
-use pumpkin_data::data_component_impl::{BannerPatternLayer, BannerPatternsImpl};
+use pumpkin_data::data_component_impl::{BannerPatternLayer, BannerPatternsImpl, Holder};
 use pumpkin_data::dye_color::DyeColor;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
@@ -237,7 +237,7 @@ impl LoomScreenHandler {
                 .cloned()
                 .unwrap_or_default();
             existing_layers.layers.push(BannerPatternLayer {
-                pattern: pattern.to_string(),
+                pattern: Holder::Reference(pattern.to_string()),
                 color: pattern_color,
             });
             banner_stack.set_data_component(existing_layers);

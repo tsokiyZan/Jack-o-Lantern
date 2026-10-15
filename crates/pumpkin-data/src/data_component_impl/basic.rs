@@ -701,13 +701,67 @@ impl DataComponentImpl for ProvidesBannerPatternsImpl {
     default_impl!(ProvidesBannerPatterns);
 }
 
+/// An inline banner pattern, `BannerPattern.DIRECT_CODEC`.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub struct BannerPatternDefinition {
+    pub asset_id: String,
+    pub translation_key: String,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct BannerPatternLayer {
-    pub pattern: String,
+    /// A `banner_pattern` registry id, or an inline pattern.
+    pub pattern: Holder<String, BannerPatternDefinition>,
     pub color: crate::dye_color::DyeColor,
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq, Default)]
+impl BannerPatternLayer {
+    fn read_data(tag: &NbtTag) -> Option<Self> {
+        let compound = tag.extract_compound()?;
+        let pattern = match compound.get("pattern")? {
+            NbtTag::String(id) => Holder::Reference(id.to_string()),
+            NbtTag::Compound(pattern) => Holder::Direct(BannerPatternDefinition {
+                asset_id: pattern.get_string("asset_id")?.to_string(),
+                translation_key: pattern.get_string("translation_key")?.to_string(),
+            }),
+            _ => return None,
+        };
+        let color = crate::dye_color::DyeColor::by_name(compound.get_string("color")?)?;
+        Some(Self { pattern, color })
+    }
+
+    fn write_data(&self) -> NbtTag {
+        let mut compound = NbtCompound::new();
+        match &self.pattern {
+            Holder::Reference(id) => compound.put_string("pattern", id.clone()),
+            Holder::Direct(definition) => {
+                let mut pattern = NbtCompound::new();
+                pattern.put_string("asset_id", definition.asset_id.clone());
+                pattern.put_string("translation_key", definition.translation_key.clone());
+                compound.put_compound("pattern", pattern);
+            }
+        }
+        compound.put_string("color", self.color.name().to_string());
+        NbtTag::Compound(compound)
+    }
+
+    fn get_hash(&self) -> u32 {
+        let pattern = match &self.pattern {
+            Holder::Reference(id) => get_str_hash(&namespaced(id)),
+            Holder::Direct(definition) => MapHash::new()
+                .field("asset_id", get_str_hash(&namespaced(&definition.asset_id)))
+                .field("translation_key", get_str_hash(&definition.translation_key))
+                .finish(),
+        };
+        MapHash::new()
+            .field("pattern", pattern)
+            .field("color", get_str_hash(self.color.name()))
+            .finish()
+    }
+}
+
+/// `minecraft:banner_patterns`: the layers painted on a banner or shield.
+#[derive(Clone, Debug, PartialEq, Default)]
 pub struct BannerPatternsImpl {
     pub layers: Vec<BannerPatternLayer>,
 }
@@ -717,31 +771,27 @@ impl BannerPatternsImpl {
 
     #[must_use]
     pub fn read_data(data: &NbtTag) -> Option<Self> {
-        let mut layers = Vec::new();
-        if let NbtTag::List(list) = data {
-            for tag in list {
-                if let Some(compound) = tag.extract_compound() {
-                    let pattern = compound.get_string("pattern")?.to_string();
-                    let color_str = compound.get_string("color")?;
-                    let color = crate::dye_color::DyeColor::by_name(color_str).unwrap_or_default();
-                    layers.push(BannerPatternLayer { pattern, color });
-                }
-            }
-        }
+        let layers = data
+            .extract_list()?
+            .iter()
+            .map(BannerPatternLayer::read_data)
+            .collect::<Option<Vec<_>>>()?;
         Some(Self { layers })
     }
 }
 
 impl DataComponentImpl for BannerPatternsImpl {
     fn write_data(&self) -> NbtTag {
-        let mut list = Vec::new();
-        for layer in &self.layers {
-            let mut compound = NbtCompound::new();
-            compound.put_string("pattern", layer.pattern.clone());
-            compound.put_string("color", layer.color.name().to_string());
-            list.push(NbtTag::Compound(compound));
-        }
-        NbtTag::List(list)
+        NbtTag::List(
+            self.layers
+                .iter()
+                .map(BannerPatternLayer::write_data)
+                .collect(),
+        )
+    }
+
+    fn get_hash(&self) -> i32 {
+        get_list_hash(self.layers.iter().map(BannerPatternLayer::get_hash)) as i32
     }
 
     default_impl!(BannerPatterns);

@@ -6,6 +6,7 @@ use crate::codec::item_stack_seralizer::ItemStackSerializer;
 use crate::codec::var_int::VarInt;
 use crate::ser::{NetworkReadExt, NetworkWriteExt, ReadingError, WritingError};
 use pumpkin_data::Enchantment;
+use pumpkin_data::banner_pattern::BannerPattern;
 use pumpkin_data::data_component::DataComponent;
 use pumpkin_data::data_component_impl::*;
 use pumpkin_data::decorated_pot_pattern::DecoratedPotPattern;
@@ -14,6 +15,7 @@ use pumpkin_data::instrument::Instrument;
 use pumpkin_data::jukebox_song::JukeboxSong;
 use pumpkin_data::painting_variant::PaintingVariant;
 use pumpkin_data::trim_material::TrimMaterial;
+use pumpkin_data::trim_pattern::TrimPattern;
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::text::TextComponent;
 
@@ -2611,19 +2613,90 @@ impl DataComponentCodec<Self> for WrittenBookContentImpl {
     }
 }
 
+/// A `TrimMaterial.STREAM_CODEC` holder kept as `TrimImpl`'s NBT form.
+fn serialize_trim_material(
+    seq: &mut impl NetworkWriteExt,
+    material: &NbtTag,
+) -> Result<(), WritingError> {
+    match material {
+        NbtTag::String(id) => {
+            let material = TrimMaterial::from_name(id)
+                .ok_or_else(|| WritingError::Message(format!("Unknown trim material {id}")))?;
+            write_holder_reference(seq, material.id())
+        }
+        NbtTag::Compound(definition) => {
+            seq.write_var_int(&VarInt(0))?;
+            seq.write_string(definition.get_string("palette_id").unwrap_or_default())?;
+            write_text(seq, &trim_description(definition))
+        }
+        _ => Err(WritingError::Message("Invalid trim material".into())),
+    }
+}
+
+/// A `TrimPattern.STREAM_CODEC` holder kept as `TrimImpl`'s NBT form.
+fn serialize_trim_pattern(
+    seq: &mut impl NetworkWriteExt,
+    pattern: &NbtTag,
+) -> Result<(), WritingError> {
+    match pattern {
+        NbtTag::String(id) => {
+            let pattern = TrimPattern::from_name(id)
+                .ok_or_else(|| WritingError::Message(format!("Unknown trim pattern {id}")))?;
+            write_holder_reference(seq, pattern.id())
+        }
+        NbtTag::Compound(definition) => {
+            seq.write_var_int(&VarInt(0))?;
+            seq.write_string(definition.get_string("asset_id").unwrap_or_default())?;
+            write_text(seq, &trim_description(definition))?;
+            seq.write_bool(definition.get_bool("decal").unwrap_or(false))
+        }
+        _ => Err(WritingError::Message("Invalid trim pattern".into())),
+    }
+}
+
+fn trim_description(definition: &NbtCompound) -> TextComponent {
+    definition
+        .get("description")
+        .map_or_else(TextComponent::empty, TextComponent::from_nbt)
+}
+
 impl DataComponentCodec<Self> for TrimImpl {
     fn serialize(&self, seq: &mut impl NetworkWriteExt) -> Result<(), WritingError> {
-        seq.write_var_int(&VarInt(0))?;
-        seq.write_var_int(&VarInt(0))
+        serialize_trim_material(seq, &self.material)?;
+        serialize_trim_pattern(seq, &self.pattern)
     }
 
     fn deserialize(seq: &mut impl NetworkReadExt) -> Result<Self, ReadingError> {
-        let _material = seq.get_var_int()?;
-        let _pattern = seq.get_var_int()?;
-        Ok(Self {
-            material: NbtTag::String("minecraft:quartz".into()),
-            pattern: NbtTag::String("minecraft:coast".into()),
-        })
+        let material = if let Some(id) = read_holder_id(seq, "trim material")? {
+            NbtTag::String(
+                TrimMaterial::all()
+                    .get(id as usize)
+                    .ok_or_else(|| ReadingError::Message(format!("Unknown trim material id {id}")))?
+                    .asset_id()
+                    .into(),
+            )
+        } else {
+            let mut definition = NbtCompound::new();
+            definition.put_string("palette_id", seq.get_str()?.into());
+            definition.put("description", text_to_nbt(&read_text(seq)?));
+            NbtTag::Compound(definition)
+        };
+        let pattern = if let Some(id) = read_holder_id(seq, "trim pattern")? {
+            NbtTag::String(
+                TrimPattern::all()
+                    .get(id as usize)
+                    .ok_or_else(|| ReadingError::Message(format!("Unknown trim pattern id {id}")))?
+                    .asset_id()
+                    .into(),
+            )
+        } else {
+            let mut definition = NbtCompound::new();
+            definition.put_string("asset_id", seq.get_str()?.into());
+            definition.put("description", text_to_nbt(&read_text(seq)?));
+            definition.put_bool("decal", seq.get_bool()?);
+            NbtTag::Compound(definition)
+        };
+        Ok(Self { material, pattern })
     }
 }
 
@@ -3012,22 +3085,43 @@ impl DataComponentCodec<Self> for BannerPatternsImpl {
     fn serialize(&self, seq: &mut impl NetworkWriteExt) -> Result<(), WritingError> {
         seq.write_var_int(&VarInt::from(self.layers.len() as i32))?;
         for layer in &self.layers {
-            seq.write_var_int(&VarInt(0))?;
-            seq.write_var_int(&VarInt::from(layer.color.id() as i32))?;
+            match &layer.pattern {
+                Holder::Reference(id) => {
+                    let pattern = BannerPattern::from_name(id).ok_or_else(|| {
+                        WritingError::Message(format!("Unknown banner pattern {id}"))
+                    })?;
+                    write_holder_reference(seq, pattern.id())?;
+                }
+                Holder::Direct(definition) => {
+                    seq.write_var_int(&VarInt(0))?;
+                    seq.write_string(&definition.asset_id)?;
+                    seq.write_string(&definition.translation_key)?;
+                }
+            }
+            write_dye_color(seq, layer.color)?;
         }
         Ok(())
     }
 
     fn deserialize(seq: &mut impl NetworkReadExt) -> Result<Self, ReadingError> {
-        let len = seq.get_var_int()?.0 as usize;
+        let len = read_list_length(seq, "banner pattern layer")?;
         let mut layers = Vec::with_capacity(len);
         for _ in 0..len {
-            let _pattern = seq.get_var_int()?.0;
-            let color_id = seq.get_var_int()?.0 as u8;
-            let color = pumpkin_data::dye_color::DyeColor::by_id(color_id).unwrap_or_default();
-            layers.push(pumpkin_data::data_component_impl::BannerPatternLayer {
-                pattern: String::new(),
-                color,
+            let pattern = match read_holder_id(seq, "banner pattern")? {
+                Some(id) => {
+                    let pattern = BannerPattern::all().get(id as usize).ok_or_else(|| {
+                        ReadingError::Message(format!("Unknown banner pattern id {id}"))
+                    })?;
+                    Holder::Reference(pattern.asset_id().to_string())
+                }
+                None => Holder::Direct(BannerPatternDefinition {
+                    asset_id: seq.get_str()?.into(),
+                    translation_key: seq.get_str()?.into(),
+                }),
+            };
+            layers.push(BannerPatternLayer {
+                pattern,
+                color: read_dye_color(seq)?,
             });
         }
         Ok(Self { layers })
@@ -3875,6 +3969,39 @@ mod tests {
         assert_eq!((painting.width, painting.height), (2, 1));
         assert_eq!(painting.asset_id, "minecraft:sunset");
         assert!(painting.author.is_none());
+        assert_eq!(encode(&decoded), bytes);
+    }
+
+    #[test]
+    fn banner_pattern_layers_are_holders() {
+        // creeper is banner pattern 4; then red (14).
+        let layers = BannerPatternsImpl {
+            layers: vec![BannerPatternLayer {
+                pattern: Holder::Reference("minecraft:creeper".to_string()),
+                color: DyeColor::Red,
+            }],
+        };
+        assert_wire(&layers, &[0x01, 0x05, 0x0e]);
+    }
+
+    #[test]
+    fn armor_trim_is_two_holders() {
+        // diamond is trim material 2, coast is trim pattern 1.
+        assert_eq!(
+            encode(&TrimImpl {
+                material: NbtTag::String("minecraft:diamond".into()),
+                pattern: NbtTag::String("minecraft:coast".into()),
+            }),
+            [0x03, 0x02]
+        );
+        let decoded = decode::<TrimImpl>(&[0x03, 0x02]);
+        assert_eq!(decoded.material, NbtTag::String("minecraft:diamond".into()));
+        assert_eq!(decoded.pattern, NbtTag::String("minecraft:coast".into()));
+        // An inline material reads its palette id and description.
+        let mut bytes = vec![0x00, 0x0e];
+        bytes.extend_from_slice(b"minecraft:ruby");
+        bytes.extend_from_slice(&[0x08, 0x00, 0x04, b'R', b'u', b'b', b'y', 0x02]);
+        let decoded = decode::<TrimImpl>(&bytes);
         assert_eq!(encode(&decoded), bytes);
     }
 }
