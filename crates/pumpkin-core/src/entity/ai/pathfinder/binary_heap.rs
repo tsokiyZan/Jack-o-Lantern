@@ -190,32 +190,39 @@ impl BinaryHeap {
         }
     }
 
+    fn f_at(&self, index: usize) -> f32 {
+        self.heap[index].map_or(f32::INFINITY, |node| node.f)
+    }
+
     fn bubble_down(&mut self, mut index: usize) {
+        let cost = self.f_at(index);
         loop {
             let left_child = index * 2;
-            let right_child = index * 2 + 1;
-            let mut smallest = index;
-
-            if left_child <= self.size
-                && let (Some(node), Some(left)) = (&self.heap[smallest], &self.heap[left_child])
-                && left.f < node.f
-            {
-                smallest = left_child;
-            }
-
-            if right_child <= self.size
-                && let (Some(node), Some(right)) = (&self.heap[smallest], &self.heap[right_child])
-                && right.f < node.f
-            {
-                smallest = right_child;
-            }
-
-            if smallest == index {
+            let right_child = left_child + 1;
+            if left_child > self.size {
                 break;
             }
 
-            self.swap_nodes(index, smallest);
-            index = smallest;
+            let left_cost = self.f_at(left_child);
+            let right_cost = if right_child > self.size {
+                f32::INFINITY
+            } else {
+                self.f_at(right_child)
+            };
+
+            // Vanilla takes the right child on a tie between the two children.
+            let (child, child_cost) = if left_cost < right_cost {
+                (left_child, left_cost)
+            } else {
+                (right_child, right_cost)
+            };
+            let moves_down = child_cost < cost;
+            if !moves_down {
+                break;
+            }
+
+            self.swap_nodes(index, child);
+            index = child;
         }
     }
 
@@ -236,5 +243,33 @@ impl BinaryHeap {
 impl Default for BinaryHeap {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use pumpkin_util::math::position::BlockPos;
+
+    use super::BinaryHeap;
+    use crate::entity::ai::pathfinder::node::Node;
+
+    fn node(x: i32, f: f32) -> Node {
+        let mut node = Node::new(BlockPos::new(x, 0, 0));
+        node.f = f;
+        node
+    }
+
+    #[test]
+    fn down_heap_takes_right_child_on_tie() {
+        // Vanilla `BinaryHeap` pops these as 0, 2, 1, 3: after the first pop
+        // the last node sinks below two equal children and swaps with the right one.
+        let mut heap = BinaryHeap::new();
+        heap.insert(node(0, 0.0));
+        heap.insert(node(1, 1.0));
+        heap.insert(node(2, 1.0));
+        heap.insert(node(3, 5.0));
+
+        let order: Vec<i32> = std::iter::from_fn(|| heap.pop().map(|n| n.pos.0.x)).collect();
+        assert_eq!(order, [0, 2, 1, 3]);
     }
 }
