@@ -2,6 +2,7 @@ use crate::entity::ai::goal::run_around_like_crazy::RunAroundLikeCrazyGoal;
 use crate::entity::ai::util::goal_utils;
 use crate::entity::passive::abstract_horse::AbstractHorse;
 use crate::entity::passive::animal::horse_can_parent;
+use crate::entity::passive::llama::{CaravanData, LlamaFollowCaravanGoal};
 use std::sync::{
     Arc, Weak,
     atomic::{AtomicBool, AtomicI32, AtomicU8, Ordering},
@@ -93,6 +94,7 @@ pub struct TraderLlamaEntity {
     pub owner: AtomicCell<Option<Uuid>>,
     /// Vanilla `AbstractHorse.standCounter`.
     pub stand_counter: AtomicI32,
+    pub caravan: CaravanData,
 }
 
 impl TraderLlamaEntity {
@@ -116,6 +118,7 @@ impl TraderLlamaEntity {
             temper: AtomicI32::new(0),
             owner: AtomicCell::new(None),
             stand_counter: AtomicI32::new(0),
+            caravan: CaravanData::default(),
         };
         let mob_arc = Arc::new(llama);
         let mob_weak: Weak<dyn Mob> = {
@@ -141,7 +144,7 @@ impl TraderLlamaEntity {
 
             goal_selector.add_goal(0, SwimGoal::new(&mob_arc.mob_entity));
             goal_selector.add_goal(1, Box::new(RunAroundLikeCrazyGoal::new(1.2)));
-            // TODO: 2 LlamaFollowCaravanGoal(2.1) is not ported.
+            goal_selector.add_goal(2, Box::new(LlamaFollowCaravanGoal::new(2.1)));
             goal_selector.add_goal(
                 3,
                 Box::new(RangedAttackGoal::new(ranged_weak, 1.25, 40, 20.0)),
