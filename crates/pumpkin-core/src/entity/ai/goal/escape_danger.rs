@@ -3,6 +3,7 @@ use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
 use std::sync::atomic::Ordering::Relaxed;
 
+use super::revenge::MobFilter;
 use super::{Controls, Goal};
 use crate::entity::ai::goal::try_find_water::TryFindWaterGoal;
 use crate::entity::ai::util::{default_random_pos, goal_utils};
@@ -20,6 +21,8 @@ pub struct EscapeDangerGoal {
     running: bool,
     /// Vanilla `TurtlePanicGoal`: always looks for water this far first, not only on fire.
     always_seek_water: Option<i32>,
+    /// What a vanilla subclass adds to `shouldPanic`, like a defending fox staying put.
+    gate: Option<MobFilter>,
 }
 
 impl EscapeDangerGoal {
@@ -31,6 +34,7 @@ impl EscapeDangerGoal {
             target: None,
             running: false,
             always_seek_water: None,
+            gate: None,
         })
     }
 
@@ -42,6 +46,13 @@ impl EscapeDangerGoal {
         goal
     }
 
+    /// Only panics while `gate` holds, like vanilla's `FoxPanicGoal.shouldPanic`.
+    #[must_use]
+    pub fn panics_only_when(mut self: Box<Self>, gate: MobFilter) -> Box<Self> {
+        self.gate = Some(gate);
+        self
+    }
+
     #[must_use]
     pub const fn is_running(&self) -> bool {
         self.running
@@ -49,13 +60,15 @@ impl EscapeDangerGoal {
 
     /// Only `#minecraft:panic_causes` damage makes a mob flee, and only while the source is still
     /// remembered.
-    fn should_panic(mob: &dyn Mob) -> bool {
-        mob.get_mob_entity()
-            .living_entity
-            .get_last_damage_type()
-            .is_some_and(|damage_type| {
-                damage_type.has_tag(&tag::DamageType::MINECRAFT_PANIC_CAUSES)
-            })
+    fn should_panic(&self, mob: &dyn Mob) -> bool {
+        self.gate.is_none_or(|gate| gate(mob))
+            && mob
+                .get_mob_entity()
+                .living_entity
+                .get_last_damage_type()
+                .is_some_and(|damage_type| {
+                    damage_type.has_tag(&tag::DamageType::MINECRAFT_PANIC_CAUSES)
+                })
     }
 
     /// Vanilla `PanicGoal.lookForWater`: the first water in Manhattan order within `range` blocks
@@ -86,7 +99,7 @@ impl EscapeDangerGoal {
 
 impl Goal for EscapeDangerGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
-        if !Self::should_panic(mob) {
+        if !self.should_panic(mob) {
             return false;
         }
 

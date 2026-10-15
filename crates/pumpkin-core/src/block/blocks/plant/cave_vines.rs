@@ -1,15 +1,22 @@
 use pumpkin_data::block_properties::{CaveVinesLikeProperties, CaveVinesPlantLikeProperties};
+use pumpkin_data::game_event::GameEvent;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
+use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_data::{Block, BlockDirection, BlockId, BlockStateId};
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_world::world::{BlockAccessor, BlockFlags};
+
+use std::sync::Arc;
+
+use rand::RngExt;
 
 use crate::block::registry::BlockActionResult;
 use crate::block::{
     BlockBehaviour, BlockMetadata, BonemealArgs, CanPlaceAtArgs, GetStateForNeighborUpdateArgs,
     NormalUseArgs, PlacedArgs,
 };
+use crate::world::World;
 
 pub struct CaveVinesBlock;
 
@@ -20,6 +27,49 @@ impl BlockMetadata for CaveVinesBlock {
 }
 
 impl CaveVinesBlock {
+    /// Vanilla `CaveVines.hasGlowBerries`.
+    #[must_use]
+    pub fn has_glow_berries(block: &Block, state_id: BlockStateId) -> bool {
+        if block == &Block::CAVE_VINES {
+            CaveVinesLikeProperties::from_state_id(state_id).berries
+        } else if block == &Block::CAVE_VINES_PLANT {
+            CaveVinesPlantLikeProperties::from_state_id(state_id).berries
+        } else {
+            false
+        }
+    }
+
+    /// Vanilla `CaveVines.use`: picks the glow berries off a vine, returning whether it had
+    /// any.
+    pub fn use_berries(world: &Arc<World>, pos: &BlockPos) -> bool {
+        let (block, state) = world.get_block_and_state_id(pos);
+        if !Self::has_glow_berries(block, state) {
+            return false;
+        }
+        // The `harvest_cave_vine` loot table.
+        world.drop_stack(pos, ItemStack::new(1, &Item::GLOW_BERRIES));
+        let pitch = rand::rng().random::<f32>().mul_add(0.4, 0.8);
+        world.play_sound_fine(
+            Sound::BlockCaveVinesPickBerries,
+            SoundCategory::Blocks,
+            &pos.to_centered_f64(),
+            1.0,
+            pitch,
+        );
+        let new_state = if block == &Block::CAVE_VINES {
+            let mut props = CaveVinesLikeProperties::from_state_id(state);
+            props.berries = false;
+            props.to_state_id(block)
+        } else {
+            let mut props = CaveVinesPlantLikeProperties::from_state_id(state);
+            props.berries = false;
+            props.to_state_id(block)
+        };
+        world.set_block_state(pos, new_state, BlockFlags::NOTIFY_LISTENERS);
+        world.emit_game_event(GameEvent::BlockChange.name(), pos.to_centered_f64());
+        true
+    }
+
     #[must_use]
     pub fn can_survive(world: &dyn BlockAccessor, pos: &BlockPos) -> bool {
         let support_pos = pos.up();
@@ -63,35 +113,11 @@ impl BlockBehaviour for CaveVinesBlock {
     }
 
     fn normal_use(&self, args: NormalUseArgs<'_>) -> BlockActionResult {
-        let state_id = args.world.get_block_state_id(args.position);
-        if args.block == &Block::CAVE_VINES {
-            let mut props = CaveVinesLikeProperties::from_state_id(state_id);
-            if props.berries {
-                props.berries = false;
-                args.world
-                    .drop_stack(args.position, ItemStack::new(1, &Item::GLOW_BERRIES));
-                args.world.set_block_state(
-                    args.position,
-                    props.to_state_id(args.block),
-                    BlockFlags::NOTIFY_ALL,
-                );
-                return BlockActionResult::SuccessServer;
-            }
-        } else if args.block == &Block::CAVE_VINES_PLANT {
-            let mut props = CaveVinesPlantLikeProperties::from_state_id(state_id);
-            if props.berries {
-                props.berries = false;
-                args.world
-                    .drop_stack(args.position, ItemStack::new(1, &Item::GLOW_BERRIES));
-                args.world.set_block_state(
-                    args.position,
-                    props.to_state_id(args.block),
-                    BlockFlags::NOTIFY_ALL,
-                );
-                return BlockActionResult::SuccessServer;
-            }
+        if Self::use_berries(args.world, args.position) {
+            BlockActionResult::SuccessServer
+        } else {
+            BlockActionResult::Pass
         }
-        BlockActionResult::Pass
     }
 
     fn is_valid_bonemeal_target(&self, args: BonemealArgs<'_>) -> bool {

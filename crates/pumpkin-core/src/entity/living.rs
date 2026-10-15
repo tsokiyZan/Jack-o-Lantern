@@ -39,8 +39,9 @@ use crate::world::loot::LootContextParameters;
 use crossbeam::atomic::AtomicCell;
 use pumpkin_data::AttributeModifierSlot;
 use pumpkin_data::attributes::Attributes;
+use pumpkin_data::data_component_impl::IdOr;
 use pumpkin_data::data_component_impl::Operation;
-use pumpkin_data::data_component_impl::food::{ConsumableImpl, ConsumeEffect};
+use pumpkin_data::data_component_impl::food::{ConsumableImpl, ConsumeAnimation, ConsumeEffect};
 use pumpkin_data::data_component_impl::{
     AttributeModifiersImpl, BlocksAttacksImpl, DeathProtectionImpl, EnchantmentsImpl,
     EquipmentSlot, EquippableImpl, FoodImpl, IDSet, MobVisibilityImpl,
@@ -48,6 +49,7 @@ use pumpkin_data::data_component_impl::{
 use pumpkin_data::effect::StatusEffect;
 use pumpkin_data::entity::{EntityPose, EntityStatus, EntityType};
 use pumpkin_data::fluid::Fluid;
+use pumpkin_data::game_event::GameEvent;
 use pumpkin_data::game_rules::{GameRule, GameRuleValue};
 use pumpkin_data::item_stack::{DamageResult, ItemStack};
 use pumpkin_data::sound::SoundCategory;
@@ -1489,7 +1491,8 @@ impl LivingEntity {
 
         let suffocating = self.entity.tick_block_collisions(caller);
 
-        if suffocating {
+        // Vanilla `LivingEntity.isInWall`: a sleeping entity is never in a wall.
+        if suffocating && !caller.get_mob().is_some_and(super::mob::Mob::is_sleeping) {
             caller.damage(caller, 1.0, DamageType::IN_WALL);
         }
 
@@ -2211,6 +2214,9 @@ impl LivingEntity {
                 ..Default::default()
             };
 
+            if let Some(mob) = dyn_self.get_mob() {
+                mob.before_drop_all_death_loot();
+            }
             // Drop loot
             self.drop_loot(&params);
 
@@ -3641,6 +3647,9 @@ impl EntityBase for LivingEntity {
                     .lock()
                     .unwrap_or_else(std::sync::PoisonError::into_inner)
                     .client_tick(mob);
+                if mob.is_sleeping() {
+                    self.entity.set_pitch(0.0);
+                }
             }
             // Vanilla-like order: freeze logic runs after movement/collisions.
             self.entity.tick_frozen(caller);
@@ -3935,6 +3944,50 @@ impl LivingEntity {
         let efficiency = self.get_attribute_value(&Attributes::MOVEMENT_EFFICIENCY) as f32;
         let super_factor = self.entity.get_block_speed_factor();
         super_factor + efficiency * (1.0 - super_factor)
+    }
+
+    /// Vanilla `ItemStack.finishUsingItem` for a mob: `Consumable.onConsume`'s sounds,
+    /// effects and game event, then one item used up. Returns what is left of `stack`.
+    pub fn finish_using_item(&self, caller: &dyn EntityBase, mut stack: ItemStack) -> ItemStack {
+        let Some(consumable) = stack.get_data_component::<ConsumableImpl>() else {
+            return stack;
+        };
+        let world = self.entity.world.load();
+        let pos = self.entity.pos.load();
+        let play = |volume: f32, pitch: f32, category: SoundCategory| match &consumable.sound_event
+        {
+            IdOr::Id(sound) => world.play_sound_fine(*sound, category, &pos, volume, pitch),
+            IdOr::Value(sound) => {
+                world.play_custom_sound(&sound.sound_name, category, &pos, volume, pitch);
+            }
+        };
+        let mut rng = rand::rng();
+        // `Consumable.emitParticlesAndSounds`, through `Entity.playSound`.
+        let eat_volume = if rng.random::<bool>() { 0.5 } else { 1.0 };
+        let eat_pitch = (rng.random::<f32>() - rng.random::<f32>()).mul_add(0.2, 1.0);
+        let drink_pitch = rng.random::<f32>().mul_add(0.1, 0.9);
+        let drinks = consumable.animation == ConsumeAnimation::Drink;
+        if !self.entity.is_silent() {
+            if drinks {
+                play(0.5, drink_pitch, caller.entity_sound_source());
+            } else {
+                play(eat_volume, eat_pitch, caller.entity_sound_source());
+            }
+        }
+        // `FoodProperties.onConsume`, the consume listener of food.
+        if stack.get_data_component::<FoodImpl>().is_some() {
+            let pitch = (rng.random::<f32>() - rng.random::<f32>()).mul_add(0.4, 1.0);
+            play(1.0, pitch, SoundCategory::Neutral);
+        }
+        self.apply_consumable_effects(caller, &stack);
+        let event = if drinks {
+            GameEvent::Drink
+        } else {
+            GameEvent::Eat
+        };
+        world.emit_game_event(event.name(), pos);
+        stack.decrement(1);
+        stack
     }
 
     /// Applies data-driven `apply_effects` consume effects after an item completes use.

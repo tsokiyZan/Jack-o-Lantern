@@ -1,5 +1,6 @@
 use super::{Controls, Goal};
 
+use crate::entity::EntityBase;
 use crate::entity::ai::goal::revenge::MobFilter;
 use crate::entity::ai::pathfinder::path::Path;
 use crate::entity::mob::Mob;
@@ -8,6 +9,10 @@ use pumpkin_util::math::vector3::Vector3;
 use rand::RngExt;
 
 const CAN_USE_CHECK_INTERVAL: i64 = 20;
+
+/// A vanilla `checkAndPerformAttack` override: the hit that replaces swinging and hurting the
+/// target once the attack is ready.
+pub type MeleeAttackFn = fn(&dyn Mob, &dyn EntityBase);
 
 pub struct MeleeAttackGoal {
     goal_control: Controls,
@@ -19,6 +24,7 @@ pub struct MeleeAttackGoal {
     pub cooldown: i32,
     last_can_use_check: i64,
     gate: Option<MobFilter>,
+    attack: Option<MeleeAttackFn>,
 }
 
 impl MeleeAttackGoal {
@@ -34,7 +40,16 @@ impl MeleeAttackGoal {
             cooldown: 0,
             last_can_use_check: 0,
             gate: None,
+            attack: None,
         }
+    }
+
+    /// Hits with `attack` instead of swinging and hurting the target, like vanilla's
+    /// `FoxMeleeAttackGoal`.
+    #[must_use]
+    pub const fn attacking_with(mut self, attack: MeleeAttackFn) -> Self {
+        self.attack = Some(attack);
+        self
     }
 
     /// Extra condition for starting and for continuing, checked after the base goal's own.
@@ -204,6 +219,10 @@ impl Goal for MeleeAttackGoal {
             && mob.has_line_of_sight(target.get_entity())
         {
             self.cooldown = self.get_max_cooldown();
+            if let Some(attack) = self.attack {
+                attack(mob, target.as_ref());
+                return;
+            }
 
             // Iron golem animation plays on every swing, even when blocked
             if let Some(golem) = mob.as_iron_golem() {

@@ -5469,6 +5469,28 @@ impl World {
         (15.0 - sky_light_level).clamp(0.0, 15.0) as i32
     }
 
+    /// Vanilla `ServerLevel.sectionsToVillage`, for the section holding `pos`.
+    #[must_use]
+    pub fn sections_to_village(&self, pos: &BlockPos) -> i32 {
+        self.villager_poi
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .sections_to_village(Vector3::new(pos.0.x >> 4, pos.0.y >> 4, pos.0.z >> 4))
+    }
+
+    /// Vanilla `ServerLevel.isCloseToVillage`.
+    #[must_use]
+    pub fn is_close_to_village(&self, pos: &BlockPos, section_distance: i32) -> bool {
+        section_distance < villager_poi::MAX_SECTIONS_TO_VILLAGE
+            && self.sections_to_village(pos) <= section_distance
+    }
+
+    /// Vanilla `ServerLevel.isVillage`.
+    #[must_use]
+    pub fn is_village(&self, pos: &BlockPos) -> bool {
+        self.is_close_to_village(pos, 1)
+    }
+
     #[must_use]
     pub fn is_bright_outside(&self) -> bool {
         !self.dimension.has_fixed_time && self.get_sky_darken() < 4

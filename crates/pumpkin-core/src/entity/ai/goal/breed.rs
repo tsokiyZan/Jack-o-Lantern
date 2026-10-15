@@ -17,6 +17,10 @@ use super::{Controls, Goal};
 
 const PARTNER_RANGE: f64 = 8.0;
 
+/// What a vanilla `breed()` override does to the offspring before it enters the world, given
+/// the breeder, its partner and the offspring.
+pub type OffspringFn = fn(&dyn Mob, &dyn EntityBase, &dyn EntityBase);
+
 pub struct BreedGoal {
     speed: f64,
     /// Vanilla `partnerClass`; `None` is the breeder's own class.
@@ -24,8 +28,9 @@ pub struct BreedGoal {
     partner_targeting: TargetPredicate,
     mate: Option<Arc<dyn EntityBase>>,
     timer: i32,
-    /// Vanilla `BreedGoal.breed`, which turtles override to carry an egg.
-    breed: fn(&dyn Mob, &dyn EntityBase),
+    /// Vanilla `BreedGoal.breed` overrides, like the turtle carrying an egg.
+    breed: Option<fn(&dyn Mob, &dyn EntityBase)>,
+    offspring: Option<OffspringFn>,
 }
 
 impl BreedGoal {
@@ -39,7 +44,8 @@ impl BreedGoal {
                 .ignore_visibility(),
             mate: None,
             timer: 0,
-            breed: Self::breed,
+            breed: None,
+            offspring: None,
         })
     }
 
@@ -47,8 +53,22 @@ impl BreedGoal {
     #[must_use]
     pub fn with_breed(speed: f64, breed: fn(&dyn Mob, &dyn EntityBase)) -> Box<Self> {
         let mut goal = Self::new(speed);
-        goal.breed = breed;
+        goal.breed = Some(breed);
         goal
+    }
+
+    /// Runs `offspring` on each baby before it enters the world, like vanilla's
+    /// `FoxBreedGoal.breed`.
+    #[must_use]
+    pub fn with_offspring(mut self: Box<Self>, offspring: OffspringFn) -> Box<Self> {
+        self.offspring = Some(offspring);
+        self
+    }
+
+    /// Vanilla `BreedGoal.partner`, the mate found by `canUse`.
+    #[must_use]
+    pub const fn partner(&self) -> Option<&Arc<dyn EntityBase>> {
+        self.mate.as_ref()
     }
 
     /// Looks for partners of a wider class than the breeder's own, like `AbstractHorse`.
@@ -101,7 +121,7 @@ impl BreedGoal {
     }
 
     /// Vanilla `Animal.spawnChildFromBreeding` and `finalizeSpawnChildFromBreeding`.
-    pub(crate) fn breed(mob: &dyn Mob, mate: &dyn EntityBase) {
+    pub(crate) fn breed(mob: &dyn Mob, mate: &dyn EntityBase, offspring: Option<OffspringFn>) {
         let mob_entity = mob.get_mob_entity();
         let entity = mob.get_entity();
         let world = entity.world.load_full();
@@ -110,6 +130,9 @@ impl BreedGoal {
         // TODO: vanilla `getBreedOffspring` is per species and may decline (horse and donkey
         // make a mule); this always clones the breeder's type.
         let baby = from_type(entity.entity_type, parent_pos, &world, Uuid::new_v4());
+        if let Some(offspring) = offspring {
+            offspring(mob, mate, baby.as_ref());
+        }
         baby.get_entity().set_age(-24000);
         baby.refresh_dimensions();
 
@@ -218,7 +241,10 @@ impl Goal for BreedGoal {
             .load()
             .squared_distance_to_vec(&mate.get_entity().pos.load());
         if self.timer >= self.get_tick_count(60) && dist_sq < 9.0 {
-            (self.breed)(mob, mate.as_ref());
+            match self.breed {
+                Some(breed) => breed(mob, mate.as_ref()),
+                None => Self::breed(mob, mate.as_ref(), self.offspring),
+            }
         }
     }
 

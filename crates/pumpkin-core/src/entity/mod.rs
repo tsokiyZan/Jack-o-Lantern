@@ -132,6 +132,56 @@ impl dyn EntityBase + '_ {
     }
 }
 
+/// Vanilla `Entity.push(Entity)`: nudges the two entities apart.
+pub fn push_apart(self_entity: &Entity, self_pushable: bool, entity: &dyn EntityBase) {
+    let other_entity = entity.get_entity();
+
+    if self_entity.no_physics.load(Ordering::Relaxed)
+        || other_entity.no_physics.load(Ordering::Relaxed)
+    {
+        return;
+    }
+
+    if self_entity.has_passenger(other_entity.entity_id)
+        || other_entity.has_passenger(self_entity.entity_id)
+    {
+        return;
+    }
+
+    let mut dx = other_entity.pos.load().x - self_entity.pos.load().x;
+    let mut dz = other_entity.pos.load().z - self_entity.pos.load().z;
+    let mut d = dx.abs().max(dz.abs());
+    if d >= 0.01 {
+        d = d.sqrt();
+        dx /= d;
+        dz /= d;
+        let mut d2 = 1.0 / d;
+        if d2 > 1.0 {
+            d2 = 1.0;
+        }
+        dx *= d2;
+        dz *= d2;
+        dx *= 0.05;
+        dz *= 0.05;
+
+        if !self_entity.has_passengers() && self_pushable {
+            let mut vel = self_entity.velocity.load();
+            vel.x -= dx;
+            vel.z -= dz;
+            self_entity.velocity.store(vel);
+            self_entity.velocity_dirty.store(true, Ordering::SeqCst);
+        }
+
+        if !other_entity.has_passengers() && entity.is_pushable() {
+            let mut vel = other_entity.velocity.load();
+            vel.x += dx;
+            vel.z += dz;
+            other_entity.velocity.store(vel);
+            other_entity.velocity_dirty.store(true, Ordering::SeqCst);
+        }
+    }
+}
+
 pub trait EntityBase: Send + Sync + std::any::Any {
     fn write_nbt(&self, nbt: &mut NbtCompound) {
         self.get_entity().write_nbt(nbt);
@@ -665,53 +715,7 @@ pub trait EntityBase: Send + Sync + std::any::Any {
     }
 
     fn push(&self, entity: &dyn EntityBase) {
-        let self_entity = self.get_entity();
-        let other_entity = entity.get_entity();
-
-        if self_entity.no_physics.load(Ordering::Relaxed)
-            || other_entity.no_physics.load(Ordering::Relaxed)
-        {
-            return;
-        }
-
-        if self_entity.has_passenger(other_entity.entity_id)
-            || other_entity.has_passenger(self_entity.entity_id)
-        {
-            return;
-        }
-
-        let mut dx = other_entity.pos.load().x - self_entity.pos.load().x;
-        let mut dz = other_entity.pos.load().z - self_entity.pos.load().z;
-        let mut d = dx.abs().max(dz.abs());
-        if d >= 0.01 {
-            d = d.sqrt();
-            dx /= d;
-            dz /= d;
-            let mut d2 = 1.0 / d;
-            if d2 > 1.0 {
-                d2 = 1.0;
-            }
-            dx *= d2;
-            dz *= d2;
-            dx *= 0.05;
-            dz *= 0.05;
-
-            if !self_entity.has_passengers() && self.is_pushable() {
-                let mut vel = self_entity.velocity.load();
-                vel.x -= dx;
-                vel.z -= dz;
-                self_entity.velocity.store(vel);
-                self_entity.velocity_dirty.store(true, Ordering::SeqCst);
-            }
-
-            if !other_entity.has_passengers() && entity.is_pushable() {
-                let mut vel = other_entity.velocity.load();
-                vel.x += dx;
-                vel.z += dz;
-                other_entity.velocity.store(vel);
-                other_entity.velocity_dirty.store(true, Ordering::SeqCst);
-            }
-        }
+        push_apart(self.get_entity(), self.is_pushable(), entity);
     }
 
     #[allow(clippy::too_many_lines)]
@@ -2952,6 +2956,22 @@ impl Entity {
     #[must_use]
     pub fn is_on_fire(&self) -> bool {
         self.fire_ticks.load(Ordering::Relaxed) > 0 || self.has_visual_fire.load(Ordering::Relaxed)
+    }
+
+    /// Vanilla `Entity.getLookAngle`, through `calculateViewVector`.
+    #[must_use]
+    pub fn get_look_angle(&self) -> Vector3<f64> {
+        let x_rot = self.pitch.load() * (std::f64::consts::PI / 180.0) as f32;
+        let y_rot = -self.yaw.load() * (std::f64::consts::PI / 180.0) as f32;
+        let y_cos = pumpkin_util::math::cos(y_rot);
+        let y_sin = pumpkin_util::math::sin(y_rot);
+        let x_cos = pumpkin_util::math::cos(x_rot);
+        let x_sin = pumpkin_util::math::sin(x_rot);
+        Vector3::new(
+            f64::from(y_sin * x_cos),
+            f64::from(-x_sin),
+            f64::from(y_cos * x_cos),
+        )
     }
 
     pub fn get_horizontal_facing(&self) -> HorizontalFacing {

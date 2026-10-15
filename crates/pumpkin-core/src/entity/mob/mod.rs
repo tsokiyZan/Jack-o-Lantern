@@ -14,6 +14,7 @@ use crate::entity::ai::control::move_control::MoveControl;
 use crate::entity::ai::goal::escape_danger::EscapeDangerGoal;
 use crate::entity::ai::goal::goal_selector::GoalSelector;
 use crate::entity::ai::sensing::Sensing;
+use crate::entity::item::ItemEntity;
 use crate::entity::movement_emission::MovementEmission;
 use crate::entity::player::Player;
 use crate::entity::predicate::EntityPredicate;
@@ -139,6 +140,40 @@ impl MobEntity {
         EquipmentSlot::LEGS,
         EquipmentSlot::FEET,
     ];
+
+    /// Vanilla `Mob.ITEM_PICKUP_REACH`.
+    pub const ITEM_PICKUP_REACH: Vector3<i32> = Vector3::new(1, 0, 1);
+
+    /// The looting part of vanilla `Mob.aiStep`: runs `pick_up` on every item in reach that
+    /// can be picked up, while this mob picks up loot and `mobGriefing` is on.
+    pub fn for_each_item_in_pickup_reach(&self, mut pick_up: impl FnMut(&ItemEntity)) {
+        let entity = &self.living_entity.entity;
+        if !self.can_pick_up_loot() || !entity.is_alive() || self.living_entity.dead.load(Relaxed) {
+            return;
+        }
+        let world = entity.world.load();
+        if !world.level_info.load().game_rules.mob_griefing {
+            return;
+        }
+        let reach = entity.bounding_box.load().expand(
+            f64::from(Self::ITEM_PICKUP_REACH.x),
+            f64::from(Self::ITEM_PICKUP_REACH.y),
+            f64::from(Self::ITEM_PICKUP_REACH.z),
+        );
+        for candidate in world.get_entities_at_box(&reach) {
+            let Some(item) = candidate.get_item_entity() else {
+                continue;
+            };
+            let empty = item
+                .get_item_stack()
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .is_empty();
+            if !item.get_entity().removed.load(Relaxed) && !empty && item.get_pickup_delay() == 0 {
+                pick_up(item);
+            }
+        }
+    }
 
     /// Vanilla `Mob.setSpeed`: the speed travel uses, also set as the forward input.
     pub fn set_speed(&self, speed: f32) {
@@ -1329,6 +1364,15 @@ pub trait Mob: EntityBase + Send + Sync {
     ) {
     }
 
+    /// The start of a vanilla `dropAllDeathLoot` override, before the loot table and the
+    /// equipment drop.
+    fn before_drop_all_death_loot(&self) {}
+
+    /// Vanilla `LivingEntity.isSleeping`, for mobs that sleep without a bed.
+    fn is_sleeping(&self) -> bool {
+        false
+    }
+
     /// The mob's own part of vanilla `LivingEntity.canBeSeenAsEnemy`.
     fn can_be_seen_as_enemy(&self) -> bool {
         true
@@ -1637,21 +1681,7 @@ pub trait Mob: EntityBase + Send + Sync {
 
     /// Set or clear the mob's target. Override to add side effects when targeting changes.
     fn set_mob_target(&self, target: Option<Arc<dyn EntityBase>>) {
-        let mob = self.get_mob_entity();
-        let target = self.as_valid_target(target);
-        let target_id = target.as_ref().map(|t| t.get_entity().entity_id);
-        *mob.target
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) = target;
-        let world = mob.living_entity.entity.world.load_full();
-        let entity_id = mob.living_entity.entity.entity_id;
-        if let Some(server) = world.server.upgrade() {
-            let mut event =
-                crate::plugin::api::events::entity::entity_target::EntityTargetEvent::new(
-                    entity_id, target_id,
-                );
-            server.plugin_manager.fire_blocking(&server, &mut event);
-        }
+        set_mob_target_base(self, target);
     }
 
     fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
@@ -1810,6 +1840,25 @@ pub trait Mob: EntityBase + Send + Sync {
             .on_lightning_strike(caller, lightning);
     }
 }
+/// Vanilla `Mob.setTarget`, for overrides that run their own part first.
+pub fn set_mob_target_base<M: Mob + ?Sized>(mob: &M, target: Option<Arc<dyn EntityBase>>) {
+    let mob_entity = mob.get_mob_entity();
+    let target = mob.as_valid_target(target);
+    let target_id = target.as_ref().map(|t| t.get_entity().entity_id);
+    *mob_entity
+        .target
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = target;
+    let world = mob_entity.living_entity.entity.world.load_full();
+    let entity_id = mob_entity.living_entity.entity.entity_id;
+    if let Some(server) = world.server.upgrade() {
+        let mut event = crate::plugin::api::events::entity::entity_target::EntityTargetEvent::new(
+            entity_id, target_id,
+        );
+        server.plugin_manager.fire_blocking(&server, &mut event);
+    }
+}
+
 /// Whether vanilla's class for `entity_type` extends `Monster`: every `Enemy` except the
 /// slimes, phantoms, ghasts, shulkers, hoglins and the ender dragon.
 #[must_use]
@@ -1881,6 +1930,13 @@ impl<T: Mob + Send + 'static> EntityBase for T {
 
     fn is_pushable(&self) -> bool {
         self.get_mob_entity().living_entity.is_pushable()
+    }
+
+    /// Vanilla `LivingEntity.push`: a sleeping entity is not pushed.
+    fn push(&self, entity: &dyn EntityBase) {
+        if !self.is_sleeping() {
+            super::push_apart(self.get_entity(), self.is_pushable(), entity);
+        }
     }
 
     fn on_lightning_strike(

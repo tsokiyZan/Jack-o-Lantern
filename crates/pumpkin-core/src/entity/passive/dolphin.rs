@@ -65,8 +65,6 @@ const BABY_SPAWN_CHANCE: f32 = 0.1;
 const TREASURE_MIN_AIR: i32 = 100;
 /// The `findNearestMapStructure` radius `DolphinSwimToTreasureGoal` searches.
 const TREASURE_SEARCH_RADIUS: i32 = 50;
-/// Vanilla `Mob.ITEM_PICKUP_REACH`.
-const ITEM_PICKUP_REACH: Vector3<i32> = Vector3::new(1, 0, 1);
 /// The pickup delay vanilla's `Dolphin.ItemGoal.drop` gives a tossed item.
 const THROWN_ITEM_PICKUP_DELAY: u8 = 40;
 
@@ -375,38 +373,8 @@ impl Mob for DolphinEntity {
 
     /// The looting part of vanilla `Mob.aiStep`, which runs after the move.
     fn post_tick(&self) {
-        let entity = self.get_entity();
-        if !self.mob_entity.can_pick_up_loot()
-            || !entity.is_alive()
-            || self.mob_entity.living_entity.dead.load(Ordering::Relaxed)
-        {
-            return;
-        }
-        let world = entity.world.load();
-        if !world.level_info.load().game_rules.mob_griefing {
-            return;
-        }
-        let reach = entity.bounding_box.load().expand(
-            f64::from(ITEM_PICKUP_REACH.x),
-            f64::from(ITEM_PICKUP_REACH.y),
-            f64::from(ITEM_PICKUP_REACH.z),
-        );
-        for candidate in world.get_entities_at_box(&reach) {
-            let Some(item) = candidate.get_item_entity() else {
-                continue;
-            };
-            let empty = item
-                .get_item_stack()
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner)
-                .is_empty();
-            if !item.get_entity().removed.load(Ordering::Relaxed)
-                && !empty
-                && item.get_pickup_delay() == 0
-            {
-                self.pick_up_item(item);
-            }
-        }
+        self.mob_entity
+            .for_each_item_in_pickup_reach(|item| self.pick_up_item(item));
     }
 
     fn mob_write_nbt(&self, nbt: &mut NbtCompound) {

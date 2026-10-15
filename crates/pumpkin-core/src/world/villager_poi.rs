@@ -2,8 +2,12 @@ use std::{collections::HashMap, sync::Weak};
 
 use pumpkin_data::{Block, villager::VillagerProfession};
 use pumpkin_util::math::position::BlockPos;
+use pumpkin_util::math::vector3::Vector3;
 
 use crate::entity::EntityBase;
+
+/// Vanilla `PoiManager.DistanceTracker`'s level for a section with no village nearby.
+pub const MAX_SECTIONS_TO_VILLAGE: i32 = 7;
 
 struct JobSite {
     profession: VillagerProfession,
@@ -101,6 +105,23 @@ impl VillagerPoiStorage {
             .collect::<Vec<_>>();
         sites.sort_unstable_by_key(|(distance, _)| *distance);
         sites.into_iter().map(|(_, position)| position).collect()
+    }
+
+    /// Vanilla `PoiManager.sectionsToVillage`: the Chebyshev distance in sections from
+    /// `section` to the nearest section holding an occupied village POI, capped at
+    /// [`MAX_SECTIONS_TO_VILLAGE`]. Only claimed job sites are tracked here, not beds or bells.
+    #[must_use]
+    pub fn sections_to_village(&self, section: Vector3<i32>) -> i32 {
+        self.job_sites
+            .iter()
+            .filter(|(_, site)| site.owner.as_ref().and_then(Self::live_owner).is_some())
+            .map(|(position, _)| {
+                ((position.0.x >> 4) - section.x)
+                    .abs()
+                    .max(((position.0.y >> 4) - section.y).abs())
+                    .max(((position.0.z >> 4) - section.z).abs())
+            })
+            .fold(MAX_SECTIONS_TO_VILLAGE, i32::min)
     }
 
     #[must_use]

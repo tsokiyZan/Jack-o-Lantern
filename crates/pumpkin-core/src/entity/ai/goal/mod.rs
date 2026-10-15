@@ -50,6 +50,7 @@ pub mod run_around_like_crazy;
 pub mod sit_when_ordered_to;
 pub mod spider_attack;
 pub mod step_and_destroy_block;
+pub mod stroll_through_village;
 pub mod swim;
 pub mod teleport_towards_player;
 pub mod tempt;
