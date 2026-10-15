@@ -98,6 +98,8 @@ pub struct LlamaEntity {
     /// Vanilla `AbstractHorse.standCounter`.
     pub stand_counter: AtomicI32,
     pub caravan: CaravanData,
+    /// Vanilla `Llama.didSpit`: ends the retaliation after a spit.
+    pub did_spit: AtomicBool,
 }
 
 impl LlamaEntity {
@@ -121,6 +123,7 @@ impl LlamaEntity {
             temper: AtomicI32::new(0),
             owner: AtomicCell::new(None),
             stand_counter: AtomicI32::new(0),
+            did_spit: AtomicBool::new(false),
             caravan: CaravanData::default(),
         };
         let mob_arc = Arc::new(llama);
@@ -163,12 +166,30 @@ impl LlamaEntity {
             );
             goal_selector.add_goal(9, Box::new(RandomLookAroundGoal::default()));
 
-            // TODO: LlamaHurtByTargetGoal (stops after spitting) and LlamaAttackWolfGoal
-            // (untamed wolves, reciprocal 16, must reach) are approximated.
-            target_selector.add_goal(1, Box::new(RevengeGoal::new(true)));
+            // `LlamaHurtByTargetGoal`: a spit ends the retaliation.
+            target_selector.add_goal(
+                1,
+                Box::new(
+                    RevengeGoal::new(true)
+                        .continuing_while(|mob| !super::llama::take_did_spit(mob)),
+                ),
+            );
+            // `LlamaAttackWolfGoal`: untamed wolves, reaching them, at a quarter of the range.
             target_selector.add_goal(
                 2,
-                ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::WOLF, true),
+                Box::new(ActiveTargetGoal::new(
+                    &mob_arc.mob_entity,
+                    &EntityType::WOLF,
+                    16,
+                    false,
+                    true,
+                    Some(
+                        |target: &crate::entity::living::LivingEntity, _: &crate::world::World| {
+                            !crate::entity::mob::is_tame(target)
+                        },
+                    ),
+                ))
+                .with_follow_distance_scale(0.25),
             );
         };
 
@@ -255,16 +276,25 @@ impl LlamaEntity {
         let dy = (target_pos.y + target_height / 3.0) - spit.get_entity().pos.load().y;
         let dz = target_pos.z - mob_pos.z;
         let horizontal_distance = dx.hypot(dz);
-        let yo = horizontal_distance * 0.2;
+        let yo = horizontal_distance * f64::from(0.2f32);
 
         spit.thrown.set_velocity(dx, dy + yo, dz, 1.5, 10.0);
 
         if !entity.silent.load(Ordering::Relaxed) {
-            world.play_sound(Sound::EntityLlamaSpit, SoundCategory::Neutral, &mob_pos);
+            let mut rng = rand::rng();
+            let pitch = 1.0 + (rng.random::<f32>() - rng.random::<f32>()) * 0.2;
+            world.play_sound_fine(
+                Sound::EntityLlamaSpit,
+                SoundCategory::Neutral,
+                &mob_pos,
+                1.0,
+                pitch,
+            );
         }
 
         let spit_arc: Arc<dyn EntityBase> = Arc::new(spit);
         world.spawn_entity(spit_arc);
+        self.did_spit.store(true, Ordering::Relaxed);
     }
 }
 
@@ -711,4 +741,18 @@ impl Goal for LlamaFollowCaravanGoal {
     fn controls(&self) -> Controls {
         Controls::MOVE
     }
+}
+
+/// The `didSpit` half of vanilla `LlamaHurtByTargetGoal.canContinueToUse`: true once after a
+/// spit, clearing the flag.
+pub(super) fn take_did_spit(mob: &dyn crate::entity::mob::Mob) -> bool {
+    let any = mob.cast_any();
+    let did_spit = any
+        .downcast_ref::<LlamaEntity>()
+        .map(|llama| &llama.did_spit)
+        .or_else(|| {
+            any.downcast_ref::<super::trader_llama::TraderLlamaEntity>()
+                .map(|llama| &llama.did_spit)
+        });
+    did_spit.is_some_and(|did_spit| did_spit.swap(false, Ordering::Relaxed))
 }

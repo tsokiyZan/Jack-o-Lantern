@@ -1914,6 +1914,17 @@ pub trait Mob: EntityBase + Send + Sync {
             .on_lightning_strike(caller, lightning);
     }
 }
+/// Vanilla `TamableAnimal.isTame` for a target or avoid candidate.
+#[must_use]
+pub fn is_tame(target: &crate::entity::living::LivingEntity) -> bool {
+    target
+        .entity
+        .world
+        .load()
+        .get_entity_by_id(target.entity.entity_id)
+        .is_some_and(|entity| entity.get_mob().is_some_and(Mob::is_tamed))
+}
+
 /// Vanilla `Mob.setTarget`, for overrides that run their own part first.
 pub fn set_mob_target_base<M: Mob + ?Sized>(mob: &M, target: Option<Arc<dyn EntityBase>>) {
     let mob_entity = mob.get_mob_entity();

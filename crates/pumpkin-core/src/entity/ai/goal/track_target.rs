@@ -22,6 +22,8 @@ pub struct TrackTargetGoal {
     pub max_time_without_visibility: i32,
     /// Fallback target, used while the mob's own target is cleared.
     target_mob: Option<Arc<dyn EntityBase>>,
+    /// Vanilla `getFollowDistance` overrides, as a factor on the follow range.
+    pub follow_distance_scale: f64,
 }
 
 #[expect(dead_code)]
@@ -37,6 +39,7 @@ impl TrackTargetGoal {
             time_without_visibility: 0,
             max_time_without_visibility: 60,
             target_mob: None,
+            follow_distance_scale: 1.0,
         }
     }
 
@@ -163,7 +166,8 @@ impl Goal for TrackTargetGoal {
         // Get follow range attribute value and check if target is within range
         let follow_range = mob_entity
             .living_entity
-            .get_attribute_value(&Attributes::FOLLOW_RANGE);
+            .get_attribute_value(&Attributes::FOLLOW_RANGE)
+            * self.follow_distance_scale;
 
         if dist_sq > follow_range * follow_range {
             return false;

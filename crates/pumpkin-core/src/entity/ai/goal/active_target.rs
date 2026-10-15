@@ -140,6 +140,13 @@ impl ActiveTargetGoal {
         self
     }
 
+    /// A vanilla `getFollowDistance` override, as a factor on the follow range.
+    #[must_use]
+    pub const fn with_follow_distance_scale(mut self: Box<Self>, scale: f64) -> Box<Self> {
+        self.track_target_goal.follow_distance_scale = scale;
+        self
+    }
+
     /// Vanilla `getTargetSearchArea`, given the follow distance.
     #[must_use]
     pub fn with_search_area(
@@ -221,7 +228,8 @@ impl ActiveTargetGoal {
         let entity = &mob_entity.living_entity.entity;
         let follow_range = mob_entity
             .living_entity
-            .get_attribute_value(&Attributes::FOLLOW_RANGE);
+            .get_attribute_value(&Attributes::FOLLOW_RANGE)
+            * self.track_target_goal.follow_distance_scale;
 
         // Vanilla updates the target conditions with the current follow distance on every search
         self.target_predicate.base_max_distance = follow_range;

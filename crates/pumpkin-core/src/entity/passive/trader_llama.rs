@@ -95,9 +95,12 @@ pub struct TraderLlamaEntity {
     /// Vanilla `AbstractHorse.standCounter`.
     pub stand_counter: AtomicI32,
     pub caravan: CaravanData,
+    /// Vanilla `Llama.didSpit`: ends the retaliation after a spit.
+    pub did_spit: AtomicBool,
 }
 
 impl TraderLlamaEntity {
+    #[expect(clippy::too_many_lines)]
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
         set_animal_pathfinding_malus(&mob_entity);
@@ -118,6 +121,7 @@ impl TraderLlamaEntity {
             temper: AtomicI32::new(0),
             owner: AtomicCell::new(None),
             stand_counter: AtomicI32::new(0),
+            did_spit: AtomicBool::new(false),
             caravan: CaravanData::default(),
         };
         let mob_arc = Arc::new(llama);
@@ -161,15 +165,33 @@ impl TraderLlamaEntity {
             goal_selector.add_goal(9, Box::new(RandomLookAroundGoal::default()));
             goal_selector.add_goal(1, EscapeDangerGoal::new(2.0));
 
-            // TODO: LlamaHurtByTargetGoal (stops after spitting) and LlamaAttackWolfGoal
-            // (untamed wolves, reciprocal 16, must reach) are approximated.
-            target_selector.add_goal(1, Box::new(RevengeGoal::new(true)));
+            // `LlamaHurtByTargetGoal`: a spit ends the retaliation.
+            target_selector.add_goal(
+                1,
+                Box::new(
+                    RevengeGoal::new(true)
+                        .continuing_while(|mob| !super::llama::take_did_spit(mob)),
+                ),
+            );
+            // `LlamaAttackWolfGoal`: untamed wolves, reaching them, at a quarter of the range.
             target_selector.add_goal(
                 2,
-                ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::WOLF, true),
+                Box::new(ActiveTargetGoal::new(
+                    &mob_arc.mob_entity,
+                    &EntityType::WOLF,
+                    16,
+                    false,
+                    true,
+                    Some(
+                        |target: &crate::entity::living::LivingEntity, _: &crate::world::World| {
+                            !crate::entity::mob::is_tame(target)
+                        },
+                    ),
+                ))
+                .with_follow_distance_scale(0.25),
             );
             // `TraderLlama.registerGoals`, after the llama's.
-            // TODO: 1 TraderLlamaDefendWanderingTraderGoal is not ported.
+            target_selector.add_goal(1, Box::new(DefendWanderingTraderGoal::new()));
             target_selector.add_goal(
                 2,
                 ActiveTargetGoal::predicated(&mob_arc.mob_entity, 10, true, |target, _world| {
@@ -274,16 +296,25 @@ impl TraderLlamaEntity {
         let dy = (target_pos.y + target_height / 3.0) - spit.get_entity().pos.load().y;
         let dz = target_pos.z - mob_pos.z;
         let horizontal_distance = dx.hypot(dz);
-        let yo = horizontal_distance * 0.2;
+        let yo = horizontal_distance * f64::from(0.2f32);
 
         spit.thrown.set_velocity(dx, dy + yo, dz, 1.5, 10.0);
 
         if !entity.silent.load(Ordering::Relaxed) {
-            world.play_sound(Sound::EntityLlamaSpit, SoundCategory::Neutral, &mob_pos);
+            let mut rng = rand::rng();
+            let pitch = 1.0 + (rng.random::<f32>() - rng.random::<f32>()) * 0.2;
+            world.play_sound_fine(
+                Sound::EntityLlamaSpit,
+                SoundCategory::Neutral,
+                &mob_pos,
+                1.0,
+                pitch,
+            );
         }
 
         let spit_arc: Arc<dyn EntityBase> = Arc::new(spit);
         world.spawn_entity(spit_arc);
+        self.did_spit.store(true, Ordering::Relaxed);
     }
 }
 
@@ -497,5 +528,83 @@ impl AbstractHorse for TraderLlamaEntity {
 
     fn can_perform_rearing(&self) -> bool {
         false
+    }
+}
+
+/// Vanilla `TraderLlama.TraderLlamaDefendWanderingTraderGoal`: a trader llama on its trader's
+/// leash goes for whatever last hurt the trader.
+struct DefendWanderingTraderGoal {
+    track_target_goal: crate::entity::ai::goal::track_target::TrackTargetGoal,
+    target_predicate: crate::entity::ai::target_predicate::TargetPredicate,
+    owner_last_hurt_by: Option<Arc<dyn EntityBase>>,
+    timestamp: i32,
+}
+
+impl DefendWanderingTraderGoal {
+    fn new() -> Self {
+        Self {
+            track_target_goal: crate::entity::ai::goal::track_target::TrackTargetGoal::with_default(
+                false,
+            ),
+            target_predicate:
+                crate::entity::ai::target_predicate::TargetPredicate::create_attackable(),
+            owner_last_hurt_by: None,
+            timestamp: 0,
+        }
+    }
+
+    /// The wandering trader holding the llama's leash.
+    fn leash_trader(mob: &dyn Mob) -> Option<Arc<dyn EntityBase>> {
+        mob.get_entity()
+            .leashed_to
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+            .filter(|holder| holder.get_entity().entity_type == &EntityType::WANDERING_TRADER)
+    }
+}
+
+impl crate::entity::ai::goal::Goal for DefendWanderingTraderGoal {
+    fn can_start(&mut self, mob: &dyn Mob) -> bool {
+        let Some(owner) = Self::leash_trader(mob) else {
+            return false;
+        };
+        let Some(owner_living) = owner.get_living_entity() else {
+            return false;
+        };
+        let world = mob.get_entity().world.load();
+        self.owner_last_hurt_by = match owner_living.last_attacker_id.load(Ordering::Relaxed) {
+            0 => None,
+            id => world.get_entity_by_id(id),
+        };
+        let timestamp = owner_living.last_attacked_time.load(Ordering::Relaxed);
+        timestamp != self.timestamp
+            && self.track_target_goal.can_track(
+                mob,
+                self.owner_last_hurt_by.as_deref(),
+                &self.target_predicate,
+            )
+    }
+
+    fn should_continue(&mut self, mob: &dyn Mob) -> bool {
+        self.track_target_goal.should_continue(mob)
+    }
+
+    fn start(&mut self, mob: &dyn Mob) {
+        mob.set_mob_target(self.owner_last_hurt_by.clone());
+        if let Some(owner) = Self::leash_trader(mob)
+            && let Some(owner_living) = owner.get_living_entity()
+        {
+            self.timestamp = owner_living.last_attacked_time.load(Ordering::Relaxed);
+        }
+        self.track_target_goal.start(mob);
+    }
+
+    fn stop(&mut self, mob: &dyn Mob) {
+        self.track_target_goal.stop(mob);
+    }
+
+    fn controls(&self) -> crate::entity::ai::goal::Controls {
+        crate::entity::ai::goal::Controls::TARGET
     }
 }

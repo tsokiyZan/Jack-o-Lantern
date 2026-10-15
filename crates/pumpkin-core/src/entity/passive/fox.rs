@@ -296,7 +296,7 @@ impl FoxEntity {
                 Box::new(
                     AvoidEntityGoal::new(&EntityType::WOLF, 8.0, 1.6, 1.4).avoiding_only(
                         move |target| {
-                            !is_tame(target)
+                            !crate::entity::mob::is_tame(target)
                                 && wolf_fox.upgrade().is_some_and(|fox| !fox.is_defending())
                         },
                     ),
@@ -731,16 +731,6 @@ fn is_sleeping(entity: &dyn EntityBase) -> bool {
         || entity.get_mob().is_some_and(Mob::is_sleeping),
         |player| player.sleeping_since.load().is_some(),
     )
-}
-
-/// Vanilla `TamableAnimal.isTame` for an avoid-goal candidate.
-fn is_tame(target: &LivingEntity) -> bool {
-    target
-        .entity
-        .world
-        .load()
-        .get_entity_by_id(target.entity.entity_id)
-        .is_some_and(|entity| entity.get_mob().is_some_and(Mob::is_tamed))
 }
 
 /// Vanilla `FoxMeleeAttackGoal.checkAndPerformAttack`: a bite, without a swing.
