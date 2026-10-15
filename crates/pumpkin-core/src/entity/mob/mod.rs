@@ -1568,6 +1568,10 @@ pub trait Mob: EntityBase + Send + Sync {
         true
     }
 
+    /// Vanilla `Entity.updateSwimming`, run right after the fluid update. Only the
+    /// drowned's override is ported for mobs.
+    fn update_swimming(&self) {}
+
     /// Builds this mob's brain from its saved memories; goal mobs keep the brain-dead default.
     fn make_brain(&self, _packed: &PackedMemories) -> Brain {
         Brain::default()
@@ -2187,4 +2191,9 @@ pub trait PathAwareEntity: Mob + Send + Sync {
 
 pub trait RangedAttackMob: Mob + Send + Sync {
     fn perform_ranged_attack(&self, target: &Arc<dyn EntityBase>, power: f32);
+
+    /// Vanilla `RangedAttackMob.rangedAttackUncertainty`.
+    fn ranged_attack_uncertainty(&self, world: &World) -> f32 {
+        (14 - world.level_info.load().difficulty as i32 * 4) as f32
+    }
 }

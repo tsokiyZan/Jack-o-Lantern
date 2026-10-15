@@ -4455,6 +4455,9 @@ impl EntityBase for Entity {
         self.was_eye_in_water
             .store(self.eye_in_water.load(Ordering::Relaxed), Ordering::Relaxed);
         self.update_fluid_state(caller);
+        if let Some(mob) = caller.get_mob() {
+            mob.update_swimming();
+        }
         self.check_out_of_world(caller);
         let fire_ticks = self.fire_ticks.load(Ordering::Relaxed);
 

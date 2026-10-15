@@ -60,8 +60,8 @@ impl ZombieEntityBase {
         )
     }
 
-    /// Vanilla `Zombie.registerGoals`, with `add_behaviour_goals` standing in for the
-    /// `addBehaviourGoals` that drowned and zombified piglins override.
+    /// Vanilla `Zombie.registerGoals`, with `add_behaviour_goals` standing in for
+    /// `addBehaviourGoals`. The drowned adds its own once it exists.
     pub fn with_behaviour_goals(
         entity: Entity,
         can_break_doors: bool,
