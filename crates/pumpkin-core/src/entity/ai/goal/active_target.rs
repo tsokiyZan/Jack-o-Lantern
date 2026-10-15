@@ -174,6 +174,13 @@ impl ActiveTargetGoal {
         self.target = target;
     }
 
+    /// Vanilla `NearestAttackableTargetGoal.findTarget`, for subclasses that skip the random
+    /// interval; returns whether a target was found.
+    pub fn find_target(&mut self, mob: &dyn Mob) -> bool {
+        self.find_closest_target(mob);
+        self.target.is_some()
+    }
+
     fn find_closest_target(&mut self, mob: &dyn Mob) {
         let mob_entity = mob.get_mob_entity();
         let entity = &mob_entity.living_entity.entity;

@@ -1,4 +1,6 @@
+use crate::entity::ai::goal::{Controls, Goal, to_goal_ticks};
 use crate::entity::mob::raider::{add_raider_goals, is_raider};
+use rand::RngExt;
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 use std::sync::{Arc, Weak};
 
@@ -55,6 +57,10 @@ pub struct WitchEntity {
     pub raider_data: RaiderData,
     drinking_potion: AtomicBool,
     using_time: AtomicI32,
+    /// Vanilla `NearestHealableRaiderTargetGoal.cooldown`, which `aiStep` counts down.
+    heal_raiders_cooldown: AtomicI32,
+    /// Vanilla `NearestAttackableWitchTargetGoal.canAttack`.
+    can_attack_players: AtomicBool,
 }
 
 impl WitchEntity {
@@ -63,6 +69,8 @@ impl WitchEntity {
         let mob_entity = MobEntity::new(entity);
         let witch = Self {
             mob_entity,
+            heal_raiders_cooldown: AtomicI32::new(0),
+            can_attack_players: AtomicBool::new(true),
             raider_data: RaiderData::default(),
             drinking_potion: AtomicBool::new(false),
             using_time: AtomicI32::new(0),
@@ -104,11 +112,29 @@ impl WitchEntity {
 
             // `HurtByTargetGoal(this, Raider.class)`, without alerting others.
             target_selector.add_goal(1, Box::new(RevengeGoal::new(true).ignoring(is_raider)));
-            // TODO: 2 NearestHealableRaiderTargetGoal; 3 is NearestAttackableWitchTargetGoal,
-            // which only targets players while the witch may (outside a raid).
+            target_selector.add_goal(
+                2,
+                Box::new(NearestHealableRaiderTargetGoal {
+                    inner: ActiveTargetGoal::predicated(
+                        &mob_arc.mob_entity,
+                        500,
+                        true,
+                        |target, _world| {
+                            is_raider(target.entity.entity_type)
+                                && target.entity.entity_type != &EntityType::WITCH
+                        },
+                    ),
+                }),
+            );
             target_selector.add_goal(
                 3,
-                ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::PLAYER, true),
+                Box::new(NearestAttackableWitchTargetGoal {
+                    inner: ActiveTargetGoal::with_default(
+                        &mob_arc.mob_entity,
+                        &EntityType::PLAYER,
+                        true,
+                    ),
+                }),
             );
         };
 
@@ -142,21 +168,29 @@ impl WitchEntity {
         let witch_pos = entity.pos.load();
 
         let xd = target_pos.x + target_vel.x - witch_pos.x;
-        let yd = target_pos.y + target_entity.get_eye_height() - 1.1 - witch_pos.y;
+        let yd = target_pos.y + target_entity.get_eye_height() - f64::from(1.1f32) - witch_pos.y;
         let zd = target_pos.z + target_vel.z - witch_pos.z;
         let dist = xd.hypot(zd);
 
         let mut potion = &Potion::HARMING;
 
         if let Some(target_living) = target.get_living_entity() {
-            let r: f32 = rand::random();
-            if dist >= 8.0 && !target_living.has_effect(&StatusEffect::SLOWNESS) {
+            if is_raider(target_entity.entity_type) {
+                potion = if target_living.health.load() <= 4.0 {
+                    &Potion::HEALING
+                } else {
+                    &Potion::REGENERATION
+                };
+                self.mob_entity.set_target(None);
+            } else if dist >= 8.0 && !target_living.has_effect(&StatusEffect::SLOWNESS) {
                 potion = &Potion::SLOWNESS;
             } else if target_living.health.load() >= 8.0
                 && !target_living.has_effect(&StatusEffect::POISON)
             {
                 potion = &Potion::POISON;
-            } else if dist <= 3.0 && !target_living.has_effect(&StatusEffect::WEAKNESS) && r < 0.25
+            } else if dist <= 3.0
+                && !target_living.has_effect(&StatusEffect::WEAKNESS)
+                && rand::random::<f32>() < 0.25
             {
                 potion = &Potion::WEAKNESS;
             }
@@ -221,6 +255,10 @@ impl Mob for WitchEntity {
     }
 
     fn mob_tick(&self, caller: &dyn EntityBase) {
+        // Vanilla `Witch.aiStep`: players are fair game once the heal cooldown runs out.
+        let cooldown = self.heal_raiders_cooldown.fetch_sub(1, Ordering::Relaxed) - 1;
+        self.can_attack_players
+            .store(cooldown <= 0, Ordering::Relaxed);
         let entity = &self.mob_entity.living_entity.entity;
         let living = &self.mob_entity.living_entity;
         let world = entity.world.load();
@@ -327,5 +365,78 @@ impl Raider for WitchEntity {
 
     fn get_celebrate_sound(&self) -> Sound {
         Sound::EntityWitchCelebrate
+    }
+}
+
+fn as_witch(mob: &dyn Mob) -> Option<&WitchEntity> {
+    mob.cast_any().downcast_ref::<WitchEntity>()
+}
+
+/// Vanilla `NearestHealableRaiderTargetGoal`: in a raid, targets a hurt raider to throw a
+/// healing potion at, then waits 200 ticks.
+struct NearestHealableRaiderTargetGoal {
+    inner: Box<ActiveTargetGoal>,
+}
+
+impl Goal for NearestHealableRaiderTargetGoal {
+    fn can_start(&mut self, mob: &dyn Mob) -> bool {
+        let Some(witch) = as_witch(mob) else {
+            return false;
+        };
+        if witch.heal_raiders_cooldown.load(Ordering::Relaxed) > 0
+            || !mob.get_random().random::<bool>()
+        {
+            return false;
+        }
+        witch.has_active_raid() && self.inner.find_target(mob)
+    }
+
+    fn should_continue(&mut self, mob: &dyn Mob) -> bool {
+        self.inner.should_continue(mob)
+    }
+
+    fn start(&mut self, mob: &dyn Mob) {
+        if let Some(witch) = as_witch(mob) {
+            witch
+                .heal_raiders_cooldown
+                .store(to_goal_ticks(200), Ordering::Relaxed);
+        }
+        self.inner.start(mob);
+    }
+
+    fn stop(&mut self, mob: &dyn Mob) {
+        self.inner.stop(mob);
+    }
+
+    fn controls(&self) -> Controls {
+        self.inner.controls()
+    }
+}
+
+/// Vanilla `NearestAttackableWitchTargetGoal`: a player target the witch drops while healing.
+struct NearestAttackableWitchTargetGoal {
+    inner: Box<ActiveTargetGoal>,
+}
+
+impl Goal for NearestAttackableWitchTargetGoal {
+    fn can_start(&mut self, mob: &dyn Mob) -> bool {
+        as_witch(mob).is_some_and(|witch| witch.can_attack_players.load(Ordering::Relaxed))
+            && self.inner.can_start(mob)
+    }
+
+    fn should_continue(&mut self, mob: &dyn Mob) -> bool {
+        self.inner.should_continue(mob)
+    }
+
+    fn start(&mut self, mob: &dyn Mob) {
+        self.inner.start(mob);
+    }
+
+    fn stop(&mut self, mob: &dyn Mob) {
+        self.inner.stop(mob);
+    }
+
+    fn controls(&self) -> Controls {
+        self.inner.controls()
     }
 }
