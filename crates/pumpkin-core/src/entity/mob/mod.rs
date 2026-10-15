@@ -2270,7 +2270,6 @@ impl<T: Mob + Send + 'static> EntityBase for T {
         // Armadillo scute drop, state switching, `danger_detected_recently_ticks`
         // (not `in_state_ticks`, that is vanilla `tick`)
         // ZombifiedPiglin `maybe_alert_others`
-        // Piglin timers, `tick_sensors`, admiring, dancing (conversion already checks NoAI)
         // ZombifiedPiglin `update_persistent_anger` (see `updates_anger_in_ai_step`).
         mob_entity.living_entity.tick(caller, server);
         self.post_tick();
