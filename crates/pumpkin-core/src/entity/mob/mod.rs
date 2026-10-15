@@ -2284,7 +2284,6 @@ impl<T: Mob + Send + 'static> EntityBase for T {
         // (not `in_state_ticks`, that is vanilla `tick`)
         // Wither `tick_wither` invulnerable countdown, healing, boss bar, head attacks
         // (not the movement towards the target, that is vanilla `aiStep`)
-        // ZombifiedPiglin `maybe_alert_others`
         // Piglin timers, `tick_sensors`, admiring, dancing (conversion already checks NoAI)
         // Bee and ZombifiedPiglin `update_persistent_anger` (Enderman, Wolf, IronGolem and
         // PolarBear run it outside the AI step, so the shared call stays for them).
