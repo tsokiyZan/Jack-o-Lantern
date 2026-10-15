@@ -1,4 +1,6 @@
-# Pumpkin, tsokiyZan's fork
+# Jack o'Lantern
+
+Jack o'Lantern is tsokiyZan's fork of Pumpkin, a Minecraft server written in Rust.
 
 > [!WARNING]
 > This is a personal fork of [Pumpkin](https://github.com/Pumpkin-MC/Pumpkin), pushed toward
