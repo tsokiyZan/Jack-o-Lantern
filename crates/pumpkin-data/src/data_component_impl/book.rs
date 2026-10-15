@@ -1,4 +1,4 @@
-use crate::data_component_impl::DataComponentImpl;
+use crate::data_component_impl::{DataComponentImpl, get_map_hash, get_str_hash, namespaced};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_nbt::tag::NbtTag;
 use pumpkin_util::text::TextComponent;
@@ -110,14 +110,40 @@ impl DataComponentImpl for WrittenBookContentImpl {
     default_impl!(WrittenBookContent);
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct DebugStickStateImpl;
+/// `minecraft:debug_stick_state`: the property a debug stick edits on each block.
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Default)]
+pub struct DebugStickStateImpl {
+    /// `(block id, property name)` pairs.
+    pub properties: Vec<(String, String)>,
+}
 impl DebugStickStateImpl {
-    pub const fn read_data(_data: &NbtTag) -> Option<Self> {
-        Some(Self)
+    pub fn read_data(data: &NbtTag) -> Option<Self> {
+        let properties = data
+            .extract_compound()?
+            .child_tags
+            .iter()
+            .map(|(block, property)| {
+                Some((block.to_string(), property.extract_string()?.to_string()))
+            })
+            .collect::<Option<Vec<_>>>()?;
+        Some(Self { properties })
     }
 }
 impl DataComponentImpl for DebugStickStateImpl {
+    fn write_data(&self) -> NbtTag {
+        let mut compound = NbtCompound::new();
+        for (block, property) in &self.properties {
+            compound.put_string(block, property.clone());
+        }
+        NbtTag::Compound(compound)
+    }
+    fn get_hash(&self) -> i32 {
+        get_map_hash(
+            self.properties.iter().map(|(block, property)| {
+                (get_str_hash(&namespaced(block)), get_str_hash(property))
+            }),
+        ) as i32
+    }
     default_impl!(DebugStickState);
 }
 

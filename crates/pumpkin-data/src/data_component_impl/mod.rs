@@ -731,6 +731,31 @@ pub enum Holder<R, D> {
     Direct(D),
 }
 
+/// The id a client gives `name` in a synced registry, which is its position in
+/// the registry data Pumpkin sends during configuration.
+#[must_use]
+pub fn synced_registry_id(registry: &str, name: &str) -> Option<u32> {
+    let name = name.strip_prefix("minecraft:").unwrap_or(name);
+    crate::registry::REGISTRY_V_26_3
+        .iter()
+        .find(|reg| reg.registry_id == registry)?
+        .entries
+        .iter()
+        .position(|entry| entry.name == name)
+        .and_then(|id| u32::try_from(id).ok())
+}
+
+/// The entry name at `id` in a synced registry, see `synced_registry_id`.
+#[must_use]
+pub fn synced_registry_entry(registry: &str, id: u32) -> Option<&'static str> {
+    crate::registry::REGISTRY_V_26_3
+        .iter()
+        .find(|reg| reg.registry_id == registry)?
+        .entries
+        .get(usize::try_from(id).ok()?)
+        .map(|entry| entry.name)
+}
+
 /// Hash of a text component as `ComponentSerialization.CODEC` encodes it.
 /// Text component NBT only uses bytes for boolean style fields, which the
 /// codec writes as booleans.
@@ -756,6 +781,80 @@ pub fn get_text_hash(text: &TextComponent) -> u32 {
 #[must_use]
 pub fn text_to_nbt(text: &TextComponent) -> NbtTag {
     text.to_nbt_tag_for_version(&JavaMinecraftVersion::V_26_3)
+}
+
+/// Reads an `ItemStackTemplate.CODEC` value: an item id, or `{id, count, components}`
+/// where `count` defaults to 1.
+#[must_use]
+pub fn read_item_stack_template(tag: &NbtTag) -> Option<crate::item_stack::ItemStack> {
+    match tag {
+        NbtTag::String(id) => {
+            let item =
+                crate::item::Item::from_registry_key(id.strip_prefix("minecraft:").unwrap_or(id))?;
+            Some(crate::item_stack::ItemStack::new(1, item))
+        }
+        NbtTag::Compound(compound) => {
+            if compound.has("count") {
+                crate::item_stack::ItemStack::read_item_stack(compound)
+            } else {
+                let mut compound = compound.clone();
+                compound.put_int("count", 1);
+                crate::item_stack::ItemStack::read_item_stack(&compound)
+            }
+        }
+        _ => None,
+    }
+}
+
+/// Writes an `ItemStackTemplate.CODEC` value, leaving out a count of 1 and an
+/// empty component patch like vanilla's optional fields do.
+#[must_use]
+pub fn write_item_stack_template(stack: &crate::item_stack::ItemStack) -> NbtTag {
+    let mut compound = NbtCompound::new();
+    stack.write_item_stack(&mut compound);
+    if compound.get_int("count") == Some(1) {
+        compound.child_tags.remove("count");
+    }
+    if compound
+        .get_compound("components")
+        .is_some_and(|components| components.child_tags.is_empty())
+    {
+        compound.child_tags.remove("components");
+    }
+    NbtTag::Compound(compound)
+}
+
+/// Hash of an `ItemStackTemplate.CODEC` value.
+#[must_use]
+pub fn get_item_stack_template_hash(stack: &crate::item_stack::ItemStack) -> u32 {
+    let mut fields = MapHash::new().field("id", get_str_hash(&namespaced(stack.item.registry_key)));
+    if stack.item_count != 1 {
+        fields = fields.field("count", get_i32_hash(i32::from(stack.item_count)));
+    }
+    let components: Vec<(u32, u32)> = stack
+        .patch
+        .iter()
+        .map(|(id, data)| match data {
+            Some(data) => (get_str_hash(id.to_name()), data.get_hash() as u32),
+            None => (
+                get_str_hash(&format!("!{}", id.to_name())),
+                get_map_hash([]),
+            ),
+        })
+        .collect();
+    if !components.is_empty() {
+        fields = fields.field("components", get_map_hash(components));
+    }
+    fields.finish()
+}
+
+/// Whether two item stack templates hold the same item, count and components.
+#[must_use]
+pub fn item_stack_template_eq(
+    a: &crate::item_stack::ItemStack,
+    b: &crate::item_stack::ItemStack,
+) -> bool {
+    a.item_count == b.item_count && a.are_items_and_components_equal(b)
 }
 
 pub mod basic;
@@ -930,6 +1029,16 @@ pub fn read_data(id: DataComponent, data: &NbtTag) -> Option<Box<dyn DataCompone
         DataComponent::CookingFuel => Some(CookingFuelImpl::read_data(data)?.to_dyn()),
         DataComponent::Compostable => Some(CompostableImpl::read_data(data)?.to_dyn()),
         DataComponent::Waxed => Some(WaxedImpl::read_data(data)?.to_dyn()),
+        DataComponent::InteractAnimation => Some(InteractAnimationImpl::read_data(data)?.to_dyn()),
+        DataComponent::BlockTransformer => Some(BlockTransformerImpl::read_data(data)?.to_dyn()),
+        DataComponent::VillagerFood => Some(VillagerFoodImpl::read_data(data)?.to_dyn()),
+        DataComponent::MobVisibility => Some(MobVisibilityImpl::read_data(data)?.to_dyn()),
+        DataComponent::ProvidesPotteryPattern => {
+            Some(ProvidesPotteryPatternImpl::read_data(data)?.to_dyn())
+        }
+        DataComponent::SignTextFront => Some(SignTextFrontImpl::read_data(data)?.to_dyn()),
+        DataComponent::SignTextBack => Some(SignTextBackImpl::read_data(data)?.to_dyn()),
+        DataComponent::CushionColor => Some(CushionColorImpl::read_data(data)?.to_dyn()),
         _ => None,
     }
 }
@@ -965,6 +1074,14 @@ mod tests {
             PotionDurationScaleImpl { scale: 0.5 }.get_hash(),
             -1_631_070_359
         );
+        assert_eq!(
+            EnchantmentGlintOverrideImpl { has_glint: true }.get_hash(),
+            -1_019_818_302
+        );
+        assert_eq!(
+            EnchantmentGlintOverrideImpl { has_glint: false }.get_hash(),
+            828_198_337
+        );
         // `Unit.CODEC` encodes an empty map.
         assert_eq!(UnbreakableImpl.get_hash(), -982_207_288);
         assert_eq!(GliderImpl.get_hash(), -982_207_288);
@@ -976,7 +1093,73 @@ mod tests {
         nbt.put_int("Age", 5);
         nbt.put_float("Health", 10.0);
         nbt.put_string("Name", "é".to_string());
+        assert_eq!(
+            BucketEntityDataImpl {
+                nbt: Some(nbt.clone())
+            }
+            .get_hash(),
+            -1_842_861_489
+        );
         assert_eq!(CustomDataImpl { data: nbt }.get_hash(), -1_842_861_489);
+    }
+
+    #[test]
+    fn hash_records_omit_default_fields() {
+        assert_eq!(
+            UseEffectsImpl {
+                can_sprint: true,
+                interact_vibrations: false,
+                speed_multiplier: 0.5,
+            }
+            .get_hash(),
+            1_668_803_792
+        );
+        assert_eq!(UseEffectsImpl::DEFAULT.get_hash(), -982_207_288);
+        assert_eq!(TooltipDisplayImpl::DEFAULT.get_hash(), -982_207_288);
+        assert_eq!(
+            TooltipDisplayImpl {
+                hide_tooltip: true,
+                hidden_components: vec![DataComponent::CustomName, DataComponent::Lore],
+            }
+            .get_hash(),
+            -1_090_191_763
+        );
+        assert_eq!(SwingAnimationImpl::DEFAULT.get_hash(), -982_207_288);
+        assert_eq!(
+            InteractAnimationImpl(SwingAnimationImpl {
+                animation_type: SwingAnimationType::Stab,
+                duration: 10,
+            })
+            .get_hash(),
+            -2_140_542_379
+        );
+    }
+
+    #[test]
+    fn hash_registry_values() {
+        assert_eq!(
+            DyeImpl {
+                color: crate::dye_color::DyeColor::Red
+            }
+            .get_hash(),
+            -1_939_582_294
+        );
+        assert_eq!(VillagerFoodImpl { nutrition: 4 }.get_hash(), -964_794_316);
+        assert_eq!(
+            MobVisibilityImpl {
+                targeting_entity_types: IDSet::IDs(Cow::Borrowed(&[&EntityType::ZOMBIE])),
+                visibility: 0.5,
+            }
+            .get_hash(),
+            -407_642_323
+        );
+        assert_eq!(
+            RecipesImpl {
+                recipes: vec!["minecraft:stick".to_string()]
+            }
+            .get_hash(),
+            -533_729_841
+        );
     }
 
     fn custom_horn_sound() -> IdOr<SoundEvent> {
@@ -1032,24 +1215,31 @@ mod tests {
     }
 
     #[test]
-    fn holders_round_trip_through_nbt() {
-        assert_round_trip(
-            InstrumentImpl {
-                instrument: Holder::Reference(crate::instrument::Instrument::SeekGoatHorn),
-            },
-            InstrumentImpl::read_data,
+    fn hash_resolvable_numbers() {
+        assert_eq!(
+            CompostableImpl {
+                layers: IntProvider::Id(Cow::Borrowed("minecraft:compostable/low")),
+            }
+            .get_hash(),
+            2_075_224_535
         );
-        assert_round_trip(
-            JukeboxPlayableImpl {
-                song: Holder::Reference(crate::jukebox_song::JukeboxSong::Pigstep),
-            },
-            JukeboxPlayableImpl::read_data,
+        assert_eq!(
+            BrewingFuelImpl {
+                uses: IntProvider::Inline(3),
+                speed_multiplier: FloatProvider::Inline(1.5),
+            }
+            .get_hash(),
+            1_256_775_528
         );
-        assert_round_trip(
-            ProvidesBannerPatternsImpl {
-                patterns: IDSet::Tag(Cow::Borrowed("pattern_item/flower")),
-            },
-            ProvidesBannerPatternsImpl::read_data,
+        assert_eq!(
+            CookingFuelImpl {
+                burn_time: IntProvider::Inline(1600),
+                speed_multiplier: FloatProvider::Id(Cow::Borrowed(
+                    "minecraft:cooking/speed_default"
+                )),
+            }
+            .get_hash(),
+            1_144_219_266
         );
     }
 
@@ -1155,6 +1345,193 @@ mod tests {
         assert!(!effect.ambient);
         // `show_icon` falls back to `show_particles`.
         assert!(!effect.show_icon);
+    }
+
+    #[test]
+    fn hash_bees_and_templates() {
+        let mut entity = NbtCompound::new();
+        entity.put_int("Age", 5);
+        entity.put_float("Health", 10.0);
+        entity.put_string("Name", "é".to_string());
+        entity.put_string("id", "minecraft:bee".to_string());
+        assert_eq!(
+            BeesImpl {
+                bees: vec![BeeOccupant {
+                    entity_data: entity,
+                    ticks_in_hive: 100,
+                    min_ticks_in_hive: 600,
+                }],
+            }
+            .get_hash(),
+            1_269_290_279
+        );
+        assert_eq!(
+            PotDecorationsImpl {
+                back: Some(crate::item_stack::ItemStack::new(
+                    1,
+                    &crate::item::Item::BRICK
+                )),
+                front: Some(crate::item_stack::ItemStack::new(
+                    2,
+                    &crate::item::Item::ARCHER_POTTERY_SHERD
+                )),
+                ..Default::default()
+            }
+            .get_hash(),
+            -118_313_068
+        );
+        assert_eq!(
+            SulfurCubeContentImpl {
+                absorbed_block: crate::item_stack::ItemStack::new(3, &crate::item::Item::STONE),
+            }
+            .get_hash(),
+            -1_751_786_989
+        );
+    }
+
+    #[test]
+    fn hash_sign_text_and_map_decorations() {
+        let empty = || TextComponent::text("");
+        assert_eq!(
+            SignTextFrontImpl(SignText {
+                messages: [TextComponent::text("Hi"), empty(), empty(), empty()],
+                filtered_messages: None,
+                color: crate::dye_color::DyeColor::Red,
+                has_glowing_text: true,
+            })
+            .get_hash(),
+            -1_435_795_150
+        );
+        assert_eq!(
+            MapDecorationsImpl {
+                decorations: vec![(
+                    "+".to_string(),
+                    MapDecorationEntry {
+                        r#type: "minecraft:target_point".to_string(),
+                        x: 12.5,
+                        z: -3.0,
+                        rotation: 180.0,
+                    },
+                )],
+            }
+            .get_hash(),
+            1_654_822_948
+        );
+    }
+
+    #[test]
+    fn hash_consume_effect_components() {
+        let regeneration = StatusEffectInstance {
+            effect_id: Cow::Borrowed("minecraft:regeneration"),
+            amplifier: 1,
+            duration: 900,
+            ambient: false,
+            show_particles: true,
+            show_icon: true,
+            hidden_effect: None,
+        };
+        assert_eq!(
+            DeathProtectionImpl {
+                death_effects: Cow::Owned(vec![
+                    ConsumeEffect::ClearAllEffects,
+                    ConsumeEffect::ApplyEffects((Cow::Owned(vec![regeneration]), 1.0)),
+                ]),
+            }
+            .get_hash(),
+            -1_943_729_730
+        );
+        assert_eq!(
+            DeathProtectionImpl {
+                death_effects: Cow::Owned(vec![ConsumeEffect::TeleportRandomly {
+                    diameter: 16.0,
+                    directional_particles: false,
+                }]),
+            }
+            .get_hash(),
+            -2_127_496_444
+        );
+        assert_eq!(
+            BlocksAttacksImpl {
+                block_delay_seconds: 0.25,
+                disable_cooldown_scale: 1.0,
+                damage_reductions: Cow::Borrowed(BlocksAttacksImpl::DEFAULT_DAMAGE_REDUCTIONS),
+                item_damage: ItemDamageFunction {
+                    threshold: 3.0,
+                    base: 1.0,
+                    factor: 1.0,
+                },
+                bypassed_by: None,
+                block_sound: Some(IdOr::Id(Sound::ItemShieldBlock)),
+                disabled_sound: None,
+            }
+            .get_hash(),
+            -1_772_717_597
+        );
+    }
+
+    #[test]
+    fn holders_round_trip_through_nbt() {
+        assert_round_trip(
+            InstrumentImpl {
+                instrument: Holder::Reference(crate::instrument::Instrument::SeekGoatHorn),
+            },
+            InstrumentImpl::read_data,
+        );
+        assert_round_trip(
+            JukeboxPlayableImpl {
+                song: Holder::Reference(crate::jukebox_song::JukeboxSong::Pigstep),
+            },
+            JukeboxPlayableImpl::read_data,
+        );
+        assert_round_trip(
+            ProvidesBannerPatternsImpl {
+                patterns: IDSet::Tag(Cow::Borrowed("pattern_item/flower")),
+            },
+            ProvidesBannerPatternsImpl::read_data,
+        );
+    }
+
+    #[test]
+    fn components_round_trip_through_nbt() {
+        assert_round_trip(
+            SignTextBackImpl(SignText {
+                messages: std::array::from_fn(|i| TextComponent::text(format!("line {i}"))),
+                filtered_messages: Some(std::array::from_fn(|_| TextComponent::text("***"))),
+                color: crate::dye_color::DyeColor::Cyan,
+                has_glowing_text: false,
+            }),
+            SignTextBackImpl::read_data,
+        );
+        assert_round_trip(
+            DebugStickStateImpl {
+                properties: vec![("minecraft:oak_stairs".to_string(), "facing".to_string())],
+            },
+            DebugStickStateImpl::read_data,
+        );
+        assert_round_trip(
+            BlockTransformerImpl {
+                transformer: Cow::Borrowed("minecraft:axe"),
+            },
+            BlockTransformerImpl::read_data,
+        );
+    }
+
+    #[test]
+    fn hash_fireworks() {
+        assert_eq!(
+            FireworksImpl {
+                flight_duration: 2,
+                explosions: vec![FireworkExplosionImpl {
+                    shape: FireworkExplosionShape::Star,
+                    colors: vec![0xFF0000],
+                    fade_colors: Vec::new(),
+                    has_trail: true,
+                    has_twinkle: false,
+                }],
+            }
+            .get_hash(),
+            1_870_020_809
+        );
     }
 
     fn assert_round_trip<T: DataComponentImpl + Clone + 'static>(
@@ -1316,7 +1693,13 @@ mod tests {
             IntangibleProjectileImpl,
             IntangibleProjectileImpl::read_data,
         );
-        assert_round_trip(BrewingFuelImpl, BrewingFuelImpl::read_data);
+        assert_round_trip(
+            BrewingFuelImpl {
+                uses: IntProvider::Id(Cow::Borrowed("minecraft:brewing/uses_default")),
+                speed_multiplier: FloatProvider::Inline(2.0),
+            },
+            BrewingFuelImpl::read_data,
+        );
         assert_round_trip(WaxedImpl, WaxedImpl::read_data);
         assert_round_trip(
             CookingFuelImpl {

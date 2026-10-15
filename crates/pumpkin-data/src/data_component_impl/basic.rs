@@ -1,10 +1,14 @@
 use crate::banner_pattern::BannerPattern;
+use crate::data_component::DataComponent;
 use crate::data_component_impl::{
-    DataComponentImpl, Holder, IDSet, IDSetContent, IdOr, MapHash, get_compound_hash, get_f32_hash,
-    get_i32_hash, get_idor, get_idor_hash, get_idset_hash, get_map_hash, get_str_hash,
-    get_text_hash, namespaced, put_idor, text_to_nbt,
+    DataComponentImpl, Holder, IDSet, IDSetContent, IdOr, MapHash, get_bool_hash,
+    get_compound_hash, get_f32_hash, get_i32_hash, get_idor, get_idor_hash, get_idset_hash,
+    get_item_stack_template_hash, get_list_hash, get_map_hash, get_str_hash, get_text_hash,
+    item_stack_template_eq, namespaced, put_idor, read_item_stack_template, text_to_nbt,
+    write_item_stack_template,
 };
 use crate::instrument::Instrument;
+use crate::item_stack::ItemStack;
 use crate::sound::Sound;
 use crate::trim_material::TrimMaterial;
 use pumpkin_nbt::compound::NbtCompound;
@@ -358,14 +362,71 @@ impl DataComponentImpl for CustomModelDataImpl {
     default_impl!(CustomModelData);
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct TooltipDisplayImpl;
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Default)]
+pub struct TooltipDisplayImpl {
+    pub hide_tooltip: bool,
+    pub hidden_components: Vec<DataComponent>,
+}
 impl TooltipDisplayImpl {
-    pub const fn read_data(_data: &NbtTag) -> Option<Self> {
-        Some(Self)
+    pub const DEFAULT: Self = Self {
+        hide_tooltip: false,
+        hidden_components: Vec::new(),
+    };
+
+    pub fn read_data(data: &NbtTag) -> Option<Self> {
+        let compound = data.extract_compound()?;
+        let hide_tooltip = match compound.get("hide_tooltip") {
+            Some(tag) => tag.extract_bool()?,
+            None => false,
+        };
+        let hidden_components = match compound.get_list("hidden_components") {
+            Some(list) => list
+                .iter()
+                .map(|tag| DataComponent::try_from_name(&namespaced(tag.extract_string()?)))
+                .collect::<Option<Vec<_>>>()?,
+            None => Vec::new(),
+        };
+        Some(Self {
+            hide_tooltip,
+            hidden_components,
+        })
     }
 }
 impl DataComponentImpl for TooltipDisplayImpl {
+    fn write_data(&self) -> NbtTag {
+        let mut compound = NbtCompound::new();
+        if self.hide_tooltip {
+            compound.put_bool("hide_tooltip", true);
+        }
+        if !self.hidden_components.is_empty() {
+            compound.put_list(
+                "hidden_components",
+                self.hidden_components
+                    .iter()
+                    .map(|id| NbtTag::String(id.to_name().into()))
+                    .collect(),
+            );
+        }
+        NbtTag::Compound(compound)
+    }
+    fn get_hash(&self) -> i32 {
+        MapHash::new()
+            .optional_field(
+                "hide_tooltip",
+                self.hide_tooltip.then(|| get_bool_hash(true)),
+            )
+            .optional_field(
+                "hidden_components",
+                (!self.hidden_components.is_empty()).then(|| {
+                    get_list_hash(
+                        self.hidden_components
+                            .iter()
+                            .map(|id| get_str_hash(id.to_name())),
+                    )
+                }),
+            )
+            .finish() as i32
+    }
     default_impl!(TooltipDisplay);
 }
 
@@ -381,13 +442,21 @@ impl DataComponentImpl for CreativeSlotLockImpl {
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct EnchantmentGlintOverrideImpl;
+pub struct EnchantmentGlintOverrideImpl {
+    pub has_glint: bool,
+}
 impl EnchantmentGlintOverrideImpl {
-    pub const fn read_data(_data: &NbtTag) -> Option<Self> {
-        Some(Self)
+    pub fn read_data(data: &NbtTag) -> Option<Self> {
+        data.extract_bool().map(|has_glint| Self { has_glint })
     }
 }
 impl DataComponentImpl for EnchantmentGlintOverrideImpl {
+    fn write_data(&self) -> NbtTag {
+        NbtTag::Byte(i8::from(self.has_glint))
+    }
+    fn get_hash(&self) -> i32 {
+        get_bool_hash(self.has_glint) as i32
+    }
     default_impl!(EnchantmentGlintOverride);
 }
 
@@ -678,14 +747,76 @@ impl DataComponentImpl for BannerPatternsImpl {
     default_impl!(BannerPatterns);
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct PotDecorationsImpl;
+/// `minecraft:pot_decorations`: the item shown on each side of a decorated pot.
+#[derive(Clone, Default)]
+pub struct PotDecorationsImpl {
+    pub back: Option<ItemStack>,
+    pub left: Option<ItemStack>,
+    pub right: Option<ItemStack>,
+    pub front: Option<ItemStack>,
+}
 impl PotDecorationsImpl {
-    pub const fn read_data(_data: &NbtTag) -> Option<Self> {
-        Some(Self)
+    const SIDES: [&'static str; 4] = ["back", "left", "right", "front"];
+
+    #[must_use]
+    pub const fn sides(&self) -> [&Option<ItemStack>; 4] {
+        [&self.back, &self.left, &self.right, &self.front]
+    }
+
+    pub fn read_data(data: &NbtTag) -> Option<Self> {
+        let compound = data.extract_compound()?;
+        let side = |name: &str| match compound.get(name) {
+            Some(tag) => read_item_stack_template(tag).map(Some),
+            None => Some(None),
+        };
+        Some(Self {
+            back: side("back")?,
+            left: side("left")?,
+            right: side("right")?,
+            front: side("front")?,
+        })
+    }
+}
+impl PartialEq for PotDecorationsImpl {
+    fn eq(&self, other: &Self) -> bool {
+        self.sides()
+            .iter()
+            .zip(other.sides())
+            .all(|(a, b)| match (a, b) {
+                (Some(a), Some(b)) => item_stack_template_eq(a, b),
+                (None, None) => true,
+                _ => false,
+            })
+    }
+}
+impl std::fmt::Debug for PotDecorationsImpl {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let name = |side: &Option<ItemStack>| side.as_ref().map(|stack| stack.item.registry_key);
+        f.debug_struct("PotDecorationsImpl")
+            .field("back", &name(&self.back))
+            .field("left", &name(&self.left))
+            .field("right", &name(&self.right))
+            .field("front", &name(&self.front))
+            .finish()
     }
 }
 impl DataComponentImpl for PotDecorationsImpl {
+    fn write_data(&self) -> NbtTag {
+        let mut compound = NbtCompound::new();
+        for (name, side) in Self::SIDES.iter().zip(self.sides()) {
+            if let Some(stack) = side {
+                compound.put(name, write_item_stack_template(stack));
+            }
+        }
+        NbtTag::Compound(compound)
+    }
+    fn get_hash(&self) -> i32 {
+        let mut fields = MapHash::new();
+        for (name, side) in Self::SIDES.iter().zip(self.sides()) {
+            fields = fields.optional_field(name, side.as_ref().map(get_item_stack_template_hash));
+        }
+        fields.finish() as i32
+    }
     default_impl!(PotDecorations);
 }
 

@@ -1,7 +1,14 @@
 use super::Digest;
-use crate::data_component_impl::DataComponentImpl;
+use crate::data_component_impl::{
+    DataComponentImpl, MapHash, get_bool_hash, get_compound_hash, get_i32_hash,
+    get_item_stack_template_hash, get_list_hash, get_str_hash, get_text_hash,
+    item_stack_template_eq, read_item_stack_template, text_to_nbt, write_item_stack_template,
+};
+use crate::decorated_pot_pattern::DecoratedPotPattern;
+use crate::dye_color::DyeColor;
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_nbt::tag::NbtTag;
+use pumpkin_util::text::TextComponent;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct BlockEntityDataImpl {
@@ -46,14 +53,31 @@ impl DataComponentImpl for EntityDataImpl {
     default_impl!(EntityData);
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct BucketEntityDataImpl;
+/// `minecraft:bucket_entity_data`: the NBT a bucketed mob keeps, as `CustomData`.
+/// `None` stands for the empty compound of an item's default component.
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct BucketEntityDataImpl {
+    pub nbt: Option<NbtCompound>,
+}
 impl BucketEntityDataImpl {
-    pub const fn read_data(_data: &NbtTag) -> Option<Self> {
-        Some(Self)
+    pub fn read_data(data: &NbtTag) -> Option<Self> {
+        data.extract_compound().map(|nbt| Self {
+            nbt: Some(nbt.clone()),
+        })
+    }
+
+    #[must_use]
+    pub fn nbt(&self) -> NbtCompound {
+        self.nbt.clone().unwrap_or_default()
     }
 }
 impl DataComponentImpl for BucketEntityDataImpl {
+    fn write_data(&self) -> NbtTag {
+        NbtTag::Compound(self.nbt())
+    }
+    fn get_hash(&self) -> i32 {
+        get_compound_hash(&self.nbt()) as i32
+    }
     default_impl!(BucketEntityData);
 }
 
@@ -167,14 +191,63 @@ impl DataComponentImpl for BlockStateImpl {
     default_impl!(BlockState);
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct BeesImpl;
+/// One bee stored in a hive, `BeehiveBlockEntity.Occupant`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct BeeOccupant {
+    /// The bee's entity NBT, with its type in `id` like `minecraft:entity_data`.
+    pub entity_data: NbtCompound,
+    pub ticks_in_hive: i32,
+    pub min_ticks_in_hive: i32,
+}
+
+/// `minecraft:bees`: the bees inside a beehive or bee nest item.
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct BeesImpl {
+    pub bees: Vec<BeeOccupant>,
+}
 impl BeesImpl {
-    pub const fn read_data(_data: &NbtTag) -> Option<Self> {
-        Some(Self)
+    pub fn read_data(data: &NbtTag) -> Option<Self> {
+        let bees = data
+            .extract_list()?
+            .iter()
+            .map(|tag| {
+                let compound = tag.extract_compound()?;
+                let entity_data = compound.get_compound("entity_data")?;
+                entity_data.get_string("id")?;
+                Some(BeeOccupant {
+                    entity_data: entity_data.clone(),
+                    ticks_in_hive: compound.get("ticks_in_hive")?.as_numeric_int()?,
+                    min_ticks_in_hive: compound.get("min_ticks_in_hive")?.as_numeric_int()?,
+                })
+            })
+            .collect::<Option<Vec<_>>>()?;
+        Some(Self { bees })
     }
 }
 impl DataComponentImpl for BeesImpl {
+    fn write_data(&self) -> NbtTag {
+        NbtTag::List(
+            self.bees
+                .iter()
+                .map(|bee| {
+                    let mut compound = NbtCompound::new();
+                    compound.put_compound("entity_data", bee.entity_data.clone());
+                    compound.put_int("ticks_in_hive", bee.ticks_in_hive);
+                    compound.put_int("min_ticks_in_hive", bee.min_ticks_in_hive);
+                    NbtTag::Compound(compound)
+                })
+                .collect(),
+        )
+    }
+    fn get_hash(&self) -> i32 {
+        get_list_hash(self.bees.iter().map(|bee| {
+            MapHash::new()
+                .field("entity_data", get_compound_hash(&bee.entity_data))
+                .field("ticks_in_hive", get_i32_hash(bee.ticks_in_hive))
+                .field("min_ticks_in_hive", get_i32_hash(bee.min_ticks_in_hive))
+                .finish()
+        })) as i32
+    }
     default_impl!(Bees);
 }
 
@@ -201,13 +274,181 @@ impl DataComponentImpl for ContainerLootImpl {
     default_impl!(ContainerLoot);
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct SulfurCubeContentImpl;
+/// `minecraft:sulfur_cube_content`: the block item a sulfur cube absorbed.
+#[derive(Clone)]
+pub struct SulfurCubeContentImpl {
+    pub absorbed_block: crate::item_stack::ItemStack,
+}
 impl SulfurCubeContentImpl {
-    pub const fn read_data(_data: &NbtTag) -> Option<Self> {
-        Some(Self)
+    pub fn read_data(data: &NbtTag) -> Option<Self> {
+        read_item_stack_template(data).map(|absorbed_block| Self { absorbed_block })
+    }
+}
+impl PartialEq for SulfurCubeContentImpl {
+    fn eq(&self, other: &Self) -> bool {
+        item_stack_template_eq(&self.absorbed_block, &other.absorbed_block)
+    }
+}
+impl std::fmt::Debug for SulfurCubeContentImpl {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SulfurCubeContentImpl")
+            .field("absorbed_block", &self.absorbed_block.item.registry_key)
+            .finish()
     }
 }
 impl DataComponentImpl for SulfurCubeContentImpl {
+    fn write_data(&self) -> NbtTag {
+        write_item_stack_template(&self.absorbed_block)
+    }
+    fn get_hash(&self) -> i32 {
+        get_item_stack_template_hash(&self.absorbed_block) as i32
+    }
     default_impl!(SulfurCubeContent);
+}
+
+/// The text on one side of a sign item, `SignText`.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct SignText {
+    pub messages: [TextComponent; SignText::LINES],
+    /// What players with chat filtering see; `None` when it matches `messages`.
+    pub filtered_messages: Option<[TextComponent; SignText::LINES]>,
+    pub color: DyeColor,
+    pub has_glowing_text: bool,
+}
+
+impl SignText {
+    pub const LINES: usize = 4;
+
+    fn read_lines(tag: &NbtTag) -> Option<[TextComponent; Self::LINES]> {
+        let lines = tag.extract_list()?;
+        if lines.len() != Self::LINES {
+            return None;
+        }
+        Some(std::array::from_fn(|i| TextComponent::from_nbt(&lines[i])))
+    }
+
+    fn write_lines(lines: &[TextComponent; Self::LINES]) -> NbtTag {
+        NbtTag::List(lines.iter().map(text_to_nbt).collect())
+    }
+
+    fn lines_hash(lines: &[TextComponent; Self::LINES]) -> u32 {
+        get_list_hash(lines.iter().map(get_text_hash))
+    }
+
+    pub fn read_data(data: &NbtTag) -> Option<Self> {
+        let compound = data.extract_compound()?;
+        let messages = Self::read_lines(compound.get("messages")?)?;
+        // `lenientOptionalFieldOf`: a malformed value counts as absent.
+        let filtered_messages = compound
+            .get("filtered_messages")
+            .and_then(Self::read_lines)
+            .filter(|filtered| *filtered != messages);
+        let color = match compound.get("color") {
+            Some(tag) => DyeColor::by_name(tag.extract_string()?)?,
+            None => DyeColor::Black,
+        };
+        let has_glowing_text = match compound.get("has_glowing_text") {
+            Some(tag) => tag.as_numeric_int()? != 0,
+            None => false,
+        };
+        Some(Self {
+            messages,
+            filtered_messages,
+            color,
+            has_glowing_text,
+        })
+    }
+
+    pub fn write_data(&self) -> NbtTag {
+        let mut compound = NbtCompound::new();
+        compound.put("messages", Self::write_lines(&self.messages));
+        if let Some(filtered) = &self.filtered_messages {
+            compound.put("filtered_messages", Self::write_lines(filtered));
+        }
+        compound.put_string("color", self.color.name().to_string());
+        compound.put_bool("has_glowing_text", self.has_glowing_text);
+        NbtTag::Compound(compound)
+    }
+
+    pub fn get_hash(&self) -> u32 {
+        MapHash::new()
+            .field("messages", Self::lines_hash(&self.messages))
+            .optional_field(
+                "filtered_messages",
+                self.filtered_messages.as_ref().map(Self::lines_hash),
+            )
+            .field("color", get_str_hash(self.color.name()))
+            .field("has_glowing_text", get_bool_hash(self.has_glowing_text))
+            .finish()
+    }
+}
+
+macro_rules! sign_text_component {
+    ($name:ident, $component:ident) => {
+        #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+        pub struct $name(pub SignText);
+
+        impl $name {
+            pub fn read_data(data: &NbtTag) -> Option<Self> {
+                SignText::read_data(data).map(Self)
+            }
+        }
+
+        impl DataComponentImpl for $name {
+            fn write_data(&self) -> NbtTag {
+                self.0.write_data()
+            }
+            fn get_hash(&self) -> i32 {
+                self.0.get_hash() as i32
+            }
+            default_impl!($component);
+        }
+    };
+}
+
+sign_text_component!(SignTextFrontImpl, SignTextFront);
+sign_text_component!(SignTextBackImpl, SignTextBack);
+
+/// `minecraft:cushion/color`.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct CushionColorImpl {
+    pub color: DyeColor,
+}
+impl CushionColorImpl {
+    pub fn read_data(data: &NbtTag) -> Option<Self> {
+        Some(Self {
+            color: DyeColor::by_name(data.extract_string()?)?,
+        })
+    }
+}
+impl DataComponentImpl for CushionColorImpl {
+    fn write_data(&self) -> NbtTag {
+        NbtTag::String(self.color.name().into())
+    }
+    fn get_hash(&self) -> i32 {
+        get_str_hash(self.color.name()) as i32
+    }
+    default_impl!(CushionColor);
+}
+
+/// `minecraft:provides_pottery_pattern`: the pattern a pottery sherd puts on a pot.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ProvidesPotteryPatternImpl {
+    pub pattern: DecoratedPotPattern,
+}
+impl ProvidesPotteryPatternImpl {
+    pub fn read_data(data: &NbtTag) -> Option<Self> {
+        Some(Self {
+            pattern: DecoratedPotPattern::from_name(data.extract_string()?)?,
+        })
+    }
+}
+impl DataComponentImpl for ProvidesPotteryPatternImpl {
+    fn write_data(&self) -> NbtTag {
+        NbtTag::String(format!("minecraft:{}", self.pattern.to_name()).into())
+    }
+    fn get_hash(&self) -> i32 {
+        get_str_hash(&format!("minecraft:{}", self.pattern.to_name())) as i32
+    }
+    default_impl!(ProvidesPotteryPattern);
 }

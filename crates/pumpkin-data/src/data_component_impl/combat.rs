@@ -4,9 +4,10 @@ use crate::Enchantment;
 use crate::attributes::Attributes;
 use crate::damage::DamageType;
 use crate::data_component_impl::basic::SoundEvent;
+use crate::data_component_impl::food::ConsumeEffect;
 use crate::data_component_impl::{
-    DataComponentImpl, EquipmentSlot, IDSet, IdOr, get_f32_hash, get_i32_hash, get_idor,
-    get_idor_hash, get_idset_hash, get_map_hash, get_str_hash, put_idor,
+    DataComponentImpl, EquipmentSlot, IDSet, IdOr, MapHash, get_f32_hash, get_i32_hash, get_idor,
+    get_idor_hash, get_idset_hash, get_list_hash, get_map_hash, get_str_hash, namespaced, put_idor,
 };
 use crate::entity_type::EntityType;
 use crate::item::Item;
@@ -752,25 +753,317 @@ impl DataComponentImpl for GliderImpl {
     default_impl!(Glider);
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct DeathProtectionImpl;
+/// `minecraft:death_protection`: the effects applied when the item saves its holder.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DeathProtectionImpl {
+    pub death_effects: Cow<'static, [ConsumeEffect]>,
+}
 impl DeathProtectionImpl {
-    pub const fn read_data(_data: &NbtTag) -> Option<Self> {
-        Some(Self)
+    pub fn read_data(data: &NbtTag) -> Option<Self> {
+        let death_effects = match data.extract_compound()?.get("death_effects") {
+            Some(list) => list
+                .extract_list()?
+                .iter()
+                .map(ConsumeEffect::read_data)
+                .collect::<Option<Vec<_>>>()?,
+            None => Vec::new(),
+        };
+        Some(Self {
+            death_effects: Cow::Owned(death_effects),
+        })
     }
 }
 impl DataComponentImpl for DeathProtectionImpl {
+    fn write_data(&self) -> NbtTag {
+        let mut compound = NbtCompound::new();
+        if !self.death_effects.is_empty() {
+            compound.put_list(
+                "death_effects",
+                self.death_effects
+                    .iter()
+                    .map(ConsumeEffect::as_nbt)
+                    .collect(),
+            );
+        }
+        NbtTag::Compound(compound)
+    }
+    fn get_hash(&self) -> i32 {
+        MapHash::new()
+            .optional_field(
+                "death_effects",
+                (!self.death_effects.is_empty()).then(|| {
+                    get_list_hash(
+                        self.death_effects
+                            .iter()
+                            .map(|effect| effect.get_hash() as u32),
+                    )
+                }),
+            )
+            .finish() as i32
+    }
     default_impl!(DeathProtection);
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct BlocksAttacksImpl;
-impl BlocksAttacksImpl {
-    pub const fn read_data(_data: &NbtTag) -> Option<Self> {
-        Some(Self)
+/// A holder set of damage types, kept by name: `#tag`, or registry entries.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum DamageTypeSet {
+    Tag(Cow<'static, str>),
+    Entries(Cow<'static, [Cow<'static, str>]>),
+}
+
+impl DamageTypeSet {
+    pub fn read_data(tag: &NbtTag) -> Option<Self> {
+        match tag {
+            NbtTag::String(id) => Some(match id.strip_prefix('#') {
+                Some(tag) => Self::Tag(Cow::Owned(tag.to_string())),
+                None => Self::Entries(Cow::Owned(vec![Cow::Owned(id.to_string())])),
+            }),
+            NbtTag::List(ids) => Some(Self::Entries(Cow::Owned(
+                ids.iter()
+                    .map(|id| Some(Cow::Owned(id.extract_string()?.to_string())))
+                    .collect::<Option<Vec<_>>>()?,
+            ))),
+            _ => None,
+        }
+    }
+
+    pub fn write_data(&self) -> NbtTag {
+        match self {
+            Self::Tag(tag) => NbtTag::String(format!("#{}", namespaced(tag)).into()),
+            Self::Entries(ids) if ids.len() == 1 => NbtTag::String(namespaced(&ids[0]).into()),
+            Self::Entries(ids) => NbtTag::List(
+                ids.iter()
+                    .map(|id| NbtTag::String(namespaced(id).into()))
+                    .collect(),
+            ),
+        }
+    }
+
+    pub fn get_hash(&self) -> u32 {
+        match self {
+            Self::Tag(tag) => get_str_hash(&format!("#{}", namespaced(tag))),
+            Self::Entries(ids) if ids.len() == 1 => get_str_hash(&namespaced(&ids[0])),
+            Self::Entries(ids) => get_list_hash(ids.iter().map(|id| get_str_hash(&namespaced(id)))),
+        }
     }
 }
+
+/// `BlocksAttacks.DamageReduction`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DamageReduction {
+    pub horizontal_blocking_angle: f32,
+    pub r#type: Option<DamageTypeSet>,
+    pub base: f32,
+    pub factor: f32,
+}
+
+impl DamageReduction {
+    const DEFAULT_ANGLE: f32 = 90.0;
+
+    fn read_data(tag: &NbtTag) -> Option<Self> {
+        let compound = tag.extract_compound()?;
+        Some(Self {
+            horizontal_blocking_angle: match compound.get("horizontal_blocking_angle") {
+                Some(tag) => tag.as_numeric_float()?,
+                None => Self::DEFAULT_ANGLE,
+            },
+            r#type: match compound.get("type") {
+                Some(tag) => Some(DamageTypeSet::read_data(tag)?),
+                None => None,
+            },
+            base: compound.get("base")?.as_numeric_float()?,
+            factor: compound.get("factor")?.as_numeric_float()?,
+        })
+    }
+
+    fn write_data(&self) -> NbtTag {
+        let mut compound = NbtCompound::new();
+        if self.horizontal_blocking_angle != Self::DEFAULT_ANGLE {
+            compound.put_float("horizontal_blocking_angle", self.horizontal_blocking_angle);
+        }
+        if let Some(r#type) = &self.r#type {
+            compound.put("type", r#type.write_data());
+        }
+        compound.put_float("base", self.base);
+        compound.put_float("factor", self.factor);
+        NbtTag::Compound(compound)
+    }
+
+    fn get_hash(&self) -> u32 {
+        MapHash::new()
+            .optional_field(
+                "horizontal_blocking_angle",
+                (self.horizontal_blocking_angle != Self::DEFAULT_ANGLE)
+                    .then(|| get_f32_hash(self.horizontal_blocking_angle)),
+            )
+            .optional_field("type", self.r#type.as_ref().map(DamageTypeSet::get_hash))
+            .field("base", get_f32_hash(self.base))
+            .field("factor", get_f32_hash(self.factor))
+            .finish()
+    }
+}
+
+/// `BlocksAttacks.ItemDamageFunction`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ItemDamageFunction {
+    pub threshold: f32,
+    pub base: f32,
+    pub factor: f32,
+}
+
+impl ItemDamageFunction {
+    pub const DEFAULT: Self = Self {
+        threshold: 1.0,
+        base: 0.0,
+        factor: 1.0,
+    };
+
+    fn read_data(tag: &NbtTag) -> Option<Self> {
+        let compound = tag.extract_compound()?;
+        Some(Self {
+            threshold: compound.get("threshold")?.as_numeric_float()?,
+            base: compound.get("base")?.as_numeric_float()?,
+            factor: compound.get("factor")?.as_numeric_float()?,
+        })
+    }
+
+    fn write_data(&self) -> NbtTag {
+        let mut compound = NbtCompound::new();
+        compound.put_float("threshold", self.threshold);
+        compound.put_float("base", self.base);
+        compound.put_float("factor", self.factor);
+        NbtTag::Compound(compound)
+    }
+
+    fn get_hash(&self) -> u32 {
+        MapHash::new()
+            .field("threshold", get_f32_hash(self.threshold))
+            .field("base", get_f32_hash(self.base))
+            .field("factor", get_f32_hash(self.factor))
+            .finish()
+    }
+}
+
+/// `minecraft:blocks_attacks`: how the item blocks incoming damage, like a shield.
+#[derive(Clone, Debug, PartialEq)]
+pub struct BlocksAttacksImpl {
+    pub block_delay_seconds: f32,
+    pub disable_cooldown_scale: f32,
+    pub damage_reductions: Cow<'static, [DamageReduction]>,
+    pub item_damage: ItemDamageFunction,
+    pub bypassed_by: Option<DamageTypeSet>,
+    pub block_sound: Option<IdOr<SoundEvent>>,
+    pub disabled_sound: Option<IdOr<SoundEvent>>,
+}
+
+impl BlocksAttacksImpl {
+    /// The `damage_reductions` vanilla uses when the field is absent.
+    pub const DEFAULT_DAMAGE_REDUCTIONS: &'static [DamageReduction] = &[DamageReduction {
+        horizontal_blocking_angle: DamageReduction::DEFAULT_ANGLE,
+        r#type: None,
+        base: 0.0,
+        factor: 1.0,
+    }];
+
+    pub fn read_data(data: &NbtTag) -> Option<Self> {
+        let compound = data.extract_compound()?;
+        let float_or = |name: &str, default: f32| match compound.get(name) {
+            Some(tag) => tag.as_numeric_float(),
+            None => Some(default),
+        };
+        Some(Self {
+            block_delay_seconds: float_or("block_delay_seconds", 0.0)?,
+            disable_cooldown_scale: float_or("disable_cooldown_scale", 1.0)?,
+            damage_reductions: match compound.get("damage_reductions") {
+                Some(list) => Cow::Owned(
+                    list.extract_list()?
+                        .iter()
+                        .map(DamageReduction::read_data)
+                        .collect::<Option<Vec<_>>>()?,
+                ),
+                None => Cow::Borrowed(Self::DEFAULT_DAMAGE_REDUCTIONS),
+            },
+            item_damage: match compound.get("item_damage") {
+                Some(tag) => ItemDamageFunction::read_data(tag)?,
+                None => ItemDamageFunction::DEFAULT,
+            },
+            bypassed_by: match compound.get("bypassed_by") {
+                Some(tag) => Some(DamageTypeSet::read_data(tag)?),
+                None => None,
+            },
+            block_sound: get_optional_idor(compound, "block_sound"),
+            disabled_sound: get_optional_idor(compound, "disabled_sound"),
+        })
+    }
+}
+
 impl DataComponentImpl for BlocksAttacksImpl {
+    fn write_data(&self) -> NbtTag {
+        let mut compound = NbtCompound::new();
+        if self.block_delay_seconds != 0.0 {
+            compound.put_float("block_delay_seconds", self.block_delay_seconds);
+        }
+        if self.disable_cooldown_scale != 1.0 {
+            compound.put_float("disable_cooldown_scale", self.disable_cooldown_scale);
+        }
+        if self.damage_reductions.as_ref() != Self::DEFAULT_DAMAGE_REDUCTIONS {
+            compound.put_list(
+                "damage_reductions",
+                self.damage_reductions
+                    .iter()
+                    .map(DamageReduction::write_data)
+                    .collect(),
+            );
+        }
+        if self.item_damage != ItemDamageFunction::DEFAULT {
+            compound.put("item_damage", self.item_damage.write_data());
+        }
+        if let Some(bypassed_by) = &self.bypassed_by {
+            compound.put("bypassed_by", bypassed_by.write_data());
+        }
+        put_optional_idor(&mut compound, "block_sound", self.block_sound.as_ref());
+        put_optional_idor(
+            &mut compound,
+            "disabled_sound",
+            self.disabled_sound.as_ref(),
+        );
+        NbtTag::Compound(compound)
+    }
+
+    fn get_hash(&self) -> i32 {
+        MapHash::new()
+            .optional_field(
+                "block_delay_seconds",
+                (self.block_delay_seconds != 0.0).then(|| get_f32_hash(self.block_delay_seconds)),
+            )
+            .optional_field(
+                "disable_cooldown_scale",
+                (self.disable_cooldown_scale != 1.0)
+                    .then(|| get_f32_hash(self.disable_cooldown_scale)),
+            )
+            .optional_field(
+                "damage_reductions",
+                (self.damage_reductions.as_ref() != Self::DEFAULT_DAMAGE_REDUCTIONS).then(|| {
+                    get_list_hash(self.damage_reductions.iter().map(DamageReduction::get_hash))
+                }),
+            )
+            .optional_field(
+                "item_damage",
+                (self.item_damage != ItemDamageFunction::DEFAULT)
+                    .then(|| self.item_damage.get_hash()),
+            )
+            .optional_field(
+                "bypassed_by",
+                self.bypassed_by.as_ref().map(DamageTypeSet::get_hash),
+            )
+            .optional_field("block_sound", self.block_sound.as_ref().map(get_idor_hash))
+            .optional_field(
+                "disabled_sound",
+                self.disabled_sound.as_ref().map(get_idor_hash),
+            )
+            .finish() as i32
+    }
+
     default_impl!(BlocksAttacks);
 }
 
@@ -1046,6 +1339,22 @@ impl SwingAnimationImpl {
     }
 }
 
+impl SwingAnimationImpl {
+    fn swing_hash(&self) -> i32 {
+        MapHash::new()
+            .optional_field(
+                "type",
+                (self.animation_type != Self::DEFAULT.animation_type)
+                    .then(|| get_str_hash(self.animation_type.to_name())),
+            )
+            .optional_field(
+                "duration",
+                (self.duration != Self::DEFAULT.duration).then(|| get_i32_hash(self.duration)),
+            )
+            .finish() as i32
+    }
+}
+
 impl DataComponentImpl for SwingAnimationImpl {
     fn write_data(&self) -> NbtTag {
         let mut compound = NbtCompound::new();
@@ -1054,17 +1363,54 @@ impl DataComponentImpl for SwingAnimationImpl {
         NbtTag::Compound(compound)
     }
 
+    fn get_hash(&self) -> i32 {
+        self.swing_hash()
+    }
+
     default_impl!(AttackAnimation);
 }
 
+/// `minecraft:interact_animation`, the swing played when the item is used on
+/// something. Same codec as `minecraft:attack_animation`.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+pub struct InteractAnimationImpl(pub SwingAnimationImpl);
+
+impl InteractAnimationImpl {
+    pub fn read_data(data: &NbtTag) -> Option<Self> {
+        SwingAnimationImpl::read_data(data).map(Self)
+    }
+}
+
+impl DataComponentImpl for InteractAnimationImpl {
+    fn write_data(&self) -> NbtTag {
+        self.0.write_data()
+    }
+
+    fn get_hash(&self) -> i32 {
+        self.0.swing_hash()
+    }
+
+    default_impl!(InteractAnimation);
+}
+
+/// `minecraft:additional_trade_cost`, extra emeralds a villager trade asks for.
+/// Network only: vanilla gives it no persistent codec.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct AdditionalTradeCostImpl;
+pub struct AdditionalTradeCostImpl {
+    pub cost: i32,
+}
 impl AdditionalTradeCostImpl {
-    pub const fn read_data(_data: &NbtTag) -> Option<Self> {
-        Some(Self)
+    pub fn read_data(data: &NbtTag) -> Option<Self> {
+        data.as_numeric_int().map(|cost| Self { cost })
     }
 }
 impl DataComponentImpl for AdditionalTradeCostImpl {
+    fn write_data(&self) -> NbtTag {
+        NbtTag::Int(self.cost)
+    }
+    fn get_hash(&self) -> i32 {
+        get_i32_hash(self.cost) as i32
+    }
     default_impl!(AdditionalTradeCost);
 }
 

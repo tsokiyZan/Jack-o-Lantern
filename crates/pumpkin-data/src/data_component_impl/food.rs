@@ -249,7 +249,10 @@ pub enum ConsumeEffect {
     ApplyEffects((Cow<'static, [StatusEffectInstance]>, f32)),
     RemoveEffects(IDSet<StatusEffect>),
     ClearAllEffects,
-    TeleportRandomly(f32),
+    TeleportRandomly {
+        diameter: f32,
+        directional_particles: bool,
+    },
     PlaySound(IdOr<SoundEvent>),
 }
 impl Hash for ConsumeEffect {
@@ -258,26 +261,35 @@ impl Hash for ConsumeEffect {
         match self {
             ConsumeEffect::ApplyEffects(tuple) => {
                 tuple.0.hash(state);
-                unsafe { (*(&raw const tuple.1).cast::<u32>()).hash(state) };
+                tuple.1.to_bits().hash(state);
             }
             ConsumeEffect::RemoveEffects(status_effect_instances) => {
                 status_effect_instances.hash(state)
             }
             ConsumeEffect::ClearAllEffects => (),
-            ConsumeEffect::TeleportRandomly(dst) => unsafe {
-                (*(&raw const dst).cast::<u32>()).hash(state)
-            },
+            ConsumeEffect::TeleportRandomly {
+                diameter,
+                directional_particles,
+            } => {
+                diameter.to_bits().hash(state);
+                directional_particles.hash(state);
+            }
             ConsumeEffect::PlaySound(id_or) => id_or.hash(state),
         }
     }
 }
 impl ConsumeEffect {
+    /// `TeleportRandomlyConsumeEffect.DEFAULT_DIAMETER`.
+    pub const DEFAULT_DIAMETER: f32 = 16.0;
+    /// Bounds the effect lists read from NBT or the network.
+    pub const MAX_EFFECTS: usize = 256;
+
     pub fn to_str(&self) -> &str {
         match self {
             ConsumeEffect::ApplyEffects(_) => "apply_effects",
             ConsumeEffect::RemoveEffects(_) => "remove_effects",
             ConsumeEffect::ClearAllEffects => "clear_all_effects",
-            ConsumeEffect::TeleportRandomly(_) => "teleport_randomly",
+            ConsumeEffect::TeleportRandomly { .. } => "teleport_randomly",
             ConsumeEffect::PlaySound(_) => "play_sound",
         }
     }
@@ -286,52 +298,78 @@ impl ConsumeEffect {
             ConsumeEffect::ApplyEffects(_) => 0,
             ConsumeEffect::RemoveEffects(_) => 1,
             ConsumeEffect::ClearAllEffects => 2,
-            ConsumeEffect::TeleportRandomly(_) => 3,
+            ConsumeEffect::TeleportRandomly { .. } => 3,
             ConsumeEffect::PlaySound(_) => 4,
         }
     }
+    /// Reads `ConsumeEffect.CODEC`, dispatched on the namespaced `type`.
     pub fn read_data(nbt: &NbtTag) -> Option<Self> {
         let compound = nbt.extract_compound()?;
         let r#type = compound.get_string("type")?;
-        match r#type {
+        match r#type.strip_prefix("minecraft:").unwrap_or(r#type) {
             "remove_effects" => {
                 let idset = IDSet::read(compound.get("effects")?)?;
                 Some(Self::RemoveEffects(idset))
             }
             "clear_all_effects" => Some(Self::ClearAllEffects),
             "teleport_randomly" => {
-                let dst = compound.get_float("diameter")?;
-                Some(Self::TeleportRandomly(dst))
+                let diameter = match compound.get("diameter") {
+                    Some(tag) => tag.as_numeric_float()?,
+                    None => Self::DEFAULT_DIAMETER,
+                };
+                let directional_particles = match compound.get("directional_particles") {
+                    Some(tag) => tag.as_numeric_int()? != 0,
+                    None => true,
+                };
+                Some(Self::TeleportRandomly {
+                    diameter,
+                    directional_particles,
+                })
             }
             "play_sound" => {
+                compound.get("sound")?;
                 let sound = get_idor(compound, "sound", Sound::EntityGenericEat);
                 Some(Self::PlaySound(sound))
             }
             "apply_effects" => {
-                let probability = compound.get_float("probability")?;
-                let effects_vec: Vec<StatusEffectInstance> = compound
+                let probability = match compound.get("probability") {
+                    Some(tag) => tag.as_numeric_float()?,
+                    None => 1.0,
+                };
+                let effects = compound
                     .get_list("effects")?
                     .iter()
-                    .filter_map(StatusEffectInstance::read_data)
-                    .collect();
-                let effects: Cow<'static, [StatusEffectInstance]> = Cow::Owned(effects_vec);
-                Some(Self::ApplyEffects((effects, probability)))
+                    .map(StatusEffectInstance::read_data)
+                    .collect::<Option<Vec<_>>>()?;
+                Some(Self::ApplyEffects((Cow::Owned(effects), probability)))
             }
             _ => None,
         }
     }
     pub fn as_nbt(&self) -> NbtTag {
         let mut compound = NbtCompound::new();
-        compound.put_string("type", self.to_str().to_string());
+        compound.put_string("type", format!("minecraft:{}", self.to_str()));
         match self {
-            ConsumeEffect::ApplyEffects(data) => {
-                let nbt_arr = data.0.iter().map(|x| x.as_nbt()).collect();
+            ConsumeEffect::ApplyEffects((effects, probability)) => {
+                let nbt_arr = effects.iter().map(StatusEffectInstance::as_nbt).collect();
                 compound.put_list("effects", nbt_arr);
-                compound.put_float("probability", data.1);
+                if *probability != 1.0 {
+                    compound.put_float("probability", *probability);
+                }
             }
             ConsumeEffect::RemoveEffects(idset) => idset.write(&mut compound, "effects"),
             ConsumeEffect::ClearAllEffects => (),
-            ConsumeEffect::TeleportRandomly(dst) => compound.put_float("diameter", *dst),
+            ConsumeEffect::TeleportRandomly {
+                diameter,
+                directional_particles,
+            } => {
+                if *diameter != Self::DEFAULT_DIAMETER {
+                    compound.put_float("diameter", *diameter);
+                }
+                if !directional_particles {
+                    compound.put_bool("directional_particles", false);
+                }
+            }
             ConsumeEffect::PlaySound(id_or) => {
                 put_idor(&mut compound, "sound", id_or);
             }
@@ -339,33 +377,37 @@ impl ConsumeEffect {
         NbtTag::Compound(compound)
     }
     pub fn get_hash(&self) -> i32 {
-        let mut digest = Digest::new();
-        match self {
-            ConsumeEffect::ApplyEffects((effects, probability)) => {
-                digest.update(&[1u8]);
-                for effect in effects.iter() {
-                    digest.update(&effect.get_hash().to_le_bytes());
-                }
-                digest.update(&[13u8]);
-                digest.update(&get_f32_hash(*probability).to_le_bytes());
-            }
-            ConsumeEffect::RemoveEffects(idset) => {
-                digest.update(&[2u8]);
-                digest.update(&get_idset_hash(idset).to_le_bytes());
-            }
-            ConsumeEffect::ClearAllEffects => {
-                digest.update(&[3u8]);
-            }
-            ConsumeEffect::TeleportRandomly(dst) => {
-                digest.update(&[4u8]);
-                digest.update(&get_f32_hash(*dst).to_le_bytes());
-            }
-            ConsumeEffect::PlaySound(id_or) => {
-                digest.update(&[5u8]);
-                digest.update(&get_idor_hash(id_or).to_le_bytes());
-            }
-        }
-        digest.finalize() as i32
+        let fields = MapHash::new().field(
+            "type",
+            get_str_hash(&format!("minecraft:{}", self.to_str())),
+        );
+        let fields = match self {
+            ConsumeEffect::ApplyEffects((effects, probability)) => fields
+                .field(
+                    "effects",
+                    get_list_hash(effects.iter().map(|effect| effect.get_hash() as u32)),
+                )
+                .optional_field(
+                    "probability",
+                    (*probability != 1.0).then(|| get_f32_hash(*probability)),
+                ),
+            ConsumeEffect::RemoveEffects(idset) => fields.field("effects", get_idset_hash(idset)),
+            ConsumeEffect::ClearAllEffects => fields,
+            ConsumeEffect::TeleportRandomly {
+                diameter,
+                directional_particles,
+            } => fields
+                .optional_field(
+                    "diameter",
+                    (*diameter != Self::DEFAULT_DIAMETER).then(|| get_f32_hash(*diameter)),
+                )
+                .optional_field(
+                    "directional_particles",
+                    (!directional_particles).then(|| get_bool_hash(false)),
+                ),
+            ConsumeEffect::PlaySound(id_or) => fields.field("sound", get_idor_hash(id_or)),
+        };
+        fields.finish() as i32
     }
 }
 
@@ -456,14 +498,69 @@ impl Hash for ConsumableImpl {
     }
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct UseEffectsImpl;
+/// `minecraft:use_effects`: how using the item affects the player.
+#[derive(Clone, Debug, PartialEq)]
+pub struct UseEffectsImpl {
+    pub can_sprint: bool,
+    pub interact_vibrations: bool,
+    pub speed_multiplier: f32,
+}
 impl UseEffectsImpl {
-    pub const fn read_data(_data: &NbtTag) -> Option<Self> {
-        Some(Self)
+    pub const DEFAULT: Self = Self {
+        can_sprint: false,
+        interact_vibrations: true,
+        speed_multiplier: 0.2,
+    };
+
+    pub fn read_data(data: &NbtTag) -> Option<Self> {
+        let compound = data.extract_compound()?;
+        let flag = |name: &str, default: bool| match compound.get(name) {
+            Some(tag) => tag.as_numeric_int().map(|value| value != 0),
+            None => Some(default),
+        };
+        Some(Self {
+            can_sprint: flag("can_sprint", Self::DEFAULT.can_sprint)?,
+            interact_vibrations: flag("interact_vibrations", Self::DEFAULT.interact_vibrations)?,
+            speed_multiplier: match compound.get("speed_multiplier") {
+                Some(tag) => tag.as_numeric_float()?,
+                None => Self::DEFAULT.speed_multiplier,
+            },
+        })
     }
 }
 impl DataComponentImpl for UseEffectsImpl {
+    fn write_data(&self) -> NbtTag {
+        let mut compound = NbtCompound::new();
+        if self.can_sprint != Self::DEFAULT.can_sprint {
+            compound.put_bool("can_sprint", self.can_sprint);
+        }
+        if self.interact_vibrations != Self::DEFAULT.interact_vibrations {
+            compound.put_bool("interact_vibrations", self.interact_vibrations);
+        }
+        if self.speed_multiplier != Self::DEFAULT.speed_multiplier {
+            compound.put_float("speed_multiplier", self.speed_multiplier);
+        }
+        NbtTag::Compound(compound)
+    }
+    fn get_hash(&self) -> i32 {
+        MapHash::new()
+            .optional_field(
+                "can_sprint",
+                (self.can_sprint != Self::DEFAULT.can_sprint)
+                    .then(|| get_bool_hash(self.can_sprint)),
+            )
+            .optional_field(
+                "interact_vibrations",
+                (self.interact_vibrations != Self::DEFAULT.interact_vibrations)
+                    .then(|| get_bool_hash(self.interact_vibrations)),
+            )
+            .optional_field(
+                "speed_multiplier",
+                (self.speed_multiplier != Self::DEFAULT.speed_multiplier)
+                    .then(|| get_f32_hash(self.speed_multiplier)),
+            )
+            .finish() as i32
+    }
     default_impl!(UseEffects);
 }
 
@@ -631,6 +728,35 @@ impl DataComponentImpl for PotionContentsImpl {
             .finish() as i32
     }
     default_impl!(PotionContents);
+}
+
+/// `minecraft:villager_food`: how much a villager is fed by picking the item up.
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub struct VillagerFoodImpl {
+    pub nutrition: i32,
+}
+impl VillagerFoodImpl {
+    pub fn read_data(data: &NbtTag) -> Option<Self> {
+        Some(Self {
+            nutrition: data
+                .extract_compound()?
+                .get("nutrition")?
+                .as_numeric_int()?,
+        })
+    }
+}
+impl DataComponentImpl for VillagerFoodImpl {
+    fn write_data(&self) -> NbtTag {
+        let mut compound = NbtCompound::new();
+        compound.put_int("nutrition", self.nutrition);
+        NbtTag::Compound(compound)
+    }
+    fn get_hash(&self) -> i32 {
+        MapHash::new()
+            .field("nutrition", get_i32_hash(self.nutrition))
+            .finish() as i32
+    }
+    default_impl!(VillagerFood);
 }
 
 #[derive(Clone, Debug, PartialEq)]

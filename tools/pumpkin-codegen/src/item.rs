@@ -85,7 +85,7 @@ pub struct ItemComponents {
     #[serde(rename = "minecraft:break_sound")]
     pub break_sound: Option<serde_json::Value>,
     #[serde(rename = "minecraft:brewing_fuel")]
-    pub brewing_fuel: Option<serde_json::Value>,
+    pub brewing_fuel: Option<BrewingFuelComponent>,
     #[serde(rename = "minecraft:bucket_entity_data")]
     pub bucket_entity_data: Option<serde_json::Value>,
     #[serde(rename = "minecraft:bundle_contents")]
@@ -164,7 +164,7 @@ pub struct ItemComponents {
     #[serde(rename = "minecraft:tooltip_display")]
     pub tooltip_display: Option<serde_json::Value>,
     #[serde(rename = "minecraft:use_effects")]
-    pub use_effects: Option<serde_json::Value>,
+    pub use_effects: Option<UseEffectsComponent>,
     #[serde(rename = "minecraft:use_remainder")]
     pub use_remainder: Option<UseRemainderComponent>,
     #[serde(rename = "minecraft:waxed")]
@@ -196,7 +196,32 @@ pub struct EnchantableComponent {
 
 #[derive(Deserialize, Clone)]
 pub struct CompostableComponent {
-    pub layers: String,
+    pub layers: serde_json::Value,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct BrewingFuelComponent {
+    pub uses: serde_json::Value,
+    pub speed_multiplier: serde_json::Value,
+}
+
+const fn default_interact_vibrations() -> bool {
+    true
+}
+
+const fn default_use_speed_multiplier() -> f32 {
+    0.2
+}
+
+/// `UseEffects`, with vanilla's defaults for absent fields.
+#[derive(Deserialize, Clone)]
+pub struct UseEffectsComponent {
+    #[serde(default)]
+    pub can_sprint: bool,
+    #[serde(default = "default_interact_vibrations")]
+    pub interact_vibrations: bool,
+    #[serde(default = "default_use_speed_multiplier")]
+    pub speed_multiplier: f32,
 }
 
 #[derive(Deserialize, Clone)]
@@ -427,82 +452,8 @@ impl ToTokens for ItemComponents {
                     .unwrap()
                     .to_pascal_case()
             );
-            let effects: Vec<ConsumeEffect> =
-                consumable.on_consume_effects.clone().unwrap_or(vec![]);
-            let mut effect_tokens = TokenStream::new();
-
-            for effect in effects {
-                match effect.r#type.as_str() {
-                    "minecraft:clear_all_effects" => {
-                        effect_tokens.extend(quote! { ConsumeEffect::ClearAllEffects, });
-                    }
-                    "minecraft:teleport_randomly" => {
-                        let diameter = effect.diameter.unwrap_or(16.);
-                        effect_tokens
-                            .extend(quote! { ConsumeEffect::TeleportRandomly(#diameter), });
-                    }
-                    "minecraft:play_sound" => {
-                        let sound = format_ident!(
-                            "{}",
-                            effect
-                                .sound
-                                .unwrap()
-                                .strip_prefix("minecraft:")
-                                .unwrap()
-                                .to_pascal_case()
-                        );
-                        effect_tokens
-                            .extend(quote! { ConsumeEffect::PlaySound(IdOr::Id(Sound::#sound)), });
-                    }
-                    "minecraft:apply_effects" => {
-                        let probability = effect.probability.unwrap_or(1.);
-                        if let StringOrStatusEffects::Effects(status_effect_instances) =
-                            effect.effects.unwrap()
-                        {
-                            let mut status_tokens = TokenStream::new();
-
-                            for status in status_effect_instances {
-                                let effect_id = status.id;
-                                let amplifier = status.amplifier.unwrap_or(0);
-                                let duration = status.duration.unwrap_or(0);
-                                let ambient = status.ambient.unwrap_or(false);
-                                let show_particles = status.show_particles.unwrap_or(true);
-                                let show_icon = status.show_icon.unwrap_or(show_particles);
-                                status_tokens.extend(quote! {
-                                    StatusEffectInstance {
-                                        effect_id: Cow::Borrowed(#effect_id),
-                                        amplifier: #amplifier,
-                                        duration: #duration,
-                                        ambient: #ambient,
-                                        show_particles: #show_particles,
-                                        show_icon: #show_icon,
-                                        hidden_effect: None,
-                                    },
-                                });
-                            }
-                            effect_tokens.extend(quote! {
-                                ConsumeEffect::ApplyEffects((Cow::Borrowed(&[#status_tokens]), #probability)),
-                            });
-                        }
-                    }
-                    "minecraft:remove_effects" => {
-                        if let StringOrStatusEffects::String(id) = effect.effects.unwrap() {
-                            let effect_id = format_ident!(
-                                "{}",
-                                id.strip_prefix("minecraft:")
-                                    .unwrap()
-                                    .to_pascal_case()
-                                    .to_uppercase()
-                            );
-
-                            effect_tokens.extend(quote! {
-                                ConsumeEffect::RemoveEffects(IDSet::IDs(Cow::Borrowed(&[&StatusEffect::#effect_id]))),
-                            });
-                        }
-                    }
-                    _ => println!("Unknown CustomEffect type: {}", effect.r#type),
-                }
-            }
+            let effect_tokens =
+                consume_effect_tokens(&consumable.on_consume_effects.clone().unwrap_or_default());
 
             tokens.extend(quote! { (Consumable, &ConsumableImpl {
                 consume_seconds: #consume_seconds,
@@ -513,12 +464,15 @@ impl ToTokens for ItemComponents {
             }), });
         }
 
-        if self.blocks_attacks.is_some() {
-            tokens.extend(quote! { (BlocksAttacks, &BlocksAttacksImpl), });
+        if let Some(blocks_attacks) = &self.blocks_attacks {
+            tokens.extend(blocks_attacks_tokens(blocks_attacks));
         }
 
-        if self.death_protection.is_some() {
-            tokens.extend(quote! { (DeathProtection, &DeathProtectionImpl), });
+        if let Some(death_protection) = &self.death_protection {
+            let effects = consume_effect_tokens(&death_protection.death_effects);
+            tokens.extend(quote! { (DeathProtection, &DeathProtectionImpl {
+                death_effects: Cow::Borrowed(&[#effects]),
+            }), });
         }
 
         if let Some(weapon) = &self.weapon {
@@ -764,7 +718,7 @@ impl ToTokens for ItemComponents {
             tokens.extend(quote! { (BannerPatterns, &BannerPatternsImpl::EMPTY), });
         }
         if self.bees.is_some() {
-            tokens.extend(quote! { (Bees, &BeesImpl), });
+            tokens.extend(quote! { (Bees, &BeesImpl { bees: Vec::new() }), });
         }
         if let Some(block_state) = &self.block_state {
             let mut entries = TokenStream::new();
@@ -804,7 +758,7 @@ impl ToTokens for ItemComponents {
             });
         }
         if self.bucket_entity_data.is_some() {
-            tokens.extend(quote! { (BucketEntityData, &BucketEntityDataImpl), });
+            tokens.extend(quote! { (BucketEntityData, &BucketEntityDataImpl { nbt: None }), });
         }
         if self.bundle_contents.is_some() {
             tokens.extend(quote! { (BundleContents, &BundleContentsImpl { items: Vec::new() }), });
@@ -838,73 +792,53 @@ impl ToTokens for ItemComponents {
             });
         }
         if self.debug_stick_state.is_some() {
-            tokens.extend(quote! { (DebugStickState, &DebugStickStateImpl), });
+            tokens.extend(
+                quote! { (DebugStickState, &DebugStickStateImpl { properties: Vec::new() }), },
+            );
         }
-        if self.dye.is_some() {
-            tokens.extend(quote! { (Dye, &DyeImpl), });
+        if let Some(dye) = self.dye.as_ref().and_then(serde_json::Value::as_str) {
+            let color = format_ident!("{}", dye.to_pascal_case());
+            tokens.extend(quote! {
+                (Dye, &DyeImpl { color: crate::dye_color::DyeColor::#color }),
+            });
         }
-        if self.brewing_fuel.is_some() {
-            tokens.extend(quote! { (BrewingFuel, &BrewingFuelImpl), });
+        if let Some(fuel) = &self.brewing_fuel {
+            let uses = int_provider_tokens(&fuel.uses);
+            let speed_multiplier = float_provider_tokens(&fuel.speed_multiplier);
+            tokens.extend(quote! {
+                (BrewingFuel, &BrewingFuelImpl {
+                    uses: #uses,
+                    speed_multiplier: #speed_multiplier,
+                }),
+            });
         }
         if let Some(compostable) = &self.compostable {
-            let layers = compostable
-                .layers
-                .strip_prefix("minecraft:")
-                .unwrap_or(&compostable.layers);
-            let chance = match layers {
-                "compostable/low" => 0.3,
-                "compostable/low_medium" => 0.5,
-                "compostable/medium" => 0.65,
-                "compostable/medium_high" => 0.85,
-                "compostable/always_add_one" => 1.0,
-                _ => panic!("Unknown compostable layers: {}", compostable.layers),
-            };
-            let chance_lit = LitFloat::new(&format!("{chance:?}f32"), Span::call_site());
+            let layers = int_provider_tokens(&compostable.layers);
             tokens.extend(quote! {
-                (Compostable, &CompostableImpl { chance: #chance_lit }),
+                (Compostable, &CompostableImpl { layers: #layers }),
             });
         }
         if let Some(fuel) = &self.cooking_fuel {
-            let burn_time_tokens = match &fuel.burn_time {
-                serde_json::Value::Number(n) => {
-                    let val = n.as_i64().unwrap_or(0) as i32;
-                    let val_lit = LitInt::new(&val.to_string(), Span::call_site());
-                    quote! { crate::data_component_impl::IntProvider::Inline(#val_lit) }
-                }
-                serde_json::Value::String(s) => {
-                    let s_lit = LitStr::new(s, Span::call_site());
-                    quote! { crate::data_component_impl::IntProvider::Id(std::borrow::Cow::Borrowed(#s_lit)) }
-                }
-                _ => quote! { crate::data_component_impl::IntProvider::Inline(0) },
-            };
-
-            let speed_multiplier_tokens = match &fuel.speed_multiplier {
-                Some(serde_json::Value::Number(n)) => {
-                    let val = n.as_f64().unwrap_or(1.0) as f32;
-                    let val_lit = LitFloat::new(&format!("{val:?}f32"), Span::call_site());
-                    quote! { crate::data_component_impl::FloatProvider::Inline(#val_lit) }
-                }
-                Some(serde_json::Value::String(s)) => {
-                    let s_lit = LitStr::new(s, Span::call_site());
-                    quote! { crate::data_component_impl::FloatProvider::Id(std::borrow::Cow::Borrowed(#s_lit)) }
-                }
-                _ => {
-                    quote! { crate::data_component_impl::FloatProvider::Id(std::borrow::Cow::Borrowed("minecraft:cooking/speed_default")) }
-                }
-            };
-
+            let burn_time = int_provider_tokens(&fuel.burn_time);
+            let speed_multiplier = float_provider_tokens(&fuel.speed_multiplier);
             tokens.extend(quote! {
                 (CookingFuel, &CookingFuelImpl {
-                    burn_time: #burn_time_tokens,
-                    speed_multiplier: #speed_multiplier_tokens,
+                    burn_time: #burn_time,
+                    speed_multiplier: #speed_multiplier,
                 }),
             });
         }
         if self.waxed.is_some() {
             tokens.extend(quote! { (Waxed, &WaxedImpl), });
         }
-        if self.enchantment_glint_override.is_some() {
-            tokens.extend(quote! { (EnchantmentGlintOverride, &EnchantmentGlintOverrideImpl), });
+        if let Some(has_glint) = self
+            .enchantment_glint_override
+            .as_ref()
+            .and_then(serde_json::Value::as_bool)
+        {
+            tokens.extend(quote! {
+                (EnchantmentGlintOverride, &EnchantmentGlintOverrideImpl { has_glint: #has_glint }),
+            });
         }
         if self.enchantments.is_some() {
             tokens.extend(
@@ -986,7 +920,9 @@ impl ToTokens for ItemComponents {
             tokens.extend(quote! { (Lore, &LoreImpl { lines: Vec::new() }), });
         }
         if self.map_decorations.is_some() {
-            tokens.extend(quote! { (MapDecorations, &MapDecorationsImpl), });
+            tokens.extend(
+                quote! { (MapDecorations, &MapDecorationsImpl { decorations: Vec::new() }), },
+            );
         }
         if let Some(charge) = self.minimum_attack_charge {
             let charge = float_literal(charge);
@@ -1012,8 +948,43 @@ impl ToTokens for ItemComponents {
                 }),
             });
         }
-        if self.pot_decorations.is_some() {
-            tokens.extend(quote! { (PotDecorations, &PotDecorationsImpl), });
+        if let Some(pot_decorations) = &self.pot_decorations {
+            let side = |name: &str| {
+                pot_decorations
+                    .get(name)
+                    .and_then(|side| side.get("id").or(Some(side)))
+                    .and_then(serde_json::Value::as_str)
+                    .map_or_else(
+                        || quote! { None },
+                        |id| {
+                            let item = format_ident!(
+                                "{}",
+                                id.strip_prefix("minecraft:")
+                                    .unwrap_or(id)
+                                    .to_shouty_snake_case()
+                            );
+                            // A const stack; its Bedrock `uid` is never sent.
+                            quote! {
+                                Some(crate::item_stack::ItemStack {
+                                    item_count: 1,
+                                    item: &Self::#item,
+                                    patch: Vec::new(),
+                                    uid: std::num::NonZero::<i32>::MIN,
+                                })
+                            }
+                        },
+                    )
+            };
+            let (back, left, right, front) =
+                (side("back"), side("left"), side("right"), side("front"));
+            tokens.extend(quote! {
+                (PotDecorations, &PotDecorationsImpl {
+                    back: #back,
+                    left: #left,
+                    right: #right,
+                    front: #front,
+                }),
+            });
         }
         if self.potion_contents.is_some() {
             tokens.extend(quote! {
@@ -1083,7 +1054,7 @@ impl ToTokens for ItemComponents {
             tokens.extend(quote! { (Rarity, &RarityImpl { rarity: #rarity_variant }), });
         }
         if self.recipes.is_some() {
-            tokens.extend(quote! { (Recipes, &RecipesImpl), });
+            tokens.extend(quote! { (Recipes, &RecipesImpl { recipes: Vec::new() }), });
         }
         if let Some(cost) = self.repair_cost {
             tokens.extend(quote! { (RepairCost, &RepairCostImpl { cost: #cost }), });
@@ -1143,10 +1114,19 @@ impl ToTokens for ItemComponents {
             });
         }
         if self.tooltip_display.is_some() {
-            tokens.extend(quote! { (TooltipDisplay, &TooltipDisplayImpl), });
+            tokens.extend(quote! { (TooltipDisplay, &TooltipDisplayImpl::DEFAULT), });
         }
-        if self.use_effects.is_some() {
-            tokens.extend(quote! { (UseEffects, &UseEffectsImpl), });
+        if let Some(use_effects) = &self.use_effects {
+            let can_sprint = use_effects.can_sprint;
+            let interact_vibrations = use_effects.interact_vibrations;
+            let speed_multiplier = float_literal(use_effects.speed_multiplier);
+            tokens.extend(quote! {
+                (UseEffects, &UseEffectsImpl {
+                    can_sprint: #can_sprint,
+                    interact_vibrations: #interact_vibrations,
+                    speed_multiplier: #speed_multiplier,
+                }),
+            });
         }
         if self.use_remainder.is_some() {
             let remainder = self.use_remainder.as_ref().unwrap();
@@ -1284,10 +1264,11 @@ pub enum StringOrStatusEffects {
     Effects(Vec<StatusEffectInstance>),
 }
 
-/// Deserialized death-protection component (e.g., totem of undying); fields are unimplemented.
+/// Deserialized death-protection component (e.g., totem of undying).
 #[derive(Deserialize, Clone)]
 pub struct DeathProtection {
-    // TODO
+    #[serde(default)]
+    death_effects: Vec<ConsumeEffect>,
 }
 
 /// Deserialized attack-blocking component (e.g., shield); fields are unimplemented.
@@ -1367,8 +1348,184 @@ pub struct PiercingWeaponComponent {
     pub hit_sound: Option<String>,
 }
 
+/// The `ConsumeEffect` list of a consumable or death protection component.
+fn consume_effect_tokens(effects: &[ConsumeEffect]) -> TokenStream {
+    let mut effect_tokens = TokenStream::new();
+
+    for effect in effects.iter().cloned() {
+        match effect.r#type.as_str() {
+            "minecraft:clear_all_effects" => {
+                effect_tokens.extend(quote! { ConsumeEffect::ClearAllEffects, });
+            }
+            "minecraft:teleport_randomly" => {
+                let diameter = effect.diameter.unwrap_or(16.);
+                effect_tokens.extend(quote! {
+                    ConsumeEffect::TeleportRandomly {
+                        diameter: #diameter,
+                        directional_particles: true,
+                    },
+                });
+            }
+            "minecraft:play_sound" => {
+                let sound = format_ident!(
+                    "{}",
+                    effect
+                        .sound
+                        .unwrap()
+                        .strip_prefix("minecraft:")
+                        .unwrap()
+                        .to_pascal_case()
+                );
+                effect_tokens.extend(quote! { ConsumeEffect::PlaySound(IdOr::Id(Sound::#sound)), });
+            }
+            "minecraft:apply_effects" => {
+                let probability = effect.probability.unwrap_or(1.);
+                if let StringOrStatusEffects::Effects(status_effect_instances) =
+                    effect.effects.unwrap()
+                {
+                    let mut status_tokens = TokenStream::new();
+
+                    for status in status_effect_instances {
+                        let effect_id = status.id;
+                        let amplifier = status.amplifier.unwrap_or(0);
+                        let duration = status.duration.unwrap_or(0);
+                        let ambient = status.ambient.unwrap_or(false);
+                        let show_particles = status.show_particles.unwrap_or(true);
+                        let show_icon = status.show_icon.unwrap_or(show_particles);
+                        status_tokens.extend(quote! {
+                            StatusEffectInstance {
+                                effect_id: Cow::Borrowed(#effect_id),
+                                amplifier: #amplifier,
+                                duration: #duration,
+                                ambient: #ambient,
+                                show_particles: #show_particles,
+                                show_icon: #show_icon,
+                                hidden_effect: None,
+                            },
+                        });
+                    }
+                    effect_tokens.extend(quote! {
+                        ConsumeEffect::ApplyEffects((Cow::Borrowed(&[#status_tokens]), #probability)),
+                    });
+                }
+            }
+            "minecraft:remove_effects" => {
+                if let StringOrStatusEffects::String(id) = effect.effects.unwrap() {
+                    let effect_id = format_ident!(
+                        "{}",
+                        id.strip_prefix("minecraft:")
+                            .unwrap()
+                            .to_pascal_case()
+                            .to_uppercase()
+                    );
+
+                    effect_tokens.extend(quote! {
+                        ConsumeEffect::RemoveEffects(IDSet::IDs(Cow::Borrowed(&[&StatusEffect::#effect_id]))),
+                    });
+                }
+            }
+            _ => println!("Unknown CustomEffect type: {}", effect.r#type),
+        }
+    }
+    effect_tokens
+}
+
 fn float_literal(value: f32) -> LitFloat {
     LitFloat::new(&format!("{value:?}f32"), Span::call_site())
+}
+
+/// A `ResolvableInt`: an int constant or a `context_int_provider` key.
+fn int_provider_tokens(value: &serde_json::Value) -> TokenStream {
+    if let Some(id) = value.as_str() {
+        quote! { IntProvider::Id(Cow::Borrowed(#id)) }
+    } else {
+        let value = value.as_i64().expect("ResolvableInt is an int or a key") as i32;
+        quote! { IntProvider::Inline(#value) }
+    }
+}
+
+/// A `ResolvableFloat`: a float constant or a `context_float_provider` key.
+fn float_provider_tokens(value: &serde_json::Value) -> TokenStream {
+    if let Some(id) = value.as_str() {
+        quote! { FloatProvider::Id(Cow::Borrowed(#id)) }
+    } else {
+        let value =
+            float_literal(value.as_f64().expect("ResolvableFloat is a float or a key") as f32);
+        quote! { FloatProvider::Inline(#value) }
+    }
+}
+
+fn damage_type_set_tokens(set: &StringOrList) -> TokenStream {
+    match set {
+        StringOrList::String(id) => id.strip_prefix('#').map_or_else(
+            || quote! { DamageTypeSet::Entries(Cow::Borrowed(&[Cow::Borrowed(#id)])) },
+            |tag| quote! { DamageTypeSet::Tag(Cow::Borrowed(#tag)) },
+        ),
+        StringOrList::List(ids) => {
+            quote! { DamageTypeSet::Entries(Cow::Borrowed(&[#(Cow::Borrowed(#ids)),*])) }
+        }
+    }
+}
+
+fn blocks_attacks_tokens(blocks_attacks: &BlocksAttacks) -> TokenStream {
+    let block_delay_seconds = float_literal(blocks_attacks.block_delay_seconds.unwrap_or(0.0));
+    let disable_cooldown_scale =
+        float_literal(blocks_attacks.disable_cooldown_scale.unwrap_or(1.0));
+    let damage_reductions = blocks_attacks.damage_reductions.as_ref().map_or_else(
+        || quote! { Cow::Borrowed(BlocksAttacksImpl::DEFAULT_DAMAGE_REDUCTIONS) },
+        |reductions| {
+            let reductions = reductions.iter().map(|reduction| {
+                let angle = float_literal(reduction.horizontal_blocking_angle.unwrap_or(90.0));
+                let damage_types = reduction.r#type.as_ref().map_or_else(
+                    || quote! { None },
+                    |set| {
+                        let set = damage_type_set_tokens(set);
+                        quote! { Some(#set) }
+                    },
+                );
+                let base = float_literal(reduction.base);
+                let factor = float_literal(reduction.factor);
+                quote! {
+                    DamageReduction {
+                        horizontal_blocking_angle: #angle,
+                        r#type: #damage_types,
+                        base: #base,
+                        factor: #factor,
+                    }
+                }
+            });
+            quote! { Cow::Borrowed(&[#(#reductions),*]) }
+        },
+    );
+    let item_damage = blocks_attacks.item_damage.as_ref().map_or_else(
+        || quote! { ItemDamageFunction::DEFAULT },
+        |function| {
+            let threshold = float_literal(function.threshold);
+            let base = float_literal(function.base);
+            let factor = float_literal(function.factor);
+            quote! { ItemDamageFunction { threshold: #threshold, base: #base, factor: #factor } }
+        },
+    );
+    let bypassed_by = blocks_attacks.bypassed_by.as_ref().map_or_else(
+        || quote! { None },
+        |set| {
+            let set = damage_type_set_tokens(set);
+            quote! { Some(#set) }
+        },
+    );
+    let block_sound = optional_sound_tokens(blocks_attacks.block_sound.as_deref());
+    let disabled_sound = optional_sound_tokens(blocks_attacks.disabled_sound.as_deref());
+    quote! {
+        (BlocksAttacks, &BlocksAttacksImpl {
+            block_delay_seconds: #block_delay_seconds,
+            disable_cooldown_scale: #disable_cooldown_scale,
+            damage_reductions: #damage_reductions,
+            item_damage: #item_damage,
+            bypassed_by: #bypassed_by,
+            block_sound: #block_sound,
+            disabled_sound: #disabled_sound,
+        }),
+    }
 }
 
 fn optional_sound_tokens(sound: Option<&str>) -> TokenStream {
@@ -1408,7 +1565,28 @@ fn kinetic_condition_tokens(condition: Option<&KineticConditionComponent>) -> To
 
 #[derive(Deserialize, Clone)]
 pub struct BlocksAttacks {
-    // TODO
+    block_delay_seconds: Option<f32>,
+    disable_cooldown_scale: Option<f32>,
+    damage_reductions: Option<Vec<DamageReductionComponent>>,
+    item_damage: Option<ItemDamageFunctionComponent>,
+    bypassed_by: Option<StringOrList>,
+    block_sound: Option<String>,
+    disabled_sound: Option<String>,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct DamageReductionComponent {
+    horizontal_blocking_angle: Option<f32>,
+    r#type: Option<StringOrList>,
+    base: f32,
+    factor: f32,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct ItemDamageFunctionComponent {
+    threshold: f32,
+    base: f32,
+    factor: f32,
 }
 
 /// Deserialized damage-resistance component indicating which damage types the item resists.
@@ -1427,8 +1605,7 @@ pub enum StringOrList {
 #[derive(Deserialize, Clone)]
 pub struct CookingFuelComponent {
     pub burn_time: serde_json::Value,
-    #[serde(default)]
-    pub speed_multiplier: Option<serde_json::Value>,
+    pub speed_multiplier: serde_json::Value,
 }
 
 #[derive(Deserialize, Clone)]

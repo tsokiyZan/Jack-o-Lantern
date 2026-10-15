@@ -51,7 +51,7 @@ impl BlockBehaviour for ComposterBlock {
             let Some(compostable) = item_stack.get_data_component::<CompostableImpl>() else {
                 return BlockActionResult::Pass;
             };
-            let chance = compostable.chance;
+            let chance = compostable.chance();
 
             // Consume one item from the stack (if in survival mode)
             if !args.player.has_infinite_materials() {

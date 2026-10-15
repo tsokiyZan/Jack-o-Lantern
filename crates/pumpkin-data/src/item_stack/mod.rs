@@ -1110,7 +1110,7 @@ mod tests {
         let mut stack = ItemStack::new(1, &Item::FILLED_MAP);
         stack.patch.push((
             DataComponent::MapDecorations,
-            Some(MapDecorationsImpl.to_dyn()),
+            Some(MapDecorationsImpl::default().to_dyn()),
         ));
 
         let mut compound = NbtCompound::new();
@@ -1591,7 +1591,7 @@ mod tests {
         // Add a transient component and a persistent component
         stack.patch.push((
             DataComponent::AdditionalTradeCost,
-            Some(crate::data_component_impl::AdditionalTradeCostImpl.to_dyn()),
+            Some(crate::data_component_impl::AdditionalTradeCostImpl { cost: 1 }.to_dyn()),
         ));
         stack.patch.push((
             DataComponent::Damage,

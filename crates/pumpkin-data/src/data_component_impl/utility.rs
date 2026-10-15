@@ -2,9 +2,13 @@ use super::Digest;
 use crate::data_component_impl::basic::SoundEvent;
 use crate::data_component_impl::combat::SwingAnimationImpl;
 use crate::data_component_impl::{
-    DataComponentImpl, Holder, IdOr, MapHash, get_f32_hash, get_i32_hash, get_idor, get_idor_hash,
-    get_str_hash, get_text_hash, put_idor, text_to_nbt,
+    DataComponentImpl, Holder, IDSet, IdOr, MapHash, get_bool_hash, get_byte_hash, get_f32_hash,
+    get_f64_hash, get_i32_hash, get_idor, get_idor_hash, get_idset_hash, get_list_hash,
+    get_map_hash, get_str_hash, get_text_hash, namespaced, put_idor, synced_registry_id,
+    text_to_nbt,
 };
+use crate::dye_color::DyeColor;
+use crate::entity_type::EntityType;
 use crate::jukebox_song::JukeboxSong;
 use crate::sound::Sound;
 use pumpkin_nbt::compound::NbtCompound;
@@ -66,54 +70,114 @@ impl std::hash::Hash for FloatProvider {
     }
 }
 
+// `ResolvableInt.CODEC`/`ResolvableFloat.CODEC` are `Codec.either(constant, key)`.
+impl IntProvider {
+    #[must_use]
+    pub fn read_data(tag: &NbtTag) -> Option<Self> {
+        match tag {
+            NbtTag::String(id) => Some(Self::Id(Cow::Owned(id.to_string()))),
+            other => other.as_numeric_int().map(Self::Inline),
+        }
+    }
+
+    #[must_use]
+    pub fn write_data(&self) -> NbtTag {
+        match self {
+            Self::Id(id) => NbtTag::String(id.as_ref().into()),
+            Self::Inline(value) => NbtTag::Int(*value),
+        }
+    }
+
+    #[must_use]
+    pub fn get_hash(&self) -> u32 {
+        match self {
+            Self::Id(id) => get_str_hash(&namespaced(id)),
+            Self::Inline(value) => get_i32_hash(*value),
+        }
+    }
+}
+
+impl FloatProvider {
+    #[must_use]
+    pub fn read_data(tag: &NbtTag) -> Option<Self> {
+        match tag {
+            NbtTag::String(id) => Some(Self::Id(Cow::Owned(id.to_string()))),
+            other => other.as_numeric_float().map(Self::Inline),
+        }
+    }
+
+    #[must_use]
+    pub fn write_data(&self) -> NbtTag {
+        match self {
+            Self::Id(id) => NbtTag::String(id.as_ref().into()),
+            Self::Inline(value) => NbtTag::Float(*value),
+        }
+    }
+
+    #[must_use]
+    pub fn get_hash(&self) -> u32 {
+        match self {
+            Self::Id(id) => get_str_hash(&namespaced(id)),
+            Self::Inline(value) => get_f32_hash(*value),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct CookingFuelImpl {
     pub burn_time: IntProvider,
     pub speed_multiplier: FloatProvider,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+/// `minecraft:compostable`: how many layers the item adds to a composter.
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct CompostableImpl {
-    pub chance: f32,
+    pub layers: IntProvider,
 }
 
 impl CompostableImpl {
+    /// The chance that composting the item adds a layer. The vanilla
+    /// `compostable/*` providers are weighted lists of 1 and 0 layers.
+    #[must_use]
+    pub fn chance(&self) -> f32 {
+        match &self.layers {
+            IntProvider::Inline(layers) => {
+                if *layers > 0 {
+                    1.0
+                } else {
+                    0.0
+                }
+            }
+            IntProvider::Id(id) => match id.strip_prefix("minecraft:").unwrap_or(id) {
+                "compostable/low" => 0.3,
+                "compostable/low_medium" => 0.5,
+                "compostable/medium" => 0.65,
+                "compostable/medium_high" => 0.85,
+                "compostable/always_add_one" => 1.0,
+                _ => 0.0,
+            },
+        }
+    }
+
     pub fn read_data(data: &NbtTag) -> Option<Self> {
-        let layers = data.extract_compound()?.get_string("layers")?;
-        let chance = match layers.as_ref() {
-            "minecraft:compostable/low" => 0.3,
-            "minecraft:compostable/low_medium" => 0.5,
-            "minecraft:compostable/medium" => 0.65,
-            "minecraft:compostable/medium_high" => 0.85,
-            "minecraft:compostable/always_add_one" => 1.0,
-            _ => return None,
-        };
-        Some(Self { chance })
+        Some(Self {
+            layers: IntProvider::read_data(data.extract_compound()?.get("layers")?)?,
+        })
     }
 }
 
 impl DataComponentImpl for CompostableImpl {
     fn write_data(&self) -> NbtTag {
-        let layers = match self.chance {
-            0.3 => "minecraft:compostable/low",
-            0.5 => "minecraft:compostable/low_medium",
-            0.65 => "minecraft:compostable/medium",
-            0.85 => "minecraft:compostable/medium_high",
-            1.0 => "minecraft:compostable/always_add_one",
-            _ => return NbtTag::End,
-        };
         let mut compound = NbtCompound::new();
-        compound.put_string("layers", layers.to_string());
+        compound.put("layers", self.layers.write_data());
         NbtTag::Compound(compound)
     }
-
-    default_impl!(Compostable);
-}
-
-impl std::hash::Hash for CompostableImpl {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        state.write_u32(self.chance.to_bits());
+    fn get_hash(&self) -> i32 {
+        MapHash::new()
+            .field("layers", self.layers.get_hash())
+            .finish() as i32
     }
+    default_impl!(Compostable);
 }
 
 impl CookingFuelImpl {
@@ -173,74 +237,27 @@ impl CookingFuelImpl {
     }
 
     pub fn read_data(data: &NbtTag) -> Option<Self> {
-        match data {
-            NbtTag::Compound(compound) => {
-                let burn_time = if let Some(id) = compound.get_string("burn_time") {
-                    IntProvider::Id(Cow::Owned(id.to_string()))
-                } else if let Some(val) = compound.get("burn_time").and_then(NbtTag::extract_int) {
-                    IntProvider::Inline(val)
-                } else {
-                    return None;
-                };
-
-                let speed_multiplier = if let Some(id) = compound.get_string("speed_multiplier") {
-                    FloatProvider::Id(Cow::Owned(id.to_string()))
-                } else if let Some(val) = compound
-                    .get("speed_multiplier")
-                    .and_then(NbtTag::extract_float)
-                {
-                    FloatProvider::Inline(val)
-                } else {
-                    FloatProvider::Id(Cow::Borrowed("minecraft:cooking/speed_default"))
-                };
-
-                Some(Self {
-                    burn_time,
-                    speed_multiplier,
-                })
-            }
-            _ => None,
-        }
+        let compound = data.extract_compound()?;
+        Some(Self {
+            burn_time: IntProvider::read_data(compound.get("burn_time")?)?,
+            speed_multiplier: FloatProvider::read_data(compound.get("speed_multiplier")?)?,
+        })
     }
 }
 
 impl DataComponentImpl for CookingFuelImpl {
     fn write_data(&self) -> NbtTag {
         let mut compound = NbtCompound::new();
-        match &self.burn_time {
-            IntProvider::Id(id) => compound.put_string("burn_time", id.to_string()),
-            IntProvider::Inline(val) => compound.put_int("burn_time", *val),
-        }
-        match &self.speed_multiplier {
-            FloatProvider::Id(id) => compound.put_string("speed_multiplier", id.to_string()),
-            FloatProvider::Inline(val) => compound.put_float("speed_multiplier", *val),
-        }
+        compound.put("burn_time", self.burn_time.write_data());
+        compound.put("speed_multiplier", self.speed_multiplier.write_data());
         NbtTag::Compound(compound)
     }
 
     fn get_hash(&self) -> i32 {
-        let mut digest = Digest::new();
-        match &self.burn_time {
-            IntProvider::Id(id) => {
-                digest.update(&[1u8]);
-                digest.update(&get_str_hash(id).to_le_bytes());
-            }
-            IntProvider::Inline(val) => {
-                digest.update(&[2u8]);
-                digest.update(&get_i32_hash(*val).to_le_bytes());
-            }
-        }
-        match &self.speed_multiplier {
-            FloatProvider::Id(id) => {
-                digest.update(&[3u8]);
-                digest.update(&get_str_hash(id).to_le_bytes());
-            }
-            FloatProvider::Inline(val) => {
-                digest.update(&[4u8]);
-                digest.update(&get_f32_hash(*val).to_le_bytes());
-            }
-        }
-        digest.finalize() as i32
+        MapHash::new()
+            .field("burn_time", self.burn_time.get_hash())
+            .field("speed_multiplier", self.speed_multiplier.get_hash())
+            .finish() as i32
     }
 
     default_impl!(CookingFuel);
@@ -257,30 +274,128 @@ impl WaxedImpl {
 }
 
 impl DataComponentImpl for WaxedImpl {
+    fn write_data(&self) -> NbtTag {
+        NbtTag::Compound(NbtCompound::new())
+    }
+    fn get_hash(&self) -> i32 {
+        get_map_hash([]) as i32
+    }
     default_impl!(Waxed);
 }
 
+/// `minecraft:dye`: the dye color an item applies.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct DyeImpl;
+pub struct DyeImpl {
+    pub color: DyeColor,
+}
 impl DyeImpl {
-    pub const fn read_data(_data: &NbtTag) -> Option<Self> {
-        Some(Self)
+    pub fn read_data(data: &NbtTag) -> Option<Self> {
+        Some(Self {
+            color: DyeColor::by_name(data.extract_string()?)?,
+        })
     }
 }
 impl DataComponentImpl for DyeImpl {
+    fn write_data(&self) -> NbtTag {
+        NbtTag::String(self.color.name().into())
+    }
+    fn get_hash(&self) -> i32 {
+        get_str_hash(self.color.name()) as i32
+    }
     default_impl!(Dye);
 }
 
-/// 26.3 `minecraft:brewing_fuel` marker. Presence identifies brewing-stand fuel.
+/// 26.3 `minecraft:brewing_fuel`: how many brews the fuel lasts and how fast it brews.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct BrewingFuelImpl;
+pub struct BrewingFuelImpl {
+    pub uses: IntProvider,
+    pub speed_multiplier: FloatProvider,
+}
 impl BrewingFuelImpl {
-    pub const fn read_data(_data: &NbtTag) -> Option<Self> {
-        Some(Self)
+    pub fn read_data(data: &NbtTag) -> Option<Self> {
+        let compound = data.extract_compound()?;
+        Some(Self {
+            uses: IntProvider::read_data(compound.get("uses")?)?,
+            speed_multiplier: FloatProvider::read_data(compound.get("speed_multiplier")?)?,
+        })
     }
 }
 impl DataComponentImpl for BrewingFuelImpl {
+    fn write_data(&self) -> NbtTag {
+        let mut compound = NbtCompound::new();
+        compound.put("uses", self.uses.write_data());
+        compound.put("speed_multiplier", self.speed_multiplier.write_data());
+        NbtTag::Compound(compound)
+    }
+    fn get_hash(&self) -> i32 {
+        MapHash::new()
+            .field("uses", self.uses.get_hash())
+            .field("speed_multiplier", self.speed_multiplier.get_hash())
+            .finish() as i32
+    }
     default_impl!(BrewingFuel);
+}
+
+/// `minecraft:mob_visibility`: how well the listed mobs can see the item's wearer.
+#[derive(Clone, Debug, PartialEq)]
+pub struct MobVisibilityImpl {
+    pub targeting_entity_types: IDSet<EntityType>,
+    pub visibility: f32,
+}
+impl MobVisibilityImpl {
+    pub fn read_data(data: &NbtTag) -> Option<Self> {
+        let compound = data.extract_compound()?;
+        Some(Self {
+            targeting_entity_types: IDSet::read(compound.get("targeting_entity_types")?)?,
+            visibility: compound.get("visibility")?.as_numeric_float()?,
+        })
+    }
+}
+impl DataComponentImpl for MobVisibilityImpl {
+    fn write_data(&self) -> NbtTag {
+        let mut compound = NbtCompound::new();
+        self.targeting_entity_types
+            .write(&mut compound, "targeting_entity_types");
+        compound.put_float("visibility", self.visibility);
+        NbtTag::Compound(compound)
+    }
+    fn get_hash(&self) -> i32 {
+        MapHash::new()
+            .field(
+                "targeting_entity_types",
+                get_idset_hash(&self.targeting_entity_types),
+            )
+            .field("visibility", get_f32_hash(self.visibility))
+            .finish() as i32
+    }
+    default_impl!(MobVisibility);
+}
+
+/// `minecraft:block_transformer`: the `block_transformer` registry entry the
+/// item applies when used on a block.
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub struct BlockTransformerImpl {
+    pub transformer: Cow<'static, str>,
+}
+impl BlockTransformerImpl {
+    pub const REGISTRY: &'static str = "block_transformer";
+
+    pub fn read_data(data: &NbtTag) -> Option<Self> {
+        let id = data.extract_string()?;
+        synced_registry_id(Self::REGISTRY, id)?;
+        Some(Self {
+            transformer: Cow::Owned(namespaced(id).into_owned()),
+        })
+    }
+}
+impl DataComponentImpl for BlockTransformerImpl {
+    fn write_data(&self) -> NbtTag {
+        NbtTag::String(namespaced(&self.transformer).into())
+    }
+    fn get_hash(&self) -> i32 {
+        get_str_hash(&namespaced(&self.transformer)) as i32
+    }
+    default_impl!(BlockTransformer);
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -321,17 +436,67 @@ impl DataComponentImpl for MapIdImpl {
     default_impl!(MapId);
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct MapDecorationsImpl;
+/// One `MapDecorations.Entry`: a marker drawn on a map item.
+#[derive(Clone, Debug, PartialEq)]
+pub struct MapDecorationEntry {
+    pub r#type: String,
+    pub x: f64,
+    pub z: f64,
+    pub rotation: f32,
+}
+
+/// `minecraft:map_decorations`: markers keyed by id.
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct MapDecorationsImpl {
+    pub decorations: Vec<(String, MapDecorationEntry)>,
+}
 impl MapDecorationsImpl {
-    pub const fn read_data(_data: &NbtTag) -> Option<Self> {
-        Some(Self)
+    pub fn read_data(data: &NbtTag) -> Option<Self> {
+        let decorations = data
+            .extract_compound()?
+            .child_tags
+            .iter()
+            .map(|(key, entry)| {
+                let entry = entry.extract_compound()?;
+                Some((
+                    key.to_string(),
+                    MapDecorationEntry {
+                        r#type: entry.get_string("type")?.to_string(),
+                        x: entry.get_double("x")?,
+                        z: entry.get_double("z")?,
+                        rotation: entry.get_float("rotation")?,
+                    },
+                ))
+            })
+            .collect::<Option<Vec<_>>>()?;
+        Some(Self { decorations })
     }
 }
 impl DataComponentImpl for MapDecorationsImpl {
-    // TAG_End would close the surrounding components compound and corrupt the chunk.
     fn write_data(&self) -> NbtTag {
-        NbtTag::Compound(NbtCompound::new())
+        let mut compound = NbtCompound::new();
+        for (key, entry) in &self.decorations {
+            let mut entry_compound = NbtCompound::new();
+            entry_compound.put_string("type", entry.r#type.clone());
+            entry_compound.put_double("x", entry.x);
+            entry_compound.put_double("z", entry.z);
+            entry_compound.put_float("rotation", entry.rotation);
+            compound.put_compound(key, entry_compound);
+        }
+        NbtTag::Compound(compound)
+    }
+    fn get_hash(&self) -> i32 {
+        get_map_hash(self.decorations.iter().map(|(key, entry)| {
+            (
+                get_str_hash(key),
+                MapHash::new()
+                    .field("type", get_str_hash(&namespaced(&entry.r#type)))
+                    .field("x", get_f64_hash(entry.x))
+                    .field("z", get_f64_hash(entry.z))
+                    .field("rotation", get_f32_hash(entry.rotation))
+                    .finish(),
+            )
+        })) as i32
     }
     default_impl!(MapDecorations);
 }
@@ -612,19 +777,20 @@ impl FireworkExplosionImpl {
     pub fn read_data(tag: &NbtTag) -> Option<Self> {
         let compound = tag.extract_compound()?;
         let shape = FireworkExplosionShape::from_name(compound.get_string("shape")?)?;
-        let colors = compound
-            .get_int_array("colors")
-            .map(|v| v.to_vec())
-            .unwrap_or_default();
-        let fade_colors = compound
-            .get_int_array("fade_colors")
-            .map(|v| v.to_vec())
-            .unwrap_or_default();
+        // `Codec.INT.listOf()` reads an int list or an int array.
+        let colors = |name: &str| match compound.get(name) {
+            Some(NbtTag::IntArray(colors)) => Some(colors.clone()),
+            Some(NbtTag::List(colors)) => colors.iter().map(NbtTag::as_numeric_int).collect(),
+            Some(_) => None,
+            None => Some(Vec::new()),
+        };
+        let colors_list = colors("colors")?;
+        let fade_colors = colors("fade_colors")?;
         let has_trail = compound.get_bool("has_trail").unwrap_or(false);
         let has_twinkle = compound.get_bool("has_twinkle").unwrap_or(false);
         Some(Self {
             shape,
-            colors,
+            colors: colors_list,
             fade_colors,
             has_trail,
             has_twinkle,
@@ -635,27 +801,33 @@ impl DataComponentImpl for FireworkExplosionImpl {
     fn write_data(&self) -> NbtTag {
         let mut compound = NbtCompound::new();
         compound.put_string("shape", self.shape.to_name().to_string());
-        compound.put("colors", NbtTag::IntArray(self.colors.clone()));
-        compound.put("fade_colors", NbtTag::IntArray(self.fade_colors.clone()));
-        compound.put_bool("has_trail", self.has_trail);
-        compound.put_bool("has_twinkle", self.has_twinkle);
+        let colors = |colors: &[i32]| colors.iter().map(|color| NbtTag::Int(*color)).collect();
+        if !self.colors.is_empty() {
+            compound.put_list("colors", colors(&self.colors));
+        }
+        if !self.fade_colors.is_empty() {
+            compound.put_list("fade_colors", colors(&self.fade_colors));
+        }
+        if self.has_trail {
+            compound.put_bool("has_trail", true);
+        }
+        if self.has_twinkle {
+            compound.put_bool("has_twinkle", true);
+        }
         NbtTag::Compound(compound)
     }
     fn get_hash(&self) -> i32 {
-        let mut digest = Digest::new();
-        digest.update(&[2u8]);
-        digest.update(&[self.shape.to_id() as u8]);
-        for color in &self.colors {
-            digest.update(&get_i32_hash(*color).to_le_bytes());
-        }
-        digest.update(&[3u8]);
-        for color in &self.fade_colors {
-            digest.update(&get_i32_hash(*color).to_le_bytes());
-        }
-        digest.update(&[4u8]);
-        digest.update(&[self.has_trail as u8]);
-        digest.update(&[self.has_twinkle as u8]);
-        digest.finalize() as i32
+        // `COLOR_LIST_CODEC` is `Codec.INT.listOf()`, a plain list of ints.
+        let colors = |colors: &[i32]| {
+            (!colors.is_empty()).then(|| get_list_hash(colors.iter().map(|c| get_i32_hash(*c))))
+        };
+        MapHash::new()
+            .field("shape", get_str_hash(self.shape.to_name()))
+            .optional_field("colors", colors(&self.colors))
+            .optional_field("fade_colors", colors(&self.fade_colors))
+            .optional_field("has_trail", self.has_trail.then(|| get_bool_hash(true)))
+            .optional_field("has_twinkle", self.has_twinkle.then(|| get_bool_hash(true)))
+            .finish() as i32
     }
     default_impl!(FireworkExplosion);
 }
@@ -674,11 +846,11 @@ impl FireworksImpl {
     }
     pub fn read_data(tag: &NbtTag) -> Option<Self> {
         let compound = tag.extract_compound()?;
-        let flight_duration = compound
-            .get_byte("flight_duration")
-            .map(i32::from)
-            .or_else(|| compound.get_int("flight_duration"))
-            .unwrap_or(1);
+        // `ExtraCodecs.UNSIGNED_BYTE`, 0 when absent.
+        let flight_duration = match compound.get("flight_duration") {
+            Some(tag) => i32::from(tag.as_numeric_int()? as u8),
+            None => 0,
+        };
         let mut explosions = Vec::new();
         if let Some(list) = compound.get_list("explosions") {
             for item in list {
@@ -696,20 +868,29 @@ impl FireworksImpl {
 impl DataComponentImpl for FireworksImpl {
     fn write_data(&self) -> NbtTag {
         let mut compound = NbtCompound::new();
-        compound.put_int("flight_duration", self.flight_duration);
-        let explosions_list: Vec<NbtTag> = self.explosions.iter().map(|e| e.write_data()).collect();
-        compound.put_list("explosions", explosions_list);
+        if self.flight_duration != 0 {
+            compound.put_byte("flight_duration", self.flight_duration as u8 as i8);
+        }
+        if !self.explosions.is_empty() {
+            let explosions_list: Vec<NbtTag> =
+                self.explosions.iter().map(|e| e.write_data()).collect();
+            compound.put_list("explosions", explosions_list);
+        }
         NbtTag::Compound(compound)
     }
     fn get_hash(&self) -> i32 {
-        let mut digest = Digest::new();
-        digest.update(&[2u8]);
-        digest.update(&get_i32_hash(self.flight_duration).to_le_bytes());
-        for explosion in &self.explosions {
-            digest.update(&get_i32_hash(explosion.get_hash()).to_le_bytes());
-        }
-        digest.update(&[3u8]);
-        digest.finalize() as i32
+        MapHash::new()
+            .optional_field(
+                "flight_duration",
+                (self.flight_duration != 0)
+                    .then(|| get_byte_hash(self.flight_duration as u8 as i8)),
+            )
+            .optional_field(
+                "explosions",
+                (!self.explosions.is_empty())
+                    .then(|| get_list_hash(self.explosions.iter().map(|e| e.get_hash() as u32))),
+            )
+            .finish() as i32
     }
     default_impl!(Fireworks);
 }
@@ -934,13 +1115,36 @@ impl DataComponentImpl for JukeboxPlayableImpl {
     default_impl!(JukeboxPlayable);
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct RecipesImpl;
+/// `minecraft:recipes`: the recipe keys a knowledge book unlocks.
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Default)]
+pub struct RecipesImpl {
+    pub recipes: Vec<String>,
+}
 impl RecipesImpl {
-    pub const fn read_data(_data: &NbtTag) -> Option<Self> {
-        Some(Self)
+    pub fn read_data(data: &NbtTag) -> Option<Self> {
+        let recipes = data
+            .extract_list()?
+            .iter()
+            .map(|tag| tag.extract_string().map(str::to_string))
+            .collect::<Option<Vec<_>>>()?;
+        Some(Self { recipes })
     }
 }
 impl DataComponentImpl for RecipesImpl {
+    fn write_data(&self) -> NbtTag {
+        NbtTag::List(
+            self.recipes
+                .iter()
+                .map(|recipe| NbtTag::String(recipe.as_str().into()))
+                .collect(),
+        )
+    }
+    fn get_hash(&self) -> i32 {
+        get_list_hash(
+            self.recipes
+                .iter()
+                .map(|recipe| get_str_hash(&namespaced(recipe))),
+        ) as i32
+    }
     default_impl!(Recipes);
 }
