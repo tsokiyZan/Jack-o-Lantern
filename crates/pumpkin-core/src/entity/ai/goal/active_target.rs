@@ -11,6 +11,7 @@ use crate::entity::{EntityBase, mob::MobEntity};
 use crate::world::World;
 use pumpkin_data::attributes::Attributes;
 use pumpkin_data::entity::EntityType;
+use pumpkin_util::math::boundingbox::BoundingBox;
 use pumpkin_util::math::vector3::Vector3;
 use rand::RngExt;
 use std::sync::Arc;
@@ -63,6 +64,10 @@ pub struct ActiveTargetGoal {
     target_predicate: TargetPredicate,
     condition: TargetCondition,
     gate: Option<MobFilter>,
+    /// A subclass `canUse` check that, unlike `gate`, leaves `canContinueToUse` alone.
+    start_gate: Option<MobFilter>,
+    /// Vanilla `getTargetSearchArea` overrides: the box searched for non-player targets.
+    search_area: Option<fn(&dyn Mob, f64) -> BoundingBox>,
 }
 
 impl ActiveTargetGoal {
@@ -95,6 +100,8 @@ impl ActiveTargetGoal {
             target_predicate,
             condition: TargetCondition::Always,
             gate: None,
+            start_gate: None,
+            search_area: None,
         }
     }
 
@@ -119,6 +126,23 @@ impl ActiveTargetGoal {
         self
     }
 
+    /// An extra condition in `canUse` only, like a subclass that checks before `super.canUse()`.
+    #[must_use]
+    pub fn starting_only_when(mut self: Box<Self>, gate: MobFilter) -> Box<Self> {
+        self.start_gate = Some(gate);
+        self
+    }
+
+    /// Vanilla `getTargetSearchArea`, given the follow distance.
+    #[must_use]
+    pub fn with_search_area(
+        mut self: Box<Self>,
+        area: fn(&dyn Mob, f64) -> BoundingBox,
+    ) -> Box<Self> {
+        self.search_area = Some(area);
+        self
+    }
+
     #[must_use]
     pub fn with_default(
         mob: &MobEntity,
@@ -139,6 +163,8 @@ impl ActiveTargetGoal {
             target_predicate,
             condition: TargetCondition::Always,
             gate: None,
+            start_gate: None,
+            search_area: None,
         })
     }
 
@@ -167,6 +193,8 @@ impl ActiveTargetGoal {
             target_predicate,
             condition: TargetCondition::Always,
             gate: None,
+            start_gate: None,
+            search_area: None,
         })
     }
 
@@ -203,10 +231,15 @@ impl ActiveTargetGoal {
                 .map(|player| Arc::clone(player) as Arc<dyn EntityBase>)
                 .collect()
         } else {
-            let area = entity
-                .bounding_box
-                .load()
-                .expand(follow_range, follow_range, follow_range);
+            let area = self.search_area.map_or_else(
+                || {
+                    entity
+                        .bounding_box
+                        .load()
+                        .expand(follow_range, follow_range, follow_range)
+                },
+                |area| area(mob, follow_range),
+            );
             goal_utils::get_entities_of_class(&world, self.target_type, &area)
         };
         let condition = self.condition;
@@ -223,7 +256,9 @@ impl ActiveTargetGoal {
 
 impl Goal for ActiveTargetGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
-        if self.gate.is_some_and(|gate| !gate(mob)) {
+        if self.gate.is_some_and(|gate| !gate(mob))
+            || self.start_gate.is_some_and(|gate| !gate(mob))
+        {
             return false;
         }
         // Vanilla `SpiderTargetGoal` checks the light before the random interval roll.

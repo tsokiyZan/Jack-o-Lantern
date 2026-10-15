@@ -1,3 +1,4 @@
+use pumpkin_util::math::boundingbox::BoundingBox;
 use std::sync::atomic::{AtomicI32, AtomicU8, Ordering};
 use std::sync::{Arc, Weak};
 
@@ -109,9 +110,23 @@ impl ShulkerEntity {
                         .alerting_others(),
                 ),
             );
+            // `ShulkerNearestAttackGoal`: players, but not in peaceful.
             target_selector.add_goal(
                 2,
-                ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::PLAYER, true),
+                ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::PLAYER, true)
+                    .starting_only_when(|mob| {
+                        mob.get_entity().world.load().level_info.load().difficulty
+                            != pumpkin_util::Difficulty::Peaceful
+                    }),
+            );
+            // `ShulkerDefenseAttackGoal`: a shulker on a team fights off monsters.
+            target_selector.add_goal(
+                3,
+                ActiveTargetGoal::predicated(&mob_arc.mob_entity, 10, true, |target, _| {
+                    target.entity.entity_type.is_enemy
+                })
+                .starting_only_when(|mob| mob.get_team_name().is_some())
+                .with_search_area(shulker_target_search_area),
             );
         };
 
@@ -549,5 +564,26 @@ impl BlockPosExt for BlockPos {
             self.0.y + offset.y,
             self.0.z + offset.z,
         )
+    }
+}
+
+/// Vanilla `ShulkerDefenseAttackGoal.getTargetSearchArea`: only 4 blocks out from the face
+/// the shulker is attached to.
+fn shulker_target_search_area(mob: &dyn Mob, follow_distance: f64) -> BoundingBox {
+    let bounding_box = mob.get_entity().bounding_box.load();
+    let attach_face = mob
+        .cast_any()
+        .downcast_ref::<ShulkerEntity>()
+        .map_or(DEFAULT_ATTACH_FACE, ShulkerEntity::get_attach_face);
+    match attach_face {
+        BlockDirection::West | BlockDirection::East => {
+            bounding_box.expand(4.0, follow_distance, follow_distance)
+        }
+        BlockDirection::North | BlockDirection::South => {
+            bounding_box.expand(follow_distance, follow_distance, 4.0)
+        }
+        BlockDirection::Down | BlockDirection::Up => {
+            bounding_box.expand(follow_distance, 4.0, follow_distance)
+        }
     }
 }
