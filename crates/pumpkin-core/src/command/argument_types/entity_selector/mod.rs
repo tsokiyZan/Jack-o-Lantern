@@ -479,7 +479,11 @@ impl EntitySelectorPredicate {
     #[allow(clippy::too_many_lines)]
     pub fn test(&self, entity: &dyn EntityBase) -> bool {
         match self {
-            Self::IsAlive => entity.get_entity().is_alive(),
+            // `Entity::isAlive`, which `LivingEntity` narrows to health above 0.
+            Self::IsAlive => entity.get_living_entity().map_or_else(
+                || entity.get_entity().is_alive(),
+                crate::entity::living::LivingEntity::is_alive,
+            ),
             Self::GameMode(mode, invert) => entity
                 .get_player()
                 .is_some_and(|p| (p.gamemode.load() == *mode) ^ invert),
