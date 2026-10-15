@@ -11,7 +11,8 @@ use crate::entity::attributes::{Modifier, ModifierOperation};
 use crate::entity::mob::MobEntity;
 use crate::world::World;
 
-const RANDOM_SPAWN_BONUS_ID: &str = "minecraft:random_spawn_bonus";
+/// Vanilla `Mob.RANDOM_SPAWN_BONUS_ID`.
+pub(crate) const RANDOM_SPAWN_BONUS_ID: &str = "minecraft:random_spawn_bonus";
 
 /// State shared by every mob of one spawn group (vanilla `SpawnGroupData`).
 pub enum SpawnGroupData {
@@ -28,6 +29,11 @@ pub enum SpawnGroupData {
     Fox {
         variant: crate::entity::passive::fox::FoxVariant,
         group_size: i32,
+    },
+    /// Vanilla `Zombie.ZombieGroupData`.
+    Zombie {
+        is_baby: bool,
+        can_spawn_jockey: bool,
     },
 }
 

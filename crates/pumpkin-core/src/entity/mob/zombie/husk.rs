@@ -1,12 +1,18 @@
-use pumpkin_data::entity::EntityPose;
+use pumpkin_data::data_component_impl::EquipmentSlot;
+use pumpkin_data::effect::StatusEffect;
+use pumpkin_data::potion::Effect;
 use pumpkin_util::math::boundingbox::EntityDimensions;
+use rand::RngExt;
 use std::sync::Arc;
 
+use crate::entity::mob::equipment::RegionalDifficulty;
+use crate::entity::mob::spawn::SpawnGroupData;
 use crate::entity::mob::zombie::ZombieEntityBase;
 use crate::entity::{
-    Entity,
+    Entity, EntityBase,
     mob::{Mob, MobEntity},
 };
+use crate::world::World;
 use pumpkin_nbt::compound::NbtCompound;
 
 pub struct HuskEntity {
@@ -34,35 +40,73 @@ const BABY_DIMENSIONS: EntityDimensions =
     EntityDimensions::scalable(0.49, 0.98).with_eye_height(0.825);
 
 impl Mob for HuskEntity {
-    /// Vanilla `Zombie.getBaseExperienceReward`.
-    fn get_base_experience_reward(&self) -> u32 {
-        super::zombie_experience_reward(
-            self.get_mob_entity()
-                .living_entity
-                .entity
-                .entity_type
-                .experience_reward,
-            self.entity.is_baby(),
-        )
-    }
-
-    fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
-        self.entity.default_dimensions(pose)
-    }
+    crate::impl_zombie_mob!(entity);
 
     fn get_mob_entity(&self) -> &MobEntity {
         &self.entity.mob_entity
     }
 
-    fn spawn_as_baby(&self) -> bool {
-        self.entity.spawn_as_baby()
+    /// Vanilla `Husk.finalizeSpawn`.
+    fn finalize_spawn(
+        &self,
+        world: &Arc<World>,
+        group_data: Option<SpawnGroupData>,
+    ) -> Option<SpawnGroupData> {
+        let group_data = self
+            .entity
+            .finalize_zombie_spawn(self, world, group_data, false);
+        let difficulty = RegionalDifficulty::at(world, self.get_entity().pos.load());
+        // Rolled again on top of `Zombie.finalizeSpawn`'s.
+        self.entity.mob_entity.set_can_pick_up_loot(
+            self.get_random().random::<f32>() < 0.55 * difficulty.special_multiplier,
+        );
+        // TODO: `Husk.finalizeSpawn`'s camel husk jockey needs `CamelHusk` and the
+        // `NATURAL` spawn reason.
+        group_data
+    }
+
+    fn populate_default_equipment_slots(
+        &self,
+        world: &Arc<World>,
+        difficulty: &RegionalDifficulty,
+    ) {
+        self.entity
+            .populate_default_equipment_slots(world, difficulty);
+    }
+
+    /// Vanilla `Husk.doHurtTarget` after a hit lands: an empty-handed husk makes its
+    /// target hungry, after `Zombie.doHurtTarget`'s fire.
+    fn on_attack(&self, target: &dyn EntityBase) {
+        self.entity.on_attack(self, target);
+        let mob_entity = &self.entity.mob_entity;
+        if !mob_entity
+            .get_item_slot(&EquipmentSlot::MAIN_HAND)
+            .is_empty()
+        {
+            return;
+        }
+        let Some(living) = target.get_living_entity() else {
+            return;
+        };
+        let world = self.get_entity().world.load_full();
+        let difficulty =
+            RegionalDifficulty::at(&world, self.get_entity().pos.load()).effective_difficulty;
+        living.add_effect(Effect {
+            effect_type: &StatusEffect::HUNGER,
+            duration: 140 * difficulty as i32,
+            amplifier: 0,
+            ambient: false,
+            show_particles: true,
+            show_icon: true,
+            blend: false,
+        });
     }
 
     fn mob_write_nbt(&self, nbt: &mut NbtCompound) {
-        self.entity.mob_write_nbt(nbt);
+        self.entity.write_zombie_nbt(nbt);
     }
 
     fn mob_read_nbt(&self, nbt: &NbtCompound) {
-        self.entity.mob_read_nbt(nbt);
+        self.entity.read_zombie_nbt(self, nbt);
     }
 }

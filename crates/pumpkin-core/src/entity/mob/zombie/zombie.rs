@@ -1,11 +1,10 @@
-use crate::entity::Entity;
 use crate::entity::mob::equipment::RegionalDifficulty;
+use crate::entity::mob::spawn::SpawnGroupData;
 use crate::entity::mob::zombie::ZombieEntityBase;
 use crate::entity::mob::{Mob, MobEntity};
+use crate::entity::{Entity, EntityBase};
 use crate::world::World;
-use pumpkin_data::entity::EntityPose;
 use pumpkin_nbt::compound::NbtCompound;
-use pumpkin_util::math::boundingbox::EntityDimensions;
 use std::sync::Arc;
 
 pub struct ZombieEntity {
@@ -29,28 +28,19 @@ impl ZombieEntity {
 }
 
 impl Mob for ZombieEntity {
-    /// Vanilla `Zombie.getBaseExperienceReward`.
-    fn get_base_experience_reward(&self) -> u32 {
-        super::zombie_experience_reward(
-            self.get_mob_entity()
-                .living_entity
-                .entity
-                .entity_type
-                .experience_reward,
-            self.entity.is_baby(),
-        )
-    }
-
-    fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
-        self.entity.default_dimensions(pose)
-    }
+    crate::impl_zombie_mob!(entity);
 
     fn get_mob_entity(&self) -> &MobEntity {
         &self.entity.mob_entity
     }
 
-    fn spawn_as_baby(&self) -> bool {
-        self.entity.spawn_as_baby()
+    fn finalize_spawn(
+        &self,
+        world: &Arc<World>,
+        group_data: Option<SpawnGroupData>,
+    ) -> Option<SpawnGroupData> {
+        self.entity
+            .finalize_zombie_spawn(self, world, group_data, false)
     }
 
     fn populate_default_equipment_slots(
@@ -62,26 +52,23 @@ impl Mob for ZombieEntity {
             .populate_default_equipment_slots(world, difficulty);
     }
 
-    fn populate_default_equipment_enchantments(&self, difficulty: &RegionalDifficulty) {
-        self.entity
-            .populate_default_equipment_enchantments(difficulty);
+    fn on_attack(&self, target: &dyn EntityBase) {
+        self.entity.on_attack(self, target);
     }
 
     fn mob_write_nbt(&self, nbt: &mut NbtCompound) {
-        self.entity.mob_write_nbt(nbt);
+        self.entity.write_zombie_nbt(nbt);
     }
 
     fn mob_read_nbt(&self, nbt: &NbtCompound) {
-        self.entity.mob_read_nbt(nbt);
+        self.entity.read_zombie_nbt(self, nbt);
     }
 }
 
 impl ZombieEntity {
     #[must_use]
     pub fn can_break_doors(&self) -> bool {
-        self.entity
-            .can_break_doors
-            .load(std::sync::atomic::Ordering::Relaxed)
+        self.entity.can_break_doors()
     }
 
     pub fn set_can_break_doors(&self, can_break: bool) {

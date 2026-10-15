@@ -159,3 +159,24 @@ impl VillagerData {
         VillagerProfession::from_i32(self.profession.0).unwrap_or(VillagerProfession::None)
     }
 }
+
+/// Vanilla `VillagerType.byBiome`: plains for every biome outside its `BY_BIOME` map.
+#[must_use]
+pub fn villager_type_by_biome(biome: &pumpkin_data::chunk::Biome) -> VillagerType {
+    match biome.registry_id {
+        "badlands" | "desert" | "eroded_badlands" | "wooded_badlands" => VillagerType::Desert,
+        "bamboo_jungle" | "jungle" | "sparse_jungle" => VillagerType::Jungle,
+        "savanna_plateau" | "savanna" | "windswept_savanna" => VillagerType::Savanna,
+        "deep_frozen_ocean" | "frozen_ocean" | "frozen_river" | "ice_spikes" | "snowy_beach"
+        | "snowy_taiga" | "snowy_plains" | "grove" | "snowy_slopes" | "frozen_peaks"
+        | "jagged_peaks" => VillagerType::Snow,
+        "swamp" | "mangrove_swamp" => VillagerType::Swamp,
+        "old_growth_spruce_taiga"
+        | "old_growth_pine_taiga"
+        | "windswept_gravelly_hills"
+        | "windswept_hills"
+        | "taiga"
+        | "windswept_forest" => VillagerType::Taiga,
+        _ => VillagerType::Plains,
+    }
+}
