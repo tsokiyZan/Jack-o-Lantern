@@ -3516,14 +3516,6 @@ impl LivingEntity {
             self.entity.sync_velocity.store(true, SeqCst);
         }
 
-        if play_sound {
-            // Vanilla `Mob.playHurtSound` resets the ambient sound timer.
-            if let Some(mob) = caller.get_mob() {
-                mob.reset_ambient_sound_time();
-            }
-            self.make_sound(caller, self.hurt_sound(caller));
-        }
-
         // Vanilla `hurtServer`: `dealDefaultKnockback` on every full-damage hit.
         if took_full_damage && !damage_type.has_tag(&tag::DamageType::MINECRAFT_NO_KNOCKBACK) {
             let (dx, dz) = self.default_knockback_direction(source, position);
@@ -3608,8 +3600,21 @@ impl LivingEntity {
             }
         }
 
+        if let Some(mob) = caller.get_mob() {
+            mob.actually_hurt(damage_type, source, cause);
+        }
+
         self.resolve_mob_responsible_for_damage(damage_type, cause.or(source));
         self.resolve_player_responsible_for_damage(cause.or(source));
+
+        // After `actuallyHurt`, like vanilla, so the sound sees what the hit changed.
+        if play_sound {
+            // Vanilla `Mob.playHurtSound` resets the ambient sound timer.
+            if let Some(mob) = caller.get_mob() {
+                mob.reset_ambient_sound_time();
+            }
+            self.make_sound(caller, self.hurt_sound(caller));
+        }
 
         if new_health <= 0.0 {
             let mut death_event =

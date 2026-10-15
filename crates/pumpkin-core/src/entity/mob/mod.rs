@@ -1452,6 +1452,16 @@ pub trait Mob: EntityBase + Send + Sync {
 
     fn on_damage(&self, _damage_type: DamageType, _source: Option<&dyn EntityBase>) {}
 
+    /// The end of a vanilla `actuallyHurt` override, after the health is taken: `source` is
+    /// the direct entity, `cause` the one responsible.
+    fn actually_hurt(
+        &self,
+        _damage_type: DamageType,
+        _source: Option<&dyn EntityBase>,
+        _cause: Option<&dyn EntityBase>,
+    ) {
+    }
+
     /// Vanilla `hurtServer`, for mobs whose override reorders it; `mob_hurt_server` is the
     /// shared path (vanilla `super.hurtServer`).
     fn hurt_server(
