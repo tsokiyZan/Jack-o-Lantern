@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use pumpkin_util::math::vector3::Vector3;
 use pumpkin_util::math::wrap_degrees;
 use rand::RngExt;
 
@@ -8,6 +7,7 @@ use super::super::BrainTick;
 use super::super::memory::position_tracker::{BlockPosTracker, PositionTracker};
 use super::super::memory::{MemoryModuleId, MemoryStatus, types};
 use super::timed::Behavior;
+use crate::entity::Entity;
 
 /// Vanilla `RandomLookAround`: looks at a random spot ahead, then waits out a gaze
 /// cooldown before the next one.
@@ -36,21 +36,6 @@ impl RandomLookAround {
     }
 }
 
-/// Vanilla `Vec3.directionFromRotation`, in vanilla's float trigonometry.
-fn direction_from_rotation(rot_x: f32, rot_y: f32) -> Vector3<f64> {
-    let to_radians = (std::f64::consts::PI / 180.0) as f32;
-    let pi = std::f64::consts::PI as f32;
-    let y_cos = pumpkin_util::math::cos(-rot_y * to_radians - pi);
-    let y_sin = pumpkin_util::math::sin(-rot_y * to_radians - pi);
-    let x_cos = -pumpkin_util::math::cos(-rot_x * to_radians);
-    let x_sin = pumpkin_util::math::sin(-rot_x * to_radians);
-    Vector3::new(
-        f64::from(y_sin * x_cos),
-        f64::from(x_sin),
-        f64::from(y_cos * x_cos),
-    )
-}
-
 impl Behavior for RandomLookAround {
     fn entry_conditions(&self) -> &[(MemoryModuleId, MemoryStatus)] {
         &self.conditions
@@ -63,7 +48,7 @@ impl Behavior for RandomLookAround {
             tick.mob.get_entity().yaw.load() + 2.0 * random.random::<f32>() * self.max_yaw
                 - self.max_yaw,
         );
-        let look_at = tick.mob.get_eye_pos() + direction_from_rotation(pitch, rotation);
+        let look_at = tick.mob.get_eye_pos() + Entity::direction_from_rotation(pitch, rotation);
         tick.brain.set(
             types::LOOK_TARGET,
             Arc::new(BlockPosTracker::from_vec(look_at)) as Arc<dyn PositionTracker>,

@@ -2271,6 +2271,12 @@ impl Entity {
         )
     }
 
+    /// Vanilla `Entity.getOnPos()`.
+    #[must_use]
+    pub fn get_on_pos(&self) -> BlockPos {
+        self.get_pos_with_y_offset(f64::from(1.0e-5f32)).0
+    }
+
     #[must_use]
     pub fn get_block_pos_below_that_affects_my_movement(&self) -> BlockPos {
         self.get_pos_with_y_offset(0.500_001).0
@@ -3067,6 +3073,28 @@ impl Entity {
     #[must_use]
     pub fn get_look_angle(&self) -> Vector3<f64> {
         Self::calculate_view_vector(self.pitch.load(), self.yaw.load())
+    }
+
+    /// Vanilla `Entity.getForward`.
+    #[must_use]
+    pub fn get_forward(&self) -> Vector3<f64> {
+        Self::direction_from_rotation(self.pitch.load(), self.yaw.load())
+    }
+
+    /// Vanilla `Vec3.directionFromRotation`, in vanilla's float trigonometry.
+    #[must_use]
+    pub fn direction_from_rotation(rot_x: f32, rot_y: f32) -> Vector3<f64> {
+        let to_radians = (std::f64::consts::PI / 180.0) as f32;
+        let pi = std::f64::consts::PI as f32;
+        let y_cos = pumpkin_util::math::cos(-rot_y * to_radians - pi);
+        let y_sin = pumpkin_util::math::sin(-rot_y * to_radians - pi);
+        let x_cos = -pumpkin_util::math::cos(-rot_x * to_radians);
+        let x_sin = pumpkin_util::math::sin(-rot_x * to_radians);
+        Vector3::new(
+            f64::from(y_sin * x_cos),
+            f64::from(x_sin),
+            f64::from(y_cos * x_cos),
+        )
     }
 
     /// Vanilla `Entity.calculateViewVector`, in vanilla's float trigonometry.

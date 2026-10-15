@@ -533,6 +533,9 @@ impl PathNavigation {
         for (&path_type, &malus) in &self.path_type_overrides {
             mob_data.set_pathfinding_malus(path_type, malus);
         }
+        if let Some(mob) = mob.as_ref().and_then(|mob| mob.get_mob()) {
+            mob.on_pathfinding_start(&mut mob_data);
+        }
         mob_data
     }
 
