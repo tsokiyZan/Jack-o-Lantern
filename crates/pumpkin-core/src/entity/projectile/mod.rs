@@ -241,14 +241,22 @@ impl ThrownItemEntity {
             });
         }
 
-        // Entity collisions
-        let candidates = world.get_entities_at_box(&search_box);
+        // Vanilla `ProjectileUtil.getEntityHitResult` searches every entity, players included,
+        // with `computeMargin`: target boxes grow from 0 to 0.3 over the first ticks.
+        let candidates = world.get_all_at_box(&search_box);
+        let margin = f64::from(
+            ((entity.tick_count.load(Ordering::Relaxed) - 2) as f32 / 20.0).clamp(0.0, 0.3),
+        );
         for cand in candidates {
             if self.should_skip_collision(entity, &cand) {
                 continue;
             }
 
-            let ebb = cand.get_entity().bounding_box.load().expand(0.3, 0.3, 0.3);
+            let ebb = cand
+                .get_entity()
+                .bounding_box
+                .load()
+                .expand(margin, margin, margin);
             if let Some(t) = calculate_ray_intersection(&start_pos, &delta, &ebb)
                 && t < closest_t
             {
@@ -271,6 +279,9 @@ impl ThrownItemEntity {
             if self.has_hit.swap(true, Ordering::SeqCst) {
                 return;
             }
+            // Vanilla moves the projectile to the hit location, not the full step, before
+            // `hitTargetOrDeflectSelf`, so effects such as a wind charge's burst start there.
+            entity.set_pos(h.hit_pos());
 
             if let ProjectileHit::Block { pos, hit_pos, .. } = &h {
                 let block = world.get_block(pos);
@@ -299,6 +310,11 @@ impl ThrownItemEntity {
         if Some(other_ent.entity_id) == self.owner_id.load()
             && self_ent.tick_count.load(Ordering::Relaxed) < 5
         {
+            return true;
+        }
+
+        // Vanilla `canBeHitByProjectile`: spectators aren't pickable.
+        if other.is_spectator() {
             return true;
         }
 
@@ -336,13 +352,14 @@ impl ThrownItemEntity {
     }
 }
 
-/// Ray intersection algorithm for AABBs, returning a t value
+/// Vanilla `AABB.clip` as a fraction of `dir`: where the segment enters `bb`, or `None` when
+/// it misses or starts inside.
 fn calculate_ray_intersection(
     start: &Vector3<f64>,
     dir: &Vector3<f64>,
     bb: &BoundingBox,
 ) -> Option<f64> {
-    let mut t_min = 0.0f64;
+    let mut t_min = f64::NEG_INFINITY;
     let mut t_max = 1.0f64;
 
     let b_min = [bb.min.x, bb.min.y, bb.min.z];
