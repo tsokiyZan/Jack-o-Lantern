@@ -1,8 +1,8 @@
 use std::sync::{Arc, Weak};
 
+use super::revenge::MobFilter;
 use crate::entity::EntityBase;
 use crate::entity::ai::goal::{Controls, Goal};
-use crate::entity::ai::pathfinder::NavigatorGoal;
 use crate::entity::mob::{Mob, RangedAttackMob};
 
 /// Generic ranged attack goal for mobs implementing [`RangedAttackMob`].
@@ -15,10 +15,11 @@ pub struct RangedAttackGoal {
     attack_interval_min: i32,
     attack_interval_max: i32,
     attack_radius: f32,
-    attack_radius_sqr: f64,
+    attack_radius_sqr: f32,
     see_time: i32,
     attack_time: i32,
     target: Option<Arc<dyn EntityBase>>,
+    gate: Option<MobFilter>,
 }
 
 impl RangedAttackGoal {
@@ -52,48 +53,49 @@ impl RangedAttackGoal {
             attack_interval_min,
             attack_interval_max,
             attack_radius,
-            attack_radius_sqr: (attack_radius * attack_radius) as f64,
+            attack_radius_sqr: attack_radius * attack_radius,
             see_time: 0,
             attack_time: -1,
             target: None,
+            gate: None,
         }
+    }
+
+    /// Extra condition on `canUse`, like vanilla's `DrownedTridentAttackGoal` wanting a
+    /// trident. `canContinueToUse` calls the overridden `canUse`, so it applies there too.
+    #[must_use]
+    pub const fn gated_by(mut self, gate: MobFilter) -> Self {
+        self.gate = Some(gate);
+        self
     }
 }
 
 impl Goal for RangedAttackGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
-        let target = mob.get_mob_entity().get_target().clone();
-        if let Some(target) = target
-            && target.get_entity().is_alive()
-        {
-            self.target = Some(target);
-            true
-        } else {
-            false
-        }
+        let Some(target) = mob
+            .get_mob_entity()
+            .get_target()
+            .filter(|target| target.get_entity().is_alive())
+        else {
+            return false;
+        };
+        self.target = Some(target);
+        self.gate.is_none_or(|gate| gate(mob))
     }
 
     fn should_continue(&mut self, mob: &dyn Mob) -> bool {
-        if let Some(target) = &self.target {
-            if !target.get_entity().is_alive() {
-                return false;
-            }
-            let current_target = mob.get_mob_entity().get_target().clone();
-            current_target.is_some()
-        } else {
-            false
-        }
+        self.can_start(mob)
+            || self
+                .target
+                .as_ref()
+                .is_some_and(|target| target.get_entity().is_alive())
+                && !mob.is_navigator_idle()
     }
 
-    fn stop(&mut self, mob: &dyn Mob) {
+    fn stop(&mut self, _mob: &dyn Mob) {
         self.target = None;
         self.see_time = 0;
         self.attack_time = -1;
-        mob.get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .stop();
     }
 
     fn should_run_every_tick(&self) -> bool {
@@ -109,13 +111,14 @@ impl Goal for RangedAttackGoal {
             return;
         };
 
-        if self.mob.upgrade().is_none() {
-            return;
-        }
-
-        let mob_pos = mob.get_entity().pos.load();
+        let mob_entity = mob.get_mob_entity();
+        let living = &mob_entity.living_entity;
         let target_pos = target.get_entity().pos.load();
-        let target_dist_sq = mob_pos.squared_distance_to_vec(&target_pos);
+        let target_dist_sqr = living
+            .entity
+            .pos
+            .load()
+            .squared_distance_to_vec(&target_pos);
 
         let has_line_of_sight = mob.has_line_of_sight(target.get_entity());
         if has_line_of_sight {
@@ -125,23 +128,19 @@ impl Goal for RangedAttackGoal {
         }
 
         {
-            let mut navigator = mob
-                .get_mob_entity()
+            let mut navigator = mob_entity
                 .navigator
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
-            if target_dist_sq <= self.attack_radius_sqr && self.see_time >= 5 {
+            if target_dist_sqr <= f64::from(self.attack_radius_sqr) && self.see_time >= 5 {
                 navigator.stop();
-            } else {
-                navigator.set_progress(NavigatorGoal::new(
-                    mob_pos,
-                    target_pos,
-                    self.speed_modifier,
-                ));
+            } else if let Some(path) = navigator.create_path(living, target_pos, 1) {
+                // Vanilla `moveTo(Entity, speed)` keeps the old path when none is found.
+                navigator.move_to_path(Some(path), self.speed_modifier, living);
             }
         }
 
-        mob.get_mob_entity()
+        mob_entity
             .look_control
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -153,20 +152,20 @@ impl Goal for RangedAttackGoal {
                 return;
             }
 
-            let dist = (target_dist_sq.sqrt() as f32) / self.attack_radius;
+            let dist = target_dist_sqr.sqrt() as f32 / self.attack_radius;
             let power = dist.clamp(0.1, 1.0);
             if let Some(ranged) = self.mob.upgrade() {
                 ranged.perform_ranged_attack(&target, power);
             }
-
-            let min = self.attack_interval_min as f32;
-            let max = self.attack_interval_max as f32;
-            self.attack_time = (dist.mul_add(max - min, min)).floor() as i32;
+            self.attack_time = (dist * (self.attack_interval_max - self.attack_interval_min) as f32
+                + self.attack_interval_min as f32)
+                .floor() as i32;
         } else if self.attack_time < 0 {
-            let ratio = (target_dist_sq.sqrt() as f32) / self.attack_radius;
-            let min = self.attack_interval_min as f32;
-            let max = self.attack_interval_max as f32;
-            self.attack_time = (ratio.mul_add(max - min, min)).floor() as i32;
+            // `Mth.lerp` in doubles, unlike the float maths after an attack.
+            let delta = target_dist_sqr.sqrt() / f64::from(self.attack_radius);
+            let min = f64::from(self.attack_interval_min);
+            self.attack_time =
+                (min + delta * (f64::from(self.attack_interval_max) - min)).floor() as i32;
         }
     }
 }
