@@ -1,3 +1,4 @@
+use crate::entity::vehicle::boat::BoatEntity;
 use pumpkin_data::BlockStateId;
 use pumpkin_data::fluid::Fluid;
 use pumpkin_data::tag::{self, Taggable};
@@ -15,18 +16,15 @@ pub struct LilyPadBlock;
 
 impl BlockBehaviour for LilyPadBlock {
     fn on_entity_collision(&self, args: OnEntityCollisionArgs<'_>) {
+        // Vanilla `LilyPadBlock.entityInside`: any `AbstractBoat`, rafts and chest boats included.
+        if args
+            .entity
+            .cast_any()
+            .downcast_ref::<BoatEntity>()
+            .is_some()
         {
-            // Proberbly not the best solution, but works
-            if args
-                .entity
-                .get_entity()
-                .entity_type
-                .resource_name
-                .ends_with("_boat")
-            {
-                args.world
-                    .break_block(args.position, None, BlockFlags::NOTIFY_ALL);
-            }
+            args.world
+                .break_block(args.position, None, BlockFlags::NOTIFY_ALL);
         }
     }
 
