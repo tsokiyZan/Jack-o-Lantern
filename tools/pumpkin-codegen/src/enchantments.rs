@@ -1543,7 +1543,7 @@ pub fn build() -> TokenStream {
                 movement: f64,
                 random: &mut impl pumpkin_util::random::RandomImpl,
             ) -> f64 {
-                f64::from(self.movement_scale).mul_add(movement, f64::from(self.base.get(random)))
+                movement * f64::from(self.movement_scale) + f64::from(self.base.get(random))
             }
         }
 

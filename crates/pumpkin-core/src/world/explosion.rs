@@ -269,7 +269,7 @@ impl Explosion {
                     let mut pos_z = self.pos.z;
 
                     let random_val = rand::random::<f32>();
-                    let mut h = self.power * random_val.mul_add(0.6, 0.7);
+                    let mut h = self.power * (0.7 + random_val * 0.6);
 
                     while h > 0.0 {
                         let block_pos = BlockPos::floored(pos_x, pos_y, pos_z);

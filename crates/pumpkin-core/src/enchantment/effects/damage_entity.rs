@@ -36,11 +36,8 @@ impl DamageEntity {
     pub fn calculate_damage(&self, level: i32, rng: &mut impl RandomImpl) -> f32 {
         let min = self.min_damage.calculate(level);
         let max = self.max_damage.calculate(level);
-        if (max - min).abs() < f32::EPSILON || min >= max {
-            min
-        } else {
-            rng.next_f32().mul_add(max - min, min)
-        }
+        // Vanilla `Mth.randomBetween`, which always draws.
+        rng.next_f32() * (max - min) + min
     }
 
     pub fn apply(

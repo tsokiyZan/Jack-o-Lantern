@@ -48,7 +48,7 @@ impl CaveVinesBlock {
         }
         // The `harvest_cave_vine` loot table.
         world.drop_stack(pos, ItemStack::new(1, &Item::GLOW_BERRIES));
-        let pitch = rand::rng().random::<f32>().mul_add(0.4, 0.8);
+        let pitch = 0.8 + rand::rng().random::<f32>() * 0.4;
         world.play_sound_fine(
             Sound::BlockCaveVinesPickBerries,
             SoundCategory::Blocks,

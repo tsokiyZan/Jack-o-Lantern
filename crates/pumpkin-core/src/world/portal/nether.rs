@@ -116,9 +116,7 @@ impl PortalSearchResult {
         let lower = self.lower_corner.0;
 
         let axis_offset = if portal_width > 0.0 {
-            relative_pos
-                .x
-                .mul_add(portal_width, f64::from(dimensions.width) / 2.0)
+            f64::from(dimensions.width) / 2.0 + portal_width * relative_pos.x
         } else {
             f64::from(self.width) / 2.0
         };

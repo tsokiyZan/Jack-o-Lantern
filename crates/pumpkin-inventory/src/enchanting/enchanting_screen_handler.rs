@@ -388,7 +388,7 @@ impl ScreenHandler for EnchantingTableScreenHandler {
         self.send_content_updates();
 
         // Vanilla plays the table use sound at a random pitch in [0.9, 1.0)
-        let pitch = rand::random::<f32>().mul_add(0.1, 0.9);
+        let pitch = rand::random::<f32>() * 0.1 + 0.9;
         player.play_block_sound(Sound::BlockEnchantmentTableUse, pitch);
 
         player.increment_stat(

@@ -62,7 +62,7 @@ impl ItemBehaviour for FireChargeItem {
             |world: Arc<World>, pos: BlockPos, new_state_id: BlockStateId| {
                 world.set_block_state(&pos, new_state_id, BlockFlags::NOTIFY_ALL);
 
-                let pitch = (rng().random::<f32>() - rng().random::<f32>()).mul_add(0.2, 1.0);
+                let pitch = (rng().random::<f32>() - rng().random::<f32>()) * 0.2 + 1.0;
                 world.play_sound_fine(
                     Sound::ItemFirechargeUse,
                     SoundCategory::Blocks,

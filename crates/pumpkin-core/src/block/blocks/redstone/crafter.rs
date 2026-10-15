@@ -59,7 +59,7 @@ impl ScreenHandlerFactory for CrafterScreenFactory {
 }
 
 fn triangle<R: Rng>(rng: &mut R, min: f64, max: f64) -> f64 {
-    (rng.random::<f64>() - rng.random::<f64>()).mul_add(max, min)
+    min + max * (rng.random::<f64>() - rng.random::<f64>())
 }
 
 const fn orientation_to_front(orientation: Orientation) -> BlockDirection {
@@ -213,7 +213,7 @@ impl CrafterBlock {
             };
 
             let entity = Entity::new(world.clone(), spawn_pos, &EntityType::ITEM);
-            let rd = rng().random::<f64>().mul_add(0.1, 0.2);
+            let rd = rng().random::<f64>() * 0.1 + 0.2;
             let velocity = Vector3::new(
                 triangle(&mut rng(), facing_normal.x * rd, 0.017_227_5 * 6.),
                 triangle(&mut rng(), 0.2, 0.017_227_5 * 6.),

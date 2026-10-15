@@ -5901,9 +5901,9 @@ impl World {
         let mut rng = Xoroshiro::from_seed(get_seed());
 
         // TODO: Use world random here: world.random.nextDouble()
-        let x = rng.next_f64().mul_add(spawn_area, x.floor()) + half_width;
-        let y = rng.next_f64().mul_add(spawn_area, y.floor());
-        let z = rng.next_f64().mul_add(spawn_area, z.floor()) + half_width;
+        let x = x.floor() + rng.next_f64() * spawn_area + half_width;
+        let y = y.floor() + rng.next_f64() * spawn_area;
+        let z = z.floor() + rng.next_f64() * spawn_area + half_width;
 
         while !stack.is_empty() {
             let item = stack.split((rng.next_bounded_i32(21) + 10) as u8);

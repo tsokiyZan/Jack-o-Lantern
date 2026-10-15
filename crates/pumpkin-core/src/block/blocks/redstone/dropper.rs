@@ -59,7 +59,7 @@ pub struct DropperBlock;
 type DispenserLikeProperties = pumpkin_data::block_properties::DispenserLikeProperties;
 
 fn triangle<R: Rng>(rng: &mut R, min: f64, max: f64) -> f64 {
-    (rng.random::<f64>() - rng.random::<f64>()).mul_add(max, min)
+    min + max * (rng.random::<f64>() - rng.random::<f64>())
 }
 
 const fn to_normal(facing: Facing) -> Vector3<f64> {
@@ -191,7 +191,7 @@ impl BlockBehaviour for DropperBlock {
                 };
 
                 let entity = Entity::new(args.world.clone(), pos, &EntityType::ITEM);
-                let rd = rng().random::<f64>().mul_add(0.1, 0.2);
+                let rd = rng().random::<f64>() * 0.1 + 0.2;
 
                 let velocity = Vector3::new(
                     triangle(&mut rng(), facing.x * rd, 0.017_227_5 * 6.),

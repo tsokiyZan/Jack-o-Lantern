@@ -5,8 +5,9 @@ pub const DAYLIGHT_BRIGHTNESS: f32 = 0.5;
 #[must_use]
 pub fn light_level_curve(raw_brightness: u8, ambient_light: f32) -> f32 {
     let brightness = f32::from(raw_brightness) / 15.0;
-    let curved = brightness / 3.0f32.mul_add(-brightness, 4.0);
-    (1.0 - curved).mul_add(ambient_light, curved)
+    let curved = brightness / (4.0 - 3.0 * brightness);
+    // `Mth.lerp(ambientLight, curved, 1.0F)`.
+    curved + ambient_light * (1.0 - curved)
 }
 
 #[cfg(test)]

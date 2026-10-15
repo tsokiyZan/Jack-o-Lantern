@@ -168,7 +168,7 @@ impl SpearItem {
                 player.get_attack_cooldown_progress(tps, 0.5, Self::attack_speed(player, stack))
                     as f32;
             magic_boost *= charge;
-            base_damage *= charge.mul_add(charge * 0.8, 0.2);
+            base_damage *= 0.2 + charge * charge * 0.8;
         }
 
         let total_damage = if effects.damage {

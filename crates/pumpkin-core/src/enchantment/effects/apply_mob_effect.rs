@@ -60,20 +60,13 @@ impl ApplyMobEffect {
 
         let min_dur = self.min_duration.calculate(enchantment_level);
         let max_dur = self.max_duration.calculate(enchantment_level);
-        let dur_secs = if (max_dur - min_dur).abs() < f32::EPSILON || min_dur >= max_dur {
-            min_dur
-        } else {
-            rng.next_f32().mul_add(max_dur - min_dur, min_dur)
-        };
+        // Vanilla `Mth.randomBetween`, which always draws.
+        let dur_secs = rng.next_f32() * (max_dur - min_dur) + min_dur;
         let ticks = (dur_secs * 20.0).round() as i32;
 
         let min_amp = self.min_amplifier.calculate(enchantment_level);
         let max_amp = self.max_amplifier.calculate(enchantment_level);
-        let amp_f = if (max_amp - min_amp).abs() < f32::EPSILON || min_amp >= max_amp {
-            min_amp
-        } else {
-            rng.next_f32().mul_add(max_amp - min_amp, min_amp)
-        };
+        let amp_f = rng.next_f32() * (max_amp - min_amp) + min_amp;
         let amplifier = (amp_f.round() as i32).max(0) as u8;
 
         let effect = Effect {
