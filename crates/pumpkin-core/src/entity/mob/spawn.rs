@@ -154,3 +154,10 @@ impl MobEntity {
         );
     }
 }
+
+/// Vanilla `SpecialDates.isHalloween`: October 31st on the server's clock.
+#[must_use]
+pub fn is_halloween() -> bool {
+    let now = time::OffsetDateTime::now_local().unwrap_or_else(|_| time::OffsetDateTime::now_utc());
+    now.month() == time::Month::October && now.day() == 31
+}

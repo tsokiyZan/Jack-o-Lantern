@@ -366,66 +366,6 @@ pub static EQUIPMENT_REGISTRY: LazyLock<HashMap<&'static str, MobEquipmentDef>> 
             },
         );
 
-        // ─── Skeleton ───
-        m.insert(
-            "skeleton",
-            MobEquipmentDef {
-                entity_type: "skeleton",
-                weapon: WeaponConfig::Always(&Item::BOW),
-                armor: ArmorConfig::Vanilla,
-                enchanted: true,
-                can_pick_up_loot: true,
-            },
-        );
-
-        // ─── Stray ───
-        m.insert(
-            "stray",
-            MobEquipmentDef {
-                entity_type: "stray",
-                weapon: WeaponConfig::Always(&Item::BOW),
-                armor: ArmorConfig::Vanilla,
-                enchanted: true,
-                can_pick_up_loot: true,
-            },
-        );
-
-        // ─── Bogged ───
-        m.insert(
-            "bogged",
-            MobEquipmentDef {
-                entity_type: "bogged",
-                weapon: WeaponConfig::Always(&Item::BOW),
-                armor: ArmorConfig::Vanilla,
-                enchanted: true,
-                can_pick_up_loot: true,
-            },
-        );
-
-        // ─── Parched ───
-        m.insert(
-            "parched",
-            MobEquipmentDef {
-                entity_type: "parched",
-                weapon: WeaponConfig::Always(&Item::BOW),
-                armor: ArmorConfig::Vanilla,
-                enchanted: true,
-                can_pick_up_loot: true,
-            },
-        );
-
-        // ─── Wither Skeleton ───
-        m.insert(
-            "wither_skeleton",
-            MobEquipmentDef {
-                entity_type: "wither_skeleton",
-                weapon: WeaponConfig::Always(&Item::STONE_SWORD),
-                armor: ArmorConfig::None,
-                enchanted: false,
-                can_pick_up_loot: false,
-            },
-        );
-
         // ─── Piglin ───
         m.insert(
             "piglin",

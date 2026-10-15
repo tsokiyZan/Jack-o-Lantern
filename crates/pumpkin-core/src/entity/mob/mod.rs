@@ -51,6 +51,7 @@ pub mod bat;
 pub mod blaze;
 pub mod breeze;
 pub mod cave_spider;
+pub mod conversion;
 pub mod creaking;
 pub mod creeper;
 pub mod crossbow_attack_mob;
@@ -1504,6 +1505,11 @@ pub trait Mob: EntityBase + Send + Sync {
     /// Vanilla `LivingEntity.isSensitiveToWater`: takes drowning damage in water or rain.
     fn is_sensitive_to_water(&self) -> bool {
         false
+    }
+
+    /// A vanilla `canFreeze` override that rules freezing out, like `Skeleton`'s.
+    fn can_freeze(&self) -> bool {
+        true
     }
 
     /// Whether the move and look controls skip their tick, as vanilla's axolotl

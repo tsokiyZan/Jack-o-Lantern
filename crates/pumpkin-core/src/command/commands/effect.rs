@@ -83,9 +83,10 @@ impl CommandExecutor for GiveExecutor {
             let Some(living) = target.get_living_entity() else {
                 continue;
             };
-            let should_skip = living
-                .get_effect(effect)
-                .is_some_and(|existing| existing.amplifier >= amplifier);
+            let should_skip = !living.can_be_affected(effect)
+                || living
+                    .get_effect(effect)
+                    .is_some_and(|existing| existing.amplifier >= amplifier);
 
             if !should_skip {
                 living.add_effect(Effect {
