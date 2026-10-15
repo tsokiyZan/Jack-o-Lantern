@@ -990,13 +990,6 @@ impl MobEntity {
         let is_persistent = self.persistence_required.load(Relaxed)
             || mob.requires_custom_persistence()
             || (**entity.custom_name.load()).is_some();
-        // Vanilla's `else` branch: a persistent mob never builds up `noActionTime`, so it keeps
-        // strolling with nobody around.
-        if is_persistent {
-            self.living_entity.no_action_time.store(0, Relaxed);
-            return;
-        }
-
         let world = entity.world.load();
         let pos = entity.pos.load();
         let players = world.players.load();
@@ -1010,13 +1003,19 @@ impl MobEntity {
         };
 
         let despawn_distance = f64::from(entity.entity_type.category.despawn_distance);
-        if dist_sqr > despawn_distance * despawn_distance && mob.remove_when_far_away(dist_sqr) {
+        if !is_persistent
+            && dist_sqr > despawn_distance * despawn_distance
+            && mob.remove_when_far_away(dist_sqr)
+        {
             entity.remove();
             return;
         }
 
         let no_despawn_distance = f64::from(NO_DESPAWN_DISTANCE);
-        if self.living_entity.no_action_time.load(Relaxed) > 600
+        // Persistence only stops the despawn: like any mob, a persistent one stops resetting
+        // `noActionTime` (and so stops strolling) once no player is near.
+        if !is_persistent
+            && self.living_entity.no_action_time.load(Relaxed) > 600
             && rand::random_range(0..800) == 0
             && dist_sqr > no_despawn_distance * no_despawn_distance
             && mob.remove_when_far_away(dist_sqr)
