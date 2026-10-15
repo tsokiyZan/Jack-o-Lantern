@@ -83,7 +83,7 @@ impl EntityBase for ExperienceOrbEntity {
         self.entity.no_physics.store(no_physics, Ordering::Relaxed);
         // TODO: isSubmergedIn
         if !no_physics {
-            velo.y -= self.get_gravity();
+            velo.y -= self.current_gravity();
         }
 
         entity.velocity.store(velo);

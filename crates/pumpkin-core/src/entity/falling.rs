@@ -55,7 +55,7 @@ impl EntityBase for FallingEntity {
     fn tick(&self, caller: &dyn EntityBase, _server: &Server) {
         let entity = &self.entity;
         let mut velo = entity.velocity.load();
-        velo.y -= self.get_gravity();
+        velo.y -= self.current_gravity();
 
         entity.velocity.store(velo);
 
