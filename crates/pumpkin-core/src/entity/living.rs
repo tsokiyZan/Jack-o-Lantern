@@ -2482,6 +2482,45 @@ impl LivingEntity {
         }
     }
 
+    /// Vanilla `LivingEntity.dropFromLootTable`: spawns what `key` rolls where this entity
+    /// stands and says whether anything dropped.
+    fn drop_from_loot_table(&self, key: &str, params: &LootContextParameters) -> bool {
+        let Some(loot_table) = self.entity.world.load().get_loot_table(key) else {
+            return false;
+        };
+        let drops =
+            crate::world::loot::generate_loot_from_handle(&loot_table, rand::random(), params);
+        let dropped = !drops.is_empty();
+        for stack in drops {
+            self.entity.spawn_at_location(stack);
+        }
+        dropped
+    }
+
+    /// Vanilla `LivingEntity.dropFromGiftLootTable`.
+    pub fn drop_from_gift_loot_table(&self, key: &str) -> bool {
+        self.drop_from_loot_table(
+            key,
+            &LootContextParameters {
+                this_entity: Some(self.entity.entity_type),
+                position: Some(self.entity.pos.load()),
+                ..Default::default()
+            },
+        )
+    }
+
+    /// Vanilla `LivingEntity.dropFromEntityInteractLootTable`.
+    pub fn drop_from_entity_interact_loot_table(&self, key: &str, tool: &ItemStack) -> bool {
+        self.drop_from_loot_table(
+            key,
+            &LootContextParameters {
+                this_entity: Some(self.entity.entity_type),
+                tool: Some(tool.clone()),
+                ..Default::default()
+            },
+        )
+    }
+
     fn tick_effects(&self) {
         let mut effects_to_remove = Vec::new();
         let mut effects_to_apply = Vec::new();

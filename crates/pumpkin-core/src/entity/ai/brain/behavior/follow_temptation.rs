@@ -13,12 +13,13 @@ pub const TEMPTATION_COOLDOWN: i32 = 100;
 pub const DEFAULT_CLOSE_ENOUGH_DIST: f64 = 2.5;
 
 type SpeedModifier = Box<dyn Fn(&BrainTick<'_>) -> f32 + Send + Sync>;
+type CloseEnoughDistance = Box<dyn Fn(&BrainTick<'_>) -> f64 + Send + Sync>;
 
 /// Vanilla `FollowTemptation`: walks after the player holding something the mob
 /// wants, and stops for a cooldown once that player goes.
 pub struct FollowTemptation {
     speed_modifier: SpeedModifier,
-    close_enough_distance: f64,
+    close_enough_distance: CloseEnoughDistance,
     look_in_the_eyes: bool,
     conditions: [(MemoryModuleId, MemoryStatus); 6],
 }
@@ -28,7 +29,7 @@ impl FollowTemptation {
     pub fn new(speed_modifier: impl Fn(&BrainTick<'_>) -> f32 + Send + Sync + 'static) -> Self {
         Self {
             speed_modifier: Box::new(speed_modifier),
-            close_enough_distance: DEFAULT_CLOSE_ENOUGH_DIST,
+            close_enough_distance: Box::new(|_| DEFAULT_CLOSE_ENOUGH_DIST),
             look_in_the_eyes: false,
             conditions: [
                 (types::LOOK_TARGET.id(), MemoryStatus::Registered),
@@ -47,13 +48,23 @@ impl FollowTemptation {
     /// Vanilla's three-argument constructor: stops within `close_enough_distance` of the
     /// player, and with `look_in_the_eyes` walks to their eyes.
     #[must_use]
-    pub const fn with_close_enough_distance(
+    pub fn with_close_enough_distance(
         mut self,
         close_enough_distance: f64,
         look_in_the_eyes: bool,
     ) -> Self {
-        self.close_enough_distance = close_enough_distance;
+        self.close_enough_distance = Box::new(move |_| close_enough_distance);
         self.look_in_the_eyes = look_in_the_eyes;
+        self
+    }
+
+    /// Vanilla's two-argument constructor: stops within `close_enough_distance(body)`.
+    #[must_use]
+    pub fn with_close_enough_distance_fn(
+        mut self,
+        close_enough_distance: impl Fn(&BrainTick<'_>) -> f64 + Send + Sync + 'static,
+    ) -> Self {
+        self.close_enough_distance = Box::new(close_enough_distance);
         self
     }
 }
@@ -95,7 +106,8 @@ impl Behavior for FollowTemptation {
             .pos
             .load()
             .squared_distance_to_vec(&player.get_entity().pos.load());
-        if distance_sq < self.close_enough_distance * self.close_enough_distance {
+        let close_enough = (self.close_enough_distance)(tick);
+        if distance_sq < close_enough * close_enough {
             tick.brain.erase(types::WALK_TARGET.id());
         } else {
             let speed_modifier = (self.speed_modifier)(tick);

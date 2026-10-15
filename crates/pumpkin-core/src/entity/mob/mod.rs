@@ -1315,6 +1315,17 @@ pub trait Mob: EntityBase + Send + Sync {
         75.0
     }
 
+    /// Vanilla `Mob.clampHeadRotationToBody`.
+    fn clamp_head_rotation_to_body(&self) {
+        let entity = self.get_entity();
+        let limit = self.get_max_head_rotation();
+        let head_y_rot = entity.head_yaw.load();
+        let body_y_rot = entity.body_yaw.load();
+        let delta = pumpkin_util::math::wrap_degrees(body_y_rot - head_y_rot);
+        let target_delta = delta.clamp(-limit, limit);
+        entity.head_yaw.store(head_y_rot + delta - target_delta);
+    }
+
     fn get_mob_entity(&self) -> &MobEntity;
 
     fn mob_bedrock_identifier(&self) -> Option<&'static str> {

@@ -2932,6 +2932,12 @@ impl Entity {
         self.touching_water.load(Ordering::Relaxed)
     }
 
+    /// Vanilla `Entity.isInLiquid`.
+    #[must_use]
+    pub fn is_in_liquid(&self) -> bool {
+        self.is_in_water() || self.touching_lava.load(Ordering::Relaxed)
+    }
+
     /// Vanilla `Entity.collidedWithShapeMovingFrom`: whether this entity's box, moved
     /// from `from` to `to`, touches any of `boxes`.
     pub fn collided_with_shape_moving_from(
