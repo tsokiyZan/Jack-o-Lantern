@@ -1,4 +1,4 @@
-use pumpkin_data::tag::{self, Taggable};
+use pumpkin_data::tag::{self, Tag, Taggable};
 use pumpkin_util::math::vector3::Vector3;
 
 use super::super::BrainTick;
@@ -6,7 +6,7 @@ use super::super::memory::walk_target::WalkTarget;
 use super::super::memory::{MemoryModuleId, MemoryStatus, types};
 use super::timed::Behavior;
 use crate::entity::ai::goal::try_find_water::TryFindWaterGoal;
-use crate::entity::ai::util::{air_and_water_random_pos, goal_utils};
+use crate::entity::ai::util::{air_and_water_random_pos, goal_utils, land_random_pos};
 use crate::entity::mob::Mob;
 use pumpkin_util::math::position::BlockPos;
 
@@ -24,19 +24,43 @@ const ENTRY_CONDITIONS: [(MemoryModuleId, MemoryStatus); 2] = [
     (types::HURT_BY.id(), MemoryStatus::Registered),
 ];
 
-/// Vanilla `AnimalPanic(speedMultiplier, flyHeight)`: after a panic-causing hit, flies
-/// to random spots near the ground, or to water when on fire.
+/// Vanilla `AnimalPanic`'s `positionGetter`.
+enum PanicPosition {
+    /// `LandRandomPos.getPos(mob, 5, 4)`.
+    Land,
+    /// `AirAndWaterRandomPos.getPos` along the view vector.
+    AirAndWater { fly_height: i32 },
+}
+
+/// Vanilla `AnimalPanic`: after a panic-causing hit, runs to random spots nearby, or to
+/// water when on fire.
 pub struct AnimalPanic {
     speed_multiplier: f32,
-    fly_height: i32,
+    panic_causing_damage_types: &'static Tag,
+    position: PanicPosition,
 }
 
 impl AnimalPanic {
+    /// Vanilla `AnimalPanic(speedMultiplier, flyHeight)`.
     #[must_use]
     pub const fn flying(speed_multiplier: f32, fly_height: i32) -> Self {
         Self {
             speed_multiplier,
-            fly_height,
+            panic_causing_damage_types: &tag::DamageType::MINECRAFT_PANIC_CAUSES,
+            position: PanicPosition::AirAndWater { fly_height },
+        }
+    }
+
+    /// Vanilla `AnimalPanic(speedMultiplier, panicCausingDamageTypes)`.
+    #[must_use]
+    pub const fn with_damage_types(
+        speed_multiplier: f32,
+        panic_causing_damage_types: &'static Tag,
+    ) -> Self {
+        Self {
+            speed_multiplier,
+            panic_causing_damage_types,
+            position: PanicPosition::Land,
         }
     }
 
@@ -46,21 +70,28 @@ impl AnimalPanic {
         {
             return Some(water.to_f64() + Vector3::new(0.5, 0.0, 0.5));
         }
-        // `getViewVector(0.0F)` is last tick's head rotation, which Pumpkin doesn't keep.
-        let entity = mob.get_entity();
-        let view = crate::entity::Entity::calculate_view_vector(
-            entity.pitch.load(),
-            entity.head_yaw.load(),
-        );
-        air_and_water_random_pos::get_pos(
-            mob,
-            PANIC_DISTANCE_HORIZONTAL,
-            PANIC_DISTANCE_VERTICAL,
-            self.fly_height,
-            view.x,
-            view.z,
-            f64::from(std::f32::consts::FRAC_PI_2),
-        )
+        match self.position {
+            PanicPosition::Land => {
+                land_random_pos::get_pos(mob, PANIC_DISTANCE_HORIZONTAL, PANIC_DISTANCE_VERTICAL)
+            }
+            PanicPosition::AirAndWater { fly_height } => {
+                // `getViewVector(0.0F)` is last tick's head rotation, which Pumpkin doesn't keep.
+                let entity = mob.get_entity();
+                let view = crate::entity::Entity::calculate_view_vector(
+                    entity.pitch.load(),
+                    entity.head_yaw.load(),
+                );
+                air_and_water_random_pos::get_pos(
+                    mob,
+                    PANIC_DISTANCE_HORIZONTAL,
+                    PANIC_DISTANCE_VERTICAL,
+                    fly_height,
+                    view.x,
+                    view.z,
+                    f64::from(std::f32::consts::FRAC_PI_2),
+                )
+            }
+        }
     }
 
     /// Vanilla `AnimalPanic.lookForWater`: a two-wide mob needs the whole 2x2 wet.
@@ -103,11 +134,10 @@ impl Behavior for AnimalPanic {
     }
 
     fn check_extra_start_conditions(&mut self, tick: &mut BrainTick<'_>) -> bool {
-        tick.brain.get(types::HURT_BY).is_some_and(|hurt_by| {
-            hurt_by
-                .damage_type
-                .has_tag(&tag::DamageType::MINECRAFT_PANIC_CAUSES)
-        }) || tick.brain.has_memory_value(types::IS_PANICKING.id())
+        tick.brain
+            .get(types::HURT_BY)
+            .is_some_and(|hurt_by| hurt_by.damage_type.has_tag(self.panic_causing_damage_types))
+            || tick.brain.has_memory_value(types::IS_PANICKING.id())
     }
 
     fn can_still_use(&mut self, _tick: &BrainTick<'_>) -> bool {

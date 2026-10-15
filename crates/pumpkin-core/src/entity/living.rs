@@ -2526,6 +2526,45 @@ impl LivingEntity {
         }
     }
 
+    /// Vanilla `LivingEntity.dropFromLootTable`: spawns what `key` rolls where this entity
+    /// stands and says whether anything dropped.
+    fn drop_from_loot_table(&self, key: &str, params: &LootContextParameters) -> bool {
+        let Some(loot_table) = self.entity.world.load().get_loot_table(key) else {
+            return false;
+        };
+        let drops =
+            crate::world::loot::generate_loot_from_handle(&loot_table, rand::random(), params);
+        let dropped = !drops.is_empty();
+        for stack in drops {
+            self.entity.spawn_at_location(stack);
+        }
+        dropped
+    }
+
+    /// Vanilla `LivingEntity.dropFromGiftLootTable`.
+    pub fn drop_from_gift_loot_table(&self, key: &str) -> bool {
+        self.drop_from_loot_table(
+            key,
+            &LootContextParameters {
+                this_entity: Some(self.entity.entity_type),
+                position: Some(self.entity.pos.load()),
+                ..Default::default()
+            },
+        )
+    }
+
+    /// Vanilla `LivingEntity.dropFromEntityInteractLootTable`.
+    pub fn drop_from_entity_interact_loot_table(&self, key: &str, tool: &ItemStack) -> bool {
+        self.drop_from_loot_table(
+            key,
+            &LootContextParameters {
+                this_entity: Some(self.entity.entity_type),
+                tool: Some(tool.clone()),
+                ..Default::default()
+            },
+        )
+    }
+
     fn tick_effects(&self) {
         let mut effects_to_remove = Vec::new();
         let mut effects_to_apply = Vec::new();
@@ -3570,14 +3609,6 @@ impl LivingEntity {
             self.entity.sync_velocity.store(true, SeqCst);
         }
 
-        if play_sound {
-            // Vanilla `Mob.playHurtSound` resets the ambient sound timer.
-            if let Some(mob) = caller.get_mob() {
-                mob.reset_ambient_sound_time();
-            }
-            self.make_sound(caller, self.hurt_sound(caller));
-        }
-
         // Vanilla `hurtServer`: `dealDefaultKnockback` on every full-damage hit.
         if took_full_damage && !damage_type.has_tag(&tag::DamageType::MINECRAFT_NO_KNOCKBACK) {
             let (dx, dz) = self.default_knockback_direction(source, position);
@@ -3662,8 +3693,21 @@ impl LivingEntity {
             }
         }
 
+        if let Some(mob) = caller.get_mob() {
+            mob.actually_hurt(damage_type, source, cause);
+        }
+
         self.resolve_mob_responsible_for_damage(damage_type, cause.or(source));
         self.resolve_player_responsible_for_damage(cause.or(source));
+
+        // After `actuallyHurt`, like vanilla, so the sound sees what the hit changed.
+        if play_sound {
+            // Vanilla `Mob.playHurtSound` resets the ambient sound timer.
+            if let Some(mob) = caller.get_mob() {
+                mob.reset_ambient_sound_time();
+            }
+            self.make_sound(caller, self.hurt_sound(caller));
+        }
 
         if new_health <= 0.0 {
             let mut death_event =
