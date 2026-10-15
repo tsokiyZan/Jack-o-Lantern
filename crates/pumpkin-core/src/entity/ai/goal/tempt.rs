@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use super::{Controls, Goal, to_goal_ticks};
 use crate::entity::EntityBase;
+use crate::entity::ai::target_predicate::TargetPredicate;
 use crate::entity::{ai::pathfinder::NavigatorGoal, mob::Mob, player::Player};
 use pumpkin_data::attributes::Attributes;
 use pumpkin_data::item::Item;
@@ -11,7 +12,7 @@ const DEFAULT_STOP_DISTANCE: f64 = 2.5;
 /// Following stops once the player moves further than this while being watched.
 const SCARE_RANGE_SQ: f64 = 36.0;
 const SCARE_MOVE_SQ: f64 = 0.010_000_000_000_000_002;
-const SCARE_ROTATION: f32 = 5.0;
+const SCARE_ROTATION: f64 = 5.0;
 
 pub struct TemptGoal {
     goal_control: Controls,
@@ -19,10 +20,11 @@ pub struct TemptGoal {
     tempt_items: &'static [&'static Item],
     can_scare: bool,
     stop_distance: f64,
-    target_player: Option<Arc<Player>>,
+    targeting_conditions: TargetPredicate,
+    target_player: Option<Arc<dyn EntityBase>>,
     watched_pos: Vector3<f64>,
-    watched_yaw: f32,
-    watched_pitch: f32,
+    watched_yaw: f64,
+    watched_pitch: f64,
     cooldown: i32,
     running: bool,
 }
@@ -46,6 +48,7 @@ impl TemptGoal {
             tempt_items,
             can_scare,
             stop_distance,
+            targeting_conditions: TargetPredicate::create_non_attackable().ignore_visibility(),
             target_player: None,
             watched_pos: Vector3::new(0.0, 0.0, 0.0),
             watched_yaw: 0.0,
@@ -69,26 +72,24 @@ impl TemptGoal {
             || self.is_tempt_item(&player.inventory().off_hand_item())
     }
 
-    /// Non-combat, line of sight ignored, ranged by `tempt_range` and filtered on the held item.
-    fn find_tempting_player(&self, mob: &dyn Mob) -> Option<Arc<Player>> {
+    /// Vanilla `TEMPT_TARGETING` ranged by `tempt_range`, with the held-item selector.
+    fn find_tempting_player(&mut self, mob: &dyn Mob) -> Option<Arc<dyn EntityBase>> {
         let mob_entity = mob.get_mob_entity();
-        let range = mob_entity
+        self.targeting_conditions.base_max_distance = mob_entity
             .living_entity
             .get_attribute_value(&Attributes::TEMPT_RANGE);
         let world = mob_entity.living_entity.entity.world.load();
-
-        world.get_nearest_player(
+        let players = world.players.load();
+        // The selector has no side effects, so filtering first picks the same player.
+        self.targeting_conditions.get_nearest_entity(
+            &world,
+            players
+                .iter()
+                .filter(|player| self.is_holding_tempt_item(player))
+                .map(|player| Arc::clone(player) as Arc<dyn EntityBase>),
+            Some(mob),
             mob_entity.living_entity.entity.pos.load(),
-            range,
-            |player| player.living_entity.is_part_of_game() && self.is_holding_tempt_item(player),
         )
-    }
-
-    fn watch(&mut self, player: &Player) {
-        let entity = player.get_entity();
-        self.watched_pos = entity.pos.load();
-        self.watched_yaw = entity.yaw.load();
-        self.watched_pitch = entity.pitch.load();
     }
 }
 
@@ -115,8 +116,8 @@ impl Goal for TemptGoal {
                 if player_pos.squared_distance_to_vec(&self.watched_pos) > SCARE_MOVE_SQ {
                     return false;
                 }
-                if (entity.pitch.load() - self.watched_pitch).abs() > SCARE_ROTATION
-                    || (entity.yaw.load() - self.watched_yaw).abs() > SCARE_ROTATION
+                if (f64::from(entity.pitch.load()) - self.watched_pitch).abs() > SCARE_ROTATION
+                    || (f64::from(entity.yaw.load()) - self.watched_yaw).abs() > SCARE_ROTATION
                 {
                     return false;
                 }
@@ -124,16 +125,17 @@ impl Goal for TemptGoal {
                 self.watched_pos = player_pos;
             }
 
-            self.watched_yaw = entity.yaw.load();
-            self.watched_pitch = entity.pitch.load();
+            self.watched_pitch = f64::from(entity.pitch.load());
+            self.watched_yaw = f64::from(entity.yaw.load());
         }
 
         self.can_start(mob)
     }
 
     fn start(&mut self, _mob: &dyn Mob) {
-        if let Some(player) = self.target_player.clone() {
-            self.watch(&player);
+        // Vanilla stores only the position; the rotations carry over from the last run.
+        if let Some(player) = &self.target_player {
+            self.watched_pos = player.get_entity().pos.load();
         }
         self.running = true;
     }
