@@ -274,6 +274,14 @@ impl ThrownItemEntity {
             return true;
         }
 
+        // Vanilla `canBeHitByProjectile`: the ender dragon isn't pickable, only its parts are.
+        if other
+            .cast_any()
+            .is::<crate::entity::boss::ender_dragon::EnderDragonEntity>()
+        {
+            return true;
+        }
+
         // Projectile vs projectile logic
         if !self.collides_with_projectiles && is_projectile(other_ent.entity_type) {
             return true;

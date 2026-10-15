@@ -2,7 +2,10 @@ use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
 use crate::{
-    entity::{Entity, EntityBase, living::LivingEntity, player::Player},
+    entity::{
+        Entity, EntityBase, boss::ender_dragon::projectile_targets, living::LivingEntity,
+        player::Player,
+    },
     server::Server,
 };
 use pumpkin_data::damage::DamageType;
@@ -270,7 +273,7 @@ impl EntityBase for TridentEntity {
         let candidates = if self.dealt_damage.load(Ordering::Relaxed) {
             Vec::new()
         } else {
-            world.get_entities_at_box(&search_box)
+            projectile_targets(&world, &search_box, world.get_entities_at_box(&search_box))
         };
         for cand in candidates {
             if self.should_skip_collision(entity, &cand) {

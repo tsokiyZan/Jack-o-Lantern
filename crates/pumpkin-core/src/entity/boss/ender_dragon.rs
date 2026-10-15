@@ -69,6 +69,50 @@ pub fn get_y(entity: &Entity, scale: f64) -> f64 {
     entity.pos.load().y + f64::from(entity.height()) * scale
 }
 
+/// Vanilla `ServerLevel.getEntityOrPart` for an id that isn't a level entity: the dragon
+/// part with that id, if any.
+#[must_use]
+pub fn find_part(world: &World, id: i32) -> Option<Arc<dyn EntityBase>> {
+    world.entities.load().iter().find_map(|entity| {
+        let dragon = entity.cast_any().downcast_ref::<EnderDragonEntity>()?;
+        dragon
+            .sub_entities
+            .iter()
+            .find(|part| part.get_entity().entity_id == id)
+            .map(|part| part.clone() as Arc<dyn EntityBase>)
+    })
+}
+
+/// The dragon parts `Level.getEntities` lists next to the level entities: those whose box
+/// meets `area`.
+#[must_use]
+pub fn parts_at_box(world: &World, area: &BoundingBox) -> Vec<Arc<dyn EntityBase>> {
+    world
+        .entities
+        .load()
+        .iter()
+        .filter_map(|entity| entity.cast_any().downcast_ref::<EnderDragonEntity>())
+        .flat_map(|dragon| dragon.sub_entities.iter())
+        .filter(|part| part.get_entity().bounding_box.load().intersects(area))
+        .map(|part| part.clone() as Arc<dyn EntityBase>)
+        .collect()
+}
+
+/// What a projectile flying through `area` may hit among `candidates`: the dragon itself isn't
+/// pickable (vanilla `canBeHitByProjectile`), so only its parts are.
+#[must_use]
+pub fn projectile_targets(
+    world: &World,
+    area: &BoundingBox,
+    candidates: impl IntoIterator<Item = Arc<dyn EntityBase>>,
+) -> Vec<Arc<dyn EntityBase>> {
+    candidates
+        .into_iter()
+        .filter(|candidate| !candidate.cast_any().is::<EnderDragonEntity>())
+        .chain(parts_at_box(world, area))
+        .collect()
+}
+
 pub struct EnderDragonEntity {
     pub mob_entity: MobEntity,
     sub_entities: [Arc<EnderDragonPart>; 8],
