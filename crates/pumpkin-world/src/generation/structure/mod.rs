@@ -2,6 +2,7 @@ use pumpkin_data::{
     structures::{Structure, StructureKeys},
     tag::{RegistryKey, get_tag_ids},
 };
+use pumpkin_util::math::position::BlockPos;
 
 use crate::{
     ProtoChunk,
@@ -43,13 +44,25 @@ pub mod template;
 /// Does NOT perform biome validation — callers that require it should add
 /// their own check after calling this function.
 #[must_use]
-#[allow(clippy::too_many_lines)]
 pub fn generate_structure_position(
     key: &StructureKeys,
     structure: &Structure,
     context: StructureGeneratorContext<'_>,
 ) -> Option<StructurePosition> {
-    match key {
+    generate_structure_position_if_valid_start(key, structure, context, &mut |_| true)
+}
+
+/// Like [`generate_structure_position`], but returns `None` when `is_valid_start` rejects
+/// the start position. Jigsaw structures check it before expanding their pieces.
+#[must_use]
+#[allow(clippy::too_many_lines)]
+pub fn generate_structure_position_if_valid_start(
+    key: &StructureKeys,
+    structure: &Structure,
+    context: StructureGeneratorContext<'_>,
+    is_valid_start: &mut dyn FnMut(&BlockPos) -> bool,
+) -> Option<StructurePosition> {
+    let position = match key {
         StructureKeys::BuriedTreasure => {
             BuriedTreasureGenerator::get_structure_position(&BuriedTreasureGenerator, context)
         }
@@ -107,7 +120,7 @@ pub fn generate_structure_position(
             if let Some(start_jigsaw_name) = structure.start_jigsaw_name {
                 generator = generator.with_start_jigsaw(start_jigsaw_name);
             }
-            generator.get_structure_position(context)
+            return generator.get_structure_position_if_valid_start(context, is_valid_start);
         }
         StructureKeys::Shipwreck | StructureKeys::ShipwreckBeached => {
             let generator = ShipwreckGenerator {
@@ -146,7 +159,8 @@ pub fn generate_structure_position(
             };
             generator.get_structure_position(context)
         }
-    }
+    };
+    position.filter(|position| is_valid_start(&position.start_pos))
 }
 
 #[must_use]
@@ -234,27 +248,22 @@ pub fn lazily_generate_structure(
         }
     }
 
-    let structure_pos = generate_structure_position(key, structure, context);
-
-    if let Some(pos) = structure_pos {
-        // Get the biome mathematically, bypassing the chunk boundaries entirely!
-        let biome_x = biome_coords::from_block(pos.start_pos.0.x);
-        let biome_y = biome_coords::from_block(pos.start_pos.0.y);
-        let biome_z = biome_coords::from_block(pos.start_pos.0.z);
-
-        let biome = biome_supplier.biome(biome_x, biome_y, biome_z, multi_noise_sampler);
-
-        if let Some(biomes) = get_tag_ids(
-            RegistryKey::WorldgenBiome,
-            structure
-                .biomes
-                .strip_prefix('#')
-                .unwrap_or(structure.biomes),
-        ) && biomes.contains(&(biome.id as u16))
-        {
-            return Some(pos);
-        }
-    }
-
-    None
+    // Vanilla `Structure.findValidGenerationPoint`: the biome at the start position
+    // decides, and jigsaw structures check it before building their pieces.
+    let biomes = get_tag_ids(
+        RegistryKey::WorldgenBiome,
+        structure
+            .biomes
+            .strip_prefix('#')
+            .unwrap_or(structure.biomes),
+    );
+    generate_structure_position_if_valid_start(key, structure, context, &mut |start_pos| {
+        let biome = biome_supplier.biome(
+            biome_coords::from_block(start_pos.0.x),
+            biome_coords::from_block(start_pos.0.y),
+            biome_coords::from_block(start_pos.0.z),
+            multi_noise_sampler,
+        );
+        biomes.is_some_and(|biomes| biomes.contains(&(biome.id as u16)))
+    })
 }
