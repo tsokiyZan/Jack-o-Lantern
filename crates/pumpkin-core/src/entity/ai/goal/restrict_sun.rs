@@ -1,7 +1,9 @@
 use super::{Controls, Goal};
+use crate::entity::EquipmentSlot;
 use crate::entity::mob::Mob;
-use crate::entity::mob::sun_burn;
 
+/// Vanilla `RestrictSunGoal`: while the sun is up and the mob has nothing on its head, its
+/// ground navigation cuts paths short before they reach open sky.
 #[derive(Default)]
 pub struct RestrictSunGoal;
 
@@ -11,18 +13,50 @@ impl RestrictSunGoal {
         Self
     }
 
-    fn is_exposed(mob: &dyn Mob) -> bool {
-        mob.get_entity().world.load().is_bright_outside() && !sun_burn::is_protected(mob)
+    fn has_ground_path_navigation(mob: &dyn Mob) -> bool {
+        mob.get_mob_entity()
+            .navigator
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .can_navigate_ground()
+    }
+
+    fn set_avoid_sun(mob: &dyn Mob, avoid_sun: bool) {
+        let mut navigator = mob
+            .get_mob_entity()
+            .navigator
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if navigator.can_navigate_ground() {
+            navigator.set_avoid_sun(avoid_sun);
+        }
     }
 }
 
 impl Goal for RestrictSunGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
-        Self::is_exposed(mob)
+        mob.get_entity().world.load().is_bright_outside()
+            && mob
+                .get_mob_entity()
+                .living_entity
+                .entity_equipment
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .get(&EquipmentSlot::HEAD)
+                .is_empty()
+            && Self::has_ground_path_navigation(mob)
     }
 
     fn should_continue(&mut self, mob: &dyn Mob) -> bool {
-        Self::is_exposed(mob)
+        self.can_start(mob)
+    }
+
+    fn start(&mut self, mob: &dyn Mob) {
+        Self::set_avoid_sun(mob, true);
+    }
+
+    fn stop(&mut self, mob: &dyn Mob) {
+        Self::set_avoid_sun(mob, false);
     }
 
     fn controls(&self) -> Controls {
