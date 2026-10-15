@@ -1,3 +1,5 @@
+use crate::entity::ai::util::goal_utils;
+use crate::entity::passive::animal::horse_can_parent;
 use std::sync::{
     Arc, Weak,
     atomic::{AtomicBool, AtomicI32, AtomicU8, Ordering},
@@ -265,6 +267,18 @@ impl Animal for TraderLlamaEntity {
                 .has_tag(&tag::Item::MINECRAFT_LLAMA_TEMPT_ITEMS)
             || item_stack.item == &Item::WHEAT
             || item_stack.item == &Item::HAY_BLOCK
+    }
+
+    /// Vanilla `Llama.canMate`.
+    fn can_mate(&self, partner: &dyn Mob) -> bool {
+        partner.get_entity().entity_id != self.get_entity().entity_id
+            && goal_utils::is_instance_of(&EntityType::LLAMA, partner.get_entity().entity_type)
+            && self.can_parent()
+            && partner.as_animal().is_some_and(Animal::can_parent)
+    }
+
+    fn can_parent(&self) -> bool {
+        horse_can_parent(self, self.is_tame())
     }
 }
 

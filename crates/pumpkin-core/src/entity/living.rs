@@ -2645,6 +2645,12 @@ impl LivingEntity {
         !self.is_spectator() && self.entity.is_alive() && self.health.load() > 0.0
     }
 
+    /// Vanilla `LivingEntity.isAlive`: not removed and with health left.
+    #[must_use]
+    pub fn is_alive(&self) -> bool {
+        !self.entity.is_removed() && self.health.load() > 0.0
+    }
+
     /// Vanilla `LivingEntity.getVisibilityPercent`: how far `targeting_entity` can notice this entity.
     pub fn get_visibility_percent(&self, targeting_entity: Option<&Entity>) -> f64 {
         let mut visibility_percent = 1.0;
@@ -3534,8 +3540,7 @@ impl LivingEntity {
         let Some(hurt_by) = hurt_by.get_living_entity() else {
             return;
         };
-        let hurt_by_alive = !hurt_by.entity.is_removed() && hurt_by.health.load() > 0.0;
-        if !hurt_by_alive
+        if !hurt_by.is_alive()
             || self.entity.tick_count.load(Relaxed) - self.last_attacked_time.load(Relaxed) > 100
         {
             self.set_last_hurt_by_mob(0);

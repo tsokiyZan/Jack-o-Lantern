@@ -1,4 +1,6 @@
+use crate::entity::ai::util::goal_utils;
 use crate::entity::mob::{first_passenger_player, mob_controlling_passenger};
+use crate::entity::passive::animal::horse_can_parent;
 use std::sync::{
     Arc, Weak,
     atomic::{AtomicBool, AtomicI32, AtomicU8, Ordering},
@@ -77,7 +79,10 @@ impl DonkeyEntity {
 
             goal_selector.add_goal(0, SwimGoal::new(&mob_arc.mob_entity));
             goal_selector.add_goal(1, EscapeDangerGoal::new(1.2));
-            goal_selector.add_goal(2, BreedGoal::new(1.0));
+            goal_selector.add_goal(
+                2,
+                BreedGoal::with_partner_class(1.0, goal_utils::is_abstract_horse),
+            );
             goal_selector.add_goal(3, Box::new(TemptGoal::new(1.25, TEMPT_ITEMS, false)));
             goal_selector.add_goal(4, Box::new(FollowParentGoal::new(1.0)));
             goal_selector.add_goal(6, Box::new(WanderAroundGoal::new(0.7)));
@@ -153,6 +158,20 @@ impl Animal for DonkeyEntity {
             || item_stack.item == &Item::GOLDEN_CARROT
             || item_stack.item == &Item::GOLDEN_APPLE
             || item_stack.item == &Item::ENCHANTED_GOLDEN_APPLE
+    }
+
+    /// Vanilla `Donkey.canMate`: horses and donkeys breed with each other (into mules).
+    fn can_mate(&self, partner: &dyn Mob) -> bool {
+        let partner_entity = partner.get_entity();
+        partner_entity.entity_id != self.get_entity().entity_id
+            && (partner_entity.entity_type == &EntityType::DONKEY
+                || partner_entity.entity_type == &EntityType::HORSE)
+            && self.can_parent()
+            && partner.as_animal().is_some_and(Animal::can_parent)
+    }
+
+    fn can_parent(&self) -> bool {
+        horse_can_parent(self, self.is_tame())
     }
 }
 

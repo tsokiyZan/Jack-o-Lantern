@@ -1,4 +1,6 @@
+use crate::entity::ai::util::goal_utils;
 use crate::entity::mob::{first_passenger_player, mob_controlling_passenger};
+use crate::entity::passive::animal::horse_can_parent;
 use std::sync::{
     Arc, Weak,
     atomic::{AtomicBool, AtomicU8, Ordering},
@@ -130,6 +132,19 @@ impl Animal for CamelEntity {
     fn is_food(&self, item_stack: &ItemStack) -> bool {
         item_stack.item.has_tag(&tag::Item::MINECRAFT_CAMEL_FOOD)
             || item_stack.item == &Item::CACTUS
+    }
+
+    /// Vanilla `Camel.canMate`.
+    fn can_mate(&self, partner: &dyn Mob) -> bool {
+        partner.get_entity().entity_id != self.get_entity().entity_id
+            && goal_utils::is_instance_of(&EntityType::CAMEL, partner.get_entity().entity_type)
+            && self.can_parent()
+            && partner.as_animal().is_some_and(Animal::can_parent)
+    }
+
+    /// Camels are always tamed (`Camel.isTamed`).
+    fn can_parent(&self) -> bool {
+        horse_can_parent(self, true)
     }
 }
 

@@ -172,6 +172,23 @@ impl Animal for WolfEntity {
         let item = item_stack.get_item();
         item.has_tag(&tag::Item::MINECRAFT_WOLF_FOOD) || item == &Item::BONE
     }
+
+    /// Vanilla `Wolf.canMate`.
+    fn can_mate(&self, partner: &dyn Mob) -> bool {
+        if partner.get_entity().entity_id == self.get_entity().entity_id || !self.is_tame() {
+            return false;
+        }
+        let Some(wolf) = partner
+            .as_tamable()
+            .filter(|_| partner.get_entity().entity_type == &EntityType::WOLF)
+        else {
+            return false;
+        };
+        wolf.is_tame()
+            && !wolf.is_in_sitting_pose()
+            && self.mob_entity.is_in_love()
+            && partner.get_mob_entity().is_in_love()
+    }
 }
 
 impl TamableAnimal for WolfEntity {

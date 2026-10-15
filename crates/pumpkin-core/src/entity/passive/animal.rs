@@ -21,6 +21,16 @@ pub fn set_animal_pathfinding_malus(mob_entity: &MobEntity) {
 pub trait Animal: Mob {
     fn is_food(&self, item_stack: &ItemStack) -> bool;
 
+    /// Vanilla `Animal.canMate`.
+    fn can_mate(&self, partner: &dyn Mob) -> bool {
+        animal_can_mate(self.get_mob_entity(), partner)
+    }
+
+    /// Vanilla `AbstractHorse.canParent`; only the horse family breeds through it.
+    fn can_parent(&self) -> bool {
+        false
+    }
+
     /// Animals prefer grass, then bright spots.
     fn animal_walk_target_value(&self, pos: &pumpkin_util::math::position::BlockPos) -> f32 {
         let world = self.get_mob_entity().living_entity.entity.world.load();
@@ -189,4 +199,28 @@ pub fn get_carpet_color_from_item(item: &pumpkin_data::item::Item) -> Option<u8>
         "black_carpet" => Some(15),
         _ => None,
     }
+}
+
+/// The base `Animal.canMate`: another animal of exactly this class, both in love.
+#[must_use]
+pub fn animal_can_mate(animal: &MobEntity, partner: &dyn Mob) -> bool {
+    let entity = &animal.living_entity.entity;
+    let partner_entity = partner.get_entity();
+    partner_entity.entity_id != entity.entity_id
+        && partner_entity.entity_type == entity.entity_type
+        && animal.is_in_love()
+        && partner.get_mob_entity().is_in_love()
+}
+
+/// Vanilla `AbstractHorse.canParent`.
+#[must_use]
+pub fn horse_can_parent(horse: &dyn Mob, is_tamed: bool) -> bool {
+    let mob_entity = horse.get_mob_entity();
+    let living = &mob_entity.living_entity;
+    !living.entity.has_passengers()
+        && !living.entity.has_vehicle()
+        && is_tamed
+        && living.entity.age.load(std::sync::atomic::Ordering::Relaxed) >= 0
+        && living.health.load() >= living.get_max_health()
+        && mob_entity.is_in_love()
 }

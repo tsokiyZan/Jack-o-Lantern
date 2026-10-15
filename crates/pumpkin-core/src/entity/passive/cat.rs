@@ -1,3 +1,4 @@
+use crate::entity::passive::animal::animal_can_mate;
 use std::sync::{
     Arc, Weak,
     atomic::{AtomicBool, AtomicU8, Ordering},
@@ -283,6 +284,14 @@ impl Animal for CatEntity {
     fn is_food(&self, item_stack: &ItemStack) -> bool {
         let item = item_stack.get_item();
         item.has_tag(&tag::Item::MINECRAFT_CAT_FOOD) || item == &Item::COD || item == &Item::SALMON
+    }
+
+    /// Vanilla `Cat.canMate`.
+    fn can_mate(&self, partner: &dyn Mob) -> bool {
+        self.is_tame()
+            && partner.get_entity().entity_type == &EntityType::CAT
+            && partner.as_tamable().is_some_and(TamableAnimal::is_tame)
+            && animal_can_mate(&self.mob_entity, partner)
     }
 }
 

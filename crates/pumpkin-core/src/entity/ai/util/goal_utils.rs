@@ -29,6 +29,8 @@ const fn parent_class(entity_type: &EntityType) -> Option<&'static EntityType> {
         Some(&EntityType::SQUID)
     } else if id == EntityType::TRADER_LLAMA.id {
         Some(&EntityType::LLAMA)
+    } else if id == EntityType::CAMEL_HUSK.id {
+        Some(&EntityType::CAMEL)
     } else {
         None
     }
@@ -39,6 +41,23 @@ const fn parent_class(entity_type: &EntityType) -> Option<&'static EntityType> {
 #[must_use]
 pub fn is_instance_of(class: &EntityType, entity_type: &EntityType) -> bool {
     entity_type == class || parent_class(entity_type).is_some_and(|parent| parent == class)
+}
+
+/// Vanilla `AbstractHorse` class membership.
+#[must_use]
+pub fn is_abstract_horse(entity_type: &'static EntityType) -> bool {
+    [
+        &EntityType::HORSE,
+        &EntityType::DONKEY,
+        &EntityType::MULE,
+        &EntityType::SKELETON_HORSE,
+        &EntityType::ZOMBIE_HORSE,
+        &EntityType::CAMEL,
+        &EntityType::CAMEL_HUSK,
+        &EntityType::LLAMA,
+        &EntityType::TRADER_LLAMA,
+    ]
+    .contains(&entity_type)
 }
 
 /// Vanilla `getEntitiesOfClass(class, area, e -> true)`. `None` stands for `Mob`.
