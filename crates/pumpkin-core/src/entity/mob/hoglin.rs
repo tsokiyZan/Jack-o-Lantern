@@ -31,6 +31,7 @@ pub struct HoglinEntity {
 impl HoglinEntity {
     pub const CONVERSION_TIME: i32 = 300;
     pub const XP_REWARD: u32 = 5;
+    pub const BABY_XP_REWARD: u32 = 3;
 
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
@@ -226,6 +227,20 @@ impl Mob for HoglinEntity {
 
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
+    }
+
+    /// The `xpReward` vanilla `Hoglin.ageBoundaryReached` sets.
+    fn xp_reward(&self) -> u32 {
+        if self.is_baby.load(Ordering::Relaxed) {
+            Self::BABY_XP_REWARD
+        } else {
+            Self::XP_REWARD
+        }
+    }
+
+    /// Vanilla `Hoglin.getBaseExperienceReward`, without `Mob`'s equipment bonus.
+    fn get_base_experience_reward(&self) -> u32 {
+        self.xp_reward()
     }
 
     fn spawn_as_baby(&self) -> bool {

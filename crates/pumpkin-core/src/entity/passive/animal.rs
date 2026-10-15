@@ -15,6 +15,7 @@ use crate::entity::{
 use crate::world::World;
 use pumpkin_protocol::bedrock::server::actor_event::ActorEventID;
 use pumpkin_util::math::vector3::Vector3;
+use rand::RngExt;
 use uuid::Uuid;
 
 /// Vanilla `Animal`'s constructor: animals keep clear of fire.
@@ -60,6 +61,11 @@ pub trait Animal: Mob {
             return 10.0;
         }
         world.get_light_level_dependent_magic_value(pos) - 0.5
+    }
+
+    /// Vanilla `Animal.getBaseExperienceReward`.
+    fn animal_base_experience_reward(&self) -> u32 {
+        1 + self.get_random().random_range(0..3)
     }
 
     fn play_eating_sound(&self, sound: Sound) {

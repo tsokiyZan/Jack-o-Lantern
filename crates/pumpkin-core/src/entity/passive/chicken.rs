@@ -264,7 +264,7 @@ impl Mob for ChickenEntity {
         if self.is_chicken_jockey() {
             CHICKEN_JOCKEY_EXPERIENCE
         } else {
-            self.get_entity().entity_type.experience_reward
+            self.animal_base_experience_reward()
         }
     }
 

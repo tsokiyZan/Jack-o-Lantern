@@ -322,8 +322,8 @@ impl Mob for CubeMobEntity {
         Some(self)
     }
 
-    fn get_base_experience_reward(&self) -> u32 {
-        // `xpReward`, which `setSize` sets to the size.
+    /// `setSize` sets `xpReward` to the size.
+    fn xp_reward(&self) -> u32 {
         self.get_size() as u32
     }
 

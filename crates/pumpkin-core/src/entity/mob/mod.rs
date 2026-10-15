@@ -2056,8 +2056,17 @@ pub trait Mob: EntityBase + Send + Sync {
             .is_some_and(crate::entity::passive::tamable::TamableAnimal::is_tame)
     }
 
-    fn get_base_experience_reward(&self) -> u32 {
+    /// Vanilla `Mob.xpReward`.
+    fn xp_reward(&self) -> u32 {
         self.get_entity().entity_type.experience_reward
+    }
+
+    /// Vanilla `getBaseExperienceReward`: `Animal`'s override for animals, `Mob`'s otherwise.
+    fn get_base_experience_reward(&self) -> u32 {
+        self.as_animal().map_or_else(
+            || mob_base_experience_reward(self),
+            crate::entity::passive::animal::Animal::animal_base_experience_reward,
+        )
     }
 
     fn mob_init_data_tracker(&self) {
@@ -2241,6 +2250,26 @@ pub fn convert_common(from: &dyn Mob, to: &dyn Mob, params: conversion::Conversi
     {
         new_zombie.set_can_break_doors(true, to);
     }
+}
+
+/// Vanilla `Mob.getBaseExperienceReward`, which `Mob::get_base_experience_reward` overrides call
+/// as `super`: `xpReward` plus 1 to 3 for each equipped item that isn't a guaranteed drop.
+pub fn mob_base_experience_reward<M: Mob + ?Sized>(mob: &M) -> u32 {
+    let xp_reward = mob.xp_reward();
+    if xp_reward == 0 {
+        return xp_reward;
+    }
+    let mob_entity = mob.get_mob_entity();
+    let mut result = xp_reward;
+    for slot in &EquipmentSlot::VALUES {
+        if slot.can_increase_experience()
+            && !mob_entity.get_item_slot(slot).is_empty()
+            && mob_entity.drop_chance(slot) <= 1.0
+        {
+            result += 1 + mob.get_random().random_range(0..3);
+        }
+    }
+    result
 }
 
 /// The shared mob `hurtServer`, which `Mob::hurt_server` overrides call as `super`.
