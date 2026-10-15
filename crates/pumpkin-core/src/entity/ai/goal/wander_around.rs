@@ -25,6 +25,8 @@ pub struct WanderAroundGoal {
     /// Vanilla `WaterAvoidingRandomStrollGoal.probability`; unused by the other strolls.
     probability: f32,
     position: fn(&dyn Mob, f32) -> Option<Vector3<f64>>,
+    /// A subclass `canUse` check that runs before the stroll's own, e.g. not in a village.
+    gate: Option<fn(&dyn Mob) -> bool>,
 }
 
 impl WanderAroundGoal {
@@ -45,6 +47,7 @@ impl WanderAroundGoal {
             check_no_action_time: true,
             probability: WATER_AVOIDING_PROBABILITY,
             position: land_position,
+            gate: None,
         }
     }
 
@@ -96,6 +99,23 @@ impl WanderAroundGoal {
         self
     }
 
+    /// Vanilla `getPosition` overrides.
+    #[must_use]
+    pub const fn with_position(
+        mut self,
+        position: fn(&dyn Mob, f32) -> Option<Vector3<f64>>,
+    ) -> Self {
+        self.position = position;
+        self
+    }
+
+    /// A subclass `canUse` that checks before `super.canUse()`.
+    #[must_use]
+    pub const fn starting_only_when(mut self, gate: fn(&dyn Mob) -> bool) -> Self {
+        self.gate = Some(gate);
+        self
+    }
+
     /// Run once on the next check, ignoring the interval.
     pub const fn trigger(&mut self) {
         self.force_trigger = true;
@@ -133,6 +153,9 @@ impl Goal for WanderAroundGoal {
             .is_some_and(|flag| flag.swap(false, Ordering::Relaxed))
         {
             self.trigger();
+        }
+        if self.gate.is_some_and(|gate| !gate(mob)) {
+            return false;
         }
         // Every mob that carries a passenger is controlled by it.
         if mob.get_controlling_passenger().is_some() {

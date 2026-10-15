@@ -3,7 +3,7 @@ use std::sync::{
     atomic::{AtomicBool, AtomicI32, Ordering},
 };
 
-use pumpkin_data::entity::{EntityStatus, EntityType, MobCategory};
+use pumpkin_data::entity::{EntityStatus, EntityType};
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::{Sound, SoundCategory};
@@ -68,6 +68,14 @@ impl IronGolemEntity {
             goal_selector.add_goal(1, Box::new(MeleeAttackGoal::new(1.0, true)));
             goal_selector.add_goal(2, Box::new(MoveTowardsTargetGoal::new(0.9, 32.0)));
             goal_selector.add_goal(
+                2,
+                Box::new(crate::entity::ai::goal::move_back_to_village::new(
+                    0.6, false,
+                )),
+            );
+            // TODO: 4 GolemRandomStrollInVillageGoal needs villagers' brain memory of wanting a
+            // golem and village POIs beyond job sites; a plain stroll stands in.
+            goal_selector.add_goal(
                 4,
                 Box::new(WanderAroundGoal::new(0.6).ignoring_no_action_time()),
             );
@@ -78,16 +86,20 @@ impl IronGolemEntity {
             );
             goal_selector.add_goal(8, Box::new(RandomLookAroundGoal::default()));
 
-            // TODO: DefendVillageTargetGoal at 1.
+            target_selector.add_goal(
+                1,
+                Box::new(
+                    crate::entity::ai::goal::defend_village_target::DefendVillageTargetGoal::new(),
+                ),
+            );
             target_selector.add_goal(2, Box::new(RevengeGoal::new(true)));
             apply_targets(&mut target_selector, &mob_arc.mob_entity, 3, 4, false);
-            // Mirrors NearestAttackableTargetGoal<Mob>: any monster but creepers.
+            // `NearestAttackableTargetGoal<Mob>`: every `Enemy` but creepers.
             target_selector.add_goal(
                 3,
                 ActiveTargetGoal::predicated(&mob_arc.mob_entity, 5, false, |living, _world| {
                     let entity_type = living.entity.entity_type;
-                    entity_type.category == &MobCategory::MONSTER
-                        && entity_type != &EntityType::CREEPER
+                    entity_type.is_enemy && entity_type != &EntityType::CREEPER
                 }),
             );
         };

@@ -786,19 +786,23 @@ impl VillagerEntity {
         self.add_trades(profession, level);
     }
 
-    fn update_special_prices(&self, player: &Player) {
-        let player_uuid = player.get_entity().entity_uuid;
-        let reputation = self
-            .gossips
+    /// Vanilla `Villager.getPlayerReputation`: every gossip about the player, weighted.
+    #[must_use]
+    pub fn get_player_reputation(&self, player_uuid: &uuid::Uuid) -> i32 {
+        self.gossips
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .get(&player_uuid)
+            .get(player_uuid)
             .map_or(0, |gossips| {
                 gossips
                     .iter()
                     .map(|(kind, value)| kind.weight() * value)
                     .sum()
-            });
+            })
+    }
+
+    fn update_special_prices(&self, player: &Player) {
+        let reputation = self.get_player_reputation(&player.get_entity().entity_uuid);
         let hero_amplifier = player
             .living_entity
             .get_effect(&StatusEffect::HERO_OF_THE_VILLAGE)
@@ -2022,10 +2026,7 @@ impl Mob for VillagerEntity {
             for (uuid, entries) in gossips.iter() {
                 for (gossip_type, val) in entries {
                     let mut gossip_nbt = NbtCompound::new();
-                    let (u1, u2) = uuid.as_u64_pair();
-                    let uuid_array =
-                        vec![(u1 >> 32) as i32, u1 as i32, (u2 >> 32) as i32, u2 as i32];
-                    gossip_nbt.put("Target", NbtTag::IntArray(uuid_array));
+                    gossip_nbt.put_uuid("Target", *uuid);
                     gossip_nbt.put_string("Type", gossip_type.name().to_string());
                     gossip_nbt.put_int("Value", *val);
                     gossip_list.push(NbtTag::Compound(gossip_nbt));
@@ -2182,14 +2183,7 @@ impl Mob for VillagerEntity {
             gossips.clear();
             for tag in gossip_list {
                 if let Some(gossip_nbt) = tag.extract_compound() {
-                    let uuid = gossip_nbt.get_int_array("Target").map(|uuid_array| {
-                        Uuid::from_u128(
-                            (uuid_array[0] as u128) << 96
-                                | (uuid_array[1] as u128) << 64
-                                | (uuid_array[2] as u128) << 32
-                                | (uuid_array[3] as u128),
-                        )
-                    });
+                    let uuid = gossip_nbt.get_uuid("Target");
                     let gossip_type = gossip_nbt
                         .get_string("Type")
                         .and_then(GossipType::from_name)
