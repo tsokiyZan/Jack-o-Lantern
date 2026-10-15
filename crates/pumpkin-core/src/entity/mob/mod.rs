@@ -1108,7 +1108,8 @@ pub trait Mob: EntityBase + Send + Sync {
             1.0
         };
         let mut random = self.get_random();
-        (random.random::<f32>() - random.random::<f32>()).mul_add(0.2, base)
+        // Vanilla rounds the product before adding, so no fused multiply-add.
+        (random.random::<f32>() - random.random::<f32>()) * 0.2 + base
     }
 
     /// Vanilla `LivingEntity.makeSound`, through `Entity.playSound`, which a silent

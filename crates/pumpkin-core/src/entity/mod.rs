@@ -1224,7 +1224,7 @@ impl Entity {
             bedrock_flags: std::sync::atomic::AtomicI64::new(0),
             bedrock_flags_two: std::sync::atomic::AtomicI64::new(0),
             fire_immune: AtomicBool::new(false),
-            fire_ticks: AtomicI32::new(-1),
+            fire_ticks: AtomicI32::new(0),
             has_visual_fire: AtomicBool::new(false),
             frozen_ticks: AtomicI32::new(0),
             is_in_powder_snow: AtomicBool::new(false),
