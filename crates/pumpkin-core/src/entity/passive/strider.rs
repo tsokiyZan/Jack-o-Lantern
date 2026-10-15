@@ -111,6 +111,10 @@ const BABY_DIMENSIONS: EntityDimensions =
     EntityDimensions::scalable(0.45, 0.85).with_eye_height(0.4375);
 
 impl Mob for StriderEntity {
+    fn is_sensitive_to_water(&self) -> bool {
+        true
+    }
+
     /// Vanilla `Strider.playStepSound`.
     fn play_step_sound(
         &self,

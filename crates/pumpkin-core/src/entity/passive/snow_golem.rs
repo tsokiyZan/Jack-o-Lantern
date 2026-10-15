@@ -119,6 +119,10 @@ impl SnowGolemEntity {
 }
 
 impl Mob for SnowGolemEntity {
+    fn is_sensitive_to_water(&self) -> bool {
+        true
+    }
+
     fn mob_write_nbt(&self, nbt: &mut NbtCompound) {
         nbt.put_bool("Pumpkin", self.has_pumpkin());
     }

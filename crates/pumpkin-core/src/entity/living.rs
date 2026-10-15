@@ -1476,6 +1476,14 @@ impl LivingEntity {
         }
 
         self.push_entities(caller);
+
+        if caller
+            .get_mob()
+            .is_some_and(super::mob::Mob::is_sensitive_to_water)
+            && self.entity.is_in_water_or_rain()
+        {
+            caller.damage(caller, 1.0, DamageType::DROWN);
+        }
     }
 
     /// Vanilla `LivingEntity.applyInput`: the last tick's movement input decays. Vanilla

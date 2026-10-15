@@ -2,7 +2,6 @@ use crate::entity::ai::pathfinder::node::PathType;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
 
-use pumpkin_data::damage::DamageType;
 use pumpkin_data::entity::EntityType;
 use pumpkin_util::math::vector3::Vector3;
 
@@ -99,7 +98,7 @@ impl Mob for BlazeEntity {
         &self.entity
     }
 
-    fn mob_tick(&self, caller: &dyn EntityBase) {
+    fn mob_tick(&self, _caller: &dyn EntityBase) {
         let base_entity = &self.entity.living_entity.entity;
         if !base_entity.is_alive() {
             return;
@@ -112,9 +111,9 @@ impl Mob for BlazeEntity {
                 .velocity
                 .store(Vector3::new(vel.x, vel.y * 0.6, vel.z));
         }
+    }
 
-        if base_entity.touching_water.load(Ordering::Relaxed) {
-            caller.damage(caller, 1.0, DamageType::DROWN);
-        }
+    fn is_sensitive_to_water(&self) -> bool {
+        true
     }
 }

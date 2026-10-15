@@ -1274,6 +1274,11 @@ pub trait Mob: EntityBase + Send + Sync {
         true
     }
 
+    /// Vanilla `LivingEntity.isSensitiveToWater`: takes drowning damage in water or rain.
+    fn is_sensitive_to_water(&self) -> bool {
+        false
+    }
+
     /// Whether the move and look controls skip their tick, as vanilla's axolotl
     /// controls do while it plays dead.
     fn controls_paused(&self) -> bool {
