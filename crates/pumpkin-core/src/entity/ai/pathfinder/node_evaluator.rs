@@ -1,6 +1,7 @@
 use pumpkin_data::{
     Block, BlockState,
     block_properties::CampfireLikeProperties,
+    fluid::Fluid,
     tag::{self, Taggable},
 };
 use rustc_hash::FxHashMap;
@@ -46,76 +47,45 @@ pub trait NodeEvaluator {
     fn can_walk_over_fences(&self) -> bool;
 }
 
+/// What the node evaluators read from the pathing mob.
 #[derive(Debug, Clone, Copy)]
 pub struct MobData {
     pub position: Vector3<f64>,
     pub width: f32,
     pub height: f32,
-    pub max_step_height: f32,
-    pub max_fall_distance: f32,
-    pub can_swim: bool,
-    pub can_walk_on_water: bool,
-    pub avoids_fire: bool,
-    pub avoids_water: bool,
+    /// Vanilla `LivingEntity.maxUpStep`.
+    pub max_up_step: f32,
+    /// Vanilla `Mob.getMaxFallDistance`.
+    pub max_fall_distance: i32,
+    /// Vanilla `LivingEntity.canStandOnFluid` holds for lava (striders).
+    pub can_stand_on_lava: bool,
     pub on_ground: bool,
+    /// Vanilla `isInWater`, which is also `isInFloatableFluid` while
+    /// `#entity_floatable` holds only water.
     pub is_in_water: bool,
-    pub sea_level: i32,
-    pub min_y: i32,
     pub path_type_malus: [Option<f32>; PATH_TYPE_COUNT],
 }
 
 impl MobData {
     #[must_use]
-    pub const fn new_zombie(position: Vector3<f64>, on_ground: bool) -> Self {
-        let mut data = Self {
-            position,
-            width: 0.6,
-            height: 1.95,
-            max_step_height: 1.0,
-            max_fall_distance: 3.0,
-            can_swim: false,
-            can_walk_on_water: false,
-            avoids_fire: true,
-            avoids_water: false,
-            on_ground,
-            is_in_water: false,
-            sea_level: 63,
-            min_y: -64,
-            path_type_malus: [None; PATH_TYPE_COUNT],
-        };
-
-        data.set_pathfinding_malus(PathType::DangerFire, 16.0);
-        data.set_pathfinding_malus(PathType::DamageFire, -1.0);
-        data.set_pathfinding_malus(PathType::Water, 8.0);
-        data.set_pathfinding_malus(PathType::Lava, -1.0);
-        data.set_pathfinding_malus(PathType::DangerOther, 8.0);
-
-        data
-    }
-
-    #[must_use]
-    pub const fn new(
-        position: Vector3<f64>,
-        width: f32,
-        height: f32,
-        max_step_height: f32,
-    ) -> Self {
+    pub const fn new(position: Vector3<f64>, width: f32, height: f32) -> Self {
         Self {
             position,
             width,
             height,
-            max_step_height,
-            max_fall_distance: 3.0,
-            can_swim: false,
-            can_walk_on_water: false,
-            avoids_fire: true,
-            avoids_water: false,
+            max_up_step: 0.0,
+            max_fall_distance: 3,
+            can_stand_on_lava: false,
             on_ground: true,
             is_in_water: false,
-            sea_level: 63,
-            min_y: -64,
             path_type_malus: [None; PATH_TYPE_COUNT],
         }
+    }
+
+    /// Vanilla `LivingEntity.canStandOnFluid`.
+    #[must_use]
+    pub fn can_stand_on_fluid(&self, fluid: &Fluid) -> bool {
+        self.can_stand_on_lava && fluid.has_tag(&tag::Fluid::MINECRAFT_LAVA)
     }
 
     #[must_use]
@@ -183,24 +153,15 @@ impl BaseNodeEvaluator {
         }
     }
 
+    /// Vanilla `NodeEvaluator.getNode`, as a copy of the cached node.
     pub fn get_node(&mut self, pos: BlockPos) -> Node {
-        if let Some(node) = self.nodes.get(&pos.0) {
-            *node
-        } else {
-            let node = Node::new(pos);
-            self.nodes.insert(pos.0, node);
-            node
-        }
+        *self.node_mut(pos)
     }
 
-    /// Vanilla closes the shared `Node` the search pops, which keeps it out of
-    /// every later neighbour list. Nodes here are handed out as copies, so the
-    /// search closes the cached one instead.
-    pub fn mark_closed(&mut self, pos: BlockPos) {
-        self.nodes
-            .entry(pos.0)
-            .or_insert_with(|| Node::new(pos))
-            .closed = true;
+    /// The cached node at `pos`. Vanilla hands out one shared `Node` per position
+    /// and mutates it in place, so every change has to land here to persist.
+    pub fn node_mut(&mut self, pos: BlockPos) -> &mut Node {
+        self.nodes.entry(pos.0).or_insert_with(|| Node::new(pos))
     }
 
     pub fn reset(&mut self) {

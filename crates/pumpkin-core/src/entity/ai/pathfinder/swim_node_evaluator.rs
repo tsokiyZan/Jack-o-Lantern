@@ -1,3 +1,7 @@
+use pumpkin_data::{
+    fluid::Fluid,
+    tag::{self, Taggable},
+};
 use pumpkin_util::math::{position::BlockPos, vector3::Vector3};
 use rustc_hash::FxHashMap;
 
@@ -45,15 +49,19 @@ impl SwimNodeEvaluator {
         if (self.allow_breaching && path_type == PathType::Breach) || path_type == PathType::Water {
             let path_cost = self.get_mob_penalty(path_type);
             (path_cost >= 0.0).then(|| {
-                let mut best = self.base.get_node(BlockPos::new(x, y, z));
+                let pos = BlockPos::new(x, y, z);
+                let fluid_empty = self
+                    .base
+                    .context
+                    .as_ref()
+                    .is_some_and(|ctx| ctx.get_fluid(&pos).id == Fluid::EMPTY.id);
+                let best = self.base.node_mut(pos);
                 best.path_type = path_type;
                 best.cost_malus = best.cost_malus.max(path_cost);
-                if let Some(ref ctx) = self.base.context
-                    && !ctx.is_water(&BlockPos::new(x, y, z))
-                {
+                if fluid_empty {
                     best.cost_malus += 8.0;
                 }
-                best
+                *best
             })
         } else {
             None
@@ -107,10 +115,7 @@ impl NodeEvaluator for SwimNodeEvaluator {
         let min_y = (mob_data.position.y + 0.5).floor() as i32;
         let min_z = (mob_data.position.z - f64::from(mob_data.width) / 2.0).floor() as i32;
 
-        let mut node = self.base.get_node(BlockPos::new(min_x, min_y, min_z));
-        node.path_type = self.get_cached_block_type(Vector3::new(min_x, min_y, min_z));
-        node.cost_malus = self.get_mob_penalty(node.path_type);
-        Some(node)
+        Some(self.base.get_node(BlockPos::new(min_x, min_y, min_z)))
     }
 
     fn get_target(&mut self, pos: BlockPos) -> Target {
@@ -168,27 +173,28 @@ impl NodeEvaluator for SwimNodeEvaluator {
         pos: Vector3<i32>,
         _mob_data: &MobData,
     ) -> PathType {
+        let mut last_pos = BlockPos(pos);
         for xx in pos.x..(pos.x + self.base.entity_width) {
             for yy in pos.y..(pos.y + self.base.entity_height) {
                 for zz in pos.z..(pos.z + self.base.entity_depth) {
                     let check_pos = BlockPos::new(xx, yy, zz);
-                    let is_water = context.is_water(&check_pos);
-                    let below_pos = check_pos.down();
-                    let below_pathfindable =
-                        context.is_pathfindable(&below_pos, PathComputationType::Water);
-                    let is_air = context.is_air(&check_pos);
-                    if !is_water && below_pathfindable && is_air {
+                    last_pos = check_pos;
+                    let fluid = context.get_fluid(&check_pos);
+                    if fluid.id == Fluid::EMPTY.id
+                        && context.is_pathfindable(&check_pos.down(), PathComputationType::Water)
+                        && context.is_air(&check_pos)
+                    {
                         return PathType::Breach;
                     }
-                    if !is_water {
+                    if !fluid.has_tag(&tag::Fluid::MINECRAFT_WATER) {
                         return PathType::Blocked;
                     }
                 }
             }
         }
 
-        let p = pos.to_block_pos();
-        if context.is_pathfindable(&p, PathComputationType::Water) {
+        // Vanilla tests the last position the loop visited, not `pos`.
+        if context.is_pathfindable(&last_pos, PathComputationType::Water) {
             PathType::Water
         } else {
             PathType::Blocked
@@ -196,22 +202,9 @@ impl NodeEvaluator for SwimNodeEvaluator {
     }
 
     fn get_path_type(&mut self, context: &mut PathfindingContext, pos: Vector3<i32>) -> PathType {
-        let mob_data = self.base.mob_data.unwrap_or(MobData {
-            position: Vector3::new(0.0, 0.0, 0.0),
-            width: 0.6,
-            height: 1.95,
-            max_step_height: 1.0,
-            max_fall_distance: 3.0,
-            can_swim: true,
-            can_walk_on_water: false,
-            avoids_fire: true,
-            avoids_water: false,
-            on_ground: false,
-            is_in_water: true,
-            sea_level: 63,
-            min_y: -64,
-            path_type_malus: [None; crate::entity::ai::pathfinder::node::PATH_TYPE_COUNT],
-        });
+        let Some(mob_data) = self.base.mob_data else {
+            return PathType::Blocked;
+        };
         self.get_path_type_of_mob(context, pos, &mob_data)
     }
 

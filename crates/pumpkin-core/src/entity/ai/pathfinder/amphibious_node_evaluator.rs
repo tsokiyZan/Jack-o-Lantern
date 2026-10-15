@@ -18,13 +18,29 @@ pub struct AmphibiousNodeEvaluator {
 impl AmphibiousNodeEvaluator {
     #[must_use]
     pub fn new(prefers_shallow_swimming: bool) -> Self {
-        let mut walk = WalkNodeEvaluator::new();
+        let mut walk = WalkNodeEvaluator::with_path_type(Self::get_path_type_static);
         walk.is_amphibious = true;
         Self {
             walk,
             prefers_shallow_swimming,
             old_walkable_cost: 0.0,
             old_water_border_cost: 0.0,
+        }
+    }
+
+    /// Vanilla `AmphibiousNodeEvaluator.getPathType`.
+    pub fn get_path_type_static(context: &mut PathfindingContext, pos: Vector3<i32>) -> PathType {
+        let block_path_type = context.get_path_type_from_state(pos);
+        if block_path_type == PathType::Water {
+            for dir in BlockDirection::all() {
+                let neighbor_pos = pos + dir.to_offset();
+                if context.get_path_type_from_state(neighbor_pos) == PathType::Blocked {
+                    return PathType::WaterBorder;
+                }
+            }
+            PathType::Water
+        } else {
+            WalkNodeEvaluator::get_path_type_static(context, pos)
         }
     }
 
@@ -104,6 +120,9 @@ impl NodeEvaluator for AmphibiousNodeEvaluator {
             block_path_type_current,
         );
 
+        // Looking up and down can retype the current node itself, which vanilla
+        // sees through its shared `Node`.
+        let current = &self.walk.base.get_node(current.pos);
         if Self::is_vertical_neighbor_valid(up_node.as_ref(), current)
             && let Some(n) = up_node
         {
@@ -117,13 +136,23 @@ impl NodeEvaluator for AmphibiousNodeEvaluator {
             out.push(n);
         }
 
-        let sea_level = self.walk.base.mob_data.map_or(63, |d| d.sea_level);
+        let Some(sea_level) = self
+            .walk
+            .base
+            .context
+            .as_ref()
+            .map(PathfindingContext::sea_level)
+        else {
+            return;
+        };
         for neighbor in out.iter_mut() {
             if neighbor.path_type == PathType::Water
                 && self.prefers_shallow_swimming
                 && neighbor.pos.0.y < sea_level - 10
             {
-                neighbor.cost_malus += 1.0;
+                let node = self.walk.base.node_mut(neighbor.pos);
+                node.cost_malus += 1.0;
+                *neighbor = *node;
             }
         }
     }
@@ -138,26 +167,7 @@ impl NodeEvaluator for AmphibiousNodeEvaluator {
     }
 
     fn get_path_type(&mut self, context: &mut PathfindingContext, pos: Vector3<i32>) -> PathType {
-        let block_path_type = context.get_path_type_from_state(pos);
-        if block_path_type == PathType::Water {
-            for dir in [
-                BlockDirection::Down,
-                BlockDirection::Up,
-                BlockDirection::North,
-                BlockDirection::South,
-                BlockDirection::West,
-                BlockDirection::East,
-            ] {
-                let neighbor_pos = pos + dir.to_offset();
-                let path_type = context.get_path_type_from_state(neighbor_pos);
-                if path_type == PathType::Blocked {
-                    return PathType::WaterBorder;
-                }
-            }
-            PathType::Water
-        } else {
-            self.walk.get_path_type(context, pos)
-        }
+        self.walk.get_path_type(context, pos)
     }
 
     fn set_can_pass_doors(&mut self, can_pass: bool) {

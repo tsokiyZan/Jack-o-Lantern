@@ -41,7 +41,7 @@ impl MobEntity {
     /// Vanilla `Mob.finalizeSpawn`: random follow range bonus and left-handedness.
     pub fn finalize_spawn_base(&self) {
         let mut rng = rand::rng();
-        {
+        let follow_range_changed = {
             let mut attributes = self
                 .living_entity
                 .attributes
@@ -59,7 +59,17 @@ impl MobEntity {
                     amount: 0.114_85 * f64::from(rng.random::<f32>() - rng.random::<f32>()),
                     operation: ModifierOperation::MultiplyBase,
                 });
+                true
+            } else {
+                false
             }
+        };
+        // Vanilla `Mob.onAttributeUpdated`.
+        if follow_range_changed {
+            self.navigator
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .update_pathfinder_max_visited_nodes(&self.living_entity);
         }
         self.set_left_handed(rng.random::<f32>() < 0.05);
 

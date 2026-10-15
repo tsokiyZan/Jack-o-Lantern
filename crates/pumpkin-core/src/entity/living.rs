@@ -815,6 +815,12 @@ impl LivingEntity {
             .set_synced_data(tracked_data::living_entity::DATA_HEALTH_ID, clamped);
     }
 
+    /// Vanilla `LivingEntity.getComfortableFallDistance`.
+    #[must_use]
+    pub fn get_comfortable_fall_distance(allowed_damage: f32) -> i32 {
+        (allowed_damage + 3.0).floor() as i32
+    }
+
     /// Returns the current maximum health for this entity
     pub fn get_max_health(&self) -> f32 {
         self.get_attribute_value(&Attributes::MAX_HEALTH) as f32

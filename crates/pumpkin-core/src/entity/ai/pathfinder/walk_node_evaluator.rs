@@ -1,29 +1,50 @@
 use pumpkin_data::BlockDirection;
-use pumpkin_util::math::{boundingbox::BoundingBox, position::BlockPos, vector3::Vector3};
+use pumpkin_util::math::{
+    boundingbox::{BoundingBox, EntityDimensions},
+    position::BlockPos,
+    vector3::Vector3,
+};
 use rustc_hash::FxHashMap;
 
 use crate::entity::ai::pathfinder::{
-    node::{Coordinate, Node, PathType, Target},
+    node::{Coordinate, Node, PathComputationType, PathType, Target},
     node_evaluator::{BaseNodeEvaluator, MobData, NodeEvaluator},
     pathfinding_context::PathfindingContext,
 };
+
+/// The `getPathType` a walk-based evaluator resolves blocks with. Vanilla's fly and
+/// amphibious evaluators override it while inheriting the rest of the walk logic.
+pub type PathTypeFn = fn(&mut PathfindingContext, Vector3<i32>) -> PathType;
 
 pub struct WalkNodeEvaluator {
     pub base: BaseNodeEvaluator,
     path_types_cache: FxHashMap<Vector3<i32>, PathType>,
     reusable_neighbors: [Option<Node>; 4],
     pub is_amphibious: bool,
+    path_type_fn: PathTypeFn,
 }
 
 impl WalkNodeEvaluator {
     #[must_use]
     pub fn new() -> Self {
+        Self::with_path_type(Self::get_path_type_static)
+    }
+
+    /// A walk evaluator whose `getPathType` is `path_type_fn`.
+    #[must_use]
+    pub fn with_path_type(path_type_fn: PathTypeFn) -> Self {
         Self {
             base: BaseNodeEvaluator::new(),
             path_types_cache: FxHashMap::default(),
             reusable_neighbors: [None, None, None, None],
             is_amphibious: false,
+            path_type_fn,
         }
+    }
+
+    /// Vanilla `WalkNodeEvaluator.getPathTypeStatic`.
+    pub fn get_path_type_static(context: &mut PathfindingContext, pos: Vector3<i32>) -> PathType {
+        context.get_land_node_type(pos)
     }
 
     #[must_use]
@@ -31,7 +52,7 @@ impl WalkNodeEvaluator {
         self.base.context.as_ref().map_or_else(
             || f64::from(pos.0.y),
             |ctx| {
-                if (self.base.can_float || self.is_amphibious) && ctx.is_water(pos) {
+                if (self.base.can_float || self.is_amphibious) && ctx.is_floatable(pos) {
                     f64::from(pos.0.y) + 0.5
                 } else {
                     ctx.get_floor_level(pos)
@@ -45,7 +66,7 @@ impl WalkNodeEvaluator {
         self.base
             .mob_data
             .as_ref()
-            .map_or(1.125, |d| f64::from(d.max_step_height).max(1.125))
+            .map_or(1.125, |d| f64::from(d.max_up_step).max(1.125))
     }
 
     #[must_use]
@@ -102,11 +123,7 @@ impl WalkNodeEvaluator {
             mob_data.position.x,
             mob_data.position.y,
             mob_data.position.z,
-            &pumpkin_util::math::boundingbox::EntityDimensions::new(
-                mob_data.width,
-                mob_data.height,
-                0.0,
-            ),
+            &EntityDimensions::new(mob_data.width, mob_data.height, 0.0),
         );
         let x_size = bb.max.x - bb.min.x;
         let y_size = bb.max.y - bb.min.y;
@@ -119,7 +136,8 @@ impl WalkNodeEvaluator {
         );
         let steps = (delta.length() / avg_size).ceil() as i32;
         if steps > 0 {
-            delta = delta * (1.0 / f64::from(steps));
+            // Vanilla scales by `1.0F / steps`, a float.
+            delta = delta * f64::from(1.0f32 / steps as f32);
             for _ in 1..=steps {
                 bb = bb.shift(delta);
                 if self.has_collision(&bb) {
@@ -251,7 +269,9 @@ impl WalkNodeEvaluator {
         z: i32,
         mut best: Option<Node>,
     ) -> Option<Node> {
-        let min_y = self.base.mob_data.map_or(-64, |d| d.min_y);
+        let Some(min_y) = self.base.context.as_ref().map(PathfindingContext::min_y) else {
+            return best;
+        };
         y -= 1;
         while y > min_y {
             let path_type_local = self.get_cached_path_type(Vector3::new(x, y, z));
@@ -266,11 +286,12 @@ impl WalkNodeEvaluator {
     }
 
     fn try_find_first_ground_node_below(&mut self, x: i32, y: i32, z: i32) -> Node {
-        let max_fall_distance = self
+        let max_fall_distance = self.base.mob_data.map_or(3, |d| d.max_fall_distance);
+        let min_y = self
             .base
-            .mob_data
-            .map_or(3, |d| d.max_fall_distance.floor() as i32);
-        let min_y = self.base.mob_data.map_or(-64, |d| d.min_y);
+            .context
+            .as_ref()
+            .map_or(i32::MIN, PathfindingContext::min_y);
 
         for current_y in (min_y..y).rev() {
             if y - current_y > max_fall_distance {
@@ -297,25 +318,25 @@ impl WalkNodeEvaluator {
         path_type: PathType,
         cost: f32,
     ) -> Node {
-        let mut node = self.base.get_node(BlockPos::new(x, y, z));
+        let node = self.base.node_mut(BlockPos::new(x, y, z));
         node.path_type = path_type;
         node.cost_malus = node.cost_malus.max(cost);
-        node
+        *node
     }
 
     fn get_blocked_node(&mut self, x: i32, y: i32, z: i32) -> Node {
-        let mut node = self.base.get_node(BlockPos::new(x, y, z));
+        let node = self.base.node_mut(BlockPos::new(x, y, z));
         node.path_type = PathType::Blocked;
         node.cost_malus = -1.0;
-        node
+        *node
     }
 
     fn get_closed_node(&mut self, x: i32, y: i32, z: i32, path_type: PathType) -> Node {
-        let mut node = self.base.get_node(BlockPos::new(x, y, z));
+        let node = self.base.node_mut(BlockPos::new(x, y, z));
         node.closed = true;
         node.path_type = path_type;
         node.cost_malus = path_type.get_malus();
-        node
+        *node
     }
 
     #[must_use]
@@ -361,10 +382,11 @@ impl WalkNodeEvaluator {
 
     pub fn get_start_node(&mut self, pos: Vector3<i32>) -> Node {
         let path_type = self.get_cached_path_type(pos);
-        let mut node = self.base.get_node(pos.as_blockpos());
+        let cost_malus = self.get_mob_penalty(path_type);
+        let node = self.base.node_mut(pos.as_blockpos());
         node.path_type = path_type;
-        node.cost_malus = self.get_mob_penalty(path_type);
-        node
+        node.cost_malus = cost_malus;
+        *node
     }
 
     pub fn get_path_type_within_mob_bb(
@@ -441,44 +463,36 @@ impl NodeEvaluator for WalkNodeEvaluator {
 
     fn get_start(&mut self) -> Option<Node> {
         let mob_data = self.base.mob_data?;
+        let ctx = self.base.context.as_ref()?;
         let mob_x = mob_data.position.x;
         let mob_y = mob_data.position.y;
         let mob_z = mob_data.position.z;
         let block_x = mob_x.floor() as i32;
-        let block_y = mob_y.floor() as i32;
         let block_z = mob_z.floor() as i32;
+        let fluid_at = |y| ctx.get_fluid(&BlockPos::new(block_x, y, block_z));
 
-        let mut start_y = block_y;
-
-        if !mob_data.can_walk_on_water {
-            if self.base.can_float && mob_data.is_in_water {
-                let mut check_y = block_y;
-                if let Some(ref ctx) = self.base.context {
-                    while ctx.is_water(&BlockPos::new(block_x, check_y + 1, block_z)) {
-                        check_y += 1;
-                    }
-                }
+        let mut start_y = mob_y.floor() as i32;
+        if mob_data.can_stand_on_fluid(fluid_at(start_y)) {
+            while mob_data.can_stand_on_fluid(fluid_at(start_y)) {
+                start_y += 1;
+            }
+            start_y -= 1;
+        } else if self.base.can_float && mob_data.is_in_water {
+            while ctx.is_floatable(&BlockPos::new(block_x, start_y, block_z)) {
+                start_y += 1;
+            }
+            start_y -= 1;
+        } else if mob_data.on_ground {
+            start_y = (mob_y + 0.5).floor() as i32;
+        } else {
+            let min_y = ctx.min_y();
+            let mut check_y = (mob_y + 1.0).floor() as i32;
+            while check_y > min_y {
                 start_y = check_y;
-            } else if mob_data.on_ground {
-                start_y = (mob_y + 0.5).floor() as i32;
-            } else {
-                let start_check_y = (mob_y + 1.0).floor() as i32;
-                start_y = start_check_y;
-                let min_y = mob_data.min_y;
-                let mut check_y = start_check_y;
-                while check_y > min_y {
-                    start_y = check_y;
-                    check_y -= 1;
-                    let below = BlockPos::new(block_x, check_y, block_z);
-                    if let Some(ref ctx) = self.base.context
-                        && !ctx.is_air(&below)
-                        && !ctx.is_pathfindable(
-                            &below,
-                            crate::entity::ai::pathfinder::node::PathComputationType::Land,
-                        )
-                    {
-                        break;
-                    }
+                check_y -= 1;
+                let below = BlockPos::new(block_x, check_y, block_z);
+                if !ctx.is_air(&below) && !ctx.is_pathfindable(&below, PathComputationType::Land) {
+                    break;
                 }
             }
         }
@@ -642,7 +656,7 @@ impl NodeEvaluator for WalkNodeEvaluator {
     }
 
     fn get_path_type(&mut self, context: &mut PathfindingContext, pos: Vector3<i32>) -> PathType {
-        context.get_land_node_type(pos)
+        (self.path_type_fn)(context, pos)
     }
 
     fn set_can_pass_doors(&mut self, can_pass: bool) {

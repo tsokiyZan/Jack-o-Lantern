@@ -20,6 +20,7 @@ use crate::entity::{
         look_at_entity::LookAtEntityGoal, melee_attack::MeleeAttackGoal, revenge::RevengeGoal,
         swim::SwimGoal, wander_around::WanderAroundGoal,
     },
+    living::LivingEntity,
     mob::{Mob, MobEntity},
     player::Player,
 };
@@ -131,6 +132,18 @@ impl CreeperEntity {
 }
 
 impl Mob for CreeperEntity {
+    /// Vanilla `Creeper.getMaxFallDistance`: with a target it will drop as far as
+    /// it can survive.
+    fn get_max_fall_distance(&self) -> i32 {
+        let living = &self.mob_entity.living_entity;
+        let allowed_damage = if self.mob_entity.get_target().is_none() {
+            0.0
+        } else {
+            living.health.load() - 1.0
+        };
+        LivingEntity::get_comfortable_fall_distance(allowed_damage)
+    }
+
     fn mob_write_nbt(&self, nbt: &mut NbtCompound) {
         nbt.put_bool("powered", self.charged.load(Ordering::Relaxed));
         nbt.put_short("Fuse", self.fuse_time.load(Ordering::Relaxed) as i16);

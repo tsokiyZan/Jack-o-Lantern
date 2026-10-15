@@ -5,21 +5,22 @@ use pumpkin_util::math::wrap_degrees;
 
 use crate::entity::Entity;
 use crate::entity::living::LivingEntity;
+use crate::entity::mob::Mob;
 use crate::world::World;
 
 use crate::entity::ai::pathfinder::amphibious_node_evaluator::AmphibiousNodeEvaluator;
 use crate::entity::ai::pathfinder::binary_heap::BinaryHeap;
 use crate::entity::ai::pathfinder::fly_node_evaluator::FlyNodeEvaluator;
-use crate::entity::ai::pathfinder::node::Node;
-use crate::entity::ai::pathfinder::node::PathType;
-use crate::entity::ai::pathfinder::node_evaluator::{MobData, NodeEvaluator};
+use crate::entity::ai::pathfinder::node::{Node, PathType, Target};
+use crate::entity::ai::pathfinder::node_evaluator::{BaseNodeEvaluator, MobData, NodeEvaluator};
 use crate::entity::ai::pathfinder::path::Path;
 use crate::entity::ai::pathfinder::pathfinding_context::PathfindingContext;
 use crate::entity::ai::pathfinder::swim_node_evaluator::SwimNodeEvaluator;
 use crate::entity::ai::pathfinder::walk_node_evaluator::WalkNodeEvaluator;
 use pumpkin_data::attributes::Attributes;
+use pumpkin_data::entity::EntityType;
 use pumpkin_data::tag::{self, Taggable};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -34,226 +35,8 @@ pub mod pathfinding_context;
 pub mod swim_node_evaluator;
 pub mod walk_node_evaluator;
 
-const MAX_ITERS: usize = 560;
-const TARGET_DISTANCE_MULTIPLIER: f32 = 1.5;
-
-pub struct PathFinder {
-    max_visited_nodes: usize,
-    open_set: BinaryHeap,
-    neighbors_buf: Vec<Node>,
-    all_nodes: FxHashMap<Vector3<i32>, Node>,
-}
-
-impl PathFinder {
-    #[must_use]
-    pub fn new(max_visited_nodes: usize) -> Self {
-        Self {
-            max_visited_nodes,
-            open_set: BinaryHeap::new(),
-            neighbors_buf: Vec::with_capacity(32),
-            all_nodes: FxHashMap::default(),
-        }
-    }
-
-    pub const fn set_max_visited_nodes(&mut self, max_visited_nodes: usize) {
-        self.max_visited_nodes = max_visited_nodes;
-    }
-
-    #[must_use]
-    pub const fn get_max_visited_nodes(&self) -> usize {
-        self.max_visited_nodes
-    }
-
-    pub fn find_path_single(
-        &mut self,
-        evaluator: &mut EvaluatorKind,
-        target: BlockPos,
-        max_path_length: f32,
-        reach_range: i32,
-        max_visited_nodes_multiplier: f32,
-    ) -> Option<Path> {
-        self.find_path(
-            evaluator,
-            &[target],
-            max_path_length,
-            reach_range,
-            max_visited_nodes_multiplier,
-        )
-    }
-
-    #[expect(clippy::too_many_lines)]
-    pub fn find_path(
-        &mut self,
-        evaluator: &mut EvaluatorKind,
-        targets: &[BlockPos],
-        max_path_length: f32,
-        reach_range: i32,
-        max_visited_nodes_multiplier: f32,
-    ) -> Option<Path> {
-        if targets.is_empty() {
-            return None;
-        }
-
-        let mut from = evaluator.get_start()?;
-
-        let mut target_entries: Vec<(crate::entity::ai::pathfinder::node::Target, BlockPos)> =
-            targets
-                .iter()
-                .map(|&pos| (evaluator.get_target(pos), pos))
-                .collect();
-
-        self.all_nodes.clear();
-        self.open_set.clear();
-
-        from.g = 0.0;
-        from.h = Self::get_best_h(&from, &mut target_entries);
-        from.f = from.h;
-        from.walked_dist = 0.0;
-        from.came_from = None;
-        from.closed = false;
-
-        self.all_nodes.insert(from.pos.0, from);
-        self.open_set.insert(from);
-
-        let mut count = 0usize;
-        let mut reached_targets: Vec<usize> = Vec::new();
-        let max_visited_nodes_adjusted =
-            (self.max_visited_nodes as f32 * max_visited_nodes_multiplier) as usize;
-
-        while !self.open_set.is_empty() {
-            count += 1;
-            if count >= max_visited_nodes_adjusted {
-                break;
-            }
-
-            let Some(mut current) = self.open_set.pop() else {
-                break;
-            };
-
-            current.closed = true;
-            evaluator.mark_closed(current.pos);
-            self.all_nodes.insert(current.pos.0, current);
-
-            for (idx, (target, _)) in target_entries.iter_mut().enumerate() {
-                if current.distance_manhattan_node(&target.node) <= reach_range as f32 {
-                    target.set_reached();
-                    target.update_best(0.0, &current);
-                    if !reached_targets.contains(&idx) {
-                        reached_targets.push(idx);
-                    }
-                }
-            }
-
-            if !reached_targets.is_empty() {
-                break;
-            }
-
-            if current.distance_to_node(&from) < max_path_length {
-                self.neighbors_buf.clear();
-                evaluator.get_neighbors(&current, &mut self.neighbors_buf);
-
-                for mut neighbor in self.neighbors_buf.drain(..) {
-                    let distance = current.distance_to_node(&neighbor);
-                    neighbor.walked_dist = current.walked_dist + distance;
-                    let tentative_g = current.g + distance + neighbor.cost_malus;
-
-                    let in_open = self.open_set.contains(&neighbor);
-                    let is_better = if in_open {
-                        self.open_set
-                            .get_node(&neighbor)
-                            .is_some_and(|existing| tentative_g < existing.g)
-                    } else {
-                        true
-                    };
-
-                    if neighbor.walked_dist < max_path_length && is_better {
-                        neighbor.came_from = Some(current.pos.0);
-                        neighbor.g = tentative_g;
-                        neighbor.h = Self::get_best_h(&neighbor, &mut target_entries) * 1.5;
-                        neighbor.f = neighbor.g + neighbor.h;
-
-                        if in_open {
-                            self.open_set.update_node(&neighbor, neighbor);
-                        } else {
-                            self.open_set.insert(neighbor);
-                        }
-                        self.all_nodes.insert(neighbor.pos.0, neighbor);
-                    }
-                }
-            }
-        }
-
-        for node in self.open_set.drain() {
-            self.all_nodes.entry(node.pos.0).or_insert(node);
-        }
-
-        if reached_targets.is_empty() {
-            target_entries
-                .into_iter()
-                .filter_map(|(target, target_pos)| {
-                    target.get_best_node().map(|best| {
-                        Self::reconstruct_path(&best, target_pos, false, &self.all_nodes)
-                    })
-                })
-                .min_by(|a, b| {
-                    a.get_dist_to_target()
-                        .total_cmp(&b.get_dist_to_target())
-                        .then_with(|| a.get_node_count().cmp(&b.get_node_count()))
-                })
-        } else {
-            reached_targets
-                .into_iter()
-                .filter_map(|idx| {
-                    let (target, target_pos) = &target_entries[idx];
-                    target.get_best_node().map(|best| {
-                        Self::reconstruct_path(&best, *target_pos, true, &self.all_nodes)
-                    })
-                })
-                .min_by_key(Path::get_node_count)
-        }
-    }
-
-    fn reconstruct_path(
-        closest: &Node,
-        target: BlockPos,
-        reached: bool,
-        all_nodes: &FxHashMap<Vector3<i32>, Node>,
-    ) -> Path {
-        let mut nodes = Vec::new();
-        let mut current = *closest;
-        nodes.push(current);
-        let mut visited = FxHashSet::default();
-        visited.insert(current.pos.0);
-
-        while let Some(prev_pos) = current.came_from {
-            if prev_pos == current.pos.0 || !visited.insert(prev_pos) {
-                break;
-            }
-            if let Some(prev_node) = all_nodes.get(&prev_pos) {
-                nodes.push(*prev_node);
-                current = *prev_node;
-            } else {
-                break;
-            }
-        }
-
-        nodes.reverse();
-        Path::new(nodes, target, reached)
-    }
-
-    fn get_best_h(
-        from: &Node,
-        targets: &mut [(crate::entity::ai::pathfinder::node::Target, BlockPos)],
-    ) -> f32 {
-        let mut best_h = f32::MAX;
-        for (target, _) in targets.iter_mut() {
-            let h = from.distance_to_node(&target.node);
-            target.update_best(h, from);
-            best_h = best_h.min(h);
-        }
-        best_h
-    }
-}
+/// Vanilla `PathFinder.FUDGING`: how much more the heuristic weighs than the cost so far.
+const FUDGING: f32 = 1.5;
 
 #[derive(Clone, Copy, Debug)]
 pub struct NavigatorGoal {
@@ -326,7 +109,7 @@ impl EvaluatorKind {
         }
     }
 
-    pub fn get_target(&mut self, pos: BlockPos) -> crate::entity::ai::pathfinder::node::Target {
+    pub fn get_target(&mut self, pos: BlockPos) -> Target {
         match self {
             Self::Walk(e) => e.get_target(pos),
             Self::Fly(e) => e.get_target(pos),
@@ -335,12 +118,13 @@ impl EvaluatorKind {
         }
     }
 
-    pub fn mark_closed(&mut self, pos: BlockPos) {
+    /// The evaluator's shared node map and settings.
+    pub const fn base_mut(&mut self) -> &mut BaseNodeEvaluator {
         match self {
-            Self::Walk(e) => e.base.mark_closed(pos),
-            Self::Fly(e) => e.walk.base.mark_closed(pos),
-            Self::Swim(e) => e.base.mark_closed(pos),
-            Self::Amphibious(e) => e.walk.base.mark_closed(pos),
+            Self::Walk(e) => &mut e.base,
+            Self::Fly(e) => &mut e.walk.base,
+            Self::Swim(e) => &mut e.base,
+            Self::Amphibious(e) => &mut e.walk.base,
         }
     }
 
@@ -429,7 +213,10 @@ pub trait PathNavigationTrait: Send + Sync {
     fn set_can_float(&mut self, can_float: bool);
     fn can_float(&self) -> bool;
     fn can_navigate_ground(&self) -> bool;
-    fn set_required_path_length(&mut self, length: f32);
+    fn set_required_path_length(&mut self, length: f32, entity: &LivingEntity);
+    /// Vanilla `PathNavigation.updatePathfinderMaxVisitedNodes`, which `Mob` runs
+    /// whenever its follow range changes.
+    fn update_pathfinder_max_visited_nodes(&mut self, entity: &LivingEntity);
     fn set_max_visited_nodes_multiplier(&mut self, multiplier: f32);
     fn reset_max_visited_nodes_multiplier(&mut self);
     fn get_target_pos(&self) -> Option<BlockPos>;
@@ -482,6 +269,9 @@ pub struct PathNavigation {
     pub target_pos: Option<BlockPos>,
     pub reach_range: i32,
     pub max_visited_nodes_multiplier: f32,
+    /// Vanilla `PathFinder.maxVisitedNodes`, set from the follow range base value
+    /// on the first search since the navigation has no mob when it is built.
+    pub max_visited_nodes: Option<i32>,
     pub is_stuck: bool,
     pub required_path_length: f32,
     pub ticks_on_current_node: u32,
@@ -536,6 +326,7 @@ impl PathNavigation {
             target_pos: None,
             reach_range: 1,
             max_visited_nodes_multiplier: 1.0,
+            max_visited_nodes: None,
             is_stuck: false,
             required_path_length: 16.0,
             ticks_on_current_node: 0,
@@ -679,104 +470,138 @@ impl PathNavigation {
             .is_some_and(|path| path.can_reach() || path.get_dist_to_target() <= distance)
     }
 
+    /// Vanilla `PathNavigation.getMaxPathLength`.
     fn mob_max_follow_range(&self, entity: &LivingEntity) -> f32 {
         let follow_range = entity.get_attribute_value(&Attributes::FOLLOW_RANGE) as f32;
         follow_range.max(self.required_path_length)
     }
 
-    #[allow(clippy::too_many_lines)]
+    /// Vanilla `PathNavigation.setRequiredPathLength`.
+    pub fn set_required_path_length(&mut self, length: f32, entity: &LivingEntity) {
+        self.required_path_length = length;
+        self.update_pathfinder_max_visited_nodes(entity);
+    }
+
+    /// Vanilla `PathNavigation.updatePathfinderMaxVisitedNodes`.
+    pub fn update_pathfinder_max_visited_nodes(&mut self, entity: &LivingEntity) {
+        self.max_visited_nodes = Some((self.mob_max_follow_range(entity) * 16.0).floor() as i32);
+    }
+
+    /// What the node evaluators read from `entity`, vanilla's `Mob` getters.
+    fn mob_data(&self, entity: &LivingEntity, world: &World) -> MobData {
+        let mob = world.get_entity_by_id(entity.entity.entity_id);
+        let mut mob_data = MobData::new(
+            entity.entity.pos.load(),
+            entity.entity.width(),
+            entity.entity.height(),
+        );
+
+        let step_height = entity.get_attribute_value(&Attributes::STEP_HEIGHT) as f32;
+        let player_controlled = mob
+            .as_ref()
+            .and_then(|mob| mob.controlling_passenger())
+            .is_some_and(|passenger| passenger.get_player().is_some());
+        mob_data.max_up_step = if player_controlled {
+            step_height.max(1.0)
+        } else {
+            step_height
+        };
+        mob_data.max_fall_distance = mob
+            .as_ref()
+            .and_then(|mob| mob.get_mob().map(Mob::get_max_fall_distance))
+            .unwrap_or_else(|| LivingEntity::get_comfortable_fall_distance(0.0));
+        mob_data.can_stand_on_lava = entity.entity.entity_type == &EntityType::STRIDER;
+        mob_data.on_ground = entity.entity.on_ground.load(Ordering::Relaxed);
+        mob_data.is_in_water = entity.entity.is_in_water();
+
+        for (&path_type, &malus) in &self.path_type_overrides {
+            mob_data.set_pathfinding_malus(path_type, malus);
+        }
+        mob_data
+    }
+
+    /// Vanilla `PathFinder.findPath` for a single target, run with this
+    /// navigation's evaluator.
     pub fn compute_path(
         &mut self,
         entity: &LivingEntity,
         destination: Vector3<f64>,
         reach_range: i32,
     ) -> Option<Path> {
-        let start_pos_f = entity.entity.pos.load();
-        let start_block_vec = BlockPos::floored_v(start_pos_f).0;
-        let mob_position = Vector3::new(start_block_vec.x, start_block_vec.y, start_block_vec.z);
-
-        let context = PathfindingContext::new(mob_position, entity.entity.world.load_full());
-        let mut mob_data = MobData::new(start_pos_f, self.mob_width, self.mob_height, 1.0);
-        mob_data.on_ground = entity.entity.on_ground.load(Ordering::Relaxed);
-        mob_data.can_swim = self.can_float;
-
-        mob_data.set_pathfinding_malus(PathType::DangerFire, 16.0);
-        mob_data.set_pathfinding_malus(PathType::DamageFire, -1.0);
-        // Floating only changes where a path may start and end; like vanilla's
-        // `FloatGoal`, it leaves the cost of water alone. Mobs that swim set
-        // their own water malus.
-        mob_data.set_pathfinding_malus(PathType::Water, 8.0);
-        mob_data.set_pathfinding_malus(PathType::Lava, -1.0);
-        mob_data.set_pathfinding_malus(PathType::DangerOther, 8.0);
-
-        for (&path_type, &malus) in &self.path_type_overrides {
-            mob_data.set_pathfinding_malus(path_type, malus);
-        }
+        let world = entity.entity.world.load_full();
+        let mob_position = BlockPos::floored_v(entity.entity.pos.load()).0;
+        let mob_data = self.mob_data(entity, &world);
+        let context = PathfindingContext::new(mob_position, world);
 
         self.evaluator.set_can_float(self.can_float);
         self.evaluator.set_can_open_doors(self.can_open_doors);
         self.evaluator.set_can_pass_doors(self.can_pass_doors);
         self.evaluator
             .set_can_walk_over_fences(self.can_walk_over_fences);
-        self.evaluator.prepare(context, mob_data);
 
-        let mut start_node = self.evaluator.get_start()?;
-        let mut target = self.evaluator.get_target(BlockPos::floored_v(destination));
-
-        start_node.g = 0.0;
-        let start_dist = start_node.distance(&target);
-        target.update_best(start_dist, &start_node);
-        start_node.h = start_dist;
-        start_node.f = start_node.h;
-        start_node.walked_dist = 0.0;
-        start_node.came_from = None;
-
-        let start_pos = start_node.pos.0;
-        let mut closed_set: FxHashMap<Vector3<i32>, Node> = FxHashMap::default();
-        // Vanilla keeps one `Node` per position and overwrites its `walkedDistance`
-        // whenever the search looks at it, even when the cheaper-path check then
-        // rejects the update. That shortens how far a search reaches, so the
-        // distance is tracked per position here rather than on the node copies.
-        let mut walked_dist: FxHashMap<Vector3<i32>, f32> = FxHashMap::default();
-        walked_dist.insert(start_node.pos.0, 0.0);
+        let max_visited_nodes = *self.max_visited_nodes.get_or_insert_with(|| {
+            (entity.get_attribute_base(&Attributes::FOLLOW_RANGE) * 16.0).floor() as i32
+        });
+        let max_path_length = self.mob_max_follow_range(entity);
 
         self.open_set.clear();
-        self.open_set.insert(start_node);
+        self.evaluator.prepare(context, mob_data);
+        let path = self.find_path(
+            BlockPos::floored_v(destination),
+            max_path_length,
+            reach_range,
+            max_visited_nodes,
+        );
+        self.evaluator.done();
+        path
+    }
 
-        let mut iterations = 0usize;
-        let mut reached = false;
-        let max_iters = ((self.mob_max_follow_range(entity)
-            * 16.0
-            * self.max_visited_nodes_multiplier) as usize)
-            .clamp(100, 2048)
-            .max(MAX_ITERS);
+    fn find_path(
+        &mut self,
+        target_pos: BlockPos,
+        max_path_length: f32,
+        reach_range: i32,
+        max_visited_nodes: i32,
+    ) -> Option<Path> {
+        let from = self.evaluator.get_start()?;
+        let mut target = self.evaluator.get_target(target_pos);
+
+        let from = {
+            let node = self.evaluator.base_mut().node_mut(from.pos);
+            node.g = 0.0;
+            node.h = node.distance(&target);
+            target.update_best(node.h, node);
+            node.f = node.h;
+            *node
+        };
+        self.open_set.clear();
+        self.open_set.insert(from);
+
+        let mut count = 0;
+        let max_visited_nodes_adjusted =
+            (max_visited_nodes as f32 * self.max_visited_nodes_multiplier) as i32;
 
         while !self.open_set.is_empty() {
-            iterations += 1;
-            if iterations >= max_iters {
+            count += 1;
+            if count >= max_visited_nodes_adjusted {
                 break;
             }
 
-            let Some(current) = self.open_set.pop() else {
+            let Some(popped) = self.open_set.pop() else {
                 break;
             };
-            self.evaluator.mark_closed(current.pos);
+            let current = {
+                let node = self.evaluator.base_mut().node_mut(popped.pos);
+                node.closed = true;
+                *node
+            };
 
             if current.distance_manhattan(&target) <= reach_range as f32 {
-                target.reached = true;
-                reached = true;
-                target.update_best(0.0, &current);
-                closed_set.insert(current.pos.0, current);
+                target.set_reached();
                 break;
             }
 
-            let dx = (current.pos.0.x - start_pos.x) as f32;
-            let dy = (current.pos.0.y - start_pos.y) as f32;
-            let dz = (current.pos.0.z - start_pos.z) as f32;
-            let euclidean = (dx * dx + dy * dy + dz * dz).sqrt();
-            let follow_range = self.mob_max_follow_range(entity);
-            if euclidean >= follow_range {
-                closed_set.insert(current.pos.0, current);
+            if current.distance_to_node(&from) >= max_path_length {
                 continue;
             }
 
@@ -784,76 +609,58 @@ impl PathNavigation {
             self.evaluator
                 .get_neighbors(&current, &mut self.neighbors_buf);
 
-            let current_walked = walked_dist
-                .get(&current.pos.0)
-                .copied()
-                .unwrap_or(current.walked_dist);
-            for mut neighbor in self.neighbors_buf.drain(..) {
-                let step_cost = current.distance(&neighbor);
-                neighbor.walked_dist = current_walked + step_cost;
-                walked_dist.insert(neighbor.pos.0, neighbor.walked_dist);
-                let tentative_g = current.g + step_cost + neighbor.cost_malus;
-
-                let in_heap = self.open_set.contains(&neighbor);
-                if neighbor.walked_dist < follow_range
-                    && (!in_heap
-                        || self
-                            .open_set
-                            .get_node(&neighbor)
-                            .is_some_and(|existing| tentative_g < existing.g))
+            for neighbor_pos in self.neighbors_buf.iter().map(|neighbor| neighbor.pos) {
+                let in_open_set = self.open_set.contains(&neighbor_pos);
+                let neighbor = self.evaluator.base_mut().node_mut(neighbor_pos);
+                let distance = current.distance_to_node(neighbor);
+                // Vanilla overwrites the walked distance even when the check below
+                // turns the cheaper path down.
+                neighbor.walked_dist = current.walked_dist + distance;
+                let tentative_g = current.g + distance + neighbor.cost_malus;
+                if neighbor.walked_dist < max_path_length
+                    && (!in_open_set || tentative_g < neighbor.g)
                 {
                     neighbor.came_from = Some(current.pos.0);
                     neighbor.g = tentative_g;
-                    let dist_to_target = neighbor.distance(&target);
-                    target.update_best(dist_to_target, &neighbor);
-                    neighbor.h = dist_to_target * TARGET_DISTANCE_MULTIPLIER;
+                    let h = neighbor.distance(&target);
+                    target.update_best(h, neighbor);
+                    neighbor.h = h * FUDGING;
                     neighbor.f = neighbor.g + neighbor.h;
-
-                    if in_heap {
-                        self.open_set.update_node(&neighbor, neighbor);
+                    let neighbor = *neighbor;
+                    if in_open_set {
+                        self.open_set.change_cost(&neighbor_pos, neighbor.f);
                     } else {
                         self.open_set.insert(neighbor);
                     }
                 }
             }
-
-            closed_set.insert(current.pos.0, current);
         }
 
-        self.evaluator.done();
+        let best = target.get_best_node()?;
+        Some(Path::new(
+            self.reconstruct_path(best.pos),
+            target_pos,
+            target.is_reached(),
+        ))
+    }
 
-        for node in self.open_set.drain() {
-            closed_set.entry(node.pos.0).or_insert(node);
-        }
-
-        if let Some(best_node) = target.best_node {
-            let mut path_nodes: Vec<Node> = Vec::new();
-            let mut current_pos = best_node.pos.0;
-            path_nodes.push(best_node);
-            let mut visited: FxHashSet<Vector3<i32>> = FxHashSet::default();
-            visited.insert(current_pos);
-            while let Some(node) = closed_set.get(&current_pos) {
-                if let Some(prev_pos) = node.came_from {
-                    if prev_pos == current_pos || !visited.insert(prev_pos) {
-                        break;
-                    }
-                    if let Some(&prev_node) = closed_set.get(&prev_pos) {
-                        path_nodes.push(prev_node);
-                        current_pos = prev_pos;
-                    } else {
-                        break;
-                    }
-                } else {
-                    break;
-                }
+    /// Vanilla `PathFinder.reconstructPath`, following `came_from` through the
+    /// evaluator's nodes as they stand when the search ends.
+    fn reconstruct_path(&mut self, closest: BlockPos) -> Vec<Node> {
+        let nodes = &self.evaluator.base_mut().nodes;
+        let mut path = Vec::new();
+        let mut node = nodes.get(&closest.0).copied();
+        while let Some(current) = node {
+            path.push(current);
+            // Each node points at one closed before it, so the chain ends; the bound
+            // only guards against a broken map.
+            if path.len() > nodes.len() {
+                break;
             }
-            path_nodes.reverse();
-
-            let path_target = target.node.pos;
-            return Some(Path::new(path_nodes, path_target, reached));
+            node = current.came_from.and_then(|pos| nodes.get(&pos).copied());
         }
-
-        None
+        path.reverse();
+        path
     }
 
     pub fn needs_new_path(&self, goal: &NavigatorGoal) -> bool {
@@ -1557,8 +1364,12 @@ impl PathNavigationTrait for GroundPathNavigation {
         true
     }
 
-    fn set_required_path_length(&mut self, length: f32) {
-        self.inner.required_path_length = length;
+    fn set_required_path_length(&mut self, length: f32, entity: &LivingEntity) {
+        self.inner.set_required_path_length(length, entity);
+    }
+
+    fn update_pathfinder_max_visited_nodes(&mut self, entity: &LivingEntity) {
+        self.inner.update_pathfinder_max_visited_nodes(entity);
     }
 
     fn set_max_visited_nodes_multiplier(&mut self, multiplier: f32) {
@@ -1845,8 +1656,12 @@ impl PathNavigationTrait for FlyingPathNavigation {
         false
     }
 
-    fn set_required_path_length(&mut self, length: f32) {
-        self.inner.required_path_length = length;
+    fn set_required_path_length(&mut self, length: f32, entity: &LivingEntity) {
+        self.inner.set_required_path_length(length, entity);
+    }
+
+    fn update_pathfinder_max_visited_nodes(&mut self, entity: &LivingEntity) {
+        self.inner.update_pathfinder_max_visited_nodes(entity);
     }
 
     fn set_max_visited_nodes_multiplier(&mut self, multiplier: f32) {
@@ -2282,8 +2097,12 @@ impl PathNavigationTrait for WaterBoundPathNavigation {
         false
     }
 
-    fn set_required_path_length(&mut self, length: f32) {
-        self.inner.required_path_length = length;
+    fn set_required_path_length(&mut self, length: f32, entity: &LivingEntity) {
+        self.inner.set_required_path_length(length, entity);
+    }
+
+    fn update_pathfinder_max_visited_nodes(&mut self, entity: &LivingEntity) {
+        self.inner.update_pathfinder_max_visited_nodes(entity);
     }
 
     fn set_max_visited_nodes_multiplier(&mut self, multiplier: f32) {
@@ -2513,8 +2332,12 @@ impl PathNavigationTrait for WallClimberNavigation {
         true
     }
 
-    fn set_required_path_length(&mut self, length: f32) {
-        self.inner.set_required_path_length(length);
+    fn set_required_path_length(&mut self, length: f32, entity: &LivingEntity) {
+        self.inner.set_required_path_length(length, entity);
+    }
+
+    fn update_pathfinder_max_visited_nodes(&mut self, entity: &LivingEntity) {
+        self.inner.update_pathfinder_max_visited_nodes(entity);
     }
 
     fn set_max_visited_nodes_multiplier(&mut self, multiplier: f32) {
@@ -2949,8 +2772,12 @@ impl PathNavigationTrait for AmphibiousPathNavigation {
         true
     }
 
-    fn set_required_path_length(&mut self, length: f32) {
-        self.inner.required_path_length = length;
+    fn set_required_path_length(&mut self, length: f32, entity: &LivingEntity) {
+        self.inner.set_required_path_length(length, entity);
+    }
+
+    fn update_pathfinder_max_visited_nodes(&mut self, entity: &LivingEntity) {
+        self.inner.update_pathfinder_max_visited_nodes(entity);
     }
 
     fn set_max_visited_nodes_multiplier(&mut self, multiplier: f32) {

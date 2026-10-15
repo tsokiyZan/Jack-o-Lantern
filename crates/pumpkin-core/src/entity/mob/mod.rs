@@ -958,6 +958,24 @@ pub trait Mob: EntityBase + Send + Sync {
         false
     }
 
+    /// Vanilla `Mob.getMaxFallDistance`: how far pathing may drop, more when it
+    /// has a target and health to spare.
+    fn get_max_fall_distance(&self) -> i32 {
+        let mob_entity = self.get_mob_entity();
+        if mob_entity.get_target().is_none() {
+            return LivingEntity::get_comfortable_fall_distance(0.0);
+        }
+
+        let living = &mob_entity.living_entity;
+        let difficulty = living.entity.world.load().level_info.load().difficulty;
+        let mut sacrifice = (living.health.load() - living.get_max_health() * 0.33) as i32;
+        sacrifice -= (3 - difficulty as i32) * 4;
+        if sacrifice < 0 {
+            sacrifice = 0;
+        }
+        LivingEntity::get_comfortable_fall_distance(sacrifice as f32)
+    }
+
     fn get_random(&self) -> rand::rngs::ThreadRng {
         rand::rng()
     }
