@@ -32,6 +32,8 @@ pub mod slide;
 const HEAD_ROT_SPEED: f32 = 25.0;
 /// Vanilla `Breeze.getMaxHeadYRot`.
 const MAX_HEAD_Y_ROT: f32 = 30.0;
+/// Vanilla `Breeze.FALL_DISTANCE_SOUND_TRIGGER_THRESHOLD`.
+const FALL_DISTANCE_SOUND_TRIGGER_THRESHOLD: f32 = 3.0;
 /// Vanilla `Breeze.JUMP_CIRCLE_DISTANCE_Y`.
 const JUMP_CIRCLE_DISTANCE_Y: f64 = 10.0;
 
@@ -160,6 +162,13 @@ impl Mob for BreezeEntity {
         let target_type = target.get_entity().entity_type;
         (target_type == &EntityType::PLAYER || target_type == &EntityType::IRON_GOLEM)
             && self.mob_entity.living_entity.can_attack(target)
+    }
+
+    /// Vanilla `Breeze.causeFallDamage`: lands with a sound, though it takes no fall damage.
+    fn before_cause_fall_damage(&self, fall_distance: f32) {
+        if fall_distance > FALL_DISTANCE_SOUND_TRIGGER_THRESHOLD {
+            self.play_sound_at_self(Sound::EntityBreezeLand, 1.0, 1.0);
+        }
     }
 
     /// Vanilla `Breeze.isInvulnerableTo`, checked where `LivingEntity.hurtServer` checks it.
