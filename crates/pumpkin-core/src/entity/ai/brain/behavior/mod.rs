@@ -2,6 +2,7 @@ use super::BrainTick;
 use super::memory::MemoryModuleId;
 
 pub mod animal_make_love;
+pub mod animal_panic;
 pub mod baby_follow_adult;
 pub mod back_up_if_too_close;
 pub mod copy_memory_with_expiry;
@@ -34,12 +35,14 @@ pub mod start_celebrating_if_target_dead;
 pub mod stop_attacking_if_target_invalid;
 pub mod stop_being_angry_if_target_dead;
 pub mod stroll_to_poi;
+pub mod swim;
 pub mod timed;
 pub mod try_find_liquid;
 pub mod utils;
 
 pub use animal_make_love::AnimalMakeLove;
-pub use baby_follow_adult::baby_follow_adult;
+pub use animal_panic::AnimalPanic;
+pub use baby_follow_adult::{baby_follow_adult, baby_follow_nearest};
 pub use back_up_if_too_close::back_up_if_too_close;
 pub use copy_memory_with_expiry::copy_memory_with_expiry;
 pub use count_down_cooldown_ticks::CountDownCooldownTicks;
@@ -58,7 +61,7 @@ pub use melee_attack::melee_attack;
 pub use mount::mount;
 pub use move_to_target_sink::MoveToTargetSink;
 pub use one_shot::{OneShot, Trigger};
-pub use random_stroll::{stroll, stroll_with_range, swim};
+pub use random_stroll::{fly, stroll, stroll_with_range, swim};
 pub use set_entity_look_target::{
     set_entity_look_target, set_entity_look_target_any, set_entity_look_target_of_type,
 };
@@ -80,6 +83,7 @@ pub use start_celebrating_if_target_dead::start_celebrating_if_target_dead;
 pub use stop_attacking_if_target_invalid::stop_attacking_if_target_invalid;
 pub use stop_being_angry_if_target_dead::stop_being_angry_if_target_dead;
 pub use stroll_to_poi::{stroll_around_poi, stroll_to_poi};
+pub use swim::Swim;
 pub use timed::{Behavior, DEFAULT_DURATION, Timed};
 pub use try_find_liquid::try_find_liquid;
 

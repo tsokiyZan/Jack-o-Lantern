@@ -43,6 +43,19 @@ impl FollowTemptation {
             ],
         }
     }
+
+    /// Vanilla's three-argument constructor: stops within `close_enough_distance` of the
+    /// player, and with `look_in_the_eyes` walks to their eyes.
+    #[must_use]
+    pub const fn with_close_enough_distance(
+        mut self,
+        close_enough_distance: f64,
+        look_in_the_eyes: bool,
+    ) -> Self {
+        self.close_enough_distance = close_enough_distance;
+        self.look_in_the_eyes = look_in_the_eyes;
+        self
+    }
 }
 
 impl Behavior for FollowTemptation {
@@ -89,7 +102,11 @@ impl Behavior for FollowTemptation {
             tick.brain.set(
                 types::WALK_TARGET,
                 WalkTarget::new(
-                    Arc::new(EntityTracker::new(player, self.look_in_the_eyes)),
+                    Arc::new(EntityTracker::with_target_eye_height(
+                        player,
+                        self.look_in_the_eyes,
+                        self.look_in_the_eyes,
+                    )),
                     speed_modifier,
                     2,
                 ),

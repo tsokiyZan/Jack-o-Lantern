@@ -300,6 +300,8 @@ pub struct PathNavigation {
     pub wanted_position: Option<(Vector3<f64>, f64)>,
     /// Vanilla `FlyingPathNavigation`'s overrides of the base navigation.
     pub flying: bool,
+    /// The `blockedByFluids` of a flying navigation's `canMoveDirectly`.
+    pub direct_moves_blocked_by_fluids: bool,
 }
 
 impl Default for PathNavigation {
@@ -353,6 +355,7 @@ impl PathNavigation {
             pending_move: None,
             wanted_position: None,
             flying: false,
+            direct_moves_blocked_by_fluids: true,
         }
     }
 
@@ -1231,7 +1234,8 @@ impl PathNavigation {
             && next_type != PathType::DangerOther
             && next_type != PathType::WalkableDoor;
         let flying = self.flying;
-        // `canMoveDirectly`: ground navigation never does; flying clips (fluids included).
+        // `canMoveDirectly`: ground navigation never does; flying clips.
+        let blocked_by_fluids = self.direct_moves_blocked_by_fluids;
         let moves_directly = |path: &Path| {
             flying
                 && path.get_next_entity_pos(width).is_some_and(|next| {
@@ -1240,7 +1244,7 @@ impl PathNavigation {
                         mob_pos,
                         next,
                         entity.entity.entity_dimension.load().height,
-                        true,
+                        blocked_by_fluids,
                     )
                 })
         };
@@ -1497,6 +1501,14 @@ impl FlyingPathNavigation {
             inner,
             stable_over_any_block: false,
         }
+    }
+
+    /// Vanilla `HappyGhast.BabyFlyingPathNavigation.canMoveDirectly`: fluids don't block
+    /// a direct move.
+    #[must_use]
+    pub const fn moves_directly_through_fluids(mut self) -> Self {
+        self.inner.direct_moves_blocked_by_fluids = false;
+        self
     }
 
     /// Vanilla `Bee.createNavigation`'s `isStableDestination`: the block below only has

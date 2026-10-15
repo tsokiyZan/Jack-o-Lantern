@@ -1,9 +1,14 @@
+use crate::entity::ai::brain::BrainTick;
+use crate::entity::ai::brain::{Brain, memory::PackedMemories};
+use crate::entity::ai::control::flying_move_control::FlyingMoveControl;
 use crate::entity::ai::control::look_control::LookControl;
+use crate::entity::ai::pathfinder::{FlyingPathNavigation, Navigator};
 use crate::entity::mob::equipment::is_equippable_in_slot;
 use crate::entity::mob::ghast::{
     GhastMoveControl, RAD_TO_DEG, RandomFloatAroundGoal, face_movement_direction,
 };
 use crate::entity::mob::{first_passenger_player, mob_controlling_passenger};
+use crate::entity::passive::happy_ghast_ai;
 use pumpkin_data::attributes::Attributes;
 use pumpkin_data::data_component_impl::EquipmentSlot;
 use pumpkin_util::math::boundingbox::BoundingBox;
@@ -46,6 +51,10 @@ const RESTRICTION_RADIUS_BUFFER: i32 = 16;
 const STILL_TIMEOUT_ON_LOAD_GRACE_PERIOD: i32 = 60;
 /// Vanilla `HappyGhast.MAX_STILL_TIMEOUT`.
 const MAX_STILL_TIMEOUT: i32 = 10;
+/// The `maxTurn` of the ghastling's `FlyingMoveControl`.
+const BABY_MAX_TURN: i32 = 180;
+/// `BabyFlyingPathNavigation.setRequiredPathLength`.
+const BABY_REQUIRED_PATH_LENGTH: f32 = 48.0;
 
 /// Represents a Happy Ghast, a passive flying mob.
 ///
@@ -78,7 +87,62 @@ impl HappyGhastEntity {
         };
         let mob_arc = Arc::new(happy_ghast);
         mob_arc.register_goals();
+        mob_arc.mob_entity.init_brain(mob_arc.as_ref());
         mob_arc
+    }
+
+    /// Vanilla `adultGhastSetup`.
+    fn adult_ghast_setup(&self) {
+        let mob_entity = &self.mob_entity;
+        *mob_entity
+            .move_control
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) =
+            Box::new(GhastMoveControl::new(true, is_on_still_timeout));
+        // `HappyGhastLookControl`, through `custom_look_control_tick`.
+        *mob_entity
+            .look_control
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = LookControl::default();
+        *mob_entity
+            .navigator
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Navigator::default();
+        // Pumpkin keeps the path costs in the navigation, vanilla on the mob.
+        set_animal_pathfinding_malus(mob_entity);
+        mob_entity.clear_ai_goals(self);
+        self.register_goals();
+        mob_entity.with_brain(self, |tick| {
+            tick.brain.stop_all(tick.world, tick.mob, tick.time);
+            tick.brain.clear_memories();
+        });
+    }
+
+    /// Vanilla `babyGhastSetup`.
+    fn baby_ghast_setup(&self) {
+        let mob_entity = &self.mob_entity;
+        *mob_entity
+            .move_control
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) =
+            Box::new(FlyingMoveControl::new(BABY_MAX_TURN, true));
+        *mob_entity
+            .look_control
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = LookControl::default();
+        // Vanilla `BabyFlyingPathNavigation`.
+        let mut navigator =
+            Navigator::new(FlyingPathNavigation::new().moves_directly_through_fluids());
+        navigator.set_can_open_doors(false);
+        navigator.set_can_float(true);
+        *mob_entity
+            .navigator
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = navigator;
+        mob_entity.set_required_path_length(BABY_REQUIRED_PATH_LENGTH);
+        set_animal_pathfinding_malus(mob_entity);
+        self.set_server_still_timeout(0);
+        mob_entity.clear_ai_goals(self);
     }
 
     /// Vanilla `HappyGhast.registerGoals`.
@@ -209,6 +273,15 @@ impl HappyGhastEntity {
 impl AgeableMob for HappyGhastEntity {
     fn get_ageable_data(&self) -> &AgeableData {
         &self.ageable_data
+    }
+
+    /// Vanilla `HappyGhast.ageBoundaryReached`.
+    fn age_boundary_reached(&self) {
+        if self.is_baby() {
+            self.baby_ghast_setup();
+        } else {
+            self.adult_ghast_setup();
+        }
     }
 }
 
@@ -372,7 +445,19 @@ impl Mob for HappyGhastEntity {
 
     /// Vanilla `HappyGhast.customServerAiStep`.
     fn custom_server_ai_step(&self, _caller: &dyn EntityBase) {
+        if self.is_baby() {
+            self.mob_entity.tick_brain(self);
+        }
         self.check_restriction();
+    }
+
+    fn make_brain(&self, packed: &PackedMemories) -> Brain {
+        happy_ghast_ai::HAPPY_GHAST_PROVIDER.make_brain(self, packed)
+    }
+
+    /// The `HappyGhastAi.updateActivity` of vanilla `customServerAiStep`.
+    fn after_brain_tick(&self, tick: &mut BrainTick<'_>) {
+        happy_ghast_ai::update_activity(tick);
     }
 
     /// Vanilla `HappyGhast.travel`.
@@ -390,6 +475,10 @@ impl Mob for HappyGhastEntity {
 
     /// Vanilla `HappyGhastLookControl.tick`.
     fn custom_look_control_tick(&self, look_control: &mut LookControl) -> bool {
+        // A ghastling has the plain `LookControl`.
+        if self.is_baby() {
+            return false;
+        }
         let entity = self.get_entity();
         if self.is_on_still_timeout() {
             let close_angle = wrap_degrees_90(entity.yaw.load());

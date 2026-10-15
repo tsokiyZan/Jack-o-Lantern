@@ -20,7 +20,7 @@ pub mod piglin_brute_specific;
 pub mod piglin_specific;
 pub mod tempting;
 
-pub use adult::AdultSensor;
+pub use adult::{AdultSensor, AdultSensorAnyType};
 pub use axolotl_attackables::AxolotlAttackablesSensor;
 pub use dummy::DummySensor;
 pub use hurt_by::HurtBySensor;
@@ -48,6 +48,7 @@ pub enum SensorType {
     PiglinSpecific,
     PiglinBruteSpecific,
     NearestAdult,
+    NearestAdultAnyType,
     AxolotlAttackables,
     FoodTemptations,
 }
@@ -64,6 +65,7 @@ impl SensorType {
             Self::PiglinSpecific => "minecraft:piglin_specific_sensor",
             Self::PiglinBruteSpecific => "minecraft:piglin_brute_specific_sensor",
             Self::NearestAdult => "minecraft:nearest_adult",
+            Self::NearestAdultAnyType => "minecraft:nearest_adult_any_type",
             Self::AxolotlAttackables => "minecraft:axolotl_attackables",
             Self::FoodTemptations => "minecraft:food_temptations",
         }
@@ -80,6 +82,7 @@ impl SensorType {
             | Self::PiglinSpecific
             | Self::PiglinBruteSpecific
             | Self::NearestAdult
+            | Self::NearestAdultAnyType
             | Self::AxolotlAttackables
             | Self::FoodTemptations => DEFAULT_SCAN_RATE,
         }
@@ -95,6 +98,7 @@ impl SensorType {
             Self::PiglinSpecific => Box::new(PiglinSpecificSensor),
             Self::PiglinBruteSpecific => Box::new(PiglinBruteSpecificSensor),
             Self::NearestAdult => Box::new(AdultSensor),
+            Self::NearestAdultAnyType => Box::new(AdultSensorAnyType),
             Self::AxolotlAttackables => Box::new(AxolotlAttackablesSensor),
             Self::FoodTemptations => Box::new(FoodTemptationsSensor),
         }

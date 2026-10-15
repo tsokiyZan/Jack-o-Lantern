@@ -56,8 +56,12 @@ pub trait AgeableMob: Mob {
             entity.set_synced_data(tracked_data::ageable_mob::DATA_BABY_ID, is_baby);
             // Vanilla `AgeableMob.onSyncedDataUpdated` on `DATA_BABY_ID`.
             self.refresh_dimensions();
+            self.age_boundary_reached();
         }
     }
+
+    /// Vanilla `AgeableMob.ageBoundaryReached`, run when the mob turns into or out of a baby.
+    fn age_boundary_reached(&self) {}
 
     fn is_age_locked(&self) -> bool {
         self.get_ageable_data().age_locked.load(Relaxed)

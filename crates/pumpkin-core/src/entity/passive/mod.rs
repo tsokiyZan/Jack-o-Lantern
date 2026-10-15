@@ -19,6 +19,7 @@ pub mod frog;
 pub mod glow_squid;
 pub mod goat;
 pub mod happy_ghast;
+pub mod happy_ghast_ai;
 pub mod horse;
 pub mod iron_golem;
 pub mod llama;

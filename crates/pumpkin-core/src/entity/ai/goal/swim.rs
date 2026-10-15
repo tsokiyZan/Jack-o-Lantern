@@ -21,7 +21,9 @@ impl SwimGoal {
         })
     }
 
-    fn is_in_fluid(mob: &dyn Mob) -> bool {
+    /// Vanilla `FloatGoal.canUse`: deeper in a floatable fluid than the jump threshold,
+    /// or in lava.
+    pub(crate) fn is_in_fluid(mob: &dyn Mob) -> bool {
         let living = &mob.get_mob_entity().living_entity;
         let entity = &living.entity;
         let in_water = entity.touching_water.load(Ordering::SeqCst)

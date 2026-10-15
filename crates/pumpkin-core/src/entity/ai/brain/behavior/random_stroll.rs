@@ -1,7 +1,9 @@
 use super::super::memory::walk_target::WalkTarget;
 use super::super::memory::{MemoryStatus, types};
 use super::one_shot::OneShot;
-use crate::entity::ai::util::{default_random_pos, goal_utils, land_random_pos};
+use crate::entity::ai::util::{
+    air_and_water_random_pos, default_random_pos, goal_utils, land_random_pos,
+};
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
 
@@ -38,6 +40,42 @@ pub fn stroll_with_range(
             tick.brain.set_optional(types::WALK_TARGET, target);
             true
         },
+    )
+}
+
+/// Vanilla `RandomStroll.fly`.
+#[must_use]
+pub fn fly(speed_modifier: f32) -> OneShot {
+    OneShot::new(
+        "RandomStroll",
+        vec![(types::WALK_TARGET.id(), MemoryStatus::ValueAbsent)],
+        move |tick| {
+            let target = target_fly_pos(tick.mob, MAX_XZ_DIST, MAX_Y_DIST)
+                .map(|pos| WalkTarget::from_vec(pos, speed_modifier, 0));
+            tick.brain.set_optional(types::WALK_TARGET, target);
+            true
+        },
+    )
+}
+
+/// Vanilla `RandomStroll.getTargetFlyPos`. Vanilla wanders along `getViewVector(0.0F)`,
+/// last tick's head rotation, which Pumpkin doesn't keep; this uses the current one.
+fn target_fly_pos(
+    mob: &dyn crate::entity::mob::Mob,
+    max_horizontal_distance: i32,
+    max_vertical_distance: i32,
+) -> Option<Vector3<f64>> {
+    let entity = mob.get_entity();
+    let wander_direction =
+        crate::entity::Entity::calculate_view_vector(entity.pitch.load(), entity.head_yaw.load());
+    air_and_water_random_pos::get_pos(
+        mob,
+        max_horizontal_distance,
+        max_vertical_distance,
+        -2,
+        wander_direction.x,
+        wander_direction.z,
+        f64::from(std::f32::consts::FRAC_PI_2),
     )
 }
 
