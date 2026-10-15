@@ -13,7 +13,7 @@ use pumpkin_util::{
     math::{position::BlockPos, vector2::Vector2, vector3::Vector3},
     text::TextComponent,
 };
-use pumpkin_world::world::BlockFlags;
+use pumpkin_world::{chunk::ChunkHeightmapType, world::BlockFlags};
 
 use super::{
     World,
@@ -426,9 +426,9 @@ impl DragonFight {
         let uuid = Uuid::new_v4();
         let spawn_y = self.origin.0.y + DRAGON_SPAWN_Y;
         let position = Vector3::new(
-            self.origin.0.x as f64 + 0.5,
-            spawn_y as f64,
-            self.origin.0.z as f64 + 0.5,
+            f64::from(self.origin.0.x),
+            f64::from(spawn_y),
+            f64::from(self.origin.0.z),
         );
         let dragon =
             crate::entity::r#type::from_type(&EntityType::ENDER_DRAGON, position, world, uuid);
@@ -437,8 +437,15 @@ impl DragonFight {
             .cast_any()
             .downcast_ref::<crate::entity::boss::ender_dragon::EnderDragonEntity>(
         ) {
-            dragon_entity.set_fight_origin(self.exit_portal_location.unwrap_or(self.origin));
+            dragon_entity.set_dragon_fight();
+            dragon_entity.set_fight_origin(self.origin);
+            dragon_entity.set_phase(
+                crate::entity::boss::ender_dragon::phase::EnderDragonPhase::HoldingPattern,
+            );
         }
+        dragon
+            .get_entity()
+            .set_rotation(rand::random::<f32>() * 360.0, 0.0);
 
         world.spawn_entity_non_save(dragon);
         self.dragon_uuid = Some(uuid);
@@ -470,24 +477,10 @@ impl DragonFight {
         if let Some(name) = custom_name {
             self.update_bossbar_title(world, name);
         }
-
-        if let Some(loc) = self.exit_portal_location
-            && let Some(dragon_uuid) = self.dragon_uuid
-            && let Some(e) = world
-                .entities
-                .load()
-                .iter()
-                .find(|e| e.get_entity().entity_uuid == dragon_uuid)
-            && let Some(dragon) = e
-                .cast_any()
-                .downcast_ref::<crate::entity::boss::ender_dragon::EnderDragonEntity>()
-        {
-            dragon.set_fight_origin(loc);
-        }
     }
 
     pub fn set_dragon_killed(&mut self, world: &Arc<World>, killed_uuid: Uuid) {
-        if self.dragon_uuid.is_some() && Some(killed_uuid) != self.dragon_uuid {
+        if Some(killed_uuid) != self.dragon_uuid {
             return;
         }
 
@@ -500,20 +493,26 @@ impl DragonFight {
         // Spawn a new end gateway.
         self.spawn_new_gateway(world);
 
-        // Place the dragon egg on the first kill.
+        // Place the dragon egg on the first kill, on top of the podium.
         if !self.previously_killed {
-            let podium_pos = self.exit_portal_location.unwrap_or(self.origin);
-            let egg_pos = BlockPos::new(podium_pos.0.x, podium_pos.0.y + 4, podium_pos.0.z);
+            let egg_pos = BlockPos::new(
+                self.origin.0.x,
+                world.get_heightmap_height(
+                    ChunkHeightmapType::MotionBlocking,
+                    self.origin.0.x,
+                    self.origin.0.z,
+                ) + 1,
+                self.origin.0.z,
+            );
             world.set_block_state(
                 &egg_pos,
                 Block::DRAGON_EGG.default_state.id,
-                BlockFlags::NOTIFY_LISTENERS,
+                BlockFlags::NOTIFY_ALL,
             );
         }
 
         self.previously_killed = true;
         self.dragon_killed = true;
-        self.dragon_uuid = None;
     }
 
     pub fn update_crystal_count(&mut self, world: &Arc<World>) {
@@ -546,11 +545,15 @@ impl DragonFight {
 
     // ── Crystal destruction ───────────────────────────────────────────────────
 
-    pub fn on_crystal_destroyed(&mut self, world: &Arc<World>, crystal_uuid: Uuid) {
+    /// Returns the dragon that vanilla tells about the crystal next (`onCrystalDestroyed`),
+    /// which the caller does once the fight is unlocked.
+    pub fn on_crystal_destroyed(&mut self, world: &Arc<World>, crystal_uuid: Uuid) -> Option<Uuid> {
         if self.respawn_stage.is_some() && self.respawn_crystals.contains(&crystal_uuid) {
             self.abort_respawn_sequence(world);
+            None
         } else {
             self.update_crystal_count(world);
+            self.dragon_uuid
         }
     }
 
