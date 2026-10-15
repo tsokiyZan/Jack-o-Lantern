@@ -840,7 +840,8 @@ impl PathNavigation {
         let dx = mob_pos.x - current_node.x;
         let dy = mob_pos.y - current_node.y;
         let dz = mob_pos.z - current_node.z;
-        if dx * dx + dy * dy + dz * dz > 4.0 {
+        // `!mobPosition.closerThan(currentNode, 2.0)`: closer means strictly within.
+        if dx * dx + dy * dy + dz * dz >= 4.0 {
             return false;
         }
 
