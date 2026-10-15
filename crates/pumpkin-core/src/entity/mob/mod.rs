@@ -1423,6 +1423,12 @@ pub trait Mob: EntityBase + Send + Sync {
         false
     }
 
+    /// Whether vanilla `checkFallDamage` runs after a move, adding up the fall and landing
+    /// on the block below. Flyers such as the phantom override it to do nothing.
+    fn checks_fall_damage(&self) -> bool {
+        true
+    }
+
     /// The horse family's shared `AbstractHorse` behaviour.
     fn as_abstract_horse(
         &self,

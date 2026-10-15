@@ -274,6 +274,14 @@ impl CatEntity {
         );
     }
 
+    /// Vanilla `Cat.hiss`, at a phantom that comes too close.
+    pub fn hiss(&self) {
+        let is_baby = self.get_entity().is_baby();
+        let sound_variant = CatSoundVariant::from_id(self.sound_variant.load(Ordering::Relaxed))
+            .unwrap_or_default();
+        self.make_sound(sound_variant.hiss_sound(is_baby));
+    }
+
     pub fn play_eating_sound(&self) {
         let mob_entity = self.get_mob_entity();
         let entity = &mob_entity.living_entity.entity;

@@ -397,6 +397,17 @@ impl BoundingBox {
             && self.max.z > other.min.z
     }
 
+    /// Vanilla `AABB.contains`: the point lies inside, counting the min faces but not the max.
+    #[must_use]
+    pub fn contains(&self, pos: Vector3<f64>) -> bool {
+        pos.x >= self.min.x
+            && pos.x < self.max.x
+            && pos.y >= self.min.y
+            && pos.y < self.max.y
+            && pos.z >= self.min.z
+            && pos.z < self.max.z
+    }
+
     /// Computes the squared magnitude from a point to the nearest point on this bounding box.
     ///
     /// # Arguments

@@ -2293,7 +2293,9 @@ impl Entity {
 
         self.velocity.store(final_move * velocity_multiplier);
 
-        if let Some(living) = caller.get_living_entity() {
+        if let Some(living) = caller.get_living_entity()
+            && caller.get_mob().is_none_or(mob::Mob::checks_fall_damage)
+        {
             let on_ground = self.on_ground.load(Ordering::SeqCst);
             living.fall(caller, final_move.y, on_ground, false);
         }

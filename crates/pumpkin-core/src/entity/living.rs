@@ -1563,6 +1563,35 @@ impl LivingEntity {
         }
     }
 
+    /// Vanilla `LivingEntity.travelFlying(input, speed)`: water and lava both move at 0.02.
+    pub fn travel_flying(&self, caller: &dyn EntityBase, speed: f32) {
+        self.travel_flying_with_speeds(caller, 0.02, 0.02, speed);
+    }
+
+    /// Vanilla `LivingEntity.travelFlying`: moves without gravity, with a speed and drag
+    /// for water, lava and air.
+    pub fn travel_flying_with_speeds(
+        &self,
+        caller: &dyn EntityBase,
+        water_speed: f32,
+        lava_speed: f32,
+        air_speed: f32,
+    ) {
+        let (speed, drag) = if self.entity.is_in_water() {
+            (water_speed, f64::from(0.8f32))
+        } else if self.entity.touching_lava.load(SeqCst) {
+            (lava_speed, 0.5)
+        } else {
+            (air_speed, f64::from(0.91f32))
+        };
+        self.entity
+            .update_velocity_from_input(self.movement_input.load(), f64::from(speed));
+        self.make_move(caller);
+        self.entity
+            .velocity
+            .store(self.entity.velocity.load() * drag);
+    }
+
     /// Decays player velocity like vanilla `travelInAir` friction.
     fn apply_travel_friction(&self) {
         let mut velo = self.entity.velocity.load();
