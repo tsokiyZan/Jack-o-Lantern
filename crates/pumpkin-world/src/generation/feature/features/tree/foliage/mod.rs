@@ -102,6 +102,7 @@ impl FoliagePlacer {
         }
     }
 
+    #[expect(clippy::too_many_arguments)]
     pub fn generate<T: GenerationCache>(
         &self,
         chunk: &mut T,
@@ -110,6 +111,7 @@ impl FoliagePlacer {
         foliage_height: i32,
         radius: i32,
         foliage_provider: &BlockState,
+        trunk_state: &BlockState,
     ) -> Vec<BlockPos> {
         let offset = self.offset.get(random);
         self.r#type.generate(
@@ -120,6 +122,7 @@ impl FoliagePlacer {
             radius,
             offset,
             foliage_provider,
+            trunk_state,
         )
     }
 
@@ -277,6 +280,7 @@ impl FoliageType {
         radius: i32,
         offset: i32,
         foliage_provider: &BlockState,
+        trunk_state: &BlockState,
     ) -> Vec<BlockPos> {
         match self {
             Self::Blob(blob) => blob.generate(
@@ -386,6 +390,7 @@ impl FoliageType {
                 radius,
                 offset,
                 foliage_provider,
+                trunk_state,
             ),
         }
     }

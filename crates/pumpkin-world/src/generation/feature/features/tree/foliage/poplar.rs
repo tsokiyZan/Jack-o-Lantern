@@ -1,4 +1,5 @@
 use pumpkin_data::BlockState;
+use pumpkin_data::block_properties::Axis;
 use pumpkin_util::{
     math::{int_provider::IntProvider, position::BlockPos},
     random::{RandomGenerator, RandomImpl},
@@ -6,6 +7,7 @@ use pumpkin_util::{
 
 use super::FoliagePlacer;
 use crate::generation::feature::features::tree::TreeNode;
+use crate::generation::feature::features::tree::trunk::poplar::PoplarTrunkPlacer;
 use crate::generation::proto_chunk::GenerationCache;
 
 pub struct PoplarFoliagePlacer {
@@ -24,6 +26,7 @@ impl PoplarFoliagePlacer {
         leaf_radius: i32,
         offset: i32,
         foliage_provider: &BlockState,
+        trunk_state: &BlockState,
     ) -> Vec<BlockPos> {
         let mut foliage_positions = Vec::new();
         let pos = node.center.up_height(offset);
@@ -80,6 +83,18 @@ impl PoplarFoliagePlacer {
                 flipped,
             );
         }
+        Self::replace_leaves_with_log(
+            &mut foliage_positions,
+            chunk,
+            pos,
+            current_radius,
+            foliage_height - 4,
+            node.giant_trunk,
+            foliage_provider,
+            trunk_state,
+            foliage_height,
+            flipped,
+        );
         self.generate_rhombus(
             &mut foliage_positions,
             chunk,
@@ -105,6 +120,50 @@ impl PoplarFoliagePlacer {
             flipped,
         );
         foliage_positions
+    }
+
+    /// `replaceLeavesWithLog`: turns the leaves along the row's axes, four or more blocks in from
+    /// the edge, into sideways logs. Vanilla places them through the foliage setter, so they count
+    /// as foliage.
+    #[expect(clippy::too_many_arguments)]
+    fn replace_leaves_with_log<T: GenerationCache>(
+        foliage_positions: &mut Vec<BlockPos>,
+        chunk: &mut T,
+        origin: BlockPos,
+        current_radius: i32,
+        y: i32,
+        giant_trunk: bool,
+        foliage_provider: &BlockState,
+        trunk_state: &BlockState,
+        foliage_height: i32,
+        flipped: bool,
+    ) {
+        let offset = i32::from(giant_trunk);
+        let partial = foliage_height - 1 == y || foliage_height - 2 == y;
+
+        for dx in -current_radius..=current_radius + offset {
+            for dz in -current_radius..=current_radius + offset {
+                let abs_dx = dx.abs();
+                let abs_dz = dz.abs();
+                let corner = Self::corner_blocks_to_cut(dx, dz, current_radius, partial, flipped);
+                let within_rhombus = abs_dx + abs_dz <= current_radius * 2 - (corner + 2);
+                if !within_rhombus
+                    || !(abs_dz == 0 && current_radius - abs_dx >= 4
+                        || abs_dx == 0 && current_radius - abs_dz >= 4)
+                {
+                    continue;
+                }
+                // `tryPlaceLog`: only where this tree's leaves are.
+                let pos = BlockPos(origin.0.add_raw(dx, y, dz));
+                if GenerationCache::get_block_state(chunk, &pos.0) != foliage_provider.id {
+                    continue;
+                }
+                let axis = if abs_dz == 0 { Axis::X } else { Axis::Z };
+                let log = PoplarTrunkPlacer::get_sideways_state(trunk_state.id, axis);
+                chunk.set_block_state(&pos.0, log.to_state());
+                foliage_positions.push(pos);
+            }
+        }
     }
 
     pub fn get_random_height(&self, random: &mut RandomGenerator) -> i32 {

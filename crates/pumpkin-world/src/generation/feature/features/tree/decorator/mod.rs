@@ -1,6 +1,9 @@
 use std::borrow::Cow;
 
-use crate::{generation::proto_chunk::GenerationCache, world::WorldPortalExt};
+use crate::{
+    generation::{java_hash_set::JavaBlockPosSet, proto_chunk::GenerationCache},
+    world::WorldPortalExt,
+};
 use alter_ground::AlterGroundTreeDecorator;
 use attached_to_leaves::AttachedToLeavesTreeDecorator;
 use attached_to_logs::AttachedToLogsTreeDecorator;
@@ -11,6 +14,7 @@ use leave_vine::LeavesVineTreeDecorator;
 use pale_moss::PaleMossTreeDecorator;
 use place_on_ground::PlaceOnGroundTreeDecorator;
 use pumpkin_util::{math::position::BlockPos, random::RandomGenerator};
+use shelf_mushroom::ShelfMushroomTreeDecorator;
 
 use trunk_vine::TrunkVineTreeDecorator;
 
@@ -23,6 +27,7 @@ pub mod creaking_heart;
 pub mod leave_vine;
 pub mod pale_moss;
 pub mod place_on_ground;
+pub mod shelf_mushroom;
 pub mod trunk_vine;
 
 pub enum TreeDecorator {
@@ -36,6 +41,7 @@ pub enum TreeDecorator {
     AttachedToLeaves(AttachedToLeavesTreeDecorator),
     PlaceOnGround(PlaceOnGroundTreeDecorator),
     AttachedToLogs(AttachedToLogsTreeDecorator),
+    ShelfMushroom(ShelfMushroomTreeDecorator),
 }
 
 impl TreeDecorator {
@@ -101,7 +107,19 @@ impl TreeDecorator {
             Self::AttachedToLogs(decorator) => {
                 decorator.generate(chunk, block_registry, random, log_positions, decorations);
             }
+            Self::ShelfMushroom(decorator) => {
+                decorator.generate(chunk, random, log_positions, decorations);
+            }
         }
+    }
+
+    /// `TreeDecorator.Context`'s lists: a `HashSet`'s positions in its iteration order,
+    /// stable-sorted by Y.
+    #[must_use]
+    pub fn context_list(positions: &JavaBlockPosSet) -> Vec<BlockPos> {
+        let mut list = positions.to_java_order();
+        list.sort_by_key(|pos| pos.0.y);
+        list
     }
 
     pub(super) fn get_leaf_litter_positions<'a>(

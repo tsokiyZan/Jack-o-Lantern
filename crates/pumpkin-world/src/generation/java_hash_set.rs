@@ -3,30 +3,69 @@ use std::collections::HashSet;
 use pumpkin_util::math::position::BlockPos;
 
 /// A set of block positions that iterates in the order vanilla's `java.util.HashSet<BlockPos>`
-/// does, for features that draw random numbers while walking such a set.
+/// does, for features that draw random numbers or settle values while walking such a set.
 ///
-/// Java's iteration order depends only on the members and the order they were added: entries sit
-/// in buckets chosen by `BlockPos.hashCode`, and a bucket keeps its entries in insertion order.
-#[derive(Default, Clone, Debug)]
+/// This replays `HashMap`'s table: entries sit in buckets chosen by `BlockPos.hashCode`, a bucket
+/// keeps its entries in insertion order, and iteration walks the buckets in index order.
+#[derive(Clone, Debug)]
 pub struct JavaBlockPosSet {
-    inserted: Vec<BlockPos>,
+    table: Vec<Vec<(i32, BlockPos)>>,
     members: HashSet<BlockPos>,
 }
+
+impl Default for JavaBlockPosSet {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl FromIterator<BlockPos> for JavaBlockPosSet {
+    fn from_iter<I: IntoIterator<Item = BlockPos>>(positions: I) -> Self {
+        let mut set = Self::new();
+        for pos in positions {
+            set.insert(pos);
+        }
+        set
+    }
+}
+
+/// `HashMap.DEFAULT_INITIAL_CAPACITY`.
+const DEFAULT_INITIAL_CAPACITY: usize = 16;
+/// `HashMap.TREEIFY_THRESHOLD`.
+const TREEIFY_THRESHOLD: usize = 8;
+/// `HashMap.MIN_TREEIFY_CAPACITY`.
+const MIN_TREEIFY_CAPACITY: usize = 64;
 
 impl JavaBlockPosSet {
     #[must_use]
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            table: vec![Vec::new(); DEFAULT_INITIAL_CAPACITY],
+            members: HashSet::new(),
+        }
     }
 
-    /// `Set.add`: returns whether the position was new.
+    /// `HashMap.putVal`: returns whether the position was new.
+    ///
+    /// The table doubles when the size passes 3/4 of the capacity, or when a bucket reaches 9
+    /// entries while there are fewer than 64 buckets (`treeifyBin`). With 64 or more buckets such a
+    /// bucket becomes a red-black tree, whose order this does not model; position sets spread too
+    /// evenly for that to happen in practice.
     pub fn insert(&mut self, pos: BlockPos) -> bool {
-        if self.members.insert(pos) {
-            self.inserted.push(pos);
-            true
-        } else {
-            false
+        if !self.members.insert(pos) {
+            return false;
         }
+        let hash = spread(block_pos_hash(&pos));
+        let mask = self.table.len() - 1;
+        let bucket = &mut self.table[hash as usize & mask];
+        bucket.push((hash, pos));
+        if bucket.len() > TREEIFY_THRESHOLD && self.table.len() < MIN_TREEIFY_CAPACITY {
+            self.resize();
+        }
+        if self.members.len() > self.table.len() / 4 * 3 {
+            self.resize();
+        }
+        true
     }
 
     #[must_use]
@@ -35,19 +74,29 @@ impl JavaBlockPosSet {
     }
 
     #[must_use]
-    pub const fn len(&self) -> usize {
-        self.inserted.len()
+    pub fn len(&self) -> usize {
+        self.members.len()
     }
 
     #[must_use]
-    pub const fn is_empty(&self) -> bool {
-        self.inserted.is_empty()
+    pub fn is_empty(&self) -> bool {
+        self.members.is_empty()
     }
 
     /// The members in the order a Java `HashSet` holding them iterates.
     #[must_use]
     pub fn to_java_order(&self) -> Vec<BlockPos> {
-        java_hash_map_order(&self.inserted)
+        self.table.iter().flatten().map(|&(_, pos)| pos).collect()
+    }
+
+    /// `HashMap.resize`: doubles the table, splitting each bucket in order.
+    fn resize(&mut self) {
+        let mut resized = vec![Vec::new(); self.table.len() * 2];
+        let mask = resized.len() - 1;
+        for entry in std::mem::take(&mut self.table).into_iter().flatten() {
+            resized[entry.0 as usize & mask].push(entry);
+        }
+        self.table = resized;
     }
 }
 
@@ -63,45 +112,6 @@ const fn block_pos_hash(pos: &BlockPos) -> i32 {
 /// `HashMap.hash`: spreads the high bits down.
 const fn spread(hash: i32) -> i32 {
     hash ^ ((hash as u32) >> 16) as i32
-}
-
-/// Replays `HashMap.putVal` for distinct keys added in `inserted` order and returns the order of
-/// the resulting table: buckets in index order, each bucket's entries in insertion order.
-///
-/// The table starts at 16 buckets and doubles when the size passes 3/4 of the capacity, or when a
-/// bucket reaches 9 entries while there are fewer than 64 buckets (`treeifyBin`). With 64 or more
-/// buckets such a bucket becomes a red-black tree, whose order this does not model; position sets
-/// spread too evenly for that to happen in practice.
-fn java_hash_map_order(inserted: &[BlockPos]) -> Vec<BlockPos> {
-    const TREEIFY_THRESHOLD: usize = 8;
-    const MIN_TREEIFY_CAPACITY: usize = 64;
-
-    let mut table: Vec<Vec<(i32, BlockPos)>> = vec![Vec::new(); 16];
-    let mut size = 0;
-    for &pos in inserted {
-        let hash = spread(block_pos_hash(&pos));
-        let mask = table.len() - 1;
-        let bucket = &mut table[hash as usize & mask];
-        bucket.push((hash, pos));
-        if bucket.len() > TREEIFY_THRESHOLD && table.len() < MIN_TREEIFY_CAPACITY {
-            table = resize(table);
-        }
-        size += 1;
-        if size > table.len() / 4 * 3 {
-            table = resize(table);
-        }
-    }
-    table.into_iter().flatten().map(|(_, pos)| pos).collect()
-}
-
-/// `HashMap.resize`: doubles the table, splitting each bucket in order.
-fn resize(table: Vec<Vec<(i32, BlockPos)>>) -> Vec<Vec<(i32, BlockPos)>> {
-    let mut resized = vec![Vec::new(); table.len() * 2];
-    let mask = resized.len() - 1;
-    for entry in table.into_iter().flatten() {
-        resized[entry.0 as usize & mask].push(entry);
-    }
-    resized
 }
 
 #[cfg(test)]

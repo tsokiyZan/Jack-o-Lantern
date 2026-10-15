@@ -197,13 +197,15 @@ impl FallenTreeFeature {
         logs: &[BlockPos],
         decorators: &[TreeDecorator],
     ) {
+        // Vanilla passes a `HashSet` of the logs, which the decorator context sorts by Y.
+        let logs = TreeDecorator::context_list(&logs.iter().copied().collect());
         for decorator in decorators {
             decorator.generate(
                 chunk,
                 block_registry,
                 random,
                 &[],
-                logs,
+                &logs,
                 &[],
                 &mut Vec::new(),
             );

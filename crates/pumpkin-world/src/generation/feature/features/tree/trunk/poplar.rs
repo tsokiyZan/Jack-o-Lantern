@@ -94,7 +94,7 @@ impl PoplarTrunkPlacer {
             .collect()
     }
 
-    fn get_sideways_state(id: BlockStateId, axis: Axis) -> BlockStateId {
+    pub(crate) fn get_sideways_state(id: BlockStateId, axis: Axis) -> BlockStateId {
         let block = id.to_block();
         let mut props = PaleOakWoodLikeProperties::from_state_id(id);
         props.axis = axis;

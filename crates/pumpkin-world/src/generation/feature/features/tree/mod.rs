@@ -85,16 +85,18 @@ impl TreeFeature {
         random: &mut RandomGenerator,
         pos: BlockPos,
     ) -> bool {
-        let (mut log_positions, mut root_positions, mut foliage_positions) =
+        let (log_positions, root_positions, foliage_positions) =
             self.generate_main(block_registry, chunk, random, pos);
 
         if log_positions.is_empty() && foliage_positions.is_empty() {
             return false;
         }
 
-        log_positions.sort_by_key(|p| p.0.y);
-        root_positions.sort_by_key(|p| p.0.y);
-        foliage_positions.sort_by_key(|p| p.0.y);
+        // Vanilla collects these in `HashSet`s and hands decorators lists sorted by Y.
+        let log_positions = TreeDecorator::context_list(&log_positions.into_iter().collect());
+        let root_positions = TreeDecorator::context_list(&root_positions.into_iter().collect());
+        let foliage_positions =
+            TreeDecorator::context_list(&foliage_positions.into_iter().collect());
 
         let mut decorations = Vec::new();
         for decorator in &self.decorators {
@@ -326,6 +328,7 @@ impl TreeFeature {
                 foliage_height,
                 foliage_radius,
                 foliage_state,
+                trunk_state,
             ));
         }
         (logs, root_positions, foliage_positions)
