@@ -1,8 +1,12 @@
 use std::sync::Arc;
 
+use pumpkin_data::entity::EntityType;
+use pumpkin_data::item_stack::ItemStack;
+use pumpkin_util::math::vector3::Vector3;
 use uuid::Uuid;
 
-use crate::entity::EntityBase;
+use crate::entity::item::ItemEntity;
+use crate::entity::{Entity, EntityBase};
 use crate::world::World;
 
 use super::super::memory::position_tracker::{BlockPosTracker, EntityTracker, PositionTracker};
@@ -190,6 +194,37 @@ pub fn global_pos_in(
 ) -> Option<super::super::memory::GlobalPos> {
     pumpkin_data::dimension::Dimension::from_name(world.dimension.minecraft_name)
         .map(|dimension| super::super::memory::GlobalPos::new(dimension, pos))
+}
+
+/// Vanilla `BehaviorUtils.throwItem`: drops `item` from the thrower's hand, thrown towards
+/// `target_pos`.
+pub fn throw_item(
+    entity: &Entity,
+    item: ItemStack,
+    target_pos: Vector3<f64>,
+    throw_velocity: Vector3<f64>,
+    hand_y_distance_from_eye: f32,
+) {
+    let pos = entity.pos.load();
+    let y_hand_pos = entity.get_eye_y() - f64::from(hand_y_distance_from_eye);
+    let throw_vector = (target_pos - pos).normalize();
+    let velocity = Vector3::new(
+        throw_vector.x * throw_velocity.x,
+        throw_vector.y * throw_velocity.y,
+        throw_vector.z * throw_velocity.z,
+    );
+    let world = entity.world.load_full();
+    let item_entity = ItemEntity::new_with_velocity(
+        Entity::new(
+            world.clone(),
+            Vector3::new(pos.x, y_hand_pos, pos.z),
+            &EntityType::ITEM,
+        ),
+        item,
+        velocity,
+        ItemEntity::DEFAULT_PICKUP_DELAY,
+    );
+    world.spawn_entity(Arc::new(item_entity));
 }
 
 #[must_use]

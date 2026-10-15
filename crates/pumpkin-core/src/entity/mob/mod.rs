@@ -152,9 +152,21 @@ impl MobEntity {
 
     /// The looting part of vanilla `Mob.aiStep`: runs `pick_up` on every item in reach that
     /// can be picked up, while this mob picks up loot and `mobGriefing` is on.
-    pub fn for_each_item_in_pickup_reach(&self, mut pick_up: impl FnMut(&ItemEntity)) {
+    pub fn for_each_item_in_pickup_reach(&self, pick_up: impl FnMut(&ItemEntity)) {
+        if self.can_pick_up_loot() {
+            self.for_each_item_in_reach(Self::ITEM_PICKUP_REACH, pick_up);
+        }
+    }
+
+    /// `for_each_item_in_pickup_reach` for a mob that overrides `getPickupReach` and
+    /// `canPickUpLoot`; the caller has already checked the latter.
+    pub fn for_each_item_in_reach(
+        &self,
+        pickup_reach: Vector3<i32>,
+        mut pick_up: impl FnMut(&ItemEntity),
+    ) {
         let entity = &self.living_entity.entity;
-        if !self.can_pick_up_loot() || !entity.is_alive() || self.living_entity.dead.load(Relaxed) {
+        if !entity.is_alive() || self.living_entity.dead.load(Relaxed) {
             return;
         }
         let world = entity.world.load();
@@ -162,9 +174,9 @@ impl MobEntity {
             return;
         }
         let reach = entity.bounding_box.load().expand(
-            f64::from(Self::ITEM_PICKUP_REACH.x),
-            f64::from(Self::ITEM_PICKUP_REACH.y),
-            f64::from(Self::ITEM_PICKUP_REACH.z),
+            f64::from(pickup_reach.x),
+            f64::from(pickup_reach.y),
+            f64::from(pickup_reach.z),
         );
         for candidate in world.get_entities_at_box(&reach) {
             let Some(item) = candidate.get_item_entity() else {
@@ -1899,6 +1911,17 @@ pub trait Mob: EntityBase + Send + Sync {
     /// locking it again would deadlock.
     fn wants_to_pick_up(&self, _brain: &Brain, _stack: &ItemStack) -> bool {
         true
+    }
+
+    /// Vanilla `Mob.canPickUpLoot`, which a plain mob answers from its saved flag. Takes the
+    /// brain for the same reason as `wants_to_pick_up`.
+    fn can_pick_up_loot(&self, _brain: &Brain) -> bool {
+        self.get_mob_entity().can_pick_up_loot()
+    }
+
+    /// The part of a vanilla `considersEntityAsAlly` override before `super`'s.
+    fn mob_considers_entity_as_ally(&self, _other: &dyn EntityBase) -> bool {
+        false
     }
 
     /// Vanilla `Mob.canUseNonMeleeWeapon`, false unless the mob knows how to fire what it holds.
