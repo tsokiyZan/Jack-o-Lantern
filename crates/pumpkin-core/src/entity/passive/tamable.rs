@@ -5,7 +5,12 @@ use pumpkin_nbt::compound::NbtCompound;
 use uuid::Uuid;
 
 use crate::entity::EntityBase;
+use crate::entity::ai::goal::follow_owner::FollowOwnerGoal;
+use crate::entity::mob::Mob;
 use crate::entity::passive::animal::Animal;
+use crate::entity::player::Player;
+use pumpkin_data::data_component_impl::food::FoodImpl;
+use pumpkin_data::item_stack::ItemStack;
 
 pub const SITTING_FLAG: u8 = 1;
 pub const TAME_FLAG: u8 = 4;
@@ -118,9 +123,32 @@ pub trait TamableAnimal: Animal {
         self.get_owner().is_some_and(|id| id == *player_uuid)
     }
 
+    /// Vanilla `TamableAnimal.tame`.
     fn tame(&self, player_id: Uuid) {
         self.set_tame(true);
         self.set_owner(Some(player_id));
+        let world = self.get_mob_entity().living_entity.entity.world.load();
+        if let Some(player) = world.get_player_by_uuid(player_id) {
+            player.trigger_advancement_criterion(
+                pumpkin_data::advancement::Advancement::HUSBANDRY_TAME_AN_ANIMAL,
+                "tamed_animal",
+            );
+        }
+    }
+
+    /// Vanilla `TamableAnimal.feed` up to `playEatingSound`, which the caller plays.
+    fn feed(
+        &self,
+        player: &Player,
+        item_stack: &mut ItemStack,
+        healing_factor: f32,
+        default_heal: f32,
+    ) {
+        let heal = item_stack
+            .get_data_component::<FoodImpl>()
+            .map_or(default_heal, |food| healing_factor * food.nutrition as f32);
+        item_stack.decrement_unless_creative(player.gamemode.load(), 1);
+        self.get_mob_entity().living_entity.heal(heal);
     }
 
     fn spawn_taming_particles(&self, success: bool) {
@@ -165,5 +193,16 @@ pub trait TamableAnimal: Animal {
         // Vanilla `readAdditionalSaveData` restores the pose with the order.
         self.set_ordered_to_sit(sitting);
         self.set_in_sitting_pose(sitting);
+    }
+}
+
+/// Vanilla `TamableAnimal.TamableAnimalPanicGoal.tick`: a panicking pet still teleports to
+/// an owner who got too far away.
+pub fn tamable_animal_panic_tick(mob: &dyn Mob, _speed: f64) {
+    if let Some(owner) = FollowOwnerGoal::find_owner(mob)
+        && !FollowOwnerGoal::unable_to_move_to_owner(mob, Some(&owner))
+        && FollowOwnerGoal::should_try_teleport_to_owner(mob, &owner)
+    {
+        FollowOwnerGoal::try_teleport_to_owner(mob, &owner);
     }
 }

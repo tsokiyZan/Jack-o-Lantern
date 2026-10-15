@@ -29,15 +29,9 @@ impl OcelotAttackGoal {
 
 impl Goal for OcelotAttackGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
-        let target = mob.get_mob_entity().get_target();
-        let Some(target) = target else {
+        let Some(target) = mob.get_mob_entity().get_target() else {
             return false;
         };
-
-        if !target.get_entity().is_alive() {
-            return false;
-        }
-
         self.target = Some(target);
         true
     }
@@ -59,9 +53,7 @@ impl Goal for OcelotAttackGoal {
             return false;
         }
 
-        let is_idle = mob.is_navigator_idle();
-
-        !is_idle || mob.get_mob_entity().get_target().is_some()
+        !mob.is_navigator_idle() || self.can_start(mob)
     }
 
     fn stop(&mut self, mob: &dyn Mob) {
@@ -113,8 +105,8 @@ impl Goal for OcelotAttackGoal {
         self.attack_time = (self.attack_time - 1).max(0);
         if dist_sq <= f64::from(melee_radius_sq) && self.attack_time <= 0 {
             self.attack_time = 20;
-            mob.get_mob_entity().living_entity.swing_hand();
-            // The mob itself, not its bare `Entity`, so the victim knows who hurt it.
+            // Vanilla `doHurtTarget`, with no swing unlike `MeleeAttackGoal`. The mob itself,
+            // not its bare `Entity`, so the victim knows who hurt it.
             let attacker: &dyn crate::entity::EntityBase = mob;
             let damaged = mob.get_mob_entity().try_attack(attacker, target.as_ref());
             if damaged {

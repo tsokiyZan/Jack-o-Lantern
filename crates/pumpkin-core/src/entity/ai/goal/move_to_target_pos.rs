@@ -143,6 +143,14 @@ pub trait MoveToTargetPos: Send + Sync {
         1.0
     }
 
+    /// Vanilla `nextStartTick`: the wait before the next search.
+    fn next_start_tick(&self, mob: &dyn Mob) -> i32
+    where
+        Self: Sized,
+    {
+        MoveToTargetPosGoal::<Self>::get_interval(mob)
+    }
+
     /// Vanilla `getMoveToTarget`: the block above the target by default.
     fn get_move_to_target(&self, target_pos: BlockPos) -> BlockPos {
         target_pos.up()
@@ -160,7 +168,10 @@ impl<M: MoveToTargetPos> Goal for MoveToTargetPosGoal<M> {
             self.cooldown -= 1;
             return false;
         }
-        self.cooldown = Self::get_interval(mob);
+        self.cooldown = self.move_to_target_pos.get().map_or_else(
+            || Self::get_interval(mob),
+            |parent| parent.next_start_tick(mob),
+        );
         self.find_target_pos(mob)
     }
 
