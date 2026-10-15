@@ -1902,7 +1902,6 @@ impl<T: Mob + Send + 'static> EntityBase for T {
     fn tick(&self, caller: &dyn EntityBase, server: &Server) {
         let mob_entity = self.get_mob_entity();
         mob_entity.living_entity.entity.tick_leash();
-        sun_burn::tick(self);
 
         if mob_entity.breeding_cooldown.load(Relaxed) > 0 {
             mob_entity.breeding_cooldown.fetch_sub(1, Relaxed);

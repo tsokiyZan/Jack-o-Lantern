@@ -1502,6 +1502,11 @@ impl LivingEntity {
         {
             caller.damage(caller, 1.0, DamageType::DROWN);
         }
+
+        // Vanilla `Mob.aiStep` burns undead right after `super.aiStep()`.
+        if let Some(mob) = caller.get_mob() {
+            super::mob::sun_burn::tick(mob);
+        }
     }
 
     /// Vanilla `LivingEntity.applyInput`: the last tick's movement input decays. Vanilla

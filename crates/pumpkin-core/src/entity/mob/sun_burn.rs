@@ -35,10 +35,9 @@ fn is_sun_burn_tick(entity: &Entity) -> bool {
         return false;
     }
 
-    !(entity.touching_water.load(Relaxed)
+    !(entity.is_in_water_or_rain()
         || entity.is_in_powder_snow()
-        || entity.was_in_powder_snow.load(Relaxed)
-        || world.is_raining_at(&eye))
+        || entity.was_in_powder_snow.load(Relaxed))
 }
 
 /// An item in the protection slot takes the sun instead of the mob.
