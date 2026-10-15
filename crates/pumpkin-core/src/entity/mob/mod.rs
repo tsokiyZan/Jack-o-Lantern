@@ -51,6 +51,7 @@ pub mod bat;
 pub mod blaze;
 pub mod breeze;
 pub mod cave_spider;
+pub mod conversion;
 pub mod creaking;
 pub mod creeper;
 pub mod crossbow_attack_mob;
@@ -119,6 +120,7 @@ pub struct MobEntity {
     pub breeder: AtomicCell<Option<Uuid>>,
     pub persistence_required: AtomicBool,
     pending_riders: std::sync::Mutex<Vec<Arc<dyn EntityBase>>>,
+    pending_vehicle: std::sync::Mutex<Option<Arc<dyn EntityBase>>>,
     mob_flags: AtomicU8,
 }
 impl MobEntity {
@@ -284,6 +286,7 @@ impl MobEntity {
             breeder: AtomicCell::new(None),
             persistence_required: AtomicBool::new(false),
             pending_riders: std::sync::Mutex::new(Vec::new()),
+            pending_vehicle: std::sync::Mutex::new(None),
             mob_flags: AtomicU8::new(0),
         }
     }
@@ -1487,6 +1490,12 @@ pub trait Mob: EntityBase + Send + Sync {
     /// What a vanilla `dropCustomDeathLoot` override adds after the equipment drops.
     fn drop_custom_death_loot(&self) {}
 
+    /// Vanilla `killedEntity`, run on the attacker as `victim` dies. `false` keeps the
+    /// victim's loot, equipment and experience from dropping.
+    fn killed_entity(&self, _victim: &dyn EntityBase) -> bool {
+        true
+    }
+
     /// Vanilla `LivingEntity.isSleeping`, for mobs that sleep without a bed.
     fn is_sleeping(&self) -> bool {
         false
@@ -1623,6 +1632,11 @@ pub trait Mob: EntityBase + Send + Sync {
     }
 
     /// Must return `Some(self)` for every `NeutralMob` implementor. Not compiler-enforced.
+    /// Vanilla `instanceof Zombie`.
+    fn as_zombie(&self) -> Option<&zombie::ZombieEntityBase> {
+        None
+    }
+
     fn as_neutral(&self) -> Option<&dyn neutral::NeutralMob> {
         None
     }
@@ -2063,7 +2077,7 @@ pub fn is_player_holding(passenger: &dyn EntityBase, item: &Item) -> bool {
 
 /// Vanilla `ConversionType.convertCommon`: what a converted mob takes over from the old one.
 /// Scoreboard teams are not carried over.
-pub fn convert_common(from: &dyn Mob, to: &dyn Mob) {
+pub fn convert_common(from: &dyn Mob, to: &dyn Mob, params: conversion::ConversionParams) {
     let (old, new) = (from.get_mob_entity(), to.get_mob_entity());
     let (old_living, new_living) = (&old.living_entity, &new.living_entity);
     let (old_entity, new_entity) = (&old_living.entity, &new_living.entity);
@@ -2078,10 +2092,15 @@ pub fn convert_common(from: &dyn Mob, to: &dyn Mob) {
     for effect in effects {
         new_living.add_effect(effect);
     }
-    if let (Some(old_ageable), Some(new_ageable)) = (from.as_ageable(), to.as_ageable()) {
-        if old_ageable.is_baby() {
-            new_ageable.set_baby(true);
+    if old_entity.is_baby() {
+        match to.as_ageable() {
+            Some(new_ageable) => new_ageable.set_baby(true),
+            None => {
+                to.spawn_as_baby();
+            }
         }
+    }
+    if let (Some(old_ageable), Some(new_ageable)) = (from.as_ageable(), to.as_ageable()) {
         new_ageable.set_age(old_ageable.get_age());
         let (old_data, new_data) = (
             old_ageable.get_ageable_data(),
@@ -2093,6 +2112,9 @@ pub fn convert_common(from: &dyn Mob, to: &dyn Mob) {
         new_data
             .forced_age_timer
             .store(old_data.forced_age_timer.load(Relaxed), Relaxed);
+    }
+    if params.preserve_can_pick_up_loot {
+        new.set_can_pick_up_loot(old.can_pick_up_loot());
     }
     new.set_left_handed(old.is_left_handed());
     new.set_no_ai(old.is_no_ai());
@@ -2121,6 +2143,11 @@ pub fn convert_common(from: &dyn Mob, to: &dyn Mob) {
         .extend(tags);
     if let Some(name) = &**old_entity.custom_name.load() {
         new_entity.set_custom_name(name.clone());
+    }
+    if let (Some(old_zombie), Some(new_zombie)) = (from.as_zombie(), to.as_zombie())
+        && old_zombie.can_break_doors()
+    {
+        new_zombie.set_can_break_doors(true, to);
     }
 }
 

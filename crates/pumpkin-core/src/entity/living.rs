@@ -2230,6 +2230,10 @@ impl LivingEntity {
 
             // Plays the death sound
             self.make_sound(&*dyn_self, self.death_sound(&*dyn_self));
+            // Vanilla `die`: the attacker's `killedEntity` can claim the body, leaving no loot.
+            let perished = cause
+                .and_then(EntityBase::get_mob)
+                .is_none_or(|mob| mob.killed_entity(&*dyn_self));
             world.send_entity_status(&self.entity, EntityStatus::Death, Some(ActorEventID::Death));
             let looting_level;
             let tool = if let Some(cause_ent) = cause {
@@ -2290,26 +2294,30 @@ impl LivingEntity {
                 ..Default::default()
             };
 
-            if let Some(mob) = dyn_self.get_mob() {
-                mob.before_drop_all_death_loot();
-            }
-            // Drop loot
-            self.drop_loot(&params);
+            if perished {
+                if let Some(mob) = dyn_self.get_mob() {
+                    mob.before_drop_all_death_loot();
+                }
+                // Drop loot
+                self.drop_loot(&params);
 
-            // Award experience
-            if params.killed_by_player.unwrap_or(false)
-                && world.level_info.load().game_rules.mob_drops
-            {
-                let amount = dyn_self.get_experience_reward(killer);
-                if amount > 0 {
-                    ExperienceOrbEntity::spawn(&world, self.entity.pos.load(), amount);
+                // Award experience
+                if params.killed_by_player.unwrap_or(false)
+                    && world.level_info.load().game_rules.mob_drops
+                {
+                    let amount = dyn_self.get_experience_reward(killer);
+                    if amount > 0 {
+                        ExperienceOrbEntity::spawn(&world, self.entity.pos.load(), amount);
+                    }
                 }
             }
             self.entity.pose.store(EntityPose::Dying);
 
-            self.drop_equipment(looting_level);
-            if let Some(mob) = dyn_self.get_mob() {
-                mob.drop_custom_death_loot();
+            if perished {
+                self.drop_equipment(looting_level);
+                if let Some(mob) = dyn_self.get_mob() {
+                    mob.drop_custom_death_loot();
+                }
             }
 
             // Broadcast death message if it's a player and the gamerule is enabled

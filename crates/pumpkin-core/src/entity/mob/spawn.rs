@@ -111,6 +111,22 @@ impl MobEntity {
                 .unwrap_or_else(std::sync::PoisonError::into_inner),
         )
     }
+
+    /// Queues an entity already in the world for this mob to mount when it enters the world,
+    /// as a vanilla `startRiding` during `finalizeSpawn` does.
+    pub fn set_pending_vehicle(&self, vehicle: Arc<dyn EntityBase>) {
+        *self
+            .pending_vehicle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(vehicle);
+    }
+
+    pub(crate) fn take_pending_vehicle(&self) -> Option<Arc<dyn EntityBase>> {
+        self.pending_vehicle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .take()
+    }
 }
 
 /// Finalizes `entity` if it is a mob, and returns the group data for the next mob of the group.
