@@ -8,11 +8,14 @@ use std::sync::Arc;
 
 use pumpkin_data::damage::DamageType;
 use pumpkin_data::entity::{EntityPose, EntityType};
+use pumpkin_data::sound::Sound;
+use pumpkin_data::tag::{self, Taggable};
 use pumpkin_util::math::vector3::Vector3;
 
 use crate::entity::ai::brain::memory::{PackedMemories, types};
 use crate::entity::ai::brain::{Brain, BrainTick, behavior::utils::is_alive};
 use crate::entity::ai::pathfinder::node::PathType;
+use crate::entity::projectile_deflection::ProjectileDeflectionType;
 use crate::entity::{
     Entity, EntityBase,
     mob::{Mob, MobEntity, mob_hurt_server},
@@ -79,6 +82,21 @@ pub fn pose(tick: &BrainTick<'_>) -> EntityPose {
     tick.mob.get_entity().pose.load()
 }
 
+/// Vanilla `Breeze.PROJECTILE_DEFLECTION`: a whoosh, then `ProjectileDeflection.REVERSE`.
+fn projectile_deflection(projectile: &dyn EntityBase, entity: Option<&dyn EntityBase>) {
+    if let Some(entity) = entity {
+        let breeze = entity.get_entity();
+        breeze.world.load().play_sound_from_entity(
+            breeze,
+            Sound::EntityBreezeDeflect,
+            entity.entity_sound_source(),
+            1.0,
+            1.0,
+        );
+    }
+    ProjectileDeflectionType::Simple.deflect(projectile, entity);
+}
+
 impl Mob for BreezeEntity {
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
@@ -90,6 +108,25 @@ impl Mob for BreezeEntity {
 
     fn get_max_head_rotation(&self) -> f32 {
         MAX_HEAD_Y_ROT
+    }
+
+    /// Vanilla `Breeze.deflection`: everything but wind charges bounces off.
+    fn mob_deflection(&self, projectile: &dyn EntityBase) -> ProjectileDeflectionType {
+        let projectile_type = projectile.get_entity().entity_type;
+        if projectile_type == &EntityType::BREEZE_WIND_CHARGE
+            || projectile_type == &EntityType::WIND_CHARGE
+        {
+            return ProjectileDeflectionType::None;
+        }
+        if self
+            .get_entity()
+            .entity_type
+            .has_tag(&tag::EntityType::MINECRAFT_DEFLECTS_PROJECTILES)
+        {
+            ProjectileDeflectionType::Custom(projectile_deflection)
+        } else {
+            ProjectileDeflectionType::None
+        }
     }
 
     /// Vanilla `Breeze.makeBrain`.

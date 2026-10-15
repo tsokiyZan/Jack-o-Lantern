@@ -1,6 +1,6 @@
 use crate::{
     command::argument_types::entity_anchor::{EntityAnchor, EntityAnchorExt},
-    entity::item::ItemEntity,
+    entity::{item::ItemEntity, projectile_deflection::ProjectileDeflectionType},
     net::{ClientPlatform, bedrock::BedrockClient, java::JavaClient},
     server::Server,
     world::{
@@ -395,6 +395,12 @@ pub trait EntityBase: Send + Sync + std::any::Any {
 
     fn get_mob(&self) -> Option<&dyn mob::Mob> {
         None
+    }
+
+    /// Vanilla `Entity.deflection`: how `projectile` bounces off this entity instead of
+    /// hitting it.
+    fn deflection(&self, _projectile: &dyn EntityBase) -> ProjectileDeflectionType {
+        ProjectileDeflectionType::of_entity_type(self.get_entity())
     }
 
     /// Players are tracked by profile name, every other entity by its UUID.

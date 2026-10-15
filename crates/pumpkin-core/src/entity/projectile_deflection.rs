@@ -1,4 +1,6 @@
-use crate::entity::EntityBase;
+use pumpkin_data::tag::{self, Taggable};
+
+use crate::entity::{Entity, EntityBase};
 use std::sync::atomic::Ordering;
 
 #[derive(Clone, Copy)]
@@ -7,12 +9,29 @@ pub enum ProjectileDeflectionType {
     Simple,
     Redirected,
     TransferVelocityDirection,
+    /// A deflection of the mob's own, such as vanilla `Breeze.PROJECTILE_DEFLECTION`.
+    Custom(fn(&dyn EntityBase, Option<&dyn EntityBase>)),
 }
 
 impl ProjectileDeflectionType {
-    pub fn deflect(&self, projectile: &mut dyn EntityBase, hit_entity: Option<&dyn EntityBase>) {
+    /// Vanilla `Entity.deflection`'s default: projectiles bounce back off the entity
+    /// types in `deflects_projectiles`.
+    #[must_use]
+    pub fn of_entity_type(entity: &Entity) -> Self {
+        if entity
+            .entity_type
+            .has_tag(&tag::EntityType::MINECRAFT_DEFLECTS_PROJECTILES)
+        {
+            Self::Simple
+        } else {
+            Self::None
+        }
+    }
+
+    pub fn deflect(&self, projectile: &dyn EntityBase, hit_entity: Option<&dyn EntityBase>) {
         match self {
             Self::None => {}
+            Self::Custom(deflect) => deflect(projectile, hit_entity),
             Self::Simple => {
                 let vel = rand::random::<f32>() * 20.0 + 170.0;
 

@@ -18,6 +18,7 @@ use crate::entity::item::ItemEntity;
 use crate::entity::movement_emission::MovementEmission;
 use crate::entity::player::Player;
 use crate::entity::predicate::EntityPredicate;
+use crate::entity::projectile_deflection::ProjectileDeflectionType;
 use crate::server::Server;
 use crate::world::World;
 use crate::world::brightness::DAYLIGHT_BRIGHTNESS;
@@ -1729,6 +1730,11 @@ pub trait Mob: EntityBase + Send + Sync {
     /// The end of a vanilla `LivingEntity.doPush` override: this mob pushed `entity`.
     fn do_push(&self, _entity: &dyn EntityBase) {}
 
+    /// A vanilla `Entity.deflection` override.
+    fn mob_deflection(&self, _projectile: &dyn EntityBase) -> ProjectileDeflectionType {
+        ProjectileDeflectionType::of_entity_type(self.get_entity())
+    }
+
     /// A vanilla `Entity.getFluidJumpThreshold` override.
     fn fluid_jump_threshold(&self) -> Option<f64> {
         None
@@ -2397,6 +2403,10 @@ impl<T: Mob + Send + 'static> EntityBase for T {
 
     fn is_pushed_by_fluids(&self) -> bool {
         self.mob_is_pushed_by_fluids()
+    }
+
+    fn deflection(&self, projectile: &dyn EntityBase) -> ProjectileDeflectionType {
+        self.mob_deflection(projectile)
     }
 
     fn is_pushable(&self) -> bool {

@@ -293,6 +293,7 @@ pub fn from_type(
                 owner_id: crossbeam::atomic::AtomicCell::new(None),
                 collides_with_projectiles: false,
                 has_hit: AtomicBool::new(false),
+                last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
                 gravity: WIND_CHARGE_GRAVITY,
             };
             Arc::new(WindChargeEntity::new_normal(thrown))
@@ -303,6 +304,7 @@ pub fn from_type(
                 owner_id: crossbeam::atomic::AtomicCell::new(None),
                 collides_with_projectiles: false,
                 has_hit: AtomicBool::new(false),
+                last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
                 gravity: WIND_CHARGE_GRAVITY,
             };
             Arc::new(WindChargeEntity::new_breeze(thrown))

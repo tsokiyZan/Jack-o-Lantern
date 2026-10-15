@@ -29,6 +29,7 @@ impl SplashPotionEntity {
             owner_id: crossbeam::atomic::AtomicCell::new(None),
             collides_with_projectiles: false,
             has_hit: AtomicBool::new(false),
+            last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
             gravity: GRAVITY,
         };
 

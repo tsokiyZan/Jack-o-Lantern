@@ -67,6 +67,8 @@ pub struct ArrowEntity {
     pub life: AtomicU32,
     pub shake_time: AtomicU8,
     pub has_hit: AtomicBool,
+    /// Vanilla `Projectile.lastDeflectedBy`.
+    pub last_deflected_by: crossbeam::atomic::AtomicCell<Option<i32>>,
     pub last_block_pos: Arc<std::sync::RwLock<Option<BlockPos>>>,
     pub pierced_entities: Arc<RwLock<Vec<i32>>>,
     pub weapon: RwLock<Option<ItemStack>>,
@@ -106,6 +108,7 @@ impl ArrowEntity {
             life: AtomicU32::new(0),
             shake_time: AtomicU8::new(0),
             has_hit: AtomicBool::new(false),
+            last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
             last_block_pos: Arc::new(std::sync::RwLock::new(None)),
             pierced_entities: Arc::new(RwLock::new(Vec::new())),
             weapon: RwLock::new(None),
@@ -148,6 +151,7 @@ impl ArrowEntity {
             life: AtomicU32::new(0),
             shake_time: AtomicU8::new(0),
             has_hit: AtomicBool::new(false),
+            last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
             last_block_pos: Arc::new(std::sync::RwLock::new(None)),
             pierced_entities: Arc::new(RwLock::new(Vec::new())),
             weapon: RwLock::new(None),
@@ -835,6 +839,9 @@ impl EntityBase for ArrowEntity {
                     caller.on_hit(h);
                 }
                 ProjectileHit::Entity { .. } => {
+                    if super::is_deflected(caller, &self.last_deflected_by, &h) {
+                        return;
+                    }
                     let pierce = self.pierce_level.load(Ordering::Relaxed);
                     let pierced_len = self
                         .pierced_entities

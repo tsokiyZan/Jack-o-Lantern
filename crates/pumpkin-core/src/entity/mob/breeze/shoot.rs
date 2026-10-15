@@ -159,6 +159,7 @@ impl Behavior for Shoot {
             owner_id: AtomicCell::new(Some(breeze.entity_id)),
             collides_with_projectiles: false,
             has_hit: AtomicBool::new(false),
+            last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
             gravity: WIND_CHARGE_GRAVITY,
         };
         wind_charge.set_velocity(

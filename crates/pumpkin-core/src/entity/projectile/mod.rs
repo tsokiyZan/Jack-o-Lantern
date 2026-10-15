@@ -1,4 +1,6 @@
-use super::{Entity, EntityBase, living::LivingEntity};
+use super::{
+    Entity, EntityBase, living::LivingEntity, projectile_deflection::ProjectileDeflectionType,
+};
 use pumpkin_data::BlockDirection;
 use pumpkin_data::entity::EntityType;
 use pumpkin_protocol::java::client::play::CEntityVelocity;
@@ -28,6 +30,31 @@ pub mod wind_charge;
 pub mod wither_skull;
 
 use pumpkin_data::item_stack::ItemStack;
+
+/// The entity half of vanilla `Projectile.hitTargetOrDeflectSelf`: whether the entity `hit`
+/// turned `projectile` away instead of being hit. The same entity never deflects it twice in
+/// a row.
+pub fn is_deflected(
+    projectile: &dyn EntityBase,
+    last_deflected_by: &crossbeam::atomic::AtomicCell<Option<i32>>,
+    hit: &ProjectileHit,
+) -> bool {
+    let ProjectileHit::Entity { entity: target, .. } = hit else {
+        return false;
+    };
+    let deflection = target.deflection(projectile);
+    if matches!(deflection, ProjectileDeflectionType::None) {
+        return false;
+    }
+    let target_id = target.get_entity().entity_id;
+    if last_deflected_by.load() != Some(target_id) {
+        // Vanilla `Projectile.deflect` keeps the owner; `onDeflection` only slows
+        // fireballs, which do not track their acceleration here.
+        deflection.deflect(projectile, Some(target.as_ref()));
+        last_deflected_by.store(Some(target_id));
+    }
+    true
+}
 
 #[must_use]
 pub fn is_projectile(entity_type: &EntityType) -> bool {
@@ -79,6 +106,8 @@ pub struct ThrownItemEntity {
     pub owner_id: crossbeam::atomic::AtomicCell<Option<i32>>,
     pub collides_with_projectiles: bool,
     pub has_hit: AtomicBool,
+    /// Vanilla `Projectile.lastDeflectedBy`.
+    pub last_deflected_by: crossbeam::atomic::AtomicCell<Option<i32>>,
     pub gravity: f64,
 }
 
@@ -92,6 +121,7 @@ impl ThrownItemEntity {
             owner_id: crossbeam::atomic::AtomicCell::new(Some(owner.entity_id)),
             collides_with_projectiles: false,
             has_hit: AtomicBool::new(false),
+            last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
             gravity,
         }
     }
@@ -234,6 +264,9 @@ impl ThrownItemEntity {
 
         // Handle hit or continue
         if let Some(h) = hit {
+            if is_deflected(caller, &self.last_deflected_by, &h) {
+                return;
+            }
             // Ensure hit is only processed once per projectile
             if self.has_hit.swap(true, Ordering::SeqCst) {
                 return;

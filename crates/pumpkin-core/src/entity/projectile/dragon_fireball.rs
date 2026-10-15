@@ -36,6 +36,7 @@ impl DragonFireballEntity {
                 owner_id: AtomicCell::new(None),
                 collides_with_projectiles: false,
                 has_hit: AtomicBool::new(false),
+                last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
                 gravity: 0.0,
             },
             acceleration_power: AtomicCell::new(INITIAL_ACCELERATION_POWER),

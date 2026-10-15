@@ -38,6 +38,7 @@ impl FireballEntity {
             owner_id: crossbeam::atomic::AtomicCell::new(None),
             collides_with_projectiles: false,
             has_hit: AtomicBool::new(false),
+            last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
             gravity: 0.0,
         };
 
@@ -75,6 +76,7 @@ impl FireballEntity {
             owner_id: crossbeam::atomic::AtomicCell::new(None),
             collides_with_projectiles: false,
             has_hit: AtomicBool::new(false),
+            last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
             gravity: 0.0,
         };
         let vel = direction.normalize().multiply(
