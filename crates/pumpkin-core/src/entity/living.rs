@@ -17,7 +17,7 @@ use rustc_hash::FxHashMap;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use std::sync::atomic::{
-    AtomicBool, AtomicI32, AtomicI64, AtomicU8,
+    AtomicBool, AtomicI32, AtomicU8,
     Ordering::{Relaxed, SeqCst},
 };
 use tracing::warn;
@@ -163,14 +163,11 @@ pub struct LivingEntity {
     /// Tracks combat entries, assisted falls, kill credit, and death messages.
     pub combat_tracker: std::sync::Mutex<CombatTracker>,
 
-    /// The ID of the player that last hurt this entity.
-    pub last_hurt_by_player_id: AtomicI32,
-    /// The tick at which this entity was last hurt by a player.
-    pub last_hurt_by_player_time: AtomicI64,
-    /// The ID of the mob/entity that last hurt this entity.
-    pub last_hurt_by_mob_id: AtomicI32,
-    /// The tick at which this entity was last hurt by a mob/entity.
-    pub last_hurt_by_mob_time: AtomicI64,
+    /// Vanilla `lastHurtByPlayer`.
+    pub last_hurt_by_player: AtomicCell<Option<uuid::Uuid>>,
+    /// Vanilla `lastHurtByPlayerMemoryTime`: ticks left before `last_hurt_by_player` is
+    /// forgotten; a kill while it runs counts as a player kill.
+    pub last_hurt_by_player_memory_time: AtomicI32,
 
     water_movement_speed_multiplier: f32,
     livings_flags: AtomicU8,
@@ -354,10 +351,8 @@ impl LivingEntity {
             last_attacking_id: AtomicI32::new(0),
             last_attack_time: AtomicI32::new(0),
             combat_tracker: std::sync::Mutex::new(CombatTracker::new()),
-            last_hurt_by_player_id: AtomicI32::new(0),
-            last_hurt_by_player_time: AtomicI64::new(0),
-            last_hurt_by_mob_id: AtomicI32::new(0),
-            last_hurt_by_mob_time: AtomicI64::new(0),
+            last_hurt_by_player: AtomicCell::new(None),
+            last_hurt_by_player_memory_time: AtomicI32::new(0),
             movement_input: AtomicCell::new(Vector3::default()),
             water_movement_speed_multiplier,
             last_block_pos: AtomicCell::new(None),
@@ -366,44 +361,18 @@ impl LivingEntity {
         }
     }
 
-    /// Returns the entity that should receive kill credit for this entity's death.
-    /// Following vanilla Java logic (`LivingEntity.getKillCredit`):
-    /// 1. Prioritize `last_hurt_by_player` if hurt within the last 100 ticks (5 seconds).
-    /// 2. Then `last_hurt_by_mob` if hurt within the last 100 ticks.
-    /// 3. Fall back to combat tracker's killer entry if available.
+    /// Vanilla `LivingEntity.getKillCredit`: the player that hurt it recently, otherwise
+    /// `lastHurtByMob`.
     pub fn get_kill_credit(&self) -> Option<Arc<dyn EntityBase>> {
-        let world = self.entity.world.load();
-        let current_tick = world.level_info.load().day_time;
-
-        let player_id = self.last_hurt_by_player_id.load(Relaxed);
-        let player_time = self.last_hurt_by_player_time.load(Relaxed);
-        if player_id != 0
-            && (current_tick - player_time).abs() <= 100
-            && let Some(player) = world.get_entity_by_id(player_id)
-        {
-            return Some(player);
+        if let Some(uuid) = self.last_hurt_by_player.load() {
+            return self
+                .entity
+                .world
+                .load()
+                .get_player_by_uuid(uuid)
+                .map(|player| player as Arc<dyn EntityBase>);
         }
-
-        let mob_id = self.last_hurt_by_mob_id.load(Relaxed);
-        let mob_time = self.last_hurt_by_mob_time.load(Relaxed);
-        if mob_id != 0
-            && (current_tick - mob_time).abs() <= 100
-            && let Some(mob) = world.get_entity_by_id(mob_id)
-        {
-            return Some(mob);
-        }
-
-        let tracker = self
-            .combat_tracker
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        if let Some(killer) = tracker.get_killer_entry()
-            && let Some(killer_id) = killer.attacker_id
-        {
-            return world.get_entity_by_id(killer_id);
-        }
-
-        None
+        self.get_last_hurt_by_mob()
     }
 
     /// Triggers location-based enchantment effects (e.g. Frost Walker) when the entity's block position changes.
@@ -2260,14 +2229,8 @@ impl LivingEntity {
             let is_raining = world.is_raining();
             let is_thundering = world.is_thundering();
 
-            let has_player_kill =
-                killer.is_some_and(|c| c.get_entity().entity_type == &EntityType::PLAYER) || {
-                    let tracker = self
-                        .combat_tracker
-                        .lock()
-                        .unwrap_or_else(std::sync::PoisonError::into_inner);
-                    tracker.has_player_attacker()
-                };
+            // Vanilla `dropAllDeathLoot`'s `playerKilled`.
+            let has_player_kill = self.last_hurt_by_player_memory_time.load(Relaxed) > 0;
 
             let params = LootContextParameters {
                 killed_by_player: Some(has_player_kill),
@@ -2980,6 +2943,13 @@ impl LivingEntity {
     /// Writes living-entity tags.
     pub fn write_living_nbt(&self, nbt: &mut NbtCompound) {
         nbt.put("Health", NbtTag::Float(self.health.load()));
+        if let Some(player) = self.last_hurt_by_player.load() {
+            nbt.put_uuid("last_hurt_by_player", player);
+            nbt.put_int(
+                "last_hurt_by_player_memory_time",
+                self.last_hurt_by_player_memory_time.load(Relaxed),
+            );
+        }
         self.write_attributes_nbt(nbt);
         // Avoid persisting a lethal fall distance when the entity is dead to prevent death loops
         let fall_distance = if self.dead.load(Relaxed) {
@@ -3079,6 +3049,10 @@ impl LivingEntity {
     }
 
     pub fn read_living_nbt_non_mut(&self, nbt: &NbtCompound) {
+        self.set_last_hurt_by_player(
+            nbt.get_uuid("last_hurt_by_player"),
+            nbt.get_int("last_hurt_by_player_memory_time").unwrap_or(0),
+        );
         // Vanilla reads `attributes` before `Health`, so a raised max health holds.
         self.read_attributes_nbt(nbt);
         // Vanilla LivingEntity.readAdditionalSaveData defaults to the mob's own max health,
@@ -3613,18 +3587,6 @@ impl LivingEntity {
                     (dmg_to_health * 10.0).round() as i32,
                 );
             }
-
-            if let Some(attacker) = cause.or(source) {
-                let attacker_id = attacker.get_entity().entity_id;
-                let current_tick = world.level_info.load().day_time;
-                if attacker.get_player().is_some() {
-                    self.last_hurt_by_player_id.store(attacker_id, Relaxed);
-                    self.last_hurt_by_player_time.store(current_tick, Relaxed);
-                } else if attacker.get_living_entity().is_some() {
-                    self.last_hurt_by_mob_id.store(attacker_id, Relaxed);
-                    self.last_hurt_by_mob_time.store(current_tick, Relaxed);
-                }
-            }
         }
 
         if dmg_to_health > 0.0 || absorbed_damage > 0.0 {
@@ -3651,6 +3613,7 @@ impl LivingEntity {
         }
 
         self.resolve_mob_responsible_for_damage(damage_type, cause.or(source));
+        self.resolve_player_responsible_for_damage(cause.or(source));
 
         if new_health <= 0.0 {
             let mut death_event =
@@ -3687,6 +3650,32 @@ impl LivingEntity {
         self.last_attacker_id.store(hurt_by_id, Relaxed);
         self.last_attacked_time
             .store(self.entity.tick_count.load(Relaxed), Relaxed);
+    }
+
+    /// Vanilla `LivingEntity.resolvePlayerResponsibleForDamage`: a player, or a tame wolf's
+    /// owner, is remembered for 100 ticks.
+    fn resolve_player_responsible_for_damage(&self, attacker: Option<&dyn EntityBase>) {
+        let Some(attacker) = attacker else {
+            return;
+        };
+        if let Some(player) = attacker.get_player() {
+            self.set_last_hurt_by_player(Some(player.gameprofile.id), 100);
+        } else if attacker.get_entity().entity_type == &EntityType::WOLF
+            && let Some(tamable) = attacker.get_mob().and_then(|mob| mob.as_tamable())
+            && tamable.is_tame()
+        {
+            match tamable.get_owner() {
+                Some(owner) => self.set_last_hurt_by_player(Some(owner), 100),
+                None => self.set_last_hurt_by_player(None, 0),
+            }
+        }
+    }
+
+    /// Vanilla `LivingEntity.setLastHurtByPlayer`.
+    pub fn set_last_hurt_by_player(&self, player: Option<uuid::Uuid>, time_to_remember: i32) {
+        self.last_hurt_by_player.store(player);
+        self.last_hurt_by_player_memory_time
+            .store(time_to_remember, Relaxed);
     }
 
     /// Vanilla `LivingEntity.resolveMobResponsibleForDamage`.
@@ -3853,6 +3842,12 @@ impl EntityBase for LivingEntity {
             self.on_changed_block(caller, current_block_pos);
         }
 
+        // The `lastHurtByPlayer` part of vanilla `baseTick`.
+        if self.last_hurt_by_player_memory_time.load(Relaxed) > 0 {
+            self.last_hurt_by_player_memory_time.fetch_sub(1, Relaxed);
+        } else {
+            self.last_hurt_by_player.store(None);
+        }
         self.tick_last_hurt_by_mob();
         self.tick_effects();
 
