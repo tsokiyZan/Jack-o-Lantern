@@ -3025,33 +3025,10 @@ impl LivingEntity {
             return damage;
         }
 
-        let mut armor = 0.0f32;
-        let mut toughness = 0.0f32;
-        {
-            let equipment_lock = self
-                .entity_equipment
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            for slot in [
-                EquipmentSlot::HEAD,
-                EquipmentSlot::CHEST,
-                EquipmentSlot::LEGS,
-                EquipmentSlot::FEET,
-            ] {
-                if let Some(stack) = equipment_lock.equipment.get(&slot)
-                    && !stack.is_empty()
-                    && let Some(modifiers) = stack.get_data_component::<AttributeModifiersImpl>()
-                {
-                    for modifier in modifiers.attribute_modifiers.iter() {
-                        if modifier.r#type == &Attributes::ARMOR {
-                            armor += modifier.amount as f32;
-                        } else if modifier.r#type == &Attributes::ARMOR_TOUGHNESS {
-                            toughness += modifier.amount as f32;
-                        }
-                    }
-                }
-            }
-        }
+        // Vanilla `getArmorValue` (the floored ARMOR attribute, worn armor included through
+        // its attribute modifiers) and the ARMOR_TOUGHNESS attribute.
+        let armor = self.get_attribute_value(&Attributes::ARMOR).floor() as f32;
+        let toughness = self.get_attribute_value(&Attributes::ARMOR_TOUGHNESS) as f32;
 
         let breach_level = attacker
             .and_then(|att| {
