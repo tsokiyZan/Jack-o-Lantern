@@ -1,10 +1,12 @@
 use super::{Controls, Goal};
 
+use crate::entity::EntityBase;
 use crate::entity::ai::target_predicate::TargetPredicate;
+use crate::entity::ai::util::goal_utils;
 use crate::entity::mob::Mob;
 use crate::entity::predicate::EntityPredicate;
-use crate::entity::{EntityBase, player::Player};
 use pumpkin_data::entity::EntityType;
+use pumpkin_util::math::vector3::Vector3;
 use rand::RngExt;
 use std::sync::{Arc, Weak};
 
@@ -56,7 +58,7 @@ impl LookAtEntityGoal {
         range: f32,
     ) -> TargetPredicate {
         let mut target_predicate = TargetPredicate::create_non_attackable();
-        target_predicate.base_max_distance = range as f64; // TODO
+        target_predicate.base_max_distance = f64::from(range);
         if target_type == &EntityType::PLAYER {
             target_predicate.set_predicate(move |living_entity, _world| {
                 mob_weak.upgrade().is_some_and(|mob_arc| {
@@ -87,23 +89,22 @@ impl Goal for LookAtEntityGoal {
             }
         }
 
-        let world = mob_entity.living_entity.entity.world.load();
-        let mob_pos = mob_entity.living_entity.entity.pos.load();
+        let entity = &mob_entity.living_entity.entity;
+        let world = entity.world.load();
+        let pos = entity.pos.load();
+        let search_pos = Vector3::new(pos.x, entity.get_eye_y(), pos.z);
 
-        // The conditions filter the candidates instead of being applied to the nearest one.
-        let predicate = &self.target_predicate;
         self.target = if *self.target_type == EntityType::PLAYER {
-            world
-                .get_nearest_player(mob_pos, self.range.into(), |player| {
-                    predicate.test(&world, Some(mob), player.as_ref())
-                })
-                .map(|p: Arc<Player>| p as Arc<dyn EntityBase>)
+            self.target_predicate
+                .get_nearest_player(&world, Some(mob), search_pos)
         } else {
-            world.get_nearest_entity(
-                mob_pos,
-                self.range.into(),
-                Some(&[self.target_type]),
-                |entity| predicate.test(&world, Some(mob), entity.as_ref()),
+            let range = f64::from(self.range);
+            let area = entity.bounding_box.load().expand(range, 3.0, range);
+            self.target_predicate.get_nearest_entity(
+                &world,
+                goal_utils::get_entities_of_class(&world, Some(self.target_type), &area),
+                Some(mob),
+                search_pos,
             )
         };
 
@@ -118,7 +119,7 @@ impl Goal for LookAtEntityGoal {
             }
             let mob_pos = mob_entity.living_entity.entity.pos.load();
             let target_pos = target.get_entity().pos.load();
-            if mob_pos.squared_distance_to_vec(&target_pos) as f32 > (self.range * self.range) {
+            if mob_pos.squared_distance_to_vec(&target_pos) > f64::from(self.range * self.range) {
                 return false;
             }
             return self.look_time > 0;

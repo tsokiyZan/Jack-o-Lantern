@@ -1,4 +1,5 @@
 use pumpkin_util::Difficulty;
+use pumpkin_util::math::vector3::Vector3;
 
 use crate::entity::EntityBase;
 use crate::entity::living::{LivingEntity, can_be_seen_as_enemy};
@@ -151,5 +152,44 @@ impl TargetPredicate {
         }
 
         true
+    }
+
+    /// Vanilla `ServerEntityGetter.getNearestEntity(List, TargetingConditions, ...)`: of the
+    /// candidates passing these conditions, the first one closest to `pos`.
+    pub fn get_nearest_entity(
+        &self,
+        world: &World,
+        entities: impl IntoIterator<Item = Arc<dyn EntityBase>>,
+        source: Option<&dyn EntityBase>,
+        pos: Vector3<f64>,
+    ) -> Option<Arc<dyn EntityBase>> {
+        let mut best: Option<(f64, Arc<dyn EntityBase>)> = None;
+        for entity in entities {
+            if self.test(world, source, entity.as_ref()) {
+                let dist = entity.get_entity().pos.load().squared_distance_to_vec(&pos);
+                if best.as_ref().is_none_or(|(best_dist, _)| dist < *best_dist) {
+                    best = Some((dist, entity));
+                }
+            }
+        }
+        best.map(|(_, entity)| entity)
+    }
+
+    /// Vanilla `ServerEntityGetter.getNearestPlayer(TargetingConditions, LivingEntity, x, y, z)`.
+    pub fn get_nearest_player(
+        &self,
+        world: &World,
+        source: Option<&dyn EntityBase>,
+        pos: Vector3<f64>,
+    ) -> Option<Arc<dyn EntityBase>> {
+        let players = world.players.load();
+        self.get_nearest_entity(
+            world,
+            players
+                .iter()
+                .map(|player| Arc::clone(player) as Arc<dyn EntityBase>),
+            source,
+            pos,
+        )
     }
 }

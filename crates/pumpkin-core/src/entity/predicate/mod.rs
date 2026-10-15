@@ -38,19 +38,13 @@ impl EntityPredicate<'_> {
                 EntityPredicate::ExceptSpectator.test(entity) && entity.can_hit()
             }
             EntityPredicate::Rides(target_entity) => {
-                let target: &Entity = target_entity;
-
                 let mut opt_vehicle_arc = entity.get_vehicle();
-
                 while let Some(vehicle_arc) = opt_vehicle_arc {
-                    let vehicle_entity_base: &dyn EntityBase = &*vehicle_arc;
-                    let target_base: &dyn EntityBase = target;
-
-                    if std::ptr::eq(vehicle_entity_base, target_base) {
+                    let vehicle = vehicle_arc.get_entity();
+                    if vehicle.entity_id == target_entity.entity_id {
                         return false;
                     }
-
-                    opt_vehicle_arc = vehicle_entity_base.get_entity().get_vehicle();
+                    opt_vehicle_arc = vehicle.get_vehicle();
                 }
                 true
             }

@@ -1,10 +1,71 @@
+use std::sync::Arc;
+
+use pumpkin_data::entity::EntityType;
 use pumpkin_data::tag::{self, Taggable};
+use pumpkin_util::math::boundingbox::BoundingBox;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
 
+use crate::entity::EntityBase;
 use crate::entity::ai::pathfinder::pathfinding_context::PathfindingContext;
 use crate::entity::mob::Mob;
 use crate::world::World;
+
+/// The vanilla entity class `entity_type`'s class extends, when that parent is itself a
+/// concrete entity type.
+const fn parent_class(entity_type: &EntityType) -> Option<&'static EntityType> {
+    let id = entity_type.id;
+    if id == EntityType::CAVE_SPIDER.id {
+        Some(&EntityType::SPIDER)
+    } else if id == EntityType::DROWNED.id
+        || id == EntityType::HUSK.id
+        || id == EntityType::ZOMBIE_VILLAGER.id
+        || id == EntityType::ZOMBIFIED_PIGLIN.id
+    {
+        Some(&EntityType::ZOMBIE)
+    } else if id == EntityType::ELDER_GUARDIAN.id {
+        Some(&EntityType::GUARDIAN)
+    } else if id == EntityType::GLOW_SQUID.id {
+        Some(&EntityType::SQUID)
+    } else if id == EntityType::TRADER_LLAMA.id {
+        Some(&EntityType::LLAMA)
+    } else {
+        None
+    }
+}
+
+/// Vanilla `Class.isInstance` for a class named by its own entity type: entities of a
+/// subclass match too, e.g. a husk is a `Zombie` and a trader llama is a `Llama`.
+#[must_use]
+pub fn is_instance_of(class: &EntityType, entity_type: &EntityType) -> bool {
+    entity_type == class || parent_class(entity_type).is_some_and(|parent| parent == class)
+}
+
+/// Vanilla `getEntitiesOfClass(class, area, e -> true)`. `None` stands for `Mob`.
+#[must_use]
+pub fn get_entities_of_class(
+    world: &World,
+    class: Option<&EntityType>,
+    area: &BoundingBox,
+) -> Vec<Arc<dyn EntityBase>> {
+    if class == Some(&EntityType::PLAYER) {
+        return world
+            .get_players_at_box(area)
+            .into_iter()
+            .map(|player| player as Arc<dyn EntityBase>)
+            .collect();
+    }
+    world
+        .get_entities_at_box(area)
+        .into_iter()
+        .filter(|entity| {
+            class.map_or_else(
+                || entity.get_mob().is_some(),
+                |class| is_instance_of(class, entity.get_entity().entity_type),
+            )
+        })
+        .collect()
+}
 
 #[must_use]
 pub fn mob_restricted(mob: &dyn Mob, horizontal_dist: f64) -> bool {

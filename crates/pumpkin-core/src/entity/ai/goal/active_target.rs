@@ -4,16 +4,16 @@ use crate::entity::ageable::AgeableMob;
 use crate::entity::ai::goal::revenge::MobFilter;
 use crate::entity::ai::goal::track_target::TrackTargetGoal;
 use crate::entity::ai::target_predicate::TargetPredicate;
+use crate::entity::ai::util::goal_utils;
 use crate::entity::living::LivingEntity;
 use crate::entity::mob::Mob;
-use crate::entity::mob::neutral::{NeutralMob, find_by_uuid};
-use crate::entity::{EntityBase, mob::MobEntity, player::Player};
+use crate::entity::{EntityBase, mob::MobEntity};
 use crate::world::World;
 use pumpkin_data::attributes::Attributes;
 use pumpkin_data::entity::EntityType;
+use pumpkin_util::math::vector3::Vector3;
 use rand::RngExt;
 use std::sync::Arc;
-use uuid::Uuid;
 
 const DEFAULT_RECIPROCAL_CHANCE: i32 = 10;
 
@@ -44,19 +44,7 @@ impl TargetCondition {
         }
     }
 
-    /// Fixed candidate the grudge points at. Replaces the area search.
-    /// Universal anger has no such target and still searches.
-    fn grudge_target(self, mob: &dyn Mob) -> Option<Uuid> {
-        match self {
-            Self::AngryAt => mob
-                .as_neutral()
-                .and_then(NeutralMob::get_persistent_anger_target),
-            Self::Always | Self::NoDaylight | Self::Adult => None,
-        }
-    }
-
     /// Checked per candidate during the search.
-    /// The grudge target is already filtered by the search.
     fn allows_target(self, mob: &dyn Mob, target: &dyn EntityBase, world: &World) -> bool {
         match self {
             Self::AngryAt => mob
@@ -181,6 +169,7 @@ impl ActiveTargetGoal {
 
     fn find_closest_target(&mut self, mob: &dyn Mob) {
         let mob_entity = mob.get_mob_entity();
+        let entity = &mob_entity.living_entity.entity;
         let follow_range = mob_entity
             .living_entity
             .get_attribute_value(&Attributes::FOLLOW_RANGE);
@@ -188,52 +177,33 @@ impl ActiveTargetGoal {
         // Vanilla updates the target conditions with the current follow distance on every search
         self.target_predicate.base_max_distance = follow_range;
 
-        let world = mob_entity.living_entity.entity.world.load();
+        let world = entity.world.load();
+        let pos = entity.pos.load();
+        let search_pos = Vector3::new(pos.x, entity.get_eye_y(), pos.z);
 
-        // Vanilla searches using getEyeY(), so we offset the position by the eye height
-        let mut search_pos = mob_entity.living_entity.entity.pos.load();
-        search_pos.y += mob_entity
-            .living_entity
-            .entity
-            .entity_dimension
-            .load()
-            .eye_height as f64;
-
-        // Pick the nearest candidate that passes the conditions, not the nearest overall.
-        let predicate = &self.target_predicate;
-        let condition = self.condition;
-        let found = if let Some(uuid) = condition.grudge_target(mob) {
-            // Same range rule as the area search: follow range from the eye.
-            find_by_uuid(&world, uuid).filter(|candidate| {
-                let entity = candidate.get_entity();
-                self.target_type
-                    .is_none_or(|target_type| entity.entity_type == target_type)
-                    && entity.pos.load().squared_distance_to_vec(&search_pos)
-                        <= follow_range * follow_range
-                    && predicate.test(&world, Some(mob), candidate.as_ref())
-                    && condition.allows_target(mob, candidate.as_ref(), &world)
-            })
-        } else if self.target_type == Some(&EntityType::PLAYER) {
+        let candidates = if self.target_type == Some(&EntityType::PLAYER) {
             world
-                .get_nearest_player(search_pos, follow_range, |player| {
-                    predicate.test(&world, Some(mob), player.as_ref())
-                        && condition.allows_target(mob, player.as_ref(), &world)
-                })
-                .map(|p: Arc<Player>| p as Arc<dyn EntityBase>)
+                .players
+                .load()
+                .iter()
+                .map(|player| Arc::clone(player) as Arc<dyn EntityBase>)
+                .collect()
         } else {
-            let entity_types = self.target_type.map(|t| [t]);
-            world.get_nearest_entity(
-                search_pos,
-                follow_range,
-                entity_types.as_ref().map(<[&EntityType; 1]>::as_slice),
-                |entity| {
-                    predicate.test(&world, Some(mob), entity.as_ref())
-                        && condition.allows_target(mob, entity.as_ref(), &world)
-                },
-            )
+            let area = entity
+                .bounding_box
+                .load()
+                .expand(follow_range, follow_range, follow_range);
+            goal_utils::get_entities_of_class(&world, self.target_type, &area)
         };
-
-        self.target = found;
+        let condition = self.condition;
+        self.target = self.target_predicate.get_nearest_entity(
+            &world,
+            candidates
+                .into_iter()
+                .filter(|candidate| condition.allows_target(mob, candidate.as_ref(), &world)),
+            Some(mob),
+            search_pos,
+        );
     }
 }
 
