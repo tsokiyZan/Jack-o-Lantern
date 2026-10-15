@@ -876,6 +876,8 @@ impl PathNavigation {
         })
     }
 
+    /// Vanilla `PathNavigation.isClearForMovementBetween`: a collider ray from `start_pos` to
+    /// half the mob's height above `stop_pos` hits nothing (and no fluid, if asked).
     pub fn can_move_directly(
         world: &World,
         start_pos: Vector3<f64>,
@@ -888,32 +890,19 @@ impl PathNavigation {
             stop_pos.y + f64::from(mob_height) * 0.5,
             stop_pos.z,
         );
-        let diff = to - start_pos;
-        let dist = diff.length();
-        if dist < 1e-5 {
-            return true;
-        }
-        let steps = (dist * 2.0).ceil() as usize;
-        let step_vec = diff / (steps as f64);
-        let mut current = start_pos;
-        for _ in 0..steps {
-            current += step_vec;
-            let bp = BlockPos::new(
-                current.x.floor() as i32,
-                current.y.floor() as i32,
-                current.z.floor() as i32,
-            );
-            let block_state = world.get_block_state(&bp);
-            if !block_state.is_air() {
-                if blocked_by_fluids && block_state.is_liquid() {
-                    return false;
-                }
-                if block_state.is_solid() {
-                    return false;
-                }
-            }
-        }
-        true
+        let fluid = if blocked_by_fluids {
+            pumpkin_world::clip::ClipFluid::Any
+        } else {
+            pumpkin_world::clip::ClipFluid::None
+        };
+        world
+            .clip(&pumpkin_world::clip::ClipContext::new(
+                start_pos,
+                to,
+                pumpkin_world::clip::ClipBlock::Collider,
+                fluid,
+            ))
+            .is_miss
     }
 
     pub fn find_surface_position(world: &World, mut pos: BlockPos) -> BlockPos {
