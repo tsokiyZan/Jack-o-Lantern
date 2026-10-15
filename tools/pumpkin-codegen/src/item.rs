@@ -231,10 +231,15 @@ impl ToTokens for ItemComponents {
         }
 
         if let Some(playable) = &self.jukebox_playable {
-            let song = LitStr::new(playable, Span::call_site());
+            let song = playable.strip_prefix("minecraft:").unwrap_or(playable);
+            let song = if song.starts_with(|c: char| c.is_ascii_digit()) {
+                format_ident!("Id{}", song.to_pascal_case())
+            } else {
+                format_ident!("{}", song.to_pascal_case())
+            };
             tokens.extend(quote! {
-                (JukeboxPlayable, &JukeboxPlayableImpl{
-                    song: #song,
+                (JukeboxPlayable, &JukeboxPlayableImpl {
+                    song: Holder::Reference(crate::jukebox_song::JukeboxSong::#song),
                 }),
             });
         }
@@ -781,8 +786,21 @@ impl ToTokens for ItemComponents {
                 }),
             });
         }
-        if self.break_sound.is_some() {
-            tokens.extend(quote! { (BreakSound, &BreakSoundImpl), });
+        if let Some(sound) = self
+            .break_sound
+            .as_ref()
+            .and_then(serde_json::Value::as_str)
+        {
+            let sound = format_ident!(
+                "{}",
+                sound
+                    .strip_prefix("minecraft:")
+                    .unwrap_or(sound)
+                    .to_pascal_case()
+            );
+            tokens.extend(quote! {
+                (BreakSound, &BreakSoundImpl { sound: IdOr::Id(Sound::#sound) }),
+            });
         }
         if self.bucket_entity_data.is_some() {
             tokens.extend(quote! { (BucketEntityData, &BucketEntityDataImpl), });
@@ -913,8 +931,19 @@ impl ToTokens for ItemComponents {
         if self.glider.is_some() {
             tokens.extend(quote! { (Glider, &GliderImpl), });
         }
-        if self.instrument.is_some() {
-            tokens.extend(quote! { (Instrument, &InstrumentImpl), });
+        if let Some(instrument) = self.instrument.as_ref().and_then(serde_json::Value::as_str) {
+            let instrument = format_ident!(
+                "{}",
+                instrument
+                    .strip_prefix("minecraft:")
+                    .unwrap_or(instrument)
+                    .to_pascal_case()
+            );
+            tokens.extend(quote! {
+                (Instrument, &InstrumentImpl {
+                    instrument: Holder::Reference(crate::instrument::Instrument::#instrument),
+                }),
+            });
         }
         if let Some(model) = &self.item_model {
             let model_lit = LitStr::new(model, Span::call_site());
@@ -1001,11 +1030,47 @@ impl ToTokens for ItemComponents {
                 quote! { (PotionDurationScale, &PotionDurationScaleImpl { scale: #scale_lit }), },
             );
         }
-        if self.provides_banner_patterns.is_some() {
-            tokens.extend(quote! { (ProvidesBannerPatterns, &ProvidesBannerPatternsImpl), });
+        if let Some(patterns) = self
+            .provides_banner_patterns
+            .as_ref()
+            .and_then(serde_json::Value::as_str)
+        {
+            let patterns = if let Some(tag) = patterns.strip_prefix('#') {
+                let tag = tag.strip_prefix("minecraft:").unwrap_or(tag);
+                quote! { IDSet::Tag(Cow::Borrowed(#tag)) }
+            } else {
+                let pattern = format_ident!(
+                    "{}",
+                    patterns
+                        .strip_prefix("minecraft:")
+                        .unwrap_or(patterns)
+                        .to_pascal_case()
+                );
+                quote! {
+                    IDSet::IDs(Cow::Borrowed(&[&crate::banner_pattern::BannerPattern::#pattern]))
+                }
+            };
+            tokens.extend(quote! {
+                (ProvidesBannerPatterns, &ProvidesBannerPatternsImpl { patterns: #patterns }),
+            });
         }
-        if self.provides_trim_material.is_some() {
-            tokens.extend(quote! { (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl), });
+        if let Some(material) = self
+            .provides_trim_material
+            .as_ref()
+            .and_then(serde_json::Value::as_str)
+        {
+            let material = format_ident!(
+                "{}",
+                material
+                    .strip_prefix("minecraft:")
+                    .unwrap_or(material)
+                    .to_pascal_case()
+            );
+            tokens.extend(quote! {
+                (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl {
+                    material: Holder::Reference(crate::trim_material::TrimMaterial::#material),
+                }),
+            });
         }
         if let Some(rarity_str) = &self.rarity {
             let rarity_variant = match rarity_str.as_str() {

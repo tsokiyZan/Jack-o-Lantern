@@ -82,6 +82,14 @@ pub fn build() -> TokenStream {
         })
         .collect::<TokenStream>();
 
+    let type_from_id = songs
+        .iter()
+        .map(|(name, id)| {
+            let variant_name = make_variant_ident(name);
+            quote! { #id => Some(Self::#variant_name), }
+        })
+        .collect::<TokenStream>();
+
     let type_to_length = songs
         .keys()
         .map(|name| {
@@ -103,7 +111,7 @@ pub fn build() -> TokenStream {
         .collect::<TokenStream>();
 
     quote! {
-        #[derive(Clone, Copy, PartialEq, Eq, Hash)]
+        #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
         #[repr(u32)]
         pub enum JukeboxSong {
             #variants
@@ -132,6 +140,15 @@ pub fn build() -> TokenStream {
             pub const fn get_id(&self) -> u32 {
                 match self {
                     #type_to_id
+                }
+            }
+
+            #[doc = r" Returns the song with the given synced registry ID."]
+            #[must_use]
+            pub const fn from_id(id: u32) -> Option<Self> {
+                match id {
+                    #type_from_id
+                    _ => None
                 }
             }
 

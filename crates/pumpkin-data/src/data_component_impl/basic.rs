@@ -1,6 +1,12 @@
+use crate::banner_pattern::BannerPattern;
 use crate::data_component_impl::{
-    DataComponentImpl, get_compound_hash, get_i32_hash, get_map_hash, get_str_hash,
+    DataComponentImpl, Holder, IDSet, IDSetContent, IdOr, MapHash, get_compound_hash, get_f32_hash,
+    get_i32_hash, get_idor, get_idor_hash, get_idset_hash, get_map_hash, get_str_hash,
+    get_text_hash, namespaced, put_idor, text_to_nbt,
 };
+use crate::instrument::Instrument;
+use crate::sound::Sound;
+use crate::trim_material::TrimMaterial;
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_nbt::tag::NbtTag;
 use pumpkin_util::text::TextComponent;
@@ -446,36 +452,183 @@ impl DataComponentImpl for BaseColorImpl {
     default_impl!(BaseColor);
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct InstrumentImpl;
+/// An inline instrument, `Instrument.DIRECT_CODEC`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct InstrumentDefinition {
+    pub sound_event: IdOr<SoundEvent>,
+    pub use_duration: f32,
+    pub range: f32,
+    pub durability_damage: i32,
+    pub description: TextComponent,
+}
+
+impl InstrumentDefinition {
+    fn read_data(compound: &NbtCompound) -> Option<Self> {
+        compound.get("sound_event")?;
+        Some(Self {
+            sound_event: get_idor(compound, "sound_event", Sound::IntentionallyEmpty),
+            use_duration: compound.get("use_duration")?.as_numeric_float()?,
+            range: compound.get("range")?.as_numeric_float()?,
+            durability_damage: match compound.get("durability_damage") {
+                Some(tag) => tag.as_numeric_int()?,
+                None => 0,
+            },
+            description: TextComponent::from_nbt(compound.get("description")?),
+        })
+    }
+
+    fn write_data(&self) -> NbtTag {
+        let mut compound = NbtCompound::new();
+        put_idor(&mut compound, "sound_event", &self.sound_event);
+        compound.put_float("use_duration", self.use_duration);
+        compound.put_float("range", self.range);
+        if self.durability_damage != 0 {
+            compound.put_int("durability_damage", self.durability_damage);
+        }
+        compound.put("description", text_to_nbt(&self.description));
+        NbtTag::Compound(compound)
+    }
+
+    fn get_hash(&self) -> u32 {
+        MapHash::new()
+            .field("sound_event", get_idor_hash(&self.sound_event))
+            .field("use_duration", get_f32_hash(self.use_duration))
+            .field("range", get_f32_hash(self.range))
+            .optional_field(
+                "durability_damage",
+                (self.durability_damage != 0).then(|| get_i32_hash(self.durability_damage)),
+            )
+            .field("description", get_text_hash(&self.description))
+            .finish()
+    }
+}
+
+/// `minecraft:instrument`, a holder that is either a registry entry or an inline instrument.
+#[derive(Clone, Debug, PartialEq)]
+pub struct InstrumentImpl {
+    pub instrument: Holder<Instrument, Box<InstrumentDefinition>>,
+}
 impl InstrumentImpl {
-    pub const fn read_data(_data: &NbtTag) -> Option<Self> {
-        Some(Self)
+    pub fn read_data(data: &NbtTag) -> Option<Self> {
+        let instrument = match data {
+            NbtTag::String(id) => Holder::Reference(Instrument::from_name(id)?),
+            NbtTag::Compound(compound) => {
+                Holder::Direct(Box::new(InstrumentDefinition::read_data(compound)?))
+            }
+            _ => return None,
+        };
+        Some(Self { instrument })
     }
 }
 impl DataComponentImpl for InstrumentImpl {
+    fn write_data(&self) -> NbtTag {
+        match &self.instrument {
+            Holder::Reference(instrument) => NbtTag::String(instrument.asset_id().into()),
+            Holder::Direct(definition) => definition.write_data(),
+        }
+    }
+    fn get_hash(&self) -> i32 {
+        (match &self.instrument {
+            Holder::Reference(instrument) => get_str_hash(instrument.asset_id()),
+            Holder::Direct(definition) => definition.get_hash(),
+        }) as i32
+    }
     default_impl!(Instrument);
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct ProvidesTrimMaterialImpl;
+/// An inline trim material, `TrimMaterial.DIRECT_CODEC`.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct TrimMaterialDefinition {
+    pub palette_id: String,
+    pub description: TextComponent,
+}
+
+/// `minecraft:provides_trim_material`, a holder that is either a registry entry
+/// or an inline trim material.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ProvidesTrimMaterialImpl {
+    pub material: Holder<TrimMaterial, TrimMaterialDefinition>,
+}
 impl ProvidesTrimMaterialImpl {
-    pub const fn read_data(_data: &NbtTag) -> Option<Self> {
-        Some(Self)
+    pub fn read_data(data: &NbtTag) -> Option<Self> {
+        let material = match data {
+            NbtTag::String(id) => Holder::Reference(TrimMaterial::from_name(id)?),
+            NbtTag::Compound(compound) => Holder::Direct(TrimMaterialDefinition {
+                palette_id: compound.get_string("palette_id")?.to_string(),
+                description: TextComponent::from_nbt(compound.get("description")?),
+            }),
+            _ => return None,
+        };
+        Some(Self { material })
     }
 }
 impl DataComponentImpl for ProvidesTrimMaterialImpl {
+    fn write_data(&self) -> NbtTag {
+        match &self.material {
+            Holder::Reference(material) => NbtTag::String(material.asset_id().into()),
+            Holder::Direct(definition) => {
+                let mut compound = NbtCompound::new();
+                compound.put_string("palette_id", definition.palette_id.clone());
+                compound.put("description", text_to_nbt(&definition.description));
+                NbtTag::Compound(compound)
+            }
+        }
+    }
+    fn get_hash(&self) -> i32 {
+        (match &self.material {
+            Holder::Reference(material) => get_str_hash(material.asset_id()),
+            Holder::Direct(definition) => MapHash::new()
+                .field(
+                    "palette_id",
+                    get_str_hash(&namespaced(&definition.palette_id)),
+                )
+                .field("description", get_text_hash(&definition.description))
+                .finish(),
+        }) as i32
+    }
     default_impl!(ProvidesTrimMaterial);
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct ProvidesBannerPatternsImpl;
+impl IDSetContent for BannerPattern {
+    fn registry_id(&self) -> u16 {
+        self.id() as u16
+    }
+    fn to_string(&self) -> String {
+        self.asset_id().to_string()
+    }
+    fn from_id(id: u16) -> Option<&'static Self> {
+        Self::all().get(usize::from(id))
+    }
+    fn from_str(name: &str) -> Option<&'static Self> {
+        Self::from_id(Self::from_name(name)?.id() as u16)
+    }
+}
+
+/// `minecraft:provides_banner_patterns`, a set of banner patterns given by tag
+/// or by id.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ProvidesBannerPatternsImpl {
+    pub patterns: IDSet<BannerPattern>,
+}
 impl ProvidesBannerPatternsImpl {
-    pub const fn read_data(_data: &NbtTag) -> Option<Self> {
-        Some(Self)
+    pub fn read_data(data: &NbtTag) -> Option<Self> {
+        Some(Self {
+            patterns: IDSet::read(data)?,
+        })
     }
 }
 impl DataComponentImpl for ProvidesBannerPatternsImpl {
+    fn write_data(&self) -> NbtTag {
+        let mut compound = NbtCompound::new();
+        self.patterns.write(&mut compound, "patterns");
+        compound
+            .child_tags
+            .remove("patterns")
+            .unwrap_or(NbtTag::End)
+    }
+    fn get_hash(&self) -> i32 {
+        get_idset_hash(&self.patterns) as i32
+    }
     default_impl!(ProvidesBannerPatterns);
 }
 
@@ -557,14 +710,29 @@ impl DataComponentImpl for LockImpl {
     default_impl!(Lock);
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct BreakSoundImpl;
+/// `minecraft:break_sound`, a sound event holder.
+#[derive(Clone, Debug, Hash, PartialEq)]
+pub struct BreakSoundImpl {
+    pub sound: IdOr<SoundEvent>,
+}
 impl BreakSoundImpl {
-    pub const fn read_data(_data: &NbtTag) -> Option<Self> {
-        Some(Self)
+    pub fn read_data(data: &NbtTag) -> Option<Self> {
+        let mut compound = NbtCompound::new();
+        compound.put("sound", data.clone());
+        Some(Self {
+            sound: get_idor(&compound, "sound", Sound::EntityItemBreak),
+        })
     }
 }
 impl DataComponentImpl for BreakSoundImpl {
+    fn write_data(&self) -> NbtTag {
+        let mut compound = NbtCompound::new();
+        put_idor(&mut compound, "sound", &self.sound);
+        compound.child_tags.remove("sound").unwrap_or(NbtTag::End)
+    }
+    fn get_hash(&self) -> i32 {
+        get_idor_hash(&self.sound) as i32
+    }
     default_impl!(BreakSound);
 }
 

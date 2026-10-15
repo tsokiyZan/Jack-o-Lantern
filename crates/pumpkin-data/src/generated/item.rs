@@ -104,7 +104,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -154,7 +159,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -214,7 +224,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -274,7 +289,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -334,7 +354,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -394,7 +419,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -454,7 +484,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -514,7 +549,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -574,7 +614,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 Enchantments,
@@ -624,7 +669,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -684,7 +734,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -744,7 +799,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -804,7 +864,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 CookingFuel,
@@ -865,7 +930,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 CookingFuel,
@@ -926,7 +996,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -986,7 +1061,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -1046,7 +1126,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -1106,7 +1191,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -1166,7 +1256,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -1226,7 +1321,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -1275,7 +1375,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -1324,7 +1429,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -1374,7 +1484,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -1424,7 +1539,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -1473,7 +1593,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -1522,7 +1647,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -1536,7 +1666,12 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl),
+            (
+                ProvidesTrimMaterial,
+                &ProvidesTrimMaterialImpl {
+                    material: Holder::Reference(crate::trim_material::TrimMaterial::Amethyst),
+                },
+            ),
             (
                 Rarity,
                 &RarityImpl {
@@ -1578,7 +1713,12 @@ impl Item {
                     res_type: DamageResistantType::Fire,
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -1627,7 +1767,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -1676,7 +1821,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -1725,7 +1875,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -1774,7 +1929,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -1823,7 +1983,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -1872,7 +2037,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -1939,7 +2109,12 @@ impl Item {
                     effects: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -1989,7 +2164,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -2038,7 +2218,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -2087,7 +2272,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -2137,7 +2327,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -2186,7 +2381,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -2235,7 +2435,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -2284,7 +2489,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (BucketEntityData, &BucketEntityDataImpl),
             (
                 Enchantments,
@@ -2334,7 +2544,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -2384,7 +2599,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 CookingFuel,
@@ -2445,7 +2665,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 Enchantments,
@@ -2495,7 +2720,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -2563,7 +2793,12 @@ impl Item {
                     effects: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.85f32 }),
             (
                 Enchantments,
@@ -2613,7 +2848,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -2673,7 +2913,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -2733,7 +2978,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -2793,7 +3043,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -2853,7 +3108,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -2913,7 +3173,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -2973,7 +3238,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -3033,7 +3303,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -3093,7 +3368,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -3153,7 +3433,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -3213,7 +3498,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -3273,7 +3563,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -3333,7 +3628,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -3393,7 +3693,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -3453,7 +3758,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 CookingFuel,
@@ -3514,7 +3824,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -3574,7 +3889,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -3634,7 +3954,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -3694,7 +4019,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -3754,7 +4084,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 CookingFuel,
@@ -3815,7 +4150,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -3864,7 +4204,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -3913,7 +4258,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -3963,7 +4313,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -4012,7 +4367,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -4071,7 +4431,12 @@ impl Item {
                     )]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -4120,7 +4485,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -4188,7 +4558,12 @@ impl Item {
                     effects: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -4247,7 +4622,12 @@ impl Item {
                     )]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -4314,7 +4694,12 @@ impl Item {
                     effects: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -4364,7 +4749,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 Enchantments,
@@ -4432,7 +4822,12 @@ impl Item {
                     effects: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -4487,7 +4882,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -4536,7 +4936,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -4586,7 +4991,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -4646,7 +5056,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -4706,7 +5121,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -4766,7 +5186,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -4826,7 +5251,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -4886,7 +5316,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -4946,7 +5381,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -5006,7 +5446,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 Enchantments,
@@ -5056,7 +5501,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -5116,7 +5566,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -5176,7 +5631,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -5236,7 +5696,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 CookingFuel,
@@ -5297,7 +5762,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 CookingFuel,
@@ -5358,7 +5828,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -5418,7 +5893,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -5478,7 +5958,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -5538,7 +6023,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -5598,7 +6088,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -5659,7 +6154,12 @@ impl Item {
                 },
             ),
             (BannerPatterns, &BannerPatternsImpl::EMPTY),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -5719,7 +6219,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -5768,7 +6273,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (BundleContents, &BundleContentsImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -5818,7 +6328,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -5886,7 +6401,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemLlamaCarpetUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -5946,7 +6466,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -5995,7 +6520,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -6044,7 +6574,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -6093,7 +6628,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -6142,7 +6682,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -6202,7 +6747,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Dye, &DyeImpl),
             (
                 Enchantments,
@@ -6252,7 +6802,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -6317,7 +6872,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::EntityHappyGhastUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -6366,7 +6926,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -6416,7 +6981,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -6465,7 +7035,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -6514,7 +7089,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -6563,7 +7143,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -6623,7 +7208,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -6683,7 +7273,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -6743,7 +7338,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -6792,7 +7392,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -6841,7 +7446,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -6890,7 +7500,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -6939,7 +7554,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -6988,7 +7608,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -7038,7 +7663,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (BrewingFuel, &BrewingFuelImpl),
             (
                 Enchantments,
@@ -7088,7 +7718,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -7148,7 +7783,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -7199,7 +7839,12 @@ impl Item {
                 },
             ),
             (BannerPatterns, &BannerPatternsImpl::EMPTY),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -7259,7 +7904,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -7308,7 +7958,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (BundleContents, &BundleContentsImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -7358,7 +8013,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -7426,7 +8086,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemLlamaCarpetUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -7486,7 +8151,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -7535,7 +8205,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -7584,7 +8259,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -7633,7 +8313,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -7682,7 +8367,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -7742,7 +8432,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Dye, &DyeImpl),
             (
                 Enchantments,
@@ -7792,7 +8487,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 ChickenVariant,
                 &ChickenVariantImpl {
@@ -7847,7 +8547,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -7912,7 +8617,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::EntityHappyGhastUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -7961,7 +8671,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -8010,7 +8725,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -8060,7 +8780,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -8110,7 +8835,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -8159,7 +8889,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -8208,7 +8943,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -8257,7 +8997,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -8317,7 +9062,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -8377,7 +9127,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -8437,7 +9192,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -8487,7 +9247,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -8536,7 +9301,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -8585,7 +9355,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -8634,7 +9409,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -8684,7 +9464,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 1 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -8733,7 +9518,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -8793,7 +9583,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -8807,7 +9602,12 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (ProvidesBannerPatterns, &ProvidesBannerPatternsImpl),
+            (
+                ProvidesBannerPatterns,
+                &ProvidesBannerPatternsImpl {
+                    patterns: IDSet::Tag(Cow::Borrowed("pattern_item/bordure_indented")),
+                },
+            ),
             (
                 Rarity,
                 &RarityImpl {
@@ -8846,7 +9646,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 1 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -8906,7 +9711,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -8966,7 +9776,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -9015,7 +9830,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -9064,7 +9884,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -9131,7 +9956,12 @@ impl Item {
                     effects: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.85f32 }),
             (
                 Enchantments,
@@ -9181,7 +10011,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -9230,7 +10065,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -9280,7 +10120,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -9329,7 +10174,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -9379,7 +10229,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -9428,7 +10283,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -9477,7 +10337,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -9526,7 +10391,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -9575,7 +10445,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -9625,7 +10500,12 @@ impl Item {
                 },
             ),
             (BannerPatterns, &BannerPatternsImpl::EMPTY),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -9685,7 +10565,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -9734,7 +10619,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (BundleContents, &BundleContentsImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -9784,7 +10674,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -9852,7 +10747,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemLlamaCarpetUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -9912,7 +10812,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -9961,7 +10866,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -10010,7 +10920,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -10059,7 +10974,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -10108,7 +11028,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -10168,7 +11093,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Dye, &DyeImpl),
             (
                 Enchantments,
@@ -10218,7 +11148,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 ChickenVariant,
                 &ChickenVariantImpl {
@@ -10273,7 +11208,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -10338,7 +11278,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::EntityHappyGhastUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -10387,7 +11332,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -10437,7 +11387,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.85f32 }),
             (
                 Enchantments,
@@ -10487,7 +11442,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -10537,7 +11497,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -10586,7 +11551,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -10635,7 +11605,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -10684,7 +11659,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -10744,7 +11724,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -10804,7 +11789,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -10866,7 +11856,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -10915,7 +11910,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -10964,7 +11964,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -11013,7 +12018,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -11062,7 +12072,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -11111,7 +12126,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -11160,7 +12180,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (BundleContents, &BundleContentsImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -11210,7 +12235,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -11260,7 +12290,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -11310,7 +12345,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -11360,7 +12400,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -11410,7 +12455,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -11459,7 +12509,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 Enchantments,
@@ -11509,7 +12564,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.5f32 }),
             (
                 Enchantments,
@@ -11559,7 +12619,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 Enchantments,
@@ -11609,7 +12674,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 1.0f32 }),
             (
                 Enchantments,
@@ -11659,7 +12729,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -11708,7 +12783,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -11757,7 +12837,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -11807,7 +12892,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -11857,7 +12947,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -11907,7 +13002,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -11974,7 +13074,12 @@ impl Item {
                     effects: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -12026,7 +13131,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -12075,7 +13185,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -12157,7 +13272,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemShearsSnip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -12207,7 +13327,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -12257,7 +13382,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -12306,7 +13436,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -12356,7 +13491,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -12439,7 +13579,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 12 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -12528,7 +13673,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 12 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -12617,7 +13767,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 12 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -12706,7 +13861,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 12 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -12761,7 +13921,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -12821,7 +13986,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -12881,7 +14051,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -12941,7 +14116,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -13001,7 +14181,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -13061,7 +14246,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -13121,7 +14311,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -13181,7 +14376,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -13241,7 +14441,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 Enchantments,
@@ -13291,7 +14496,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -13351,7 +14561,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -13411,7 +14626,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -13471,7 +14691,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 CookingFuel,
@@ -13532,7 +14757,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 CookingFuel,
@@ -13593,7 +14823,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -13653,7 +14888,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -13713,7 +14953,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -13773,7 +15018,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -13833,7 +15083,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -13893,7 +15148,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 CookingFuel,
@@ -13954,7 +15214,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -14031,7 +15296,12 @@ impl Item {
                     ))]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -14080,7 +15350,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -14130,7 +15405,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -14179,7 +15459,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 CookingFuel,
@@ -14240,7 +15525,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -14289,7 +15579,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -14338,7 +15633,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -14387,7 +15687,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -14436,7 +15741,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -14485,7 +15795,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -14534,7 +15849,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -14583,7 +15903,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -14632,7 +15957,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -14681,7 +16011,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -14730,7 +16065,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -14779,7 +16119,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -14828,7 +16173,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -14877,7 +16227,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -14951,7 +16306,12 @@ impl Item {
                     effects: Cow::Borrowed(&[ConsumeEffect::TeleportRandomly(16f32)]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -15000,7 +16360,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -15049,7 +16414,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -15098,7 +16468,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -15147,7 +16522,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -15196,7 +16576,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -15245,7 +16630,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -15294,7 +16684,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -15343,7 +16738,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -15392,7 +16792,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -15441,7 +16846,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -15490,7 +16900,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -15539,7 +16954,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -15588,7 +17008,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -15638,7 +17063,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -15698,7 +17128,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -15758,7 +17193,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -15807,7 +17247,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -15856,7 +17301,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -15905,7 +17355,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -15954,7 +17409,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -16003,7 +17463,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -16052,7 +17517,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -16101,7 +17571,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -16150,7 +17625,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -16199,7 +17679,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -16248,7 +17733,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -16297,7 +17787,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -16346,7 +17841,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -16414,7 +17914,12 @@ impl Item {
                     effects: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -16471,7 +17976,12 @@ impl Item {
                     can_always_eat: false,
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (BucketEntityData, &BucketEntityDataImpl),
             (
                 Enchantments,
@@ -16521,7 +18031,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -16571,7 +18086,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -16620,7 +18140,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -16669,7 +18194,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -16718,7 +18248,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -16767,7 +18302,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -16827,7 +18367,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -16894,7 +18439,12 @@ impl Item {
                     effects: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -16961,7 +18511,12 @@ impl Item {
                     effects: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -17028,7 +18583,12 @@ impl Item {
                     effects: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -17095,7 +18655,12 @@ impl Item {
                     effects: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -17162,7 +18727,12 @@ impl Item {
                     effects: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -17229,7 +18799,12 @@ impl Item {
                     effects: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -17296,7 +18871,12 @@ impl Item {
                     effects: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -17363,7 +18943,12 @@ impl Item {
                     effects: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.85f32 }),
             (
                 Enchantments,
@@ -17457,7 +19042,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 13 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -17512,7 +19102,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -17561,7 +19156,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -17644,7 +19244,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 8 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -17699,7 +19304,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -17748,7 +19358,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -17797,7 +19412,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -17880,7 +19500,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 8 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -17935,7 +19560,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -17984,7 +19614,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -18043,7 +19678,12 @@ impl Item {
                     )]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -18092,7 +19732,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -18175,7 +19820,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 8 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -18274,7 +19924,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 13 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -18360,7 +20015,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemHorseArmorUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -18409,7 +20069,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -18423,7 +20088,12 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl),
+            (
+                ProvidesTrimMaterial,
+                &ProvidesTrimMaterialImpl {
+                    material: Holder::Reference(crate::trim_material::TrimMaterial::Copper),
+                },
+            ),
             (
                 Rarity,
                 &RarityImpl {
@@ -18459,7 +20129,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -18542,7 +20217,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 8 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -18628,7 +20308,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemArmorUnequipNautilus),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -18677,7 +20362,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -18726,7 +20416,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -18819,7 +20514,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 13 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -18918,7 +20618,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 13 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -19008,7 +20713,12 @@ impl Item {
                     mob_factor: 0.5f32,
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 DamageType,
                 &DamageTypeImpl {
@@ -19157,7 +20867,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 13 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -19212,7 +20927,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -19261,7 +20981,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -19310,7 +21035,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -19360,7 +21090,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -19410,7 +21145,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -19459,7 +21199,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -19508,7 +21253,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -19557,7 +21307,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -19606,7 +21361,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -19655,7 +21415,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -19705,7 +21470,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -19765,7 +21535,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -19814,7 +21589,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -19864,7 +21644,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -19878,7 +21663,12 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (ProvidesBannerPatterns, &ProvidesBannerPatternsImpl),
+            (
+                ProvidesBannerPatterns,
+                &ProvidesBannerPatternsImpl {
+                    patterns: IDSet::Tag(Cow::Borrowed("pattern_item/creeper")),
+                },
+            ),
             (
                 Rarity,
                 &RarityImpl {
@@ -19936,7 +21726,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemShearsSnip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -19985,7 +21780,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -20035,7 +21835,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -20084,7 +21889,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -20133,7 +21943,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -20182,7 +21997,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -20231,7 +22051,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -20281,7 +22106,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -20330,7 +22160,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -20379,7 +22214,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -20428,7 +22268,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -20477,7 +22322,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -20526,7 +22376,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -20576,7 +22431,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -20626,7 +22486,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -20675,7 +22540,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -20724,7 +22594,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -20773,7 +22648,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -20822,7 +22702,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -20874,7 +22759,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 1 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 ChargedProjectiles,
                 &ChargedProjectilesImpl {
@@ -20940,7 +22830,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -20989,7 +22884,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -21038,7 +22938,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -21087,7 +22992,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -21136,7 +23046,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -21185,7 +23100,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -21234,7 +23154,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -21283,7 +23208,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -21333,7 +23263,12 @@ impl Item {
                 },
             ),
             (BannerPatterns, &BannerPatternsImpl::EMPTY),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -21393,7 +23328,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -21442,7 +23382,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (BundleContents, &BundleContentsImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -21492,7 +23437,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -21560,7 +23510,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemLlamaCarpetUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -21620,7 +23575,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -21669,7 +23629,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -21718,7 +23683,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -21767,7 +23737,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -21816,7 +23791,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -21876,7 +23856,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Dye, &DyeImpl),
             (
                 Enchantments,
@@ -21926,7 +23911,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -21991,7 +23981,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::EntityHappyGhastUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -22040,7 +24035,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -22090,7 +24090,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -22139,7 +24144,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -22188,7 +24198,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -22237,7 +24252,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -22297,7 +24317,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -22357,7 +24382,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -22417,7 +24447,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -22466,7 +24501,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -22516,7 +24556,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -22565,7 +24610,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -22625,7 +24675,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -22685,7 +24740,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -22745,7 +24805,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -22805,7 +24870,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -22865,7 +24935,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -22925,7 +25000,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -22985,7 +25065,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 Enchantments,
@@ -23035,7 +25120,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -23095,7 +25185,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -23155,7 +25250,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -23215,7 +25315,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 CookingFuel,
@@ -23276,7 +25381,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 CookingFuel,
@@ -23337,7 +25447,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -23397,7 +25512,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -23457,7 +25577,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -23517,7 +25642,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -23577,7 +25707,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -23637,7 +25772,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -23686,7 +25826,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -23735,7 +25880,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -23784,7 +25934,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -23844,7 +25999,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -23893,7 +26053,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -23942,7 +26107,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -23991,7 +26161,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -24040,7 +26215,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -24089,7 +26269,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -24138,7 +26323,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -24198,7 +26388,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -24247,7 +26442,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -24296,7 +26496,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -24345,7 +26550,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -24394,7 +26604,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -24443,7 +26658,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -24492,7 +26712,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -24541,7 +26766,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -24590,7 +26820,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -24639,7 +26874,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (DebugStickState, &DebugStickStateImpl),
             (EnchantmentGlintOverride, &EnchantmentGlintOverrideImpl),
             (
@@ -24690,7 +26930,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -24741,7 +26986,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -24790,7 +27040,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -24839,7 +27094,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -24888,7 +27148,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -24937,7 +27202,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -24986,7 +27256,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -25035,7 +27310,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -25084,7 +27364,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -25133,7 +27418,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -25182,7 +27472,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -25231,7 +27526,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -25280,7 +27580,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -25329,7 +27634,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -25378,7 +27688,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -25427,7 +27742,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -25476,7 +27796,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -25525,7 +27850,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -25574,7 +27904,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -25624,7 +27959,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -25674,7 +28014,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -25723,7 +28068,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -25737,7 +28087,12 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl),
+            (
+                ProvidesTrimMaterial,
+                &ProvidesTrimMaterialImpl {
+                    material: Holder::Reference(crate::trim_material::TrimMaterial::Diamond),
+                },
+            ),
             (
                 Rarity,
                 &RarityImpl {
@@ -25817,7 +28172,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 10 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -25872,7 +28232,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -25955,7 +28320,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 10 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -26044,7 +28414,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 10 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -26133,7 +28508,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 10 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -26232,7 +28612,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 10 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -26318,7 +28703,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemHorseArmorUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -26401,7 +28791,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 10 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -26487,7 +28882,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemArmorUnequipNautilus),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -26536,7 +28936,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -26629,7 +29034,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 10 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -26728,7 +29138,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 10 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -26818,7 +29233,12 @@ impl Item {
                     mob_factor: 0.5f32,
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 DamageType,
                 &DamageTypeImpl {
@@ -26967,7 +29387,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 10 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -27022,7 +29447,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -27071,7 +29501,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -27120,7 +29555,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -27169,7 +29609,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -27218,7 +29663,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -27267,7 +29717,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -27316,7 +29771,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -27365,7 +29825,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -27415,7 +29880,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -27465,7 +29935,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -27515,7 +29990,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -27564,7 +30044,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -27635,7 +30120,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemShearsSnip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -27684,7 +30174,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -27751,7 +30246,12 @@ impl Item {
                     effects: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 Enchantments,
@@ -27801,7 +30301,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.5f32 }),
             (
                 CookingFuel,
@@ -27862,7 +30367,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -27911,7 +30421,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -27961,7 +30476,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -28011,7 +30531,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -28060,7 +30585,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -28109,7 +30639,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 ChickenVariant,
                 &ChickenVariantImpl {
@@ -28164,7 +30699,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -28232,7 +30772,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemShearsSnip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -28288,7 +30833,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -28302,7 +30852,12 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl),
+            (
+                ProvidesTrimMaterial,
+                &ProvidesTrimMaterialImpl {
+                    material: Holder::Reference(crate::trim_material::TrimMaterial::Emerald),
+                },
+            ),
             (
                 Rarity,
                 &RarityImpl {
@@ -28338,7 +30893,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -28387,7 +30947,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -28436,7 +31001,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (EnchantmentGlintOverride, &EnchantmentGlintOverrideImpl),
             (
                 Enchantments,
@@ -28546,7 +31116,12 @@ impl Item {
                     ))]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (EnchantmentGlintOverride, &EnchantmentGlintOverrideImpl),
             (
                 Enchantments,
@@ -28596,7 +31171,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -28645,7 +31225,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (EnchantmentGlintOverride, &EnchantmentGlintOverrideImpl),
             (
                 Enchantments,
@@ -28695,7 +31280,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -28744,7 +31334,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -28793,7 +31388,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -28842,7 +31442,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -28891,7 +31496,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -28940,7 +31550,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -28989,7 +31604,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -29038,7 +31658,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -29087,7 +31712,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -29137,7 +31767,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -29193,7 +31828,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -29242,7 +31882,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -29292,7 +31937,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -29342,7 +31992,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -29392,7 +32047,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (EnchantmentGlintOverride, &EnchantmentGlintOverrideImpl),
             (
                 Enchantments,
@@ -29442,7 +32102,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -29491,7 +32156,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -29540,7 +32210,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -29589,7 +32264,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -29638,7 +32318,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -29687,7 +32372,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -29736,7 +32426,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -29785,7 +32480,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -29843,7 +32543,12 @@ impl Item {
                     )]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -29892,7 +32597,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -29941,7 +32651,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -29990,7 +32705,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -30039,7 +32759,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -30088,7 +32813,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -30137,7 +32867,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -30186,7 +32921,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -30235,7 +32975,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -30284,7 +33029,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -30333,7 +33083,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -30382,7 +33137,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -30431,7 +33191,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -30481,7 +33246,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -30495,7 +33265,12 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (ProvidesBannerPatterns, &ProvidesBannerPatternsImpl),
+            (
+                ProvidesBannerPatterns,
+                &ProvidesBannerPatternsImpl {
+                    patterns: IDSet::Tag(Cow::Borrowed("pattern_item/field_masoned")),
+                },
+            ),
             (
                 Rarity,
                 &RarityImpl {
@@ -30531,7 +33306,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -30581,7 +33361,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -30630,7 +33415,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -30679,7 +33469,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -30728,7 +33523,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -30777,7 +33577,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 Enchantments,
@@ -30827,7 +33632,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -30883,7 +33693,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -30935,7 +33750,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 1 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -30995,7 +33815,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -31055,7 +33880,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -31106,7 +33936,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -31155,7 +33990,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -31204,7 +34044,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -31218,7 +34063,12 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (ProvidesBannerPatterns, &ProvidesBannerPatternsImpl),
+            (
+                ProvidesBannerPatterns,
+                &ProvidesBannerPatternsImpl {
+                    patterns: IDSet::Tag(Cow::Borrowed("pattern_item/flow")),
+                },
+            ),
             (
                 Rarity,
                 &RarityImpl {
@@ -31254,7 +34104,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -31303,7 +34158,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -31317,7 +34177,12 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (ProvidesBannerPatterns, &ProvidesBannerPatternsImpl),
+            (
+                ProvidesBannerPatterns,
+                &ProvidesBannerPatternsImpl {
+                    patterns: IDSet::Tag(Cow::Borrowed("pattern_item/flower")),
+                },
+            ),
             (
                 Rarity,
                 &RarityImpl {
@@ -31353,7 +34218,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -31402,7 +34272,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.85f32 }),
             (
                 CookingFuel,
@@ -31463,7 +34338,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.5f32 }),
             (
                 Enchantments,
@@ -31513,7 +34393,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -31563,7 +34448,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -31612,7 +34502,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -31662,7 +34557,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -31711,7 +34611,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -31761,7 +34666,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -31810,7 +34720,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -31860,7 +34775,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -31909,7 +34829,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -31958,7 +34883,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -32007,7 +34937,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -32056,7 +34991,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -32105,7 +35045,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -32154,7 +35099,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -32168,7 +35118,12 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (ProvidesBannerPatterns, &ProvidesBannerPatternsImpl),
+            (
+                ProvidesBannerPatterns,
+                &ProvidesBannerPatternsImpl {
+                    patterns: IDSet::Tag(Cow::Borrowed("pattern_item/globe")),
+                },
+            ),
             (
                 Rarity,
                 &RarityImpl {
@@ -32222,7 +35177,12 @@ impl Item {
                     effects: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 Enchantments,
@@ -32272,7 +35232,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -32321,7 +35286,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -32370,7 +35340,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.5f32 }),
             (
                 Enchantments,
@@ -32420,7 +35395,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -32470,7 +35450,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -32519,7 +35504,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -32568,14 +35558,24 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
                     enchantment: Cow::Borrowed(&[]),
                 },
             ),
-            (Instrument, &InstrumentImpl),
+            (
+                Instrument,
+                &InstrumentImpl {
+                    instrument: Holder::Reference(crate::instrument::Instrument::PonderGoatHorn),
+                },
+            ),
             (
                 ItemModel,
                 &ItemModelImpl {
@@ -32618,7 +35618,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -32668,7 +35673,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -32717,7 +35727,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -32731,7 +35746,12 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl),
+            (
+                ProvidesTrimMaterial,
+                &ProvidesTrimMaterialImpl {
+                    material: Holder::Reference(crate::trim_material::TrimMaterial::Gold),
+                },
+            ),
             (
                 Rarity,
                 &RarityImpl {
@@ -32767,7 +35787,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -32816,7 +35841,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -32903,7 +35933,12 @@ impl Item {
                     ))]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -32996,7 +36031,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 22 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -33085,7 +36125,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 25 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -33158,7 +36203,12 @@ impl Item {
                     effects: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -33241,7 +36291,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 25 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -33296,7 +36351,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -33379,7 +36439,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 25 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -33478,7 +36543,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 22 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -33564,7 +36634,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemHorseArmorUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -33647,7 +36722,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 25 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -33733,7 +36813,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemArmorUnequipNautilus),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -33826,7 +36911,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 22 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -33925,7 +37015,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 22 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -34015,7 +37110,12 @@ impl Item {
                     mob_factor: 0.5f32,
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 DamageType,
                 &DamageTypeImpl {
@@ -34164,7 +37264,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 22 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -34219,7 +37324,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -34268,7 +37378,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -34317,7 +37432,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -34366,7 +37486,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -34415,7 +37540,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -34464,7 +37594,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -34514,7 +37649,12 @@ impl Item {
                 },
             ),
             (BannerPatterns, &BannerPatternsImpl::EMPTY),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -34574,7 +37714,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -34623,7 +37768,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (BundleContents, &BundleContentsImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -34673,7 +37823,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -34741,7 +37896,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemLlamaCarpetUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -34801,7 +37961,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -34850,7 +38015,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -34899,7 +38069,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -34948,7 +38123,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -34997,7 +38177,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -35057,7 +38242,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Dye, &DyeImpl),
             (
                 Enchantments,
@@ -35107,7 +38297,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -35172,7 +38367,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::EntityHappyGhastUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -35221,7 +38421,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -35271,7 +38476,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -35320,7 +38530,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -35369,7 +38584,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -35418,7 +38638,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -35478,7 +38703,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -35538,7 +38768,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -35599,7 +38834,12 @@ impl Item {
                 },
             ),
             (BannerPatterns, &BannerPatternsImpl::EMPTY),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -35659,7 +38899,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -35708,7 +38953,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (BundleContents, &BundleContentsImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -35758,7 +39008,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -35826,7 +39081,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemLlamaCarpetUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -35886,7 +39146,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -35935,7 +39200,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -35984,7 +39254,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -36033,7 +39308,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -36082,7 +39362,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -36142,7 +39427,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Dye, &DyeImpl),
             (
                 Enchantments,
@@ -36192,7 +39482,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -36257,7 +39552,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::EntityHappyGhastUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -36306,7 +39606,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -36356,7 +39661,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -36405,7 +39715,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -36454,7 +39769,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -36503,7 +39823,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -36563,7 +39888,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -36623,7 +39953,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -36683,7 +40018,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -36732,7 +40072,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -36782,7 +40127,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -36831,7 +40181,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -36845,7 +40200,12 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (ProvidesBannerPatterns, &ProvidesBannerPatternsImpl),
+            (
+                ProvidesBannerPatterns,
+                &ProvidesBannerPatternsImpl {
+                    patterns: IDSet::Tag(Cow::Borrowed("pattern_item/guster")),
+                },
+            ),
             (
                 Rarity,
                 &RarityImpl {
@@ -36881,7 +40241,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -36930,7 +40295,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 Enchantments,
@@ -36980,7 +40350,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -37030,7 +40405,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.85f32 }),
             (
                 Enchantments,
@@ -37080,7 +40460,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -37129,7 +40514,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -37178,7 +40568,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -37227,7 +40622,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -37276,7 +40676,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -37325,7 +40730,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -37375,7 +40785,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -37444,7 +40859,12 @@ impl Item {
                     ))]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -37499,7 +40919,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -37548,7 +40973,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -37597,7 +41027,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -37647,7 +41082,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -37696,7 +41136,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -37745,7 +41190,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -37794,7 +41244,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -37843,7 +41298,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -37893,7 +41353,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -37942,7 +41407,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -37991,7 +41461,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -38041,7 +41516,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -38090,7 +41570,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -38139,7 +41624,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -38188,7 +41678,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -38237,7 +41732,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -38286,7 +41786,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -38335,7 +41840,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -38384,7 +41894,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -38433,7 +41948,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -38526,7 +42046,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 14 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -38581,7 +42106,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -38630,7 +42160,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -38713,7 +42248,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 9 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -38768,7 +42308,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -38851,7 +42396,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 9 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -38906,7 +42456,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -38955,7 +42510,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -39039,7 +42599,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 9 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -39138,7 +42703,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 14 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -39224,7 +42794,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemHorseArmorUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -39273,7 +42848,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -39287,7 +42867,12 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl),
+            (
+                ProvidesTrimMaterial,
+                &ProvidesTrimMaterialImpl {
+                    material: Holder::Reference(crate::trim_material::TrimMaterial::Iron),
+                },
+            ),
             (
                 Rarity,
                 &RarityImpl {
@@ -39357,7 +42942,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 9 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -39443,7 +43033,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemArmorUnequipNautilus),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -39492,7 +43087,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -39541,7 +43141,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -39634,7 +43239,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 14 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -39733,7 +43343,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 14 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -39823,7 +43438,12 @@ impl Item {
                     mob_factor: 0.5f32,
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 DamageType,
                 &DamageTypeImpl {
@@ -39972,7 +43592,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 14 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -40027,7 +43652,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -40076,7 +43706,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -40125,7 +43760,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -40174,7 +43814,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -40223,7 +43868,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -40283,7 +43933,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -40343,7 +43998,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -40403,7 +44063,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -40463,7 +44128,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -40523,7 +44193,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -40583,7 +44258,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -40643,7 +44323,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -40703,7 +44388,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 Enchantments,
@@ -40753,7 +44443,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -40813,7 +44508,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -40873,7 +44573,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -40933,7 +44638,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -40983,7 +44693,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 CookingFuel,
@@ -41044,7 +44759,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 CookingFuel,
@@ -41105,7 +44825,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -41165,7 +44890,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -41225,7 +44955,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -41285,7 +45020,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -41345,7 +45085,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -41405,7 +45150,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 Enchantments,
@@ -41455,7 +45205,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -41505,7 +45260,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -41565,7 +45325,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -41614,7 +45379,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -41663,7 +45433,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -41677,7 +45452,12 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl),
+            (
+                ProvidesTrimMaterial,
+                &ProvidesTrimMaterialImpl {
+                    material: Holder::Reference(crate::trim_material::TrimMaterial::Lapis),
+                },
+            ),
             (
                 Rarity,
                 &RarityImpl {
@@ -41713,7 +45493,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -41762,7 +45547,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -41811,7 +45601,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -41861,7 +45656,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -41921,7 +45721,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -41970,7 +45775,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 CookingFuel,
@@ -42031,7 +45841,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -42114,7 +45929,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 15 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -42203,7 +46023,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 15 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -42292,7 +46117,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 15 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -42378,7 +46208,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemHorseArmorUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -42461,7 +46296,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 15 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -42516,7 +46356,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -42576,7 +46421,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -42631,7 +46481,12 @@ impl Item {
                     properties: Cow::Borrowed(&[(Cow::Borrowed("level"), Cow::Borrowed("15"))]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -42681,7 +46536,12 @@ impl Item {
                 },
             ),
             (BannerPatterns, &BannerPatternsImpl::EMPTY),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -42741,7 +46601,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -42790,7 +46655,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (BundleContents, &BundleContentsImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -42840,7 +46710,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -42908,7 +46783,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemLlamaCarpetUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -42968,7 +46848,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -43017,7 +46902,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -43066,7 +46956,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -43115,7 +47010,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -43164,7 +47064,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -43224,7 +47129,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Dye, &DyeImpl),
             (
                 Enchantments,
@@ -43274,7 +47184,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -43339,7 +47254,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::EntityHappyGhastUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -43388,7 +47308,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -43438,7 +47363,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -43487,7 +47417,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -43536,7 +47471,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -43585,7 +47525,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -43645,7 +47590,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -43705,7 +47655,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -43766,7 +47721,12 @@ impl Item {
                 },
             ),
             (BannerPatterns, &BannerPatternsImpl::EMPTY),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -43826,7 +47786,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -43875,7 +47840,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (BundleContents, &BundleContentsImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -43925,7 +47895,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -43993,7 +47968,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemLlamaCarpetUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -44053,7 +48033,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -44102,7 +48087,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -44151,7 +48141,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -44200,7 +48195,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -44249,7 +48249,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -44309,7 +48314,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Dye, &DyeImpl),
             (
                 Enchantments,
@@ -44359,7 +48369,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -44424,7 +48439,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::EntityHappyGhastUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -44473,7 +48493,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -44523,7 +48548,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -44572,7 +48602,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -44621,7 +48656,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -44670,7 +48710,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -44730,7 +48775,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -44790,7 +48840,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -44850,7 +48905,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -44899,7 +48959,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -44948,7 +49013,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -44998,7 +49068,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -45048,7 +49123,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -45099,7 +49179,12 @@ impl Item {
                 },
             ),
             (BannerPatterns, &BannerPatternsImpl::EMPTY),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -45159,7 +49244,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -45208,7 +49298,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (BundleContents, &BundleContentsImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -45258,7 +49353,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -45326,7 +49426,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemLlamaCarpetUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -45386,7 +49491,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -45435,7 +49545,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -45484,7 +49599,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -45533,7 +49653,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -45582,7 +49707,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -45642,7 +49772,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Dye, &DyeImpl),
             (
                 Enchantments,
@@ -45692,7 +49827,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -45757,7 +49897,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::EntityHappyGhastUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -45806,7 +49951,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -45856,7 +50006,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -45905,7 +50060,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -45954,7 +50114,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -46003,7 +50168,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -46063,7 +50233,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -46123,7 +50298,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -46183,7 +50363,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -46245,7 +50430,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -46295,7 +50485,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -46344,7 +50539,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -46437,7 +50637,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 15 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -46493,7 +50698,12 @@ impl Item {
                 },
             ),
             (BannerPatterns, &BannerPatternsImpl::EMPTY),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -46553,7 +50763,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -46602,7 +50817,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (BundleContents, &BundleContentsImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -46652,7 +50872,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -46720,7 +50945,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemLlamaCarpetUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -46780,7 +51010,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -46829,7 +51064,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -46878,7 +51118,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -46927,7 +51172,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -46976,7 +51226,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -47036,7 +51291,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Dye, &DyeImpl),
             (
                 Enchantments,
@@ -47086,7 +51346,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -47151,7 +51416,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::EntityHappyGhastUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -47200,7 +51470,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -47250,7 +51525,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -47299,7 +51579,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -47348,7 +51633,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -47397,7 +51687,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -47457,7 +51752,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -47517,7 +51817,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -47577,7 +51882,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -47626,7 +51936,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -47675,7 +51990,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -47725,7 +52045,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -47785,7 +52110,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -47845,7 +52175,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -47905,7 +52240,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -47965,7 +52305,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -48025,7 +52370,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -48085,7 +52435,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -48145,7 +52500,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 Enchantments,
@@ -48195,7 +52555,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -48255,7 +52620,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -48315,7 +52685,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -48375,7 +52750,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 CookingFuel,
@@ -48436,7 +52816,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 CookingFuel,
@@ -48497,7 +52882,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 CookingFuel,
@@ -48558,7 +52948,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -48618,7 +53013,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -48678,7 +53078,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -48738,7 +53143,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -48798,7 +53208,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -48858,7 +53273,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -48907,7 +53327,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -48956,7 +53381,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -49006,7 +53436,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 Enchantments,
@@ -49074,7 +53509,12 @@ impl Item {
                     effects: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.5f32 }),
             (
                 Enchantments,
@@ -49134,7 +53574,12 @@ impl Item {
                     effects: Cow::Borrowed(&[ConsumeEffect::ClearAllEffects]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -49189,7 +53634,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -49238,7 +53688,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -49287,7 +53742,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -49301,7 +53761,12 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (ProvidesBannerPatterns, &ProvidesBannerPatternsImpl),
+            (
+                ProvidesBannerPatterns,
+                &ProvidesBannerPatternsImpl {
+                    patterns: IDSet::Tag(Cow::Borrowed("pattern_item/mojang")),
+                },
+            ),
             (
                 Rarity,
                 &RarityImpl {
@@ -49337,7 +53802,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -49387,7 +53857,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -49437,7 +53912,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 Enchantments,
@@ -49487,7 +53967,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -49536,7 +54021,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -49585,7 +54075,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -49634,7 +54129,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -49683,7 +54183,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -49732,7 +54237,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -49781,7 +54291,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -49830,7 +54345,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -49879,7 +54399,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -49928,7 +54453,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -49977,7 +54507,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -50026,7 +54561,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -50075,7 +54615,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -50124,7 +54669,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -50173,7 +54723,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -50222,7 +54777,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -50272,7 +54832,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -50340,7 +54905,12 @@ impl Item {
                     effects: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -50386,7 +54956,7 @@ impl Item {
             (
                 JukeboxPlayable,
                 &JukeboxPlayableImpl {
-                    song: "minecraft:11",
+                    song: Holder::Reference(crate::jukebox_song::JukeboxSong::Id11),
                 },
             ),
             (
@@ -50401,7 +54971,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -50441,7 +55016,7 @@ impl Item {
             (
                 JukeboxPlayable,
                 &JukeboxPlayableImpl {
-                    song: "minecraft:13",
+                    song: Holder::Reference(crate::jukebox_song::JukeboxSong::Id13),
                 },
             ),
             (
@@ -50456,7 +55031,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -50496,7 +55076,7 @@ impl Item {
             (
                 JukeboxPlayable,
                 &JukeboxPlayableImpl {
-                    song: "minecraft:5",
+                    song: Holder::Reference(crate::jukebox_song::JukeboxSong::Id5),
                 },
             ),
             (
@@ -50511,7 +55091,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -50551,7 +55136,7 @@ impl Item {
             (
                 JukeboxPlayable,
                 &JukeboxPlayableImpl {
-                    song: "minecraft:blocks",
+                    song: Holder::Reference(crate::jukebox_song::JukeboxSong::Blocks),
                 },
             ),
             (
@@ -50566,7 +55151,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -50606,7 +55196,7 @@ impl Item {
             (
                 JukeboxPlayable,
                 &JukeboxPlayableImpl {
-                    song: "minecraft:bounce",
+                    song: Holder::Reference(crate::jukebox_song::JukeboxSong::Bounce),
                 },
             ),
             (
@@ -50621,7 +55211,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -50661,7 +55256,7 @@ impl Item {
             (
                 JukeboxPlayable,
                 &JukeboxPlayableImpl {
-                    song: "minecraft:cat",
+                    song: Holder::Reference(crate::jukebox_song::JukeboxSong::Cat),
                 },
             ),
             (
@@ -50676,7 +55271,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -50716,7 +55316,7 @@ impl Item {
             (
                 JukeboxPlayable,
                 &JukeboxPlayableImpl {
-                    song: "minecraft:chirp",
+                    song: Holder::Reference(crate::jukebox_song::JukeboxSong::Chirp),
                 },
             ),
             (
@@ -50731,7 +55331,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -50771,7 +55376,7 @@ impl Item {
             (
                 JukeboxPlayable,
                 &JukeboxPlayableImpl {
-                    song: "minecraft:creator",
+                    song: Holder::Reference(crate::jukebox_song::JukeboxSong::Creator),
                 },
             ),
             (
@@ -50786,7 +55391,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -50826,7 +55436,7 @@ impl Item {
             (
                 JukeboxPlayable,
                 &JukeboxPlayableImpl {
-                    song: "minecraft:creator_music_box",
+                    song: Holder::Reference(crate::jukebox_song::JukeboxSong::CreatorMusicBox),
                 },
             ),
             (
@@ -50841,7 +55451,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -50881,7 +55496,7 @@ impl Item {
             (
                 JukeboxPlayable,
                 &JukeboxPlayableImpl {
-                    song: "minecraft:far",
+                    song: Holder::Reference(crate::jukebox_song::JukeboxSong::Far),
                 },
             ),
             (
@@ -50896,7 +55511,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -50936,7 +55556,7 @@ impl Item {
             (
                 JukeboxPlayable,
                 &JukeboxPlayableImpl {
-                    song: "minecraft:lava_chicken",
+                    song: Holder::Reference(crate::jukebox_song::JukeboxSong::LavaChicken),
                 },
             ),
             (
@@ -50951,7 +55571,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -50991,7 +55616,7 @@ impl Item {
             (
                 JukeboxPlayable,
                 &JukeboxPlayableImpl {
-                    song: "minecraft:mall",
+                    song: Holder::Reference(crate::jukebox_song::JukeboxSong::Mall),
                 },
             ),
             (
@@ -51006,7 +55631,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -51046,7 +55676,7 @@ impl Item {
             (
                 JukeboxPlayable,
                 &JukeboxPlayableImpl {
-                    song: "minecraft:mellohi",
+                    song: Holder::Reference(crate::jukebox_song::JukeboxSong::Mellohi),
                 },
             ),
             (
@@ -51061,7 +55691,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -51101,7 +55736,7 @@ impl Item {
             (
                 JukeboxPlayable,
                 &JukeboxPlayableImpl {
-                    song: "minecraft:otherside",
+                    song: Holder::Reference(crate::jukebox_song::JukeboxSong::Otherside),
                 },
             ),
             (
@@ -51116,7 +55751,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -51156,7 +55796,7 @@ impl Item {
             (
                 JukeboxPlayable,
                 &JukeboxPlayableImpl {
-                    song: "minecraft:pigstep",
+                    song: Holder::Reference(crate::jukebox_song::JukeboxSong::Pigstep),
                 },
             ),
             (
@@ -51171,7 +55811,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -51211,7 +55856,7 @@ impl Item {
             (
                 JukeboxPlayable,
                 &JukeboxPlayableImpl {
-                    song: "minecraft:precipice",
+                    song: Holder::Reference(crate::jukebox_song::JukeboxSong::Precipice),
                 },
             ),
             (
@@ -51226,7 +55871,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -51266,7 +55916,7 @@ impl Item {
             (
                 JukeboxPlayable,
                 &JukeboxPlayableImpl {
-                    song: "minecraft:relic",
+                    song: Holder::Reference(crate::jukebox_song::JukeboxSong::Relic),
                 },
             ),
             (
@@ -51281,7 +55931,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -51321,7 +55976,7 @@ impl Item {
             (
                 JukeboxPlayable,
                 &JukeboxPlayableImpl {
-                    song: "minecraft:stal",
+                    song: Holder::Reference(crate::jukebox_song::JukeboxSong::Stal),
                 },
             ),
             (
@@ -51336,7 +55991,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -51376,7 +56036,7 @@ impl Item {
             (
                 JukeboxPlayable,
                 &JukeboxPlayableImpl {
-                    song: "minecraft:strad",
+                    song: Holder::Reference(crate::jukebox_song::JukeboxSong::Strad),
                 },
             ),
             (
@@ -51391,7 +56051,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -51431,7 +56096,7 @@ impl Item {
             (
                 JukeboxPlayable,
                 &JukeboxPlayableImpl {
-                    song: "minecraft:tears",
+                    song: Holder::Reference(crate::jukebox_song::JukeboxSong::Tears),
                 },
             ),
             (
@@ -51446,7 +56111,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -51486,7 +56156,7 @@ impl Item {
             (
                 JukeboxPlayable,
                 &JukeboxPlayableImpl {
-                    song: "minecraft:wait",
+                    song: Holder::Reference(crate::jukebox_song::JukeboxSong::Wait),
                 },
             ),
             (
@@ -51501,7 +56171,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -51541,7 +56216,7 @@ impl Item {
             (
                 JukeboxPlayable,
                 &JukeboxPlayableImpl {
-                    song: "minecraft:ward",
+                    song: Holder::Reference(crate::jukebox_song::JukeboxSong::Ward),
                 },
             ),
             (
@@ -51556,7 +56231,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -51623,7 +56303,12 @@ impl Item {
                     effects: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -51672,7 +56357,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -51721,7 +56411,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -51770,7 +56465,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -51819,7 +56519,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -51869,7 +56574,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -51918,7 +56628,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -51967,7 +56682,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -52016,7 +56736,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -52065,7 +56790,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -52114,7 +56844,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -52163,7 +56898,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -52212,7 +56952,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -52261,7 +57006,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.5f32 }),
             (
                 Enchantments,
@@ -52317,7 +57067,12 @@ impl Item {
                     res_type: DamageResistantType::Explosion,
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (EnchantmentGlintOverride, &EnchantmentGlintOverrideImpl),
             (
                 Enchantments,
@@ -52367,7 +57122,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -52417,7 +57177,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.85f32 }),
             (
                 Enchantments,
@@ -52517,7 +57282,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 15 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -52578,7 +57348,12 @@ impl Item {
                     res_type: DamageResistantType::Fire,
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -52674,7 +57449,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 15 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -52776,7 +57556,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 15 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -52878,7 +57663,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 15 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -52983,7 +57773,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 15 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -53082,7 +57877,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemHorseArmorUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -53137,7 +57937,12 @@ impl Item {
                     res_type: DamageResistantType::Fire,
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -53151,7 +57956,12 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl),
+            (
+                ProvidesTrimMaterial,
+                &ProvidesTrimMaterialImpl {
+                    material: Holder::Reference(crate::trim_material::TrimMaterial::Netherite),
+                },
+            ),
             (
                 Rarity,
                 &RarityImpl {
@@ -53234,7 +58044,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 15 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -53333,7 +58148,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemArmorUnequipNautilus),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -53432,7 +58252,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 15 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -53493,7 +58318,12 @@ impl Item {
                     res_type: DamageResistantType::Fire,
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -53592,7 +58422,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 15 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -53688,7 +58523,12 @@ impl Item {
                     mob_factor: 0.5f32,
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 DamageType,
                 &DamageTypeImpl {
@@ -53843,7 +58683,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 15 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -53898,7 +58743,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -53947,7 +58797,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -53996,7 +58851,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -54056,7 +58916,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -54116,7 +58981,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -54176,7 +59046,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -54236,7 +59111,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -54296,7 +59176,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -54356,7 +59241,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -54416,7 +59306,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -54476,7 +59371,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 Enchantments,
@@ -54526,7 +59426,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -54586,7 +59491,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -54646,7 +59556,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -54706,7 +59621,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 CookingFuel,
@@ -54767,7 +59687,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 CookingFuel,
@@ -54828,7 +59753,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -54888,7 +59818,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -54948,7 +59883,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -55008,7 +59948,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -55068,7 +60013,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -55128,7 +60078,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -55177,7 +60132,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -55226,7 +60186,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -55276,7 +60241,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -55326,7 +60296,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -55387,7 +60362,12 @@ impl Item {
                     ))]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -55440,7 +60420,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -55489,7 +60474,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -55540,7 +60530,12 @@ impl Item {
                 },
             ),
             (BannerPatterns, &BannerPatternsImpl::EMPTY),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -55600,7 +60595,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -55649,7 +60649,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (BundleContents, &BundleContentsImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -55699,7 +60704,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -55767,7 +60777,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemLlamaCarpetUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -55827,7 +60842,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -55876,7 +60896,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -55925,7 +60950,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -55974,7 +61004,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -56023,7 +61058,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -56083,7 +61123,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Dye, &DyeImpl),
             (
                 Enchantments,
@@ -56133,7 +61178,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -56198,7 +61248,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::EntityHappyGhastUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -56247,7 +61302,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 Enchantments,
@@ -56297,7 +61357,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -56347,7 +61412,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -56396,7 +61466,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -56445,7 +61520,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -56494,7 +61574,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -56544,7 +61629,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -56604,7 +61694,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -56664,7 +61759,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -56724,7 +61824,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -56774,7 +61879,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -56823,7 +61933,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -56872,7 +61987,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -56921,7 +62041,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -56970,7 +62095,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -57019,7 +62149,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -57068,7 +62203,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -57126,7 +62266,12 @@ impl Item {
                     )]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -57175,7 +62320,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -57224,7 +62374,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -57273,7 +62428,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -57322,7 +62482,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -57371,7 +62536,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -57420,7 +62590,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -57469,7 +62644,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -57518,7 +62698,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -57567,7 +62752,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -57616,7 +62806,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -57665,7 +62860,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 Enchantments,
@@ -57715,7 +62915,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -57765,7 +62970,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 Enchantments,
@@ -57815,7 +63025,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -57875,7 +63090,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -57935,7 +63155,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -57995,7 +63220,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -58055,7 +63285,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -58115,7 +63350,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -58175,7 +63415,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -58235,7 +63480,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 Enchantments,
@@ -58285,7 +63535,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -58345,7 +63600,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -58405,7 +63665,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -58465,7 +63730,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 CookingFuel,
@@ -58526,7 +63796,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 CookingFuel,
@@ -58587,7 +63862,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -58647,7 +63927,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -58707,7 +63992,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -58767,7 +64057,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -58827,7 +64122,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -58887,7 +64187,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -58937,7 +64242,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -58986,7 +64296,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -59036,7 +64351,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -59086,7 +64406,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -59135,7 +64460,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -59185,7 +64515,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -59234,7 +64569,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -59283,7 +64623,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -59333,7 +64678,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -59383,7 +64733,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -59397,7 +64752,12 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (ProvidesBannerPatterns, &ProvidesBannerPatternsImpl),
+            (
+                ProvidesBannerPatterns,
+                &ProvidesBannerPatternsImpl {
+                    patterns: IDSet::Tag(Cow::Borrowed("pattern_item/piglin")),
+                },
+            ),
             (
                 Rarity,
                 &RarityImpl {
@@ -59433,7 +64793,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -59505,7 +64870,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemShearsSnip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -59554,7 +64924,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -59604,7 +64979,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -59655,7 +65035,12 @@ impl Item {
                 },
             ),
             (BannerPatterns, &BannerPatternsImpl::EMPTY),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -59715,7 +65100,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -59764,7 +65154,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (BundleContents, &BundleContentsImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -59814,7 +65209,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -59882,7 +65282,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemLlamaCarpetUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -59942,7 +65347,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -59991,7 +65401,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -60040,7 +65455,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -60089,7 +65509,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -60138,7 +65563,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -60198,7 +65628,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Dye, &DyeImpl),
             (
                 Enchantments,
@@ -60248,7 +65683,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -60313,7 +65753,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::EntityHappyGhastUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -60362,7 +65807,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 Enchantments,
@@ -60412,7 +65862,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -60462,7 +65917,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -60511,7 +65971,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -60560,7 +66025,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -60609,7 +66079,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -60659,7 +66134,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -60719,7 +66199,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -60779,7 +66264,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -60839,7 +66329,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -60888,7 +66383,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.85f32 }),
             (
                 Enchantments,
@@ -60938,7 +66438,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 Enchantments,
@@ -60988,7 +66493,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -61060,7 +66570,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemShearsSnip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -61109,7 +66624,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -61158,7 +66678,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -61207,7 +66732,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -61284,7 +66814,12 @@ impl Item {
                     ))]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -61333,7 +66868,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -61383,7 +66923,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -61432,7 +66977,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -61481,7 +67031,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -61530,7 +67085,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -61579,7 +67139,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -61628,7 +67193,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -61677,7 +67247,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -61726,7 +67301,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -61775,7 +67355,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -61824,7 +67409,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -61873,7 +67463,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -61922,7 +67517,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -61971,7 +67571,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -62020,7 +67625,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -62069,7 +67679,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -62118,7 +67733,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -62167,7 +67787,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -62216,7 +67841,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -62265,7 +67895,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -62314,7 +67949,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -62363,7 +68003,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -62412,7 +68057,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -62461,7 +68111,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -62510,7 +68165,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -62559,7 +68219,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -62608,7 +68273,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -62657,7 +68327,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -62706,7 +68381,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -62755,7 +68435,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -62804,7 +68489,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -62853,7 +68543,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -62902,7 +68597,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -62951,7 +68651,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -63000,7 +68705,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -63049,7 +68759,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -63098,7 +68813,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -63147,7 +68867,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -63207,7 +68932,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -63267,7 +68997,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -63327,7 +69062,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -63387,7 +69127,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -63447,7 +69192,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -63507,7 +69257,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -63567,7 +69322,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -63627,7 +69387,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -63687,7 +69452,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -63747,7 +69517,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 CookingFuel,
@@ -63808,7 +69583,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 CookingFuel,
@@ -63869,7 +69649,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -63929,7 +69714,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -63989,7 +69779,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -64049,7 +69844,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -64109,7 +69909,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -64169,7 +69974,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -64218,7 +70028,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -64286,7 +70101,12 @@ impl Item {
                     effects: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -64353,7 +70173,12 @@ impl Item {
                     effects: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -64403,7 +70228,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -64462,7 +70292,12 @@ impl Item {
                     effects: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -64526,7 +70361,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -64575,7 +70415,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -64624,7 +70469,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -64673,7 +70523,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -64722,7 +70577,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -64771,7 +70631,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -64820,7 +70685,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -64869,7 +70739,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -64918,7 +70793,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -64967,7 +70847,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -65016,7 +70901,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -65065,7 +70955,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -65160,7 +71055,12 @@ impl Item {
                     ))]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -65217,7 +71117,12 @@ impl Item {
                     can_always_eat: false,
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (BucketEntityData, &BucketEntityDataImpl),
             (
                 Enchantments,
@@ -65267,7 +71172,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -65317,7 +71227,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -65385,7 +71300,12 @@ impl Item {
                     effects: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 1.0f32 }),
             (
                 Enchantments,
@@ -65435,7 +71355,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 Enchantments,
@@ -65486,7 +71411,12 @@ impl Item {
                 },
             ),
             (BannerPatterns, &BannerPatternsImpl::EMPTY),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -65546,7 +71476,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -65595,7 +71530,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (BundleContents, &BundleContentsImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -65645,7 +71585,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -65713,7 +71658,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemLlamaCarpetUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -65773,7 +71723,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -65822,7 +71777,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -65871,7 +71831,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -65920,7 +71885,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -65969,7 +71939,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -66029,7 +72004,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Dye, &DyeImpl),
             (
                 Enchantments,
@@ -66079,7 +72059,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -66144,7 +72129,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::EntityHappyGhastUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -66193,7 +72183,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -66243,7 +72238,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -66292,7 +72292,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -66341,7 +72346,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -66390,7 +72400,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -66450,7 +72465,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -66510,7 +72530,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -66570,7 +72595,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -66619,7 +72649,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -66668,7 +72703,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -66717,7 +72757,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -66766,7 +72811,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -66780,7 +72830,12 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl),
+            (
+                ProvidesTrimMaterial,
+                &ProvidesTrimMaterialImpl {
+                    material: Holder::Reference(crate::trim_material::TrimMaterial::Quartz),
+                },
+            ),
             (
                 Rarity,
                 &RarityImpl {
@@ -66816,7 +72871,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -66865,7 +72925,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -66914,7 +72979,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -66963,7 +73033,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -67012,7 +73087,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -67079,7 +73159,12 @@ impl Item {
                     effects: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -67128,7 +73213,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -67177,7 +73267,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -67226,7 +73321,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -67294,7 +73394,12 @@ impl Item {
                     effects: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -67349,7 +73454,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -67398,7 +73508,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -67447,7 +73562,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -67497,7 +73617,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -67546,7 +73671,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -67595,7 +73725,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -67644,7 +73779,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -67693,7 +73833,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -67742,7 +73887,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -67791,7 +73941,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -67841,7 +73996,12 @@ impl Item {
                 },
             ),
             (BannerPatterns, &BannerPatternsImpl::EMPTY),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -67901,7 +74061,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -67950,7 +74115,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (BundleContents, &BundleContentsImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -68000,7 +74170,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -68068,7 +74243,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemLlamaCarpetUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -68128,7 +74308,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -68177,7 +74362,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -68226,7 +74416,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -68275,7 +74470,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -68324,7 +74524,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -68384,7 +74589,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Dye, &DyeImpl),
             (
                 Enchantments,
@@ -68434,7 +74644,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -68499,7 +74714,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::EntityHappyGhastUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -68548,7 +74768,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -68598,7 +74823,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.85f32 }),
             (
                 Enchantments,
@@ -68648,7 +74878,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -68697,7 +74932,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -68746,7 +74986,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -68795,7 +75040,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -68844,7 +75094,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 Enchantments,
@@ -68894,7 +75149,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -68943,7 +75203,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -68992,7 +75257,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -69041,7 +75311,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -69090,7 +75365,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -69139,7 +75419,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 Enchantments,
@@ -69189,7 +75474,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -69239,7 +75529,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -69288,7 +75583,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -69337,7 +75637,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -69386,7 +75691,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -69436,7 +75746,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -69496,7 +75811,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -69556,7 +75876,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -69616,7 +75941,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -69630,7 +75960,12 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl),
+            (
+                ProvidesTrimMaterial,
+                &ProvidesTrimMaterialImpl {
+                    material: Holder::Reference(crate::trim_material::TrimMaterial::Redstone),
+                },
+            ),
             (
                 Rarity,
                 &RarityImpl {
@@ -69666,7 +76001,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -69715,7 +76055,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -69764,7 +76109,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -69813,7 +76163,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -69862,7 +76217,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -69911,7 +76271,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -69960,7 +76325,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -70009,7 +76379,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -70058,7 +76433,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -70072,7 +76452,12 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (ProvidesTrimMaterial, &ProvidesTrimMaterialImpl),
+            (
+                ProvidesTrimMaterial,
+                &ProvidesTrimMaterialImpl {
+                    material: Holder::Reference(crate::trim_material::TrimMaterial::Resin),
+                },
+            ),
             (
                 Rarity,
                 &RarityImpl {
@@ -70108,7 +76493,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -70157,7 +76547,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -70206,7 +76601,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -70255,7 +76655,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -70304,7 +76709,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -70353,7 +76763,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -70402,7 +76817,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -70451,7 +76871,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -70500,7 +76925,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -70578,7 +77008,12 @@ impl Item {
                     ))]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -70643,7 +77078,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemSaddleUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -70710,7 +77150,12 @@ impl Item {
                     effects: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -70767,7 +77212,12 @@ impl Item {
                     can_always_eat: false,
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (BucketEntityData, &BucketEntityDataImpl),
             (
                 Enchantments,
@@ -70817,7 +77267,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -70867,7 +77322,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -70916,7 +77376,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -70965,7 +77430,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -71014,7 +77484,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -71063,7 +77538,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -71112,7 +77592,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -71162,7 +77647,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -71222,7 +77712,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -71271,7 +77766,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -71320,7 +77820,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -71369,7 +77874,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -71418,7 +77928,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -71467,7 +77982,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -71516,7 +78036,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -71565,7 +78090,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -71615,7 +78145,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 Enchantments,
@@ -71665,7 +78200,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -71714,7 +78254,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -71763,7 +78308,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -71844,7 +78394,12 @@ impl Item {
                     can_destroy_blocks_in_creative: true,
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -71893,7 +78448,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -71943,7 +78503,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -71993,7 +78558,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -72062,7 +78632,12 @@ impl Item {
                 },
             ),
             (BannerPatterns, &BannerPatternsImpl::EMPTY),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::ItemShieldBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -72117,7 +78692,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 CookingFuel,
@@ -72178,7 +78758,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 Enchantments,
@@ -72228,7 +78813,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -72278,7 +78868,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -72328,7 +78923,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -72377,7 +78977,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -72427,7 +79032,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -72476,7 +79086,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -72526,7 +79141,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -72598,7 +79218,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemShearsSnip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -72647,7 +79272,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -72697,7 +79327,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -72711,7 +79346,12 @@ impl Item {
                 },
             ),
             (Lore, &LoreImpl { lines: Vec::new() }),
-            (ProvidesBannerPatterns, &ProvidesBannerPatternsImpl),
+            (
+                ProvidesBannerPatterns,
+                &ProvidesBannerPatternsImpl {
+                    patterns: IDSet::Tag(Cow::Borrowed("pattern_item/skull")),
+                },
+            ),
             (
                 Rarity,
                 &RarityImpl {
@@ -72747,7 +79387,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -72796,7 +79441,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -72845,7 +79495,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -72894,7 +79549,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -72944,7 +79604,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -72993,7 +79658,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 Enchantments,
@@ -73043,7 +79713,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -73103,7 +79778,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -73153,7 +79833,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -73202,7 +79887,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -73251,7 +79941,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -73300,7 +79995,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -73349,7 +80049,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -73398,7 +80103,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -73447,7 +80157,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -73496,7 +80211,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -73545,7 +80265,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -73594,7 +80319,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -73643,7 +80373,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -73692,7 +80427,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -73741,7 +80481,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -73790,7 +80535,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -73840,7 +80590,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -73889,7 +80644,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -73938,7 +80698,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -73987,7 +80752,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -74036,7 +80806,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -74086,7 +80861,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -74135,7 +80915,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -74185,7 +80970,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -74235,7 +81025,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -74284,7 +81079,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -74333,7 +81133,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -74382,7 +81187,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -74431,7 +81241,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -74480,7 +81295,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -74557,7 +81377,12 @@ impl Item {
                     ))]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -74606,7 +81431,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -74656,7 +81486,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -74705,7 +81540,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -74763,7 +81603,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -74812,7 +81657,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -74862,7 +81712,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -74922,7 +81777,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -74982,7 +81842,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -75042,7 +81907,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -75102,7 +81972,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -75162,7 +82037,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -75222,7 +82102,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -75282,7 +82167,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 Enchantments,
@@ -75332,7 +82222,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -75392,7 +82287,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -75452,7 +82352,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -75512,7 +82417,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 CookingFuel,
@@ -75573,7 +82483,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 CookingFuel,
@@ -75634,7 +82549,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -75694,7 +82614,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -75754,7 +82679,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -75814,7 +82744,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -75874,7 +82809,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -75934,7 +82874,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -75983,7 +82928,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -76033,7 +82983,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -76093,7 +83048,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -76142,7 +83102,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -76235,7 +83200,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 5 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -76290,7 +83260,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -76339,7 +83314,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -76388,7 +83368,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -76437,7 +83422,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -76486,7 +83476,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -76579,7 +83574,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 5 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -76678,7 +83678,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 5 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -76733,7 +83738,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -76826,7 +83836,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 5 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -76881,7 +83896,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -76965,7 +83985,12 @@ impl Item {
                     mob_factor: 0.5f32,
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 DamageType,
                 &DamageTypeImpl {
@@ -77065,7 +84090,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -77163,7 +84193,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 5 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -77218,7 +84253,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -77267,7 +84307,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.85f32 }),
             (
                 Enchantments,
@@ -77317,7 +84362,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -77367,7 +84417,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -77417,7 +84472,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -77466,7 +84526,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -77526,7 +84591,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -77586,7 +84656,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -77646,7 +84721,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -77706,7 +84786,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -77766,7 +84851,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -77826,7 +84916,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -77886,7 +84981,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -77935,7 +85035,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -77984,7 +85089,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -78044,7 +85154,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -78104,7 +85219,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -78164,7 +85284,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -78224,7 +85349,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -78284,7 +85414,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -78344,7 +85479,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -78404,7 +85544,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -78464,7 +85609,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -78524,7 +85674,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -78584,7 +85739,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -78644,7 +85804,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -78704,7 +85869,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -78764,7 +85934,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -78824,7 +85999,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -78873,7 +86053,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -78922,7 +86107,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -78971,7 +86161,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -79020,7 +86215,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -79069,7 +86269,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.5f32 }),
             (
                 Enchantments,
@@ -79119,7 +86324,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -79168,7 +86378,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -79217,7 +86432,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -79266,7 +86486,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -79315,7 +86540,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -79364,7 +86594,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (BucketEntityData, &BucketEntityDataImpl),
             (
                 Enchantments,
@@ -79414,7 +86649,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -79464,7 +86704,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -79513,7 +86758,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -79562,7 +86812,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -79611,7 +86866,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -79660,7 +86920,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -79710,7 +86975,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -79759,7 +87029,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -79826,7 +87101,12 @@ impl Item {
                     effects: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -79882,7 +87162,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -79950,7 +87235,12 @@ impl Item {
                     effects: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 Enchantments,
@@ -80000,7 +87290,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (BucketEntityData, &BucketEntityDataImpl),
             (
                 Enchantments,
@@ -80050,7 +87345,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -80100,7 +87400,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -80150,7 +87455,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 CookingFuel,
@@ -80211,7 +87521,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.5f32 }),
             (
                 Enchantments,
@@ -80261,7 +87576,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -80310,7 +87630,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -80365,7 +87690,12 @@ impl Item {
                     properties: Cow::Borrowed(&[(Cow::Borrowed("mode"), Cow::Borrowed("start"))]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -80414,7 +87744,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -80463,7 +87798,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -80512,7 +87852,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -80561,7 +87906,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -80623,7 +87973,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -80672,7 +88027,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -80721,7 +88081,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -80770,7 +88135,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.85f32 }),
             (
                 Enchantments,
@@ -80820,7 +88190,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 Enchantments,
@@ -80871,7 +88246,12 @@ impl Item {
                 },
             ),
             (DeathProtection, &DeathProtectionImpl),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -80920,7 +88300,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -80970,7 +88355,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 CookingFuel,
@@ -81031,7 +88421,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -81080,7 +88475,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -81162,7 +88562,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 1 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -81211,7 +88616,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -81278,7 +88688,12 @@ impl Item {
                     effects: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -81335,7 +88750,12 @@ impl Item {
                     can_always_eat: false,
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (BucketEntityData, &BucketEntityDataImpl),
             (
                 Enchantments,
@@ -81385,7 +88805,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -81435,7 +88860,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -81484,7 +88914,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -81533,7 +88968,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -81582,7 +89022,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -81631,7 +89076,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -81680,7 +89130,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -81729,7 +89184,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -81778,7 +89238,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -81827,7 +89292,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -81876,7 +89346,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -81925,7 +89400,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -81974,7 +89454,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -82057,7 +89542,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 9 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -82112,7 +89602,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -82161,7 +89656,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -82211,7 +89711,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.5f32 }),
             (
                 Enchantments,
@@ -82261,7 +89766,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -82310,7 +89820,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -82359,7 +89874,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -82408,7 +89928,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -82458,7 +89983,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -82508,7 +90038,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -82558,7 +90093,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.5f32 }),
             (
                 Enchantments,
@@ -82608,7 +90148,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -82658,7 +90203,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -82707,7 +90257,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -82757,7 +90312,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -82807,7 +90367,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -82856,7 +90421,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -82905,7 +90475,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -82954,7 +90529,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -83003,7 +90583,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -83055,7 +90640,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -83104,7 +90694,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -83153,7 +90748,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -83202,7 +90802,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -83251,7 +90856,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -83300,7 +90910,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -83349,7 +90964,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -83399,7 +91019,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -83449,7 +91074,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -83498,7 +91128,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -83547,7 +91182,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -83596,7 +91236,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -83645,7 +91290,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -83694,7 +91344,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.85f32 }),
             (
                 Enchantments,
@@ -83744,7 +91399,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -83793,7 +91453,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -83842,7 +91507,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -83891,7 +91561,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -83940,7 +91615,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -83989,7 +91669,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -84038,7 +91723,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -84087,7 +91777,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -84145,7 +91840,12 @@ impl Item {
                     )]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -84194,7 +91894,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -84243,7 +91948,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -84292,7 +92002,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -84341,7 +92056,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -84390,7 +92110,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -84439,7 +92164,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -84488,7 +92218,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -84537,7 +92272,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -84586,7 +92326,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -84635,7 +92380,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -84684,7 +92434,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -84733,7 +92488,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -84782,7 +92542,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -84840,7 +92605,12 @@ impl Item {
                     )]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -84889,7 +92659,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -84938,7 +92713,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -84987,7 +92767,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -85036,7 +92821,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -85085,7 +92875,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -85134,7 +92929,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -85183,7 +92983,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -85232,7 +93037,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -85281,7 +93091,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -85330,7 +93145,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -85379,7 +93199,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -85428,7 +93253,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -85477,7 +93307,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -85526,7 +93361,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -85575,7 +93415,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -85633,7 +93478,12 @@ impl Item {
                     )]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -85682,7 +93532,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -85731,7 +93586,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -85780,7 +93640,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -85829,7 +93694,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -85878,7 +93748,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -85927,7 +93802,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -85976,7 +93856,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -86025,7 +93910,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -86074,7 +93964,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -86123,7 +94018,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -86172,7 +94072,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -86221,7 +94126,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -86270,7 +94180,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -86319,7 +94234,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -86377,7 +94297,12 @@ impl Item {
                     )]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -86426,7 +94351,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -86475,7 +94405,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -86524,7 +94459,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -86573,7 +94513,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -86622,7 +94567,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -86671,7 +94621,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -86720,7 +94675,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -86769,7 +94729,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -86818,7 +94783,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -86867,7 +94837,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -86916,7 +94891,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -86965,7 +94945,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -87014,7 +94999,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -87063,7 +95053,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -87112,7 +95107,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -87170,7 +95170,12 @@ impl Item {
                     )]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -87219,7 +95224,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -87268,7 +95278,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -87317,7 +95332,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -87366,7 +95386,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -87415,7 +95440,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -87464,7 +95494,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -87513,7 +95548,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -87562,7 +95602,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.5f32 }),
             (
                 Enchantments,
@@ -87612,7 +95657,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -87661,7 +95711,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -87711,7 +95766,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 Enchantments,
@@ -87762,7 +95822,12 @@ impl Item {
                 },
             ),
             (BannerPatterns, &BannerPatternsImpl::EMPTY),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -87822,7 +95887,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -87871,7 +95941,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (BundleContents, &BundleContentsImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -87921,7 +95996,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -87989,7 +96069,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemLlamaCarpetUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -88049,7 +96134,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -88098,7 +96188,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -88147,7 +96242,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -88196,7 +96296,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -88245,7 +96350,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -88305,7 +96415,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Dye, &DyeImpl),
             (
                 Enchantments,
@@ -88355,7 +96470,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -88420,7 +96540,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::EntityHappyGhastUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -88469,7 +96594,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -88519,7 +96649,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -88568,7 +96703,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -88617,7 +96757,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -88666,7 +96811,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -88716,7 +96866,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -88776,7 +96931,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -88836,7 +96996,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -88896,7 +97061,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -88945,7 +97115,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 Enchantments,
@@ -89002,7 +97177,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -89051,7 +97231,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -89101,7 +97286,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.65f32 }),
             (
                 Enchantments,
@@ -89173,7 +97363,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemShearsSnip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -89222,7 +97417,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -89272,7 +97472,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -89357,7 +97562,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemArmorUnequipWolf),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::ItemWolfArmorBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -89412,7 +97622,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -89506,7 +97721,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 15 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -89616,7 +97836,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 15 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -89726,7 +97951,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 15 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -89836,7 +98066,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 15 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -89937,7 +98172,12 @@ impl Item {
                     mob_factor: 0.5f32,
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 DamageType,
                 &DamageTypeImpl {
@@ -90097,7 +98337,12 @@ impl Item {
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 15 }),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -90163,7 +98408,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -90213,7 +98463,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -90266,7 +98521,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (EnchantmentGlintOverride, &EnchantmentGlintOverrideImpl),
             (
                 Enchantments,
@@ -90317,7 +98577,12 @@ impl Item {
                 },
             ),
             (BannerPatterns, &BannerPatternsImpl::EMPTY),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -90377,7 +98642,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -90426,7 +98696,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (BundleContents, &BundleContentsImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -90476,7 +98751,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -90544,7 +98824,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemLlamaCarpetUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -90604,7 +98889,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -90653,7 +98943,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -90702,7 +98997,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -90751,7 +99051,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -90800,7 +99105,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -90860,7 +99170,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Dye, &DyeImpl),
             (
                 Enchantments,
@@ -90910,7 +99225,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -90975,7 +99295,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::EntityHappyGhastUnequip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -91024,7 +99349,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Compostable, &CompostableImpl { chance: 0.3f32 }),
             (
                 Enchantments,
@@ -91074,7 +99404,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (Container, &ContainerImpl { items: Vec::new() }),
             (
                 Enchantments,
@@ -91124,7 +99459,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -91173,7 +99513,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -91222,7 +99567,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -91271,7 +99621,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -91331,7 +99686,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -91391,7 +99751,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 CookingFuel,
                 &CookingFuelImpl {
@@ -91451,7 +99816,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -91523,7 +99893,12 @@ impl Item {
                     shearing_sound: IdOr::Id(Sound::ItemShearsSnip),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -91572,7 +99947,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -91622,7 +100002,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -91672,7 +100057,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -91722,7 +100112,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -91772,7 +100167,12 @@ impl Item {
                     attribute_modifiers: Cow::Borrowed(&[]),
                 },
             ),
-            (BreakSound, &BreakSoundImpl),
+            (
+                BreakSound,
+                &BreakSoundImpl {
+                    sound: IdOr::Id(Sound::EntityItemBreak),
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {

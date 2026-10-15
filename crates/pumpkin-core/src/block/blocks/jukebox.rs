@@ -9,9 +9,8 @@ use crate::block::{
 use crate::entity::Entity;
 use crate::entity::item::ItemEntity;
 use crate::world::World;
-use pumpkin_data::data_component_impl::JukeboxPlayableImpl;
+use pumpkin_data::data_component_impl::{Holder, JukeboxPlayableImpl};
 use pumpkin_data::entity::EntityType;
-use pumpkin_data::jukebox_song::JukeboxSong;
 use pumpkin_data::world::WorldEvent;
 use pumpkin_data::{Block, BlockStateId, block_properties::JukeboxLikeProperties};
 use pumpkin_macros::pumpkin_block;
@@ -19,8 +18,6 @@ use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
 use pumpkin_world::world::BlockFlags;
 use rand::{RngExt, rng};
-
-use tracing::error;
 
 #[pumpkin_block("minecraft:jukebox")]
 pub struct JukeboxBlock;
@@ -115,19 +112,15 @@ impl BlockBehaviour for JukeboxBlock {
         // Vanilla: JukeboxPlayableComponent lv = stack.get(DataComponentTypes.JUKEBOX_PLAYABLE)
         let jukebox_playable = item_stack
             .get_data_component::<JukeboxPlayableImpl>()
-            .map(|i| i.song);
+            .map(|i| i.song.clone());
 
         // Vanilla: if (lv == null) return PASS_TO_DEFAULT_BLOCK_ACTION
         let Some(jukebox_playable) = jukebox_playable else {
             return BlockActionResult::PassToDefaultBlockAction;
         };
 
-        let Some(song_name) = jukebox_playable.split(':').nth(1) else {
-            return BlockActionResult::PassToDefaultBlockAction;
-        };
-
-        let Some(jukebox_song) = JukeboxSong::from_name(song_name) else {
-            error!("Jukebox playable song not registered: {song_name}");
+        // TODO: play inline (non-registry) songs, which vanilla also accepts.
+        let Holder::Reference(jukebox_song) = jukebox_playable else {
             return BlockActionResult::PassToDefaultBlockAction;
         };
 
@@ -202,8 +195,7 @@ impl BlockBehaviour for JukeboxBlock {
             let record = jukebox_entity.get_record();
             // Get the song from the record's jukebox_playable component
             if let Some(playable) = record.get_data_component::<JukeboxPlayableImpl>()
-                && let Some(song_name) = playable.song.rsplit(':').next()
-                && let Some(song) = JukeboxSong::from_name(song_name)
+                && let Holder::Reference(song) = playable.song
             {
                 return Some(song.comparator_output());
             }

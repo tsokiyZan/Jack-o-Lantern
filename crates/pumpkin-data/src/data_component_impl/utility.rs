@@ -1,8 +1,15 @@
 use super::Digest;
+use crate::data_component_impl::basic::SoundEvent;
 use crate::data_component_impl::combat::SwingAnimationImpl;
-use crate::data_component_impl::{DataComponentImpl, get_f32_hash, get_i32_hash, get_str_hash};
+use crate::data_component_impl::{
+    DataComponentImpl, Holder, IdOr, MapHash, get_f32_hash, get_i32_hash, get_idor, get_idor_hash,
+    get_str_hash, get_text_hash, put_idor, text_to_nbt,
+};
+use crate::jukebox_song::JukeboxSong;
+use crate::sound::Sound;
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_nbt::tag::NbtTag;
+use pumpkin_util::text::TextComponent;
 use std::borrow::Cow;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -855,22 +862,75 @@ impl DataComponentImpl for ProfileImpl {
     default_impl!(Profile);
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+/// An inline jukebox song, `JukeboxSong.DIRECT_CODEC`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct JukeboxSongDefinition {
+    pub sound_event: IdOr<SoundEvent>,
+    pub description: TextComponent,
+    pub length_in_seconds: f32,
+    pub comparator_output: i32,
+}
+
+/// `minecraft:jukebox_playable`, a holder of the song the item plays.
+#[derive(Clone, Debug, PartialEq)]
 pub struct JukeboxPlayableImpl {
-    pub song: &'static str,
+    pub song: Holder<JukeboxSong, Box<JukeboxSongDefinition>>,
 }
 impl JukeboxPlayableImpl {
+    // `JukeboxSong.CODEC` only stores registry songs. The inline form is read
+    // back too so a song that arrived over the network survives a save.
     pub fn read_data(data: &NbtTag) -> Option<Self> {
-        let compound = data.extract_compound()?;
-        let song = compound.get_string("song")?;
-        let static_song = crate::jukebox_song::JukeboxSong::from_name(
-            song.strip_prefix("minecraft:").unwrap_or(song),
-        )
-        .map_or("", |s| s.to_name());
-        Some(Self { song: static_song })
+        let song = match data {
+            NbtTag::String(id) => Holder::Reference(JukeboxSong::from_name(
+                id.strip_prefix("minecraft:").unwrap_or(id),
+            )?),
+            NbtTag::Compound(compound) => {
+                compound.get("sound_event")?;
+                Holder::Direct(Box::new(JukeboxSongDefinition {
+                    sound_event: get_idor(compound, "sound_event", Sound::IntentionallyEmpty),
+                    description: TextComponent::from_nbt(compound.get("description")?),
+                    length_in_seconds: compound.get("length_in_seconds")?.as_numeric_float()?,
+                    comparator_output: compound.get("comparator_output")?.as_numeric_int()?,
+                }))
+            }
+            _ => return None,
+        };
+        Some(Self { song })
     }
 }
 impl DataComponentImpl for JukeboxPlayableImpl {
+    fn write_data(&self) -> NbtTag {
+        match &self.song {
+            Holder::Reference(song) => {
+                NbtTag::String(format!("minecraft:{}", song.to_name()).into())
+            }
+            Holder::Direct(definition) => {
+                let mut compound = NbtCompound::new();
+                put_idor(&mut compound, "sound_event", &definition.sound_event);
+                compound.put("description", text_to_nbt(&definition.description));
+                compound.put_float("length_in_seconds", definition.length_in_seconds);
+                compound.put_int("comparator_output", definition.comparator_output);
+                NbtTag::Compound(compound)
+            }
+        }
+    }
+    fn get_hash(&self) -> i32 {
+        (match &self.song {
+            Holder::Reference(song) => get_str_hash(&format!("minecraft:{}", song.to_name())),
+            Holder::Direct(definition) => MapHash::new()
+                .field("sound_event", get_idor_hash(&definition.sound_event))
+                .field("description", get_text_hash(&definition.description))
+                .field(
+                    "length_in_seconds",
+                    get_f32_hash(definition.length_in_seconds),
+                )
+                .field(
+                    "comparator_output",
+                    get_i32_hash(definition.comparator_output),
+                )
+                .finish(),
+        }) as i32
+    }
     default_impl!(JukeboxPlayable);
 }
 

@@ -8,6 +8,8 @@ use crate::sound::Sound;
 use crate::tag::Taggable;
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_nbt::tag::NbtTag;
+use pumpkin_util::text::TextComponent;
+use pumpkin_util::version::JavaMinecraftVersion;
 use std::any::Any;
 use std::borrow::Cow;
 
@@ -476,6 +478,10 @@ impl<T: IDSetContent + 'static> IDSet<T> {
                 tag.insert(0, '#');
                 compound.put_string(key, tag);
             }
+            // `ExtraCodecs.compactListCodec` writes a single id without the list.
+            Self::IDs(arr) if arr.len() == 1 => {
+                compound.put_string(key, namespaced(&arr[0].to_string()).into_owned());
+            }
             Self::IDs(arr) => {
                 let id_vec: Vec<NbtTag> = arr
                     .iter()
@@ -716,6 +722,42 @@ pub enum IdOr<T> {
     Value(T),
 }
 
+/// A registry holder that may also carry its value inline, like a vanilla
+/// `Holder` encoded with `ByteBufCodecs.holder` or `RegistryCodecs.holder`
+/// with a direct codec.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Holder<R, D> {
+    Reference(R),
+    Direct(D),
+}
+
+/// Hash of a text component as `ComponentSerialization.CODEC` encodes it.
+/// Text component NBT only uses bytes for boolean style fields, which the
+/// codec writes as booleans.
+#[must_use]
+pub fn get_text_hash(text: &TextComponent) -> u32 {
+    fn hash(tag: &NbtTag) -> u32 {
+        match tag {
+            NbtTag::Byte(value) => get_bool_hash(*value != 0),
+            NbtTag::List(values) => get_list_hash(values.iter().map(hash)),
+            NbtTag::Compound(compound) => get_map_hash(
+                compound
+                    .child_tags
+                    .iter()
+                    .map(|(key, value)| (get_str_hash(key), hash(value))),
+            ),
+            other => get_nbt_hash(other),
+        }
+    }
+    hash(&text_to_nbt(text))
+}
+
+/// `ComponentSerialization.CODEC` NBT form of a text component.
+#[must_use]
+pub fn text_to_nbt(text: &TextComponent) -> NbtTag {
+    text.to_nbt_tag_for_version(&JavaMinecraftVersion::V_26_3)
+}
+
 pub mod basic;
 pub mod block_entity;
 pub mod book;
@@ -935,6 +977,80 @@ mod tests {
         nbt.put_float("Health", 10.0);
         nbt.put_string("Name", "é".to_string());
         assert_eq!(CustomDataImpl { data: nbt }.get_hash(), -1_842_861_489);
+    }
+
+    fn custom_horn_sound() -> IdOr<SoundEvent> {
+        IdOr::Value(SoundEvent {
+            sound_name: "minecraft:custom.horn".to_string(),
+            range: Some(32.0),
+        })
+    }
+
+    #[test]
+    fn hash_sound_holders() {
+        assert_eq!(
+            BreakSoundImpl {
+                sound: IdOr::Id(Sound::EntityItemBreak)
+            }
+            .get_hash(),
+            123_447_120
+        );
+        assert_eq!(
+            BreakSoundImpl {
+                sound: custom_horn_sound()
+            }
+            .get_hash(),
+            786_858_243
+        );
+    }
+
+    #[test]
+    fn hash_inline_holders() {
+        assert_eq!(
+            InstrumentImpl {
+                instrument: Holder::Direct(Box::new(InstrumentDefinition {
+                    sound_event: custom_horn_sound(),
+                    use_duration: 7.0,
+                    range: 256.0,
+                    durability_damage: 2,
+                    description: TextComponent::text("Horn"),
+                })),
+            }
+            .get_hash(),
+            -1_895_168_128
+        );
+        assert_eq!(
+            ProvidesTrimMaterialImpl {
+                material: Holder::Direct(TrimMaterialDefinition {
+                    palette_id: "minecraft:ruby".to_string(),
+                    description: TextComponent::text("Ruby"),
+                }),
+            }
+            .get_hash(),
+            72_354_046
+        );
+    }
+
+    #[test]
+    fn holders_round_trip_through_nbt() {
+        assert_round_trip(
+            InstrumentImpl {
+                instrument: Holder::Reference(crate::instrument::Instrument::SeekGoatHorn),
+            },
+            InstrumentImpl::read_data,
+        );
+        assert_round_trip(
+            JukeboxPlayableImpl {
+                song: Holder::Reference(crate::jukebox_song::JukeboxSong::Pigstep),
+            },
+            JukeboxPlayableImpl::read_data,
+        );
+        assert_round_trip(
+            ProvidesBannerPatternsImpl {
+                patterns: IDSet::Tag(Cow::Borrowed("pattern_item/flower")),
+            },
+            ProvidesBannerPatternsImpl::read_data,
+        );
     }
 
     fn assert_round_trip<T: DataComponentImpl + Clone + 'static>(

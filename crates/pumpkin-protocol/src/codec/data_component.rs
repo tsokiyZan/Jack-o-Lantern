@@ -7,6 +7,10 @@ use crate::ser::{NetworkReadExt, NetworkWriteExt, ReadingError, WritingError};
 use pumpkin_data::Enchantment;
 use pumpkin_data::data_component::DataComponent;
 use pumpkin_data::data_component_impl::*;
+use pumpkin_data::instrument::Instrument;
+use pumpkin_data::jukebox_song::JukeboxSong;
+use pumpkin_data::trim_material::TrimMaterial;
+use pumpkin_util::text::TextComponent;
 
 use pumpkin_data::effect::StatusEffect;
 use pumpkin_data::entity::EntityType;
@@ -88,6 +92,54 @@ fn serialize_idset<C: IDSetContent>(
             Ok(())
         }
     }
+}
+
+fn read_registry_id(seq: &mut impl NetworkReadExt, what: &str) -> Result<u32, ReadingError> {
+    let id = seq.get_var_int()?.0;
+    u32::try_from(id).map_err(|_| ReadingError::Message(format!("Invalid {what} id {id}")))
+}
+
+/// Reads a `ByteBufCodecs.holder` id: 0 for an inline value, otherwise the
+/// registry id plus one.
+fn read_holder_id(seq: &mut impl NetworkReadExt, what: &str) -> Result<Option<u32>, ReadingError> {
+    let id = read_registry_id(seq, what)?;
+    Ok(id.checked_sub(1))
+}
+
+fn write_holder_reference(seq: &mut impl NetworkWriteExt, id: u32) -> Result<(), WritingError> {
+    seq.write_var_int(&VarInt(id as i32 + 1))
+}
+
+/// `SoundEvent.STREAM_CODEC`.
+fn read_sound(seq: &mut impl NetworkReadExt) -> Result<IdOr<SoundEvent>, ReadingError> {
+    let proto = crate::IdOr::<crate::SoundEvent>::read(seq, |r| {
+        let sound_name = r.get_str()?.into();
+        let range = r.get_option(NetworkReadExt::get_f32)?;
+        Ok(crate::SoundEvent { sound_name, range })
+    })?;
+    proto_to_data_sound(&proto).ok_or_else(|| ReadingError::Message("Invalid sound id".into()))
+}
+
+fn write_sound(
+    seq: &mut impl NetworkWriteExt,
+    sound: &IdOr<SoundEvent>,
+) -> Result<(), WritingError> {
+    crate::IdOr::<crate::SoundEvent>::write(&data_to_proto_sound(sound), seq, |w, e| {
+        w.write_string(&e.sound_name)?;
+        w.write_option(&e.range, |w2, r| w2.write_f32(*r))
+    })
+}
+
+/// `ComponentSerialization.STREAM_CODEC`.
+fn read_text(seq: &mut impl NetworkReadExt) -> Result<TextComponent, ReadingError> {
+    let tag = seq
+        .get_nbt_with_version(&JavaMinecraftVersion::V_26_2)?
+        .ok_or_else(|| ReadingError::Message("Missing text component".into()))?;
+    Ok(TextComponent::from_nbt(&tag))
+}
+
+fn write_text(seq: &mut impl NetworkWriteExt, text: &TextComponent) -> Result<(), WritingError> {
+    seq.write_slice(&text.encode_for_version(&JavaMinecraftVersion::V_26_2))
 }
 
 fn deserialize_status_effects(
@@ -2404,23 +2456,64 @@ impl DataComponentCodec<Self> for BlockEntityDataImpl {
 
 impl DataComponentCodec<Self> for InstrumentImpl {
     fn serialize(&self, seq: &mut impl NetworkWriteExt) -> Result<(), WritingError> {
-        seq.write_var_int(&VarInt(0))
+        match &self.instrument {
+            Holder::Reference(instrument) => write_holder_reference(seq, instrument.id()),
+            Holder::Direct(definition) => {
+                seq.write_var_int(&VarInt(0))?;
+                write_sound(seq, &definition.sound_event)?;
+                seq.write_f32(definition.use_duration)?;
+                seq.write_f32(definition.range)?;
+                seq.write_var_int(&VarInt(definition.durability_damage))?;
+                write_text(seq, &definition.description)
+            }
+        }
     }
 
     fn deserialize(seq: &mut impl NetworkReadExt) -> Result<Self, ReadingError> {
-        let _ = seq.get_var_int()?;
-        Ok(Self)
+        let instrument = match read_holder_id(seq, "instrument")? {
+            Some(id) => Holder::Reference(
+                Instrument::all()
+                    .get(id as usize)
+                    .copied()
+                    .ok_or_else(|| ReadingError::Message(format!("Unknown instrument id {id}")))?,
+            ),
+            None => Holder::Direct(Box::new(InstrumentDefinition {
+                sound_event: read_sound(seq)?,
+                use_duration: seq.get_f32()?,
+                range: seq.get_f32()?,
+                durability_damage: seq.get_var_int()?.0,
+                description: read_text(seq)?,
+            })),
+        };
+        Ok(Self { instrument })
     }
 }
 
 impl DataComponentCodec<Self> for ProvidesTrimMaterialImpl {
     fn serialize(&self, seq: &mut impl NetworkWriteExt) -> Result<(), WritingError> {
-        seq.write_var_int(&VarInt(0))
+        match &self.material {
+            Holder::Reference(material) => write_holder_reference(seq, material.id()),
+            Holder::Direct(definition) => {
+                seq.write_var_int(&VarInt(0))?;
+                seq.write_string(&definition.palette_id)?;
+                write_text(seq, &definition.description)
+            }
+        }
     }
 
     fn deserialize(seq: &mut impl NetworkReadExt) -> Result<Self, ReadingError> {
-        let _ = seq.get_var_int()?;
-        Ok(Self)
+        let material = match read_holder_id(seq, "trim material")? {
+            Some(id) => {
+                Holder::Reference(TrimMaterial::all().get(id as usize).copied().ok_or_else(
+                    || ReadingError::Message(format!("Unknown trim material id {id}")),
+                )?)
+            }
+            None => Holder::Direct(TrimMaterialDefinition {
+                palette_id: seq.get_str()?.into(),
+                description: read_text(seq)?,
+            }),
+        };
+        Ok(Self { material })
     }
 }
 
@@ -2437,31 +2530,44 @@ impl DataComponentCodec<Self> for OminousBottleAmplifierImpl {
 
 impl DataComponentCodec<Self> for JukeboxPlayableImpl {
     fn serialize(&self, seq: &mut impl NetworkWriteExt) -> Result<(), WritingError> {
-        let song_id = Sound::from_name(self.song).map_or(0, |s| s as i32);
-        seq.write_var_int(&VarInt::from(song_id))
+        match &self.song {
+            Holder::Reference(song) => write_holder_reference(seq, song.get_id()),
+            Holder::Direct(definition) => {
+                seq.write_var_int(&VarInt(0))?;
+                write_sound(seq, &definition.sound_event)?;
+                write_text(seq, &definition.description)?;
+                seq.write_f32(definition.length_in_seconds)?;
+                seq.write_var_int(&VarInt(definition.comparator_output))
+            }
+        }
     }
 
     fn deserialize(seq: &mut impl NetworkReadExt) -> Result<Self, ReadingError> {
-        let _ = seq.get_var_int()?;
-        Ok(Self { song: "" })
+        let song =
+            match read_holder_id(seq, "jukebox song")? {
+                Some(id) => Holder::Reference(JukeboxSong::from_id(id).ok_or_else(|| {
+                    ReadingError::Message(format!("Unknown jukebox song id {id}"))
+                })?),
+                None => Holder::Direct(Box::new(JukeboxSongDefinition {
+                    sound_event: read_sound(seq)?,
+                    description: read_text(seq)?,
+                    length_in_seconds: seq.get_f32()?,
+                    comparator_output: seq.get_var_int()?.0,
+                })),
+            };
+        Ok(Self { song })
     }
 }
 
 impl DataComponentCodec<Self> for ProvidesBannerPatternsImpl {
     fn serialize(&self, seq: &mut impl NetworkWriteExt) -> Result<(), WritingError> {
-        seq.write_var_int(&VarInt(0))
+        serialize_idset(&self.patterns, seq)
     }
 
     fn deserialize(seq: &mut impl NetworkReadExt) -> Result<Self, ReadingError> {
-        let id_type = seq.get_var_int()?.0;
-        if id_type == 0 {
-            let _ = seq.get_str()?;
-        } else if id_type > 0 {
-            for _ in 0..(id_type - 1) {
-                let _ = seq.get_var_int()?;
-            }
-        }
-        Ok(Self)
+        Ok(Self {
+            patterns: deserialize_idset(seq)?,
+        })
     }
 }
 
@@ -2815,12 +2921,13 @@ impl DataComponentCodec<Self> for ContainerLootImpl {
 
 impl DataComponentCodec<Self> for BreakSoundImpl {
     fn serialize(&self, seq: &mut impl NetworkWriteExt) -> Result<(), WritingError> {
-        seq.write_var_int(&VarInt(0))
+        write_sound(seq, &self.sound)
     }
 
     fn deserialize(seq: &mut impl NetworkReadExt) -> Result<Self, ReadingError> {
-        let _ = seq.get_var_int()?;
-        Ok(Self)
+        Ok(Self {
+            sound: read_sound(seq)?,
+        })
     }
 }
 
@@ -2883,5 +2990,153 @@ mod tests {
         let decoded = ProfileImpl::deserialize(&mut encoded.as_slice()).unwrap();
         assert_eq!(decoded.name.as_deref(), Some("Notch"));
         assert_eq!(decoded.id, Some([1, 2, 3, 4]));
+    }
+
+    // Wire bytes below were produced by vanilla 26.3's stream codecs.
+
+    fn encode<T: DataComponentImpl + DataComponentCodec<T>>(value: &T) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        value.serialize(&mut bytes).unwrap();
+        bytes
+    }
+
+    /// Decodes `bytes` and checks nothing is left over for the next component.
+    fn decode<T: DataComponentImpl + DataComponentCodec<T>>(bytes: &[u8]) -> T {
+        let mut slice = bytes;
+        let value = T::deserialize(&mut slice).unwrap();
+        assert!(slice.is_empty(), "{} bytes left unread", slice.len());
+        value
+    }
+
+    fn assert_wire<T>(value: &T, bytes: &[u8])
+    where
+        T: DataComponentImpl + DataComponentCodec<T> + PartialEq + std::fmt::Debug,
+    {
+        assert_eq!(encode(value), bytes);
+        assert_eq!(&decode::<T>(bytes), value);
+    }
+
+    fn custom_horn_sound() -> IdOr<SoundEvent> {
+        IdOr::Value(SoundEvent {
+            sound_name: "minecraft:custom.horn".to_string(),
+            range: Some(32.0),
+        })
+    }
+
+    /// `SoundEvent.DIRECT_STREAM_CODEC` of `custom_horn_sound` behind a holder id of 0.
+    const CUSTOM_HORN_SOUND: &[u8] = &[
+        0x00, 0x15, b'm', b'i', b'n', b'e', b'c', b'r', b'a', b'f', b't', b':', b'c', b'u', b's',
+        b't', b'o', b'm', b'.', b'h', b'o', b'r', b'n', 0x01, 0x42, 0x00, 0x00, 0x00,
+    ];
+
+    #[test]
+    fn instrument_reference_is_holder_id_plus_one() {
+        // ponder_goat_horn is id 4 in the instrument registry.
+        assert_wire(
+            &InstrumentImpl {
+                instrument: Holder::Reference(Instrument::PonderGoatHorn),
+            },
+            &[0x05],
+        );
+    }
+
+    #[test]
+    fn instrument_inline_value_is_fully_read() {
+        let mut bytes = vec![0x00];
+        bytes.extend_from_slice(CUSTOM_HORN_SOUND);
+        bytes.extend_from_slice(&[0x40, 0xe0, 0x00, 0x00, 0x43, 0x80, 0x00, 0x00, 0x02]);
+        bytes.extend_from_slice(&[0x08, 0x00, 0x04, b'H', b'o', b'r', b'n']);
+        let decoded = decode::<InstrumentImpl>(&bytes);
+        let Holder::Direct(definition) = &decoded.instrument else {
+            panic!("expected an inline instrument");
+        };
+        assert_eq!(definition.sound_event, custom_horn_sound());
+        assert_eq!(
+            (
+                definition.use_duration,
+                definition.range,
+                definition.durability_damage
+            ),
+            (7.0, 256.0, 2)
+        );
+        assert_eq!(definition.description.clone().get_text(), "Horn");
+        assert_eq!(encode(&decoded), bytes);
+    }
+
+    #[test]
+    fn instrument_rejects_truncated_inline_and_unknown_ids() {
+        // A lone 0 announces an inline instrument; this is what used to kick goat horns.
+        assert!(InstrumentImpl::deserialize(&mut [0x00u8].as_slice()).is_err());
+        assert!(InstrumentImpl::deserialize(&mut [0x7fu8].as_slice()).is_err());
+    }
+
+    #[test]
+    fn break_sound_holder() {
+        // entity.item.break is sound 914.
+        assert_wire(
+            &BreakSoundImpl {
+                sound: IdOr::Id(Sound::EntityItemBreak),
+            },
+            &[0x93, 0x07],
+        );
+        assert_wire(
+            &BreakSoundImpl {
+                sound: custom_horn_sound(),
+            },
+            CUSTOM_HORN_SOUND,
+        );
+    }
+
+    #[test]
+    fn trim_material_inline_value() {
+        let mut bytes = vec![0x00, 0x0e];
+        bytes.extend_from_slice(b"minecraft:ruby");
+        bytes.extend_from_slice(&[0x08, 0x00, 0x04, b'R', b'u', b'b', b'y']);
+        let decoded = decode::<ProvidesTrimMaterialImpl>(&bytes);
+        assert!(matches!(
+            &decoded.material,
+            Holder::Direct(definition) if definition.palette_id == "minecraft:ruby"
+        ));
+        assert_eq!(encode(&decoded), bytes);
+        // diamond is id 2 in the trim material registry.
+        assert_wire(
+            &ProvidesTrimMaterialImpl {
+                material: Holder::Reference(TrimMaterial::Diamond),
+            },
+            &[0x03],
+        );
+    }
+
+    #[test]
+    fn jukebox_playable_holder() {
+        // pigstep is id 14 in the jukebox song registry.
+        assert_wire(
+            &JukeboxPlayableImpl {
+                song: Holder::Reference(JukeboxSong::Pigstep),
+            },
+            &[0x0f],
+        );
+        let mut bytes = vec![0x00];
+        bytes.extend_from_slice(CUSTOM_HORN_SOUND);
+        bytes.extend_from_slice(&[0x08, 0x00, 0x04, b'S', b'o', b'n', b'g']);
+        bytes.extend_from_slice(&[0x42, 0xb4, 0x00, 0x00, 0x07]);
+        let decoded = decode::<JukeboxPlayableImpl>(&bytes);
+        assert!(matches!(
+            &decoded.song,
+            Holder::Direct(song) if song.length_in_seconds == 90.0 && song.comparator_output == 7
+        ));
+        assert_eq!(encode(&decoded), bytes);
+    }
+
+    #[test]
+    fn provides_banner_patterns_tag() {
+        let mut bytes = vec![0x00, 0x13];
+        bytes.extend_from_slice(b"pattern_item/flower");
+        assert_wire(
+            &ProvidesBannerPatternsImpl {
+                patterns: IDSet::Tag(Cow::Borrowed("pattern_item/flower")),
+            },
+            &bytes,
+        );
     }
 }
