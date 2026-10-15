@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::sync::{
     Arc, Weak,
     atomic::{AtomicBool, AtomicI32, Ordering},
@@ -5,6 +6,9 @@ use std::sync::{
 
 use crate::block::blocks::plant::crop::CropBlockBase;
 use crate::block::blocks::plant::crop::carrot::CarrotBlock;
+use crate::entity::ai::control::jump_control::JumpControlTrait;
+use crate::entity::ai::control::move_control::{MoveControl, Operation};
+use crate::entity::ai::control::{Control, MoveControlTrait};
 use crate::entity::ai::goal::climb_on_top_of_powder_snow::ClimbOnTopOfPowderSnowGoal;
 use crate::entity::ai::goal::move_to_target_pos::{MoveToTargetPos, MoveToTargetPosGoal};
 use crate::entity::ai::goal::revenge::RevengeGoal;
@@ -12,6 +16,7 @@ use crate::entity::ai::goal::{Controls, Goal, ParentHandle};
 use crate::world::World;
 use pumpkin_data::entity::EntityPose;
 use pumpkin_data::entity::EntityType;
+use pumpkin_data::entity_status::EntityStatus;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::Sound;
@@ -20,8 +25,10 @@ use pumpkin_data::world::WorldEvent;
 use pumpkin_data::{Block, BlockStateId};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::codec::var_int::VarInt;
+use pumpkin_util::math;
 use pumpkin_util::math::boundingbox::EntityDimensions;
 use pumpkin_util::math::position::BlockPos;
+use pumpkin_util::math::vector3::Vector3;
 use pumpkin_world::world::BlockFlags;
 use rand::RngExt;
 
@@ -40,6 +47,21 @@ use crate::entity::{
 };
 
 const TEMPT_ITEMS: &[&Item] = &[&Item::CARROT, &Item::GOLDEN_CARROT, &Item::DANDELION];
+
+/// Vanilla `Rabbit.STROLL_SPEED_MOD`.
+const STROLL_SPEED_MOD: f64 = 0.6;
+/// Vanilla `Rabbit.FLEE_SPEED_MOD`.
+const FLEE_SPEED_MOD: f64 = 2.2;
+/// Vanilla `Rabbit.BABY_JUMP_HEIGHT`.
+const BABY_JUMP_HEIGHT: f64 = 0.5;
+/// Vanilla `Rabbit.ADULT_JUMP_HEIGHT`.
+const ADULT_JUMP_HEIGHT: f64 = 1.5;
+/// Vanilla `Rabbit.JUMP_DELAY_TICKS`.
+const JUMP_DELAY_TICKS: i32 = 10;
+/// Vanilla `Rabbit.PANIC_JUMP_DELAY_TICKS`.
+const PANIC_JUMP_DELAY_TICKS: i32 = 3;
+/// Vanilla `Rabbit.JUMP_DURATION_IN_TICKS`.
+const JUMP_DURATION_IN_TICKS: i32 = 15;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[repr(i32)]
@@ -92,6 +114,10 @@ pub struct RabbitEntity {
     pub ageable_data: AgeableData,
     pub variant: AtomicI32,
     pub more_carrot_ticks: AtomicI32,
+    jump_ticks: AtomicI32,
+    jump_duration: AtomicI32,
+    was_on_ground: AtomicBool,
+    jump_delay_ticks: AtomicI32,
 }
 
 impl RabbitEntity {
@@ -104,8 +130,25 @@ impl RabbitEntity {
             ageable_data: AgeableData::default(),
             variant: AtomicI32::new(variant.id()),
             more_carrot_ticks: AtomicI32::new(0),
+            jump_ticks: AtomicI32::new(0),
+            jump_duration: AtomicI32::new(0),
+            was_on_ground: AtomicBool::new(false),
+            jump_delay_ticks: AtomicI32::new(0),
         };
         let mob_arc = Arc::new(rabbit);
+        *mob_arc
+            .mob_entity
+            .jump_control
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) =
+            Box::new(RabbitJumpControl::default());
+        *mob_arc
+            .mob_entity
+            .move_control
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) =
+            Box::new(RabbitMoveControl::new(Arc::downgrade(&mob_arc)));
+        mob_arc.set_speed_modifier(0.0);
         let mob_weak: Weak<dyn Mob> = {
             let mob_arc: Arc<dyn Mob> = mob_arc.clone();
             Arc::downgrade(&mob_arc)
@@ -120,8 +163,10 @@ impl RabbitEntity {
 
             goal_selector.add_goal(1, SwimGoal::new(&mob_arc.mob_entity));
             goal_selector.add_goal(1, Box::new(ClimbOnTopOfPowderSnowGoal));
-            // RabbitPanicGoal
-            goal_selector.add_goal(1, EscapeDangerGoal::new(2.2));
+            goal_selector.add_goal(
+                1,
+                EscapeDangerGoal::new(FLEE_SPEED_MOD).ticking_with(rabbit_panic_tick),
+            );
             goal_selector.add_goal(2, BreedGoal::new(0.8));
             goal_selector.add_goal(3, Box::new(TemptGoal::new(1.0, TEMPT_ITEMS, false)));
             // RabbitAvoidEntityGoal: only while not the killer bunny.
@@ -151,7 +196,10 @@ impl RabbitEntity {
                 ),
             );
             goal_selector.add_goal(5, RaidGardenGoal::new());
-            goal_selector.add_goal(6, Box::new(WanderAroundGoal::avoiding_water(0.6)));
+            goal_selector.add_goal(
+                6,
+                Box::new(WanderAroundGoal::avoiding_water(STROLL_SPEED_MOD)),
+            );
             goal_selector.add_goal(
                 11,
                 LookAtEntityGoal::with_default(mob_weak, &EntityType::PLAYER, 10.0),
@@ -197,6 +245,134 @@ impl RabbitEntity {
                 ActiveTargetGoal::with_default(&self.mob_entity, &EntityType::WOLF, true),
             );
         }
+    }
+}
+
+impl RabbitEntity {
+    fn with_move_control<R>(&self, f: impl FnOnce(&mut RabbitMoveControl) -> R) -> Option<R> {
+        let mut guard = self
+            .mob_entity
+            .move_control
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let control: &mut dyn Any = &mut **guard;
+        control.downcast_mut::<RabbitMoveControl>().map(f)
+    }
+
+    fn with_jump_control<R>(&self, f: impl FnOnce(&mut RabbitJumpControl) -> R) -> Option<R> {
+        let mut guard = self
+            .mob_entity
+            .jump_control
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let control: &mut dyn Any = &mut **guard;
+        control.downcast_mut::<RabbitJumpControl>().map(f)
+    }
+
+    /// Vanilla `RabbitJumpControl.wantJump`.
+    fn want_jump(&self) -> bool {
+        self.with_jump_control(|control| control.jump)
+            .unwrap_or(false)
+    }
+
+    /// Vanilla `moveControl.getSpeedModifier()`.
+    fn move_speed_modifier(&self) -> f64 {
+        self.with_move_control(|control| control.move_control.speed_modifier)
+            .unwrap_or(0.0)
+    }
+
+    /// Vanilla `path.getNextEntityPos(this)` of an unfinished navigation path.
+    fn next_path_pos(&self) -> Option<Vector3<f64>> {
+        let width = self.get_entity().entity_dimension.load().width;
+        self.mob_entity
+            .navigator
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get_path()
+            .filter(|path| !path.is_done())
+            .and_then(|path| path.get_next_entity_pos(width))
+    }
+
+    /// Vanilla `Rabbit.getJumpPower`: higher when the path or the wanted position climbs,
+    /// or when the rabbit runs into a wall.
+    fn get_jump_power(&self) -> f32 {
+        let living = &self.mob_entity.living_entity;
+        let entity = &living.entity;
+        let (speed_modifier, wanted_y) = self
+            .with_move_control(|control| {
+                (
+                    control.move_control.speed_modifier,
+                    control.move_control.wanted_y,
+                )
+            })
+            .unwrap_or_default();
+        let mut base_jump_power = if speed_modifier <= STROLL_SPEED_MOD {
+            0.2f32
+        } else {
+            0.3
+        };
+
+        let y = entity.pos.load().y;
+        if self.next_path_pos().is_some_and(|pos| pos.y > y + 0.5) {
+            base_jump_power = 0.5;
+        }
+
+        if entity.horizontal_collision.load(Ordering::Relaxed)
+            || living.jumping.load(Ordering::Relaxed) && wanted_y > y + 0.5
+        {
+            base_jump_power = 0.5;
+        }
+
+        living.get_jump_velocity(base_jump_power / 0.42)
+    }
+
+    /// Vanilla `Rabbit.setSpeedModifier`.
+    fn set_speed_modifier(&self, speed: f64) {
+        self.with_move_control(|control| control.set_speed_modifier(self, speed));
+    }
+
+    /// Vanilla `Rabbit.setJumping`: every jump start plays the jump sound.
+    fn set_jumping(&self, jump: bool) {
+        self.mob_entity
+            .living_entity
+            .jumping
+            .store(jump, Ordering::Relaxed);
+        if jump {
+            let mut random = self.get_random();
+            // Vanilla rounds each product, so no fused multiply-add.
+            let pitch = ((random.random::<f32>() - random.random::<f32>()) * 0.2 + 1.0) * 0.8;
+            self.play_sound_at_self(Sound::EntityRabbitJump, self.sound_volume(), pitch);
+        }
+    }
+
+    /// Vanilla `Rabbit.startJumping`.
+    fn start_jumping(&self) {
+        self.set_jumping(true);
+        self.jump_duration
+            .store(JUMP_DURATION_IN_TICKS, Ordering::Relaxed);
+        self.jump_ticks.store(0, Ordering::Relaxed);
+    }
+
+    /// Vanilla `Rabbit.facePoint`.
+    fn face_point(&self, face_x: f64, face_z: f64) {
+        let entity = self.get_entity();
+        let pos = entity.pos.load();
+        entity.yaw.store(
+            (math::atan2(face_z - pos.z, face_x - pos.x) * f64::from(180.0f32)
+                / f64::from(std::f32::consts::PI)) as f32
+                - 90.0,
+        );
+    }
+
+    /// Vanilla `Rabbit.checkLandingDelay`, with `setLandingDelay` and `disableJumpControl`.
+    fn check_landing_delay(&self) {
+        let delay = if self.move_speed_modifier() < FLEE_SPEED_MOD {
+            JUMP_DELAY_TICKS
+        } else {
+            PANIC_JUMP_DELAY_TICKS
+        };
+        self.jump_delay_ticks.store(delay, Ordering::Relaxed);
+        self.with_jump_control(|control| control.can_jump = false);
     }
 }
 
@@ -263,14 +439,111 @@ impl Mob for RabbitEntity {
         self.ageable_ai_step();
     }
 
-    /// The `moreCarrotTicks` countdown from vanilla `Rabbit.customServerAiStep`.
-    // TODO: the rest of it, the hop timing with RabbitJumpControl and RabbitMoveControl.
+    /// Vanilla `Rabbit.customServerAiStep`: the hop timing.
     fn custom_server_ai_step(&self, _caller: &dyn EntityBase) {
+        if self.jump_delay_ticks.load(Ordering::Relaxed) > 0 {
+            self.jump_delay_ticks.fetch_sub(1, Ordering::Relaxed);
+        }
+
         let ticks = self.more_carrot_ticks.load(Ordering::Relaxed);
         if ticks > 0 {
             let ticks = ticks - self.get_random().random_range(0..3);
             self.more_carrot_ticks
                 .store(ticks.max(0), Ordering::Relaxed);
+        }
+
+        let entity = self.get_entity();
+        if entity.on_ground.load(Ordering::Relaxed) {
+            if !self.was_on_ground.load(Ordering::Relaxed) {
+                self.set_jumping(false);
+                self.check_landing_delay();
+            }
+
+            if self.get_variant() == RabbitVariant::Evil
+                && self.jump_delay_ticks.load(Ordering::Relaxed) == 0
+                && let Some(target) = self.mob_entity.get_target()
+            {
+                let target_pos = target.get_entity().pos.load();
+                if entity.pos.load().squared_distance_to_vec(&target_pos) < 16.0 {
+                    self.face_point(target_pos.x, target_pos.z);
+                    self.with_move_control(|control| {
+                        let speed_modifier = control.move_control.speed_modifier;
+                        control.set_wanted_position(
+                            target_pos.x,
+                            target_pos.y,
+                            target_pos.z,
+                            speed_modifier,
+                        );
+                    });
+                    self.start_jumping();
+                    self.was_on_ground.store(true, Ordering::Relaxed);
+                }
+            }
+
+            let (want_jump, can_jump) = self
+                .with_jump_control(|control| (control.jump, control.can_jump))
+                .unwrap_or_default();
+            if !want_jump {
+                let wanted = self
+                    .with_move_control(|control| {
+                        let move_control = &control.move_control;
+                        move_control.has_wanted().then_some(Vector3::new(
+                            move_control.wanted_x,
+                            move_control.wanted_y,
+                            move_control.wanted_z,
+                        ))
+                    })
+                    .flatten();
+                if let Some(wanted) = wanted
+                    && self.jump_delay_ticks.load(Ordering::Relaxed) == 0
+                {
+                    let pos = self.next_path_pos().unwrap_or(wanted);
+                    self.face_point(pos.x, pos.z);
+                    self.start_jumping();
+                }
+            } else if !can_jump {
+                self.with_jump_control(|control| control.can_jump = true);
+            }
+        }
+
+        self.was_on_ground
+            .store(entity.on_ground.load(Ordering::Relaxed), Ordering::Relaxed);
+    }
+
+    /// Vanilla `Rabbit.jumpFromGround`: a hop from standstill gets a push forwards.
+    fn jump_from_ground(&self) {
+        let living = &self.mob_entity.living_entity;
+        let entity = &living.entity;
+        living.jump_with_power(self.get_jump_power());
+        if self.move_speed_modifier() > 0.0 {
+            let current = entity.velocity.load().horizontal_length_squared();
+            if current < 0.01 {
+                let height = if entity.is_baby() {
+                    BABY_JUMP_HEIGHT
+                } else {
+                    ADULT_JUMP_HEIGHT
+                };
+                entity
+                    .update_velocity_from_input(Vector3::new(0.0, height, 1.0), f64::from(0.1f32));
+            }
+        }
+
+        entity
+            .world
+            .load()
+            .broadcast_entity_event(entity, EntityStatus::Jump, None);
+    }
+
+    /// The end of vanilla `Rabbit.aiStep`: a hop lasts at most `JUMP_DURATION_IN_TICKS`.
+    fn post_tick(&self) {
+        let jump_ticks = self.jump_ticks.load(Ordering::Relaxed);
+        let jump_duration = self.jump_duration.load(Ordering::Relaxed);
+        if jump_ticks != jump_duration {
+            self.jump_ticks.store(jump_ticks + 1, Ordering::Relaxed);
+        } else if jump_duration != 0 {
+            self.jump_ticks.store(0, Ordering::Relaxed);
+            self.jump_duration.store(0, Ordering::Relaxed);
+            self.set_jumping(false);
         }
     }
 
@@ -288,6 +561,118 @@ impl Mob for RabbitEntity {
 
     fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
         self.animal_interact(player, item_stack, Sound::EntityRabbitAmbient)
+    }
+}
+
+/// Vanilla `RabbitPanicGoal.tick`: keeps the flee speed for the next hops.
+fn rabbit_panic_tick(mob: &dyn Mob, speed_modifier: f64) {
+    if let Some(rabbit) = mob.cast_any().downcast_ref::<RabbitEntity>() {
+        rabbit.set_speed_modifier(speed_modifier);
+    }
+}
+
+/// Vanilla `Rabbit.RabbitJumpControl`: a jump request starts a hop, and the jump stays on
+/// until the rabbit lands or the hop times out.
+#[derive(Default)]
+struct RabbitJumpControl {
+    jump: bool,
+    can_jump: bool,
+}
+
+impl Control for RabbitJumpControl {}
+
+impl JumpControlTrait for RabbitJumpControl {
+    fn jump(&mut self) {
+        self.jump = true;
+    }
+
+    fn tick(&mut self, mob: &dyn Mob) {
+        if self.jump {
+            if let Some(rabbit) = mob.cast_any().downcast_ref::<RabbitEntity>() {
+                rabbit.start_jumping();
+            }
+            self.jump = false;
+        }
+    }
+}
+
+/// Vanilla `Rabbit.RabbitMoveControl`: a rabbit only moves while it hops, at the speed
+/// it was last asked for.
+struct RabbitMoveControl {
+    move_control: MoveControl,
+    next_jump_speed: f64,
+    rabbit: Weak<RabbitEntity>,
+}
+
+impl RabbitMoveControl {
+    fn new(rabbit: Weak<RabbitEntity>) -> Self {
+        Self {
+            move_control: MoveControl::default(),
+            next_jump_speed: 0.0,
+            rabbit,
+        }
+    }
+
+    /// Vanilla `Rabbit.setSpeedModifier`, which sets the speed on this move control.
+    fn set_speed_modifier(&mut self, mob: &dyn Mob, speed: f64) {
+        mob.get_mob_entity()
+            .navigator
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .set_speed(speed);
+        let MoveControl {
+            wanted_x,
+            wanted_y,
+            wanted_z,
+            ..
+        } = self.move_control;
+        self.set_wanted_position(wanted_x, wanted_y, wanted_z, speed);
+    }
+}
+
+impl Control for RabbitMoveControl {}
+
+impl MoveControlTrait for RabbitMoveControl {
+    fn tick(&mut self, mob: &dyn Mob) {
+        let living = &mob.get_mob_entity().living_entity;
+        let Some(rabbit) = mob.cast_any().downcast_ref::<RabbitEntity>() else {
+            return;
+        };
+        if living.entity.on_ground.load(Ordering::Relaxed)
+            && !living.jumping.load(Ordering::Relaxed)
+            && !rabbit.want_jump()
+        {
+            self.set_speed_modifier(mob, 0.0);
+        } else if self.move_control.has_wanted()
+            || self.move_control.operation == Operation::Jumping
+        {
+            self.set_speed_modifier(mob, self.next_jump_speed);
+        }
+
+        MoveControlTrait::tick(&mut self.move_control, mob);
+    }
+
+    fn set_wanted_position(&mut self, x: f64, y: f64, z: f64, mut speed_modifier: f64) {
+        if self
+            .rabbit
+            .upgrade()
+            .is_some_and(|rabbit| rabbit.get_entity().is_in_water())
+        {
+            speed_modifier = 1.5;
+        }
+
+        MoveControlTrait::set_wanted_position(&mut self.move_control, x, y, z, speed_modifier);
+        if speed_modifier > 0.0 {
+            self.next_jump_speed = speed_modifier;
+        }
+    }
+
+    fn strafe(&mut self, forward: f32, right: f32) {
+        MoveControlTrait::strafe(&mut self.move_control, forward, right);
+    }
+
+    fn has_wanted(&self) -> bool {
+        MoveControlTrait::has_wanted(&self.move_control)
     }
 }
 
