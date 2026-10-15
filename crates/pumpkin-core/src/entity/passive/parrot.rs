@@ -3,13 +3,20 @@ use std::sync::{Arc, Weak};
 use crate::entity::ai::control::flying_move_control::FlyingMoveControl;
 use crate::entity::ai::goal::escape_danger::EscapeDangerGoal;
 use crate::entity::ai::goal::follow_mob::FollowMobGoal;
+use crate::entity::ai::goal::follow_owner::FollowOwnerGoal;
+use crate::entity::ai::goal::sit_when_ordered_to::SitWhenOrderedToGoal;
 use crate::entity::ai::goal::water_avoiding_random_flying::WaterAvoidingRandomFlyingGoal;
 use crate::entity::ai::pathfinder::Navigator;
+use crate::entity::passive::animal::Animal;
+use crate::entity::passive::tamable::{TamableAnimal, TamableData};
 use pumpkin_data::damage::DamageType;
 use pumpkin_data::effect::StatusEffect;
+use pumpkin_data::entity::EntityStatus;
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::tag::{self, Taggable};
+use pumpkin_protocol::bedrock::server::actor_event::ActorEventID;
+use rand::RngExt;
 
 use crate::entity::ai::pathfinder::node::PathType;
 use crate::entity::{
@@ -201,6 +208,7 @@ const PARROT_IMITATIONS: &[(&EntityType, pumpkin_data::sound::Sound)] = &[
 
 pub struct ParrotEntity {
     pub mob_entity: MobEntity,
+    pub tamable_data: TamableData,
 }
 
 impl ParrotEntity {
@@ -226,7 +234,10 @@ impl ParrotEntity {
         mob_entity.set_pathfinding_malus(PathType::DangerFire, -1.0);
         mob_entity.set_pathfinding_malus(PathType::DamageFire, -1.0);
         mob_entity.set_pathfinding_malus(PathType::Cocoa, -1.0);
-        let parrot = Self { mob_entity };
+        let parrot = Self {
+            mob_entity,
+            tamable_data: TamableData::default(),
+        };
         let mob_arc = Arc::new(parrot);
         let mob_weak: Weak<dyn Mob> = {
             let mob_arc: Arc<dyn Mob> = mob_arc.clone();
@@ -247,10 +258,13 @@ impl ParrotEntity {
                 1,
                 LookAtEntityGoal::with_default(mob_weak, &EntityType::PLAYER, 8.0),
             );
-            // TODO: parrots are not tamable here yet, so 2 SitWhenOrderedToGoal,
-            // 2 FollowOwnerGoal(1.0, 5, 1) and 3 LandOnOwnersShoulderGoal are missing, and
-            // ParrotWanderGoal's preference for trees is not ported.
-            goal_selector.add_goal(2, Box::new(WaterAvoidingRandomFlyingGoal::new(1.0)));
+            goal_selector.add_goal(2, Box::new(SitWhenOrderedToGoal::new()));
+            goal_selector.add_goal(2, FollowOwnerGoal::new(1.0, 5.0, 1.0));
+            goal_selector.add_goal(
+                2,
+                Box::new(WaterAvoidingRandomFlyingGoal::new(1.0).preferring_trees()),
+            );
+            // TODO: 3 LandOnOwnersShoulderGoal needs players to carry shoulder entities.
             goal_selector.add_goal(3, Box::new(FollowMobGoal::new(1.0, 3.0, 7.0)));
         };
 
@@ -288,6 +302,23 @@ impl ParrotEntity {
     }
 }
 
+/// Parrots can't breed: vanilla `Parrot.isFood` and `canMate` are always false.
+impl Animal for ParrotEntity {
+    fn is_food(&self, _item_stack: &ItemStack) -> bool {
+        false
+    }
+
+    fn can_mate(&self, _partner: &dyn Mob) -> bool {
+        false
+    }
+}
+
+impl TamableAnimal for ParrotEntity {
+    fn get_tamable_data(&self) -> &TamableData {
+        &self.tamable_data
+    }
+}
+
 impl Mob for ParrotEntity {
     fn omnidirectional_air_mover(&self) -> bool {
         true
@@ -311,14 +342,62 @@ impl Mob for ParrotEntity {
         &self.mob_entity
     }
 
+    fn as_animal(&self) -> Option<&dyn Animal> {
+        Some(self)
+    }
+
+    fn as_tamable(&self) -> Option<&dyn TamableAnimal> {
+        Some(self)
+    }
+
+    fn mob_write_nbt(&self, nbt: &mut pumpkin_nbt::compound::NbtCompound) {
+        self.write_tamable_nbt(nbt);
+    }
+
+    fn mob_read_nbt(&self, nbt: &pumpkin_nbt::compound::NbtCompound) {
+        self.read_tamable_nbt(nbt);
+    }
+
+    /// Vanilla `Parrot.mobInteract`.
     fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
-        // Vanilla checks the poisonous food tag last, after taming, which isn't
-        // implemented yet. Nothing in `parrot_food` is also in
-        // `parrot_poisonous_food`, so the two branches can't be confused.
-        if !item_stack
-            .get_item()
-            .has_tag(&tag::Item::MINECRAFT_PARROT_POISONOUS_FOOD)
-        {
+        let item = item_stack.get_item();
+        if !self.is_tame() && item.has_tag(&tag::Item::MINECRAFT_PARROT_FOOD) {
+            item_stack.decrement_unless_creative(player.gamemode.load(), 1);
+            let entity = self.get_entity();
+            let mut random = self.get_random();
+            if !entity.is_silent() {
+                let pitch = 1.0 + (random.random::<f32>() - random.random::<f32>()) * 0.2;
+                entity.world.load().play_sound_fine(
+                    pumpkin_data::sound::Sound::EntityParrotEat,
+                    self.sound_source(),
+                    &entity.pos.load(),
+                    1.0,
+                    pitch,
+                );
+            }
+            let (status, bedrock) = if random.random_range(0..10) == 0 {
+                TamableAnimal::tame(self, player.gameprofile.id);
+                Mob::tame(self, player);
+                (EntityStatus::TamingSucceeded, ActorEventID::TamingSucceeded)
+            } else {
+                (EntityStatus::TamingFailed, ActorEventID::TamingFailed)
+            };
+            entity
+                .world
+                .load()
+                .send_entity_status(entity, status, Some(bedrock));
+            return true;
+        }
+        if !item.has_tag(&tag::Item::MINECRAFT_PARROT_POISONOUS_FOOD) {
+            // `isFlying`: off the ground.
+            let flying = !self
+                .get_entity()
+                .on_ground
+                .load(std::sync::atomic::Ordering::Relaxed);
+            if !flying && self.is_tame() && self.is_owned_by(&player.gameprofile.id) {
+                self.set_ordered_to_sit(!self.is_ordered_to_sit());
+                return true;
+            }
             return self.mob_entity.mob_interact(player, item_stack);
         }
 
