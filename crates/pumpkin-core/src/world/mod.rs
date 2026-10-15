@@ -6117,6 +6117,25 @@ impl World {
         }
     }
 
+    /// Vanilla `ServerLevel.updateNeighboursOnBlockSet`: the neighbour updates a block change
+    /// placed without them sends afterwards.
+    pub fn update_neighbours_on_block_set(
+        self: &Arc<Self>,
+        pos: &BlockPos,
+        old_state: BlockStateId,
+    ) {
+        let (block, state) = self.get_block_and_state(pos);
+        let old_block = Block::from_state_id(old_state);
+        if old_block != block {
+            self.block_registry
+                .on_state_replaced(self, old_block, pos, old_state, false);
+        }
+        self.update_neighbors_at(pos, block, None);
+        if state.has_analog_output_signal() {
+            self.update_neighbour_for_output_signal(pos, block);
+        }
+    }
+
     pub fn update_neighbour_for_output_signal(
         self: &Arc<Self>,
         pos: &BlockPos,
