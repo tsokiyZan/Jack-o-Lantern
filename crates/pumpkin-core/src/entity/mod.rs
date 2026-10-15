@@ -2137,31 +2137,37 @@ impl Entity {
         self.velocity.store(self.velocity.load() + final_input);
     }
 
-    // Entity.movementInputToVelocity in yarn
-
+    /// Vanilla `Entity.getInputVector`: the input, capped at length 1, scaled by `speed` and
+    /// turned by the yaw through the `Mth` sine table. `speed` is a float in vanilla.
     fn movement_input_to_velocity(&self, movement_input: Vector3<f64>, speed: f64) -> Vector3<f64> {
-        let yaw = f64::from(self.yaw.load()).to_radians();
-
-        let dist = movement_input.length_squared();
-
-        if dist < 1.0e-7 {
+        let length = movement_input.length_squared();
+        if length < 1.0E-7 {
             return Vector3::default();
         }
-
-        let input = if dist > 1.0 {
-            movement_input.normalize() * speed
+        let input = if length > 1.0 {
+            // `Vec3.normalize`.
+            let norm = length.sqrt();
+            if norm < f64::from(1.0E-5f32) {
+                Vector3::default()
+            } else {
+                Vector3::new(
+                    movement_input.x / norm,
+                    movement_input.y / norm,
+                    movement_input.z / norm,
+                )
+            }
         } else {
-            movement_input * speed
+            movement_input
         };
-
-        let sin = yaw.sin();
-
-        let cos = yaw.cos();
-
+        let speed = f64::from(speed as f32);
+        let movement = Vector3::new(input.x * speed, input.y * speed, input.z * speed);
+        let yaw_radians = self.yaw.load() * (std::f64::consts::PI / 180.0) as f32;
+        let sin = f64::from(pumpkin_util::math::sin(yaw_radians));
+        let cos = f64::from(pumpkin_util::math::cos(yaw_radians));
         Vector3::new(
-            input.x.mul_add(cos, -(input.z * sin)),
-            input.y,
-            input.z.mul_add(cos, input.x * sin),
+            movement.x * cos - movement.z * sin,
+            movement.y,
+            movement.z * cos + movement.x * sin,
         )
     }
 

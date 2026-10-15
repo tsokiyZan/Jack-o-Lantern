@@ -1565,35 +1565,42 @@ impl LivingEntity {
         self.entity.velocity.store(velo);
     }
 
+    /// Vanilla `LivingEntity.computeModifiedFriction`.
+    fn compute_modified_friction(friction: f32, modifier: f32) -> f32 {
+        (1.0 - (1.0 - friction) * modifier).clamp(0.0, 1.0)
+    }
+
+    /// Vanilla `LivingEntity.travelInAir`, in vanilla's float maths.
     fn travel_in_air(&self, caller: &dyn EntityBase) {
-        // applyMovementInput
-
-        let effective_speed = self.get_speed(caller);
-
-        let (speed, friction) = if self.entity.on_ground.load(Relaxed) {
-            // getVelocityAffectingPos
-
-            let slipperiness = f64::from(
+        let on_ground = self.entity.on_ground.load(Relaxed);
+        let block_friction = if on_ground {
+            Self::compute_modified_friction(
                 self.entity
                     .get_block_with_y_offset(0.500_001)
                     .1
                     .slipperiness,
-            );
-
-            let speed =
-                effective_speed * 0.216_000_02 / (slipperiness * slipperiness * slipperiness);
-
-            (speed, slipperiness * 0.91)
+                self.get_attribute_value(&Attributes::FRICTION_MODIFIER) as f32,
+            )
         } else {
-            let speed = caller
-                .get_player()
-                .map_or(0.02, super::player::Player::get_off_ground_speed);
+            1.0
+        };
 
-            (speed, 0.91)
+        // `getFrictionInfluencedSpeed`; Java compares the float friction with the double 0.6.
+        let speed = if on_ground {
+            let speed = self.get_speed(caller) as f32;
+            if f64::from(block_friction) > 0.6 {
+                speed * (0.216_000_02 / (block_friction * block_friction * block_friction))
+            } else {
+                speed
+            }
+        } else {
+            caller
+                .get_player()
+                .map_or(0.02, |player| player.get_off_ground_speed() as f32)
         };
 
         self.entity
-            .update_velocity_from_input(self.movement_input.load(), speed);
+            .update_velocity_from_input(self.movement_input.load(), f64::from(speed));
 
         self.apply_climbing_speed();
 
@@ -1616,7 +1623,7 @@ impl LivingEntity {
         let levitation = self.get_effect(&StatusEffect::LEVITATION);
 
         if let Some(lev) = levitation {
-            velo.y += 0.05f64.mul_add(f64::from(lev.amplifier + 1), -velo.y) * 0.2;
+            velo.y += (0.05 * f64::from(lev.amplifier + 1) - velo.y) * 0.2;
         } else {
             velo.y -= self.get_effective_gravity(caller);
 
@@ -1627,17 +1634,20 @@ impl LivingEntity {
 
         // If entity has no drag: store velo and return
 
-        velo.x *= friction;
-
-        velo.z *= friction;
-
-        velo.y *= caller.get_y_velocity_drag().unwrap_or_else(|| {
-            if caller.is_flutterer() {
-                friction
-            } else {
-                0.98
-            }
-        });
+        let air_drag_modifier = self.get_attribute_value(&Attributes::AIR_DRAG_MODIFIER) as f32;
+        let air_drag = Self::compute_modified_friction(0.91, air_drag_modifier);
+        let friction = block_friction * air_drag;
+        // `omnidirectionalAirMover` flyers drag vertically like horizontally.
+        let vertical_friction = if caller.is_flutterer() {
+            air_drag
+        } else {
+            Self::compute_modified_friction(0.98, air_drag_modifier)
+        };
+        velo.x *= f64::from(friction);
+        velo.z *= f64::from(friction);
+        velo.y *= caller
+            .get_y_velocity_drag()
+            .unwrap_or_else(|| f64::from(vertical_friction));
 
         self.entity.velocity.store(velo);
     }
@@ -1646,6 +1656,7 @@ impl LivingEntity {
         let movement_input = self.movement_input.load();
 
         let falling = self.entity.velocity.load().y <= 0.0;
+        let old_y = self.entity.pos.load().y;
         let gravity = self.get_effective_gravity(caller);
         let effective_speed = self.get_speed(caller);
 
@@ -1714,18 +1725,20 @@ impl LivingEntity {
             self.entity.velocity.store(velo);
         }
 
+        // `jumpOutOfFluid`: climb out when the box raised to 0.6 above the start is free.
         let mut velo = self.entity.velocity.load();
-
-        if self.entity.horizontal_collision.load(SeqCst)
-            && !self
-                .entity
-                .world
-                .load()
-                .check_fluid_collision(self.entity.bounding_box.load().shift(velo))
-        {
-            velo.y = 0.3;
-
-            self.entity.velocity.store(velo);
+        if self.entity.horizontal_collision.load(SeqCst) {
+            let offset = Vector3::new(
+                velo.x,
+                velo.y + f64::from(0.6f32) - self.entity.pos.load().y + old_y,
+                velo.z,
+            );
+            let moved = self.entity.bounding_box.load().shift(offset);
+            let world = self.entity.world.load();
+            if world.is_space_empty(moved) && !world.check_fluid_collision(moved) {
+                velo.y = f64::from(0.3f32);
+                self.entity.velocity.store(velo);
+            }
         }
     }
 
@@ -1862,36 +1875,34 @@ impl LivingEntity {
         }
     }
 
+    /// Vanilla `LivingEntity.jumpFromGround`, in vanilla's float maths.
     fn jump(&self) {
         let jump = self.get_jump_velocity(1.0);
-
-        if jump <= 1.0e-5 {
+        if jump <= 1.0E-5 {
             return;
         }
 
         let mut velo = self.entity.velocity.load();
-
-        velo.y = jump.max(velo.y);
-
+        velo.y = f64::from(jump).max(velo.y);
         if self.entity.sprinting.load(Relaxed) {
-            let yaw = f64::from(self.entity.yaw.load()).to_radians();
-
-            velo.x -= yaw.sin() * 0.2;
-            velo.z += yaw.cos() * 0.2;
+            let angle = self.entity.yaw.load() * (std::f64::consts::PI / 180.0) as f32;
+            velo.x += f64::from(-pumpkin_util::math::sin(angle)) * 0.2;
+            velo.z += f64::from(pumpkin_util::math::cos(angle)) * 0.2;
         }
-
         self.entity.velocity.store(velo);
-
         self.entity.velocity_dirty.store(true, SeqCst);
     }
 
-    fn get_jump_velocity(&self, mut strength: f64) -> f64 {
-        strength *= self.get_attribute_value(&Attributes::JUMP_STRENGTH);
-        strength *= f64::from(self.entity.get_jump_velocity_multiplier());
-        if let Some(effect) = self.get_effect(&StatusEffect::JUMP_BOOST) {
-            strength += 0.1 * f64::from(effect.amplifier + 1);
-        }
-        strength
+    /// Vanilla `getJumpPower(multiplier)`: jump strength times the block jump factor, plus
+    /// jump boost, all floats.
+    fn get_jump_velocity(&self, multiplier: f32) -> f32 {
+        let boost = self
+            .get_effect(&StatusEffect::JUMP_BOOST)
+            .map_or(0.0, |effect| 0.1 * (effect.amplifier as f32 + 1.0));
+        self.get_attribute_value(&Attributes::JUMP_STRENGTH) as f32
+            * multiplier
+            * self.entity.get_jump_velocity_multiplier()
+            + boost
     }
 
     pub fn fall(
