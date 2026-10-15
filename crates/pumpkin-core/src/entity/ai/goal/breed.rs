@@ -134,8 +134,13 @@ impl BreedGoal {
         if let Some(offspring) = offspring {
             offspring(mob, mate, baby.as_ref());
         }
-        baby.get_entity().set_age(-24000);
-        baby.refresh_dimensions();
+        // Vanilla `offspring.setBaby(true)`, which syncs the flag and runs `ageBoundaryReached`.
+        if let Some(ageable) = baby.get_mob().and_then(Mob::as_ageable) {
+            ageable.set_baby(true);
+        } else {
+            baby.get_entity().set_age(-24000);
+            baby.refresh_dimensions();
+        }
 
         award_breeding(mob, mate);
 

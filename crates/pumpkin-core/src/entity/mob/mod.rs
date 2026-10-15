@@ -1605,6 +1605,13 @@ pub trait Mob: EntityBase + Send + Sync {
 
     fn on_attack(&self, _target: &dyn EntityBase) {}
 
+    /// Vanilla `doHurtTarget` as the brain's `MeleeAttack` calls it, with this mob's brain
+    /// held in `tick`.
+    fn do_hurt_target(&self, tick: &mut BrainTick<'_>, target: &Arc<dyn EntityBase>) -> bool {
+        let attacker: &dyn EntityBase = tick.mob;
+        self.get_mob_entity().try_attack(attacker, target.as_ref())
+    }
+
     fn on_eating_grass(&self) {}
 
     fn modify_incoming_damage(&self, amount: f32, _damage_type: DamageType) -> f32 {
@@ -2058,6 +2065,12 @@ pub trait Mob: EntityBase + Send + Sync {
 
     fn get_base_experience_reward(&self) -> u32 {
         self.get_entity().entity_type.experience_reward
+    }
+
+    /// Vanilla `shouldDropExperience`: no babies, though `Monster` drops it for its babies too.
+    fn should_drop_experience(&self) -> bool {
+        let entity = self.get_entity();
+        !entity.is_baby() || is_monster(entity.entity_type)
     }
 
     fn mob_init_data_tracker(&self) {
@@ -2559,11 +2572,7 @@ impl<T: Mob + Send + 'static> EntityBase for T {
     }
 
     fn get_experience_reward(&self, _killer: Option<&dyn EntityBase>) -> u32 {
-        // Vanilla `shouldDropExperience`: no babies, though `Monster` drops it for its babies too.
-        let entity = self.get_entity();
-        if entity.age.load(std::sync::atomic::Ordering::Relaxed) < 0
-            && !is_monster(entity.entity_type)
-        {
+        if !Mob::should_drop_experience(self) {
             return 0;
         }
         // TODO: apply enchantment processing like in vanilla
