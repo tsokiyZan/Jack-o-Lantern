@@ -54,6 +54,7 @@ pub mod cave_spider;
 pub mod creaking;
 pub mod creeper;
 pub mod crossbow_attack_mob;
+pub mod cube_mob;
 pub mod elder_guardian;
 pub mod enderman;
 pub mod endermite;
@@ -64,7 +65,6 @@ pub mod giant;
 pub mod guardian;
 pub mod hoglin;
 pub mod illusioner;
-pub mod magma_cube;
 pub mod neutral;
 pub mod patrol;
 pub mod phantom;
@@ -472,6 +472,23 @@ impl MobEntity {
         let x_rot_d = (-to_degrees(pumpkin_util::math::atan2(yd, sd))) as f32;
         entity.set_pitch(rotlerp(entity.pitch.load(), x_rot_d, x_max));
         entity.yaw.store(rotlerp(entity.yaw.load(), y_rot_d, y_max));
+    }
+
+    /// Vanilla `Mob.jumpInLiquid`: a mob whose navigation can't float leaps out.
+    pub fn jump_in_liquid(&self) {
+        let can_float = self
+            .navigator
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .can_float();
+        if can_float {
+            self.living_entity.jump_in_liquid_base();
+        } else {
+            let entity = &self.living_entity.entity;
+            let mut velocity = entity.velocity.load();
+            velocity.y += 0.3;
+            entity.velocity.store(velocity);
+        }
     }
 
     /// Vanilla `mob.getJumpControl().jump()`: jump at the end of this AI step.
@@ -1404,6 +1421,11 @@ pub trait Mob: EntityBase + Send + Sync {
         self.get_mob_entity().living_entity.jump();
     }
 
+    /// Vanilla `jumpInLiquid`, which some mobs override.
+    fn jump_in_liquid(&self, _lava: bool) {
+        self.get_mob_entity().jump_in_liquid();
+    }
+
     fn get_preferred_weapon_type(&self) -> Option<&'static pumpkin_data::tag::Tag> {
         None
     }
@@ -1766,6 +1788,9 @@ pub trait Mob: EntityBase + Send + Sync {
 
     fn mob_read_nbt(&self, _nbt: &NbtCompound) {}
 
+    /// Mob tags vanilla reads before `super.readAdditionalSaveData`.
+    fn mob_read_nbt_before_super(&self, _nbt: &NbtCompound) {}
+
     /// Vanilla `LivingEntity.onEquipItem`: an equipment slot changed. Skeletons re-pick their
     /// weapon goal here.
     fn on_equip_item(&self, _slot: &EquipmentSlot) {}
@@ -1900,6 +1925,13 @@ pub trait Mob: EntityBase + Send + Sync {
 
     fn mob_player_collision(&self, _player: &Arc<Player>) {}
 
+    /// The start of a vanilla `push(Entity)` override, after the mob was pushed by `entity`.
+    fn mob_push(&self, _entity: &dyn EntityBase) {}
+
+    /// The start of a vanilla `remove` override for a mob removed once its death
+    /// animation ends (`RemovalReason.KILLED`).
+    fn remove_killed(&self) {}
+
     fn get_owner_uuid(&self) -> Option<Uuid> {
         self.as_tamable()
             .and_then(crate::entity::passive::tamable::TamableAnimal::get_owner)
@@ -2026,6 +2058,69 @@ pub fn is_player_holding(passenger: &dyn EntityBase, item: &Item) -> bool {
     })
 }
 
+/// Vanilla `ConversionType.convertCommon`: what a converted mob takes over from the old one.
+/// Scoreboard teams are not carried over.
+pub fn convert_common(from: &dyn Mob, to: &dyn Mob) {
+    let (old, new) = (from.get_mob_entity(), to.get_mob_entity());
+    let (old_living, new_living) = (&old.living_entity, &new.living_entity);
+    let (old_entity, new_entity) = (&old_living.entity, &new_living.entity);
+    new_living.set_absorption(old_living.absorption.load());
+    let effects: Vec<_> = old_living
+        .active_effects
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .values()
+        .cloned()
+        .collect();
+    for effect in effects {
+        new_living.add_effect(effect);
+    }
+    if let (Some(old_ageable), Some(new_ageable)) = (from.as_ageable(), to.as_ageable()) {
+        if old_ageable.is_baby() {
+            new_ageable.set_baby(true);
+        }
+        new_ageable.set_age(old_ageable.get_age());
+        let (old_data, new_data) = (
+            old_ageable.get_ageable_data(),
+            new_ageable.get_ageable_data(),
+        );
+        new_data
+            .forced_age
+            .store(old_data.forced_age.load(Relaxed), Relaxed);
+        new_data
+            .forced_age_timer
+            .store(old_data.forced_age_timer.load(Relaxed), Relaxed);
+    }
+    new.set_left_handed(old.is_left_handed());
+    new.set_no_ai(old.is_no_ai());
+    if old.persistence_required.load(Relaxed) {
+        new.persistence_required.store(true, Relaxed);
+    }
+    new_entity.set_custom_name_visible(old_entity.custom_name_visible.load(Relaxed));
+    new_entity.set_invulnerable(old_entity.invulnerable.load(Relaxed));
+    new_living
+        .hurt_cooldown
+        .store(old_living.hurt_cooldown.load(Relaxed), Relaxed);
+    new_entity.set_has_no_gravity(old_entity.has_no_gravity.load(Relaxed));
+    new_entity
+        .portal_cooldown
+        .store(old_entity.portal_cooldown.load(Relaxed), Relaxed);
+    new_entity.set_silent(old_entity.silent.load(Relaxed));
+    let tags = old_entity
+        .scoreboard_tags
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone();
+    new_entity
+        .scoreboard_tags
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .extend(tags);
+    if let Some(name) = &**old_entity.custom_name.load() {
+        new_entity.set_custom_name(name.clone());
+    }
+}
+
 /// The shared mob `hurtServer`, which `Mob::hurt_server` overrides call as `super`.
 pub fn mob_hurt_server<M: Mob + ?Sized>(
     mob: &M,
@@ -2079,6 +2174,7 @@ impl<T: Mob + Send + 'static> EntityBase for T {
         if !self.is_sleeping() {
             super::push_apart(self.get_entity(), self.is_pushable(), entity);
         }
+        self.mob_push(entity);
     }
 
     fn on_lightning_strike(
@@ -2308,6 +2404,10 @@ impl<T: Mob + Send + 'static> EntityBase for T {
             neutral.write_anger_nbt(nbt);
         }
         self.mob_write_nbt(nbt);
+    }
+
+    fn read_nbt_before_living(&self, nbt: &NbtCompound) {
+        self.mob_read_nbt_before_super(nbt);
     }
 
     fn read_custom_nbt(&self, nbt: &NbtCompound) {

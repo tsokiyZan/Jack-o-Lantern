@@ -347,18 +347,6 @@ impl ExplosionDamageCalculator for SimpleExplosionDamageCalculator {
     }
 }
 
-/// Vanilla `Entity.doTeamsAllowDamage`.
-fn do_teams_allow_damage(attacker: &dyn EntityBase, target: &dyn EntityBase) -> bool {
-    let Some(team) = attacker.get_team() else {
-        return true;
-    };
-    match target.get_team() {
-        // `PlayerTeam` option bit 0 is friendly fire.
-        Some(other) if other.name == team.name => team.options & 1 != 0,
-        _ => true,
-    }
-}
-
 /// Vanilla `ServerExplosion`.
 pub struct Explosion {
     pub(crate) radius: f32,
@@ -592,7 +580,7 @@ impl Explosion {
             };
             if should_damage
                 && self.source.as_ref().is_none_or(|source| {
-                    do_teams_allow_damage(source.as_ref(), entity_base.as_ref())
+                    crate::entity::do_teams_allow_damage(source.as_ref(), entity_base.as_ref())
                 })
             {
                 let damage = self.damage_calculator.get_entity_damage_amount(

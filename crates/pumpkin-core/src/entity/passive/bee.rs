@@ -514,6 +514,14 @@ impl Mob for BeeEntity {
         Some(self)
     }
 
+    /// Vanilla `Bee.jumpInLiquid`.
+    fn jump_in_liquid(&self, _lava: bool) {
+        let entity = &self.mob_entity.living_entity.entity;
+        let mut velocity = entity.velocity.load();
+        velocity.y += 0.01;
+        entity.velocity.store(velocity);
+    }
+
     fn as_animal(&self) -> Option<&dyn Animal> {
         Some(self)
     }

@@ -1479,28 +1479,25 @@ impl LivingEntity {
 
         if self.jumping.load(SeqCst) && should_swim_in_fluids {
             let in_lava = self.entity.touching_lava.load(SeqCst);
-
-            let in_water = self.entity.touching_water.load(SeqCst);
-
             let fluid_height = if in_lava {
                 self.entity.lava_height.load()
             } else {
                 self.entity.water_height.load()
             };
-
-            let swim_height = self.get_swim_height();
-
+            let in_water_and_has_fluid_height =
+                self.entity.touching_water.load(SeqCst) && fluid_height > 0.0;
+            let fluid_jump_threshold = self.get_swim_height();
             let on_ground = self.entity.on_ground.load(SeqCst);
-
-            if (in_water || in_lava) && (!on_ground || fluid_height > swim_height) {
-                // Swim upward
-
-                let mut velo = self.entity.velocity.load();
-
-                velo.y += f64::from(0.04f32);
-
-                self.entity.velocity.store(velo);
-            } else if (on_ground || in_water && fluid_height <= swim_height)
+            if in_water_and_has_fluid_height && !(on_ground && fluid_height <= fluid_jump_threshold)
+            {
+                self.jump_in_liquid(caller, false);
+            } else if in_lava
+                // `isInShallowFluid(LAVA)`.
+                && !(on_ground && self.entity.lava_height.load() <= fluid_jump_threshold)
+            {
+                self.jump_in_liquid(caller, true);
+            } else if (on_ground
+                || in_water_and_has_fluid_height && fluid_height <= fluid_jump_threshold)
                 && self.jumping_cooldown.load(SeqCst) == 0
             {
                 if let Some(mob) = caller.get_mob() {
@@ -1508,7 +1505,6 @@ impl LivingEntity {
                 } else {
                     self.jump();
                 }
-
                 self.jumping_cooldown.store(10, SeqCst);
             }
         } else {
@@ -1995,6 +1991,22 @@ impl LivingEntity {
         } else {
             0.4
         }
+    }
+
+    /// Vanilla `jumpInLiquid`, which `Mob` and some mobs override.
+    fn jump_in_liquid(&self, caller: &dyn EntityBase, lava: bool) {
+        if let Some(mob) = caller.get_mob() {
+            mob.jump_in_liquid(lava);
+        } else {
+            self.jump_in_liquid_base();
+        }
+    }
+
+    /// Vanilla `LivingEntity.jumpInLiquid`.
+    pub fn jump_in_liquid_base(&self) {
+        let mut velocity = self.entity.velocity.load();
+        velocity.y += f64::from(0.04f32);
+        self.entity.velocity.store(velocity);
     }
 
     /// Vanilla `LivingEntity.jumpFromGround`, in vanilla's float maths.
@@ -4002,6 +4014,9 @@ impl EntityBase for LivingEntity {
             // broadcast in `on_death`. Sending it again here would restart the
             // client-side death animation.
             if time >= 20 && !self.entity.removed.swap(true, Ordering::Relaxed) {
+                if let Some(mob) = caller.get_mob() {
+                    mob.remove_killed();
+                }
                 self.entity
                     .world
                     .load()

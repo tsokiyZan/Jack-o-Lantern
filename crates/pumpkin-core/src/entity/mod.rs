@@ -132,6 +132,18 @@ impl dyn EntityBase + '_ {
     }
 }
 
+/// Vanilla `Entity.doTeamsAllowDamage`.
+pub fn do_teams_allow_damage(attacker: &dyn EntityBase, target: &dyn EntityBase) -> bool {
+    let Some(team) = attacker.get_team() else {
+        return true;
+    };
+    match target.get_team() {
+        // `PlayerTeam` option bit 0 is friendly fire.
+        Some(other) if other.name == team.name => team.options & 1 != 0,
+        _ => true,
+    }
+}
+
 /// Vanilla `Entity.push(Entity)`: nudges the two entities apart.
 pub fn push_apart(self_entity: &Entity, self_pushable: bool, entity: &dyn EntityBase) {
     let other_entity = entity.get_entity();
@@ -195,6 +207,7 @@ pub trait EntityBase: Send + Sync + std::any::Any {
     /// Reads base, living and custom tags.
     fn read_nbt_non_mut(&self, nbt: &NbtCompound) {
         self.get_entity().read_nbt_non_mut(nbt);
+        self.read_nbt_before_living(nbt);
         if let Some(living) = self.get_living_entity() {
             living.read_living_nbt_non_mut(nbt);
             let max_air = self
@@ -206,6 +219,10 @@ pub trait EntityBase: Send + Sync + std::any::Any {
     }
 
     fn read_custom_nbt(&self, _nbt: &NbtCompound) {}
+
+    /// The part of a vanilla `readAdditionalSaveData` override that runs before
+    /// `super.readAdditionalSaveData`, so before the living tags.
+    fn read_nbt_before_living(&self, _nbt: &NbtCompound) {}
     /// Called every tick for this entity.
     ///
     /// The `caller` parameter is a reference to the entity that initiated the tick.

@@ -1073,10 +1073,13 @@ impl TrialSpawner {
             mob.spawn_as_baby();
         }
 
-        if let Some(size) = slime_size {
-            entity
-                .get_entity()
-                .set_synced_data(pumpkin_data::tracked_data::slime::ID_SIZE, i32::from(size));
+        // Vanilla reads `Size` through `readAdditionalSaveData`, which sets the size one up.
+        if let Some(size) = slime_size
+            && let Some(cube) = entity
+                .cast_any()
+                .downcast_ref::<crate::entity::mob::cube_mob::CubeMobEntity>()
+        {
+            cube.set_size(i32::from(size) + 1, true);
         }
 
         if let Some(equip) = equipment_loot_table
