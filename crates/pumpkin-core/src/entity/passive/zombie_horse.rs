@@ -36,6 +36,8 @@ pub struct ZombieHorseEntity {
     pub ageable_data: AgeableData,
     pub flags: AtomicU8,
     pub temper: AtomicI32,
+    /// Vanilla `AbstractHorse.gallopSoundCounter`.
+    pub gallop_sound_counter: AtomicI32,
     pub owner: AtomicCell<Option<Uuid>>,
 }
 
@@ -47,6 +49,7 @@ impl ZombieHorseEntity {
             ageable_data: AgeableData::default(),
             flags: AtomicU8::new(0),
             temper: AtomicI32::new(0),
+            gallop_sound_counter: AtomicI32::new(0),
             owner: AtomicCell::new(None),
         };
         let mob_arc = Arc::new(horse);
@@ -127,6 +130,23 @@ const BABY_DIMENSIONS: EntityDimensions =
     Entity::type_dimensions(&EntityType::ZOMBIE_HORSE).scale(0.7);
 
 impl Mob for ZombieHorseEntity {
+    /// Vanilla `AbstractHorse.playStepSound`.
+    fn play_step_sound(
+        &self,
+        caller: &dyn EntityBase,
+        pos: &pumpkin_util::math::position::BlockPos,
+        _block: &'static pumpkin_data::Block,
+        state: &'static pumpkin_data::BlockState,
+    ) {
+        crate::entity::passive::horse::play_horse_step_sound(
+            caller,
+            pos,
+            state,
+            Some(&self.gallop_sound_counter),
+            false,
+        );
+    }
+
     /// Vanilla `ZombieHorse.getDefaultDimensions`.
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
         let entity = self.get_entity();

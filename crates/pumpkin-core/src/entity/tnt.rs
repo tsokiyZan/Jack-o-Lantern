@@ -169,4 +169,8 @@ impl EntityBase for TNTEntity {
     fn cast_any(&self) -> &dyn std::any::Any {
         self
     }
+
+    fn movement_emission(&self) -> crate::entity::movement_emission::MovementEmission {
+        crate::entity::movement_emission::MovementEmission::None
+    }
 }

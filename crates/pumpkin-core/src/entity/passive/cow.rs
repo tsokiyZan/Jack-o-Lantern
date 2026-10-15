@@ -137,6 +137,20 @@ const BABY_DIMENSIONS: EntityDimensions =
     EntityDimensions::scalable(0.45, 0.7).with_eye_height(0.69);
 
 impl Mob for CowEntity {
+    /// Vanilla `AbstractCow.playStepSound`.
+    fn play_step_sound(
+        &self,
+        caller: &dyn crate::entity::EntityBase,
+        _pos: &pumpkin_util::math::position::BlockPos,
+        _block: &'static pumpkin_data::Block,
+        _state: &'static pumpkin_data::BlockState,
+    ) {
+        let sound = CowSoundVariant::from_id(self.sound_variant.load(Ordering::Relaxed))
+            .unwrap_or_default()
+            .step_sound(self.get_entity().is_baby());
+        caller.play_sound_at_self(sound, 0.15, 1.0);
+    }
+
     /// Vanilla `AbstractCow.getAmbientSound`.
     fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
         let sounds = CowSoundVariant::from_id(self.sound_variant.load(Ordering::Relaxed))

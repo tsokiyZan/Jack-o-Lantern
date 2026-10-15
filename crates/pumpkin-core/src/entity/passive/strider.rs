@@ -111,6 +111,22 @@ const BABY_DIMENSIONS: EntityDimensions =
     EntityDimensions::scalable(0.45, 0.85).with_eye_height(0.4375);
 
 impl Mob for StriderEntity {
+    /// Vanilla `Strider.playStepSound`.
+    fn play_step_sound(
+        &self,
+        caller: &dyn crate::entity::EntityBase,
+        _pos: &pumpkin_util::math::position::BlockPos,
+        _block: &'static pumpkin_data::Block,
+        _state: &'static pumpkin_data::BlockState,
+    ) {
+        let sound = if self.get_entity().touching_lava.load(Ordering::Relaxed) {
+            Sound::EntityStriderStepLava
+        } else {
+            Sound::EntityStriderStep
+        };
+        caller.play_sound_at_self(sound, 1.0, 1.0);
+    }
+
     /// Vanilla `Strider.getAmbientSound`: quiet while panicking or tempted.
     fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
         let goals = self

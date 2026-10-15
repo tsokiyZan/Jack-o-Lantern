@@ -4,6 +4,8 @@ use std::sync::{
 };
 
 use crossbeam::atomic::AtomicCell;
+use pumpkin_data::Block;
+use pumpkin_data::block_sound_type::SoundType;
 use pumpkin_data::entity::EntityPose;
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::item::Item;
@@ -42,12 +44,74 @@ pub const FLAG_EATING: u8 = 16;
 pub const FLAG_STANDING: u8 = 32;
 pub const FLAG_OPEN_MOUTH: u8 = 64;
 
+/// Vanilla `AbstractHorse.playStepSound`. `gallop_sound_counter` is the horse's counter when
+/// it can gallop (not donkeys and mules); `breathe` adds `Horse.playGallopSound`'s breathing.
+pub fn play_horse_step_sound(
+    caller: &dyn EntityBase,
+    pos: &pumpkin_util::math::position::BlockPos,
+    state: &'static pumpkin_data::BlockState,
+    gallop_sound_counter: Option<&AtomicI32>,
+    breathe: bool,
+) {
+    if state.is_liquid() {
+        return;
+    }
+    let entity = caller.get_entity();
+    let above = entity.world.load().get_block_state(&pos.up());
+    let sound_type = if Block::from_state_id(above.id) == &Block::SNOW {
+        SoundType::from_state_id(above.id.as_u16())
+    } else {
+        SoundType::from_state_id(state.id.as_u16())
+    };
+    let volume = sound_type.volume * 0.15;
+    let pitch = sound_type.pitch;
+
+    if let Some(counter) = gallop_sound_counter
+        && caller.is_vehicle()
+    {
+        let count = counter.fetch_add(1, Ordering::Relaxed) + 1;
+        if count > 5 && count % 3 == 0 {
+            // Vanilla `AbstractHorse.playGallopSound`.
+            caller.play_sound_at_self(Sound::EntityHorseGallop, volume, pitch);
+            if breathe && rand::rng().random_range(0..10) == 0 {
+                let sound = if entity.is_baby() {
+                    Sound::EntityBabyHorseBreathe
+                } else {
+                    Sound::EntityHorseBreathe
+                };
+                caller.play_sound_at_self(sound, sound_type.volume * 0.6, pitch);
+            }
+        } else if count <= 5 {
+            caller.play_sound_at_self(Sound::EntityHorseStepWood, volume, pitch);
+        }
+    } else if [
+        &SoundType::WOOD,
+        &SoundType::NETHER_WOOD,
+        &SoundType::STEM,
+        &SoundType::CHERRY_WOOD,
+        &SoundType::BAMBOO_WOOD,
+    ]
+    .contains(&sound_type)
+    {
+        caller.play_sound_at_self(Sound::EntityHorseStepWood, volume, pitch);
+    } else {
+        let sound = if entity.is_baby() {
+            Sound::EntityBabyHorseStep
+        } else {
+            Sound::EntityHorseStep
+        };
+        caller.play_sound_at_self(sound, volume, pitch);
+    }
+}
+
 pub struct HorseEntity {
     pub mob_entity: MobEntity,
     pub ageable_data: AgeableData,
     pub variant: AtomicI32,
     pub flags: AtomicU8,
     pub temper: AtomicI32,
+    /// Vanilla `AbstractHorse.gallopSoundCounter`.
+    pub gallop_sound_counter: AtomicI32,
     pub owner: AtomicCell<Option<Uuid>>,
 }
 
@@ -65,6 +129,7 @@ impl HorseEntity {
             variant: AtomicI32::new(variant),
             flags: AtomicU8::new(0),
             temper: AtomicI32::new(0),
+            gallop_sound_counter: AtomicI32::new(0),
             owner: AtomicCell::new(None),
         };
         let mob_arc = Arc::new(horse);
@@ -168,6 +233,17 @@ impl Animal for HorseEntity {
 const BABY_DIMENSIONS: EntityDimensions = Entity::type_dimensions(&EntityType::HORSE).scale(0.7);
 
 impl Mob for HorseEntity {
+    /// Vanilla `AbstractHorse.playStepSound`.
+    fn play_step_sound(
+        &self,
+        caller: &dyn EntityBase,
+        pos: &pumpkin_util::math::position::BlockPos,
+        _block: &'static pumpkin_data::Block,
+        state: &'static pumpkin_data::BlockState,
+    ) {
+        play_horse_step_sound(caller, pos, state, Some(&self.gallop_sound_counter), true);
+    }
+
     /// Vanilla `Horse.getAmbientSound`.
     fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
         Some(if self.get_entity().is_baby() {

@@ -212,6 +212,15 @@ impl CustomSound for NautilusEntity {
 const BABY_DIMENSIONS: EntityDimensions = Entity::type_dimensions(&EntityType::NAUTILUS).scale(0.5);
 
 impl Mob for NautilusEntity {
+    /// Vanilla `Nautilus.getSwimSound`.
+    fn swim_sound(&self) -> Sound {
+        if self.get_entity().is_baby() {
+            Sound::EntityBabyNautilusSwim
+        } else {
+            Sound::EntityNautilusSwim
+        }
+    }
+
     /// Vanilla `Nautilus.getAmbientSound`.
     fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
         let entity = self.get_entity();

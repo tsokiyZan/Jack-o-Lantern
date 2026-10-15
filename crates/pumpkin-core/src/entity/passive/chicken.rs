@@ -153,6 +153,20 @@ const BABY_DIMENSIONS: EntityDimensions =
     EntityDimensions::scalable(0.3, 0.4).with_eye_height(0.281_25);
 
 impl Mob for ChickenEntity {
+    /// Vanilla `Chicken.playStepSound`.
+    fn play_step_sound(
+        &self,
+        caller: &dyn crate::entity::EntityBase,
+        _pos: &pumpkin_util::math::position::BlockPos,
+        _block: &'static pumpkin_data::Block,
+        _state: &'static pumpkin_data::BlockState,
+    ) {
+        let sound = ChickenSoundVariant::from_id(self.sound_variant.load(Ordering::Relaxed))
+            .unwrap_or_default()
+            .step_sound(self.get_entity().is_baby());
+        caller.play_sound_at_self(sound, 0.15, 1.0);
+    }
+
     /// Vanilla `Chicken.getAmbientSound`.
     fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
         let sounds = ChickenSoundVariant::from_id(self.sound_variant.load(Ordering::Relaxed))

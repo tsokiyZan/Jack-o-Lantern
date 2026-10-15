@@ -199,6 +199,17 @@ impl CustomSound for CopperGolemEntity {
 }
 
 impl Mob for CopperGolemEntity {
+    /// Vanilla `CopperGolem.playStepSound`.
+    fn play_step_sound(
+        &self,
+        caller: &dyn crate::entity::EntityBase,
+        _pos: &pumpkin_util::math::position::BlockPos,
+        _block: &'static pumpkin_data::Block,
+        _state: &'static pumpkin_data::BlockState,
+    ) {
+        caller.play_sound_at_self(self.step_sound(), 1.0, 1.0);
+    }
+
     fn as_custom_sound(&self) -> Option<&dyn crate::entity::custom_sound::CustomSound> {
         Some(self)
     }

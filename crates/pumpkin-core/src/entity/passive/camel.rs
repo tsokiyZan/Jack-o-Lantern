@@ -136,6 +136,22 @@ const BABY_DIMENSIONS: EntityDimensions =
     EntityDimensions::scalable(0.95, 1.4).with_eye_height(1.38);
 
 impl Mob for CamelEntity {
+    /// Vanilla `Camel.playStepSound`.
+    fn play_step_sound(
+        &self,
+        caller: &dyn crate::entity::EntityBase,
+        _pos: &pumpkin_util::math::position::BlockPos,
+        block: &'static pumpkin_data::Block,
+        _state: &'static pumpkin_data::BlockState,
+    ) {
+        let sound = if block.has_tag(&tag::Block::MINECRAFT_CAMEL_SAND_STEP_SOUND_BLOCKS) {
+            Sound::EntityCamelStepSand
+        } else {
+            Sound::EntityCamelStep
+        };
+        caller.play_sound_at_self(sound, 1.0, 1.0);
+    }
+
     /// Vanilla `Camel.getDefaultDimensions`.
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
         let entity = self.get_entity();

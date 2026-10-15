@@ -1,9 +1,10 @@
 //! Vanilla's state-independent mob sound overrides, by entity type.
 //!
-//! These are the `getAmbientSound`, `getAmbientSoundInterval` and `getSoundVolume`
-//! overrides that return a constant. Mobs whose override reads their state override the
-//! `Mob` method instead.
+//! These are the `getAmbientSound`, `getAmbientSoundInterval`, `getSoundVolume`, step,
+//! swim, splash, `getMovementEmission` and `nextStep` overrides that return a constant.
+//! Mobs whose override reads their state override the `Mob` method instead.
 
+use crate::entity::movement_emission::MovementEmission;
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::sound::{Sound, SoundCategory};
 
@@ -140,6 +141,164 @@ const SOUND_VOLUMES: &[(&EntityType, f32)] = &[
     (&EntityType::WARDEN, 4.0),
 ];
 
+/// Vanilla `playStepSound` overrides that play one fixed sound, with its volume (pitch 1).
+/// Zombies and skeletons go through their `getStepSound`.
+const STEP_SOUNDS: &[(&EntityType, (Sound, f32))] = &[
+    (&EntityType::ARMADILLO, (Sound::EntityArmadilloStep, 0.15)),
+    (&EntityType::BOGGED, (Sound::EntityBoggedStep, 0.15)),
+    (&EntityType::CAVE_SPIDER, (Sound::EntitySpiderStep, 0.15)),
+    (&EntityType::CREAKING, (Sound::EntityCreakingStep, 0.15)),
+    (&EntityType::DROWNED, (Sound::EntityDrownedStep, 0.15)),
+    (&EntityType::ENDERMITE, (Sound::EntityEndermiteStep, 0.15)),
+    (&EntityType::FROG, (Sound::EntityFrogStep, 0.15)),
+    (&EntityType::GOAT, (Sound::EntityGoatStep, 0.15)),
+    (&EntityType::HOGLIN, (Sound::EntityHoglinStep, 0.15)),
+    (&EntityType::HUSK, (Sound::EntityHuskStep, 0.15)),
+    (&EntityType::IRON_GOLEM, (Sound::EntityIronGolemStep, 1.0)),
+    (&EntityType::LLAMA, (Sound::EntityLlamaStep, 0.15)),
+    (&EntityType::PANDA, (Sound::EntityPandaStep, 0.15)),
+    (&EntityType::PARCHED, (Sound::EntityParchedStep, 0.15)),
+    (&EntityType::PARROT, (Sound::EntityParrotStep, 0.15)),
+    (&EntityType::PIGLIN, (Sound::EntityPiglinStep, 0.15)),
+    (
+        &EntityType::PIGLIN_BRUTE,
+        (Sound::EntityPiglinBruteStep, 0.15),
+    ),
+    (&EntityType::POLAR_BEAR, (Sound::EntityPolarBearStep, 0.15)),
+    (&EntityType::RAVAGER, (Sound::EntityRavagerStep, 0.15)),
+    (&EntityType::SHEEP, (Sound::EntitySheepStep, 0.15)),
+    (&EntityType::SILVERFISH, (Sound::EntitySilverfishStep, 0.15)),
+    (&EntityType::SKELETON, (Sound::EntitySkeletonStep, 0.15)),
+    (&EntityType::SNIFFER, (Sound::EntitySnifferStep, 0.15)),
+    (&EntityType::SPIDER, (Sound::EntitySpiderStep, 0.15)),
+    (&EntityType::STRAY, (Sound::EntityStrayStep, 0.15)),
+    (&EntityType::TRADER_LLAMA, (Sound::EntityLlamaStep, 0.15)),
+    (&EntityType::WARDEN, (Sound::EntityWardenStep, 10.0)),
+    (
+        &EntityType::WITHER_SKELETON,
+        (Sound::EntityWitherSkeletonStep, 0.15),
+    ),
+    (&EntityType::ZOGLIN, (Sound::EntityZoglinStep, 0.15)),
+    (&EntityType::ZOMBIE, (Sound::EntityZombieStep, 0.15)),
+    (
+        &EntityType::ZOMBIE_VILLAGER,
+        (Sound::EntityZombieVillagerStep, 0.15),
+    ),
+    (
+        &EntityType::ZOMBIFIED_PIGLIN,
+        (Sound::EntityZombieStep, 0.15),
+    ),
+];
+
+/// Vanilla's empty `playStepSound` overrides.
+const SILENT_STEPS: &[&EntityType] = &[
+    &EntityType::ALLAY,
+    &EntityType::BEE,
+    &EntityType::COD,
+    &EntityType::HAPPY_GHAST,
+    &EntityType::NAUTILUS,
+    &EntityType::PUFFERFISH,
+    &EntityType::SALMON,
+    &EntityType::TADPOLE,
+    &EntityType::TROPICAL_FISH,
+    &EntityType::ZOMBIE_NAUTILUS,
+];
+
+/// Every vanilla `Monster`, which swims and splashes with the hostile sounds.
+const MONSTERS: &[&EntityType] = &[
+    &EntityType::BLAZE,
+    &EntityType::BOGGED,
+    &EntityType::BREEZE,
+    &EntityType::CAVE_SPIDER,
+    &EntityType::CREAKING,
+    &EntityType::CREEPER,
+    &EntityType::DROWNED,
+    &EntityType::ELDER_GUARDIAN,
+    &EntityType::ENDERMAN,
+    &EntityType::ENDERMITE,
+    &EntityType::EVOKER,
+    &EntityType::GIANT,
+    &EntityType::GUARDIAN,
+    &EntityType::HUSK,
+    &EntityType::ILLUSIONER,
+    &EntityType::PARCHED,
+    &EntityType::PIGLIN,
+    &EntityType::PIGLIN_BRUTE,
+    &EntityType::PILLAGER,
+    &EntityType::RAVAGER,
+    &EntityType::SILVERFISH,
+    &EntityType::SKELETON,
+    &EntityType::SPIDER,
+    &EntityType::STRAY,
+    &EntityType::VEX,
+    &EntityType::VINDICATOR,
+    &EntityType::WARDEN,
+    &EntityType::WITCH,
+    &EntityType::WITHER,
+    &EntityType::WITHER_SKELETON,
+    &EntityType::ZOGLIN,
+    &EntityType::ZOMBIE,
+    &EntityType::ZOMBIE_VILLAGER,
+    &EntityType::ZOMBIFIED_PIGLIN,
+];
+
+/// Vanilla `getSwimSound` overrides that return one fixed sound, besides `Monster`'s.
+const SWIM_SOUNDS: &[(&EntityType, Sound)] = &[
+    (&EntityType::AXOLOTL, Sound::EntityAxolotlSwim),
+    (&EntityType::COD, Sound::EntityFishSwim),
+    (&EntityType::DOLPHIN, Sound::EntityDolphinSwim),
+    (&EntityType::DROWNED, Sound::EntityDrownedSwim),
+    (&EntityType::HOGLIN, Sound::EntityHostileSwim),
+    (&EntityType::PUFFERFISH, Sound::EntityFishSwim),
+    (&EntityType::SALMON, Sound::EntityFishSwim),
+    (&EntityType::TADPOLE, Sound::EntityFishSwim),
+    (&EntityType::TROPICAL_FISH, Sound::EntityFishSwim),
+    (&EntityType::TURTLE, Sound::EntityTurtleSwim),
+    (
+        &EntityType::ZOMBIE_NAUTILUS,
+        Sound::EntityZombieNautilusSwim,
+    ),
+];
+
+/// Vanilla `getSwimSplashSound` overrides, besides `Monster`'s.
+const SWIM_SPLASH_SOUNDS: &[(&EntityType, Sound)] = &[
+    (&EntityType::AXOLOTL, Sound::EntityAxolotlSplash),
+    (&EntityType::DOLPHIN, Sound::EntityDolphinSplash),
+    (&EntityType::HOGLIN, Sound::EntityHostileSplash),
+];
+
+/// Vanilla `getMovementEmission` overrides on mobs.
+const MOVEMENT_EMISSIONS: &[(&EntityType, MovementEmission)] = &[
+    (&EntityType::BAT, MovementEmission::Events),
+    (&EntityType::BREEZE, MovementEmission::Events),
+    (&EntityType::ELDER_GUARDIAN, MovementEmission::Events),
+    (&EntityType::ENDERMITE, MovementEmission::Events),
+    (&EntityType::GLOW_SQUID, MovementEmission::Events),
+    (&EntityType::GUARDIAN, MovementEmission::Events),
+    (&EntityType::SHULKER, MovementEmission::None),
+    (&EntityType::SILVERFISH, MovementEmission::Events),
+    (&EntityType::SQUID, MovementEmission::Events),
+];
+
+/// Vanilla `nextStep` overrides: `moveDist` plus this, where the default rounds up.
+const NEXT_STEP_DISTANCES: &[(&EntityType, f32)] = &[
+    (&EntityType::STRIDER, 0.6),
+    (&EntityType::TURTLE, 0.15),
+    (&EntityType::WARDEN, 0.55),
+];
+
+/// How a mob's steps sound when it has no state-dependent `playStepSound` override.
+pub enum StepSound {
+    /// Vanilla `Entity.playStepSound`: the block's own step sound.
+    Block,
+    Silent,
+    Fixed(Sound, f32),
+}
+
+fn is_listed(list: &[&EntityType], entity_type: &EntityType) -> bool {
+    list.iter().any(|candidate| candidate.id == entity_type.id)
+}
+
 fn lookup<T: Copy>(table: &[(&EntityType, T)], entity_type: &EntityType) -> Option<T> {
     table
         .iter()
@@ -171,4 +330,47 @@ pub const fn sound_source(entity_type: &EntityType) -> SoundCategory {
     } else {
         SoundCategory::Neutral
     }
+}
+
+#[must_use]
+pub fn step_sound(entity_type: &EntityType) -> StepSound {
+    if let Some((sound, volume)) = lookup(STEP_SOUNDS, entity_type) {
+        StepSound::Fixed(sound, volume)
+    } else if is_listed(SILENT_STEPS, entity_type) {
+        StepSound::Silent
+    } else {
+        StepSound::Block
+    }
+}
+
+#[must_use]
+pub fn swim_sound(entity_type: &EntityType) -> Sound {
+    lookup(SWIM_SOUNDS, entity_type).unwrap_or_else(|| {
+        if is_listed(MONSTERS, entity_type) {
+            Sound::EntityHostileSwim
+        } else {
+            Sound::EntityGenericSwim
+        }
+    })
+}
+
+#[must_use]
+pub fn swim_splash_sound(entity_type: &EntityType) -> Sound {
+    lookup(SWIM_SPLASH_SOUNDS, entity_type).unwrap_or_else(|| {
+        if is_listed(MONSTERS, entity_type) {
+            Sound::EntityHostileSplash
+        } else {
+            Sound::EntityGenericSplash
+        }
+    })
+}
+
+#[must_use]
+pub fn movement_emission(entity_type: &EntityType) -> MovementEmission {
+    lookup(MOVEMENT_EMISSIONS, entity_type).unwrap_or(MovementEmission::All)
+}
+
+#[must_use]
+pub fn next_step_distance(entity_type: &EntityType) -> Option<f32> {
+    lookup(NEXT_STEP_DISTANCES, entity_type)
 }

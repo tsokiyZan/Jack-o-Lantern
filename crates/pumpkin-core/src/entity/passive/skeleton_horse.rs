@@ -36,6 +36,8 @@ pub struct SkeletonHorseEntity {
     pub ageable_data: AgeableData,
     pub flags: AtomicU8,
     pub temper: AtomicI32,
+    /// Vanilla `AbstractHorse.gallopSoundCounter`.
+    pub gallop_sound_counter: AtomicI32,
     pub owner: AtomicCell<Option<Uuid>>,
 }
 
@@ -47,6 +49,7 @@ impl SkeletonHorseEntity {
             ageable_data: AgeableData::default(),
             flags: AtomicU8::new(0),
             temper: AtomicI32::new(0),
+            gallop_sound_counter: AtomicI32::new(0),
             owner: AtomicCell::new(None),
         };
         let mob_arc = Arc::new(horse);
@@ -126,6 +129,51 @@ const BABY_DIMENSIONS: EntityDimensions =
     Entity::type_dimensions(&EntityType::SKELETON_HORSE).scale(0.7);
 
 impl Mob for SkeletonHorseEntity {
+    /// Vanilla `AbstractHorse.playStepSound`.
+    fn play_step_sound(
+        &self,
+        caller: &dyn EntityBase,
+        pos: &pumpkin_util::math::position::BlockPos,
+        _block: &'static pumpkin_data::Block,
+        state: &'static pumpkin_data::BlockState,
+    ) {
+        crate::entity::passive::horse::play_horse_step_sound(
+            caller,
+            pos,
+            state,
+            Some(&self.gallop_sound_counter),
+            false,
+        );
+    }
+
+    /// Vanilla `SkeletonHorse.getSwimSound`.
+    fn swim_sound(&self) -> Sound {
+        let entity = self.get_entity();
+        if entity.on_ground.load(Ordering::Relaxed) {
+            if !self.is_vehicle() {
+                return Sound::EntitySkeletonHorseStepWater;
+            }
+            let count = self.gallop_sound_counter.fetch_add(1, Ordering::Relaxed) + 1;
+            if count > 5 && count % 3 == 0 {
+                return Sound::EntitySkeletonHorseGallopWater;
+            }
+            if count <= 5 {
+                return Sound::EntitySkeletonHorseStepWater;
+            }
+        }
+        Sound::EntitySkeletonHorseSwim
+    }
+
+    /// Vanilla `SkeletonHorse.playSwimSound`.
+    fn play_swim_sound(&self, caller: &dyn EntityBase, volume: f32) {
+        let volume = if self.get_entity().on_ground.load(Ordering::Relaxed) {
+            0.3
+        } else {
+            (volume * 25.0).min(0.1)
+        };
+        self.get_entity().play_swim_sound_default(caller, volume);
+    }
+
     /// Vanilla `SkeletonHorse.getAmbientSound`.
     fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
         Some(if self.get_entity().is_submerged_in_water() {

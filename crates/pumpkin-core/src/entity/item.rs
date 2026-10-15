@@ -806,6 +806,10 @@ impl EntityBase for ItemEntity {
         self
     }
 
+    fn movement_emission(&self) -> crate::entity::movement_emission::MovementEmission {
+        crate::entity::movement_emission::MovementEmission::None
+    }
+
     fn send_bedrock_spawn_packet(&self, client: &crate::net::bedrock::BedrockClient) {
         let entity = &self.entity;
         let runtime_id = entity.entity_id as u64;

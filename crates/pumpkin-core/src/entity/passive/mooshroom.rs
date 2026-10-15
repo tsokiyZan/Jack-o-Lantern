@@ -152,6 +152,19 @@ const BABY_DIMENSIONS: EntityDimensions =
     EntityDimensions::scalable(0.45, 0.7).with_eye_height(0.69);
 
 impl Mob for MooshroomEntity {
+    /// Vanilla `AbstractCow.playStepSound`.
+    fn play_step_sound(
+        &self,
+        caller: &dyn crate::entity::EntityBase,
+        _pos: &pumpkin_util::math::position::BlockPos,
+        _block: &'static pumpkin_data::Block,
+        _state: &'static pumpkin_data::BlockState,
+    ) {
+        let sound = pumpkin_data::cow_sound_variant::CowSoundVariant::default()
+            .step_sound(self.get_entity().is_baby());
+        caller.play_sound_at_self(sound, 0.15, 1.0);
+    }
+
     /// Vanilla `AbstractCow.getAmbientSound`, with the mooshroom's classic sound set.
     fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
         Some(

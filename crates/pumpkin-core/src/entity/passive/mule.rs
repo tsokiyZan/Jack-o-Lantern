@@ -157,6 +157,17 @@ impl Animal for MuleEntity {
 const BABY_DIMENSIONS: EntityDimensions = Entity::type_dimensions(&EntityType::MULE).scale(0.5);
 
 impl Mob for MuleEntity {
+    /// Vanilla `AbstractHorse.playStepSound`.
+    fn play_step_sound(
+        &self,
+        caller: &dyn EntityBase,
+        pos: &pumpkin_util::math::position::BlockPos,
+        _block: &'static pumpkin_data::Block,
+        state: &'static pumpkin_data::BlockState,
+    ) {
+        crate::entity::passive::horse::play_horse_step_sound(caller, pos, state, None, false);
+    }
+
     /// Vanilla `AbstractChestedHorse.getDefaultDimensions`.
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
         let entity = self.get_entity();

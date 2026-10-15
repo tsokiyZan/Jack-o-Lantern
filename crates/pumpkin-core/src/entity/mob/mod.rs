@@ -994,7 +994,7 @@ pub trait Mob: EntityBase + Send + Sync {
 
     /// Vanilla `Entity.getMovementEmission`.
     fn movement_emission(&self) -> MovementEmission {
-        MovementEmission::All
+        sounds::movement_emission(self.get_entity().entity_type)
     }
 
     /// Vanilla `Entity.playStepSound`.
@@ -1005,12 +1005,22 @@ pub trait Mob: EntityBase + Send + Sync {
         _block: &'static Block,
         state: &'static BlockState,
     ) {
-        self.get_entity().play_step_sound_default(caller, state);
+        match sounds::step_sound(self.get_entity().entity_type) {
+            sounds::StepSound::Block => self.get_entity().play_step_sound_default(caller, state),
+            sounds::StepSound::Silent => {}
+            sounds::StepSound::Fixed(sound, volume) => {
+                caller.play_sound_at_self(sound, volume, 1.0);
+            }
+        }
     }
 
     /// Vanilla `Entity.nextStep`.
     fn next_step(&self) -> f32 {
-        (self.get_entity().move_dist.load() as i32 + 1) as f32
+        let move_dist = self.get_entity().move_dist.load();
+        sounds::next_step_distance(self.get_entity().entity_type)
+            .map_or((move_dist as i32 + 1) as f32, |distance| {
+                move_dist + distance
+            })
     }
 
     /// Vanilla `Entity.playSwimSound`.
@@ -1020,12 +1030,12 @@ pub trait Mob: EntityBase + Send + Sync {
 
     /// Vanilla `Entity.getSwimSound`.
     fn swim_sound(&self) -> Sound {
-        Sound::EntityGenericSwim
+        sounds::swim_sound(self.get_entity().entity_type)
     }
 
     /// Vanilla `Entity.getSwimSplashSound`.
     fn swim_splash_sound(&self) -> Sound {
-        Sound::EntityGenericSplash
+        sounds::swim_splash_sound(self.get_entity().entity_type)
     }
 
     /// Vanilla `Entity.getSwimHighSpeedSplashSound`.
