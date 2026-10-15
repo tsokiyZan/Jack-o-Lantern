@@ -264,7 +264,7 @@ impl ThrownItemEntity {
 
         // Skip owner for initial frames
         if Some(other_ent.entity_id) == self.owner_id.load()
-            && self_ent.age.load(Ordering::Relaxed) < 5
+            && self_ent.tick_count.load(Ordering::Relaxed) < 5
         {
             return true;
         }

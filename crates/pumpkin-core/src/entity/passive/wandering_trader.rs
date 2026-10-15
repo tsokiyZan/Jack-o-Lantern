@@ -668,6 +668,11 @@ impl Mob for WanderingTraderEntity {
         Some(self)
     }
 
+    /// Vanilla `AgeableMob.aiStep`, which runs inside this mob's `super.aiStep()`.
+    fn ai_step_end(&self, _caller: &dyn EntityBase) {
+        self.ageable_ai_step();
+    }
+
     fn mob_write_nbt(&self, nbt: &mut NbtCompound) {
         nbt.put_int("DespawnDelay", self.despawn_delay.load(Ordering::Relaxed));
         let wander_target = *self

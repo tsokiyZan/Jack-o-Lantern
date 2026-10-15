@@ -1,4 +1,6 @@
+use pumpkin_data::particle::Particle;
 use pumpkin_data::tracked_data;
+use pumpkin_util::math::vector3::Vector3;
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering::Relaxed};
 
 use crate::entity::mob::Mob;
@@ -6,6 +8,7 @@ use crate::entity::mob::spawn::SpawnGroupData;
 
 pub const BABY_START_AGE: i32 = -24000;
 pub const FORCED_AGE_PARTICLE_TICKS: i32 = 40;
+pub const AGE_LOCK_DOWNWARDS_MOVING_PARTICLE_Y_OFFSET: f32 = 0.2;
 /// The baby chance of vanilla's `AgeableMobGroupData(boolean)`.
 const DEFAULT_BABY_SPAWN_CHANCE: f32 = 0.05;
 
@@ -35,11 +38,13 @@ pub trait AgeableMob: Mob {
     }
 
     fn is_baby(&self) -> bool {
-        self.get_mob_entity().living_entity.entity.age.load(Relaxed) < 0
+        self.can_be_a_baby() && self.get_age() < 0
     }
 
     fn set_baby(&self, baby: bool) {
-        self.set_age(if baby { self.get_baby_start_age() } else { 0 });
+        if self.can_be_a_baby() {
+            self.set_age(if baby { self.get_baby_start_age() } else { 0 });
+        }
     }
 
     fn get_age(&self) -> i32 {
@@ -69,6 +74,10 @@ pub trait AgeableMob: Mob {
 
     fn set_age_locked(&self, locked: bool) {
         self.get_ageable_data().age_locked.store(locked, Relaxed);
+        self.get_mob_entity()
+            .living_entity
+            .entity
+            .set_synced_data(tracked_data::ageable_mob::AGE_LOCKED, locked);
     }
 
     fn can_age_up(&self) -> bool {
@@ -90,7 +99,8 @@ pub trait AgeableMob: Mob {
         if forced {
             data.forced_age.fetch_add(delta, Relaxed);
             if data.forced_age_timer.load(Relaxed) == 0 {
-                data.forced_age_timer.store(40, Relaxed);
+                data.forced_age_timer
+                    .store(FORCED_AGE_PARTICLE_TICKS, Relaxed);
             }
         }
 
@@ -104,7 +114,7 @@ pub trait AgeableMob: Mob {
     where
         Self: Sized,
     {
-        (ticks_until_adult as f32 / 20.0 * 0.1) as i32
+        get_speed_up_seconds_when_feeding(ticks_until_adult)
     }
 
     fn write_ageable_nbt(&self, nbt: &mut pumpkin_nbt::compound::NbtCompound) {
@@ -155,13 +165,82 @@ pub trait AgeableMob: Mob {
         true
     }
 
+    /// Vanilla `AgeableMob.aiStep` after its `super.aiStep()`: the forced-growth particles,
+    /// one tick of growing up (or of the adult cooldown running down) and the age-lock
+    /// particles.
     fn ageable_ai_step(&self) {
-        if self.can_age_up() {
-            let age = self.get_age() + 1;
-            self.set_age(age);
-        } else if self.get_age() > 0 {
-            let age = self.get_age() - 1;
-            self.set_age(age);
+        let living = &self.get_mob_entity().living_entity;
+        let entity = &living.entity;
+        let data = self.get_ageable_data();
+        let forced_age_timer = data.forced_age_timer.load(Relaxed);
+        if forced_age_timer > 0 {
+            if forced_age_timer % 4 == 0 {
+                entity.world.load().spawn_particle(
+                    Vector3::new(
+                        entity.get_random_x(1.0),
+                        entity.get_random_y() + 0.5,
+                        entity.get_random_z(1.0),
+                    ),
+                    Vector3::new(0.0, 0.0, 0.0),
+                    0.0,
+                    1,
+                    Particle::HappyVillager,
+                );
+            }
+            data.forced_age_timer.store(forced_age_timer - 1, Relaxed);
         }
+
+        if living.is_alive() {
+            let age = self.get_age();
+            if self.can_age_up() {
+                self.set_age(age + 1);
+            } else if age > 0 {
+                self.set_age(age - 1);
+            }
+        }
+
+        make_age_locked_particle(entity, &data.age_lock_particle_timer, self.is_age_locked());
+    }
+}
+
+/// Vanilla `AgeableMob.getSpeedUpSecondsWhenFeeding`.
+#[must_use]
+pub fn get_speed_up_seconds_when_feeding(ticks_until_adult: i32) -> i32 {
+    ((ticks_until_adult / 20) as f32 * 0.1) as i32
+}
+
+/// Vanilla `AgeableMob.makeAgeLockedParticle`.
+pub fn make_age_locked_particle(
+    entity: &crate::entity::Entity,
+    age_lock_particle_timer: &AtomicI32,
+    is_age_locked: bool,
+) {
+    let timer = age_lock_particle_timer.load(Relaxed);
+    if timer > 0 {
+        if timer % 2 == 0 {
+            let y_offset = if is_age_locked {
+                AGE_LOCK_DOWNWARDS_MOVING_PARTICLE_Y_OFFSET
+            } else {
+                0.0
+            };
+            entity.world.load().spawn_particle(
+                Vector3::new(
+                    entity.get_random_x(1.0),
+                    entity.get_random_y_spread(0.2)
+                        + f64::from(entity.height())
+                        + f64::from(y_offset),
+                    entity.get_random_z(1.0),
+                ),
+                Vector3::new(0.0, 0.0, 0.0),
+                0.0,
+                1,
+                if is_age_locked {
+                    Particle::PauseMobGrowth
+                } else {
+                    Particle::ResetMobGrowth
+                },
+            );
+        }
+        age_lock_particle_timer.store(timer - 1, Relaxed);
     }
 }

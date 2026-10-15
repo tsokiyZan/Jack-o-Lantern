@@ -580,6 +580,17 @@ impl EquipmentSlot {
         max_count: 1,
         name: Cow::Borrowed("saddle"),
     });
+    /// Vanilla `EquipmentSlot.VALUES`, in declaration order.
+    pub const VALUES: [Self; 8] = [
+        Self::MAIN_HAND,
+        Self::OFF_HAND,
+        Self::FEET,
+        Self::LEGS,
+        Self::CHEST,
+        Self::HEAD,
+        Self::BODY,
+        Self::SADDLE,
+    ];
 
     #[must_use]
     pub const fn get_entity_slot_id(&self) -> i32 {
@@ -678,6 +689,12 @@ impl EquipmentSlot {
             self.slot_type(),
             EquipmentType::HumanoidArmor | EquipmentType::AnimalArmor
         )
+    }
+
+    /// Vanilla `EquipmentSlot.canIncreaseExperience`.
+    #[must_use]
+    pub const fn can_increase_experience(&self) -> bool {
+        !matches!(self.slot_type(), EquipmentType::Saddle)
     }
 
     #[must_use]

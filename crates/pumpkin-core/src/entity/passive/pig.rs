@@ -185,6 +185,11 @@ impl Mob for PigEntity {
         Some(self)
     }
 
+    /// Vanilla `AgeableMob.aiStep`, which runs inside this mob's `super.aiStep()`.
+    fn ai_step_end(&self, _caller: &dyn EntityBase) {
+        self.ageable_ai_step();
+    }
+
     fn as_custom_sound(&self) -> Option<&dyn CustomSound> {
         Some(self)
     }

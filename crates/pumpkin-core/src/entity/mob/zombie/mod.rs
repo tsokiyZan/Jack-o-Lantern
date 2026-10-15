@@ -782,7 +782,8 @@ pub fn set_baby_speed(living: &LivingEntity, baby: bool) {
     );
 }
 
-/// Vanilla `Zombie.getBaseExperienceReward`: babies are worth two and a half times as much.
+/// Vanilla `Zombie.getBaseExperienceReward`'s `xpReward`: babies are worth two and a half times
+/// as much.
 #[must_use]
 pub fn zombie_experience_reward(base: u32, baby: bool) -> u32 {
     if baby {
@@ -929,8 +930,8 @@ macro_rules! impl_zombie_mob {
             self.$field.spawn_as_baby()
         }
 
-        /// Vanilla `Zombie.getBaseExperienceReward`.
-        fn get_base_experience_reward(&self) -> u32 {
+        /// Vanilla `Zombie.getBaseExperienceReward`, which raises `xpReward` before `super`.
+        fn xp_reward(&self) -> u32 {
             $crate::entity::mob::zombie::zombie_experience_reward(
                 self.get_entity().entity_type.experience_reward,
                 self.$field.is_baby(),

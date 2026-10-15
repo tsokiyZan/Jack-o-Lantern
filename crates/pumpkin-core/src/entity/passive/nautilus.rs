@@ -25,6 +25,7 @@ use pumpkin_util::math::vector3::Vector3;
 
 use crate::entity::{
     Entity, EntityBase,
+    ageable::{AgeableData, AgeableMob},
     custom_sound::CustomSound,
     mob::{Mob, MobEntity},
     passive::animal::{Animal, set_animal_pathfinding_malus},
@@ -39,6 +40,7 @@ pub struct NautilusEntity {
     pub dash_cooldown: AtomicI32,
     pub is_saddled: AtomicBool,
     pub inventory: Mutex<Vec<ItemStack>>,
+    pub ageable_data: AgeableData,
 }
 
 impl NautilusEntity {
@@ -55,6 +57,7 @@ impl NautilusEntity {
             dash_cooldown: AtomicI32::new(0),
             is_saddled: AtomicBool::new(false),
             inventory: Mutex::new(vec![ItemStack::new(0, &pumpkin_data::item::Item::AIR); 9]),
+            ageable_data: AgeableData::default(),
         };
 
         Arc::new(nautilus)
@@ -167,6 +170,12 @@ impl NautilusEntity {
     }
 }
 
+impl AgeableMob for NautilusEntity {
+    fn get_ageable_data(&self) -> &AgeableData {
+        &self.ageable_data
+    }
+}
+
 impl Animal for NautilusEntity {
     fn is_food(&self, item_stack: &ItemStack) -> bool {
         item_stack.item == &pumpkin_data::item::Item::NAUTILUS_SHELL
@@ -272,8 +281,17 @@ impl Mob for NautilusEntity {
         Some(self)
     }
 
+    fn as_ageable(&self) -> Option<&dyn AgeableMob> {
+        Some(self)
+    }
+
     fn as_animal(&self) -> Option<&dyn Animal> {
         Some(self)
+    }
+
+    /// Vanilla `AgeableMob.aiStep`, which runs inside this mob's `super.aiStep()`.
+    fn ai_step_end(&self, _caller: &dyn EntityBase) {
+        self.ageable_ai_step();
     }
 
     fn mob_write_nbt(&self, nbt: &mut NbtCompound) {

@@ -1517,7 +1517,7 @@ impl Player {
         self.living_entity.last_attack_time.store(
             self.living_entity
                 .entity
-                .age
+                .tick_count
                 .load(std::sync::atomic::Ordering::Relaxed),
             std::sync::atomic::Ordering::Relaxed,
         );
@@ -2931,10 +2931,6 @@ impl Player {
             }
         }
         self.tick_counter.fetch_add(1, Ordering::Relaxed);
-        self.living_entity
-            .entity
-            .age
-            .fetch_add(1, Ordering::Relaxed);
         // Vanilla `Player.tick`'s sleep counter.
         if self.is_sleeping() {
             let counter = self.sleep_counter.load(Ordering::Relaxed) + 1;

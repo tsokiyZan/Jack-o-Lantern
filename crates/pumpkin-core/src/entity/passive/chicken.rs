@@ -205,6 +205,11 @@ impl Mob for ChickenEntity {
         Some(self)
     }
 
+    /// Vanilla `AgeableMob.aiStep`, which runs inside this mob's `super.aiStep()`.
+    fn ai_step_end(&self, _caller: &dyn EntityBase) {
+        self.ageable_ai_step();
+    }
+
     fn as_custom_sound(&self) -> Option<&dyn CustomSound> {
         Some(self)
     }
@@ -259,7 +264,7 @@ impl Mob for ChickenEntity {
         if self.is_chicken_jockey() {
             CHICKEN_JOCKEY_EXPERIENCE
         } else {
-            self.get_entity().entity_type.experience_reward
+            self.animal_base_experience_reward()
         }
     }
 

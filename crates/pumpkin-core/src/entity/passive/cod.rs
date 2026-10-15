@@ -1,4 +1,5 @@
 use crate::entity::breath::BreathManager;
+use rand::RngExt;
 use std::sync::Arc;
 
 use pumpkin_data::sound::Sound;
@@ -35,6 +36,11 @@ impl CodEntity {
 impl Mob for CodEntity {
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
+    }
+
+    /// Vanilla `WaterAnimal.getBaseExperienceReward`.
+    fn get_base_experience_reward(&self) -> u32 {
+        1 + self.get_random().random_range(0..3)
     }
 
     /// Vanilla `WaterAnimal.handleAirSupply`.

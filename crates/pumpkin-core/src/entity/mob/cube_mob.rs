@@ -426,7 +426,11 @@ impl Mob for CubeMobEntity {
         if self.kind == CubeKind::SulfurCube {
             return self.sulfur_base_experience_reward();
         }
-        // `xpReward`, which `setSize` sets to the size.
+        super::mob_base_experience_reward(self)
+    }
+
+    /// `setSize` sets `xpReward` to the size.
+    fn xp_reward(&self) -> u32 {
         self.get_size() as u32
     }
 

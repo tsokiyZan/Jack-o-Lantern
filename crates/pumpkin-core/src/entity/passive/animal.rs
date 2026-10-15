@@ -11,6 +11,7 @@ use pumpkin_inventory::crafting::crafting_screen_handler::match_crafting_recipe;
 use pumpkin_inventory::crafting::recipe_provider::RecipeProvider;
 use pumpkin_inventory::inventory::Inventory;
 
+use crate::entity::ageable::get_speed_up_seconds_when_feeding;
 use crate::entity::{
     EntityBase,
     ai::pathfinder::node::PathType,
@@ -21,6 +22,7 @@ use crate::entity::{
 use crate::world::World;
 use pumpkin_protocol::bedrock::server::actor_event::ActorEventID;
 use pumpkin_util::math::vector3::Vector3;
+use rand::RngExt;
 use uuid::Uuid;
 
 /// Vanilla `Animal`'s constructor: animals keep clear of fire.
@@ -71,6 +73,11 @@ pub trait Animal: Mob {
             return 10.0;
         }
         world.get_light_level_dependent_magic_value(pos) - 0.5
+    }
+
+    /// Vanilla `Animal.getBaseExperienceReward`.
+    fn animal_base_experience_reward(&self) -> u32 {
+        1 + self.get_random().random_range(0..3)
     }
 
     fn play_eating_sound(&self, sound: Sound) {
@@ -137,26 +144,11 @@ pub trait Animal: Mob {
                 return true;
             }
 
-            if age < 0 {
+            if let Some(ageable) = self.as_ageable()
+                && ageable.can_age_up()
+            {
                 item_stack.decrement_unless_creative(player.gamemode.load(), 1);
-                let speedup = (-age / 10).max(1);
-                mob_entity
-                    .living_entity
-                    .entity
-                    .age
-                    .fetch_add(speedup, std::sync::atomic::Ordering::Relaxed);
-
-                let entity = &mob_entity.living_entity.entity;
-                let world = entity.world.load();
-                let pos = entity.pos.load();
-
-                world.spawn_particle(
-                    pos + Vector3::new(0.0, f64::from(entity.height()), 0.0),
-                    Vector3::new(0.5, 0.5, 0.5),
-                    1.0,
-                    7,
-                    Particle::HappyVillager,
-                );
+                ageable.age_up(get_speed_up_seconds_when_feeding(-age), true);
                 self.play_eating_sound(ambient_sound);
                 return true;
             }
