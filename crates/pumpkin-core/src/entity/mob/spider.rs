@@ -62,7 +62,7 @@ impl SpiderEntity {
             goal_selector.add_goal(1, Box::new(SwimGoal::default()));
             // TODO: 2 AvoidEntityGoal(Armadillo, 6, 1.0, 1.2, not scared) needs predicate support.
             goal_selector.add_goal(3, Box::new(LeapAtTargetGoal::new(0.4)));
-            goal_selector.add_goal(4, SpiderAttackGoal::new(1.0, false));
+            goal_selector.add_goal(4, SpiderAttackGoal::new(1.0, true));
             goal_selector.add_goal(5, Box::new(WanderAroundGoal::avoiding_water(0.8)));
             goal_selector.add_goal(
                 6,

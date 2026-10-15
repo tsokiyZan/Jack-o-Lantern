@@ -29,12 +29,8 @@ use crate::entity::{
     player::Player,
 };
 
-const PIG_FOOD: &[&Item] = &[
-    &Item::CARROT,
-    &Item::POTATO,
-    &Item::BEETROOT,
-    &Item::CARROT_ON_A_STICK,
-];
+/// `#pig_food`.
+const PIG_FOOD: &[&Item] = &[&Item::CARROT, &Item::POTATO, &Item::BEETROOT];
 
 /// Represents a Pig, a common passive mob that provides porkchops.
 ///
@@ -78,10 +74,14 @@ impl PigEntity {
 
             goal_selector.add_goal(0, Box::new(SwimGoal::default()));
             goal_selector.add_goal(1, EscapeDangerGoal::new(1.25));
-            goal_selector.add_goal(2, BreedGoal::new(1.0));
-            goal_selector.add_goal(3, Box::new(TemptGoal::new(1.2, PIG_FOOD, false)));
-            goal_selector.add_goal(4, Box::new(FollowParentGoal::new(1.1)));
-            goal_selector.add_goal(5, Box::new(WanderAroundGoal::new(1.0)));
+            goal_selector.add_goal(3, BreedGoal::new(1.0));
+            goal_selector.add_goal(
+                4,
+                Box::new(TemptGoal::new(1.2, &[&Item::CARROT_ON_A_STICK], false)),
+            );
+            goal_selector.add_goal(4, Box::new(TemptGoal::new(1.2, PIG_FOOD, false)));
+            goal_selector.add_goal(5, Box::new(FollowParentGoal::new(1.1)));
+            goal_selector.add_goal(6, Box::new(WanderAroundGoal::avoiding_water(1.0)));
             goal_selector.add_goal(
                 6,
                 LookAtEntityGoal::with_default(mob_weak, &EntityType::PLAYER, 6.0),
