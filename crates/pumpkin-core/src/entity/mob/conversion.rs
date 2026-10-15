@@ -199,7 +199,11 @@ fn convert_single_type(from: &dyn Mob, to: &dyn Mob, params: ConversionParams) {
     new_living
         .fall_distance
         .store(old_living.fall_distance.load());
-    new_entity.set_fall_flying(old_entity.is_fall_flying());
+    // Vanilla `setSharedFlag(7, ...)`, not `set_fall_flying`, which asserts a player's
+    // glide state actually changes.
+    let fall_flying = old_entity.is_fall_flying();
+    new_entity.fall_flying.store(fall_flying, Relaxed);
+    new_entity.set_flag(crate::entity::Flag::FallFlying, fall_flying);
     new_living.set_last_hurt_by_player(
         old_living.last_hurt_by_player.load(),
         old_living.last_hurt_by_player_memory_time.load(Relaxed),
