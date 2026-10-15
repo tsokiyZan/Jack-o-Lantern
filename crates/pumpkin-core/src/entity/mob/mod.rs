@@ -65,6 +65,8 @@ pub mod ghast;
 pub mod giant;
 pub mod guardian;
 pub mod hoglin;
+pub mod hoglin_ai;
+pub mod hoglin_base;
 pub mod illusioner;
 pub mod neutral;
 pub mod patrol;

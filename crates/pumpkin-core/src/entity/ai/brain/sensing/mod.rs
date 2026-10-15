@@ -13,6 +13,7 @@ use super::{BrainTick, VisibilityContext};
 pub mod adult;
 pub mod axolotl_attackables;
 pub mod dummy;
+pub mod hoglin_specific;
 pub mod hurt_by;
 pub mod mob_sensor;
 pub mod nearest_items;
@@ -25,6 +26,7 @@ pub mod tempting;
 pub use adult::{AdultSensor, AdultSensorAnyType};
 pub use axolotl_attackables::AxolotlAttackablesSensor;
 pub use dummy::DummySensor;
+pub use hoglin_specific::HoglinSpecificSensor;
 pub use hurt_by::HurtBySensor;
 pub use mob_sensor::MobSensor;
 pub use nearest_items::NearestItemSensor;
@@ -52,6 +54,7 @@ pub enum SensorType {
     HurtBy,
     PiglinSpecific,
     PiglinBruteSpecific,
+    HoglinSpecific,
     NearestAdult,
     NearestAdultAnyType,
     AxolotlAttackables,
@@ -70,6 +73,7 @@ impl SensorType {
             Self::HurtBy => "minecraft:hurt_by",
             Self::PiglinSpecific => "minecraft:piglin_specific_sensor",
             Self::PiglinBruteSpecific => "minecraft:piglin_brute_specific_sensor",
+            Self::HoglinSpecific => "minecraft:hoglin_specific_sensor",
             Self::NearestAdult => "minecraft:nearest_adult",
             Self::NearestAdultAnyType => "minecraft:nearest_adult_any_type",
             Self::AxolotlAttackables => "minecraft:axolotl_attackables",
@@ -88,6 +92,7 @@ impl SensorType {
             | Self::HurtBy
             | Self::PiglinSpecific
             | Self::PiglinBruteSpecific
+            | Self::HoglinSpecific
             | Self::NearestAdult
             | Self::NearestAdultAnyType
             | Self::AxolotlAttackables
@@ -105,6 +110,7 @@ impl SensorType {
             Self::HurtBy => Box::new(HurtBySensor),
             Self::PiglinSpecific => Box::new(PiglinSpecificSensor),
             Self::PiglinBruteSpecific => Box::new(PiglinBruteSpecificSensor),
+            Self::HoglinSpecific => Box::new(HoglinSpecificSensor),
             Self::NearestAdult => Box::new(AdultSensor),
             Self::NearestAdultAnyType => Box::new(AdultSensorAnyType),
             Self::AxolotlAttackables => Box::new(AxolotlAttackablesSensor),

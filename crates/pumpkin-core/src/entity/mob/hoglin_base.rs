@@ -1,0 +1,83 @@
+//! Vanilla `HoglinBase`, the attack hoglins and zoglins share.
+
+use std::sync::atomic::Ordering;
+
+use pumpkin_data::attributes::Attributes;
+use pumpkin_data::damage::DamageType;
+use pumpkin_util::math::vector3::Vector3;
+use rand::RngExt;
+
+use crate::entity::EntityBase;
+use crate::entity::mob::Mob;
+
+/// Vanilla `HoglinBase.ATTACK_ANIMATION_DURATION`.
+pub const ATTACK_ANIMATION_DURATION: i32 = 10;
+/// Vanilla `HoglinBase.PROBABILITY_OF_SPAWNING_AS_BABY`.
+pub const PROBABILITY_OF_SPAWNING_AS_BABY: f32 = 0.2;
+
+/// Vanilla `HoglinBase.hurtAndThrowTarget`.
+pub fn hurt_and_throw_target(body: &dyn Mob, target: &dyn EntityBase) -> bool {
+    let attack_damage = body
+        .get_mob_entity()
+        .living_entity
+        .get_attribute_value(&Attributes::ATTACK_DAMAGE) as f32;
+    let is_baby = body.get_entity().is_baby();
+    let actual_damage = if !is_baby && attack_damage as i32 > 0 {
+        attack_damage / 2.0 + body.get_random().random_range(0..attack_damage as i32) as f32
+    } else {
+        attack_damage
+    };
+
+    let attacker: &dyn EntityBase = body;
+    let was_hurt = target.damage_with_context(
+        target,
+        actual_damage,
+        DamageType::MOB_ATTACK,
+        None,
+        Some(attacker),
+        Some(attacker),
+    );
+    if was_hurt {
+        // TODO: EnchantmentHelper.doPostAttackEffects; no mob melee attack runs it yet.
+        if !is_baby {
+            throw_target(body, target);
+        }
+    }
+    was_hurt
+}
+
+/// Vanilla `HoglinBase.throwTarget`.
+pub fn throw_target(body: &dyn Mob, target: &dyn EntityBase) {
+    let Some(target_living) = target.get_living_entity() else {
+        return;
+    };
+    let knockback_power = body
+        .get_mob_entity()
+        .living_entity
+        .get_attribute_value(&Attributes::ATTACK_KNOCKBACK);
+    let knockback_resistance = target_living.get_attribute_value(&Attributes::KNOCKBACK_RESISTANCE);
+    let effective_knockback_power = knockback_power - knockback_resistance;
+    if effective_knockback_power <= 0.0 {
+        return;
+    }
+
+    let body_pos = body.get_entity().pos.load();
+    let target_entity = target.get_entity();
+    let target_pos = target_entity.pos.load();
+    let xd = target_pos.x - body_pos.x;
+    let zd = target_pos.z - body_pos.z;
+    let mut random = body.get_random();
+    // Vanilla passes these degrees to `yRot` as radians.
+    let horizontal_push_angle = (random.random_range(0..21) - 10) as f32;
+    let horizontal_scale =
+        effective_knockback_power * f64::from(random.random::<f32>() * 0.5 + 0.2);
+    let horizontal_push_vector =
+        (Vector3::new(xd, 0.0, zd).normalize() * horizontal_scale).y_rot(horizontal_push_angle);
+    let vertical_scale = effective_knockback_power * f64::from(random.random::<f32>()) * 0.5;
+    target_entity.push_impulse(Vector3::new(
+        horizontal_push_vector.x,
+        vertical_scale,
+        horizontal_push_vector.z,
+    ));
+    target_entity.sync_velocity.store(true, Ordering::SeqCst);
+}
