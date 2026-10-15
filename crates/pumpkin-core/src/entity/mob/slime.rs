@@ -12,6 +12,7 @@ use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
 
 use crate::entity::custom_sound::CustomSound;
+use crate::entity::living::LivingEntity;
 use crate::entity::{
     Entity, EntityBase,
     ai::control::{Control, MoveControlTrait},
@@ -72,13 +73,27 @@ impl SlimeEntity {
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
 
             goal_selector.add_goal(1, Box::new(SlimeFloatGoal::new(mob_arc.clone())));
-            goal_selector.add_goal(2, Box::new(SlimeAttackGoal::new(mob_arc.clone())));
-            goal_selector.add_goal(3, Box::new(SlimeRandomDirectionGoal::new(mob_arc.clone())));
+            goal_selector.add_goal(4, Box::new(SlimeRandomDirectionGoal::new(mob_arc.clone())));
             goal_selector.add_goal(5, Box::new(SlimeKeepOnJumpingGoal::new(mob_arc.clone())));
+            // `addBehaviourGoals`, after the cube mob's own goals.
+            goal_selector.add_goal(2, Box::new(SlimeAttackGoal::new(mob_arc.clone())));
 
+            let slime = Arc::downgrade(&mob_arc);
             target_selector.add_goal(
                 1,
-                ActiveTargetGoal::with_default(&mob_arc.entity, &EntityType::PLAYER, true),
+                Box::new(ActiveTargetGoal::new(
+                    &mob_arc.entity,
+                    &EntityType::PLAYER,
+                    10,
+                    true,
+                    false,
+                    Some(move |target: &LivingEntity, _world: &World| {
+                        slime.upgrade().is_some_and(|slime| {
+                            (target.entity.pos.load().y - slime.get_entity().pos.load().y).abs()
+                                <= 4.0
+                        })
+                    }),
+                )),
             );
             target_selector.add_goal(
                 3,

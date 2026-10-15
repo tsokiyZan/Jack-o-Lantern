@@ -58,16 +58,26 @@ impl SnowGolemEntity {
                 1,
                 Box::new(RangedAttackGoal::new(ranged_weak, 1.25, 20, 10.0)),
             );
-            goal_selector.add_goal(5, Box::new(WanderAroundGoal::new(1.0)));
             goal_selector.add_goal(
-                6,
+                2,
+                Box::new(WanderAroundGoal::avoiding_water_with_probability(
+                    1.0,
+                    1.000_000_1E-5,
+                )),
+            );
+            goal_selector.add_goal(
+                3,
                 LookAtEntityGoal::with_default(mob_weak, &EntityType::PLAYER, 6.0),
             );
-            goal_selector.add_goal(6, Box::new(RandomLookAroundGoal::default()));
+            goal_selector.add_goal(4, Box::new(RandomLookAroundGoal::default()));
 
+            // `NearestAttackableTargetGoal(Mob.class, 10, true, false, target instanceof Enemy)`.
             target_selector.add_goal(
                 1,
-                ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::ZOMBIE, true),
+                ActiveTargetGoal::predicated(&mob_arc.mob_entity, 10, true, |target, _world| {
+                    target.entity.entity_type.category
+                        == &pumpkin_data::entity::MobCategory::MONSTER
+                }),
             );
         };
 

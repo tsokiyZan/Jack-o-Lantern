@@ -72,6 +72,7 @@ impl GhastEntity {
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
 
             // Priority 1: Target nearest player within vertical proximity
+            let ghast = Arc::downgrade(&mob_arc);
             target_selector.add_goal(
                 1,
                 Box::new(ActiveTargetGoal::new(
@@ -80,7 +81,12 @@ impl GhastEntity {
                     10,
                     true,
                     false,
-                    Some(|_target: &LivingEntity, _world: &World| true),
+                    Some(move |target: &LivingEntity, _world: &World| {
+                        ghast.upgrade().is_some_and(|ghast| {
+                            (target.entity.pos.load().y - ghast.get_entity().pos.load().y).abs()
+                                <= 4.0
+                        })
+                    }),
                 )),
             );
         };

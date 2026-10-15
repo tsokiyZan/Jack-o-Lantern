@@ -1,5 +1,5 @@
+use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, Ordering};
-use std::sync::{Arc, Weak};
 
 use pumpkin_data::damage::DamageType;
 use pumpkin_data::entity::EntityType;
@@ -7,9 +7,8 @@ use pumpkin_data::entity::EntityType;
 use crate::entity::{
     Entity, EntityBase,
     ai::goal::{
-        active_target::ActiveTargetGoal, look_around::RandomLookAroundGoal,
-        look_at_entity::LookAtEntityGoal, melee_attack::MeleeAttackGoal, revenge::RevengeGoal,
-        swim::SwimGoal, wander_around::WanderAroundGoal,
+        active_target::ActiveTargetGoal, melee_attack::MeleeAttackGoal, revenge::RevengeGoal,
+        swim::SwimGoal,
     },
     mob::{Mob, MobEntity},
 };
@@ -27,10 +26,6 @@ impl SilverfishEntity {
             wake_up_friends_ticks: AtomicI32::new(0),
         };
         let mob_arc = Arc::new(silverfish);
-        let mob_weak: Weak<dyn Mob> = {
-            let mob_arc: Arc<dyn Mob> = mob_arc.clone();
-            Arc::downgrade(&mob_arc)
-        };
 
         {
             let mut goal_selector = mob_arc
@@ -44,16 +39,12 @@ impl SilverfishEntity {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
 
-            goal_selector.add_goal(0, SwimGoal::new(&mob_arc.entity));
+            goal_selector.add_goal(1, SwimGoal::new(&mob_arc.entity));
+            // TODO: 1 ClimbOnTopOfPowderSnowGoal, 3 SilverfishWakeUpFriendsGoal and
+            // 5 SilverfishMergeWithStoneGoal are not ported.
             goal_selector.add_goal(4, Box::new(MeleeAttackGoal::new(1.0, false)));
-            goal_selector.add_goal(5, Box::new(WanderAroundGoal::new(1.0)));
-            goal_selector.add_goal(
-                8,
-                LookAtEntityGoal::with_default(mob_weak, &EntityType::PLAYER, 8.0),
-            );
-            goal_selector.add_goal(8, Box::new(RandomLookAroundGoal::default()));
 
-            target_selector.add_goal(1, Box::new(RevengeGoal::new(true)));
+            target_selector.add_goal(1, Box::new(RevengeGoal::new(true).alerting_others()));
             target_selector.add_goal(
                 2,
                 ActiveTargetGoal::with_default(&mob_arc.entity, &EntityType::PLAYER, true),

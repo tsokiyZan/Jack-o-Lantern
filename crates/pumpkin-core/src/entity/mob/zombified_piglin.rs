@@ -1,3 +1,5 @@
+use crate::entity::ai::goal::destroy_egg::DestroyEggGoal;
+use crate::entity::ai::goal::zombie_attack::ZombieAttackGoal;
 use pumpkin_data::entity::EntityPose;
 use pumpkin_util::math::boundingbox::EntityDimensions;
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
@@ -14,8 +16,8 @@ use crate::entity::{
     Entity, EntityBase,
     ai::behavior::neutral::apply_targets,
     ai::goal::{
-        look_around::RandomLookAroundGoal, look_at_entity::LookAtEntityGoal,
-        melee_attack::MeleeAttackGoal, revenge::RevengeGoal, wander_around::WanderAroundGoal,
+        look_around::RandomLookAroundGoal, look_at_entity::LookAtEntityGoal, revenge::RevengeGoal,
+        wander_around::WanderAroundGoal,
     },
     mob::{
         Mob, MobEntity,
@@ -62,13 +64,16 @@ impl ZombifiedPiglinEntity {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
 
-            goal_selector.add_goal(2, Box::new(MeleeAttackGoal::new(1.0, true)));
-            goal_selector.add_goal(5, Box::new(WanderAroundGoal::new(1.0)));
+            // Vanilla `Zombie.registerGoals`, then this mob's `addBehaviourGoals`.
+            goal_selector.add_goal(4, DestroyEggGoal::new(1.0, 3));
             goal_selector.add_goal(
-                6,
+                8,
                 LookAtEntityGoal::with_default(mob_weak.clone(), &EntityType::PLAYER, 8.0),
             );
-            goal_selector.add_goal(7, Box::new(RandomLookAroundGoal::default()));
+            goal_selector.add_goal(8, Box::new(RandomLookAroundGoal::default()));
+            // TODO: 1 SpearUseGoal(1.0, 1.0, 10, 2) is not ported.
+            goal_selector.add_goal(2, ZombieAttackGoal::new(1.0, false));
+            goal_selector.add_goal(7, Box::new(WanderAroundGoal::avoiding_water(1.0)));
 
             let mut target_selector = mob_arc
                 .mob_entity
