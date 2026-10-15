@@ -307,8 +307,8 @@ const INK_POS_OFFSET_SCALE: f32 = 0.3;
 fn has_last_hurt_by_mob(living: &LivingEntity) -> bool {
     let entity = &living.entity;
     // Vanilla forgets an attacker a hundred ticks after the hit.
-    let since_hit =
-        entity.age.load(Ordering::Relaxed) - living.last_attacked_time.load(Ordering::Relaxed);
+    let since_hit = entity.tick_count.load(Ordering::Relaxed)
+        - living.last_attacked_time.load(Ordering::Relaxed);
     living.last_attacker_id.load(Ordering::Relaxed) != 0 && since_hit <= 100
 }
 

@@ -277,7 +277,8 @@ impl MobEntity {
     /// Vanilla `Mob.serverAiStep`: sensing, goals, navigation and controls.
     pub fn server_ai_step(&self, mob: &dyn Mob, caller: &dyn EntityBase) {
         self.living_entity.no_action_time.fetch_add(1, Relaxed);
-        let age = self.living_entity.entity.age.load(Relaxed);
+        // Vanilla `tickCount`, not Pumpkin's `age`, which babies keep negative.
+        let age = self.living_entity.entity.tick_count.load(Relaxed);
         let entity_id = self.living_entity.entity.entity_id;
 
         self.sensing
@@ -352,17 +353,16 @@ impl MobEntity {
         mob.custom_server_ai_step(caller);
 
         // Controllers are synchronous, so we can just use normal blocks
+        // Vanilla ticks move, then look, then jump.
         if !mob.controls_paused() {
-            let mut look_control = self
-                .look_control
+            self.move_control
                 .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            look_control.tick(mob);
-            let mut move_control = self
-                .move_control
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .tick(mob);
+            self.look_control
                 .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            move_control.tick(mob);
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .tick(mob);
         }
         self.jump_control
             .lock()
@@ -802,7 +802,7 @@ impl MobEntity {
                 .store(target.get_entity().entity_id, Relaxed);
             self.living_entity
                 .last_attack_time
-                .store(self.living_entity.entity.age.load(Relaxed), Relaxed);
+                .store(self.living_entity.entity.tick_count.load(Relaxed), Relaxed);
         }
 
         damaged

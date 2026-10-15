@@ -93,7 +93,7 @@ impl Goal for PathfindToRaidGoal {
 
         let entity = mob.get_entity();
         let world = entity.world.load();
-        let current_age = entity.age.load(std::sync::atomic::Ordering::Relaxed);
+        let current_age = entity.tick_count.load(std::sync::atomic::Ordering::Relaxed);
 
         let raid_center = {
             let raids = world
@@ -113,7 +113,7 @@ impl Goal for PathfindToRaidGoal {
         let next_recruit = self
             .recruitment_tick
             .load(std::sync::atomic::Ordering::Relaxed);
-        if current_age >= next_recruit {
+        if current_age > next_recruit {
             self.recruitment_tick
                 .store(current_age + 20, std::sync::atomic::Ordering::Relaxed);
 
