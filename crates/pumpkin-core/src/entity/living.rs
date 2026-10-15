@@ -1022,8 +1022,43 @@ impl LivingEntity {
         self.entity.entity_id
     }
 
+    /// Vanilla `LivingEntity.canBeAffected`, with the `Spider`, `WitherSkeleton`, `Parched`,
+    /// `WitherBoss` and `AbstractNautilus` overrides.
+    #[must_use]
+    pub fn can_be_affected(&self, effect: &StatusEffect) -> bool {
+        let entity_type = self.entity.entity_type;
+        let immune_to = if entity_type == &EntityType::SPIDER
+            || entity_type == &EntityType::CAVE_SPIDER
+            || entity_type == &EntityType::NAUTILUS
+            || entity_type == &EntityType::ZOMBIE_NAUTILUS
+        {
+            Some(&StatusEffect::POISON)
+        } else if entity_type == &EntityType::WITHER_SKELETON || entity_type == &EntityType::WITHER
+        {
+            Some(&StatusEffect::WITHER)
+        } else if entity_type == &EntityType::PARCHED {
+            Some(&StatusEffect::WEAKNESS)
+        } else {
+            None
+        };
+        if immune_to == Some(effect) {
+            return false;
+        }
+        if entity_type.has_tag(&tag::EntityType::MINECRAFT_IMMUNE_TO_INFESTED) {
+            effect != &StatusEffect::INFESTED
+        } else if entity_type.has_tag(&tag::EntityType::MINECRAFT_IMMUNE_TO_OOZING) {
+            effect != &StatusEffect::OOZING
+        } else {
+            !entity_type.has_tag(&tag::EntityType::MINECRAFT_IGNORES_POISON_AND_REGEN)
+                || effect != &StatusEffect::REGENERATION && effect != &StatusEffect::POISON
+        }
+    }
+
     #[expect(clippy::too_many_lines)]
     pub fn add_effect(&self, effect: Effect) {
+        if !self.can_be_affected(effect.effect_type) {
+            return;
+        }
         let mut effect_event =
             crate::plugin::api::events::entity::entity_potion_effect::EntityPotionEffectEvent::new(
                 self.entity.entity_id,
