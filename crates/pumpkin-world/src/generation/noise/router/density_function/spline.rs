@@ -176,14 +176,15 @@ impl Spline {
         let previous = &self.points[index_greater_than_x - 1];
         let current = &self.points[index_greater_than_x];
 
-        // Vanilla `CubicSpline.Multipoint.sample`, in its exact float operation order.
+        // Vanilla `CubicSpline.Multipoint.sample`, in its exact float operation order. The two
+        // values are sampled first so nothing has to live across the recursive calls.
+        let y1 = previous.value.sample_with(location_of);
+        let y2 = current.value.sample_with(location_of);
         let x1 = previous.location;
         let x2 = current.location;
         let t = (location - x1) / (x2 - x1);
         let d1 = previous.derivative;
         let d2 = current.derivative;
-        let y1 = previous.value.sample_with(location_of);
-        let y2 = current.value.sample_with(location_of);
         let a = d1 * (x2 - x1) - (y2 - y1);
         let b = -d2 * (x2 - x1) + (y2 - y1);
         lerp(t, y1, y2) + t * (1.0 - t) * lerp(t, a, b)
