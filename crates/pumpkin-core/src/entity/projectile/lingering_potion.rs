@@ -97,6 +97,7 @@ impl EntityBase for LingeringPotionEntity {
         self
     }
 
+    #[expect(clippy::too_many_lines)]
     fn on_hit(&self, hit: crate::entity::projectile::ProjectileHit) {
         let world = self.get_entity().world.load();
         let hit_pos = hit.hit_pos();
@@ -194,10 +195,18 @@ impl EntityBase for LingeringPotionEntity {
             }
         }
 
+        // Vanilla `ThrownLingeringPotion.onHitAsPotion`: at the entity struck, or the potion
+        // itself; radius 3 shrinking 0.5 per use, 600 ticks after a 10-tick wait.
+        let cloud_pos = match &hit {
+            crate::entity::projectile::ProjectileHit::Entity { entity, .. } => {
+                entity.get_entity().pos.load()
+            }
+            crate::entity::projectile::ProjectileHit::Block { .. } => self.get_entity().pos.load(),
+        };
         let cloud_entity = crate::entity::Entity::from_uuid(
             Uuid::new_v4(),
             world.clone(),
-            hit_pos,
+            cloud_pos,
             &pumpkin_data::entity::EntityType::AREA_EFFECT_CLOUD,
         );
         let cloud = crate::entity::area_effect_cloud::AreaEffectCloudEntity::create(
@@ -207,9 +216,9 @@ impl EntityBase for LingeringPotionEntity {
             600,
             3.0,
             20,
-            20,
+            10,
             -0.5,
-            -100,
+            0,
         );
 
         world.spawn_entity(cloud);

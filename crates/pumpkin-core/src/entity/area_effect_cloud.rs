@@ -55,6 +55,18 @@ pub struct AreaEffectCloudEntity {
 }
 
 impl AreaEffectCloudEntity {
+    /// Vanilla `setRadius`, synced to clients.
+    fn set_radius(&self, radius: f32) {
+        *self
+            .radius
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = radius;
+        self.entity.set_synced_data(
+            pumpkin_data::tracked_data::area_effect_cloud::RADIUS,
+            radius,
+        );
+    }
+
     #[allow(clippy::new_ret_no_self)]
     pub fn new(entity: Entity) -> Arc<dyn EntityBase> {
         entity
@@ -205,242 +217,135 @@ impl EntityBase for AreaEffectCloudEntity {
         );
     }
 
-    #[allow(clippy::too_many_lines)]
-    #[allow(clippy::semicolon_outside_block)]
+    /// Vanilla `AreaEffectCloud.serverTick`.
+    #[expect(clippy::too_many_lines)]
     fn tick(&self, _caller: &dyn EntityBase, _server: &Server) {
-        // Age & duration handling
-        {
-            let mut age = self
-                .age
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            *age += 1;
-            let duration = *self
-                .duration
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            if *age > duration {
-                // Remove old entities
-                self.entity.remove();
-                return;
-            }
-        }
-
-        // Get current age and waiting period
-        let age = *self
-            .age
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        use std::sync::PoisonError;
+        let tick_count = self
+            .entity
+            .tick_count
+            .load(std::sync::atomic::Ordering::Relaxed);
         let wait_time = *self
             .wait_time
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+            .unwrap_or_else(PoisonError::into_inner);
+        let duration = *self.duration.lock().unwrap_or_else(PoisonError::into_inner);
+        if duration != -1 && tick_count - wait_time >= duration {
+            self.entity.remove();
+            return;
+        }
 
-        // When the waiting period ends, notify clients so they render full particles
-        if age == wait_time && wait_time > 0 {
+        let should_wait = tick_count < wait_time;
+        if !should_wait && tick_count == wait_time {
             self.entity.set_synced_data(
                 pumpkin_data::tracked_data::area_effect_cloud::WAITING,
                 false,
             );
         }
-
-        if age < wait_time {
-            // Respect waiting/grace period
+        if should_wait {
             return;
         }
 
-        // Update radius
-        {
-            let mut radius = self
-                .radius
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            let delta = *self
-                .radius_on_tick
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            *radius += delta;
-            let current_radius = *radius;
-            if current_radius <= 0.0 {
+        let mut radius = *self.radius.lock().unwrap_or_else(PoisonError::into_inner);
+        let radius_per_tick = *self
+            .radius_on_tick
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        if radius_per_tick != 0.0 {
+            radius += radius_per_tick;
+            if radius < 0.5 {
                 self.entity.remove();
                 return;
             }
-
-            // Send new radius
-            drop(radius);
-            self.entity.set_synced_data(
-                pumpkin_data::tracked_data::area_effect_cloud::RADIUS,
-                current_radius,
-            );
+            self.set_radius(radius);
         }
 
-        // Tick down reapplication map
-        {
-            let mut map = self
-                .reapplication_map
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            map.retain(|_, v| {
-                *v -= 1;
-                *v > 0
-            });
+        if tick_count % 5 != 0 {
+            return;
         }
-
-        // Apply effects to nearby entities if eligible
-        let pos = self.entity.pos.load();
-        let r = *self
-            .radius
+        // `victims`: entity id -> the tick it may be affected again.
+        self.reapplication_map
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) as f64;
-        let min = Vector3::new(pos.x - r, pos.y - r, pos.z - r);
-        let max = Vector3::new(pos.x + r, pos.y + r, pos.z + r);
-        let aabb = BoundingBox::new(min, max);
-        let world = self.entity.world.load();
-
-        let mut candidates = world.get_entities_at_box(&aabb);
-        let players = world.get_players_at_box(&aabb);
-        for p in players {
-            candidates.push(p.clone() as Arc<dyn EntityBase>);
-        }
-
-        for cand in candidates {
-            let cand_clone = cand.clone();
-
-            // Skip self and other `AreaEffectCloud` entities
-            if cand_clone.get_entity().entity_id == self.get_entity().entity_id {
-                continue;
-            }
-            if *cand_clone.get_entity().entity_type
-                == pumpkin_data::entity::EntityType::AREA_EFFECT_CLOUD
-            {
-                continue;
-            }
-
-            // Determine candidate id early
-            let ent_id = cand_clone.get_entity().entity_id;
-
-            {
-                let map = self
-                    .reapplication_map
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner);
-                if map.contains_key(&ent_id) {
-                    continue;
-                }
-            }
-
-            let radius_f = *self
-                .radius
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                as f64;
-            let pos_e = cand_clone.get_entity().pos.load();
-            let dx = pos_e.x - pos.x;
-            let dy = pos_e.y - pos.y;
-            let dz = pos_e.z - pos.z;
-            let dist = (dx * dx + dy * dy + dz * dz).sqrt();
-            if dist > radius_f {
-                continue;
-            }
-
-            let scale = 1.0f32 - (dist as f32 / radius_f as f32);
-
-            // Decide whether this contact will actually apply an effect
-            let effs_clone = self
-                .effects
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .clone();
-            let mut will_apply = false;
-
-            // Only living entities can receive effects
-            if let Some(living_ref) = cand_clone.get_living_entity() {
-                for (eff, _, _, _, _, _) in &effs_clone {
-                    // Instant effects always apply
-                    let is_instant = eff.id
-                        == pumpkin_data::effect::StatusEffect::INSTANT_DAMAGE.id
-                        || eff.id == pumpkin_data::effect::StatusEffect::INSTANT_HEALTH.id;
-                    if is_instant {
-                        will_apply = true;
-                        break;
-                    }
-
-                    // Only apply if entity does not already have that effect
-                    if !living_ref.has_effect(eff) {
-                        will_apply = true;
-                        break;
-                    }
-                }
-            }
-
-            // If nothing would be applied, skip
-            if !will_apply {
-                continue;
-            }
-
-            // Apply scaled effects inside a spawned task
-            if let Some(living) = cand_clone.get_living_entity() {
-                crate::item::potion::PotionContents::apply_effects_to(
-                    living,
-                    effs_clone,
-                    scale,
-                    crate::item::potion::PotionApplicationSource::AreaEffectCloud,
-                );
-            }
-
-            // Set reapplication delay for this entity
-            let delay = *self
-                .reapplication_delay
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            .unwrap_or_else(PoisonError::into_inner)
+            .retain(|_, until| tick_count < *until);
+        let effects = self
+            .effects
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone();
+        if effects.is_empty() {
             self.reapplication_map
                 .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .insert(ent_id, delay);
+                .unwrap_or_else(PoisonError::into_inner)
+                .clear();
+            return;
+        }
 
-            // Apply radius-on-use (shrink)
+        // `getEntitiesOfClass(LivingEntity.class, getBoundingBox())`: radius * 2 wide, 0.5 tall.
+        let pos = self.entity.pos.load();
+        let r = f64::from(radius);
+        let area = BoundingBox::new(
+            Vector3::new(pos.x - r, pos.y, pos.z - r),
+            Vector3::new(pos.x + r, pos.y + 0.5, pos.z + r),
+        );
+        let world = self.entity.world.load();
+        let reapplication_delay = *self
+            .reapplication_delay
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        for candidate in world.get_all_at_box(&area) {
+            let Some(living) = candidate.get_living_entity() else {
+                continue;
+            };
+            let id = candidate.get_entity().entity_id;
+            if self
+                .reapplication_map
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .contains_key(&id)
+            {
+                continue;
+            }
+            let entity_pos = candidate.get_entity().pos.load();
+            let xd = entity_pos.x - pos.x;
+            let zd = entity_pos.z - pos.z;
+            if xd * xd + zd * zd > f64::from(radius * radius) {
+                continue;
+            }
+            self.reapplication_map
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .insert(id, tick_count + reapplication_delay);
+            crate::item::potion::PotionContents::apply_effects_to(
+                living,
+                effects.clone(),
+                1.0,
+                crate::item::potion::PotionApplicationSource::AreaEffectCloud,
+            );
+
             let radius_on_use = *self
                 .radius_on_use
                 .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
+                .unwrap_or_else(PoisonError::into_inner);
             if radius_on_use != 0.0 {
-                let mut radius_lock = self
-                    .radius
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner);
-                *radius_lock += radius_on_use;
-                let current_radius = *radius_lock;
-                if current_radius < 0.5 {
-                    drop(radius_lock);
+                radius += radius_on_use;
+                if radius < 0.5 {
                     self.entity.remove();
                     return;
                 }
-                drop(radius_lock);
-
-                // Send updated radius to clients
-                self.entity.set_synced_data(
-                    pumpkin_data::tracked_data::area_effect_cloud::RADIUS,
-                    current_radius,
-                );
+                self.set_radius(radius);
             }
-
-            // Apply duration-on-use (shorten lifespan)
             let duration_on_use = *self
                 .duration_on_use
                 .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            if duration_on_use != 0 {
-                let mut duration_lock = self
-                    .duration
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner);
-                if *duration_lock != -1 {
-                    *duration_lock += duration_on_use;
-                    if *duration_lock <= 0 {
-                        drop(duration_lock);
-                        self.entity.remove();
-                        return;
-                    }
+                .unwrap_or_else(PoisonError::into_inner);
+            let mut duration = self.duration.lock().unwrap_or_else(PoisonError::into_inner);
+            if duration_on_use != 0 && *duration != -1 {
+                *duration += duration_on_use;
+                if *duration <= 0 {
+                    drop(duration);
+                    self.entity.remove();
+                    return;
                 }
             }
         }
