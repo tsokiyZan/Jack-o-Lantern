@@ -39,7 +39,7 @@ impl EndermiteEntity {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
 
-            goal_selector.add_goal(1, Box::new(SwimGoal::new(&mob_arc.mob_entity)));
+            goal_selector.add_goal(1, SwimGoal::new(&mob_arc.mob_entity));
             // TODO: 1 ClimbOnTopOfPowderSnowGoal is not ported.
             goal_selector.add_goal(2, Box::new(MeleeAttackGoal::new(1.0, false)));
             goal_selector.add_goal(3, Box::new(WanderAroundGoal::avoiding_water(1.0)));

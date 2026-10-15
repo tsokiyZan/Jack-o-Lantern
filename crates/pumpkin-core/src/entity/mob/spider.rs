@@ -59,7 +59,7 @@ impl SpiderEntity {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
 
-            goal_selector.add_goal(1, Box::new(SwimGoal::new(&mob_arc.mob_entity)));
+            goal_selector.add_goal(1, SwimGoal::new(&mob_arc.mob_entity));
             // TODO: 2 AvoidEntityGoal(Armadillo, 6, 1.0, 1.2, not scared) needs predicate support.
             goal_selector.add_goal(3, Box::new(LeapAtTargetGoal::new(0.4)));
             goal_selector.add_goal(4, SpiderAttackGoal::new(1.0, true));
