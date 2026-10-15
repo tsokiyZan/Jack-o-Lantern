@@ -16,6 +16,7 @@ use crate::block::{
 use crate::entity::ageable::AgeableMob;
 use crate::entity::decoration::armor_stand::ArmorStandEntity;
 use crate::entity::item::ItemEntity;
+use crate::entity::mob::skeleton::bogged::BoggedSkeletonEntity;
 use crate::entity::passive::sheep::SheepEntity;
 use crate::entity::projectile::ThrownItemEntity;
 use crate::entity::projectile::arrow::{ArrowEntity, ArrowPickup};
@@ -946,7 +947,7 @@ impl DispenserBlock {
     }
 
     fn dispense_shears(ctx: &DispenseContext<'_>, item: &mut ItemStack) {
-        if Self::shear_beehive(ctx) || Self::shear_entity_in_front(ctx) {
+        if Self::shear_beehive(ctx) || Self::shear_entity_in_front(ctx, item) {
             // `damage_item` already consumes the tool from the stack when it breaks.
             let _ = item.damage_item(1);
             Self::play_dispense_effects(ctx, WorldEvent::SoundDispenserDispense);
@@ -985,10 +986,17 @@ impl DispenserBlock {
         true
     }
 
-    fn shear_entity_in_front(ctx: &DispenseContext<'_>) -> bool {
+    fn shear_entity_in_front(ctx: &DispenseContext<'_>, tool: &ItemStack) -> bool {
         let target_box = BoundingBox::from_block(&Self::target_position(ctx));
 
         for entity in ctx.world.get_entities_at_box(&target_box) {
+            if let Some(bogged) = entity.cast_any().downcast_ref::<BoggedSkeletonEntity>() {
+                if !bogged.ready_for_shearing() || !entity.get_entity().is_alive() {
+                    continue;
+                }
+                bogged.shear(SoundCategory::Blocks, tool);
+                return true;
+            }
             let Some(sheep) = entity.cast_any().downcast_ref::<SheepEntity>() else {
                 continue;
             };
