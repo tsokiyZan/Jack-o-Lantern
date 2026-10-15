@@ -438,7 +438,11 @@ impl World {
 
     /// Vanilla `TicketType.FORCED` at `ChunkMap.FORCED_TICKET_LEVEL`, entity-ticking: two
     /// levels below a full chunk. Without the ticket a forced chunk never loads.
-    fn update_forced_tickets(&self, unforced: Vec<Vector2<i32>>, forced: Vec<Vector2<i32>>) {
+    fn update_forced_tickets(
+        self: &Arc<Self>,
+        unforced: Vec<Vector2<i32>>,
+        forced: Vec<Vector2<i32>>,
+    ) {
         if unforced.is_empty() && forced.is_empty() {
             return;
         }
@@ -448,16 +452,33 @@ impl World {
             .chunk_loading
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        for pos in unforced {
+        for &pos in &unforced {
             chunk_loading.remove_ticket(pos, level);
         }
-        for pos in forced {
+        for &pos in &forced {
             chunk_loading.add_ticket(pos, level);
         }
         chunk_loading.send_change();
+        drop(chunk_loading);
+
+        // Vanilla loads a chunk's entities once it is entity-ticking, whatever holds the
+        // ticket. Pumpkin loads and unloads entities by watched chunk, so forced chunks count
+        // as watched while forced.
+        let world = self.clone();
+        if let Some(server) = self.server.upgrade() {
+            server.spawn_task(async move {
+                if !unforced.is_empty() {
+                    world.level.mark_chunks_as_not_watched(&unforced).await;
+                }
+                if !forced.is_empty() {
+                    world.level.mark_chunks_as_newly_watched(&forced).await;
+                    world.load_entity_chunks(None, forced);
+                }
+            });
+        }
     }
 
-    pub fn update_active_chunks(&self) {
+    pub fn update_active_chunks(self: &Arc<Self>) {
         let sim_dist = self.server.upgrade().map_or(10, |s| {
             s.advanced_config.networking.java.simulation_distance.get()
         }) as i32;
@@ -4283,6 +4304,16 @@ impl World {
     // NOTE: This function doesn't actually await on anything, it just spawns two tokio tasks
     /// IMPORTANT: Chunks have to be non-empty
     fn spawn_world_entity_chunks(self: &Arc<Self>, player: Arc<Player>, chunks: Vec<Vector2<i32>>) {
+        self.load_entity_chunks(Some(player), chunks);
+    }
+
+    /// Loads the entities of `chunks` into the world. With a player, the task ends when they
+    /// disconnect, chunks already loaded are paired with them, and their vehicle is restored.
+    fn load_entity_chunks(
+        self: &Arc<Self>,
+        player: Option<Arc<Player>>,
+        chunks: Vec<Vector2<i32>>,
+    ) {
         #[cfg(debug_assertions)]
         let inst = std::time::Instant::now();
 
@@ -4293,17 +4324,21 @@ impl World {
         let mut entity_receiver = self.level.receive_entity_chunks(chunks);
         let level = self.level.clone();
         let world = self.clone();
+        let task_owner = player.clone();
 
-        player.clone().spawn_task(async move {
+        let task = async move {
             'main: loop {
-                let recv_result = tokio::select! {
-                    () = player.client.await_close_interrupt() => {
-                        debug!("Canceling player packet processing");
-                        None
+                let recv_result = match &player {
+                    Some(player) => tokio::select! {
+                        () = player.client.await_close_interrupt() => {
+                            debug!("Canceling player packet processing");
+                            None
+                        },
+                        recv_result = entity_receiver.recv() => {
+                            recv_result
+                        }
                     },
-                    recv_result = entity_receiver.recv() => {
-                        recv_result
-                    }
+                    None => entity_receiver.recv().await,
                 };
 
                 let Some((chunk_weak, first_load)) = recv_result else {
@@ -4371,20 +4406,32 @@ impl World {
                         // UUID-dedupes if another watcher already loaded this entity.
                         // Tracker owns pairing (spawn packets + vehicle restore).
                         world.add_entity_silent(entity.clone());
-                        player.try_restore_vehicle(&entity);
+                        if let Some(player) = &player {
+                            player.try_restore_vehicle(&entity);
+                        }
                     }
-                } else {
+                } else if let Some(player) = &player {
                     // Already live for other watchers: pair this player now so
                     // spawn packets and vehicle restore do not wait on a tracker tick.
                     world
                         .entity_tracker
-                        .update_player_chunks(&player, &world, &[position]);
+                        .update_player_chunks(player, &world, &[position]);
                 }
             }
 
             #[cfg(debug_assertions)]
             debug!("Chunks queued after {}ms", inst.elapsed().as_millis());
-        });
+        };
+        match task_owner {
+            Some(player) => {
+                player.spawn_task(task);
+            }
+            None => {
+                if let Some(server) = self.server.upgrade() {
+                    server.spawn_task(task);
+                }
+            }
+        }
     }
 
     /// Gets a `Player` by an entity id
