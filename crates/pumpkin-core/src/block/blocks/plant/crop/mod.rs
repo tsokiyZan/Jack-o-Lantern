@@ -103,6 +103,34 @@ trait CropBlockBase: PlantBlockBase {
     }
 }
 
+/// The state one age further on, which is how a pollinating bee grows crops.
+///
+/// Covers vanilla's `CropBlock`s, `StemBlock`s and the sweet berry bush: `getStateForAge(age + 1)`
+/// unless `isMaxAge`. Other blocks and fully grown ones give `None`.
+#[must_use]
+pub fn next_age_state(block: &Block, state: BlockStateId) -> Option<BlockStateId> {
+    fn next(crop: &impl CropBlockBase, block: &Block, state: BlockStateId) -> Option<BlockStateId> {
+        let age = crop.get_age(state, block);
+        (age < crop.max_age()).then(|| crop.state_with_age(block, state, age + 1))
+    }
+    match block {
+        block if block == &Block::WHEAT => next(&wheat::WheatBlock, block, state),
+        block if block == &Block::CARROTS => next(&carrot::CarrotBlock, block, state),
+        block if block == &Block::POTATOES => next(&potatoes::PotatoBlock, block, state),
+        block if block == &Block::BEETROOTS => next(&beetroot::BeetrootBlock, block, state),
+        block if block == &Block::TORCHFLOWER_CROP => {
+            next(&torch_flower::TorchFlowerBlock, block, state)
+        }
+        block if block == &Block::PUMPKIN_STEM || block == &Block::MELON_STEM => {
+            next(&gourds::stem::StemBlock, block, state)
+        }
+        block if block == &Block::SWEET_BERRY_BUSH => {
+            next(&sweet_berry_bush::SweetBerryBushBlock, block, state)
+        }
+        _ => None,
+    }
+}
+
 pub fn get_available_moisture(world: &World, pos: &BlockPos, block: &Block) -> f32 {
     let mut moisture = 1.0;
     let down_pos = pos.down();

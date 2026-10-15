@@ -490,12 +490,24 @@ impl PoiStorage {
     }
 
     /// Get all POI positions within a square radius (for portal search)
-    #[expect(clippy::similar_names)]
     pub fn get_in_square(
         &mut self,
         center: BlockPos,
         radius: i32,
         poi_type: Option<&str>,
+    ) -> Vec<BlockPos> {
+        self.get_in_square_matching(center, radius, |entry_type| {
+            poi_type.is_none_or(|filter_type| entry_type == filter_type)
+        })
+    }
+
+    /// All POI positions within a square radius whose type matches `matches`.
+    #[expect(clippy::similar_names)]
+    pub fn get_in_square_matching(
+        &mut self,
+        center: BlockPos,
+        radius: i32,
+        matches: impl Fn(&str) -> bool,
     ) -> Vec<BlockPos> {
         let min_x = center.0.x - radius;
         let max_x = center.0.x + radius;
@@ -514,9 +526,7 @@ impl PoiStorage {
             for rz in min_rz..=max_rz {
                 let region = self.get_or_load_region(rx, rz);
                 for entry in region.get_all() {
-                    if let Some(filter_type) = poi_type
-                        && entry.poi_type != filter_type
-                    {
+                    if !matches(&entry.poi_type) {
                         continue;
                     }
 

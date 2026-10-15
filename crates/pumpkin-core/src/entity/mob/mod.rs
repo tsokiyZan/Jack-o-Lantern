@@ -347,15 +347,17 @@ impl MobEntity {
             std::mem::take(&mut *guard)
         };
 
-        navigator.tick(&self.living_entity);
-        if let Some((target, speed_modifier)) = navigator.take_wanted_position() {
-            self.move_control
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .set_wanted_position(target.x, target.y, target.z, speed_modifier);
-        }
-        if navigator.take_jump() {
-            self.jump();
+        if !mob.skips_navigation_tick() {
+            navigator.tick(&self.living_entity);
+            if let Some((target, speed_modifier)) = navigator.take_wanted_position() {
+                self.move_control
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .set_wanted_position(target.x, target.y, target.z, speed_modifier);
+            }
+            if navigator.take_jump() {
+                self.jump();
+            }
         }
 
         {
@@ -374,10 +376,12 @@ impl MobEntity {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
                 .tick(mob);
-            self.look_control
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .tick(mob);
+            if !mob.skips_look_control_tick() {
+                self.look_control
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .tick(mob);
+            }
         }
         self.jump_control
             .lock()
@@ -805,10 +809,13 @@ impl MobEntity {
             self.living_entity
                 .get_attribute_value(&Attributes::ATTACK_DAMAGE) as f32;
 
+        let damage_type = caller
+            .get_mob()
+            .map_or(DamageType::MOB_ATTACK, Mob::melee_damage_type);
         let damaged = target.damage_with_context(
             target,
             attack_damage,
-            DamageType::MOB_ATTACK,
+            damage_type,
             None,
             Some(caller),
             Some(caller),
@@ -1331,6 +1338,28 @@ pub trait Mob: EntityBase + Send + Sync {
     /// controls do while it plays dead.
     fn controls_paused(&self) -> bool {
         false
+    }
+
+    /// Whether this tick's navigation is skipped, as vanilla `Bee`'s navigation does
+    /// while it pollinates.
+    fn skips_navigation_tick(&self) -> bool {
+        false
+    }
+
+    /// Whether the look control skips its tick, as vanilla's `BeeLookControl` does
+    /// while the bee is angry.
+    fn skips_look_control_tick(&self) -> bool {
+        false
+    }
+
+    /// Vanilla `LookControl.resetXRotOnTick`.
+    fn look_control_resets_x_rot(&self) -> bool {
+        true
+    }
+
+    /// The damage type of the mob's melee attack: vanilla `doHurtTarget`'s source.
+    fn melee_damage_type(&self) -> DamageType {
+        DamageType::MOB_ATTACK
     }
 
     fn on_attack(&self, _target: &dyn EntityBase) {}

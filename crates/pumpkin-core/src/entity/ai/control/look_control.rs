@@ -104,7 +104,9 @@ impl LookControl {
             return;
         }
         let entity = mob.get_entity();
-        entity.set_pitch(0.0);
+        if mob.look_control_resets_x_rot() {
+            entity.set_pitch(0.0);
+        }
 
         if self.look_at_timer > 0 {
             self.look_at_timer -= 1;

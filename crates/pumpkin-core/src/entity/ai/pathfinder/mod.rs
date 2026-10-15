@@ -1460,6 +1460,8 @@ impl PathNavigationTrait for GroundPathNavigation {
 
 pub struct FlyingPathNavigation {
     pub inner: PathNavigation,
+    /// Settles over any block that isn't air, as vanilla `Bee`'s navigation does.
+    stable_over_any_block: bool,
 }
 
 impl Default for FlyingPathNavigation {
@@ -1473,7 +1475,18 @@ impl FlyingPathNavigation {
     pub fn new() -> Self {
         let mut inner = PathNavigation::new(EvaluatorKind::Fly(FlyNodeEvaluator::default()));
         inner.flying = true;
-        Self { inner }
+        Self {
+            inner,
+            stable_over_any_block: false,
+        }
+    }
+
+    /// Vanilla `Bee.createNavigation`'s `isStableDestination`: the block below only has
+    /// to be something other than air.
+    #[must_use]
+    pub const fn stable_over_any_block(mut self) -> Self {
+        self.stable_over_any_block = true;
+        self
     }
 }
 
@@ -1653,6 +1666,14 @@ impl PathNavigationTrait for FlyingPathNavigation {
 
     fn set_can_path_to_targets_below_surface(&mut self, can_path: bool) {
         self.inner.can_path_to_targets_below_surface = can_path;
+    }
+
+    fn is_stable_destination(&self, world: &World, pos: &BlockPos) -> bool {
+        if self.stable_over_any_block {
+            !world.get_block_state(&pos.down()).is_air()
+        } else {
+            world.get_block_state(&pos.down()).is_solid_render()
+        }
     }
 }
 

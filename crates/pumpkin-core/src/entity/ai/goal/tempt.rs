@@ -6,6 +6,7 @@ use crate::entity::ai::target_predicate::TargetPredicate;
 use crate::entity::{ai::pathfinder::NavigatorGoal, mob::Mob, player::Player};
 use pumpkin_data::attributes::Attributes;
 use pumpkin_data::item::Item;
+use pumpkin_data::tag::{Tag, Taggable};
 use pumpkin_util::math::vector3::Vector3;
 
 const DEFAULT_STOP_DISTANCE: f64 = 2.5;
@@ -14,10 +15,17 @@ const SCARE_RANGE_SQ: f64 = 36.0;
 const SCARE_MOVE_SQ: f64 = 0.010_000_000_000_000_002;
 const SCARE_ROTATION: f64 = 5.0;
 
+/// What a [`TemptGoal`] follows: a fixed list or an item tag, as vanilla's predicate.
+#[derive(Clone, Copy)]
+enum TemptItems {
+    Items(&'static [&'static Item]),
+    Tag(&'static Tag),
+}
+
 pub struct TemptGoal {
     goal_control: Controls,
     speed: f64,
-    tempt_items: &'static [&'static Item],
+    tempt_items: TemptItems,
     can_scare: bool,
     stop_distance: f64,
     targeting_conditions: TargetPredicate,
@@ -35,6 +43,14 @@ impl TemptGoal {
         Self::with_stop_distance(speed, tempt_items, can_scare, DEFAULT_STOP_DISTANCE)
     }
 
+    /// Tempted by any item in `tag`, like vanilla's `i -> i.is(tag)` predicates.
+    #[must_use]
+    pub fn with_tag(speed: f64, tag: &'static Tag, can_scare: bool) -> Self {
+        let mut goal = Self::new(speed, &[], can_scare);
+        goal.tempt_items = TemptItems::Tag(tag);
+        goal
+    }
+
     #[must_use]
     pub fn with_stop_distance(
         speed: f64,
@@ -45,7 +61,7 @@ impl TemptGoal {
         Self {
             goal_control: Controls::MOVE | Controls::LOOK,
             speed,
-            tempt_items,
+            tempt_items: TemptItems::Items(tempt_items),
             can_scare,
             stop_distance,
             targeting_conditions: TargetPredicate::create_non_attackable().ignore_visibility(),
@@ -64,7 +80,11 @@ impl TemptGoal {
     }
 
     fn is_tempt_item(&self, stack: &pumpkin_data::item_stack::ItemStack) -> bool {
-        stack.item_count > 0 && self.tempt_items.iter().any(|i| i.id == stack.item.id)
+        stack.item_count > 0
+            && match self.tempt_items {
+                TemptItems::Items(items) => items.iter().any(|i| i.id == stack.item.id),
+                TemptItems::Tag(tag) => stack.item.has_tag(tag),
+            }
     }
 
     fn is_holding_tempt_item(&self, player: &Player) -> bool {
