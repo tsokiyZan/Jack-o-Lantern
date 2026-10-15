@@ -16,6 +16,7 @@ pub mod donkey;
 pub mod fish;
 pub mod fox;
 pub mod frog;
+pub mod frog_ai;
 pub mod goat;
 pub mod happy_ghast;
 pub mod happy_ghast_ai;

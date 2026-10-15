@@ -154,3 +154,20 @@ impl Mob for FrogEntity {
         self.animal_interact(player, item_stack, Sound::EntityFrogAmbient)
     }
 }
+
+/// Vanilla `Frog.canEat`: tiny slimes and magma cubes, and anything else in the
+/// `frog_food` entity tag.
+#[must_use]
+pub fn can_eat(entity: &dyn EntityBase) -> bool {
+    if let Some(cube) = entity
+        .cast_any()
+        .downcast_ref::<crate::entity::mob::cube_mob::CubeMobEntity>()
+        && cube.get_size() != 1
+    {
+        return false;
+    }
+    entity
+        .get_entity()
+        .entity_type
+        .has_tag(&tag::EntityType::MINECRAFT_FROG_FOOD)
+}

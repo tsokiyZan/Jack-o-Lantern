@@ -12,7 +12,9 @@ use super::{BrainTick, VisibilityContext};
 pub mod adult;
 pub mod axolotl_attackables;
 pub mod dummy;
+pub mod frog_attackables;
 pub mod hurt_by;
+pub mod is_in_water;
 pub mod nearest_items;
 pub mod nearest_living_entities;
 pub mod nearest_players;
@@ -23,13 +25,15 @@ pub mod tempting;
 pub use adult::{AdultSensor, AdultSensorAnyType};
 pub use axolotl_attackables::AxolotlAttackablesSensor;
 pub use dummy::DummySensor;
+pub use frog_attackables::FrogAttackablesSensor;
 pub use hurt_by::HurtBySensor;
+pub use is_in_water::IsInWaterSensor;
 pub use nearest_items::NearestItemSensor;
 pub use nearest_living_entities::NearestLivingEntitySensor;
 pub use nearest_players::PlayerSensor;
 pub use piglin_brute_specific::PiglinBruteSpecificSensor;
 pub use piglin_specific::PiglinSpecificSensor;
-pub use tempting::FoodTemptationsSensor;
+pub use tempting::TemptingSensor;
 
 pub const DEFAULT_SCAN_RATE: i32 = 20;
 
@@ -51,6 +55,9 @@ pub enum SensorType {
     NearestAdultAnyType,
     AxolotlAttackables,
     FoodTemptations,
+    FrogTemptations,
+    FrogAttackables,
+    IsInWater,
 }
 
 impl SensorType {
@@ -68,6 +75,9 @@ impl SensorType {
             Self::NearestAdultAnyType => "minecraft:nearest_adult_any_type",
             Self::AxolotlAttackables => "minecraft:axolotl_attackables",
             Self::FoodTemptations => "minecraft:food_temptations",
+            Self::FrogTemptations => "minecraft:frog_temptations",
+            Self::FrogAttackables => "minecraft:frog_attackables",
+            Self::IsInWater => "minecraft:is_in_water",
         }
     }
 
@@ -84,7 +94,10 @@ impl SensorType {
             | Self::NearestAdult
             | Self::NearestAdultAnyType
             | Self::AxolotlAttackables
-            | Self::FoodTemptations => DEFAULT_SCAN_RATE,
+            | Self::FoodTemptations
+            | Self::FrogTemptations
+            | Self::FrogAttackables
+            | Self::IsInWater => DEFAULT_SCAN_RATE,
         }
     }
 
@@ -100,7 +113,12 @@ impl SensorType {
             Self::NearestAdult => Box::new(AdultSensor),
             Self::NearestAdultAnyType => Box::new(AdultSensorAnyType),
             Self::AxolotlAttackables => Box::new(AxolotlAttackablesSensor),
-            Self::FoodTemptations => Box::new(FoodTemptationsSensor),
+            Self::FoodTemptations => Box::new(TemptingSensor::for_animal()),
+            Self::FrogTemptations => Box::new(TemptingSensor::new(|_, stack| {
+                crate::entity::passive::frog_ai::get_temptations(stack)
+            })),
+            Self::FrogAttackables => Box::new(FrogAttackablesSensor),
+            Self::IsInWater => Box::new(IsInWaterSensor),
         }
     }
 

@@ -1,30 +1,44 @@
 use std::sync::Arc;
 
 use pumpkin_data::attributes::Attributes;
+use pumpkin_data::item_stack::ItemStack;
 
 use super::super::BrainTick;
 use super::super::memory::{MemoryModuleId, types};
 use super::Sensor;
 use crate::entity::EntityBase;
 use crate::entity::ai::target_predicate::TargetPredicate;
+use crate::entity::mob::Mob;
 use crate::entity::player::Player;
 
 const REQUIRES: &[MemoryModuleId] = &[types::TEMPTING_PLAYER.id()];
 
-/// Vanilla `TemptingSensor.forAnimal`: the nearest player within the tempt range
-/// holding food the animal eats, line of sight ignored.
-pub struct FoodTemptationsSensor;
+/// Vanilla `TemptingSensor`: the nearest player within the tempt range holding a
+/// temptation in either hand, line of sight ignored.
+pub struct TemptingSensor {
+    temptations: fn(&dyn Mob, &ItemStack) -> bool,
+}
 
-impl Sensor for FoodTemptationsSensor {
+impl TemptingSensor {
+    #[must_use]
+    pub const fn new(temptations: fn(&dyn Mob, &ItemStack) -> bool) -> Self {
+        Self { temptations }
+    }
+
+    /// Vanilla `TemptingSensor.forAnimal`: food the animal eats.
+    #[must_use]
+    pub const fn for_animal() -> Self {
+        Self::new(|mob, stack| mob.as_animal().is_some_and(|animal| animal.is_food(stack)))
+    }
+}
+
+impl Sensor for TemptingSensor {
     fn requires(&self) -> &'static [MemoryModuleId] {
         REQUIRES
     }
 
     fn do_tick(&mut self, tick: &mut BrainTick<'_>) {
-        let Some(animal) = tick.mob.as_animal() else {
-            tick.brain.erase(types::TEMPTING_PLAYER.id());
-            return;
-        };
+        let temptations = self.temptations;
         let living = &tick.mob.get_mob_entity().living_entity;
         let range = living.get_attribute_value(&Attributes::TEMPT_RANGE);
         let targeting = TargetPredicate::create_non_attackable()
@@ -34,7 +48,8 @@ impl Sensor for FoodTemptationsSensor {
         let body_pos = body.pos.load();
         let holding_temptation = |player: &Player| {
             let inventory = player.inventory();
-            animal.is_food(&inventory.held_item()) || animal.is_food(&inventory.off_hand_item())
+            temptations(tick.mob, &inventory.held_item())
+                || temptations(tick.mob, &inventory.off_hand_item())
         };
         let mut players: Vec<Arc<Player>> = tick
             .world

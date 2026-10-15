@@ -37,6 +37,8 @@ pub mod stop_being_angry_if_target_dead;
 pub mod stroll_to_poi;
 pub mod swim;
 pub mod timed;
+pub mod try_find_land;
+pub mod try_find_land_near_liquid;
 pub mod try_find_liquid;
 pub mod utils;
 
@@ -85,6 +87,8 @@ pub use stop_being_angry_if_target_dead::stop_being_angry_if_target_dead;
 pub use stroll_to_poi::{stroll_around_poi, stroll_to_poi};
 pub use swim::Swim;
 pub use timed::{Behavior, DEFAULT_DURATION, Timed};
+pub use try_find_land::try_find_land;
+pub use try_find_land_near_liquid::try_find_land_near_liquid;
 pub use try_find_liquid::try_find_liquid;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
