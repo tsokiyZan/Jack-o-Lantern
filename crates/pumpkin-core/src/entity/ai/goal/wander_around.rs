@@ -18,7 +18,9 @@ pub struct WanderAroundGoal {
     force_trigger: bool,
     /// Vanilla `RandomStrollGoal.checkNoActionTime`.
     check_no_action_time: bool,
-    position: fn(&dyn Mob) -> Option<Vector3<f64>>,
+    /// Vanilla `WaterAvoidingRandomStrollGoal.probability`; unused by the other strolls.
+    probability: f32,
+    position: fn(&dyn Mob, f32) -> Option<Vector3<f64>>,
 }
 
 impl WanderAroundGoal {
@@ -36,6 +38,7 @@ impl WanderAroundGoal {
             interval,
             force_trigger: false,
             check_no_action_time: true,
+            probability: WATER_AVOIDING_PROBABILITY,
             position: land_position,
         }
     }
@@ -53,7 +56,15 @@ impl WanderAroundGoal {
     /// water when in it.
     #[must_use]
     pub const fn avoiding_water(speed: f64) -> Self {
+        Self::avoiding_water_with_probability(speed, WATER_AVOIDING_PROBABILITY)
+    }
+
+    /// `WaterAvoidingRandomStrollGoal(mob, speed, probability)`: how often a land stroll falls
+    /// back to the plain one.
+    #[must_use]
+    pub const fn avoiding_water_with_probability(speed: f64, probability: f32) -> Self {
         Self {
+            probability,
             position: water_avoiding_position,
             ..Self::new(speed)
         }
@@ -77,22 +88,22 @@ impl WanderAroundGoal {
     }
 }
 
-fn land_position(mob: &dyn Mob) -> Option<Vector3<f64>> {
+fn land_position(mob: &dyn Mob, _probability: f32) -> Option<Vector3<f64>> {
     default_random_pos::get_pos(mob, 10, 7)
 }
 
-fn water_avoiding_position(mob: &dyn Mob) -> Option<Vector3<f64>> {
+fn water_avoiding_position(mob: &dyn Mob, probability: f32) -> Option<Vector3<f64>> {
     if mob.get_mob_entity().living_entity.is_in_water() {
-        return land_random_pos::get_pos(mob, 15, 7).or_else(|| land_position(mob));
+        return land_random_pos::get_pos(mob, 15, 7).or_else(|| land_position(mob, probability));
     }
-    if mob.get_random().random::<f32>() >= WATER_AVOIDING_PROBABILITY {
+    if mob.get_random().random::<f32>() >= probability {
         land_random_pos::get_pos(mob, 10, 7)
     } else {
-        land_position(mob)
+        land_position(mob, probability)
     }
 }
 
-fn swimmable_position(mob: &dyn Mob) -> Option<Vector3<f64>> {
+fn swimmable_position(mob: &dyn Mob, _probability: f32) -> Option<Vector3<f64>> {
     default_random_pos::get_swimmable_pos(mob, 10, 7)
 }
 
@@ -123,7 +134,7 @@ impl Goal for WanderAroundGoal {
             }
         }
 
-        self.target = (self.position)(mob);
+        self.target = (self.position)(mob, self.probability);
         if self.target.is_none() {
             return false;
         }
