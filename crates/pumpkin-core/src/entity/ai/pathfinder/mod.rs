@@ -1310,12 +1310,16 @@ impl PathNavigation {
         }
     }
 
-    /// Vanilla `PathNavigation.tick` for ground navigation; the move control steers.
-    pub fn tick_ground(&mut self, entity: &LivingEntity) {
-        // The goal's `moveTo` ran before this tick in vanilla.
+    /// Runs a goal's queued `moveTo`, which vanilla ran during the goal tick, before navigation.
+    pub fn resolve_pending_move(&mut self, entity: &LivingEntity) {
         if let Some(goal) = self.pending_move.take() {
             self.ground_move_to(entity, &goal);
         }
+    }
+
+    /// Vanilla `PathNavigation.tick` for ground navigation; the move control steers.
+    pub fn tick_ground(&mut self, entity: &LivingEntity) {
+        self.resolve_pending_move(entity);
         self.wanted_position = None;
         self.tick_count += 1;
         if self.has_delayed_recomputation {
@@ -2340,8 +2344,8 @@ impl WallClimberNavigation {
 }
 
 impl PathNavigationTrait for WallClimberNavigation {
-    fn take_jump(&mut self) -> bool {
-        self.inner.take_jump()
+    fn take_wanted_position(&mut self) -> Option<(Vector3<f64>, f64)> {
+        self.inner.take_wanted_position()
     }
 
     fn set_progress(&mut self, goal: NavigatorGoal) {
@@ -2359,11 +2363,11 @@ impl PathNavigationTrait for WallClimberNavigation {
     }
 
     fn is_idle(&self) -> bool {
-        self.path_to_position.is_none() && self.inner.is_idle()
+        self.inner.is_idle()
     }
 
     fn is_done(&self) -> bool {
-        self.path_to_position.is_none() && self.inner.is_done()
+        self.inner.is_done()
     }
 
     fn is_in_progress(&self) -> bool {
@@ -2403,44 +2407,37 @@ impl PathNavigationTrait for WallClimberNavigation {
         self.inner.can_reach_within(entity, destination, distance)
     }
 
-    #[allow(clippy::too_many_lines)]
+    /// Vanilla `WallClimberNavigation.tick`: with no path left, head straight for the block
+    /// the last path was asked for, which lets spiders climb to it.
     fn tick(&mut self, entity: &LivingEntity) {
+        self.inner.inner.resolve_pending_move(entity);
         if !self.inner.is_done() {
             self.inner.tick(entity);
-        } else if let Some(target_pos) = self.path_to_position {
-            let current_pos = entity.entity.pos.load();
-            let bb = entity.entity.bounding_box.load();
-            let width = bb.max.x - bb.min.x;
-            let target_center = Vector3::new(
-                f64::from(target_pos.0.x) + 0.5,
-                f64::from(target_pos.0.y),
-                f64::from(target_pos.0.z) + 0.5,
-            );
-            let dx = target_center.x - current_pos.x;
-            let dy = target_center.y - current_pos.y;
-            let dz = target_center.z - current_pos.z;
-            let dist_sq = dx * dx + dz * dz;
-
-            let close_enough = dist_sq < width * width
-                && (current_pos.y > f64::from(target_pos.0.y)
-                    || (current_pos.y - f64::from(target_pos.0.y)).abs() < 1.0);
-
-            if close_enough {
-                self.path_to_position = None;
-                self.inner.inner.finish_navigation(entity);
+        } else if let Some(target) = self.path_to_position {
+            let pos = entity.entity.pos.load();
+            let width = f64::from(entity.entity.entity_dimension.load().width);
+            let closer_to_center = |block: BlockPos| {
+                let center = block.to_centered_f64();
+                (center - pos).length_squared() < width * width
+            };
+            if !closer_to_center(target)
+                && (pos.y <= f64::from(target.0.y)
+                    || !closer_to_center(BlockPos::floored(
+                        f64::from(target.0.x),
+                        pos.y,
+                        f64::from(target.0.z),
+                    )))
+            {
+                self.inner.inner.wanted_position = Some((
+                    Vector3::new(
+                        f64::from(target.0.x),
+                        f64::from(target.0.y),
+                        f64::from(target.0.z),
+                    ),
+                    self.inner.inner.speed_modifier,
+                ));
             } else {
-                let desired_yaw = wrap_degrees((dz.atan2(dx) as f32).to_degrees() - 90.0);
-                entity.entity.yaw.store(desired_yaw);
-                entity.entity.head_yaw.store(desired_yaw);
-                entity.entity.body_yaw.store(desired_yaw);
-
-                let speed = self.inner.inner.speed_modifier
-                    * entity.get_attribute_value(&Attributes::MOVEMENT_SPEED);
-                entity.speed.store(speed as f32);
-                entity.movement_input.store(Vector3::new(0.0, 0.0, speed));
-                if dy > 0.0 {
-                    self.inner.inner.jump = true;
-                }
+                self.path_to_position = None;
             }
         }
     }
@@ -2467,11 +2464,14 @@ impl PathNavigationTrait for WallClimberNavigation {
     }
 
     fn move_to_entity(&mut self, target: &LivingEntity, speed: f64, entity: &LivingEntity) -> bool {
-        self.path_to_position = Some(target.entity.block_pos.load());
-        let path = self.create_path(entity, target.entity.pos.load(), 0);
+        self.inner.inner.pending_move = None;
+        let target_pos = target.entity.block_pos.load();
+        self.path_to_position = Some(target_pos);
+        let path = self.inner.inner.ground_create_path(entity, target_pos, 0);
         if path.is_some() {
-            self.move_to_path(path, speed, entity)
+            self.inner.inner.ground_move_to_path(entity, path, speed)
         } else {
+            self.path_to_position = Some(target_pos);
             self.inner.inner.speed_modifier = speed;
             true
         }
