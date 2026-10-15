@@ -46,8 +46,12 @@ impl Mob for SalmonEntity {
     }
 
     fn mob_tick(&self, _caller: &dyn EntityBase) {
-        fish::flop(self, Sound::EntitySalmonFlop);
         self.school.tick(self);
+    }
+
+    /// Vanilla `AbstractFish.aiStep`.
+    fn ai_step(&self, _caller: &dyn EntityBase) {
+        fish::flop(self, Sound::EntitySalmonFlop);
     }
 
     fn as_schooling_fish(&self) -> Option<&SchoolingFish> {

@@ -209,8 +209,12 @@ impl Mob for PufferfishEntity {
 
     fn mob_tick(&self, caller: &dyn EntityBase) {
         self.tick_puff_state();
-        fish::flop(self, Sound::EntityPufferFishFlop);
         self.sting_nearby_mobs(caller);
+    }
+
+    /// Vanilla `AbstractFish.aiStep`.
+    fn ai_step(&self, _caller: &dyn EntityBase) {
+        fish::flop(self, Sound::EntityPufferFishFlop);
     }
 
     /// Vanilla's `Pufferfish.playerTouch`.

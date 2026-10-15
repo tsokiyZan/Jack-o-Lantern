@@ -122,17 +122,21 @@ pub fn travel(mob: &dyn Mob, caller: &dyn EntityBase) -> bool {
 /// Vanilla's `AbstractFish.aiStep` on dry land, where a stranded fish hops about.
 pub fn flop(mob: &dyn Mob, sound: Sound) {
     let entity = mob.get_entity();
+    // `verticalCollision` holds whenever the last move left the fish on the ground.
     if entity.touching_water.load(Ordering::Relaxed) || !entity.on_ground.load(Ordering::Relaxed) {
         return;
     }
     let mut rng = mob.get_random();
     let velocity = entity.velocity.load();
-    // Sent at once, as vanilla flags the hop with needsSync.
-    entity.set_velocity(Vector3::new(
-        velocity.x + f64::from(rng.random::<f32>() * 2.0 - 1.0) * 0.05,
-        velocity.y + 0.4,
-        velocity.z + f64::from(rng.random::<f32>() * 2.0 - 1.0) * 0.05,
+    let x = (rng.random::<f32>() * 2.0 - 1.0) * 0.05;
+    let z = (rng.random::<f32>() * 2.0 - 1.0) * 0.05;
+    entity.velocity.store(Vector3::new(
+        velocity.x + f64::from(x),
+        velocity.y + f64::from(0.4f32),
+        velocity.z + f64::from(z),
     ));
     entity.on_ground.store(false, Ordering::Relaxed);
+    // Vanilla `needsSync`: sent with the tick's changes, after travel.
+    entity.velocity_dirty.store(true, Ordering::SeqCst);
     entity.play_sound(sound);
 }

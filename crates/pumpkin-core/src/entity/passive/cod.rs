@@ -43,8 +43,12 @@ impl Mob for CodEntity {
     }
 
     fn mob_tick(&self, _caller: &dyn EntityBase) {
-        fish::flop(self, Sound::EntityCodFlop);
         self.school.tick(self);
+    }
+
+    /// Vanilla `AbstractFish.aiStep`.
+    fn ai_step(&self, _caller: &dyn EntityBase) {
+        fish::flop(self, Sound::EntityCodFlop);
     }
 
     fn as_schooling_fish(&self) -> Option<&SchoolingFish> {
