@@ -10,7 +10,6 @@ use super::utils::{
     entity_is_visible, look_at_entity, set_walk_and_look_target_memories_to_entity,
 };
 use crate::entity::EntityBase;
-use crate::entity::ai::goal::breed::BreedGoal;
 
 /// Vanilla `AnimalMakeLove.BREED_RANGE`.
 const BREED_RANGE: f64 = 3.0;
@@ -182,7 +181,9 @@ impl Behavior for AnimalMakeLove {
             .load()
             .squared_distance_to_vec(&partner.get_entity().pos.load());
         if distance_sq < BREED_RANGE * BREED_RANGE && tick.time >= self.spawn_child_at_time {
-            BreedGoal::breed(tick.mob, partner.as_ref(), None);
+            if let Some(animal) = tick.mob.as_animal() {
+                animal.spawn_child_from_breeding(tick, partner.as_ref());
+            }
             tick.brain.erase(types::BREED_TARGET.id());
             if let Some(partner_mob) = partner.get_mob() {
                 partner_mob

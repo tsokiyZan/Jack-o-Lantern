@@ -1660,6 +1660,11 @@ pub trait Mob: EntityBase + Send + Sync {
         false
     }
 
+    /// Vanilla `calculateFallDamage` overrides, given what `LivingEntity`'s returns.
+    fn calculate_fall_damage(&self, base_damage: i32) -> i32 {
+        base_damage
+    }
+
     /// Whether vanilla `checkFallDamage` runs after a move, adding up the fall and landing
     /// on the block below. Flyers such as the phantom override it to do nothing.
     fn checks_fall_damage(&self) -> bool {
