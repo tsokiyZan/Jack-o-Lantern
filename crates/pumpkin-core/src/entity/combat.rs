@@ -67,19 +67,36 @@ pub fn knockback_after_resistance(strength: f64, resistance: f64) -> f64 {
     strength * (1.0 - resistance)
 }
 
-pub fn handle_knockback(attacker: &Entity, victim: &dyn EntityBase, strength: f64) {
-    let resistance = victim.get_living_entity().map_or(0.0, |living| {
-        living.get_attribute_value(&Attributes::KNOCKBACK_RESISTANCE)
+/// Vanilla `causeExtraKnockback` of a melee hit that dealt `damage`.
+pub fn handle_knockback(
+    attacker: &Entity,
+    victim: &dyn EntityBase,
+    strength: f64,
+    damage: f32,
+    comes_from_effect: bool,
+) {
+    let yaw = attacker.yaw.load();
+    let xd = f64::from((yaw.to_radians()).sin());
+    let zd = f64::from(-(yaw.to_radians()).cos());
+    let handled = victim.get_mob().is_some_and(|mob| {
+        mob.custom_knockback(
+            strength * 0.5,
+            xd,
+            zd,
+            Some(attacker),
+            damage,
+            comes_from_effect,
+        )
     });
-    let strength = knockback_after_resistance(strength * 0.5, resistance);
 
-    if strength > 0.0 {
-        let yaw = attacker.yaw.load();
-        victim.get_entity().knockback(
-            strength,
-            f64::from((yaw.to_radians()).sin()),
-            f64::from(-(yaw.to_radians()).cos()),
-        );
+    if !handled {
+        let resistance = victim.get_living_entity().map_or(0.0, |living| {
+            living.get_attribute_value(&Attributes::KNOCKBACK_RESISTANCE)
+        });
+        let strength = knockback_after_resistance(strength * 0.5, resistance);
+        if strength > 0.0 {
+            victim.get_entity().knockback(strength, xd, zd);
+        }
     }
 
     let velocity = attacker.velocity.load();

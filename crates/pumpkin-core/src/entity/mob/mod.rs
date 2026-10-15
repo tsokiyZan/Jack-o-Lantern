@@ -1660,6 +1660,31 @@ pub trait Mob: EntityBase + Send + Sync {
         false
     }
 
+    /// A vanilla `LivingEntity.knockback` override. Returns true when the mob moved itself;
+    /// `attacker` is the damage source's responsible entity.
+    fn custom_knockback(
+        &self,
+        _power: f64,
+        _xd: f64,
+        _zd: f64,
+        _attacker: Option<&Entity>,
+        _damage: f32,
+        _comes_from_effect: bool,
+    ) -> bool {
+        false
+    }
+
+    /// The end of a vanilla `LivingEntity.doPush` override: this mob pushed `entity`.
+    fn do_push(&self, _entity: &dyn EntityBase) {}
+
+    /// A vanilla `Entity.getFluidJumpThreshold` override.
+    fn fluid_jump_threshold(&self) -> Option<f64> {
+        None
+    }
+
+    /// The end of a vanilla `LivingEntity.travelInFluid` override.
+    fn travel_in_fluid_end(&self, _water: bool) {}
+
     /// Whether vanilla `checkFallDamage` runs after a move, adding up the fall and landing
     /// on the block below. Flyers such as the phantom override it to do nothing.
     fn checks_fall_damage(&self) -> bool {

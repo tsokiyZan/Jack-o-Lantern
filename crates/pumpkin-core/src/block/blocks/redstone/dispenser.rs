@@ -16,6 +16,7 @@ use crate::block::{
 use crate::entity::ageable::AgeableMob;
 use crate::entity::decoration::armor_stand::ArmorStandEntity;
 use crate::entity::item::ItemEntity;
+use crate::entity::mob::cube_mob::CubeMobEntity;
 use crate::entity::mob::skeleton::bogged::BoggedSkeletonEntity;
 use crate::entity::passive::sheep::SheepEntity;
 use crate::entity::projectile::ThrownItemEntity;
@@ -35,8 +36,8 @@ use crate::entity::{Entity, EntityBase};
 use crate::item::ItemMetadata;
 use crate::item::items::boat::BoatItem;
 use crate::item::items::bucket::{
-    FilledBucketItem, play_bucket_evaporation, should_evaporate_in_nether, try_pickup_fluid_at,
-    try_place_filled_bucket,
+    FilledBucketItem, empty_sulfur_cube_bucket, play_bucket_evaporation,
+    should_evaporate_in_nether, try_pickup_fluid_at, try_place_filled_bucket,
 };
 use crate::item::items::honeycomb::try_wax_block;
 use crate::item::items::ignite::ignition::Ignition;
@@ -313,6 +314,7 @@ impl DispenserBlock {
     const FIREWORK_PROJECTILE_POWER: f64 = 0.5;
     const FIREWORK_PROJECTILE_UNCERTAINTY: f64 = 1.0;
 
+    #[expect(clippy::too_many_lines)]
     fn dispense(ctx: &DispenseContext<'_>, dispenser: &DispenserBlockEntity, item: &mut ItemStack) {
         let mut event = crate::plugin::api::events::block::block_dispense::BlockDispenseEvent::new(
             *ctx.position,
@@ -374,6 +376,10 @@ impl DispenserBlock {
         } else if item.item.id == Item::BUCKET.id {
             // Empty buckets pick up the fluid in front of the dispenser
             Self::dispense_empty_bucket(ctx, dispenser, item);
+        } else if item.item.id == Item::SULFUR_CUBE_BUCKET.id {
+            empty_sulfur_cube_bucket(ctx.world, item, Self::target_position(ctx));
+            *item = ItemStack::new(1, &Item::BUCKET);
+            Self::play_dispense_effects(ctx, WorldEvent::SoundDispenserDispense);
         } else if FilledBucketItem::ids().contains(&item.item.id) {
             // Filled buckets place their fluid in front of the dispenser
             Self::dispense_filled_bucket(ctx, item);
@@ -421,6 +427,16 @@ impl DispenserBlock {
         } else if Self::dispense_equipment(ctx, item) {
             // Armor, elytra, heads, saddles, horse/wolf armor and llama carpets
             Self::play_dispense_effects(ctx, WorldEvent::SoundDispenserDispense);
+        } else if item
+            .item
+            .has_tag(&tag::Item::MINECRAFT_SULFUR_CUBE_SWALLOWABLE)
+        {
+            // Vanilla `SulfurCubeBlockDispenseItemBehavior`.
+            if Self::feed_sulfur_cube(ctx, item) {
+                Self::play_dispense_effects(ctx, WorldEvent::SoundDispenserDispense);
+            } else {
+                Self::drop_item(ctx, item);
+            }
         } else {
             // TODO: Bone meal, bottles o' enchanting, chests onto llamas, brushes onto armadillos
             // Default / Drop
@@ -578,6 +594,11 @@ impl DispenserBlock {
         // Vanilla keeps the item and plays the fail click when TNT is disabled.
         if !ctx.world.level_info.load().game_rules.tnt_explodes {
             Self::play_dispense_effects(ctx, WorldEvent::SoundDispenserFail);
+            return;
+        }
+
+        if Self::feed_sulfur_cube(ctx, item) {
+            Self::play_dispense_effects(ctx, WorldEvent::SoundDispenserDispense);
             return;
         }
 
@@ -859,7 +880,22 @@ impl DispenserBlock {
         let front = Self::target_position(ctx);
         let front_block = ctx.world.get_block(&front);
 
-        let ignited = if front_block == &Block::TNT {
+        // Vanilla `tryIgniteExplosiveEntities` comes first.
+        let lit_cube = ctx
+            .world
+            .get_entities_at_box(&BoundingBox::from_block(&front))
+            .into_iter()
+            .find_map(|entity| {
+                entity
+                    .cast_any()
+                    .downcast_ref::<CubeMobEntity>()
+                    .filter(|cube| cube.can_explode())
+                    .map(|cube| cube.prime_time(false))
+            })
+            .is_some();
+        let ignited = if lit_cube {
+            true
+        } else if front_block == &Block::TNT {
             TNTBlock::prime(ctx.world, &front, None)
         } else {
             Ignition::ignite_block(
@@ -997,6 +1033,13 @@ impl DispenserBlock {
                 bogged.shear(SoundCategory::Blocks, tool);
                 return true;
             }
+            if let Some(cube) = entity.cast_any().downcast_ref::<CubeMobEntity>() {
+                if !cube.ready_for_shearing() || !entity.get_entity().is_alive() {
+                    continue;
+                }
+                cube.shear();
+                return true;
+            }
             let Some(sheep) = entity.cast_any().downcast_ref::<SheepEntity>() else {
                 continue;
             };
@@ -1019,6 +1062,21 @@ impl DispenserBlock {
             return true;
         }
 
+        false
+    }
+
+    /// Vanilla `SulfurCubeBlockDispenseItemBehavior.dispenseBlock`: the first sulfur cube in
+    /// front swallows one of `item`.
+    fn feed_sulfur_cube(ctx: &DispenseContext<'_>, item: &mut ItemStack) -> bool {
+        let target_box = BoundingBox::from_block(&Self::target_position(ctx));
+        for entity in ctx.world.get_entities_at_box(&target_box) {
+            if let Some(cube) = entity.cast_any().downcast_ref::<CubeMobEntity>()
+                && cube.equip_item(item)
+            {
+                item.decrement(1);
+                return true;
+            }
+        }
         false
     }
 
@@ -1204,8 +1262,11 @@ impl DispenserBlock {
             let Some(living) = entity.get_living_entity() else {
                 continue;
             };
+            // `SulfurCube.canDispenserEquipIntoSlot` only allows the body slot, and no body
+            // equipment is a block it can swallow.
             if !living.is_part_of_game()
                 || !is_allowed_entity(allowed_entities.as_ref(), entity.get_entity().entity_type)
+                || entity.get_entity().entity_type == &EntityType::SULFUR_CUBE
             {
                 continue;
             }

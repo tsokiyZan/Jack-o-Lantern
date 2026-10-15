@@ -2,6 +2,7 @@
  * This implementation is heavily based on <https://github.com/MCHPR/MCHPRS>
  * Updated to fit pumpkin by 4lve
  */
+use pumpkin_data::tag::{self, Taggable};
 use pumpkin_data::{Block, BlockDirection, BlockState};
 use pumpkin_util::math::position::BlockPos;
 
@@ -138,6 +139,51 @@ fn get_strong_power(
     world
         .block_registry
         .get_strong_redstone_power(block, world, pos, state, side)
+}
+
+/// Vanilla `SignalGetter.getBestOwnOrNeighbourSignal`.
+pub fn get_best_own_or_neighbour_signal(world: &World, pos: &BlockPos) -> u8 {
+    let mut best = 0;
+    for facing in BlockDirection::all() {
+        let neighbor_pos = pos.offset(facing.to_offset());
+        let (block, state) = world.get_block_and_state(&neighbor_pos);
+        best = best.max(get_redstone_power(
+            block,
+            state,
+            world,
+            &neighbor_pos,
+            facing,
+        ));
+        if best >= 15 {
+            return 15;
+        }
+    }
+    best.max(get_own_signal(world, pos))
+}
+
+/// Vanilla `BlockState.getOwnSignal`. The blocks that override `ownSignal` give the same
+/// signal as their strongest side, and every other block gives none.
+fn get_own_signal(world: &World, pos: &BlockPos) -> u8 {
+    let (block, state) = world.get_block_and_state(pos);
+    let has_own_signal = block == &Block::LEVER
+        || block == &Block::REDSTONE_TORCH
+        || block == &Block::REDSTONE_WALL_TORCH
+        || block == &Block::TARGET
+        || block == &Block::JUKEBOX
+        || block == &Block::SCULK_SENSOR
+        || block == &Block::CALIBRATED_SCULK_SENSOR
+        || block == &Block::DETECTOR_RAIL
+        || block.has_tag(&tag::Block::MINECRAFT_BUTTONS)
+        || block.has_tag(&tag::Block::MINECRAFT_PRESSURE_PLATES)
+        || block.has_tag(&tag::Block::MINECRAFT_LIGHTNING_RODS);
+    if !has_own_signal {
+        return 0;
+    }
+    BlockDirection::all()
+        .into_iter()
+        .map(|side| get_weak_power(block, state, world, pos, side, true))
+        .max()
+        .unwrap_or(0)
 }
 
 pub fn block_receives_redstone_power(world: &World, pos: &BlockPos) -> bool {

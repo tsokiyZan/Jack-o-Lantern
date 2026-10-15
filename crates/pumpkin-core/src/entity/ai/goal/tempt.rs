@@ -26,6 +26,17 @@ enum TemptItems {
     Predicate(fn(&dyn Mob, &ItemStack) -> bool),
 }
 
+/// A vanilla `stopNavigation` override.
+pub type StopNavigation = Box<dyn Fn(&dyn Mob) + Send + Sync>;
+/// A vanilla `navigateTowards` override, given the player.
+pub type NavigateTowards = Box<dyn Fn(&dyn Mob, &dyn EntityBase) + Send + Sync>;
+
+/// A subclass's vanilla `stopNavigation` and `navigateTowards`.
+pub struct TemptNavigation {
+    pub stop: StopNavigation,
+    pub towards: NavigateTowards,
+}
+
 pub struct TemptGoal {
     goal_control: Controls,
     speed: f64,
@@ -41,6 +52,7 @@ pub struct TemptGoal {
     running: bool,
     /// Vanilla `TemptGoal.ForNonPathfinders`: steers the move control, not the navigation.
     non_pathfinder: bool,
+    navigation: Option<TemptNavigation>,
 }
 
 impl TemptGoal {
@@ -78,6 +90,7 @@ impl TemptGoal {
             cooldown: 0,
             running: false,
             non_pathfinder: false,
+            navigation: None,
         }
     }
 
@@ -93,6 +106,20 @@ impl TemptGoal {
         goal.tempt_items = TemptItems::Predicate(items);
         goal.non_pathfinder = true;
         goal
+    }
+
+    /// Replaces `stopNavigation` and `navigateTowards`, as a vanilla subclass does.
+    #[must_use]
+    pub fn with_navigation(mut self, navigation: TemptNavigation) -> Self {
+        self.navigation = Some(navigation);
+        self
+    }
+
+    /// The goal's flags, for a vanilla subclass that sets its own.
+    #[must_use]
+    pub const fn with_controls(mut self, controls: Controls) -> Self {
+        self.goal_control = controls;
+        self
     }
 
     #[must_use]
@@ -117,7 +144,9 @@ impl TemptGoal {
     /// Vanilla `stopNavigation`.
     fn stop_navigation(&self, mob: &dyn Mob) {
         let mob_entity = mob.get_mob_entity();
-        if self.non_pathfinder {
+        if let Some(navigation) = &self.navigation {
+            (navigation.stop)(mob);
+        } else if self.non_pathfinder {
             mob_entity
                 .move_control
                 .lock()
@@ -138,7 +167,9 @@ impl TemptGoal {
         let mob_entity = mob.get_mob_entity();
         let mob_pos = mob_entity.living_entity.entity.pos.load();
         let player_pos = player.get_entity().pos.load();
-        if self.non_pathfinder {
+        if let Some(navigation) = &self.navigation {
+            (navigation.towards)(mob, player);
+        } else if self.non_pathfinder {
             let eye = Vector3::new(player_pos.x, player.get_entity().get_eye_y(), player_pos.z);
             let target = (eye - mob_pos) * mob.get_random().random::<f64>() + mob_pos;
             mob_entity
