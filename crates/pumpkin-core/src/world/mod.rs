@@ -128,9 +128,10 @@ use pumpkin_protocol::{
     java::{
         self,
         client::play::{
-            CBlockEntityData, CDamageEvent, CEntityStatus, CGameEvent, CLogin, CMultiBlockUpdate,
-            CPlayerInfoUpdate, CRemoveEntities, CRemovePlayerInfo, CSetSelectedSlot, CSoundEffect,
-            CSpawnEntity, GameEvent, InitChat, PlayerAction, PlayerInfoFlags,
+            CBlockEntityData, CDamageEvent, CEntitySoundEffect, CEntityStatus, CGameEvent, CLogin,
+            CMultiBlockUpdate, CPlayerInfoUpdate, CRemoveEntities, CRemovePlayerInfo,
+            CSetSelectedSlot, CSoundEffect, CSpawnEntity, GameEvent, InitChat, PlayerAction,
+            PlayerInfoFlags,
         },
         server::play::SChatMessage,
     },
@@ -1529,6 +1530,38 @@ impl World {
         let recipients = players.iter().filter(|p| {
             let center = p.get_entity().chunk_pos.load();
             // If the sound reaches their chunk, send it!
+            is_within_chebyshev_distance(chunk_pos, center, audible_chunks)
+        });
+
+        let recipients_by_version = Self::collect_java_recipients_by_version(recipients);
+        Self::broadcast_java_grouped(&packet, recipients_by_version);
+    }
+
+    /// Vanilla `Level.playSound(null, entity, ...)`: a sound that follows `entity`.
+    pub fn play_sound_from_entity(
+        &self,
+        entity: &Entity,
+        sound: Sound,
+        category: SoundCategory,
+        volume: f32,
+        pitch: f32,
+    ) {
+        let seed = rand::rng().random::<i64>();
+        let packet = CEntitySoundEffect::new(
+            IdOr::Id(sound as u16),
+            category,
+            VarInt(entity.entity_id),
+            volume,
+            pitch,
+            seed,
+        );
+
+        let audible_chunks = f64::from(volume.max(1.0)).ceil() as i32;
+        let chunk_pos = entity.chunk_pos.load();
+
+        let players = self.players.load();
+        let recipients = players.iter().filter(|p| {
+            let center = p.get_entity().chunk_pos.load();
             is_within_chebyshev_distance(chunk_pos, center, audible_chunks)
         });
 

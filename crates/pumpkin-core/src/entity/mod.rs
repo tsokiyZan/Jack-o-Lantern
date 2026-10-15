@@ -1,4 +1,5 @@
 use crate::{
+    command::argument_types::entity_anchor::{EntityAnchor, EntityAnchorExt},
     entity::item::ItemEntity,
     net::{ClientPlatform, bedrock::BedrockClient, java::JavaClient},
     server::Server,
@@ -1619,15 +1620,25 @@ impl Entity {
         Vector3::new(sin_yaw * cos_pitch, -sin_pitch, cos_yaw * cos_pitch)
     }
 
-    /// Changes this entity's pitch and yaw to look at target
-    pub fn look_at(&self, target: Vector3<f64>) {
-        let position = self.pos.load();
-        let delta = target.sub(&position);
-        let root = delta.x.hypot(delta.z);
-        let pitch = wrap_degrees((-delta.y.atan2(root) as f32).to_degrees());
-        let yaw = wrap_degrees((delta.z.atan2(delta.x) as f32).to_degrees() - 90.0);
-        self.pitch.store(pitch);
+    /// Vanilla `Entity.lookAt(EntityAnchorArgument.Anchor, Vec3)`: turns the body and head
+    /// to face `target` from the given anchor.
+    pub fn look_at(&self, anchor: EntityAnchor, target: Vector3<f64>) {
+        let delta = target.sub(&anchor.position_at_entity(self));
+        #[expect(
+            clippy::imprecise_flops,
+            reason = "vanilla's Math.sqrt rounds like this, hypot doesn't"
+        )]
+        let horizontal = (delta.x * delta.x + delta.z * delta.z).sqrt();
+        // `* 180.0F / (float) Math.PI`, left to right in doubles.
+        let to_degrees =
+            |radians: f64| radians * f64::from(180.0f32) / f64::from(std::f32::consts::PI);
+        self.set_pitch(wrap_degrees(
+            (-to_degrees(pumpkin_util::math::atan2(delta.y, horizontal))) as f32,
+        ));
+        let yaw =
+            wrap_degrees(to_degrees(pumpkin_util::math::atan2(delta.z, delta.x)) as f32 - 90.0);
         self.yaw.store(yaw);
+        self.head_yaw.store(yaw);
     }
 
     fn default_portal_cooldown(&self) -> u32 {

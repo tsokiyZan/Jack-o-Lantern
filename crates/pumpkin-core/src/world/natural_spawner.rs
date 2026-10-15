@@ -1110,24 +1110,22 @@ fn is_valid_spawn_floor(state: &'static BlockState, entity_type: &'static Entity
     }
 }
 
-fn is_block_dangerous(entity_type: &'static EntityType, state: &'static BlockState) -> bool {
+/// Vanilla `EntityType.isBlockDangerous`.
+pub(crate) fn is_block_dangerous(
+    entity_type: &'static EntityType,
+    state: &'static BlockState,
+) -> bool {
+    // TODO: vanilla `EntityType.immuneTo` is not extracted, so no type is exempt here.
     let block = Block::from_state_id(state.id);
-    if !entity_type.fire_immune && is_burning_block(block) {
+    if !entity_type.fire_immune
+        && crate::entity::ai::pathfinder::node_evaluator::is_burning_block(block, state)
+    {
         return true;
     }
     block.id == Block::WITHER_ROSE.id
         || block.id == Block::SWEET_BERRY_BUSH.id
         || block.id == Block::CACTUS.id
         || block.id == Block::POWDER_SNOW.id
-}
-
-fn is_burning_block(block: &Block) -> bool {
-    block.has_tag(&pumpkin_data::tag::Block::MINECRAFT_FIRE)
-        || block.id == Block::LAVA.id
-        || block.id == Block::MAGMA_BLOCK.id
-        || block.id == Block::LAVA_CAULDRON.id
-        || block.id == Block::CAMPFIRE.id
-        || block.id == Block::SOUL_CAMPFIRE.id
 }
 
 #[cfg(test)]
