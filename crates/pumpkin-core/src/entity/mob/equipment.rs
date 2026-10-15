@@ -452,6 +452,16 @@ pub static EQUIPMENT_REGISTRY: LazyLock<HashMap<&'static str, MobEquipmentDef>> 
 
         // ─── Vindicator ───
         m.insert(
+            "illusioner",
+            MobEquipmentDef {
+                entity_type: "illusioner",
+                weapon: WeaponConfig::Always(&Item::BOW),
+                armor: ArmorConfig::None,
+                enchanted: false,
+                can_pick_up_loot: false,
+            },
+        );
+        m.insert(
             "vex",
             MobEquipmentDef {
                 entity_type: "vex",
