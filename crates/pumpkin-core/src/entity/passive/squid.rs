@@ -58,20 +58,6 @@ impl SquidMovement {
     }
 }
 
-/// Vanilla `Vec3.xRot`.
-fn x_rot(v: Vector3<f64>, radians: f32) -> Vector3<f64> {
-    let cos = f64::from(pumpkin_util::math::cos(radians));
-    let sin = f64::from(pumpkin_util::math::sin(radians));
-    Vector3::new(v.x, v.y * cos + v.z * sin, v.z * cos - v.y * sin)
-}
-
-/// Vanilla `Vec3.yRot`.
-fn y_rot(v: Vector3<f64>, radians: f32) -> Vector3<f64> {
-    let cos = f64::from(pumpkin_util::math::cos(radians));
-    let sin = f64::from(pumpkin_util::math::sin(radians));
-    Vector3::new(v.x * cos + v.z * sin, v.y, v.z * cos - v.x * sin)
-}
-
 fn random_tentacle_speed(rng: &mut impl RngExt) -> f32 {
     1.0 / (rng.random::<f32>() + 1.0) * 0.2
 }
@@ -126,8 +112,8 @@ impl SquidEntity {
 
     /// `rotateVector`: turns a body-relative vector by last tick's body pitch and yaw.
     fn rotate_vector(&self, vec: Vector3<f64>) -> Vector3<f64> {
-        let v = x_rot(vec, self.movement.x_body_rot_o.load() * (PI / 180.0));
-        y_rot(v, -self.movement.y_body_rot_o.load() * (PI / 180.0))
+        vec.x_rot(self.movement.x_body_rot_o.load() * (PI / 180.0))
+            .y_rot(-self.movement.y_body_rot_o.load() * (PI / 180.0))
     }
 
     /// `spawnInk`.
