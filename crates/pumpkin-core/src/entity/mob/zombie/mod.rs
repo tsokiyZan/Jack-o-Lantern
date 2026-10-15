@@ -209,16 +209,50 @@ pub(crate) fn baby_turtle_on_land_target(mob: &MobEntity) -> ActiveTargetGoal {
     )
 }
 
+/// Vanilla `Zombie.SPEED_MODIFIER_BABY_ID`.
+const SPEED_MODIFIER_BABY_ID: &str = "minecraft:baby";
+
+/// The speed half of vanilla `Zombie.setBaby`: +50% of base speed while a baby.
+pub fn set_baby_speed(living: &LivingEntity, baby: bool) {
+    living.update_attribute(
+        &pumpkin_data::attributes::Attributes::MOVEMENT_SPEED,
+        |inst| {
+            inst.remove_modifier(SPEED_MODIFIER_BABY_ID);
+            if baby {
+                inst.add_or_replace_modifier(crate::entity::attributes::Modifier {
+                    id: SPEED_MODIFIER_BABY_ID.to_string(),
+                    amount: 0.5,
+                    operation: crate::entity::attributes::ModifierOperation::MultiplyBase,
+                });
+            }
+        },
+    );
+    crate::entity::attributes::send_attribute_updates_for_living(
+        living,
+        vec![pumpkin_data::attributes::Attributes::MOVEMENT_SPEED],
+    );
+}
+
+/// Vanilla `Zombie.getBaseExperienceReward`: babies are worth two and a half times as much.
+#[must_use]
+pub fn zombie_experience_reward(base: u32, baby: bool) -> u32 {
+    if baby {
+        (f64::from(base) * 2.5) as u32
+    } else {
+        base
+    }
+}
+
 impl ZombieEntityBase {
-    /// Vanilla `Zombie.setBaby`: the baby state is only the synced flag, it never ages up.
-    // TODO: vanilla baby zombies get the +50% SPEED_MODIFIER_BABY and 2.5x XP
-    // (`Zombie.getBaseExperienceReward`), unlike passive babies which drop none.
+    /// Vanilla `Zombie.setBaby`: the baby state is only the synced flag, it never ages up,
+    /// and babies are half again as fast.
     pub fn set_baby(&self, baby: bool) {
         self.mob_entity.set_baby_flag(
             &self.is_baby,
             pumpkin_data::tracked_data::zombie::BABY,
             baby,
         );
+        set_baby_speed(&self.mob_entity.living_entity, baby);
         self.refresh_dimensions();
     }
 

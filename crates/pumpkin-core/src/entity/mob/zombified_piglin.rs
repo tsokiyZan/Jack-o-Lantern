@@ -152,8 +152,18 @@ impl Mob for ZombifiedPiglinEntity {
 
     fn spawn_as_baby(&self) -> bool {
         self.mob_entity.set_baby_by_age();
+        // `ZombifiedPiglin extends Zombie`: the baby speed bonus too.
+        super::zombie::set_baby_speed(&self.mob_entity.living_entity, true);
         self.refresh_dimensions();
         true
+    }
+
+    /// Vanilla `Zombie.getBaseExperienceReward`, which zombified piglins inherit.
+    fn get_base_experience_reward(&self) -> u32 {
+        super::zombie::zombie_experience_reward(
+            self.get_entity().entity_type.experience_reward,
+            self.get_entity().is_baby(),
+        )
     }
 
     fn as_neutral(&self) -> Option<&dyn NeutralMob> {

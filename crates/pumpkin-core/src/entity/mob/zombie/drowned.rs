@@ -201,6 +201,14 @@ const BABY_DIMENSIONS: EntityDimensions =
     EntityDimensions::scalable(0.49, 0.98).with_eye_height(0.775);
 
 impl Mob for DrownedEntity {
+    /// Vanilla `Zombie.getBaseExperienceReward`.
+    fn get_base_experience_reward(&self) -> u32 {
+        super::zombie_experience_reward(
+            self.get_entity().entity_type.experience_reward,
+            self.entity.is_baby(),
+        )
+    }
+
     /// Vanilla `Drowned.getAmbientSound`.
     fn ambient_sound(&self) -> Option<Sound> {
         Some(

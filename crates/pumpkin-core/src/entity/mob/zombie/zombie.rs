@@ -29,6 +29,18 @@ impl ZombieEntity {
 }
 
 impl Mob for ZombieEntity {
+    /// Vanilla `Zombie.getBaseExperienceReward`.
+    fn get_base_experience_reward(&self) -> u32 {
+        super::zombie_experience_reward(
+            self.get_mob_entity()
+                .living_entity
+                .entity
+                .entity_type
+                .experience_reward,
+            self.entity.is_baby(),
+        )
+    }
+
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
         self.entity.default_dimensions(pose)
     }

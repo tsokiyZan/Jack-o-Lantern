@@ -264,6 +264,14 @@ const BABY_DIMENSIONS: EntityDimensions =
     EntityDimensions::scalable(0.49, 0.98).with_eye_height(0.67);
 
 impl Mob for ZombieVillagerEntity {
+    /// Vanilla `Zombie.getBaseExperienceReward`.
+    fn get_base_experience_reward(&self) -> u32 {
+        super::zombie_experience_reward(
+            self.get_entity().entity_type.experience_reward,
+            self.mob_entity.is_baby(),
+        )
+    }
+
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
         self.mob_entity.default_dimensions(pose)
     }
