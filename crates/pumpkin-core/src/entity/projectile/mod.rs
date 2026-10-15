@@ -189,29 +189,24 @@ impl ThrownItemEntity {
         let mut closest_t = 1.0f64;
         let mut hit = None;
 
-        // Block collisions
-        let (block_cols, block_positions) = world.get_block_collisions(search_box, caller);
-        for (idx, bb) in block_cols.iter().enumerate() {
-            if let Some(t) = calculate_ray_intersection(&start_pos, &delta, bb)
-                && t < closest_t
-            {
-                closest_t = t;
-                // Map back to block pos
-                let mut curr = 0;
-                for (len, pos) in &block_positions {
-                    curr += len;
-                    if idx < curr {
-                        let hit_pos = start_pos.add(&delta.multiply(t, t, t));
-                        hit = Some(ProjectileHit::Block {
-                            pos: *pos,
-                            face: get_hit_face(hit_pos, *pos),
-                            hit_pos,
-                            normal: delta.normalize().multiply(-1.0, -1.0, -1.0),
-                        });
-                        break;
-                    }
-                }
+        // Vanilla `ProjectileUtil.getHitResult`: a `COLLIDER` clip along the movement.
+        let clip = world.clip(&pumpkin_world::clip::ClipContext::new(
+            start_pos,
+            new_pos,
+            pumpkin_world::clip::ClipBlock::Collider,
+            pumpkin_world::clip::ClipFluid::None,
+        ));
+        if !clip.is_miss {
+            let length_squared = delta.length_squared();
+            if length_squared > 0.0 {
+                closest_t = clip.location.sub(&start_pos).dot(&delta) / length_squared;
             }
+            hit = Some(ProjectileHit::Block {
+                pos: clip.block_pos,
+                face: clip.direction,
+                hit_pos: clip.location,
+                normal: delta.normalize().multiply(-1.0, -1.0, -1.0),
+            });
         }
 
         // Entity collisions
@@ -329,25 +324,6 @@ fn calculate_ray_intersection(
 }
 
 /// Get the face of the block that was hit
-fn get_hit_face(hit_pos: Vector3<f64>, block_pos: BlockPos) -> BlockDirection {
-    let local = hit_pos.sub(&block_pos.0.to_f64());
-    let eps = 1.0e-4;
-
-    if local.x <= eps {
-        BlockDirection::West
-    } else if local.x >= 1.0 - eps {
-        BlockDirection::East
-    } else if local.y <= eps {
-        BlockDirection::Down
-    } else if local.y >= 1.0 - eps {
-        BlockDirection::Up
-    } else if local.z <= eps {
-        BlockDirection::North
-    } else {
-        BlockDirection::South
-    }
-}
-
 pub enum ProjectileHit {
     Block {
         pos: BlockPos,

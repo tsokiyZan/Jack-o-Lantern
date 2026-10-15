@@ -160,21 +160,48 @@ impl EntityBase for WindChargeEntity {
     }
 
     fn on_hit(&self, hit: ProjectileHit) {
-        let hit_pos = hit.hit_pos();
-        if let ProjectileHit::Entity { ref entity, .. } = hit {
-            let world = self.get_entity().world.load();
-            let owner_id = self.thrown_item_entity.owner_id.load();
-            let owner = owner_id.and_then(|id| world.get_entity_by_id(id));
-
-            let _ = entity.damage_with_context(
-                entity.as_ref(),
-                1.0,
-                DamageType::WIND_CHARGE,
-                Some(hit_pos),
-                Some(self.get_entity()),
-                owner.as_deref(),
-            );
+        match hit {
+            // Vanilla `AbstractWindCharge.onHitEntity`: `windCharge(this, owner)` for 1, then
+            // the burst at the charge itself.
+            ProjectileHit::Entity { ref entity, .. } => {
+                let world = self.get_entity().world.load();
+                let owner = self
+                    .thrown_item_entity
+                    .owner_id
+                    .load()
+                    .and_then(|id| world.get_entity_by_id(id))
+                    .filter(|owner| owner.get_living_entity().is_some());
+                if let Some(owner_living) = owner.as_ref().and_then(|o| o.get_living_entity()) {
+                    // `setLastHurtMob`.
+                    if entity.get_living_entity().is_some() {
+                        owner_living
+                            .last_attacking_id
+                            .store(entity.get_entity().entity_id, Ordering::Relaxed);
+                        owner_living.last_attack_time.store(
+                            owner_living.entity.tick_count.load(Ordering::Relaxed),
+                            Ordering::Relaxed,
+                        );
+                    }
+                }
+                let _ = entity.damage_with_context(
+                    entity.as_ref(),
+                    1.0,
+                    DamageType::WIND_CHARGE,
+                    None,
+                    Some(self.get_entity()),
+                    owner.as_deref(),
+                );
+                self.create_explosion(self.get_entity().pos.load());
+            }
+            // Vanilla `AbstractWindCharge.onHitBlock`: a quarter block out of the hit face.
+            ProjectileHit::Block { face, hit_pos, .. } => {
+                let normal = face.to_offset();
+                self.create_explosion(Vector3::new(
+                    hit_pos.x + f64::from(normal.x) * 0.25,
+                    hit_pos.y + f64::from(normal.y) * 0.25,
+                    hit_pos.z + f64::from(normal.z) * 0.25,
+                ));
+            }
         }
-        self.create_explosion(hit_pos);
     }
 }
