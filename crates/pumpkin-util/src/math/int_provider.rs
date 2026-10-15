@@ -609,12 +609,12 @@ impl ClampedNormalIntProvider {
     /// - `random` – The random number generator to use.
     ///
     /// # Returns
-    /// A random integer from a normal distribution, rounded and clamped to [`min_inclusive`, `max_inclusive`].
+    /// A random integer from a normal distribution, clamped to [`min_inclusive`, `max_inclusive`]
+    /// and truncated: vanilla `(int)Mth.clamp(Mth.normal(random, mean, deviation), min, max)`.
     pub fn get(&self, random: &mut impl RandomImpl) -> i32 {
-        // NOTE: Generate a normal distribution value and clamp to range
-        let gaussian = random.next_gaussian() as f32;
-        let value = gaussian.mul_add(self.deviation, self.mean).round() as i32;
-        value.clamp(self.min_inclusive, self.max_inclusive)
+        let value = self.mean + random.next_gaussian() as f32 * self.deviation;
+        let (min, max) = (self.min_inclusive as f32, self.max_inclusive as f32);
+        (if value < min { min } else { value.min(max) }) as i32
     }
 
     /// Returns the maximum inclusive clamp value.

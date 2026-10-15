@@ -164,41 +164,45 @@ impl Spline {
         if index_greater_than_x == 0 {
             let point = &self.points[0];
             let val = point.value.sample_with(location_of);
-            return val + point.derivative * (location - point.location);
+            return linear_extend(location, point, val);
         }
 
         if index_greater_than_x == n {
             let point = &self.points[n - 1];
             let val = point.value.sample_with(location_of);
-            return val + point.derivative * (location - point.location);
+            return linear_extend(location, point, val);
         }
 
         let previous = &self.points[index_greater_than_x - 1];
         let current = &self.points[index_greater_than_x];
 
-        let start_x = previous.location;
-        let end_x = current.location;
+        // Vanilla `CubicSpline.Multipoint.sample`, in its exact float operation order.
+        let x1 = previous.location;
+        let x2 = current.location;
+        let t = (location - x1) / (x2 - x1);
+        let d1 = previous.derivative;
+        let d2 = current.derivative;
+        let y1 = previous.value.sample_with(location_of);
+        let y2 = current.value.sample_with(location_of);
+        let a = d1 * (x2 - x1) - (y2 - y1);
+        let b = -d2 * (x2 - x1) + (y2 - y1);
+        lerp(t, y1, y2) + t * (1.0 - t) * lerp(t, a, b)
+    }
+}
 
-        let start_value = previous.value.sample_with(location_of);
-        let end_value = current.value.sample_with(location_of);
+/// Vanilla `Mth.lerp` for floats.
+#[inline]
+fn lerp(alpha: f32, p0: f32, p1: f32) -> f32 {
+    p0 + alpha * (p1 - p0)
+}
 
-        let start_derivative = previous.derivative;
-        let end_derivative = current.derivative;
-
-        let t = (location - start_x) / (end_x - start_x);
-
-        let h00 = (1.0 + 2.0 * t) * (1.0 - t) * (1.0 - t);
-        let h10 = t * (1.0 - t) * (1.0 - t);
-        let h01 = t * t * (3.0 - 2.0 * t);
-        let h11 = t * t * (t - 1.0);
-
-        h00.mul_add(
-            start_value,
-            h10.mul_add(
-                start_derivative * (end_x - start_x),
-                h01.mul_add(end_value, h11 * (end_derivative * (end_x - start_x))),
-            ),
-        )
+/// Vanilla `CubicSpline.Multipoint.linearExtend`.
+#[inline]
+fn linear_extend(input: f32, point: &SplinePoint, value: f32) -> f32 {
+    if point.derivative == 0.0 {
+        value
+    } else {
+        value + point.derivative * (input - point.location)
     }
 }
 

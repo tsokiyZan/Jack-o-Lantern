@@ -133,7 +133,7 @@ pub fn approach_degrees(current: f32, target: f32, increment: f32) -> f32 {
 
 #[must_use]
 pub const fn squared_magnitude(a: f64, b: f64, c: f64) -> f64 {
-    c.mul_add(c, a.mul_add(a, b * b))
+    a * a + b * b + c * c
 }
 
 /// `Mth.FRAC_BIAS`.
