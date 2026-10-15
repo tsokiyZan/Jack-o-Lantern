@@ -28,7 +28,7 @@ use crate::entity::{
 use crate::world::World;
 
 /// `180.0F / (float) Math.PI`, vanilla's float radians-to-degrees factor.
-const RAD_TO_DEG: f32 = 180.0 / std::f32::consts::PI;
+pub(crate) const RAD_TO_DEG: f32 = 180.0 / std::f32::consts::PI;
 /// Vanilla's `maxDist = 64.0` in `faceMovementDirection` and the fireball goal, squared.
 const MAX_TARGET_DISTANCE_SQ: f64 = 4096.0;
 

@@ -47,6 +47,17 @@ impl LookControl {
         self.position
     }
 
+    /// Vanilla's `if (this.lookAtCooldown > 0) { this.lookAtCooldown--; ...`: the wanted
+    /// position while a look is still asked for, counting the cooldown down.
+    pub const fn take_look_at(&mut self) -> Option<Vector3<f64>> {
+        if self.look_at_timer > 0 {
+            self.look_at_timer -= 1;
+            Some(self.position)
+        } else {
+            None
+        }
+    }
+
     pub fn look_at_position(&mut self, mob: &dyn Mob, position: Vector3<f64>) {
         self.look_at(mob, position.x, position.y, position.z);
     }

@@ -1,8 +1,17 @@
+use crate::entity::ai::control::look_control::LookControl;
 use crate::entity::mob::equipment::is_equippable_in_slot;
+use crate::entity::mob::ghast::{
+    GhastMoveControl, RAD_TO_DEG, RandomFloatAroundGoal, face_movement_direction,
+};
 use crate::entity::mob::{first_passenger_player, mob_controlling_passenger};
+use pumpkin_data::attributes::Attributes;
 use pumpkin_data::data_component_impl::EquipmentSlot;
+use pumpkin_util::math::boundingbox::BoundingBox;
+use pumpkin_util::math::position::BlockPos;
+use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::math::{atan2, wrap_degrees_90};
 use std::sync::{
-    Arc, Weak,
+    Arc,
     atomic::{AtomicBool, AtomicI32, Ordering},
 };
 
@@ -18,16 +27,25 @@ use pumpkin_util::math::boundingbox::EntityDimensions;
 use crate::entity::{
     Entity, EntityBase,
     ageable::{AgeableData, AgeableMob},
-    ai::goal::{
-        look_around::RandomLookAroundGoal, look_at_entity::LookAtEntityGoal, swim::SwimGoal,
-        tempt::TemptGoal, wander_around::WanderAroundGoal,
-    },
+    ai::goal::{Controls, Goal, swim::SwimGoal, tempt::TemptGoal},
     mob::{Mob, MobEntity},
     passive::animal::{Animal, set_animal_pathfinding_malus},
     player::Player,
 };
 
 pub const HAPPY_GHAST_FOOD: &[&Item] = &[&Item::SNOWBALL];
+/// Vanilla `HappyGhast.WANDER_GROUND_DISTANCE`.
+const WANDER_GROUND_DISTANCE: i32 = 16;
+/// Vanilla `HappyGhast.SMALL_RESTRICTION_RADIUS`.
+const SMALL_RESTRICTION_RADIUS: i32 = 32;
+/// Vanilla `HappyGhast.LARGE_RESTRICTION_RADIUS`.
+const LARGE_RESTRICTION_RADIUS: i32 = 64;
+/// Vanilla `HappyGhast.RESTRICTION_RADIUS_BUFFER`.
+const RESTRICTION_RADIUS_BUFFER: i32 = 16;
+/// Vanilla `HappyGhast.STILL_TIMEOUT_ON_LOAD_GRACE_PERIOD`.
+const STILL_TIMEOUT_ON_LOAD_GRACE_PERIOD: i32 = 60;
+/// Vanilla `HappyGhast.MAX_STILL_TIMEOUT`.
+const MAX_STILL_TIMEOUT: i32 = 10;
 
 /// Represents a Happy Ghast, a passive flying mob.
 ///
@@ -45,6 +63,11 @@ impl HappyGhastEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
         set_animal_pathfinding_malus(&mob_entity);
+        *mob_entity
+            .move_control
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) =
+            Box::new(GhastMoveControl::new(true, is_on_still_timeout));
         let happy_ghast = Self {
             mob_entity,
             ageable_data: AgeableData::default(),
@@ -54,45 +77,94 @@ impl HappyGhastEntity {
             stays_still: AtomicBool::new(false),
         };
         let mob_arc = Arc::new(happy_ghast);
-        let mob_weak: Weak<dyn Mob> = {
-            let mob_arc: Arc<dyn Mob> = mob_arc.clone();
-            Arc::downgrade(&mob_arc)
-        };
-
-        {
-            let mut goal_selector = mob_arc
-                .mob_entity
-                .goals_selector
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-
-            goal_selector.add_goal(0, SwimGoal::new(&mob_arc.mob_entity));
-            goal_selector.add_goal(
-                1,
-                Box::new(TemptGoal::with_stop_distance(
-                    1.0,
-                    HAPPY_GHAST_FOOD,
-                    false,
-                    7.0,
-                )),
-            );
-            goal_selector.add_goal(
-                2,
-                Box::new(WanderAroundGoal::new(1.0).ignoring_no_action_time()),
-            );
-            goal_selector.add_goal(
-                3,
-                LookAtEntityGoal::with_default(mob_weak, &EntityType::PLAYER, 6.0),
-            );
-            goal_selector.add_goal(4, Box::new(RandomLookAroundGoal::default()));
-        };
-
+        mob_arc.register_goals();
         mob_arc
     }
 
+    /// Vanilla `HappyGhast.registerGoals`.
+    fn register_goals(&self) {
+        let mob_entity = &self.mob_entity;
+        mob_entity.add_goal(3, HappyGhastFloatGoal(*SwimGoal::new(mob_entity)));
+        mob_entity.add_goal(
+            4,
+            TemptGoal::for_non_pathfinders(1.0, is_tempt_item, false, 7.0),
+        );
+        mob_entity.add_goal(5, RandomFloatAroundGoal::new(WANDER_GROUND_DISTANCE));
+    }
+
+    /// Vanilla `setServerStillTimeout`. Pumpkin does not send the position sync vanilla
+    /// sends when the timeout starts.
     pub fn set_server_still_timeout(&self, timeout: i32) {
         self.server_still_timeout.store(timeout, Ordering::Relaxed);
         self.sync_stay_still_flag();
+    }
+
+    /// Vanilla `getHappyGhastRestrictionRadius`.
+    fn get_happy_ghast_restriction_radius(&self) -> i32 {
+        let body_empty = self
+            .mob_entity
+            .living_entity
+            .entity_equipment
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get(&EquipmentSlot::BODY)
+            .is_empty();
+        if !self.is_baby() && body_empty {
+            LARGE_RESTRICTION_RADIUS
+        } else {
+            SMALL_RESTRICTION_RADIUS
+        }
+    }
+
+    /// Vanilla `checkRestriction`: keeps the home on the ghast while it is free.
+    fn check_restriction(&self) {
+        let mob_entity = &self.mob_entity;
+        let entity = self.get_entity();
+        if entity.is_leashed() || entity.has_passengers() {
+            return;
+        }
+        let radius = self.get_happy_ghast_restriction_radius();
+        let block_pos = entity.block_pos.load();
+        let home = mob_entity.position_target.load();
+        let buffered = f64::from(radius + RESTRICTION_RADIUS_BUFFER);
+        if !mob_entity.has_position_target()
+            || dist_sqr(home, block_pos) >= buffered * buffered
+            || radius != mob_entity.position_target_range.load(Ordering::Relaxed)
+        {
+            mob_entity.position_target.store(block_pos);
+            mob_entity
+                .position_target_range
+                .store(radius, Ordering::Relaxed);
+        }
+    }
+
+    /// Vanilla `scanPlayerAboveGhast`: a player, or what it rides, standing on top.
+    fn scan_player_above_ghast(&self) -> bool {
+        let bb = self.get_entity().bounding_box.load();
+        let detection_box = BoundingBox::new(
+            Vector3::new(
+                bb.min.x - 1.0,
+                bb.max.y - f64::from(1.0E-5f32),
+                bb.min.z - 1.0,
+            ),
+            Vector3::new(
+                bb.max.x + 1.0,
+                bb.max.y + (bb.max.y - bb.min.y) / 2.0,
+                bb.max.z + 1.0,
+            ),
+        );
+        let world = self.get_entity().world.load();
+        world.players.load().iter().any(|player| {
+            if player.is_spectator() {
+                return false;
+            }
+            let mut root_vehicle: Arc<dyn EntityBase> = player.clone();
+            while let Some(vehicle) = root_vehicle.get_entity().get_vehicle() {
+                root_vehicle = vehicle;
+            }
+            root_vehicle.get_entity().entity_type != &EntityType::HAPPY_GHAST
+                && detection_box.contains(root_vehicle.get_entity().pos.load())
+        })
     }
 
     /// Vanilla `Mob.isWearingBodyArmor`.
@@ -260,21 +332,6 @@ impl Mob for HappyGhastEntity {
     fn mob_tick(&self, _caller: &dyn EntityBase) {
         self.ageable_ai_step();
 
-        let leash_time = self.leash_holder_time.load(Ordering::Relaxed);
-        if leash_time > 0 {
-            self.leash_holder_time.fetch_sub(1, Ordering::Relaxed);
-        }
-        self.set_leash_holder(leash_time > 0);
-
-        let still_timeout = self.server_still_timeout.load(Ordering::Relaxed);
-        if still_timeout > 0 {
-            let entity = self.get_entity();
-            if entity.tick_count.load(Ordering::Relaxed) > 60 {
-                self.server_still_timeout.fetch_sub(1, Ordering::Relaxed);
-            }
-            self.sync_stay_still_flag();
-        }
-
         // Continuous healing
         let entity = self.get_entity();
         if entity.is_alive() {
@@ -290,6 +347,64 @@ impl Mob for HappyGhastEntity {
                 }
             }
         }
+    }
+
+    /// The part of vanilla `HappyGhast.tick` after `super.tick()`.
+    fn post_tick(&self) {
+        if self.leash_holder_time.load(Ordering::Relaxed) > 0 {
+            self.leash_holder_time.fetch_sub(1, Ordering::Relaxed);
+        }
+        self.set_leash_holder(self.leash_holder_time.load(Ordering::Relaxed) > 0);
+
+        let still_timeout = self.server_still_timeout.load(Ordering::Relaxed);
+        if still_timeout > 0 {
+            let entity = self.get_entity();
+            if entity.tick_count.load(Ordering::Relaxed) > STILL_TIMEOUT_ON_LOAD_GRACE_PERIOD {
+                self.server_still_timeout.fetch_sub(1, Ordering::Relaxed);
+            }
+            self.sync_stay_still_flag();
+        }
+
+        if self.scan_player_above_ghast() {
+            self.set_server_still_timeout(MAX_STILL_TIMEOUT);
+        }
+    }
+
+    /// Vanilla `HappyGhast.customServerAiStep`.
+    fn custom_server_ai_step(&self, _caller: &dyn EntityBase) {
+        self.check_restriction();
+    }
+
+    /// Vanilla `HappyGhast.travel`.
+    fn custom_travel(&self, caller: &dyn EntityBase) -> bool {
+        let living = &self.mob_entity.living_entity;
+        let speed = living.get_attribute_value(&Attributes::FLYING_SPEED) as f32 * 5.0 / 3.0;
+        living.travel_flying_with_speeds(caller, speed, speed, speed);
+        true
+    }
+
+    /// Vanilla `HappyGhast.checkFallDamage` does nothing.
+    fn checks_fall_damage(&self) -> bool {
+        false
+    }
+
+    /// Vanilla `HappyGhastLookControl.tick`.
+    fn custom_look_control_tick(&self, look_control: &mut LookControl) -> bool {
+        let entity = self.get_entity();
+        if self.is_on_still_timeout() {
+            let close_angle = wrap_degrees_90(entity.yaw.load());
+            entity.yaw.store(entity.yaw.load() - close_angle);
+            entity.head_yaw.store(entity.yaw.load());
+        } else if let Some(wanted) = look_control.take_look_at() {
+            let pos = entity.pos.load();
+            let y_rot = -(atan2(wanted.x - pos.x, wanted.z - pos.z) as f32) * RAD_TO_DEG;
+            entity.yaw.store(y_rot);
+            entity.body_yaw.store(y_rot);
+            entity.head_yaw.store(y_rot);
+        } else {
+            face_movement_direction(self);
+        }
+        true
     }
 
     fn mob_init_data_tracker(&self) {
@@ -314,5 +429,60 @@ impl Mob for HappyGhastEntity {
         }
 
         self.animal_interact(player, item_stack, Sound::EntityHappyGhastAmbient)
+    }
+}
+
+/// Vanilla `HappyGhast::isOnStillTimeout`, for the move control's `shouldBeStopped`.
+fn is_on_still_timeout(mob: &dyn Mob) -> bool {
+    mob.cast_any()
+        .downcast_ref::<HappyGhastEntity>()
+        .is_some_and(HappyGhastEntity::is_on_still_timeout)
+}
+
+/// The item test of the happy ghast's `TemptGoal.ForNonPathfinders`.
+fn is_tempt_item(mob: &dyn Mob, stack: &ItemStack) -> bool {
+    let Some(happy_ghast) = mob.cast_any().downcast_ref::<HappyGhastEntity>() else {
+        return false;
+    };
+    if !happy_ghast.is_wearing_body_armor() && !happy_ghast.is_baby() {
+        stack
+            .item
+            .has_tag(&tag::Item::MINECRAFT_HAPPY_GHAST_TEMPT_ITEMS)
+    } else {
+        stack.item.has_tag(&tag::Item::MINECRAFT_HAPPY_GHAST_FOOD)
+    }
+}
+
+/// Vanilla `Vec3i.distSqr`.
+fn dist_sqr(a: BlockPos, b: BlockPos) -> f64 {
+    let dx = f64::from(a.0.x) - f64::from(b.0.x);
+    let dy = f64::from(a.0.y) - f64::from(b.0.y);
+    let dz = f64::from(a.0.z) - f64::from(b.0.z);
+    dx * dx + dy * dy + dz * dz
+}
+
+/// Vanilla `HappyGhast.HappyGhastFloatGoal`: a `FloatGoal` that rests while the ghast
+/// stays still.
+struct HappyGhastFloatGoal(SwimGoal);
+
+impl Goal for HappyGhastFloatGoal {
+    fn can_start(&mut self, mob: &dyn Mob) -> bool {
+        !is_on_still_timeout(mob) && self.0.can_start(mob)
+    }
+
+    fn should_continue(&mut self, mob: &dyn Mob) -> bool {
+        self.can_start(mob)
+    }
+
+    fn tick(&mut self, mob: &dyn Mob) {
+        self.0.tick(mob);
+    }
+
+    fn should_run_every_tick(&self) -> bool {
+        self.0.should_run_every_tick()
+    }
+
+    fn controls(&self) -> Controls {
+        self.0.controls()
     }
 }

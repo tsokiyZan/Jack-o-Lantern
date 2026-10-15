@@ -6,8 +6,10 @@ use crate::entity::ai::target_predicate::TargetPredicate;
 use crate::entity::{ai::pathfinder::NavigatorGoal, mob::Mob, player::Player};
 use pumpkin_data::attributes::Attributes;
 use pumpkin_data::item::Item;
+use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::tag::{Tag, Taggable};
 use pumpkin_util::math::vector3::Vector3;
+use rand::RngExt;
 
 const DEFAULT_STOP_DISTANCE: f64 = 2.5;
 /// Following stops once the player moves further than this while being watched.
@@ -15,11 +17,13 @@ const SCARE_RANGE_SQ: f64 = 36.0;
 const SCARE_MOVE_SQ: f64 = 0.010_000_000_000_000_002;
 const SCARE_ROTATION: f64 = 5.0;
 
-/// What a [`TemptGoal`] follows: a fixed list or an item tag, as vanilla's predicate.
+/// What a [`TemptGoal`] follows: a fixed list, an item tag, or a test that depends on the
+/// mob, as vanilla's predicate.
 #[derive(Clone, Copy)]
 enum TemptItems {
     Items(&'static [&'static Item]),
     Tag(&'static Tag),
+    Predicate(fn(&dyn Mob, &ItemStack) -> bool),
 }
 
 pub struct TemptGoal {
@@ -35,6 +39,8 @@ pub struct TemptGoal {
     watched_pitch: f64,
     cooldown: i32,
     running: bool,
+    /// Vanilla `TemptGoal.ForNonPathfinders`: steers the move control, not the navigation.
+    non_pathfinder: bool,
 }
 
 impl TemptGoal {
@@ -71,7 +77,22 @@ impl TemptGoal {
             watched_pitch: 0.0,
             cooldown: 0,
             running: false,
+            non_pathfinder: false,
         }
+    }
+
+    /// Vanilla `TemptGoal.ForNonPathfinders`, tempted by whatever `items` accepts.
+    #[must_use]
+    pub fn for_non_pathfinders(
+        speed: f64,
+        items: fn(&dyn Mob, &ItemStack) -> bool,
+        can_scare: bool,
+        stop_distance: f64,
+    ) -> Self {
+        let mut goal = Self::with_stop_distance(speed, &[], can_scare, stop_distance);
+        goal.tempt_items = TemptItems::Predicate(items);
+        goal.non_pathfinder = true;
+        goal
     }
 
     #[must_use]
@@ -79,17 +100,59 @@ impl TemptGoal {
         self.running
     }
 
-    fn is_tempt_item(&self, stack: &pumpkin_data::item_stack::ItemStack) -> bool {
+    fn is_tempt_item(&self, mob: &dyn Mob, stack: &ItemStack) -> bool {
         stack.item_count > 0
             && match self.tempt_items {
                 TemptItems::Items(items) => items.iter().any(|i| i.id == stack.item.id),
                 TemptItems::Tag(tag) => stack.item.has_tag(tag),
+                TemptItems::Predicate(items) => items(mob, stack),
             }
     }
 
-    fn is_holding_tempt_item(&self, player: &Player) -> bool {
-        self.is_tempt_item(&player.inventory().held_item())
-            || self.is_tempt_item(&player.inventory().off_hand_item())
+    fn is_holding_tempt_item(&self, mob: &dyn Mob, player: &Player) -> bool {
+        self.is_tempt_item(mob, &player.inventory().held_item())
+            || self.is_tempt_item(mob, &player.inventory().off_hand_item())
+    }
+
+    /// Vanilla `stopNavigation`.
+    fn stop_navigation(&self, mob: &dyn Mob) {
+        let mob_entity = mob.get_mob_entity();
+        if self.non_pathfinder {
+            mob_entity
+                .move_control
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .set_wait();
+        } else {
+            mob_entity
+                .navigator
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .stop();
+        }
+    }
+
+    /// Vanilla `navigateTowards`; a non-pathfinder heads for a random point on the line
+    /// to the player's eyes.
+    fn navigate_towards(&self, mob: &dyn Mob, player: &dyn EntityBase) {
+        let mob_entity = mob.get_mob_entity();
+        let mob_pos = mob_entity.living_entity.entity.pos.load();
+        let player_pos = player.get_entity().pos.load();
+        if self.non_pathfinder {
+            let eye = Vector3::new(player_pos.x, player.get_entity().get_eye_y(), player_pos.z);
+            let target = (eye - mob_pos) * mob.get_random().random::<f64>() + mob_pos;
+            mob_entity
+                .move_control
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .set_wanted_position(target.x, target.y, target.z, self.speed);
+        } else {
+            mob_entity
+                .navigator
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .set_progress(NavigatorGoal::new(mob_pos, player_pos, self.speed));
+        }
     }
 
     /// Vanilla `TEMPT_TARGETING` ranged by `tempt_range`, with the held-item selector.
@@ -105,7 +168,7 @@ impl TemptGoal {
             &world,
             players
                 .iter()
-                .filter(|player| self.is_holding_tempt_item(player))
+                .filter(|player| self.is_holding_tempt_item(mob, player))
                 .map(|player| Arc::clone(player) as Arc<dyn EntityBase>),
             Some(mob),
             mob_entity.living_entity.entity.pos.load(),
@@ -180,24 +243,16 @@ impl Goal for TemptGoal {
             );
 
         let mob_pos = mob_entity.living_entity.entity.pos.load();
-        let mut navigator = mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
         if mob_pos.squared_distance_to_vec(&player_pos) < self.stop_distance * self.stop_distance {
-            navigator.stop();
+            self.stop_navigation(mob);
         } else {
-            navigator.set_progress(NavigatorGoal::new(mob_pos, player_pos, self.speed));
+            self.navigate_towards(mob, player.as_ref());
         }
     }
 
     fn stop(&mut self, mob: &dyn Mob) {
         self.target_player = None;
-        mob.get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .stop();
+        self.stop_navigation(mob);
         self.cooldown = to_goal_ticks(100);
         self.running = false;
     }

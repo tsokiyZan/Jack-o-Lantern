@@ -426,10 +426,13 @@ impl MobEntity {
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
                 .tick(mob);
             if !mob.skips_look_control_tick() {
-                self.look_control
+                let mut look_control = self
+                    .look_control
                     .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .tick(mob);
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                if !mob.custom_look_control_tick(&mut look_control) {
+                    look_control.tick(mob);
+                }
             }
         }
         self.jump_control
@@ -1458,6 +1461,12 @@ pub trait Mob: EntityBase + Send + Sync {
     /// Whether the look control skips its tick, as vanilla's `BeeLookControl` does
     /// while the bee is angry.
     fn skips_look_control_tick(&self) -> bool {
+        false
+    }
+
+    /// Replaces the look control's tick, as vanilla's `HappyGhastLookControl` does.
+    /// Returns true when handled.
+    fn custom_look_control_tick(&self, _look_control: &mut LookControl) -> bool {
         false
     }
 
