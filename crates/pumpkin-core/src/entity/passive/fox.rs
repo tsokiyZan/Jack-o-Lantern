@@ -710,15 +710,6 @@ impl FoxEntity {
     }
 }
 
-/// Vanilla `LivingEntity.getLastHurtByMob`, which is gone once its entity is.
-fn last_hurt_by_mob(living: &LivingEntity) -> Option<Arc<dyn EntityBase>> {
-    let id = living.last_attacker_id.load(Ordering::Relaxed);
-    if id == 0 {
-        return None;
-    }
-    living.entity.world.load().get_entity_by_id(id)
-}
-
 /// Vanilla `Fox.isConsumableFood`.
 fn is_consumable_food(stack: &ItemStack) -> bool {
     stack.get_data_component::<FoodImpl>().is_some()
@@ -2055,7 +2046,11 @@ impl Goal for FoxSearchForItemsGoal {
             return false;
         }
         if fox.mob_entity.get_target().is_some()
-            || last_hurt_by_mob(&fox.mob_entity.living_entity).is_some()
+            || fox
+                .mob_entity
+                .living_entity
+                .get_last_hurt_by_mob()
+                .is_some()
         {
             return false;
         }
@@ -2156,7 +2151,10 @@ impl Goal for PerchAndSearchGoal {
         let Some(fox) = as_fox(mob) else {
             return false;
         };
-        last_hurt_by_mob(&fox.mob_entity.living_entity).is_none()
+        fox.mob_entity
+            .living_entity
+            .get_last_hurt_by_mob()
+            .is_none()
             && fox.get_random().random::<f32>() < 0.02
             && !fox.is_sleeping()
             && fox.mob_entity.get_target().is_none()
@@ -2305,7 +2303,7 @@ impl Goal for DefendTrustedTargetGoal {
                 continue;
             };
             let timestamp = living.last_attacked_time.load(Ordering::Relaxed);
-            self.trusted_last_hurt_by = last_hurt_by_mob(living);
+            self.trusted_last_hurt_by = living.get_last_hurt_by_mob();
             self.trusted_last_hurt = Some(trusted_entity);
             return timestamp != self.timestamp
                 && self

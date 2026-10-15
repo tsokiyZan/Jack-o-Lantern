@@ -1414,6 +1414,9 @@ pub trait Mob: EntityBase + Send + Sync {
     /// `super.aiStep()`: after `baseTick`, before the AI step and travel.
     fn ai_step(&self, _caller: &dyn EntityBase) {}
 
+    /// The end of a vanilla `aiStep` override, after `super.aiStep()`.
+    fn ai_step_end(&self, _caller: &dyn EntityBase) {}
+
     fn post_tick(&self) {}
 
     /// Vanilla `LivingEntity.jumpFromGround` as `aiStep` calls it, which a mob may override.

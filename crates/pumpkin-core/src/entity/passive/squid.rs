@@ -1,97 +1,48 @@
-use crate::entity::ai::pathfinder::node::PathType;
-use crate::entity::breath::BreathManager;
-use pumpkin_data::entity::EntityPose;
-use pumpkin_util::math::boundingbox::EntityDimensions;
+//! Vanilla `Squid` and its subclass `GlowSquid`.
+
 use std::f32::consts::{PI, TAU};
 use std::sync::Arc;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicI32, Ordering::Relaxed};
 
 use crossbeam::atomic::AtomicCell;
-use pumpkin_data::attributes::Attributes;
-use pumpkin_data::entity::EntityStatus;
+use pumpkin_data::damage::DamageType;
+use pumpkin_data::effect::StatusEffect;
+use pumpkin_data::entity::{EntityPose, EntityStatus};
 use pumpkin_data::particle::Particle;
 use pumpkin_data::sound::{Sound, SoundCategory};
+use pumpkin_data::tracked_data;
+use pumpkin_nbt::compound::NbtCompound;
+use pumpkin_util::math::boundingbox::EntityDimensions;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
 use rand::RngExt;
 
-use crate::entity::{
-    Entity, EntityBase,
-    ai::util::goal_utils,
-    living::LivingEntity,
-    mob::{Mob, MobEntity},
-};
-
-/// Represents a Squid, a passive aquatic mob that swims by pulsing its tentacles.
-///
-/// Wiki: <https://minecraft.wiki/w/Squid>
-pub struct SquidEntity {
-    pub mob_entity: MobEntity,
-    pub movement: SquidMovement,
-}
-
-impl SquidEntity {
-    pub fn new(entity: Entity) -> Arc<Self> {
-        let mob_entity = MobEntity::new(entity);
-        // Vanilla `AgeableWaterCreature`'s constructor.
-        mob_entity.set_pathfinding_malus(PathType::Water, 0.0);
-        Arc::new(Self {
-            mob_entity,
-            movement: SquidMovement::new(),
-        })
-    }
-}
+use crate::entity::ageable::{AgeableData, AgeableMob};
+use crate::entity::ai::goal::{Goal, to_goal_ticks};
+use crate::entity::ai::pathfinder::node::PathType;
+use crate::entity::ai::util::goal_utils;
+use crate::entity::breath::BreathManager;
+use crate::entity::mob::spawn::SpawnGroupData;
+use crate::entity::mob::{Mob, MobEntity, mob_hurt_server};
+use crate::entity::{Entity, EntityBase};
+use crate::world::World;
 
 /// Vanilla `Squid.BABY_DIMENSIONS`.
 const BABY_DIMENSIONS: EntityDimensions =
     EntityDimensions::scalable(0.5, 0.5).with_eye_height(0.37);
 
-impl Mob for SquidEntity {
-    /// Vanilla `Squid.getDefaultDimensions`.
-    fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
-        let entity = self.get_entity();
-        if entity.is_baby() {
-            BABY_DIMENSIONS
-        } else {
-            entity.get_dimensions(pose)
-        }
-    }
-
-    /// Vanilla `AgeableWaterCreature.handleAirSupply`.
-    fn handle_air_supply(&self, pre_tick_air: i32) {
-        BreathManager::water_animal_handle_air_supply(self, pre_tick_air);
-    }
-
-    fn get_mob_entity(&self) -> &MobEntity {
-        &self.mob_entity
-    }
-
-    fn mob_tick(&self, _caller: &dyn EntityBase) {
-        self.movement.tick(self);
-    }
-
-    fn on_damage(
-        &self,
-        _damage_type: pumpkin_data::damage::DamageType,
-        _source: Option<&dyn EntityBase>,
-    ) {
-        self.movement
-            .spawn_ink_if_hurt_by_mob(self, Particle::SquidInk, Sound::EntitySquidSquirt);
-    }
-
-    fn custom_travel(&self, caller: &dyn EntityBase) -> bool {
-        SquidMovement::travel(self, caller)
-    }
-
-    fn mob_is_pushed_by_fluids(&self) -> bool {
-        false
-    }
+pub struct SquidEntity {
+    pub mob_entity: MobEntity,
+    ageable_data: AgeableData,
+    /// A `GlowSquid`.
+    glow: bool,
+    /// `GlowSquid.DATA_DARK_TICKS_REMAINING`.
+    dark_ticks_remaining: AtomicI32,
+    movement: Arc<SquidMovement>,
 }
 
-/// How vanilla squid get about, which is nothing like other mobs: no navigation,
-/// just a heading picked now and then and a shove along it once per tentacle
-/// stroke.
-pub struct SquidMovement {
+/// The squid fields its goals share.
+struct SquidMovement {
     movement_vector: AtomicCell<Vector3<f64>>,
     tentacle_movement: AtomicCell<f32>,
     tentacle_speed: AtomicCell<f32>,
@@ -100,144 +51,123 @@ pub struct SquidMovement {
     y_body_rot_o: AtomicCell<f32>,
 }
 
-impl Default for SquidMovement {
-    fn default() -> Self {
-        Self::new()
+impl SquidMovement {
+    /// `hasMovementVector`.
+    fn has_movement_vector(&self) -> bool {
+        self.movement_vector.load().length_squared() > f64::from(1.0E-5f32)
     }
 }
 
-impl SquidMovement {
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
+/// Vanilla `Vec3.xRot`.
+fn x_rot(v: Vector3<f64>, radians: f32) -> Vector3<f64> {
+    let cos = f64::from(pumpkin_util::math::cos(radians));
+    let sin = f64::from(pumpkin_util::math::sin(radians));
+    Vector3::new(v.x, v.y * cos + v.z * sin, v.z * cos - v.y * sin)
+}
+
+/// Vanilla `Vec3.yRot`.
+fn y_rot(v: Vector3<f64>, radians: f32) -> Vector3<f64> {
+    let cos = f64::from(pumpkin_util::math::cos(radians));
+    let sin = f64::from(pumpkin_util::math::sin(radians));
+    Vector3::new(v.x * cos + v.z * sin, v.y, v.z * cos - v.x * sin)
+}
+
+fn random_tentacle_speed(rng: &mut impl RngExt) -> f32 {
+    1.0 / (rng.random::<f32>() + 1.0) * 0.2
+}
+
+impl SquidEntity {
+    pub fn new(entity: Entity, glow: bool) -> Arc<Self> {
+        let mob_entity = MobEntity::new(entity);
+        // Vanilla `AgeableWaterCreature`'s constructor.
+        mob_entity.set_pathfinding_malus(PathType::Water, 0.0);
+        let movement = Arc::new(SquidMovement {
             movement_vector: AtomicCell::new(Vector3::default()),
             tentacle_movement: AtomicCell::new(0.0),
             tentacle_speed: AtomicCell::new(random_tentacle_speed(&mut rand::rng())),
             x_body_rot: AtomicCell::new(0.0),
             x_body_rot_o: AtomicCell::new(0.0),
             y_body_rot_o: AtomicCell::new(0.0),
-        }
-    }
-
-    /// One tick of vanilla's `Squid.aiStep`, with its two goals folded in:
-    /// `SquidFleeGoal` steers away from whoever hurt the squid, and otherwise
-    /// `SquidRandomMovementGoal` picks a new heading about every 50 ticks.
-    pub fn tick(&self, mob: &dyn Mob) {
-        let living = &mob.get_mob_entity().living_entity;
-        let entity = &living.entity;
-        let in_water = entity.touching_water.load(Ordering::Relaxed);
-        let mut rng = mob.get_random();
-
-        self.x_body_rot_o.store(self.x_body_rot.load());
-        self.y_body_rot_o.store(entity.body_yaw.load());
-
-        let fleeing = in_water && self.flee(living);
-        if !fleeing
-            && (rng.random_range(0..50) == 0
-                || !in_water
-                || self.movement_vector.load() == Vector3::default())
-        {
-            let angle = rng.random::<f32>() * TAU;
-            self.movement_vector.store(Vector3::new(
-                f64::from(angle.cos() * 0.2),
-                f64::from(-0.1 + rng.random::<f32>() * 0.2),
-                f64::from(angle.sin() * 0.2),
-            ));
-        }
-
-        let mut tentacle = self.tentacle_movement.load() + self.tentacle_speed.load();
-        if tentacle > TAU {
-            tentacle -= TAU;
-            if rng.random_range(0..10) == 0 {
-                self.tentacle_speed.store(random_tentacle_speed(&mut rng));
-            }
-            // Keeps the client's stroke animation in step with the shoves.
-            entity
-                .world
-                .load()
-                .send_entity_status(entity, EntityStatus::SquidAnimSynch, None);
-        }
-        self.tentacle_movement.store(tentacle);
-
-        if in_water {
-            // Plain stores throughout: the tracker syncs motion, and set_velocity
-            // would send a packet every tick.
-            if tentacle < PI {
-                if tentacle / PI > 0.75 {
-                    entity.velocity.store(self.movement_vector.load());
-                }
-            } else {
-                entity.velocity.store(entity.velocity.load() * 0.9);
-            }
-            // The body swings round to face where the squid is going.
-            let velocity = entity.velocity.load();
-            let heading = -(velocity.x.atan2(velocity.z) as f32).to_degrees();
-            let body_yaw = entity.body_yaw.load();
-            let body_yaw = body_yaw + (heading - body_yaw) * 0.1;
-            entity.body_yaw.store(body_yaw);
-            entity.yaw.store(body_yaw);
-            let pitch = -(velocity.horizontal_length().atan2(velocity.y) as f32).to_degrees();
-            let x_body_rot = self.x_body_rot.load();
-            self.x_body_rot
-                .store(x_body_rot + (pitch - x_body_rot) * 0.1);
-        } else {
-            let fall = entity.velocity.load().y - living.get_attribute_value(&Attributes::GRAVITY);
-            entity.velocity.store(Vector3::new(0.0, fall * 0.98, 0.0));
-            let x_body_rot = self.x_body_rot.load();
-            self.x_body_rot
-                .store(x_body_rot + (-90.0 - x_body_rot) * 0.02);
-        }
-    }
-
-    /// The tail of vanilla's `Squid.hurtServer`: a squid that was hurt while it
-    /// still remembers a mob attacking it squirts ink.
-    pub fn spawn_ink_if_hurt_by_mob(&self, mob: &dyn Mob, ink_particle: Particle, squirt: Sound) {
-        let living = &mob.get_mob_entity().living_entity;
-        if has_last_hurt_by_mob(living) {
-            self.spawn_ink(mob, ink_particle, squirt);
-        }
-    }
-
-    /// Vanilla's `Squid.rotateVector`: turns a body-relative vector by last
-    /// tick's body pitch and yaw.
-    fn rotate_vector(&self, vec: Vector3<f64>) -> Vector3<f64> {
-        let (sin, cos) = self.x_body_rot_o.load().to_radians().sin_cos();
-        let (sin, cos) = (f64::from(sin), f64::from(cos));
-        let pitched = Vector3::new(vec.x, vec.y * cos + vec.z * sin, vec.z * cos - vec.y * sin);
-        let (sin, cos) = (-self.y_body_rot_o.load()).to_radians().sin_cos();
-        let (sin, cos) = (f64::from(sin), f64::from(cos));
-        Vector3::new(
-            pitched.x * cos + pitched.z * sin,
-            pitched.y,
-            pitched.z * cos - pitched.x * sin,
-        )
-    }
-
-    /// Vanilla's `Squid.spawnInk`.
-    fn spawn_ink(&self, mob: &dyn Mob, ink_particle: Particle, squirt: Sound) {
-        let entity = &mob.get_mob_entity().living_entity.entity;
-        let world = entity.world.load();
-        let mut rng = mob.get_random();
-        let entity_pos = entity.pos.load();
-
-        let pitch = (rng.random::<f32>() - rng.random::<f32>()) * 0.2 + 1.0;
-        world.play_sound_fine(
-            squirt,
-            SoundCategory::Neutral,
-            &entity_pos,
-            SQUID_SOUND_VOLUME,
-            pitch,
+        });
+        let squid = Arc::new(Self {
+            mob_entity,
+            ageable_data: AgeableData::default(),
+            glow,
+            dark_ticks_remaining: AtomicI32::new(0),
+            movement,
+        });
+        let mut goals = squid
+            .mob_entity
+            .goals_selector
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        goals.add_goal(
+            0,
+            Box::new(SquidRandomMovementGoal {
+                movement: squid.movement.clone(),
+            }),
         );
+        goals.add_goal(
+            1,
+            Box::new(SquidFleeGoal {
+                movement: squid.movement.clone(),
+                flee_ticks: 0,
+            }),
+        );
+        drop(goals);
+        squid
+    }
 
+    fn set_dark_ticks(&self, ticks: i32) {
+        self.dark_ticks_remaining.store(ticks, Relaxed);
+        self.get_entity()
+            .set_synced_data(tracked_data::glow_squid::DATA_DARK_TICKS_REMAINING, ticks);
+    }
+
+    /// `rotateVector`: turns a body-relative vector by last tick's body pitch and yaw.
+    fn rotate_vector(&self, vec: Vector3<f64>) -> Vector3<f64> {
+        let v = x_rot(vec, self.movement.x_body_rot_o.load() * (PI / 180.0));
+        y_rot(v, -self.movement.y_body_rot_o.load() * (PI / 180.0))
+    }
+
+    /// `spawnInk`.
+    fn spawn_ink(&self) {
+        let entity = self.get_entity();
+        let world = entity.world.load();
+        let entity_pos = entity.pos.load();
+        let is_baby = self.is_baby();
+        let mut rng = self.get_random();
+        // `makeSound` with `getVoicePitch`.
+        if !entity.silent.load(Relaxed) {
+            let pitch =
+                (rng.random::<f32>() - rng.random::<f32>()) * 0.2 + if is_baby { 1.5 } else { 1.0 };
+            let squirt = if self.glow {
+                Sound::EntityGlowSquidSquirt
+            } else {
+                Sound::EntitySquidSquirt
+            };
+            world.play_sound_fine(
+                squirt,
+                SoundCategory::Neutral,
+                &entity_pos,
+                self.sound_volume(),
+                pitch,
+            );
+        }
+        let ink = if self.glow {
+            Particle::GlowSquidInk
+        } else {
+            Particle::SquidInk
+        };
         let pos = self.rotate_vector(Vector3::new(0.0, -1.0, 0.0)) + entity_pos;
-        for _ in 0..INK_PARTICLE_COUNT {
+        for _ in 0..30 {
             let dir = self.rotate_vector(Vector3::new(
                 f64::from(rng.random::<f32>()) * 0.6 - 0.3,
                 -1.0,
                 f64::from(rng.random::<f32>()) * 0.6 - 0.3,
             ));
-            // Baby squid use 0.1 here; Pumpkin's squid has no baby state yet.
-            let dir_offset = dir * f64::from(INK_POS_OFFSET_SCALE + rng.random::<f32>() * 2.0);
+            let ink_pos_offset_scale = if is_baby { 0.1f32 } else { 0.3 };
+            let dir_offset = dir * f64::from(ink_pos_offset_scale + rng.random::<f32>() * 2.0);
             // A count of zero makes the client read the offset as a velocity.
             world.spawn_particle(
                 Vector3::new(pos.x, pos.y + 0.5, pos.z),
@@ -248,74 +178,293 @@ impl SquidMovement {
                 ),
                 0.1,
                 0,
-                ink_particle,
+                ink,
+            );
+        }
+    }
+}
+
+impl AgeableMob for SquidEntity {
+    fn get_ageable_data(&self) -> &AgeableData {
+        &self.ageable_data
+    }
+}
+
+impl Mob for SquidEntity {
+    fn get_mob_entity(&self) -> &MobEntity {
+        &self.mob_entity
+    }
+
+    fn as_ageable(&self) -> Option<&dyn AgeableMob> {
+        Some(self)
+    }
+
+    /// Vanilla `Squid.getDefaultDimensions`.
+    fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
+        let entity = self.get_entity();
+        if entity.is_baby() {
+            BABY_DIMENSIONS
+        } else {
+            entity.get_dimensions(pose)
+        }
+    }
+
+    /// Vanilla `Squid.getDefaultGravity`.
+    fn get_mob_gravity(&self) -> f64 {
+        0.08
+    }
+
+    /// Vanilla `AgeableWaterCreature.handleAirSupply`.
+    fn handle_air_supply(&self, pre_tick_air: i32) {
+        BreathManager::water_animal_handle_air_supply(self, pre_tick_air);
+    }
+
+    /// Vanilla `AgeableWaterCreature.getBaseExperienceReward`.
+    fn get_base_experience_reward(&self) -> u32 {
+        1 + self.get_random().random_range(0..3)
+    }
+
+    fn mob_is_pushed_by_fluids(&self) -> bool {
+        false
+    }
+
+    /// Vanilla `Squid.finalizeSpawn`: an `AgeableMobGroupData(0.05F)` group.
+    fn finalize_spawn(
+        &self,
+        _world: &Arc<World>,
+        group_data: Option<SpawnGroupData>,
+    ) -> Option<SpawnGroupData> {
+        let group_data =
+            self.finalize_ageable_spawn(group_data.or(Some(SpawnGroupData::ageable(0.05))));
+        self.mob_entity.finalize_spawn_base();
+        Some(group_data)
+    }
+
+    fn mob_write_nbt(&self, nbt: &mut NbtCompound) {
+        self.write_ageable_nbt(nbt);
+        if self.glow {
+            nbt.put_int(
+                "DarkTicksRemaining",
+                self.dark_ticks_remaining.load(Relaxed),
             );
         }
     }
 
-    /// Vanilla's `Squid.travel`: a squid only ever moves by the velocity `tick`
-    /// gave it.
-    pub fn travel(mob: &dyn Mob, caller: &dyn EntityBase) -> bool {
-        mob.get_mob_entity().living_entity.make_move(caller);
+    fn mob_read_nbt(&self, nbt: &NbtCompound) {
+        self.read_ageable_nbt(nbt);
+        if self.glow {
+            self.set_dark_ticks(nbt.get_int("DarkTicksRemaining").unwrap_or(0));
+        }
+    }
+
+    /// `LivingEntity.baseTick` keeps last tick's body yaw.
+    fn mob_tick(&self, _caller: &dyn EntityBase) {
+        self.movement
+            .y_body_rot_o
+            .store(self.get_entity().body_yaw.load());
+    }
+
+    /// Vanilla `Squid.hurtServer`: squirts ink when a mob hurt it; a glow squid then goes
+    /// dark for 100 ticks.
+    fn hurt_server(
+        &self,
+        caller: &dyn EntityBase,
+        amount: f32,
+        damage_type: DamageType,
+        position: Option<Vector3<f64>>,
+        source: Option<&dyn EntityBase>,
+        cause: Option<&dyn EntityBase>,
+    ) -> bool {
+        let hurt = mob_hurt_server(self, caller, amount, damage_type, position, source, cause)
+            && self
+                .mob_entity
+                .living_entity
+                .get_last_hurt_by_mob()
+                .is_some();
+        if hurt {
+            self.spawn_ink();
+        }
+        if self.glow && hurt {
+            self.set_dark_ticks(100);
+        }
+        hurt
+    }
+
+    /// Vanilla `Squid.travel`: a squid only moves by the velocity `aiStep` gave it.
+    fn custom_travel(&self, caller: &dyn EntityBase) -> bool {
+        self.mob_entity.living_entity.make_move(caller);
         true
     }
 
-    /// `SquidFleeGoal`: while whoever last hurt the squid is within ten blocks,
-    /// head straight away from them. Returns whether the squid is fleeing.
-    fn flee(&self, living: &LivingEntity) -> bool {
+    /// Vanilla `Squid.aiStep` after `super.aiStep()`, which ends with `AgeableMob.aiStep`.
+    fn ai_step_end(&self, _caller: &dyn EntityBase) {
+        let living = &self.mob_entity.living_entity;
         let entity = &living.entity;
-        if !has_last_hurt_by_mob(living) {
-            return false;
+        if entity.is_alive() {
+            self.ageable_ai_step();
         }
-        let attacker_id = living.last_attacker_id.load(Ordering::Relaxed);
-        let world = entity.world.load();
-        let Some(attacker) = world.get_entity_by_id(attacker_id) else {
-            return false;
-        };
-        let pos = entity.pos.load();
-        let mut away = pos - attacker.get_entity().pos.load();
-        if away.length_squared() >= 100.0 {
-            return false;
+        let movement = &self.movement;
+        movement.x_body_rot_o.store(movement.x_body_rot.load());
+        let mut tentacle_movement =
+            movement.tentacle_movement.load() + movement.tentacle_speed.load();
+        if tentacle_movement > TAU {
+            tentacle_movement -= TAU;
+            {
+                let mut rng = self.get_random();
+                if rng.random_range(0..10) == 0 {
+                    movement
+                        .tentacle_speed
+                        .store(random_tentacle_speed(&mut rng));
+                }
+            }
+            entity
+                .world
+                .load()
+                .send_entity_status(entity, EntityStatus::SquidAnimSynch, None);
+        }
+        movement.tentacle_movement.store(tentacle_movement);
+
+        if entity.touching_water.load(Relaxed) {
+            if tentacle_movement < PI {
+                if tentacle_movement / PI > 0.75 {
+                    entity.velocity.store(movement.movement_vector.load());
+                }
+            } else {
+                entity.velocity.store(entity.velocity.load() * 0.9);
+            }
+            let velocity = entity.velocity.load();
+            let horizontal_movement = velocity.horizontal_length();
+            let y_body_rot = entity.body_yaw.load();
+            let y_body_rot = y_body_rot
+                + (-(velocity.x.atan2(velocity.z) as f32) * (180.0 / PI) - y_body_rot) * 0.1;
+            entity.body_yaw.store(y_body_rot);
+            entity.yaw.store(y_body_rot);
+            let x_body_rot = movement.x_body_rot.load();
+            movement.x_body_rot.store(
+                x_body_rot
+                    + (-(horizontal_movement.atan2(velocity.y) as f32) * (180.0 / PI) - x_body_rot)
+                        * 0.1,
+            );
+        } else {
+            let mut yd = entity.velocity.load().y;
+            if let Some(levitation) = living.get_effect(&StatusEffect::LEVITATION) {
+                yd = 0.05 * f64::from(i32::from(levitation.amplifier) + 1);
+            } else if !entity.has_no_gravity.load(Relaxed) {
+                // `getGravity`.
+                yd -= self.get_mob_gravity();
+            }
+            let air_drag = living.get_air_drag(self);
+            entity
+                .velocity
+                .store(Vector3::new(0.0, yd * f64::from(air_drag), 0.0));
+            let x_body_rot = movement.x_body_rot.load();
+            movement
+                .x_body_rot
+                .store(x_body_rot + (-90.0 - x_body_rot) * 0.02);
         }
 
-        let probe = BlockPos::floored(pos.x + away.x, pos.y + away.y, pos.z + away.z);
-        let open_air = world.get_block_state(&probe).is_air();
-        if goal_utils::is_water(&world, &probe) || open_air {
-            let length = away.length();
-            if length > 0.0 {
-                // Vanilla normalizes a copy of the offset here and discards it,
-                // so the scale applies to the raw offset.
-                let mut scale = 3.0;
-                if length > 5.0 {
-                    scale -= (length - 5.0) / 5.0;
-                }
-                if scale > 0.0 {
-                    away = away * scale;
-                }
+        if self.glow {
+            // `GlowSquid.aiStep`.
+            let dark_ticks = self.dark_ticks_remaining.load(Relaxed);
+            if dark_ticks > 0 {
+                self.set_dark_ticks(dark_ticks - 1);
             }
-            if open_air {
-                away.y = 0.0;
+            // The glow particle is the client's, but the server draws its random numbers.
+            let mut rng = self.get_random();
+            for _ in 0..3 {
+                rng.random::<f64>();
             }
-            self.movement_vector.store(away / 20.0);
         }
-        true
     }
 }
 
-/// Vanilla `Squid.getSoundVolume`.
-const SQUID_SOUND_VOLUME: f32 = 0.4;
-const INK_PARTICLE_COUNT: usize = 30;
-const INK_POS_OFFSET_SCALE: f32 = 0.3;
-
-/// Whether vanilla's `getLastHurtByMob` would still return someone.
-fn has_last_hurt_by_mob(living: &LivingEntity) -> bool {
-    let entity = &living.entity;
-    // Vanilla forgets an attacker a hundred ticks after the hit.
-    let since_hit = entity.tick_count.load(Ordering::Relaxed)
-        - living.last_attacked_time.load(Ordering::Relaxed);
-    living.last_attacker_id.load(Ordering::Relaxed) != 0 && since_hit <= 100
+/// Vanilla `SquidRandomMovementGoal`.
+struct SquidRandomMovementGoal {
+    movement: Arc<SquidMovement>,
 }
 
-fn random_tentacle_speed(rng: &mut impl RngExt) -> f32 {
-    1.0 / (rng.random::<f32>() + 1.0) * 0.2
+impl Goal for SquidRandomMovementGoal {
+    fn can_start(&mut self, _mob: &dyn Mob) -> bool {
+        true
+    }
+
+    fn tick(&mut self, mob: &dyn Mob) {
+        let living = &mob.get_mob_entity().living_entity;
+        if living.no_action_time.load(Relaxed) > 100 {
+            self.movement.movement_vector.store(Vector3::default());
+            return;
+        }
+        let mut rng = mob.get_random();
+        if rng.random_range(0..to_goal_ticks(50)) == 0
+            || !living.entity.touching_water.load(Relaxed)
+            || !self.movement.has_movement_vector()
+        {
+            let angle = rng.random::<f32>() * TAU;
+            self.movement.movement_vector.store(Vector3::new(
+                f64::from(pumpkin_util::math::cos(angle) * 0.2),
+                f64::from(-0.1 + rng.random::<f32>() * 0.2),
+                f64::from(pumpkin_util::math::sin(angle) * 0.2),
+            ));
+        }
+    }
+}
+
+/// Vanilla `SquidFleeGoal`.
+struct SquidFleeGoal {
+    movement: Arc<SquidMovement>,
+    flee_ticks: i32,
+}
+
+impl Goal for SquidFleeGoal {
+    fn can_start(&mut self, mob: &dyn Mob) -> bool {
+        let living = &mob.get_mob_entity().living_entity;
+        living.entity.touching_water.load(Relaxed)
+            && living.get_last_hurt_by_mob().is_some_and(|attacker| {
+                living
+                    .entity
+                    .pos
+                    .load()
+                    .squared_distance_to_vec(&attacker.get_entity().pos.load())
+                    < 100.0
+            })
+    }
+
+    fn start(&mut self, _mob: &dyn Mob) {
+        self.flee_ticks = 0;
+    }
+
+    fn should_run_every_tick(&self) -> bool {
+        true
+    }
+
+    fn tick(&mut self, mob: &dyn Mob) {
+        self.flee_ticks += 1;
+        let living = &mob.get_mob_entity().living_entity;
+        let Some(attacker) = living.get_last_hurt_by_mob() else {
+            return;
+        };
+        let pos = living.entity.pos.load();
+        let mut flee_to = pos - attacker.get_entity().pos.load();
+        let world = living.entity.world.load();
+        let probe = BlockPos::floored(pos.x + flee_to.x, pos.y + flee_to.y, pos.z + flee_to.z);
+        let is_air = world.get_block_state(&probe).is_air();
+        if goal_utils::is_water(&world, &probe) || is_air {
+            let length = flee_to.length();
+            if length > 0.0 {
+                // Vanilla normalizes a copy here and drops it, so the raw offset is scaled.
+                let mut avoid_speed = 3.0;
+                if length > 5.0 {
+                    avoid_speed -= (length - 5.0) / 5.0;
+                }
+                if avoid_speed > 0.0 {
+                    flee_to = flee_to * avoid_speed;
+                }
+            }
+            if is_air {
+                flee_to.y = 0.0;
+            }
+            self.movement.movement_vector.store(flee_to / 20.0);
+        }
+        // The bubble every 10 ticks is a client particle.
+    }
 }

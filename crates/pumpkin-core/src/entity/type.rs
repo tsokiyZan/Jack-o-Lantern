@@ -73,7 +73,6 @@ use crate::entity::passive::dolphin::DolphinEntity;
 use crate::entity::passive::donkey::DonkeyEntity;
 use crate::entity::passive::fox::FoxEntity;
 use crate::entity::passive::frog::FrogEntity;
-use crate::entity::passive::glow_squid::GlowSquidEntity;
 use crate::entity::passive::goat::GoatEntity;
 use crate::entity::passive::happy_ghast::HappyGhastEntity;
 use crate::entity::passive::horse::HorseEntity;
@@ -192,7 +191,7 @@ pub fn from_type(
         id if id == EntityType::RABBIT.id => RabbitEntity::new(entity),
         id if id == EntityType::TURTLE.id => TurtleEntity::new(entity),
         id if id == EntityType::VILLAGER.id => VillagerEntity::new(entity),
-        id if id == EntityType::SQUID.id => SquidEntity::new(entity),
+        id if id == EntityType::SQUID.id => SquidEntity::new(entity, false),
         id if id == EntityType::HORSE.id => HorseEntity::new(entity),
         id if id == EntityType::DONKEY.id => DonkeyEntity::new(entity),
         id if id == EntityType::MULE.id => MuleEntity::new(entity),
@@ -217,7 +216,7 @@ pub fn from_type(
         id if id == EntityType::POLAR_BEAR.id => PolarBearEntity::new(entity),
         id if id == EntityType::SNIFFER.id => SnifferEntity::new(entity),
         id if id == EntityType::STRIDER.id => StriderEntity::new(entity),
-        id if id == EntityType::GLOW_SQUID.id => GlowSquidEntity::new(entity),
+        id if id == EntityType::GLOW_SQUID.id => SquidEntity::new(entity, true),
         id if id == EntityType::COD.id => CodEntity::new(entity),
         id if id == EntityType::SALMON.id => SalmonEntity::new(entity),
         id if id == EntityType::PUFFERFISH.id => PufferfishEntity::new(entity),

@@ -1564,6 +1564,7 @@ impl LivingEntity {
         // Vanilla `Mob.aiStep` burns undead right after `super.aiStep()`.
         if let Some(mob) = caller.get_mob() {
             super::mob::sun_burn::tick(mob);
+            mob.ai_step_end(caller);
         }
     }
 
@@ -3669,6 +3670,15 @@ impl LivingEntity {
 
     pub fn damage(&self, caller: &dyn EntityBase, amount: f32, damage_type: DamageType) -> bool {
         self.damage_with_context(caller, amount, damage_type, None, None, None)
+    }
+
+    /// Vanilla `LivingEntity.getLastHurtByMob`, which is gone once its entity is.
+    pub fn get_last_hurt_by_mob(&self) -> Option<Arc<dyn EntityBase>> {
+        let id = self.last_attacker_id.load(Relaxed);
+        if id == 0 {
+            return None;
+        }
+        self.entity.world.load().get_entity_by_id(id)
     }
 
     /// Vanilla `LivingEntity.setLastHurtByMob`, kept in `last_attacker_id` (0 for none).
