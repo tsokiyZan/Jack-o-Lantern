@@ -9,11 +9,10 @@ use crate::entity::decoration::painting::PaintingEntity;
 use crate::entity::player::Player;
 use crate::item::{ItemBehaviour, ItemMetadata};
 use crate::server::Server;
-use pumpkin_data::data_component_impl::PaintingVariantImpl;
+use pumpkin_data::data_component_impl::{Holder, PaintingVariantImpl};
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
-use pumpkin_data::painting_variant::PaintingVariant;
 use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_data::{Block, BlockDirection};
 use pumpkin_util::math::position::BlockPos;
@@ -57,7 +56,8 @@ impl ItemBehaviour for HangingEntityItem {
             }
 
             let variant = if let Some(comp) = item.get_data_component::<PaintingVariantImpl>() {
-                if let Some(v) = PaintingVariant::from_name(&comp.value) {
+                // TODO: place inline (non-registry) paintings, which vanilla also accepts.
+                if let Holder::Reference(v) = comp.variant {
                     if !PaintingEntity::painting_fits(&world, location, face, v) {
                         return BlockActionResult::Fail;
                     }

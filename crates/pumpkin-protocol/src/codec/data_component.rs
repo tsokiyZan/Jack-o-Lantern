@@ -12,6 +12,7 @@ use pumpkin_data::decorated_pot_pattern::DecoratedPotPattern;
 use pumpkin_data::dye_color::DyeColor;
 use pumpkin_data::instrument::Instrument;
 use pumpkin_data::jukebox_song::JukeboxSong;
+use pumpkin_data::painting_variant::PaintingVariant;
 use pumpkin_data::trim_material::TrimMaterial;
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::text::TextComponent;
@@ -1500,16 +1501,97 @@ impl DataComponentCodec<Self> for BundleContentsImpl {
     }
 }
 
+fn serialize_variant(
+    codec: VariantCodec,
+    value: &str,
+    seq: &mut impl NetworkWriteExt,
+) -> Result<(), WritingError> {
+    let name = value.strip_prefix("minecraft:").unwrap_or(value);
+    let unknown = || WritingError::Message(format!("Unknown variant {value}"));
+    let id = match codec {
+        VariantCodec::SyncedRegistry(registry) => {
+            synced_registry_id(registry, name).ok_or_else(unknown)? as i32
+        }
+        VariantCodec::BuiltinRegistry(names) | VariantCodec::Continuous(names, _) => names
+            .iter()
+            .position(|entry| *entry == name)
+            .ok_or_else(unknown)?
+            as i32,
+        VariantCodec::Sparse(entries, _) => {
+            entries
+                .iter()
+                .find(|(_, entry)| *entry == name)
+                .ok_or_else(unknown)?
+                .0
+        }
+        VariantCodec::DyeColor => i32::from(DyeColor::by_name(name).ok_or_else(unknown)?.id()),
+    };
+    seq.write_var_int(&VarInt(id))
+}
+
+fn deserialize_variant(
+    codec: VariantCodec,
+    seq: &mut impl NetworkReadExt,
+) -> Result<Cow<'static, str>, ReadingError> {
+    let id = seq.get_var_int()?.0;
+    let unknown = || ReadingError::Message(format!("Unknown variant id {id}"));
+    Ok(match codec {
+        VariantCodec::SyncedRegistry(registry) => {
+            let name = u32::try_from(id)
+                .ok()
+                .and_then(|id| synced_registry_entry(registry, id))
+                .ok_or_else(unknown)?;
+            Cow::Owned(format!("minecraft:{name}"))
+        }
+        VariantCodec::BuiltinRegistry(names) => {
+            let name = usize::try_from(id)
+                .ok()
+                .and_then(|id| names.get(id))
+                .ok_or_else(unknown)?;
+            Cow::Owned(format!("minecraft:{name}"))
+        }
+        // `ByIdMap.continuous`
+        VariantCodec::Continuous(names, strategy) => {
+            let len = names.len() as i32;
+            let index = match strategy {
+                OutOfBoundsStrategy::Zero => {
+                    if (0..len).contains(&id) {
+                        id
+                    } else {
+                        0
+                    }
+                }
+                OutOfBoundsStrategy::Wrap => id.rem_euclid(len),
+                OutOfBoundsStrategy::Clamp => id.clamp(0, len - 1),
+            };
+            Cow::Borrowed(names[index as usize])
+        }
+        // `ByIdMap.sparse`
+        VariantCodec::Sparse(entries, default) => Cow::Borrowed(
+            entries
+                .iter()
+                .find(|(entry_id, _)| *entry_id == id)
+                .map_or(default, |(_, name)| *name),
+        ),
+        VariantCodec::DyeColor => Cow::Borrowed(
+            u8::try_from(id)
+                .ok()
+                .and_then(DyeColor::by_id)
+                .unwrap_or(DyeColor::White)
+                .name(),
+        ),
+    })
+}
+
 macro_rules! codec_string_variant {
     ($struct_name:ident) => {
         impl DataComponentCodec<Self> for $struct_name {
             fn serialize(&self, seq: &mut impl NetworkWriteExt) -> Result<(), WritingError> {
-                seq.write_string(&self.value)
+                serialize_variant(Self::CODEC, &self.value, seq)
             }
             fn deserialize(seq: &mut impl NetworkReadExt) -> Result<Self, ReadingError> {
-                let value = seq.get_str()?;
                 Ok(Self {
-                    value: Cow::Owned(value.into()),
+                    value: deserialize_variant(Self::CODEC, seq)?,
                 })
             }
         }
@@ -1537,7 +1619,6 @@ codec_string_variant!(ChickenSoundVariantImpl);
 codec_string_variant!(ZombieNautilusVariantImpl);
 codec_string_variant!(FrogVariantImpl);
 codec_string_variant!(HorseVariantImpl);
-codec_string_variant!(PaintingVariantImpl);
 codec_string_variant!(LlamaVariantImpl);
 codec_string_variant!(AxolotlVariantImpl);
 codec_string_variant!(CatVariantImpl);
@@ -1545,6 +1626,43 @@ codec_string_variant!(CatSoundVariantImpl);
 codec_string_variant!(CatCollarImpl);
 codec_string_variant!(SheepColorImpl);
 codec_string_variant!(ShulkerColorImpl);
+
+impl DataComponentCodec<Self> for PaintingVariantImpl {
+    fn serialize(&self, seq: &mut impl NetworkWriteExt) -> Result<(), WritingError> {
+        match &self.variant {
+            Holder::Reference(variant) => write_holder_reference(seq, variant.id()),
+            Holder::Direct(definition) => {
+                seq.write_var_int(&VarInt(0))?;
+                seq.write_var_int(&VarInt(definition.width))?;
+                seq.write_var_int(&VarInt(definition.height))?;
+                seq.write_string(&definition.asset_id)?;
+                seq.write_option(&definition.title, write_text)?;
+                seq.write_option(&definition.author, write_text)
+            }
+        }
+    }
+
+    fn deserialize(seq: &mut impl NetworkReadExt) -> Result<Self, ReadingError> {
+        let variant = match read_holder_id(seq, "painting variant")? {
+            Some(id) => Holder::Reference(
+                PaintingVariant::all()
+                    .get(id as usize)
+                    .copied()
+                    .ok_or_else(|| {
+                        ReadingError::Message(format!("Unknown painting variant id {id}"))
+                    })?,
+            ),
+            None => Holder::Direct(Box::new(PaintingVariantDefinition {
+                width: seq.get_var_int()?.0,
+                height: seq.get_var_int()?.0,
+                asset_id: seq.get_str()?.into(),
+                title: seq.get_option(read_text)?,
+                author: seq.get_option(read_text)?,
+            })),
+        };
+        Ok(Self { variant })
+    }
+}
 
 impl DataComponentCodec<Self> for MaxDamageImpl {
     fn serialize(&self, seq: &mut impl NetworkWriteExt) -> Result<(), WritingError> {
@@ -3707,5 +3825,56 @@ mod tests {
         assert!(encode(&CreativeSlotLockImpl).is_empty());
         assert!(encode(&WaxedImpl).is_empty());
         decode::<WaxedImpl>(&[]);
+    }
+
+    #[test]
+    fn variants_use_vanilla_id_maps() {
+        // `ByIdMap.sparse`: evil rabbits are 99, unknown ids fall back to brown.
+        assert_wire(
+            &RabbitVariantImpl {
+                value: Cow::Borrowed("evil"),
+            },
+            &[0x63],
+        );
+        assert_eq!(decode::<RabbitVariantImpl>(&[0x07]).value, "brown");
+        // Tropical fish patterns use `base | index << 8`.
+        assert_wire(
+            &TropicalFishPatternImpl {
+                value: Cow::Borrowed("betty"),
+            },
+            &[0x81, 0x08],
+        );
+        // `ByIdMap.continuous` with `WRAP`.
+        assert_eq!(decode::<HorseVariantImpl>(&[0x08]).value, "creamy");
+        // Synced registries send the entry's position: alban is the first painting.
+        assert_wire(
+            &PaintingVariantImpl {
+                variant: Holder::Reference(PaintingVariant::Alban),
+            },
+            &[0x01],
+        );
+        assert_eq!(
+            encode(&WolfVariantImpl {
+                value: Cow::Borrowed("minecraft:ashen"),
+            }),
+            [0x00]
+        );
+    }
+
+    #[test]
+    fn painting_variant_inline_value() {
+        let mut bytes = vec![0x00, 0x02, 0x01, 0x10];
+        bytes.extend_from_slice(b"minecraft:sunset");
+        bytes.extend_from_slice(&[0x01, 0x08, 0x00, 0x06]);
+        bytes.extend_from_slice(b"Sunset");
+        bytes.push(0x00);
+        let decoded = decode::<PaintingVariantImpl>(&bytes);
+        let Holder::Direct(painting) = &decoded.variant else {
+            panic!("expected an inline painting");
+        };
+        assert_eq!((painting.width, painting.height), (2, 1));
+        assert_eq!(painting.asset_id, "minecraft:sunset");
+        assert!(painting.author.is_none());
+        assert_eq!(encode(&decoded), bytes);
     }
 }

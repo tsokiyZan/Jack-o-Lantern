@@ -1517,6 +1517,24 @@ mod tests {
     }
 
     #[test]
+    fn hash_enum_variants_by_name() {
+        assert_eq!(
+            FoxVariantImpl {
+                value: Cow::Borrowed("snow")
+            }
+            .get_hash(),
+            -1_511_535_024
+        );
+        assert_eq!(
+            RabbitVariantImpl {
+                value: Cow::Borrowed("evil")
+            }
+            .get_hash(),
+            1_619_861_300
+        );
+    }
+
+    #[test]
     fn hash_fireworks() {
         assert_eq!(
             FireworksImpl {
