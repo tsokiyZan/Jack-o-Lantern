@@ -1440,7 +1440,11 @@ impl LivingEntity {
         self.apply_input();
         // Vanilla `isImmobile`, then `serverAiStep` for mobs with AI. It runs here, after
         // `baseTick` updated the fluid state, so goals see this tick's water height.
-        if self.health.load() <= 0.0 {
+        if self.health.load() <= 0.0
+            || caller
+                .get_mob()
+                .is_some_and(super::mob::Mob::mob_is_immobile)
+        {
             self.jumping.store(false, SeqCst);
             let input = self.movement_input.load();
             self.movement_input.store(Vector3::new(0.0, input.y, 0.0));
@@ -3368,9 +3372,12 @@ impl LivingEntity {
         }
 
         // Check for shield blocking before armor/magic/cooldown
+        // Vanilla `DamageSource.getSourcePosition`: the given position, else the direct
+        // entity's.
         if self.is_blocking()
             && !damage_type.has_tag(&tag::DamageType::MINECRAFT_BYPASSES_SHIELD)
-            && let Some(pos) = position
+            && let Some(pos) =
+                position.or_else(|| source.map(|source| source.get_entity().pos.load()))
         {
             let player_pos = self.entity.pos.load();
             let look_vec = Vector3::rotation_vector(0.0, self.entity.yaw.load() as f64);
@@ -3433,6 +3440,13 @@ impl LivingEntity {
                             self.clear_active_hand();
                         }
                     }
+                }
+
+                // Vanilla `blockUsingItem`: a mob whose melee hit was blocked reacts to it.
+                if !damage_type.has_tag(&tag::DamageType::MINECRAFT_IS_PROJECTILE)
+                    && let Some(attacker) = source.and_then(EntityBase::get_mob)
+                {
+                    attacker.blocked_by_item(caller, damage_type, amount, true);
                 }
 
                 return false;

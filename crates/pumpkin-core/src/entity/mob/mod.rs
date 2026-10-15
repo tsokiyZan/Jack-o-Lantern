@@ -103,6 +103,8 @@ pub struct MobEntity {
     pub navigator: std::sync::Mutex<Navigator>,
     pub target: std::sync::Mutex<Option<Arc<dyn EntityBase>>>,
     pub look_control: std::sync::Mutex<LookControl>,
+    /// How much a vanilla `getAttackBoundingBox` override shrinks the attack box sideways.
+    pub attack_box_deflate: f64,
     pub sensing: std::sync::Mutex<Sensing>,
     pub move_control: std::sync::Mutex<Box<dyn MoveControlTrait>>,
     pub jump_control: std::sync::Mutex<Box<dyn JumpControlTrait>>,
@@ -270,6 +272,7 @@ impl MobEntity {
             navigator: std::sync::Mutex::new(Navigator::default()),
             target: std::sync::Mutex::new(None),
             look_control: std::sync::Mutex::new(LookControl::default()),
+            attack_box_deflate: 0.0,
             sensing: std::sync::Mutex::new(Sensing::default()),
             move_control: std::sync::Mutex::new(Box::new(MoveControl::default())),
             jump_control: std::sync::Mutex::new(Box::new(JumpControl::default())),
@@ -987,7 +990,11 @@ impl MobEntity {
             },
         );
 
-        base_box.expand(attack_range, 0.0, attack_range)
+        base_box.expand(attack_range, 0.0, attack_range).expand(
+            -self.attack_box_deflate,
+            0.0,
+            -self.attack_box_deflate,
+        )
     }
 
     /// Brightness at the mob's eye (sky and block light) reaches daylight.
@@ -1775,6 +1782,23 @@ pub trait Mob: EntityBase + Send + Sync {
     /// `NoAI` mob's anger stands still, instead of the shared call every tick.
     fn updates_anger_in_ai_step(&self) -> bool {
         false
+    }
+
+    /// Extra conditions for vanilla `isImmobile` on top of dying: an immobile mob skips its
+    /// AI step and loses its movement input.
+    fn mob_is_immobile(&self) -> bool {
+        false
+    }
+
+    /// Vanilla `blockedByItem`: `defender` blocked this mob's attack with an item. Pumpkin
+    /// only blocks fully, where vanilla's default does nothing.
+    fn blocked_by_item(
+        &self,
+        _defender: &dyn EntityBase,
+        _damage_type: DamageType,
+        _damage: f32,
+        _fully_blocked: bool,
+    ) {
     }
 
     /// Vanilla `isPushable`, which some mobs turn off.
