@@ -20,7 +20,8 @@ fn is_sun_burn_tick(entity: &Entity) -> bool {
     let world = entity.world.load();
     let eye = entity.get_eye_pos().to_block_pos();
 
-    if !world.monsters_burn(&eye) {
+    // The environment attribute is read at the mob's position, the light at its eyes.
+    if !world.monsters_burn(&entity.block_pos.load()) {
         return false;
     }
     // One sky light read serves the brightness and the open-sky check.
