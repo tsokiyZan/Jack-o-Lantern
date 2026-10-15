@@ -1,10 +1,14 @@
 use super::{Entity, EntityBase, living::LivingEntity};
 use crate::server::Server;
 use crate::world::World;
+use crate::world::explosion::{
+    DefaultExplosionDamageCalculator, Explosion, ExplosionDamageCalculator,
+};
 use core::f32;
 use crossbeam::atomic::AtomicCell;
-use pumpkin_data::Block;
 use pumpkin_data::entity::EntityType;
+use pumpkin_data::fluid::FluidState;
+use pumpkin_data::{Block, BlockState};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::codec::var_int::VarInt;
 use pumpkin_util::math::position::BlockPos;
@@ -23,6 +27,41 @@ use uuid::Uuid;
 
 /// Vanilla `Entity.getAirDrag`, applied every tick.
 const AIR_DRAG: f32 = 0.98;
+
+/// Vanilla `PrimedTnt.USED_PORTAL_DAMAGE_CALCULATOR`: the explosion of something that came
+/// through a portal leaves nether portals alone.
+pub struct UsedPortalExplosionDamageCalculator;
+
+impl ExplosionDamageCalculator for UsedPortalExplosionDamageCalculator {
+    fn get_block_explosion_resistance(
+        &self,
+        explosion: &Explosion,
+        world: &World,
+        pos: &BlockPos,
+        block: &Block,
+        state: &BlockState,
+        fluid: &FluidState,
+    ) -> Option<f32> {
+        if block == &Block::NETHER_PORTAL {
+            return None;
+        }
+        DefaultExplosionDamageCalculator
+            .get_block_explosion_resistance(explosion, world, pos, block, state, fluid)
+    }
+
+    fn should_block_explode(
+        &self,
+        explosion: &Explosion,
+        world: &World,
+        pos: &BlockPos,
+        block: &Block,
+        power: f32,
+    ) -> bool {
+        block != &Block::NETHER_PORTAL
+            && DefaultExplosionDamageCalculator
+                .should_block_explode(explosion, world, pos, block, power)
+    }
+}
 
 // TODO: `block_state` NBT tag and `usedPortal` damage calculator.
 pub struct TNTEntity {

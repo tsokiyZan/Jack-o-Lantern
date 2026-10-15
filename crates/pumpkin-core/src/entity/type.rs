@@ -252,6 +252,7 @@ pub fn from_type(
         id if id == EntityType::EGG.id => Arc::new(EggEntity::new(entity)),
         id if id == EntityType::SILVERFISH.id => SilverfishEntity::new(entity),
         id if id == EntityType::SLIME.id => CubeMobEntity::new(entity, CubeKind::Slime),
+        id if id == EntityType::SULFUR_CUBE.id => CubeMobEntity::new(entity, CubeKind::SulfurCube),
         id if id == EntityType::SHULKER.id => ShulkerEntity::new(entity),
         id if id == EntityType::SHULKER_BULLET.id => {
             // Shulker bullets are normally spawned by ShulkerEntity directly;

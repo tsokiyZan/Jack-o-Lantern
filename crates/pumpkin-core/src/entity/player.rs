@@ -1567,7 +1567,13 @@ impl Player {
             // `Entity::knockback` halves the current velocity, so calling it with 0.0
             // would still slow the victim down.
             if config.knockback && knockback_strength > 0.0 {
-                combat::handle_knockback(attacker_entity, victim.as_ref(), knockback_strength);
+                combat::handle_knockback(
+                    attacker_entity,
+                    victim.as_ref(),
+                    knockback_strength,
+                    damage as f32,
+                    true,
+                );
             }
         }
 
