@@ -2581,7 +2581,7 @@ impl LivingEntity {
             let Ok(mut effects) = self.active_effects.try_lock() else {
                 return;
             };
-            let entity_age = self.entity.age.load(Relaxed);
+            let tick_count = self.entity.tick_count.load(Relaxed);
             for effect in effects.values_mut() {
                 if effect.duration == 0 {
                     effects_to_remove.push(effect.effect_type);
@@ -2589,7 +2589,7 @@ impl LivingEntity {
                 }
 
                 let tick_duration = if effect.duration == -1 {
-                    entity_age
+                    tick_count
                 } else {
                     effect.duration
                 };

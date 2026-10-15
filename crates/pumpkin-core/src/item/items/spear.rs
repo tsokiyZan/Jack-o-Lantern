@@ -222,7 +222,7 @@ impl SpearItem {
             .last_attacking_id
             .store(target_entity.entity_id, Ordering::Relaxed);
         player.living_entity.last_attack_time.store(
-            player.get_entity().age.load(Ordering::Relaxed),
+            player.get_entity().tick_count.load(Ordering::Relaxed),
             Ordering::Relaxed,
         );
         if was_hurt {
@@ -260,7 +260,7 @@ impl SpearItem {
         let base_damage = player
             .living_entity
             .get_attribute_base(&Attributes::ATTACK_DAMAGE) as f32;
-        let now = player.get_entity().age.load(Ordering::Relaxed);
+        let now = player.get_entity().tick_count.load(Ordering::Relaxed);
         let mut affected = false;
 
         for target in Self::targets_in_range(player, &server, stack) {
@@ -378,7 +378,7 @@ impl SpearItem {
         let attacker_speed = look.dot(&Self::known_speed(entity));
         let action_factor = f64::from(MOB_ACTION_FACTOR);
         let base_damage = living.get_attribute_base(&Attributes::ATTACK_DAMAGE) as f32;
-        let now = entity.age.load(Ordering::Relaxed);
+        let now = entity.tick_count.load(Ordering::Relaxed);
         let mut affected = false;
 
         for target in Self::mob_targets_in_range(mob, stack) {

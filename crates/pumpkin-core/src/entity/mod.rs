@@ -1117,7 +1117,8 @@ pub struct Entity {
     pub delayed_leash: std::sync::Mutex<Option<DelayedLeash>>,
     /// Cooldown before entity can mount again after dismounting
     pub riding_cooldown: AtomicI32,
-    /// The age of the entity in ticks. Negative values indicate a baby.
+    /// Vanilla `AgeableMob.age`: negative while a baby, counting up to 0. Mobs whose baby
+    /// state is their own flag (zombies, piglins, zoglins) keep it negative as well.
     pub age: AtomicI32,
     /// Vanilla `Entity.tickCount`: ticks since this entity object was created or loaded.
     pub tick_count: AtomicI32,
@@ -1406,8 +1407,7 @@ impl Entity {
         }
     }
 
-    /// Sets the entity's age in ticks.
-    /// Negative values indicate that the entity is a baby.
+    /// Stores the baby age (see [`Self::age`]) without `AgeableMob.setAge`'s side effects.
     pub fn set_age(&self, age: i32) {
         self.age.store(age, Relaxed);
     }
@@ -3705,6 +3705,27 @@ impl Entity {
 
     pub fn get_eye_y(&self) -> f64 {
         self.pos.load().y + f64::from(self.entity_dimension.load().eye_height)
+    }
+
+    /// Vanilla `Entity.getRandomX`.
+    pub fn get_random_x(&self, spread: f64) -> f64 {
+        self.pos.load().x + f64::from(self.width()) * ((2.0 * rand::random::<f64>() - 1.0) * spread)
+    }
+
+    /// Vanilla `Entity.getRandomY()`.
+    pub fn get_random_y(&self) -> f64 {
+        self.pos.load().y + f64::from(self.height()) * rand::random::<f64>()
+    }
+
+    /// Vanilla `Entity.getRandomY(double)`.
+    pub fn get_random_y_spread(&self, spread: f64) -> f64 {
+        self.pos.load().y
+            + f64::from(self.height()) * ((2.0 * rand::random::<f64>() - 1.0) * spread)
+    }
+
+    /// Vanilla `Entity.getRandomZ`.
+    pub fn get_random_z(&self, spread: f64) -> f64 {
+        self.pos.load().z + f64::from(self.width()) * ((2.0 * rand::random::<f64>() - 1.0) * spread)
     }
 
     pub fn is_removed(&self) -> bool {

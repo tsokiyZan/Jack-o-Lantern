@@ -313,9 +313,7 @@ impl Mob for DolphinEntity {
         let living = &self.mob_entity.living_entity;
         let entity = &living.entity;
         // `AgeableMob.aiStep`, which vanilla runs inside `super.tick()`.
-        if entity.is_alive() {
-            self.ageable_ai_step();
-        }
+        self.ageable_ai_step();
         if self.mob_entity.is_no_ai() {
             living.breath.set_air_supply(caller, TOTAL_AIR_SUPPLY);
             return;
