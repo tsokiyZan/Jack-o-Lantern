@@ -4,6 +4,7 @@ use pumpkin_util::math::{subtract_angles, wrap_degrees};
 pub mod body_rotation_control;
 pub mod fish_move_control;
 pub mod flying_move_control;
+pub mod guardian_move_control;
 pub mod jump_control;
 pub mod look_control;
 pub mod move_control;

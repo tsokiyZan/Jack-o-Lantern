@@ -35,6 +35,18 @@ impl LookControl {
         }
     }
 
+    /// Vanilla `isLookingAtTarget`: a look was asked for within the last two ticks.
+    #[must_use]
+    pub const fn is_looking_at_target(&self) -> bool {
+        self.look_at_timer > 0
+    }
+
+    /// Vanilla `getWantedX`/`Y`/`Z`.
+    #[must_use]
+    pub const fn wanted_position(&self) -> Vector3<f64> {
+        self.position
+    }
+
     pub fn look_at_position(&mut self, mob: &dyn Mob, position: Vector3<f64>) {
         self.look_at(mob, position.x, position.y, position.z);
     }

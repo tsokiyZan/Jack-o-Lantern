@@ -1387,6 +1387,9 @@ impl LivingEntity {
     }
 
     fn tick_movement(&self, caller: &dyn EntityBase) {
+        if let Some(mob) = caller.get_mob() {
+            mob.ai_step(caller);
+        }
         if self.jumping_cooldown.load(Relaxed) != 0 {
             self.jumping_cooldown.fetch_sub(1, Relaxed);
         }

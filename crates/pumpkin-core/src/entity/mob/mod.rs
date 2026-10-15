@@ -1272,6 +1272,10 @@ pub trait Mob: EntityBase + Send + Sync {
     /// Per-mob tick hook called each tick before AI runs. Override for mob-specific logic.
     fn mob_tick(&self, _caller: &dyn EntityBase) {}
 
+    /// The start of vanilla `aiStep`, where subclasses run their own code before
+    /// `super.aiStep()`: after `baseTick`, before the AI step and travel.
+    fn ai_step(&self, _caller: &dyn EntityBase) {}
+
     fn post_tick(&self) {}
 
     fn get_preferred_weapon_type(&self) -> Option<&'static pumpkin_data::tag::Tag> {
@@ -1910,7 +1914,6 @@ impl<T: Mob + Send + 'static> EntityBase for T {
         // Bee sting death (`time_since_sting`)
         // Armadillo scute drop, state switching, `danger_detected_recently_ticks`
         // (not `in_state_ticks`, that is vanilla `tick`)
-        // ElderGuardian fatigue
         // Wither `tick_wither` invulnerable countdown, healing, boss bar, head attacks
         // (not the movement towards the target, that is vanilla `aiStep`)
         // ZombifiedPiglin `maybe_alert_others`
