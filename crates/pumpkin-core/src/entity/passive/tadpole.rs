@@ -3,7 +3,7 @@ use std::sync::{
     atomic::{AtomicBool, AtomicI32, Ordering},
 };
 
-use pumpkin_data::data_component_impl::{BucketEntityDataImpl, CustomNameImpl};
+use pumpkin_data::data_component_impl::BucketEntityDataImpl;
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
@@ -19,6 +19,7 @@ use crate::entity::{
     ai::control::look_control::LookControl,
     ai::control::smooth_swimming_move_control::SmoothSwimmingMoveControl,
     breath::BreathManager,
+    bucketable,
     mob::{Mob, MobEntity, conversion::convert_single},
     passive::fish,
     player::Player,
@@ -136,32 +137,9 @@ impl TadpoleEntity {
         ));
     }
 
-    /// Vanilla `Tadpole.saveToBucketTag`, with `Bucketable.saveDefaultDataToBucketTag`.
+    /// Vanilla `Tadpole.saveToBucketTag`.
     fn save_to_bucket_tag(&self, bucket: &mut ItemStack) {
-        let entity = self.get_entity();
-        if let Some(name) = entity.custom_name.load().as_ref() {
-            bucket.set_data_component(CustomNameImpl { name: name.clone() });
-        }
-        let mut tag = NbtCompound::new();
-        if self.mob_entity.is_no_ai() {
-            tag.put_bool("NoAI", true);
-        }
-        if entity.is_silent() {
-            tag.put_bool("Silent", true);
-        }
-        if entity.has_no_gravity() {
-            tag.put_bool("NoGravity", true);
-        }
-        if entity.glowing.load(Ordering::Relaxed) {
-            tag.put_bool("Glowing", true);
-        }
-        if entity.invulnerable.load(Ordering::Relaxed) {
-            tag.put_bool("Invulnerable", true);
-        }
-        if self.mob_entity.persistence_required.load(Ordering::Relaxed) {
-            tag.put_bool("PersistenceRequired", true);
-        }
-        tag.put_float("Health", self.mob_entity.living_entity.health.load());
+        let mut tag = bucketable::save_default_data_to_bucket_tag(self, bucket);
         tag.put_int("Age", self.get_age());
         tag.put_bool("AgeLocked", self.is_age_locked());
         bucket.set_data_component(BucketEntityDataImpl { nbt: Some(tag) });
@@ -190,12 +168,7 @@ impl TadpoleEntity {
         self.play_sound_at_self(Sound::ItemBucketFillTadpole, 1.0, 1.0);
         let mut bucket = ItemStack::new(1, &Item::TADPOLE_BUCKET);
         self.save_to_bucket_tag(&mut bucket);
-        item_stack.decrement_unless_creative(player.gamemode.load(), 1);
-        if item_stack.is_empty() {
-            *item_stack = bucket;
-        } else if !player.inventory().insert_stack_anywhere(&mut bucket) {
-            player.drop_item(bucket);
-        }
+        bucketable::create_filled_result(item_stack, player, bucket);
         if entity.is_leashed() {
             entity.unleash();
             entity.spawn_at_location(ItemStack::new(1, &Item::LEAD));
@@ -288,33 +261,9 @@ impl Mob for TadpoleEntity {
         self.set_age_locked(nbt.get_bool("AgeLocked").unwrap_or(false));
     }
 
-    /// Vanilla `Tadpole.loadFromBucketTag`, with
-    /// `Bucketable.loadDefaultDataFromBucketTag`.
+    /// Vanilla `Tadpole.loadFromBucketTag`.
     fn load_from_bucket_tag(&self, tag: &NbtCompound) {
-        let entity = self.get_entity();
-        if let Some(no_ai) = tag.get_bool("NoAI") {
-            self.mob_entity.set_no_ai(no_ai);
-        }
-        if let Some(silent) = tag.get_bool("Silent") {
-            entity.set_silent(silent);
-        }
-        if let Some(no_gravity) = tag.get_bool("NoGravity") {
-            entity.set_has_no_gravity(no_gravity);
-        }
-        if let Some(glowing) = tag.get_bool("Glowing") {
-            entity.set_glowing(glowing);
-        }
-        if let Some(invulnerable) = tag.get_bool("Invulnerable") {
-            entity.invulnerable.store(invulnerable, Ordering::Relaxed);
-        }
-        if tag.get_bool("PersistenceRequired") == Some(true) {
-            self.mob_entity
-                .persistence_required
-                .store(true, Ordering::Relaxed);
-        }
-        if let Some(health) = tag.get_float("Health") {
-            self.mob_entity.living_entity.set_health(health);
-        }
+        bucketable::load_default_data_from_bucket_tag(self, tag);
         if let Some(age) = tag.get_int("Age") {
             self.set_age(age);
         }

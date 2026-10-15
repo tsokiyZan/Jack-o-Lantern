@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError, Weak};
 use pumpkin_data::attributes::Attributes;
 use pumpkin_data::damage::DamageType;
 use pumpkin_data::data_component_impl::{
-    BucketEntityDataImpl, CustomNameImpl, EquipmentSlot, Operation, SulfurCubeContentImpl,
+    BucketEntityDataImpl, EquipmentSlot, Operation, SulfurCubeContentImpl,
 };
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::game_event::GameEvent;
@@ -38,6 +38,7 @@ use crate::entity::ai::goal::goal_selector::GoalSelector;
 use crate::entity::ai::goal::tempt::{TemptGoal, TemptNavigation};
 use crate::entity::ai::goal::{Controls, Goal};
 use crate::entity::attributes::{Modifier, ModifierOperation, send_attribute_updates_for_living};
+use crate::entity::bucketable;
 use crate::entity::item::ItemEntity;
 use crate::entity::mob::Mob;
 use crate::entity::player::Player;
@@ -1000,13 +1001,7 @@ impl CubeMobEntity {
         self.play_sound(Sound::ItemBucketFillSulfurCube, 1.0, 1.0);
         let mut bucket = ItemStack::new(1, &Item::SULFUR_CUBE_BUCKET);
         self.save_to_bucket_tag(&mut bucket);
-        // `ItemUtils.createFilledResult`.
-        stack.decrement_unless_creative(player.gamemode.load(), 1);
-        if stack.is_empty() {
-            *stack = bucket;
-        } else if !player.inventory.insert_stack_anywhere(&mut bucket) {
-            player.drop_item(bucket);
-        }
+        bucketable::create_filled_result(stack, player, bucket);
         self.drop_leash();
         self.get_entity().remove();
         true
@@ -1014,32 +1009,7 @@ impl CubeMobEntity {
 
     /// Vanilla `SulfurCube.saveToBucketTag`.
     fn save_to_bucket_tag(&self, bucket: &mut ItemStack) {
-        let entity = self.get_entity();
-        let living = &self.mob_entity.living_entity;
-        // `Bucketable.saveDefaultDataToBucketTag`.
-        if let Some(name) = &**entity.custom_name.load() {
-            bucket.set_data_component(CustomNameImpl { name: name.clone() });
-        }
-        let mut tag = NbtCompound::new();
-        if self.mob_entity.is_no_ai() {
-            tag.put_bool("NoAI", true);
-        }
-        if entity.is_silent() {
-            tag.put_bool("Silent", true);
-        }
-        if entity.has_no_gravity.load(Relaxed) {
-            tag.put_bool("NoGravity", true);
-        }
-        if entity.glowing.load(Relaxed) {
-            tag.put_bool("Glowing", true);
-        }
-        if entity.invulnerable.load(Relaxed) {
-            tag.put_bool("Invulnerable", true);
-        }
-        if self.mob_entity.persistence_required.load(Relaxed) {
-            tag.put_bool("PersistenceRequired", true);
-        }
-        tag.put_float("Health", living.health.load());
+        let mut tag = bucketable::save_default_data_to_bucket_tag(self, bucket);
         let body = self.body_item();
         if !body.is_empty() {
             bucket.set_data_component(SulfurCubeContentImpl {
@@ -1068,29 +1038,7 @@ impl CubeMobEntity {
             .get_data_component::<BucketEntityDataImpl>()
             .map(BucketEntityDataImpl::nbt)
             .unwrap_or_default();
-        // `Bucketable.loadDefaultDataFromBucketTag`.
-        let entity = self.get_entity();
-        if let Some(no_ai) = tag.get_bool("NoAI") {
-            self.mob_entity.set_no_ai(no_ai);
-        }
-        if let Some(silent) = tag.get_bool("Silent") {
-            entity.set_silent(silent);
-        }
-        if let Some(no_gravity) = tag.get_bool("NoGravity") {
-            entity.set_has_no_gravity(no_gravity);
-        }
-        if let Some(glowing) = tag.get_bool("Glowing") {
-            entity.set_glowing(glowing);
-        }
-        if let Some(invulnerable) = tag.get_bool("Invulnerable") {
-            entity.set_invulnerable(invulnerable);
-        }
-        if tag.get_bool("PersistenceRequired") == Some(true) {
-            self.mob_entity.persistence_required.store(true, Relaxed);
-        }
-        if let Some(health) = tag.get_float("Health") {
-            self.mob_entity.living_entity.set_health(health);
-        }
+        bucketable::load_default_data_from_bucket_tag(self, &tag);
         self.set_age(tag.get_int("age").unwrap_or(0));
         self.set_age_locked(tag.get_bool("age_locked").unwrap_or(false));
         self.set_from_bucket(sulfur, true);
