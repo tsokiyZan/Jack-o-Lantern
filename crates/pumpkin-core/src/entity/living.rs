@@ -81,6 +81,9 @@ pub struct LivingEntity {
     pub breath: BreathManager,
     /// Tracks the remaining time until the entity can regenerate health.
     pub hurt_cooldown: AtomicI32,
+    /// Vanilla `LivingEntity.hurtTime`: counts down from `HURT_DURATION` after a hit that
+    /// was not softened by the damage cooldown.
+    pub hurt_time: AtomicI32,
     /// Vanilla `LivingEntity.noActionTime`: ticks since a mob last had a player nearby
     /// or got hurt.
     pub no_action_time: AtomicI32,
@@ -297,6 +300,7 @@ impl LivingEntity {
             health: AtomicCell::new(max_health), // Initial health value from attributes
             entity,
             hurt_cooldown: AtomicI32::new(0),
+            hurt_time: AtomicI32::new(0),
             no_action_time: AtomicI32::new(0),
             applied_scale: AtomicCell::new(1.0),
             speed: AtomicCell::new(0.0),
@@ -1334,6 +1338,11 @@ impl LivingEntity {
         }
 
         false
+    }
+
+    /// Vanilla `LivingEntity.wasHurtRecently`.
+    pub fn was_hurt_recently(&self) -> bool {
+        self.hurt_time.load(Relaxed) > 0
     }
 
     pub fn is_immune_to_fall_damage(&self) -> bool {
@@ -2851,7 +2860,7 @@ impl LivingEntity {
         // Persist current absorption amount
         nbt.put("AbsorptionAmount", NbtTag::Float(self.absorption.load()));
         nbt.put("FallDistance", NbtTag::Float(fall_distance));
-        nbt.put_short("HurtTime", self.hurt_cooldown.load(Relaxed).max(0) as i16);
+        nbt.put_short("HurtTime", self.hurt_time.load(Relaxed) as i16);
         nbt.put_short("DeathTime", i16::from(self.death_time.load(Relaxed)));
         nbt.put_bool("FallFlying", self.entity.is_fall_flying());
         self.breath.write_nbt(nbt);
@@ -2935,9 +2944,8 @@ impl LivingEntity {
         } else {
             self.fall_distance.store(fd);
         }
-        if let Some(hurt_time) = nbt.get_short("HurtTime") {
-            self.hurt_cooldown.store(i32::from(hurt_time), Relaxed);
-        }
+        self.hurt_time
+            .store(i32::from(nbt.get_short("HurtTime").unwrap_or(0)), Relaxed);
         if let Some(death_time) = nbt.get_short("DeathTime") {
             self.death_time.store(death_time as u8, Relaxed);
         }
@@ -3327,6 +3335,7 @@ impl LivingEntity {
                 (effective_amount - last_damage, false)
             } else {
                 self.hurt_cooldown.store(20, Relaxed);
+                self.hurt_time.store(HURT_DURATION, Relaxed);
                 (effective_amount, self.health.load() > effective_amount)
             };
 
@@ -3594,6 +3603,10 @@ impl EntityBase for LivingEntity {
         if is_alive {
             // The air part of vanilla `LivingEntity.baseTick`, which runs before movement.
             self.breath.tick(self, caller);
+        }
+        // Also `baseTick`, so the AI step sees the count already lowered.
+        if self.hurt_time.load(Relaxed) > 0 {
+            self.hurt_time.fetch_sub(1, Relaxed);
         }
         let in_death_animation = self.health.load() <= 0.0 && self.death_time.load(Relaxed) < 20;
         let is_player = self.entity.entity_type == &EntityType::PLAYER;
@@ -3872,6 +3885,8 @@ impl EntityBase for LivingEntity {
 
 /// Vanilla `LivingEntity.INPUT_FRICTION`.
 const INPUT_FRICTION: f32 = 0.98;
+/// The `hurtDuration` vanilla sets on every full-damage hit.
+const HURT_DURATION: i32 = 10;
 
 pub const SPEED_MODIFIER_SPRINTING_ID: &str = "minecraft:sprinting";
 pub const SPEED_MODIFIER_SPRINTING_AMOUNT: f64 = 0.300_000_011_920_928_96;
