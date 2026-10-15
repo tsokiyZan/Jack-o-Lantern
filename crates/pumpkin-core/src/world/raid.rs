@@ -469,7 +469,7 @@ impl Raid {
         let center_f64 = self.center.to_f64();
         let entities = world.entities.load();
 
-        for raiders in self.group_raider_map.values_mut() {
+        for (wave, raiders) in &mut self.group_raider_map {
             let mut wave_dead = Vec::new();
             for &raider_uuid in raiders.iter() {
                 let entity = entities
@@ -495,6 +495,10 @@ impl Raid {
 
             for uuid in wave_dead {
                 raiders.remove(&uuid);
+                // Vanilla `removeLeader` for a removed patrol leader.
+                if self.group_to_leader_map.get(wave) == Some(&uuid) {
+                    self.group_to_leader_map.remove(wave);
+                }
             }
         }
     }
