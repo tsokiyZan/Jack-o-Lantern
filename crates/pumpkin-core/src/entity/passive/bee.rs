@@ -679,6 +679,12 @@ impl Mob for BeeEntity {
             self.ticks_without_nectar_since_exiting_hive
                 .fetch_add(1, Ordering::Relaxed);
         }
+
+        self.update_persistent_anger();
+    }
+
+    fn updates_anger_in_ai_step(&self) -> bool {
+        true
     }
 
     /// The ends of vanilla `Bee.aiStep` and `Bee.tick`, after the movement.

@@ -1771,6 +1771,12 @@ pub trait Mob: EntityBase + Send + Sync {
     }
 
     /// Whether currents push this mob along. Water animals hold their ground.
+    /// Whether the mob runs `updatePersistentAnger` in its own `customServerAiStep`, so a
+    /// `NoAI` mob's anger stands still, instead of the shared call every tick.
+    fn updates_anger_in_ai_step(&self) -> bool {
+        false
+    }
+
     /// Vanilla `isPushable`, which some mobs turn off.
     fn mob_is_pushable(&self) -> bool {
         true
@@ -2239,7 +2245,9 @@ impl<T: Mob + Send + 'static> EntityBase for T {
 
         mob_entity.check_despawn(self);
 
-        if let Some(neutral) = self.as_neutral() {
+        if let Some(neutral) = self.as_neutral()
+            && !self.updates_anger_in_ai_step()
+        {
             neutral.update_persistent_anger();
         }
 
@@ -2259,15 +2267,11 @@ impl<T: Mob + Send + 'static> EntityBase for T {
         //
         // TODO NoAI: move these vanilla `customServerAiStep` parts of `mob_tick`
         // into `custom_server_ai_step`:
-        // Bee sting death (`time_since_sting`)
         // Armadillo scute drop, state switching, `danger_detected_recently_ticks`
         // (not `in_state_ticks`, that is vanilla `tick`)
-        // Wither `tick_wither` invulnerable countdown, healing, boss bar, head attacks
-        // (not the movement towards the target, that is vanilla `aiStep`)
         // ZombifiedPiglin `maybe_alert_others`
         // Piglin timers, `tick_sensors`, admiring, dancing (conversion already checks NoAI)
-        // Bee and ZombifiedPiglin `update_persistent_anger` (Enderman, Wolf, IronGolem and
-        // PolarBear run it outside the AI step, so the shared call stays for them).
+        // ZombifiedPiglin `update_persistent_anger` (see `updates_anger_in_ai_step`).
         mob_entity.living_entity.tick(caller, server);
         self.post_tick();
     }
