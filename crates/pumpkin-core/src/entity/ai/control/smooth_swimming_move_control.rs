@@ -1,5 +1,5 @@
 use crate::entity::ai::control::move_control::Operation;
-use crate::entity::ai::control::{Control, MoveControlTrait};
+use crate::entity::ai::control::{Control, MoveControlTrait, rotlerp};
 use crate::entity::mob::Mob;
 use pumpkin_data::attributes::Attributes;
 use pumpkin_util::math::vector3::Vector3;
@@ -42,17 +42,6 @@ impl SmoothSwimmingMoveControl {
     }
 
     /// Vanilla `MoveControl.rotlerp`, which keeps the result within 0 to 360.
-    fn rotlerp(a: f32, b: f32, max: f32) -> f32 {
-        let result = a + wrap_degrees(b - a).clamp(-max, max);
-        if result < 0.0 {
-            result + 360.0
-        } else if result > 360.0 {
-            result - 360.0
-        } else {
-            result
-        }
-    }
-
     fn get_turning_speed_factor(left_to_turn: f32) -> f32 {
         1.0 - ((left_to_turn - 10.0) / 50.0).clamp(0.0, 1.0)
     }
@@ -105,7 +94,7 @@ impl MoveControlTrait for SmoothSwimmingMoveControl {
         }
 
         let y_rot_d = (zd.atan2(xd).to_degrees() as f32) - 90.0;
-        let new_yaw = Self::rotlerp(entity.yaw.load(), y_rot_d, self.max_turn_y as f32);
+        let new_yaw = rotlerp(entity.yaw.load(), y_rot_d, self.max_turn_y as f32);
         entity.yaw.store(new_yaw);
         entity.body_yaw.store(new_yaw);
         entity.head_yaw.store(new_yaw);

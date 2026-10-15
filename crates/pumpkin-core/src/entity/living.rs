@@ -3461,6 +3461,13 @@ impl EntityBase for LivingEntity {
         let is_player = self.entity.entity_type == &EntityType::PLAYER;
         if (is_alive || in_death_animation) && !is_player {
             self.tick_movement(caller);
+            if let Some(mob) = caller.get_mob() {
+                mob.get_mob_entity()
+                    .body_rotation_control
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .client_tick(mob);
+            }
             // Vanilla-like order: freeze logic runs after movement/collisions.
             self.entity.tick_frozen(caller);
         } else if is_alive {

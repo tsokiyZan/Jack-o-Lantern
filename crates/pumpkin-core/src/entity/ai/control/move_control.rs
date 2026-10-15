@@ -1,7 +1,11 @@
-use crate::entity::ai::control::{Control, MoveControlTrait};
+use crate::entity::Entity;
+use crate::entity::ai::control::{Control, MoveControlTrait, rotlerp};
+use crate::entity::ai::pathfinder::node::PathType;
+use crate::entity::living::LivingEntity;
 use crate::entity::mob::Mob;
 use pumpkin_data::attributes::Attributes;
-use pumpkin_util::math::vector3::Vector3;
+use pumpkin_data::tag::{self, Taggable};
+use pumpkin_util::math::{self, position::BlockPos, vector3::Vector3};
 use std::sync::atomic::Ordering;
 
 #[derive(Default, Clone, Copy, PartialEq, Eq)]
@@ -44,59 +48,92 @@ impl MoveControlTrait for MoveControl {
         let mob_entity = mob.get_mob_entity();
         let living_entity = &mob_entity.living_entity;
         let entity = &living_entity.entity;
-        if self.operation == Operation::Strafe {
-            // TODO: is_walkable check
-            let movement_speed = living_entity.get_attribute_value(&Attributes::MOVEMENT_SPEED);
-            living_entity
-                .speed
-                .store(self.speed_modifier as f32 * movement_speed as f32);
-            living_entity.movement_input.store(Vector3::new(
-                self.strafe_right as f64,
-                0.0,
-                self.strafe_forwards as f64,
-            ));
-            self.operation = Operation::Wait;
-        } else if self.operation == Operation::MoveTo {
-            self.operation = Operation::Wait;
-            let pos = entity.pos.load();
-            let xd = self.wanted_x - pos.x;
-            let zd = self.wanted_z - pos.z;
-            let yd = self.wanted_y - pos.y;
-            let dd = xd * xd + yd * yd + zd * zd;
-
-            if dd < 2.5000003E-7 {
-                living_entity
-                    .movement_input
-                    .store(Vector3::new(0.0, 0.0, 0.0));
-                return;
-            }
-
-            let y_rot_d = (zd.atan2(xd).to_degrees() as f32) - 90.0;
-            entity
-                .yaw
-                .store(self.change_angle(entity.yaw.load(), y_rot_d, 90.0));
-
-            let movement_speed = living_entity.get_attribute_value(&Attributes::MOVEMENT_SPEED);
-            mob_entity.set_speed((self.speed_modifier * movement_speed) as f32);
-
-            // TODO: Jump if needed (based on collision and height difference)
-            let step_height = living_entity.get_attribute_value(&Attributes::STEP_HEIGHT);
-            if yd > step_height
-                && xd * xd + zd * zd < 1.0f64.max(entity.entity_dimension.load().width as f64)
-            {
-                mob_entity.jump();
-                self.operation = Operation::Jumping;
-            }
-        } else if self.operation == Operation::Jumping {
-            let movement_speed = living_entity.get_attribute_value(&Attributes::MOVEMENT_SPEED);
-            mob_entity.set_speed((self.speed_modifier * movement_speed) as f32);
-
-            if entity.on_ground.load(Ordering::Relaxed) {
+        match self.operation {
+            Operation::Strafe => {
+                let speed = living_entity.get_attribute_value(&Attributes::MOVEMENT_SPEED) as f32;
+                let speed_modified = self.speed_modifier as f32 * speed;
+                let mut xa = self.strafe_forwards;
+                let mut za = self.strafe_right;
+                #[expect(
+                    clippy::imprecise_flops,
+                    reason = "vanilla rounds Mth.sqrt(xa * xa + za * za), not a hypot"
+                )]
+                let mut dist = (xa * xa + za * za).sqrt();
+                if dist < 1.0 {
+                    dist = 1.0;
+                }
+                dist = speed_modified / dist;
+                xa *= dist;
+                za *= dist;
+                let yaw_radians = entity.yaw.load() * (std::f64::consts::PI / 180.0) as f32;
+                let sin = math::sin(yaw_radians);
+                let cos = math::cos(yaw_radians);
+                let dx = xa * cos - za * sin;
+                let dz = za * cos + xa * sin;
+                if !Self::is_walkable(mob, dx, dz) {
+                    self.strafe_forwards = 1.0;
+                    self.strafe_right = 0.0;
+                }
+                mob_entity.set_speed(speed_modified);
+                let input = living_entity.movement_input.load();
+                living_entity.movement_input.store(Vector3::new(
+                    f64::from(self.strafe_right),
+                    input.y,
+                    f64::from(self.strafe_forwards),
+                ));
                 self.operation = Operation::Wait;
             }
-        }
+            Operation::MoveTo => {
+                self.operation = Operation::Wait;
+                let pos = entity.pos.load();
+                let xd = self.wanted_x - pos.x;
+                let zd = self.wanted_z - pos.z;
+                let yd = self.wanted_y - pos.y;
+                let dd = xd * xd + yd * yd + zd * zd;
+                if dd < f64::from(MIN_SPEED_SQR) {
+                    set_zza(living_entity, 0.0);
+                    return;
+                }
 
-        // Navigator owns movement input while this controller waits.
+                let y_rot_d = (math::atan2(zd, xd) * f64::from(180.0f32)
+                    / f64::from(std::f32::consts::PI)) as f32
+                    - 90.0;
+                entity
+                    .yaw
+                    .store(rotlerp(entity.yaw.load(), y_rot_d, MAX_TURN));
+                mob_entity.set_speed(
+                    (self.speed_modifier
+                        * living_entity.get_attribute_value(&Attributes::MOVEMENT_SPEED))
+                        as f32,
+                );
+
+                // `mob.maxUpStep()`; a player-controlled mob never steers through this.
+                let max_up_step =
+                    living_entity.get_attribute_value(&Attributes::STEP_HEIGHT) as f32;
+                let width = entity.entity_dimension.load().width;
+                if yd > f64::from(max_up_step) && xd * xd + zd * zd < f64::from(width.max(1.0))
+                    || Self::is_on_step_to_jump(entity)
+                {
+                    mob_entity.jump();
+                    self.operation = Operation::Jumping;
+                }
+            }
+            Operation::Jumping => {
+                mob_entity.set_speed(
+                    (self.speed_modifier
+                        * living_entity.get_attribute_value(&Attributes::MOVEMENT_SPEED))
+                        as f32,
+                );
+                // Mobs are always affected by fluids.
+                if entity.on_ground.load(Ordering::Relaxed)
+                    || entity.touching_water.load(Ordering::Relaxed)
+                    || entity.touching_lava.load(Ordering::Relaxed)
+                {
+                    self.operation = Operation::Wait;
+                }
+            }
+            Operation::Wait => set_zza(living_entity, 0.0),
+        }
     }
 
     fn set_wanted_position(&mut self, x: f64, y: f64, z: f64, speed_modifier: f64) {
@@ -121,7 +158,56 @@ impl MoveControlTrait for MoveControl {
     }
 }
 
+/// `MoveControl.MIN_SPEED_SQR`.
+const MIN_SPEED_SQR: f32 = 2.500_000_3E-7;
+/// `MoveControl.MAX_TURN`.
+const MAX_TURN: f32 = 90.0;
+
+/// Vanilla `Mob.setZza`.
+fn set_zza(living_entity: &LivingEntity, zza: f32) {
+    let input = living_entity.movement_input.load();
+    living_entity
+        .movement_input
+        .store(Vector3::new(input.x, input.y, f64::from(zza)));
+}
+
 impl MoveControl {
+    /// The second half of `MOVE_TO`'s jump test: the block the mob stands in has a collision
+    /// shape whose top is above the mob, and is not a door or fence.
+    fn is_on_step_to_jump(entity: &Entity) -> bool {
+        let block_pos = entity.block_pos.load();
+        let world = entity.world.load();
+        let (block, state) = world.get_block_and_state(&block_pos);
+        if block.has_tag(&tag::Block::MINECRAFT_DOORS)
+            || block.has_tag(&tag::Block::MINECRAFT_FENCES)
+        {
+            return false;
+        }
+        let max_y = state
+            .get_block_collision_shapes_at(&block_pos)
+            .map(|shape| shape.max.y)
+            .reduce(f64::max);
+        max_y.is_some_and(|max_y| entity.pos.load().y < max_y + f64::from(block_pos.0.y))
+    }
+
+    /// `MoveControl.isWalkable`: whether the block the strafe heads into is walkable for the
+    /// mob's node evaluator.
+    fn is_walkable(mob: &dyn Mob, dx: f32, dz: f32) -> bool {
+        let entity = &mob.get_mob_entity().living_entity.entity;
+        let pos = entity.pos.load();
+        let target = BlockPos::floored(
+            pos.x + f64::from(dx),
+            f64::from(entity.block_pos.load().0.y),
+            pos.z + f64::from(dz),
+        );
+        mob.get_mob_entity()
+            .navigator
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get_path_type_at(entity, target)
+            .is_none_or(|path_type| path_type == PathType::Walkable)
+    }
+
     #[must_use]
     pub fn has_wanted(&self) -> bool {
         self.operation == Operation::MoveTo

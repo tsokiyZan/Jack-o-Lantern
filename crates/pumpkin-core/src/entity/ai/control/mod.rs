@@ -1,5 +1,5 @@
 use crate::entity::mob::Mob;
-use pumpkin_util::math::subtract_angles;
+use pumpkin_util::math::{subtract_angles, wrap_degrees};
 
 pub mod body_rotation_control;
 pub mod fish_move_control;
@@ -9,6 +9,19 @@ pub mod look_control;
 pub mod move_control;
 pub mod smooth_swimming_look_control;
 pub mod smooth_swimming_move_control;
+
+/// Vanilla `MoveControl.rotlerp`: turns `a` towards `b` by at most `max`, wrapped into 0..360.
+#[must_use]
+pub fn rotlerp(a: f32, b: f32, max: f32) -> f32 {
+    let result = a + wrap_degrees(b - a).clamp(-max, max);
+    if result < 0.0 {
+        result + 360.0
+    } else if result > 360.0 {
+        result - 360.0
+    } else {
+        result
+    }
+}
 
 pub trait Control: Send + Sync {
     fn change_angle(&self, start: f32, end: f32, max_change: f32) -> f32 {

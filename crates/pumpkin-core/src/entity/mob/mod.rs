@@ -5,6 +5,7 @@ use super::{
 use crate::entity::ai::brain::memory::PackedMemories;
 use crate::entity::ai::brain::{Brain, BrainTick};
 use crate::entity::ai::control::MoveControlTrait;
+use crate::entity::ai::control::body_rotation_control::BodyRotationControl;
 use crate::entity::ai::control::jump_control::JumpControl;
 use crate::entity::ai::control::look_control::LookControl;
 use crate::entity::ai::control::move_control::MoveControl;
@@ -100,6 +101,8 @@ pub struct MobEntity {
     pub sensing: std::sync::Mutex<Sensing>,
     pub move_control: std::sync::Mutex<Box<dyn MoveControlTrait>>,
     pub jump_control: std::sync::Mutex<JumpControl>,
+    /// Vanilla `Mob.bodyRotationControl`.
+    pub body_rotation_control: std::sync::Mutex<BodyRotationControl>,
     pub brain: std::sync::Mutex<Brain>,
     pub brain_inbox: std::sync::Mutex<Vec<BrainMessage>>,
     pub position_target: AtomicCell<BlockPos>,
@@ -210,6 +213,7 @@ impl MobEntity {
             sensing: std::sync::Mutex::new(Sensing::default()),
             move_control: std::sync::Mutex::new(Box::new(MoveControl::default())),
             jump_control: std::sync::Mutex::new(JumpControl::default()),
+            body_rotation_control: std::sync::Mutex::new(BodyRotationControl::new()),
             brain: std::sync::Mutex::new(Brain::default()),
             brain_inbox: std::sync::Mutex::new(Vec::new()),
             position_target: AtomicCell::new(BlockPos::ZERO),
