@@ -6,7 +6,7 @@ use crate::damage::DamageType;
 use crate::data_component_impl::basic::SoundEvent;
 use crate::data_component_impl::{
     DataComponentImpl, EquipmentSlot, IDSet, IdOr, get_f32_hash, get_i32_hash, get_idor,
-    get_idor_hash, get_idset_hash, get_str_hash, put_idor,
+    get_idor_hash, get_idset_hash, get_map_hash, get_str_hash, put_idor,
 };
 use crate::entity_type::EntityType;
 use crate::item::Item;
@@ -174,6 +174,9 @@ impl IntangibleProjectileImpl {
 impl DataComponentImpl for IntangibleProjectileImpl {
     fn write_data(&self) -> NbtTag {
         NbtTag::Compound(NbtCompound::new())
+    }
+    fn get_hash(&self) -> i32 {
+        get_map_hash([]) as i32
     }
     default_impl!(IntangibleProjectile);
 }
@@ -742,6 +745,9 @@ impl GliderImpl {
 impl DataComponentImpl for GliderImpl {
     fn write_data(&self) -> NbtTag {
         NbtTag::Compound(NbtCompound::new())
+    }
+    fn get_hash(&self) -> i32 {
+        get_map_hash([]) as i32
     }
     default_impl!(Glider);
 }

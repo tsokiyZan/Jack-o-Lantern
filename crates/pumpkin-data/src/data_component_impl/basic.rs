@@ -1,4 +1,6 @@
-use crate::data_component_impl::{DataComponentImpl, get_i32_hash, get_str_hash};
+use crate::data_component_impl::{
+    DataComponentImpl, get_compound_hash, get_i32_hash, get_map_hash, get_str_hash,
+};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_nbt::tag::NbtTag;
 use pumpkin_util::text::TextComponent;
@@ -27,7 +29,7 @@ impl DataComponentImpl for CustomDataImpl {
         NbtTag::Compound(self.data.clone())
     }
     fn get_hash(&self) -> i32 {
-        0
+        get_compound_hash(&self.data) as i32
     }
     default_impl!(CustomData);
 }
@@ -98,7 +100,7 @@ impl DataComponentImpl for UnbreakableImpl {
         NbtTag::Compound(NbtCompound::new())
     }
     fn get_hash(&self) -> i32 {
-        0
+        get_map_hash([]) as i32
     }
     default_impl!(Unbreakable);
 }

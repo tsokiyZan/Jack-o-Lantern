@@ -116,51 +116,232 @@ macro_rules! default_impl {
     };
 }
 
+// Type tags written by vanilla `HashOps` in front of each value.
+const HASH_TAG_EMPTY: u8 = 1;
+const HASH_TAG_MAP_START: u8 = 2;
+const HASH_TAG_MAP_END: u8 = 3;
+const HASH_TAG_LIST_START: u8 = 4;
+const HASH_TAG_LIST_END: u8 = 5;
+const HASH_TAG_BYTE: u8 = 6;
+const HASH_TAG_SHORT: u8 = 7;
+const HASH_TAG_INT: u8 = 8;
+const HASH_TAG_LONG: u8 = 9;
+const HASH_TAG_FLOAT: u8 = 10;
+const HASH_TAG_DOUBLE: u8 = 11;
+const HASH_TAG_STRING: u8 = 12;
+const HASH_TAG_BOOLEAN: u8 = 13;
+const HASH_TAG_BYTE_ARRAY_START: u8 = 14;
+const HASH_TAG_BYTE_ARRAY_END: u8 = 15;
+const HASH_TAG_INT_ARRAY_START: u8 = 16;
+const HASH_TAG_INT_ARRAY_END: u8 = 17;
+const HASH_TAG_LONG_ARRAY_START: u8 = 18;
+const HASH_TAG_LONG_ARRAY_END: u8 = 19;
+
+fn hash_bytes(parts: &[&[u8]]) -> u32 {
+    let mut digest = Digest::new();
+    for part in parts {
+        digest.update(part);
+    }
+    digest.finalize() as u32
+}
+
+/// `HashOps.empty`.
+#[must_use]
+pub fn get_empty_hash() -> u32 {
+    hash_bytes(&[&[HASH_TAG_EMPTY]])
+}
+
+/// `HashOps.createString`: the UTF-16 length, then the UTF-16 code units.
+#[must_use]
 pub fn get_str_hash(val: &str) -> u32 {
     let mut digest = Digest::new();
-    digest.update(&[12u8]);
-    digest.update(&(val.len() as u32).to_le_bytes());
-    let byte = val.as_bytes();
-    for i in byte {
-        digest.update(&[*i, 0u8]);
+    digest.update(&[HASH_TAG_STRING]);
+    digest.update(&(val.encode_utf16().count() as u32).to_le_bytes());
+    for unit in val.encode_utf16() {
+        digest.update(&unit.to_le_bytes());
     }
     digest.finalize() as u32
 }
 
+/// `HashOps.createByte`.
+#[must_use]
+pub fn get_byte_hash(val: i8) -> u32 {
+    hash_bytes(&[&[HASH_TAG_BYTE], &val.to_le_bytes()])
+}
+
+/// `HashOps.createShort`.
+#[must_use]
+pub fn get_short_hash(val: i16) -> u32 {
+    hash_bytes(&[&[HASH_TAG_SHORT], &val.to_le_bytes()])
+}
+
+/// `HashOps.createInt`.
+#[must_use]
 pub fn get_i32_hash(val: i32) -> u32 {
-    let mut digest = Digest::new();
-    digest.update(&[8u8]);
-    digest.update(&val.to_le_bytes());
-    digest.finalize() as u32
+    hash_bytes(&[&[HASH_TAG_INT], &val.to_le_bytes()])
 }
 
+/// `HashOps.createLong`.
+#[must_use]
+pub fn get_i64_hash(val: i64) -> u32 {
+    hash_bytes(&[&[HASH_TAG_LONG], &val.to_le_bytes()])
+}
+
+/// `HashOps.createFloat`.
+#[must_use]
 pub fn get_f32_hash(val: f32) -> u32 {
+    hash_bytes(&[&[HASH_TAG_FLOAT], &val.to_bits().to_le_bytes()])
+}
+
+/// `HashOps.createDouble`.
+#[must_use]
+pub fn get_f64_hash(val: f64) -> u32 {
+    hash_bytes(&[&[HASH_TAG_DOUBLE], &val.to_bits().to_le_bytes()])
+}
+
+/// `HashOps.createBoolean`.
+#[must_use]
+pub fn get_bool_hash(val: bool) -> u32 {
+    hash_bytes(&[&[HASH_TAG_BOOLEAN, u8::from(val)]])
+}
+
+/// `HashOps.createList` over already hashed elements.
+#[must_use]
+pub fn get_list_hash(elements: impl IntoIterator<Item = u32>) -> u32 {
     let mut digest = Digest::new();
-    digest.update(&[7u8]);
-    digest.update(&val.to_bits().to_le_bytes());
+    digest.update(&[HASH_TAG_LIST_START]);
+    for element in elements {
+        digest.update(&element.to_le_bytes());
+    }
+    digest.update(&[HASH_TAG_LIST_END]);
     digest.finalize() as u32
 }
 
-pub fn get_idor_hash(val: &IdOr<basic::SoundEvent>) -> u32 {
+/// `HashOps.createMap` over already hashed `(key, value)` entries. Vanilla
+/// sorts the entries by key hash, then value hash, both compared unsigned.
+#[must_use]
+pub fn get_map_hash(entries: impl IntoIterator<Item = (u32, u32)>) -> u32 {
+    let mut entries: Vec<(u32, u32)> = entries.into_iter().collect();
+    entries.sort_unstable();
     let mut digest = Digest::new();
-    digest.update(&[6u8]);
-    match val {
-        IdOr::Id(sound) => {
-            digest.update(&[1u8]);
-            digest.update(&get_str_hash(sound.to_name()).to_le_bytes());
-        }
-        IdOr::Value(sound) => {
-            digest.update(&[2u8]);
-            digest.update(&get_str_hash(sound.sound_name.as_str()).to_le_bytes());
-            if let Some(range) = sound.range {
-                digest.update(&[1u8]);
-                digest.update(&get_f32_hash(range).to_le_bytes());
-            } else {
-                digest.update(&[0u8]);
-            }
+    digest.update(&[HASH_TAG_MAP_START]);
+    for (key, value) in entries {
+        digest.update(&key.to_le_bytes());
+        digest.update(&value.to_le_bytes());
+    }
+    digest.update(&[HASH_TAG_MAP_END]);
+    digest.finalize() as u32
+}
+
+/// Collects the fields of a record codec for `get_map_hash`. Fields a codec
+/// omits (an `optionalFieldOf` at its default) are simply not added.
+#[derive(Default)]
+pub struct MapHash(Vec<(u32, u32)>);
+
+impl MapHash {
+    #[must_use]
+    pub const fn new() -> Self {
+        Self(Vec::new())
+    }
+
+    #[must_use]
+    pub fn field(mut self, key: &str, value: u32) -> Self {
+        self.0.push((get_str_hash(key), value));
+        self
+    }
+
+    #[must_use]
+    pub fn optional_field(self, key: &str, value: Option<u32>) -> Self {
+        match value {
+            Some(value) => self.field(key, value),
+            None => self,
         }
     }
-    digest.finalize() as u32
+
+    #[must_use]
+    pub fn finish(self) -> u32 {
+        get_map_hash(self.0)
+    }
+}
+
+/// Hashes an NBT tag the way `NbtOps.convertTo(HashOps)` does, as used by
+/// codecs that pass NBT through (`CustomData`, entity data).
+#[must_use]
+pub fn get_nbt_hash(tag: &NbtTag) -> u32 {
+    match tag {
+        NbtTag::End => get_empty_hash(),
+        NbtTag::Byte(value) => get_byte_hash(*value),
+        NbtTag::Short(value) => get_short_hash(*value),
+        NbtTag::Int(value) => get_i32_hash(*value),
+        NbtTag::Long(value) => get_i64_hash(*value),
+        NbtTag::Float(value) => get_f32_hash(*value),
+        NbtTag::Double(value) => get_f64_hash(*value),
+        NbtTag::ByteArray(values) => {
+            let mut digest = Digest::new();
+            digest.update(&[HASH_TAG_BYTE_ARRAY_START]);
+            for value in values {
+                digest.update(&value.to_le_bytes());
+            }
+            digest.update(&[HASH_TAG_BYTE_ARRAY_END]);
+            digest.finalize() as u32
+        }
+        NbtTag::String(value) => get_str_hash(value),
+        NbtTag::List(values) => get_list_hash(values.iter().map(get_nbt_hash)),
+        NbtTag::Compound(compound) => get_compound_hash(compound),
+        NbtTag::IntArray(values) => {
+            let mut digest = Digest::new();
+            digest.update(&[HASH_TAG_INT_ARRAY_START]);
+            for value in values {
+                digest.update(&value.to_le_bytes());
+            }
+            digest.update(&[HASH_TAG_INT_ARRAY_END]);
+            digest.finalize() as u32
+        }
+        NbtTag::LongArray(values) => {
+            let mut digest = Digest::new();
+            digest.update(&[HASH_TAG_LONG_ARRAY_START]);
+            for value in values {
+                digest.update(&value.to_le_bytes());
+            }
+            digest.update(&[HASH_TAG_LONG_ARRAY_END]);
+            digest.finalize() as u32
+        }
+    }
+}
+
+/// `get_nbt_hash` for a compound.
+#[must_use]
+pub fn get_compound_hash(compound: &NbtCompound) -> u32 {
+    get_map_hash(
+        compound
+            .child_tags
+            .iter()
+            .map(|(key, value)| (get_str_hash(key), get_nbt_hash(value))),
+    )
+}
+
+/// Adds the `minecraft` namespace to a bare resource location, as vanilla's
+/// `Identifier` parsing does.
+#[must_use]
+pub fn namespaced(id: &str) -> Cow<'_, str> {
+    if id.contains(':') {
+        Cow::Borrowed(id)
+    } else {
+        Cow::Owned(format!("minecraft:{id}"))
+    }
+}
+
+/// Hash of a `SoundEvent.CODEC` holder: the sound id for a registry
+/// reference, otherwise the inline `{sound_id, range}` record.
+#[must_use]
+pub fn get_idor_hash(val: &IdOr<basic::SoundEvent>) -> u32 {
+    match val {
+        IdOr::Id(sound) => get_str_hash(&namespaced(sound.to_name())),
+        IdOr::Value(sound) => MapHash::new()
+            .field("sound_id", get_str_hash(&namespaced(&sound.sound_name)))
+            .optional_field("range", sound.range.map(get_f32_hash))
+            .finish(),
+    }
 }
 
 pub fn put_idor(nbt: &mut NbtCompound, key: &str, val: &IdOr<basic::SoundEvent>) {
@@ -196,22 +377,21 @@ pub fn get_idor(nbt: &NbtCompound, key: &str, default: Sound) -> IdOr<basic::Sou
     }
 }
 
+/// Hash of a `RegistryCodecs.holderSet`: `#tag`, a single id, or a list of ids
+/// (`ExtraCodecs.compactListCodec`).
+#[must_use]
 pub fn get_idset_hash<T: IDSetContent>(val: &IDSet<T>) -> u32 {
-    let mut digest = Digest::new();
     match val {
-        IDSet::Tag(tag) => {
-            digest.update(&[1u8]);
-            digest.update(&get_str_hash(tag).to_le_bytes());
-        }
+        IDSet::Tag(tag) => get_str_hash(&format!("#{}", namespaced(tag))),
         IDSet::IDs(ids) => {
-            digest.update(&[2u8]);
-            for id in ids.iter() {
-                digest.update(&[3u8]);
-                digest.update(&get_i32_hash(id.registry_id() as i32).to_le_bytes());
+            let id_hash = |id: &&T| get_str_hash(&namespaced(&id.to_string()));
+            if let [id] = ids.as_ref() {
+                id_hash(id)
+            } else {
+                get_list_hash(ids.iter().map(id_hash))
             }
         }
     }
-    digest.finalize() as u32
 }
 
 pub trait IDSetContent {
@@ -729,6 +909,32 @@ mod tests {
         );
         assert_eq!(MaxStackSizeImpl { size: 99 }.get_hash(), -1632321551i32);
         assert_eq!(MapIdImpl { id: 10 }.get_hash(), -919192125i32);
+    }
+
+    // Expected hashes below come from vanilla 26.3: the component's codec
+    // encoded with `HashOps.CRC32C_INSTANCE` through registry ops.
+
+    #[test]
+    fn hash_ops_scalars() {
+        // `putUnencodedChars` hashes UTF-16 code units, not UTF-8 bytes.
+        assert_eq!(get_str_hash("é𝄞") as i32, -165_708_647);
+        // Floats carry the FLOAT tag (10), not SHORT.
+        assert_eq!(
+            PotionDurationScaleImpl { scale: 0.5 }.get_hash(),
+            -1_631_070_359
+        );
+        // `Unit.CODEC` encodes an empty map.
+        assert_eq!(UnbreakableImpl.get_hash(), -982_207_288);
+        assert_eq!(GliderImpl.get_hash(), -982_207_288);
+    }
+
+    #[test]
+    fn hash_custom_data_like_nbt_ops() {
+        let mut nbt = NbtCompound::new();
+        nbt.put_int("Age", 5);
+        nbt.put_float("Health", 10.0);
+        nbt.put_string("Name", "é".to_string());
+        assert_eq!(CustomDataImpl { data: nbt }.get_hash(), -1_842_861_489);
     }
 
     fn assert_round_trip<T: DataComponentImpl + Clone + 'static>(
