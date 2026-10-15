@@ -59,8 +59,6 @@ const TOTAL_MOISTNESS_LEVEL: i32 = 2400;
 const IN_WATER_SPEED_MODIFIER: f32 = 0.02;
 /// Vanilla `SWIM_WITH_PLAYER_TARGETING` range.
 const SWIM_WITH_PLAYER_RANGE: f64 = 10.0;
-/// Guardians, which vanilla reaches through `Guardian.class` and so also matches elder guardians.
-const GUARDIANS: [&EntityType; 2] = [&EntityType::GUARDIAN, &EntityType::ELDER_GUARDIAN];
 /// The baby chance of the `AgeableMobGroupData` vanilla's `Dolphin.finalizeSpawn` makes.
 const BABY_SPAWN_CHANCE: f32 = 0.1;
 /// `DolphinSwimToTreasureGoal` needs at least this much air to set off or keep going.
@@ -152,7 +150,7 @@ impl DolphinEntity {
             );
             goal_selector.add_goal(
                 9,
-                Box::new(AvoidEntityGoal::new_for_types(&GUARDIANS, 8.0, 1.0, 1.0)),
+                Box::new(AvoidEntityGoal::new(&EntityType::GUARDIAN, 8.0, 1.0, 1.0)),
             );
         };
 
@@ -167,7 +165,9 @@ impl DolphinEntity {
                 1,
                 Box::new(
                     RevengeGoal::new(true)
-                        .ignoring(|entity_type| GUARDIANS.contains(&entity_type))
+                        .ignoring(|entity_type| {
+                            goal_utils::is_instance_of(&EntityType::GUARDIAN, entity_type)
+                        })
                         .alerting_others(),
                 ),
             );
