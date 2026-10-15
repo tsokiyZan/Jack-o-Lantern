@@ -216,6 +216,9 @@ pub fn intersects_aabb_with_hit(
     Some((t_hit, direction, hit_pos, is_inside))
 }
 
+/// Vanilla `VoxelShape.clip`: a ray starting inside the shape hits at once (probed a
+/// thousandth of the way along, so a ray leaving a face from outside is not inside), otherwise
+/// `AABB.clip` over the shape's boxes.
 fn clip_block_shapes(
     shapes: impl Iterator<Item = BoundingBox>,
     _state: &BlockState,
@@ -223,23 +226,136 @@ fn clip_block_shapes(
     from: Vector3<f64>,
     to: Vector3<f64>,
 ) -> Option<(f64, BlockDirection, Vector3<f64>, bool)> {
-    let mut closest_hit: Option<(f64, BlockDirection, Vector3<f64>, bool)> = None;
+    let boxes: Vec<BoundingBox> = shapes.collect();
+    if boxes.is_empty() {
+        return None;
+    }
+    let diff = to.sub(&from);
+    if diff.length_squared() < 1.0e-7 {
+        return None;
+    }
+    let test_point = from.add(&(diff * 0.001));
+    let relative = test_point.sub(&block_pos.0.to_f64());
+    // `isFullWide(findIndex(..))`: cells are half-open, `[min, max)`.
+    let inside = boxes.iter().any(|b| {
+        relative.x >= b.min.x
+            && relative.x < b.max.x
+            && relative.y >= b.min.y
+            && relative.y < b.max.y
+            && relative.z >= b.min.z
+            && relative.z < b.max.z
+    });
+    if inside {
+        let direction = BlockDirection::get_nearest(-diff.x, -diff.y, -diff.z);
+        return Some((0.001, direction, test_point, true));
+    }
+    aabb_clip(&boxes, block_pos, from, diff)
+}
 
-    for shape in shapes {
-        let world_min = shape.min.add(&block_pos.0.to_f64());
-        let world_max = shape.max.add(&block_pos.0.to_f64());
-
-        if let Some((t, dir, hit_pos, is_inside)) =
-            intersects_aabb_with_hit(from, to, world_min, world_max)
-            && closest_hit
-                .as_ref()
-                .is_none_or(|(closest_t, _, _, _)| t < *closest_t)
-        {
-            closest_hit = Some((t, dir, hit_pos, is_inside));
+/// Vanilla `AABB.clip(boxes, from, to, pos)`: the nearest face the ray enters, strictly after
+/// `from`.
+fn aabb_clip(
+    boxes: &[BoundingBox],
+    block_pos: &BlockPos,
+    from: Vector3<f64>,
+    diff: Vector3<f64>,
+) -> Option<(f64, BlockDirection, Vector3<f64>, bool)> {
+    let offset = block_pos.0.to_f64();
+    let mut scale = 1.0;
+    let mut direction = None;
+    for b in boxes {
+        let min = b.min.add(&offset);
+        let max = b.max.add(&offset);
+        if diff.x > 1.0e-7 {
+            clip_point(
+                &mut scale,
+                &mut direction,
+                [diff.x, diff.y, diff.z],
+                min.x,
+                [min.y, max.y, min.z, max.z],
+                BlockDirection::West,
+                [from.x, from.y, from.z],
+            );
+        } else if diff.x < -1.0e-7 {
+            clip_point(
+                &mut scale,
+                &mut direction,
+                [diff.x, diff.y, diff.z],
+                max.x,
+                [min.y, max.y, min.z, max.z],
+                BlockDirection::East,
+                [from.x, from.y, from.z],
+            );
+        }
+        if diff.y > 1.0e-7 {
+            clip_point(
+                &mut scale,
+                &mut direction,
+                [diff.y, diff.z, diff.x],
+                min.y,
+                [min.z, max.z, min.x, max.x],
+                BlockDirection::Down,
+                [from.y, from.z, from.x],
+            );
+        } else if diff.y < -1.0e-7 {
+            clip_point(
+                &mut scale,
+                &mut direction,
+                [diff.y, diff.z, diff.x],
+                max.y,
+                [min.z, max.z, min.x, max.x],
+                BlockDirection::Up,
+                [from.y, from.z, from.x],
+            );
+        }
+        if diff.z > 1.0e-7 {
+            clip_point(
+                &mut scale,
+                &mut direction,
+                [diff.z, diff.x, diff.y],
+                min.z,
+                [min.x, max.x, min.y, max.y],
+                BlockDirection::North,
+                [from.z, from.x, from.y],
+            );
+        } else if diff.z < -1.0e-7 {
+            clip_point(
+                &mut scale,
+                &mut direction,
+                [diff.z, diff.x, diff.y],
+                max.z,
+                [min.x, max.x, min.y, max.y],
+                BlockDirection::South,
+                [from.z, from.x, from.y],
+            );
         }
     }
+    direction.map(|direction| (scale, direction, from.add(&(diff * scale)), false))
+}
 
-    closest_hit
+/// Vanilla `AABB.clipPoint`, with the axes rotated so `a` is the one being crossed.
+fn clip_point(
+    scale: &mut f64,
+    direction: &mut Option<BlockDirection>,
+    [da, db, dc]: [f64; 3],
+    point: f64,
+    [min_b, max_b, min_c, max_c]: [f64; 4],
+    new_direction: BlockDirection,
+    [from_a, from_b, from_c]: [f64; 3],
+) {
+    let s = (point - from_a) / da;
+    let pb = from_b + s * db;
+    let pc = from_c + s * dc;
+    if 0.0 < s
+        && s < *scale
+        && min_b - 1.0e-7 < pb
+        && pb < max_b + 1.0e-7
+        && min_c - 1.0e-7 < pc
+        && pc < max_c + 1.0e-7
+    {
+        *scale = s;
+        *direction = Some(new_direction);
+    }
 }
 
 fn clip_fluid(
