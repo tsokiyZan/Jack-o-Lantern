@@ -3609,6 +3609,10 @@ impl EntityBase for LivingEntity {
         // Vanilla `LivingEntity.onAttributeUpdated` refreshes the dimensions when the
         // `scale` attribute changes. Attributes change from places that cannot reach the
         // owning entity here, so the change is picked up before the entity next moves.
+        // Vanilla `Entity.commonTick` lowers `invulnerableTime` before the entity ticks.
+        if self.hurt_cooldown.load(Relaxed) > 0 {
+            self.hurt_cooldown.fetch_sub(1, Relaxed);
+        }
         let scale = self.get_scale();
         if self.applied_scale.swap(scale) != scale {
             caller.refresh_dimensions();
@@ -3848,9 +3852,6 @@ impl EntityBase for LivingEntity {
             }
         }
 
-        if self.hurt_cooldown.load(Relaxed) > 0 {
-            self.hurt_cooldown.fetch_sub(1, Relaxed);
-        }
         if self.health.load() <= 0.0 {
             let time = self
                 .death_time
