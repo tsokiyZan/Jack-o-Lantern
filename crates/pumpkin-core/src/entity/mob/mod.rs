@@ -426,6 +426,39 @@ impl MobEntity {
             .tick(mob);
     }
 
+    /// Vanilla `Mob.lookAt(Entity, yMax, xMax)`: turns the mob itself, not its head, towards
+    /// `target` by at most `y_max` and `x_max` degrees.
+    pub fn look_at(&self, target: &dyn EntityBase, y_max: f32, x_max: f32) {
+        // Vanilla `Mob.rotlerp`, which unlike `MoveControl.rotlerp` does not wrap the result.
+        fn rotlerp(a: f32, b: f32, max: f32) -> f32 {
+            a + pumpkin_util::math::wrap_degrees(b - a).clamp(-max, max)
+        }
+        let entity = &self.living_entity.entity;
+        let pos = entity.pos.load();
+        let target_entity = target.get_entity();
+        let target_pos = target_entity.pos.load();
+        let xd = target_pos.x - pos.x;
+        let zd = target_pos.z - pos.z;
+        let yd = if target.get_living_entity().is_some() {
+            target_entity.get_eye_y() - entity.get_eye_y()
+        } else {
+            let bounding_box = target_entity.bounding_box.load();
+            f64::midpoint(bounding_box.min.y, bounding_box.max.y) - entity.get_eye_y()
+        };
+        #[expect(
+            clippy::imprecise_flops,
+            reason = "vanilla's Math.sqrt rounds like this, hypot doesn't"
+        )]
+        let sd = (xd * xd + zd * zd).sqrt();
+        // `* 180.0F / (float) Math.PI`, left to right in doubles.
+        let to_degrees =
+            |radians: f64| radians * f64::from(180.0f32) / f64::from(std::f32::consts::PI);
+        let y_rot_d = to_degrees(pumpkin_util::math::atan2(zd, xd)) as f32 - 90.0;
+        let x_rot_d = (-to_degrees(pumpkin_util::math::atan2(yd, sd))) as f32;
+        entity.set_pitch(rotlerp(entity.pitch.load(), x_rot_d, x_max));
+        entity.yaw.store(rotlerp(entity.yaw.load(), y_rot_d, y_max));
+    }
+
     /// Vanilla `mob.getJumpControl().jump()`: jump at the end of this AI step.
     pub fn jump(&self) {
         self.jump_control

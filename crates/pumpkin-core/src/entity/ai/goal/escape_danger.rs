@@ -1,4 +1,4 @@
-use pumpkin_data::tag::{self, Taggable};
+use pumpkin_data::tag::{self, Tag, Taggable};
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
 use std::sync::atomic::Ordering::Relaxed;
@@ -23,6 +23,10 @@ pub struct EscapeDangerGoal {
     always_seek_water: Option<i32>,
     /// What a vanilla subclass adds to `shouldPanic`, like a defending fox staying put.
     gate: Option<MobFilter>,
+    /// Vanilla `panicCausingDamageTypes`.
+    panic_causes: &'static Tag,
+    /// What a vanilla subclass adds to `canContinueToUse`, like `PandaPanicGoal`.
+    continue_while: Option<MobFilter>,
 }
 
 impl EscapeDangerGoal {
@@ -35,7 +39,26 @@ impl EscapeDangerGoal {
             running: false,
             always_seek_water: None,
             gate: None,
+            panic_causes: &tag::DamageType::MINECRAFT_PANIC_CAUSES,
+            continue_while: None,
         })
+    }
+
+    /// Vanilla `PanicGoal(mob, speed, panicCausingDamageTypes)`: only damage in `panic_causes`
+    /// makes the mob flee.
+    #[must_use]
+    pub fn with_panic_causes(speed: f64, panic_causes: &'static Tag) -> Box<Self> {
+        let mut goal = Self::new(speed);
+        goal.panic_causes = panic_causes;
+        goal
+    }
+
+    /// Checked before the base `canContinueToUse`; the filter may act on the mob, as
+    /// `PandaPanicGoal` stops the navigation when it sits down.
+    #[must_use]
+    pub fn continuing_while(mut self: Box<Self>, filter: MobFilter) -> Box<Self> {
+        self.continue_while = Some(filter);
+        self
     }
 
     /// Vanilla `Turtle.TurtlePanicGoal`: heads for water within `range` blocks first.
@@ -58,7 +81,7 @@ impl EscapeDangerGoal {
         self.running
     }
 
-    /// Only `#minecraft:panic_causes` damage makes a mob flee, and only while the source is still
+    /// Only `panic_causes` damage makes a mob flee, and only while the source is still
     /// remembered.
     fn should_panic(&self, mob: &dyn Mob) -> bool {
         self.gate.is_none_or(|gate| gate(mob))
@@ -66,9 +89,7 @@ impl EscapeDangerGoal {
                 .get_mob_entity()
                 .living_entity
                 .get_last_damage_type()
-                .is_some_and(|damage_type| {
-                    damage_type.has_tag(&tag::DamageType::MINECRAFT_PANIC_CAUSES)
-                })
+                .is_some_and(|damage_type| damage_type.has_tag(self.panic_causes))
     }
 
     /// Vanilla `PanicGoal.lookForWater`: the first water in Manhattan order within `range` blocks
@@ -118,7 +139,7 @@ impl Goal for EscapeDangerGoal {
     }
 
     fn should_continue(&mut self, mob: &dyn Mob) -> bool {
-        !mob.is_navigator_idle()
+        self.continue_while.is_none_or(|filter| filter(mob)) && !mob.is_navigator_idle()
     }
 
     fn start(&mut self, mob: &dyn Mob) {

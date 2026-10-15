@@ -1939,7 +1939,7 @@ impl LivingEntity {
     }
 
     /// Vanilla `LivingEntity.jumpFromGround`, in vanilla's float maths.
-    fn jump(&self) {
+    pub fn jump(&self) {
         let jump = self.get_jump_velocity(1.0);
         if jump <= 1.0E-5 {
             return;

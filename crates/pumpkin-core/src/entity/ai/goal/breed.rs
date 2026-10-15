@@ -1,7 +1,5 @@
 use std::sync::Arc;
 
-use uuid::Uuid;
-
 use pumpkin_data::entity::EntityStatus;
 use rand::RngExt;
 
@@ -11,7 +9,7 @@ use crate::entity::ai::util::goal_utils;
 use crate::entity::experience_orb::ExperienceOrbEntity;
 use crate::entity::living::LivingEntity;
 use crate::entity::mob::MobEntity;
-use crate::entity::{EntityBase, mob::Mob, r#type::from_type};
+use crate::entity::{EntityBase, mob::Mob};
 
 use super::{Controls, Goal};
 
@@ -127,9 +125,12 @@ impl BreedGoal {
         let world = entity.world.load_full();
         let parent_pos = entity.pos.load();
 
-        // TODO: vanilla `getBreedOffspring` is per species and may decline (horse and donkey
-        // make a mule); this always clones the breeder's type.
-        let baby = from_type(entity.entity_type, parent_pos, &world, Uuid::new_v4());
+        let Some(baby) = mob
+            .as_animal()
+            .and_then(|animal| animal.get_breed_offspring(&world, mate))
+        else {
+            return;
+        };
         if let Some(offspring) = offspring {
             offspring(mob, mate, baby.as_ref());
         }

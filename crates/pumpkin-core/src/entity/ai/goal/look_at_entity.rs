@@ -70,7 +70,8 @@ impl LookAtEntityGoal {
         Box::new(Self::new(mob_weak, target_type, range, 0.02, false))
     }
 
-    fn create_target_predicate(
+    /// Vanilla `lookAtContext`: in range and, for players, not riding the mob.
+    pub(crate) fn create_target_predicate(
         mob_weak: Weak<dyn Mob>,
         target_type: &'static EntityType,
         range: f32,

@@ -5,12 +5,16 @@ use pumpkin_data::particle::Particle;
 use pumpkin_data::sound::{Sound, SoundCategory};
 
 use crate::entity::{
+    EntityBase,
     ai::pathfinder::node::PathType,
     mob::{Mob, MobEntity},
     player::Player,
+    r#type::from_type,
 };
+use crate::world::World;
 use pumpkin_protocol::bedrock::server::actor_event::ActorEventID;
 use pumpkin_util::math::vector3::Vector3;
+use uuid::Uuid;
 
 /// Vanilla `Animal`'s constructor: animals keep clear of fire.
 pub fn set_animal_pathfinding_malus(mob_entity: &MobEntity) {
@@ -29,6 +33,23 @@ pub trait Animal: Mob {
     /// Vanilla `AbstractHorse.canParent`; only the horse family breeds through it.
     fn can_parent(&self) -> bool {
         false
+    }
+
+    /// Vanilla `getBreedOffspring`: the baby this animal makes with `partner`, or `None` when
+    /// they make none.
+    // TODO: species whose offspring differs (horse and donkey make a mule) still override this.
+    fn get_breed_offspring(
+        &self,
+        world: &Arc<World>,
+        _partner: &dyn EntityBase,
+    ) -> Option<Arc<dyn EntityBase>> {
+        let entity = self.get_entity();
+        Some(from_type(
+            entity.entity_type,
+            entity.pos.load(),
+            world,
+            Uuid::new_v4(),
+        ))
     }
 
     /// Animals prefer grass, then bright spots.
