@@ -1,6 +1,6 @@
 use std::sync::{
     Arc, Weak,
-    atomic::{AtomicBool, Ordering},
+    atomic::{AtomicBool, AtomicI32, Ordering},
 };
 
 use crate::entity::attributes::Modifier;
@@ -12,7 +12,6 @@ use pumpkin_data::{
     damage::DamageType,
     data_component_impl::EquipmentSlot,
     entity::EntityType,
-    item::Item,
     particle::Particle,
     sound::{Sound, SoundCategory},
     tag,
@@ -48,12 +47,6 @@ const ENDERMAN_SPEED_BOOST_ID: &str = "minecraft:attacking";
 
 pub const ENDERMAN_EYE_HEIGHT: f64 = 2.55;
 pub const ENDERMAN_BODY_Y_OFFSET: f64 = 1.45;
-pub const PLAYER_EYE_HEIGHT: f64 = 1.62;
-
-fn is_projectile_damage(dt: DamageType) -> bool {
-    let (names, _) = pumpkin_data::tag::DamageType::MINECRAFT_IS_PROJECTILE;
-    names.contains(&dt.message_id)
-}
 
 pub struct EndermanEntity {
     pub mob_entity: MobEntity,
@@ -63,6 +56,8 @@ pub struct EndermanEntity {
     creepy: AtomicBool,
     provoked: AtomicBool,
     speed_boosted: AtomicBool,
+    /// Vanilla `targetChangeTime`: when the current target was set, 0 without one.
+    target_change_time: AtomicI32,
 }
 
 impl EndermanEntity {
@@ -75,6 +70,7 @@ impl EndermanEntity {
             creepy: AtomicBool::new(false),
             provoked: AtomicBool::new(false),
             speed_boosted: AtomicBool::new(false),
+            target_change_time: AtomicI32::new(0),
         };
         let mob_arc = Arc::new(entity);
         let mob_weak: Weak<dyn Mob> = {
@@ -150,18 +146,14 @@ impl EndermanEntity {
         let pos = entity.pos.load();
         let target_pos = target.get_entity().pos.load();
 
-        let dx = pos.x - target_pos.x;
-        let dy = (pos.y + ENDERMAN_BODY_Y_OFFSET) - (target_pos.y + PLAYER_EYE_HEIGHT);
-        let dz = pos.z - target_pos.z;
-        let dist = (dx * dx + dy * dy + dz * dz).sqrt();
-
-        if dist < 1e-6 {
-            return false;
-        }
-
-        let nx = dx / dist;
-        let ny = dy / dist;
-        let nz = dz / dist;
+        // Vanilla `teleportTowards`: from the target's eyes to the enderman's middle.
+        let dir = Vector3::new(
+            pos.x - target_pos.x,
+            (pos.y + ENDERMAN_BODY_Y_OFFSET) - target.get_entity().get_eye_y(),
+            pos.z - target_pos.z,
+        )
+        .normalize();
+        let (nx, ny, nz) = (dir.x, dir.y, dir.z);
         let (x, y, z) = {
             let mut rng = self.get_random();
             (
@@ -261,6 +253,14 @@ impl EndermanEntity {
         *mob_target = target;
         drop(mob_target);
 
+        let tick_count = self
+            .mob_entity
+            .living_entity
+            .entity
+            .tick_count
+            .load(Ordering::Relaxed);
+        self.target_change_time
+            .store(if is_some { tick_count } else { 0 }, Ordering::Relaxed);
         if is_some {
             self.set_creepy(true);
             // Use attribute modifier instead of direct speed arithmetic
@@ -332,61 +332,62 @@ impl EndermanEntity {
         self.carried_block.load()
     }
 
+    /// Vanilla `Enderman.isBeingStaredBy`: no gaze disguise on the head, and
+    /// `isLookingAtMe(player, 0.025, true, false, getEyeY())`.
     pub fn is_player_staring(&self, player: &Player) -> bool {
-        let equipment = player.living_entity.entity_equipment.try_lock();
-        if let Ok(equipment) = equipment
+        if let Ok(equipment) = player.living_entity.entity_equipment.try_lock()
             && let Some(head_stack) = equipment.equipment.get(&EquipmentSlot::HEAD)
-            && !head_stack.is_empty()
-            && head_stack.item == &Item::CARVED_PUMPKIN
+            && head_stack
+                .item
+                .has_tag(&pumpkin_data::tag::Item::MINECRAFT_GAZE_DISGUISE_EQUIPMENT)
         {
             return false;
         }
 
         let entity = &self.mob_entity.living_entity.entity;
-        let enderman_pos = entity.pos.load();
-        let enderman_eye_y = enderman_pos.y + ENDERMAN_EYE_HEIGHT;
-
+        let gaze_height = entity.get_eye_y();
         let player_entity = player.get_entity();
+
+        // `getViewVector(1.0F).normalize()`: `calculateViewVector` with the `Mth` tables.
+        let rx = player_entity.pitch.load() * (std::f32::consts::PI / 180.0);
+        let ry = -player_entity.yaw.load() * (std::f32::consts::PI / 180.0);
+        let (cos_y, sin_y) = (pumpkin_util::math::cos(ry), pumpkin_util::math::sin(ry));
+        let (cos_x, sin_x) = (pumpkin_util::math::cos(rx), pumpkin_util::math::sin(rx));
+        let look = Vector3::new(
+            f64::from(sin_y * cos_x),
+            f64::from(-sin_x),
+            f64::from(cos_y * cos_x),
+        )
+        .normalize();
+
+        let pos = entity.pos.load();
         let player_pos = player_entity.pos.load();
-        let player_eye_y = player_pos.y + PLAYER_EYE_HEIGHT;
-
-        let pitch = player_entity.pitch.load().to_radians();
-        let yaw = -player_entity.yaw.load().to_radians();
-
-        let cos_pitch = pitch.cos();
-        let look_dir = Vector3::new(
-            (yaw.sin() * cos_pitch) as f64,
-            (-pitch.sin()) as f64,
-            (yaw.cos() * cos_pitch) as f64,
+        let player_eye_y = player_entity.get_eye_y();
+        let dir = Vector3::new(
+            pos.x - player_pos.x,
+            gaze_height - player_eye_y,
+            pos.z - player_pos.z,
         );
-
-        let dx = enderman_pos.x - player_pos.x;
-        let dy = enderman_eye_y - player_eye_y;
-        let dz = enderman_pos.z - player_pos.z;
-        let distance = (dx * dx + dy * dy + dz * dz).sqrt();
-
-        if distance < 0.1 {
+        let dist = dir.length();
+        let dir = dir.normalize();
+        let dot = look.x * dir.x + look.y * dir.y + look.z * dir.z;
+        if dot <= 1.0 - 0.025 / dist {
             return false;
         }
 
-        let dir_x = dx / distance;
-        let dir_y = dy / distance;
-        let dir_z = dz / distance;
-
-        let dot = look_dir.x * dir_x + look_dir.y * dir_y + look_dir.z * dir_z;
-
-        if dot <= 1.0 - 0.025 / distance {
+        // `player.hasLineOfSight(this, COLLIDER, NONE, gazeHeight)`: from the player's eyes.
+        let from = Vector3::new(player_pos.x, player_eye_y, player_pos.z);
+        let to = Vector3::new(pos.x, gaze_height, pos.z);
+        if from.squared_distance_to_vec(&to).sqrt() > 128.0 {
             return false;
         }
-
-        let enderman_eye_pos = Vector3::new(enderman_pos.x, enderman_eye_y, enderman_pos.z);
-        let player_eye_pos = Vector3::new(player_pos.x, player_eye_y, player_pos.z);
-        let world = entity.world.load();
-        world
+        entity
+            .world
+            .load()
             .clip(&pumpkin_world::clip::ClipContext::new(
-                enderman_eye_pos,
-                player_eye_pos,
-                pumpkin_world::clip::ClipBlock::Visual,
+                from,
+                to,
+                pumpkin_world::clip::ClipBlock::Collider,
                 pumpkin_world::clip::ClipFluid::None,
             ))
             .is_miss
@@ -419,15 +420,26 @@ impl Mob for EndermanEntity {
     }
 
     fn mob_write_nbt(&self, nbt: &mut NbtCompound) {
+        // Vanilla `BlockState.CODEC`.
         if let Some(block_state) = self.carried_block.load() {
-            nbt.put_int("carriedBlockState", block_state.as_u16() as i32);
+            nbt.put_compound(
+                "carriedBlockState",
+                crate::block::write_block_state_nbt(block_state),
+            );
         }
     }
 
     fn mob_read_nbt(&self, nbt: &NbtCompound) {
-        if let Some(block_state) = nbt.get_int("carriedBlockState") {
-            self.set_carried_block(BlockStateId::new(block_state as u16));
-        }
+        // Vanilla `BlockState.CODEC`, air read as nothing; older Pumpkin saves held a raw id.
+        let carried = nbt
+            .get_compound("carriedBlockState")
+            .and_then(crate::block::read_block_state_nbt)
+            .or_else(|| {
+                nbt.get_int("carriedBlockState")
+                    .and_then(|id| BlockStateId::new(id as u16))
+            })
+            .filter(|state| !pumpkin_data::BlockState::from_id(*state).is_air());
+        self.set_carried_block(carried);
     }
 
     fn get_mob_entity(&self) -> &MobEntity {
@@ -438,13 +450,64 @@ impl Mob for EndermanEntity {
         self.set_target(self.as_valid_target(target));
     }
 
-    // TODO: sunlight avoidance, carried block drop on death, angerable system, ambient sound override
     fn is_sensitive_to_water(&self) -> bool {
         true
     }
 
+    /// Vanilla `Enderman.customServerAiStep`: in daylight, a while after picking a target, it
+    /// may give up and teleport away.
+    fn custom_server_ai_step(&self, _caller: &dyn EntityBase) {
+        let entity = &self.mob_entity.living_entity.entity;
+        let world = entity.world.load();
+        let tick_count = entity.tick_count.load(Ordering::Relaxed);
+        if world.is_bright_outside()
+            && tick_count >= self.target_change_time.load(Ordering::Relaxed) + 600
+        {
+            // `getLightLevelDependentMagicValue` at the eyes, `canSeeSky` at the feet.
+            let pos = entity.pos.load();
+            let eye =
+                pumpkin_util::math::position::BlockPos::floored(pos.x, entity.get_eye_y(), pos.z);
+            let br = world.get_light_level_dependent_magic_value(&eye);
+            if br > 0.5
+                && world.can_see_sky(&entity.block_pos.load())
+                && self.get_random().random::<f32>() * 30.0 < (br - 0.4) * 2.0
+            {
+                self.set_target(None);
+                self.teleport_randomly();
+            }
+        }
+    }
+
+    /// Vanilla `Enderman.dropCustomDeathLoot`: the carried block's drops, as if mined with a
+    /// silk-touch diamond axe.
+    fn drop_custom_death_loot(&self) {
+        let Some(state_id) = self.get_carried_block() else {
+            return;
+        };
+        let entity = &self.mob_entity.living_entity.entity;
+        let world = entity.world.load_full();
+        let (block, state) = pumpkin_data::BlockState::from_id_with_block(state_id);
+        let mut tool =
+            pumpkin_data::item_stack::ItemStack::new(1, &pumpkin_data::item::Item::DIAMOND_AXE);
+        tool.enchant(&pumpkin_data::Enchantment::SILK_TOUCH, 1);
+        let params = crate::world::loot::LootContextParameters {
+            block_state: Some(state),
+            position: Some(entity.pos.load()),
+            tool: Some(tool),
+            this_entity: Some(entity.entity_type),
+            ..Default::default()
+        };
+        let pos = entity.block_pos.load();
+        for stack in crate::block::block_loot_stacks(&world, block, &pos, &params) {
+            world.drop_stack(&pos, stack);
+        }
+    }
+
     fn pre_damage(&self, damage_type: DamageType, _source: Option<&dyn EntityBase>) -> bool {
-        let is_projectile = is_projectile_damage(damage_type);
+        // Vanilla `hurtServer`: projectiles make it teleport instead, unless it is riding.
+        let is_projectile = damage_type
+            .has_tag(&pumpkin_data::tag::DamageType::MINECRAFT_IS_PROJECTILE)
+            && !self.mob_entity.living_entity.entity.is_passenger();
         if is_projectile {
             for _ in 0..64 {
                 if self.teleport_randomly() {

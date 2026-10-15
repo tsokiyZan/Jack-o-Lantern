@@ -1436,6 +1436,9 @@ pub trait Mob: EntityBase + Send + Sync {
     /// equipment drop.
     fn before_drop_all_death_loot(&self) {}
 
+    /// What a vanilla `dropCustomDeathLoot` override adds after the equipment drops.
+    fn drop_custom_death_loot(&self) {}
+
     /// Vanilla `LivingEntity.isSleeping`, for mobs that sleep without a bed.
     fn is_sleeping(&self) -> bool {
         false

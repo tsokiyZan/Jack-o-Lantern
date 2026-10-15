@@ -2295,6 +2295,9 @@ impl LivingEntity {
             self.entity.pose.store(EntityPose::Dying);
 
             self.drop_equipment(looting_level);
+            if let Some(mob) = dyn_self.get_mob() {
+                mob.drop_custom_death_loot();
+            }
 
             // Broadcast death message if it's a player and the gamerule is enabled
             self.broadcast_death_message(&*dyn_self, damage_type, source, cause);

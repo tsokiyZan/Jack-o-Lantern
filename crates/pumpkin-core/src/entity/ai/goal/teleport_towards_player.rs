@@ -5,7 +5,7 @@ use super::{Controls, Goal, to_goal_ticks};
 use crate::entity::EntityBase;
 use crate::entity::ai::target_predicate::TargetPredicate;
 use crate::entity::mob::Mob;
-use crate::entity::mob::enderman::{EndermanEntity, PLAYER_EYE_HEIGHT};
+use crate::entity::mob::enderman::EndermanEntity;
 use crate::entity::mob::neutral::NeutralMob;
 use crate::entity::player::Player;
 use crate::world::World;
@@ -93,7 +93,7 @@ impl Goal for TeleportTowardsPlayerGoal {
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             look_control.look_at_with_range(
                 player_pos.x,
-                player_pos.y + PLAYER_EYE_HEIGHT,
+                player.get_entity().get_eye_y(),
                 player_pos.z,
                 10.0,
                 10.0,
