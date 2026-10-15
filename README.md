@@ -43,6 +43,10 @@ Jack o'Lantern is tsokiyZan's fork of Pumpkin, a Minecraft server written in Rus
 | Mob movement physics in vanilla's float maths, with a bit-exact `Mth.atan2` | Ported here from `LivingEntity.travel` and `Mth` |
 | Targeting scales with visibility, line of sight uses colliders, revenge memory expires | Ported here from `TargetingConditions` and `LivingEntity` |
 | Vanilla goal lists for spiders (leaps, armadillo avoidance), wolves (sitting), cats and ocelots (pouncing), illagers, ravagers, witches, vexes, snow golems, silverfish, slimes, ghasts, zombified piglins, farm animals | Ported here from each mob's `registerGoals` |
+| Per-mob AI: witches heal raiders, vindicators break doors (and Johnny attacks everything), evokers and illusioners cast spells, vexes charge, guardians fire lasers, drowned swim and throw tridents, bees use hives and pollinate, phantoms run the circling and swooping AI, turtles go home and lay eggs, striders seek lava, llamas form caravans, shulkers defend their team, silverfish wake their friends, rabbits hop and raid carrot farms | Ported here from each mob's class and goals |
+| Foxes, pandas, ghasts and happy ghasts (ghastlings on the `HappyGhastAi` brain) behave like vanilla; parrots can be tamed and sit; horses are tamed by riding them | Ported here from `Fox`, `Panda`, `Ghast`, `HappyGhast`, `Parrot` and `AbstractHorse` |
+| Entity basics follow 26.3: collisions, the damage cooldown and `hurtTime`, daylight burning, the armor attribute, attribute modifier order, `NoGravity`, and saving leashes, attributes, homes and mob flags | Fixed here |
+| Entity, worldgen and velocity maths use vanilla's float operation order (no fused multiply-add); player movement is sent with vanilla's position delta rounding | Fixed here |
 | Every item data component encodes, decodes and hashes like vanilla (goat horns, paintings, trims and banners no longer disconnect) | Ported here |
 | Dappled forest trees, vegetation patches and feature order generate like vanilla | Fixed here |
 | Structure starts are computed once and biome-checked before their pieces are built (about 25% faster chunk loading) | Fixed here |
