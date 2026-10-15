@@ -5416,6 +5416,9 @@ impl World {
                 let item = p.inventory().held_item();
                 if item.is_empty() { None } else { Some(item) }
             });
+            // Vanilla `dropResources`: `spawnAfterBreak` before the drops.
+            self.block_registry
+                .spawn_after_break(broken_block, self, position, tool.as_ref());
             let params = crate::world::loot::LootContextParameters {
                 tool,
                 block_state: Some(broken_block_state),

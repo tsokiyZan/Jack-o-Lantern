@@ -151,9 +151,6 @@ impl Goal for SilverfishWakeUpFriendsGoal {
                         // `destroyBlock(pos, true, silverfish)`, whose `spawnAfterBreak` lets
                         // the silverfish out.
                         world.break_block(&test_pos, None, BlockFlags::NOTIFY_ALL);
-                        if world.level_info.load().game_rules.block_drops {
-                            InfestedBlock::spawn_infestation(&world, &test_pos);
-                        }
                     } else if let Some(host) = InfestedBlock::host_state_by_infested(block, state) {
                         world.set_block_state(&test_pos, host, BlockFlags::NOTIFY_ALL);
                     }

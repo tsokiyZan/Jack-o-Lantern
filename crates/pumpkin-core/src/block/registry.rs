@@ -208,7 +208,7 @@ use super::{
     AttackArgs, BrokenArgs, CanPlaceAtArgs, CanUpdateAtArgs, EmitsRedstonePowerArgs, ExplodeArgs,
     GetRedstonePowerArgs, GetStateForNeighborUpdateArgs, NormalUseArgs, OnNeighborUpdateArgs,
     OnPlaceArgs, OnStateReplacedArgs, OnSyncedBlockEventArgs, PlacedArgs, PlayerPlacedArgs,
-    PrepareArgs, UseWithItemArgs,
+    PrepareArgs, SpawnAfterBreakArgs, UseWithItemArgs,
 };
 use crate::block::blocks::blast_furnace::BlastFurnaceBlock;
 use crate::block::blocks::chain::ChainBlock;
@@ -990,6 +990,23 @@ impl BlockRegistry {
             });
         }
         None
+    }
+
+    pub fn spawn_after_break(
+        &self,
+        block: &Block,
+        world: &Arc<World>,
+        position: &BlockPos,
+        tool: Option<&ItemStack>,
+    ) {
+        if let Some(pumpkin_block) = self.get_pumpkin_block(block.id) {
+            pumpkin_block.spawn_after_break(SpawnAfterBreakArgs {
+                world,
+                block,
+                position,
+                tool,
+            });
+        }
     }
 
     pub fn explode(&self, block: &Block, world: &Arc<World>, position: &BlockPos) {

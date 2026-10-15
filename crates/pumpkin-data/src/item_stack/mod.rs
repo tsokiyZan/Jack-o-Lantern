@@ -313,6 +313,13 @@ impl ItemStack {
         0
     }
 
+    /// Vanilla `EnchantmentHelper.hasTag`: whether any enchantment on the stack is in `tag`.
+    #[must_use]
+    pub fn has_enchantment_tag(&self, tag: &'static crate::tag::Tag) -> bool {
+        self.get_data_component::<EnchantmentsImpl>()
+            .is_some_and(|data| data.enchantment.iter().any(|(enc, _)| enc.has_tag(tag)))
+    }
+
     #[must_use]
     pub fn is_unbreakable(&self) -> bool {
         self.get_data_component::<UnbreakableImpl>().is_some()

@@ -101,6 +101,10 @@ pub trait BlockBehaviour: Send + Sync {
 
     fn explode(&self, _args: ExplodeArgs<'_>) {}
 
+    /// Vanilla `spawnAfterBreak`: runs before the drops whenever the block drops its resources,
+    /// whether a player, an explosion or `destroyBlock` broke it.
+    fn spawn_after_break(&self, _args: SpawnAfterBreakArgs<'_>) {}
+
     /// Handles the block event, which is an event specific to a block with an integer ID and data.
     ///
     /// returns whether the event was handled successfully
@@ -276,6 +280,14 @@ pub struct OnEntityStepArgs<'a> {
     pub position: &'a BlockPos,
     pub entity: &'a dyn EntityBase,
     pub below_supporting_block: bool,
+}
+
+pub struct SpawnAfterBreakArgs<'a> {
+    pub world: &'a Arc<World>,
+    pub block: &'a Block,
+    pub position: &'a BlockPos,
+    /// The breaking tool; `None` is vanilla's `ItemStack.EMPTY`.
+    pub tool: Option<&'a ItemStack>,
 }
 
 pub struct ExplodeArgs<'a> {

@@ -12,7 +12,7 @@ use pumpkin_world::chunk::ChunkData;
 use rustc_hash::FxHashMap;
 
 use crate::{
-    block::{ExplodeArgs, drop_loot},
+    block::{ExplodeArgs, SpawnAfterBreakArgs, drop_loot},
     entity::{Entity, EntityBase},
     world::loot::LootContextParameters,
 };
@@ -542,6 +542,15 @@ impl Explosion {
                     let pumpkin_block = world.block_registry.get_pumpkin_block(block.id);
 
                     if pumpkin_block.is_none_or(|s| s.should_drop_items_on_explosion()) {
+                        // Vanilla `onExplosionHit`: `spawnAfterBreak` with an empty tool first.
+                        if let Some(pumpkin_block) = pumpkin_block {
+                            pumpkin_block.spawn_after_break(SpawnAfterBreakArgs {
+                                world,
+                                block,
+                                position: pos,
+                                tool: None,
+                            });
+                        }
                         let is_raining = world.is_raining();
                         let is_thundering = world.is_thundering();
                         let params = LootContextParameters {

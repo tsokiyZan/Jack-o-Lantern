@@ -1,15 +1,15 @@
 use std::sync::Arc;
 
 use pumpkin_data::entity::{EntityStatus, EntityType};
-use pumpkin_data::{Block, BlockStateId, Enchantment};
+use pumpkin_data::tag::Enchantment as EnchantmentTag;
+use pumpkin_data::{Block, BlockStateId};
 use pumpkin_macros::pumpkin_block;
-use pumpkin_util::GameMode;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
 use uuid::Uuid;
 
 use crate::block::BlockBehaviour;
-use crate::block::BrokenArgs;
+use crate::block::SpawnAfterBreakArgs;
 use crate::entity::r#type::from_type;
 use crate::world::World;
 
@@ -106,18 +106,14 @@ impl InfestedBlock {
 }
 
 impl BlockBehaviour for InfestedBlock {
-    /// Vanilla `spawnAfterBreak` for a player's break: creative breaks drop nothing, and
-    /// silk touch (`PREVENTS_INFESTED_SPAWNS`) keeps the silverfish in.
-    fn broken(&self, args: BrokenArgs<'_>) {
-        if args.player.gamemode.load() == GameMode::Creative
-            || !args.world.level_info.load().game_rules.block_drops
+    /// Vanilla `spawnAfterBreak`.
+    fn spawn_after_break(&self, args: SpawnAfterBreakArgs<'_>) {
+        if args.world.level_info.load().game_rules.block_drops
+            && !args.tool.is_some_and(|tool| {
+                tool.has_enchantment_tag(&EnchantmentTag::MINECRAFT_PREVENTS_INFESTED_SPAWNS)
+            })
         {
-            return;
+            Self::spawn_infestation(args.world, args.position);
         }
-        let held_item = args.player.inventory().held_item();
-        if held_item.get_enchantment_level(&Enchantment::SILK_TOUCH) > 0 {
-            return;
-        }
-        Self::spawn_infestation(args.world, args.position);
     }
 }
