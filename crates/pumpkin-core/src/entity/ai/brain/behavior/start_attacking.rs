@@ -11,6 +11,16 @@ pub fn start_attacking(
     can_attack: impl Fn(&BrainTick<'_>) -> bool + Send + Sync + 'static,
     find_target: impl Fn(&BrainTick<'_>) -> Option<Arc<dyn EntityBase>> + Send + Sync + 'static,
 ) -> OneShot {
+    start_attacking_with_memory_writes(can_attack, move |tick| find_target(tick))
+}
+
+/// [`start_attacking`] for target finders that also write memories, as vanilla
+/// `NautilusAi.findNearestValidAttackTarget` does.
+#[must_use]
+pub fn start_attacking_with_memory_writes(
+    can_attack: impl Fn(&BrainTick<'_>) -> bool + Send + Sync + 'static,
+    find_target: impl Fn(&mut BrainTick<'_>) -> Option<Arc<dyn EntityBase>> + Send + Sync + 'static,
+) -> OneShot {
     OneShot::with_required(
         "StartAttacking",
         vec![(types::ATTACK_TARGET.id(), MemoryStatus::ValueAbsent)],

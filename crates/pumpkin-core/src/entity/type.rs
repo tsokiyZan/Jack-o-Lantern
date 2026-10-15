@@ -80,7 +80,7 @@ use crate::entity::passive::iron_golem::IronGolemEntity;
 use crate::entity::passive::llama::LlamaEntity;
 use crate::entity::passive::mooshroom::MooshroomEntity;
 use crate::entity::passive::mule::MuleEntity;
-use crate::entity::passive::nautilus::NautilusEntity;
+use crate::entity::passive::nautilus::{NautilusEntity, NautilusKind};
 use crate::entity::passive::ocelot::OcelotEntity;
 use crate::entity::passive::panda::PandaEntity;
 use crate::entity::passive::parrot::ParrotEntity;
@@ -224,7 +224,10 @@ pub fn from_type(
         id if id == EntityType::TROPICAL_FISH.id => TropicalFishEntity::new(entity),
         id if id == EntityType::TADPOLE.id => TadpoleEntity::new(entity),
         id if id == EntityType::DOLPHIN.id => DolphinEntity::new(entity),
-        id if id == EntityType::NAUTILUS.id => NautilusEntity::new(entity),
+        id if id == EntityType::NAUTILUS.id => NautilusEntity::new(entity, NautilusKind::Nautilus),
+        id if id == EntityType::ZOMBIE_NAUTILUS.id => {
+            NautilusEntity::new(entity, NautilusKind::ZombieNautilus)
+        }
 
         id if id == EntityType::SNOW_GOLEM.id => SnowGolemEntity::new(entity),
         id if id == EntityType::IRON_GOLEM.id => IronGolemEntity::new(entity),
@@ -662,10 +665,7 @@ pub fn check_spawn_rules(
             && world
                 .get_fluid(&pos.down())
                 .has_tag(&pumpkin_data::tag::Fluid::MINECRAFT_WATER)
-            && (world.get_block(&pos.up()) == &pumpkin_data::Block::WATER
-                || world
-                    .get_fluid(&pos.up())
-                    .has_tag(&pumpkin_data::tag::Fluid::MINECRAFT_WATER));
+            && world.get_block(&pos.up()) == &pumpkin_data::Block::WATER;
     }
     if id == EntityType::DROWNED.id {
         if world.level_info.load().difficulty == pumpkin_util::Difficulty::Peaceful {

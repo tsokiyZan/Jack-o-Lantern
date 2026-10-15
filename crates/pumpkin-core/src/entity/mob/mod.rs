@@ -1453,6 +1453,18 @@ pub trait Mob: EntityBase + Send + Sync {
         mob_controlling_passenger(self.get_mob_entity())
     }
 
+    /// Vanilla `PlayerRideableJumping.canJump`, for mobs that implement it.
+    fn can_jump(&self) -> bool {
+        false
+    }
+
+    /// Vanilla `PlayerRideableJumping.handleStartJump`: the rider started a jump of
+    /// `jump_scale`.
+    fn handle_start_jump(&self, _jump_scale: i32) {}
+
+    /// Vanilla `PlayerRideableJumping.handleStopJump`.
+    fn handle_stop_jump(&self) {}
+
     fn is_saddled(&self) -> bool {
         false
     }

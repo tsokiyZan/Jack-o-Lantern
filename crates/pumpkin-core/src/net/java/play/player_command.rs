@@ -44,7 +44,25 @@ impl JavaClient {
             }
             Action::LeaveBed => player.wake_up(),
 
-            Action::StartHorseJump | Action::StopHorseJump | Action::OpenVehicleInventory => {
+            Action::StartHorseJump => {
+                if let Some(vehicle) = controlled_vehicle(player)
+                    && let Some(mob) = vehicle.get_mob()
+                    && mob.can_jump()
+                    && command.jump_boost.0 > 0
+                {
+                    mob.handle_start_jump(command.jump_boost.0);
+                }
+            }
+            Action::StopHorseJump => {
+                if let Some(vehicle) = controlled_vehicle(player)
+                    && let Some(mob) = vehicle.get_mob()
+                {
+                    mob.handle_stop_jump();
+                }
+            }
+            // TODO: vanilla `HasCustomInventoryScreen.openCustomInventoryScreen`; Pumpkin
+            // opens no mount inventories yet.
+            Action::OpenVehicleInventory => {
                 debug!("todo");
             }
             Action::StartFlyingElytra => {
@@ -72,4 +90,13 @@ impl JavaClient {
             }
         }
     }
+}
+
+/// Vanilla `Player.getControlledVehicle`: the vehicle `player` rides and steers.
+fn controlled_vehicle(player: &Player) -> Option<Arc<dyn EntityBase>> {
+    let vehicle = player.get_entity().get_vehicle()?;
+    vehicle
+        .controlling_passenger()
+        .is_some_and(|controller| controller.get_entity().entity_id == player.entity_id())
+        .then_some(vehicle)
 }

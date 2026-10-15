@@ -147,7 +147,7 @@ pub trait TamableAnimal: Animal {
         let heal = item_stack
             .get_data_component::<FoodImpl>()
             .map_or(default_heal, |food| healing_factor * food.nutrition as f32);
-        item_stack.decrement_unless_creative(player.gamemode.load(), 1);
+        self.use_player_item(player, item_stack);
         self.get_mob_entity().living_entity.heal(heal);
     }
 

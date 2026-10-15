@@ -6,6 +6,7 @@ pub mod animal_panic;
 pub mod baby_follow_adult;
 pub mod back_up_if_too_close;
 pub mod become_passive_if_memory_present;
+pub mod charge_attack;
 pub mod copy_memory_with_expiry;
 pub mod count_down_cooldown_ticks;
 pub mod croak;
@@ -57,6 +58,7 @@ pub use animal_panic::AnimalPanic;
 pub use baby_follow_adult::{baby_follow_adult, baby_follow_nearest};
 pub use back_up_if_too_close::back_up_if_too_close;
 pub use become_passive_if_memory_present::become_passive_if_memory_present;
+pub use charge_attack::ChargeAttack;
 pub use copy_memory_with_expiry::copy_memory_with_expiry;
 pub use count_down_cooldown_ticks::CountDownCooldownTicks;
 pub use croak::Croak;
@@ -98,7 +100,7 @@ pub use set_walk_target_from_look_target::{
     set_walk_target_from_look_target, set_walk_target_from_look_target_with,
 };
 pub use shuffling_list::ShufflingList;
-pub use start_attacking::start_attacking;
+pub use start_attacking::{start_attacking, start_attacking_with_memory_writes};
 pub use start_celebrating_if_target_dead::start_celebrating_if_target_dead;
 pub use stay_close_to_target::stay_close_to_target;
 pub use stop_attacking_if_target_invalid::stop_attacking_if_target_invalid;
