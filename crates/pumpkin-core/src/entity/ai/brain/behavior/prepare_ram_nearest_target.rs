@@ -269,7 +269,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_ram_target_is_the_near_edge_of_the_target_block() {
+    fn the_ram_target_is_the_far_edge_of_the_target_block() {
         let start = BlockPos(Vector3::new(0, 64, 0));
         let target = BlockPos(Vector3::new(5, 64, 0));
         assert_eq!(

@@ -15,13 +15,11 @@ use pumpkin_data::tag::{self, Taggable};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::math::boundingbox::EntityDimensions;
 use pumpkin_util::math::vector3::Vector3;
-use pumpkin_util::math::wrap_degrees;
 use pumpkin_util::random::{RandomImpl, legacy_rand::LegacyRand};
 use rand::RngExt;
 use uuid::Uuid;
 
 use crate::entity::ai::brain::{Brain, BrainTick, memory::PackedMemories};
-use crate::entity::ai::control::look_control::LookControl;
 use crate::entity::ai::pathfinder::node::PathType;
 use crate::entity::item::ItemEntity;
 use crate::entity::mob::spawn::SpawnGroupData;
@@ -182,11 +180,9 @@ impl GoatEntity {
         let entity = self.get_entity();
         let body_position = entity.pos.load();
         let item = self.create_horn();
-        let mut random_between =
-            |min: f32, max: f32| f64::from(random.random::<f32>() * (max - min) + min);
-        let delta_x = random_between(-0.2, 0.2);
-        let delta_y = random_between(0.3, 0.7);
-        let delta_z = random_between(-0.2, 0.2);
+        let delta_x = f64::from(random_between(&mut random, -0.2, 0.2));
+        let delta_y = f64::from(random_between(&mut random, 0.3, 0.7));
+        let delta_z = f64::from(random_between(&mut random, -0.2, 0.2));
         let world = entity.world.load_full();
         let item_entity = ItemEntity::new_with_velocity(
             Entity::new(world.clone(), body_position, &EntityType::ITEM),
@@ -206,16 +202,11 @@ impl GoatEntity {
             Sound::EntityGoatMilk
         }
     }
+}
 
-    /// Vanilla `Goat.setYHeadRot`: the head stays within `getMaxHeadYRot` of the body.
-    fn set_y_head_rot(&self) {
-        let entity = self.get_entity();
-        let body_yaw = entity.body_yaw.load();
-        let delta_from_body = wrap_degrees(entity.head_yaw.load() - body_yaw);
-        entity
-            .head_yaw
-            .store(body_yaw + delta_from_body.clamp(-MAX_HEAD_Y_ROT, MAX_HEAD_Y_ROT));
-    }
+/// Vanilla `Mth.randomBetween`.
+fn random_between(random: &mut impl RngExt, min: f32, max: f32) -> f32 {
+    random.random::<f32>() * (max - min) + min
 }
 
 /// Java's `UUID.hashCode`.
@@ -289,7 +280,7 @@ impl Animal for GoatEntity {
         } else {
             Sound::EntityGoatEat
         };
-        let pitch = self.get_random().random::<f32>() * (1.2 - 0.8) + 0.8;
+        let pitch = random_between(&mut self.get_random(), 0.8, 1.2);
         entity.world.load().play_sound_fine(
             sound,
             SoundCategory::Neutral,
@@ -360,15 +351,10 @@ impl Mob for GoatEntity {
     }
 
     /// Vanilla `Goat.getMaxHeadYRot`.
+    // TODO: vanilla `Goat.setYHeadRot`'s clamp on teleports, loads and `lookAt`; Pumpkin has
+    // no head rotation setter to hook. `LookControl` writes the field directly, so it skips it.
     fn get_max_head_rotation(&self) -> f32 {
         MAX_HEAD_Y_ROT
-    }
-
-    /// Vanilla `LookControl.tick`, whose head turns go through `Goat.setYHeadRot`.
-    fn custom_look_control_tick(&self, look_control: &mut LookControl) -> bool {
-        look_control.tick(self);
-        self.set_y_head_rot();
-        true
     }
 
     fn as_ageable(&self) -> Option<&dyn AgeableMob> {
@@ -387,8 +373,11 @@ impl Mob for GoatEntity {
         &self.mob_entity
     }
 
-    fn mob_tick(&self, _caller: &dyn EntityBase) {
-        self.ageable_ai_step();
+    /// Vanilla `AgeableMob.aiStep`, the end of `Goat`'s `super.aiStep()`.
+    fn ai_step_end(&self, _caller: &dyn EntityBase) {
+        if self.get_entity().is_alive() {
+            self.ageable_ai_step();
+        }
     }
 
     fn make_brain(&self, packed: &PackedMemories) -> Brain {
