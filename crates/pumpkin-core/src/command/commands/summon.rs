@@ -17,6 +17,7 @@ use crate::command::node::{CommandExecutor, CommandExecutorResult};
 use crate::entity::mob::spawn::finalize_spawn;
 use crate::entity::r#type::from_type;
 use crate::world::World;
+use pumpkin_nbt::compound::NbtCompound;
 
 const DESCRIPTION: &str = "Spawns an entity at position.";
 const PERMISSION: &str = "minecraft:command.summon";
@@ -70,10 +71,11 @@ impl CommandExecutor for SummonExecutor {
             .unwrap_or_else(Uuid::new_v4);
 
         let entity = from_type(entity_type, pos, world, uuid);
-        if let Some(nbt) = nbt {
-            entity.read_nbt_non_mut(nbt);
-            entity.get_entity().set_pos(pos);
-        }
+        // Vanilla `SummonCommand.createEntity` always loads the entity from a tag (an empty one
+        // without the NBT argument), so unset fields take their load defaults, e.g.
+        // `CanPickUpLoot` false.
+        entity.read_nbt_non_mut(nbt.unwrap_or(&NbtCompound::new()));
+        entity.get_entity().set_pos(pos);
 
         if world
             .entities
