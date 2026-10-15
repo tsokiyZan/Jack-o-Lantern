@@ -58,6 +58,16 @@ impl SilverfishEntity {
 }
 
 impl Mob for SilverfishEntity {
+    /// Vanilla `Silverfish.getWalkTargetValue`: blocks it could infest are the best spots.
+    fn get_walk_target_value(&self, pos: &pumpkin_util::math::position::BlockPos) -> f32 {
+        let world = self.get_entity().world.load();
+        if is_compatible_host_block(world.get_block(&pos.down())) {
+            10.0
+        } else {
+            crate::entity::mob::monster_walk_target_value(&world, pos)
+        }
+    }
+
     fn get_mob_entity(&self) -> &MobEntity {
         &self.entity
     }
@@ -84,4 +94,19 @@ impl Mob for SilverfishEntity {
             self.wake_up_friends_ticks.store(20, Ordering::Relaxed);
         }
     }
+}
+
+/// Vanilla `InfestedBlock.isCompatibleHostBlock`: the blocks with an infested variant.
+fn is_compatible_host_block(block: &pumpkin_data::Block) -> bool {
+    use pumpkin_data::Block;
+    [
+        &Block::STONE,
+        &Block::COBBLESTONE,
+        &Block::STONE_BRICKS,
+        &Block::MOSSY_STONE_BRICKS,
+        &Block::CRACKED_STONE_BRICKS,
+        &Block::CHISELED_STONE_BRICKS,
+        &Block::DEEPSLATE,
+    ]
+    .contains(&block)
 }

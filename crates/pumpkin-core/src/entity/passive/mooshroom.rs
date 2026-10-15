@@ -153,6 +153,16 @@ const BABY_DIMENSIONS: EntityDimensions =
     EntityDimensions::scalable(0.45, 0.7).with_eye_height(0.69);
 
 impl Mob for MooshroomEntity {
+    /// Vanilla `MushroomCow.getWalkTargetValue`.
+    fn get_walk_target_value(&self, pos: &pumpkin_util::math::position::BlockPos) -> f32 {
+        let world = self.get_entity().world.load();
+        if world.get_block(&pos.down()) == &pumpkin_data::Block::MYCELIUM {
+            10.0
+        } else {
+            world.get_light_level_dependent_magic_value(pos) - 0.5
+        }
+    }
+
     /// Vanilla `AbstractCow.playStepSound`.
     fn play_step_sound(
         &self,

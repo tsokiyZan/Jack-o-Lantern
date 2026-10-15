@@ -400,6 +400,11 @@ impl NeutralMob for EndermanEntity {
 }
 
 impl Mob for EndermanEntity {
+    /// Vanilla `EnderMan.getWalkTargetValue`.
+    fn get_walk_target_value(&self, _pos: &pumpkin_util::math::position::BlockPos) -> f32 {
+        0.0
+    }
+
     /// Vanilla `Enderman.getAmbientSound`.
     fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
         Some(if self.is_creepy() {

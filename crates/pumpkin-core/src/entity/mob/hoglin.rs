@@ -185,6 +185,18 @@ const BABY_DIMENSIONS: EntityDimensions =
     EntityDimensions::scalable(0.75, 0.85).with_eye_height(0.625);
 
 impl Mob for HoglinEntity {
+    /// Vanilla `Hoglin.getWalkTargetValue`. The repellent check (-1 near warped fungus and
+    /// the like) reads the brain's `NEAREST_REPELLENT`, which Pumpkin's goal-driven hoglin
+    /// doesn't sense.
+    fn get_walk_target_value(&self, pos: &pumpkin_util::math::position::BlockPos) -> f32 {
+        let world = self.get_entity().world.load();
+        if world.get_block(&pos.down()) == &pumpkin_data::Block::CRIMSON_NYLIUM {
+            10.0
+        } else {
+            0.0
+        }
+    }
+
     /// Vanilla `Hoglin.getAmbientSound` through `HoglinAi.getSoundForCurrentActivity`:
     /// angry while fighting. Pumpkin's hoglin runs goals, not the brain, so the fight
     /// activity is its attack target and the retreat sound is never chosen.

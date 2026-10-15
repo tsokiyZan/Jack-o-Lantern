@@ -155,6 +155,20 @@ const BABY_DIMENSIONS: EntityDimensions = Entity::type_dimensions(&EntityType::H
     .with_eye_height(0.468_75);
 
 impl Mob for HappyGhastEntity {
+    /// Vanilla `HappyGhast.getWalkTargetValue`: open air just above the ground is best.
+    fn get_walk_target_value(&self, pos: &pumpkin_util::math::position::BlockPos) -> f32 {
+        let world = self.get_entity().world.load();
+        if !world.get_block_state(pos).is_air() {
+            0.0
+        } else if world.get_block_state(&pos.down()).is_air()
+            && !world.get_block_state(&pos.down_height(2)).is_air()
+        {
+            10.0
+        } else {
+            5.0
+        }
+    }
+
     /// Vanilla `HappyGhast.getAmbientSound`.
     fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
         Some(if self.get_entity().is_baby() {

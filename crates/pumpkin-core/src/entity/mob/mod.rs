@@ -1368,10 +1368,16 @@ pub trait Mob: EntityBase + Send + Sync {
         None
     }
 
-    /// How much this mob likes standing on `pos`, used to rank stroll candidates.
+    /// How much this mob likes standing on `pos`, used to rank stroll candidates: vanilla
+    /// `PathfinderMob.getWalkTargetValue`, with `Animal`'s and `Monster`'s overrides.
     fn get_walk_target_value(&self, pos: &BlockPos) -> f32 {
-        self.as_animal()
-            .map_or(0.0, |animal| animal.animal_walk_target_value(pos))
+        if let Some(animal) = self.as_animal() {
+            return animal.animal_walk_target_value(pos);
+        }
+        if is_monster(self.get_entity().entity_type) {
+            return monster_walk_target_value(&self.get_entity().world.load(), pos);
+        }
+        0.0
     }
 
     /// Vanilla `Entity.omnidirectionalAirMover`: drags vertically like horizontally in the air.
@@ -1755,6 +1761,30 @@ pub trait Mob: EntityBase + Send + Sync {
             .on_lightning_strike(caller, lightning);
     }
 }
+/// Whether vanilla's class for `entity_type` extends `Monster`: every `Enemy` except the
+/// slimes, phantoms, ghasts, shulkers, hoglins and the ender dragon.
+#[must_use]
+pub fn is_monster(entity_type: &EntityType) -> bool {
+    entity_type.is_enemy
+        && ![
+            &EntityType::SLIME,
+            &EntityType::MAGMA_CUBE,
+            &EntityType::PHANTOM,
+            &EntityType::GHAST,
+            &EntityType::SHULKER,
+            &EntityType::HOGLIN,
+            &EntityType::ENDER_DRAGON,
+        ]
+        .contains(&entity_type)
+}
+
+/// Vanilla `Monster.getWalkTargetValue`: `-getPathfindingCostFromLightLevels`, so the
+/// darker the spot the better.
+#[must_use]
+pub fn monster_walk_target_value(world: &World, pos: &BlockPos) -> f32 {
+    -(world.get_light_level_dependent_magic_value(pos) - 0.5)
+}
+
 /// Vanilla `Mob.getControllingPassenger`: a first passenger that is a mob able to steer,
 /// while this mob has AI.
 #[must_use]

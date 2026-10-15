@@ -176,6 +176,11 @@ impl WardenEntity {
 }
 
 impl Mob for WardenEntity {
+    /// Vanilla `Warden.getWalkTargetValue`.
+    fn get_walk_target_value(&self, _pos: &pumpkin_util::math::position::BlockPos) -> f32 {
+        0.0
+    }
+
     /// Vanilla `Warden.getAmbientSound`. Pumpkin's warden has no anger yet, so this is
     /// `AngerLevel.CALM`'s sound.
     fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {

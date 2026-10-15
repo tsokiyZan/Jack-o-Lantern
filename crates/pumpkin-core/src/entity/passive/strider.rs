@@ -118,6 +118,18 @@ const BABY_DIMENSIONS: EntityDimensions =
     EntityDimensions::scalable(0.45, 0.85).with_eye_height(0.4375);
 
 impl Mob for StriderEntity {
+    /// Vanilla `Strider.getWalkTargetValue`.
+    fn get_walk_target_value(&self, pos: &pumpkin_util::math::position::BlockPos) -> f32 {
+        let world = self.get_entity().world.load();
+        if world.get_fluid(pos).has_tag(&tag::Fluid::MINECRAFT_LAVA) {
+            10.0
+        } else if self.get_entity().touching_lava.load(Ordering::Relaxed) {
+            f32::NEG_INFINITY
+        } else {
+            0.0
+        }
+    }
+
     fn is_sensitive_to_water(&self) -> bool {
         true
     }

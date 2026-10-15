@@ -217,6 +217,11 @@ impl CustomSound for NautilusEntity {
 const BABY_DIMENSIONS: EntityDimensions = Entity::type_dimensions(&EntityType::NAUTILUS).scale(0.5);
 
 impl Mob for NautilusEntity {
+    /// Vanilla `AbstractNautilus.getWalkTargetValue`.
+    fn get_walk_target_value(&self, _pos: &pumpkin_util::math::position::BlockPos) -> f32 {
+        0.0
+    }
+
     /// Vanilla `Nautilus.getSwimSound`.
     fn swim_sound(&self) -> Sound {
         if self.get_entity().is_baby() {

@@ -398,6 +398,11 @@ impl CreakingEntity {
 }
 
 impl Mob for CreakingEntity {
+    /// Vanilla `Creaking.getWalkTargetValue`.
+    fn get_walk_target_value(&self, _pos: &pumpkin_util::math::position::BlockPos) -> f32 {
+        0.0
+    }
+
     /// Vanilla `Creaking.getAmbientSound`.
     fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
         (!self.is_active()).then_some(pumpkin_data::sound::Sound::EntityCreakingAmbient)

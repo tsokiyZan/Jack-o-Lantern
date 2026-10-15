@@ -118,6 +118,19 @@ impl Animal for TurtleEntity {
 const BABY_DIMENSIONS: EntityDimensions = Entity::type_dimensions(&EntityType::TURTLE).scale(0.3);
 
 impl Mob for TurtleEntity {
+    /// Vanilla `Turtle.getWalkTargetValue`. Pumpkin's turtle has no `goingHome`, so water
+    /// always counts.
+    fn get_walk_target_value(&self, pos: &pumpkin_util::math::position::BlockPos) -> f32 {
+        let world = self.get_entity().world.load();
+        if world.get_fluid(pos).has_tag(&tag::Fluid::MINECRAFT_WATER)
+            || crate::block::blocks::turtle_egg::TurtleEggBlock::on_sand(world.as_ref(), pos)
+        {
+            10.0
+        } else {
+            world.get_light_level_dependent_magic_value(pos) - 0.5
+        }
+    }
+
     /// Vanilla `Turtle.playStepSound`.
     fn play_step_sound(
         &self,
