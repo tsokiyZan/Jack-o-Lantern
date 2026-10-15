@@ -1,5 +1,6 @@
-use crate::entity::ai::util::goal_utils;
 use crate::entity::mob::{first_passenger_player, mob_controlling_passenger};
+use crate::entity::passive::abstract_horse::AbstractHorse;
+use crate::entity::passive::abstract_horse::add_abstract_horse_goals;
 use crate::entity::passive::animal::horse_can_parent;
 use std::sync::{
     Arc, Weak,
@@ -24,11 +25,7 @@ use uuid::Uuid;
 use crate::entity::{
     Entity, EntityBase,
     ageable::{AgeableData, AgeableMob},
-    ai::goal::{
-        breed::BreedGoal, escape_danger::EscapeDangerGoal, follow_parent::FollowParentGoal,
-        look_around::RandomLookAroundGoal, look_at_entity::LookAtEntityGoal, swim::SwimGoal,
-        tempt::TemptGoal, wander_around::WanderAroundGoal,
-    },
+    ai::goal::{escape_danger::EscapeDangerGoal, swim::SwimGoal, tempt::TemptGoal},
     mob::{Mob, MobEntity},
     passive::animal::{Animal, set_animal_pathfinding_malus},
     player::Player,
@@ -116,6 +113,8 @@ pub struct HorseEntity {
     /// Vanilla `AbstractHorse.gallopSoundCounter`.
     pub gallop_sound_counter: AtomicI32,
     pub owner: AtomicCell<Option<Uuid>>,
+    /// Vanilla `AbstractHorse.standCounter`.
+    pub stand_counter: AtomicI32,
 }
 
 impl HorseEntity {
@@ -135,6 +134,7 @@ impl HorseEntity {
             temper: AtomicI32::new(0),
             gallop_sound_counter: AtomicI32::new(0),
             owner: AtomicCell::new(None),
+            stand_counter: AtomicI32::new(0),
         };
         let mob_arc = Arc::new(horse);
         let mob_weak: Weak<dyn Mob> = {
@@ -149,20 +149,12 @@ impl HorseEntity {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
 
+            add_abstract_horse_goals(&mut goal_selector, mob_arc.as_ref(), mob_weak, true);
+            // `addBehaviourGoals`.
             goal_selector.add_goal(0, SwimGoal::new(&mob_arc.mob_entity));
+            // MountPanicGoal
             goal_selector.add_goal(1, EscapeDangerGoal::new(1.2));
-            goal_selector.add_goal(
-                2,
-                BreedGoal::with_partner_class(1.0, goal_utils::is_abstract_horse),
-            );
             goal_selector.add_goal(3, Box::new(TemptGoal::new(1.25, TEMPT_ITEMS, false)));
-            goal_selector.add_goal(4, Box::new(FollowParentGoal::new(1.0)));
-            goal_selector.add_goal(6, Box::new(WanderAroundGoal::new(0.7)));
-            goal_selector.add_goal(
-                7,
-                LookAtEntityGoal::with_default(mob_weak, &EntityType::PLAYER, 6.0),
-            );
-            goal_selector.add_goal(8, Box::new(RandomLookAroundGoal::default()));
         };
 
         mob_arc
@@ -254,6 +246,10 @@ impl Animal for HorseEntity {
 const BABY_DIMENSIONS: EntityDimensions = Entity::type_dimensions(&EntityType::HORSE).scale(0.7);
 
 impl Mob for HorseEntity {
+    fn as_abstract_horse(&self) -> Option<&dyn AbstractHorse> {
+        Some(self)
+    }
+
     /// Vanilla `AbstractHorse.playStepSound`.
     fn play_step_sound(
         &self,
@@ -333,6 +329,7 @@ impl Mob for HorseEntity {
     }
 
     fn mob_tick(&self, _caller: &dyn EntityBase) {
+        AbstractHorse::tick_standing(self);
         self.ageable_ai_step();
     }
 
@@ -380,5 +377,39 @@ impl Mob for HorseEntity {
         }
 
         self.animal_interact(player, item_stack, Sound::EntityHorseAmbient)
+    }
+}
+
+impl AbstractHorse for HorseEntity {
+    fn horse_flag(&self, flag: u8) -> bool {
+        (self.flags.load(Ordering::Relaxed) & flag) != 0
+    }
+
+    fn set_horse_flag(&self, flag: u8, value: bool) {
+        self.set_flag(flag, value);
+    }
+
+    fn set_horse_tamed(&self, tamed: bool) {
+        self.set_tame(tamed);
+    }
+
+    fn set_horse_owner(&self, owner: Uuid) {
+        self.owner.store(Some(owner));
+    }
+
+    fn horse_temper(&self) -> &AtomicI32 {
+        &self.temper
+    }
+
+    fn stand_counter(&self) -> &AtomicI32 {
+        &self.stand_counter
+    }
+
+    fn angry_sound(&self) -> Option<Sound> {
+        if self.get_entity().is_baby() {
+            Some(Sound::EntityBabyHorseAngry)
+        } else {
+            Some(Sound::EntityHorseAngry)
+        }
     }
 }

@@ -1,4 +1,7 @@
+use crate::entity::ai::goal::tempt::TemptGoal;
 use crate::entity::mob::{first_passenger_player, mob_controlling_passenger};
+use crate::entity::passive::abstract_horse::AbstractHorse;
+use crate::entity::passive::abstract_horse::add_abstract_horse_goals;
 use std::sync::{
     Arc, Weak,
     atomic::{AtomicI32, AtomicU8, Ordering},
@@ -17,10 +20,7 @@ use uuid::Uuid;
 use crate::entity::{
     Entity, EntityBase,
     ageable::{AgeableData, AgeableMob},
-    ai::goal::{
-        escape_danger::EscapeDangerGoal, look_around::RandomLookAroundGoal,
-        look_at_entity::LookAtEntityGoal, swim::SwimGoal, wander_around::WanderAroundGoal,
-    },
+    ai::goal::swim::SwimGoal,
     mob::{Mob, MobEntity},
     passive::animal::{Animal, set_animal_pathfinding_malus},
     player::Player,
@@ -40,6 +40,8 @@ pub struct ZombieHorseEntity {
     /// Vanilla `AbstractHorse.gallopSoundCounter`.
     pub gallop_sound_counter: AtomicI32,
     pub owner: AtomicCell<Option<Uuid>>,
+    /// Vanilla `AbstractHorse.standCounter`.
+    pub stand_counter: AtomicI32,
 }
 
 impl ZombieHorseEntity {
@@ -53,6 +55,7 @@ impl ZombieHorseEntity {
             temper: AtomicI32::new(0),
             gallop_sound_counter: AtomicI32::new(0),
             owner: AtomicCell::new(None),
+            stand_counter: AtomicI32::new(0),
         };
         let mob_arc = Arc::new(horse);
         let mob_weak: Weak<dyn Mob> = {
@@ -67,14 +70,13 @@ impl ZombieHorseEntity {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
 
+            add_abstract_horse_goals(&mut goal_selector, mob_arc.as_ref(), mob_weak, true);
+            // `addBehaviourGoals`.
             goal_selector.add_goal(0, SwimGoal::new(&mob_arc.mob_entity));
-            goal_selector.add_goal(1, EscapeDangerGoal::new(1.2));
-            goal_selector.add_goal(6, Box::new(WanderAroundGoal::new(0.7)));
             goal_selector.add_goal(
-                7,
-                LookAtEntityGoal::with_default(mob_weak, &EntityType::PLAYER, 6.0),
+                3,
+                Box::new(TemptGoal::new(1.25, &[&Item::RED_MUSHROOM], false)),
             );
-            goal_selector.add_goal(8, Box::new(RandomLookAroundGoal::default()));
         };
 
         mob_arc
@@ -132,6 +134,10 @@ const BABY_DIMENSIONS: EntityDimensions =
     Entity::type_dimensions(&EntityType::ZOMBIE_HORSE).scale(0.7);
 
 impl Mob for ZombieHorseEntity {
+    fn as_abstract_horse(&self) -> Option<&dyn AbstractHorse> {
+        Some(self)
+    }
+
     /// Vanilla `AbstractHorse.playStepSound`.
     fn play_step_sound(
         &self,
@@ -208,6 +214,7 @@ impl Mob for ZombieHorseEntity {
     }
 
     fn mob_tick(&self, _caller: &dyn EntityBase) {
+        AbstractHorse::tick_standing(self);
         self.ageable_ai_step();
     }
 
@@ -251,5 +258,35 @@ impl Mob for ZombieHorseEntity {
         }
 
         self.animal_interact(player, item_stack, Sound::EntityZombieHorseAmbient)
+    }
+}
+
+impl AbstractHorse for ZombieHorseEntity {
+    fn horse_flag(&self, flag: u8) -> bool {
+        (self.flags.load(Ordering::Relaxed) & flag) != 0
+    }
+
+    fn set_horse_flag(&self, flag: u8, value: bool) {
+        self.set_flag(flag, value);
+    }
+
+    fn set_horse_tamed(&self, tamed: bool) {
+        self.set_tame(tamed);
+    }
+
+    fn set_horse_owner(&self, owner: Uuid) {
+        self.owner.store(Some(owner));
+    }
+
+    fn horse_temper(&self) -> &AtomicI32 {
+        &self.temper
+    }
+
+    fn stand_counter(&self) -> &AtomicI32 {
+        &self.stand_counter
+    }
+
+    fn angry_sound(&self) -> Option<Sound> {
+        Some(Sound::EntityZombieHorseAngry)
     }
 }

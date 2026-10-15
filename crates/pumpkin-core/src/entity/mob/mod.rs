@@ -1374,6 +1374,13 @@ pub trait Mob: EntityBase + Send + Sync {
             .map_or(0.0, |animal| animal.animal_walk_target_value(pos))
     }
 
+    /// The horse family's shared `AbstractHorse` behaviour.
+    fn as_abstract_horse(
+        &self,
+    ) -> Option<&dyn crate::entity::passive::abstract_horse::AbstractHorse> {
+        None
+    }
+
     fn as_tamable(&self) -> Option<&dyn crate::entity::passive::tamable::TamableAnimal> {
         None
     }

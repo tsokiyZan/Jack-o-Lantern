@@ -1,4 +1,6 @@
+use crate::entity::ai::goal::run_around_like_crazy::RunAroundLikeCrazyGoal;
 use crate::entity::ai::util::goal_utils;
+use crate::entity::passive::abstract_horse::AbstractHorse;
 use crate::entity::passive::animal::horse_can_parent;
 use std::sync::{
     Arc, Weak,
@@ -89,6 +91,8 @@ pub struct TraderLlamaEntity {
     pub has_chest: AtomicBool,
     pub temper: AtomicI32,
     pub owner: AtomicCell<Option<Uuid>>,
+    /// Vanilla `AbstractHorse.standCounter`.
+    pub stand_counter: AtomicI32,
 }
 
 impl TraderLlamaEntity {
@@ -111,6 +115,7 @@ impl TraderLlamaEntity {
             has_chest: AtomicBool::new(false),
             temper: AtomicI32::new(0),
             owner: AtomicCell::new(None),
+            stand_counter: AtomicI32::new(0),
         };
         let mob_arc = Arc::new(llama);
         let mob_weak: Weak<dyn Mob> = {
@@ -135,25 +140,51 @@ impl TraderLlamaEntity {
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
 
             goal_selector.add_goal(0, SwimGoal::new(&mob_arc.mob_entity));
-            goal_selector.add_goal(1, EscapeDangerGoal::new(1.2));
-            goal_selector.add_goal(2, BreedGoal::new(1.0));
+            goal_selector.add_goal(1, Box::new(RunAroundLikeCrazyGoal::new(1.2)));
+            // TODO: 2 LlamaFollowCaravanGoal(2.1) is not ported.
             goal_selector.add_goal(
                 3,
                 Box::new(RangedAttackGoal::new(ranged_weak, 1.25, 40, 20.0)),
             );
-            goal_selector.add_goal(4, Box::new(TemptGoal::new(1.25, TEMPT_ITEMS, false)));
-            goal_selector.add_goal(5, Box::new(FollowParentGoal::new(1.0)));
-            goal_selector.add_goal(7, Box::new(WanderAroundGoal::new(0.7)));
+            goal_selector.add_goal(3, EscapeDangerGoal::new(1.2));
+            goal_selector.add_goal(4, BreedGoal::new(1.0));
+            goal_selector.add_goal(5, Box::new(TemptGoal::new(1.25, TEMPT_ITEMS, false)));
+            goal_selector.add_goal(6, Box::new(FollowParentGoal::new(1.0)));
+            goal_selector.add_goal(7, Box::new(WanderAroundGoal::avoiding_water(0.7)));
             goal_selector.add_goal(
                 8,
                 LookAtEntityGoal::with_default(mob_weak, &EntityType::PLAYER, 6.0),
             );
             goal_selector.add_goal(9, Box::new(RandomLookAroundGoal::default()));
+            goal_selector.add_goal(1, EscapeDangerGoal::new(2.0));
 
+            // TODO: LlamaHurtByTargetGoal (stops after spitting) and LlamaAttackWolfGoal
+            // (untamed wolves, reciprocal 16, must reach) are approximated.
             target_selector.add_goal(1, Box::new(RevengeGoal::new(true)));
             target_selector.add_goal(
                 2,
                 ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::WOLF, true),
+            );
+            // `TraderLlama.registerGoals`, after the llama's.
+            // TODO: 1 TraderLlamaDefendWanderingTraderGoal is not ported.
+            target_selector.add_goal(
+                2,
+                ActiveTargetGoal::predicated(&mob_arc.mob_entity, 10, true, |target, _world| {
+                    goal_utils::is_instance_of(&EntityType::ZOMBIE, target.entity.entity_type)
+                        && target.entity.entity_type != &EntityType::ZOMBIFIED_PIGLIN
+                }),
+            );
+            target_selector.add_goal(
+                2,
+                ActiveTargetGoal::predicated(&mob_arc.mob_entity, 10, true, |target, _world| {
+                    [
+                        &EntityType::PILLAGER,
+                        &EntityType::VINDICATOR,
+                        &EntityType::EVOKER,
+                        &EntityType::ILLUSIONER,
+                    ]
+                    .contains(&target.entity.entity_type)
+                }),
             );
         };
 
@@ -286,6 +317,10 @@ impl Animal for TraderLlamaEntity {
 const BABY_DIMENSIONS: EntityDimensions = Entity::type_dimensions(&EntityType::LLAMA).scale(0.5);
 
 impl Mob for TraderLlamaEntity {
+    fn as_abstract_horse(&self) -> Option<&dyn AbstractHorse> {
+        Some(self)
+    }
+
     /// Vanilla `Llama.getDefaultDimensions`.
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
         let entity = self.get_entity();
@@ -343,6 +378,7 @@ impl Mob for TraderLlamaEntity {
     }
 
     fn mob_tick(&self, _caller: &dyn EntityBase) {
+        AbstractHorse::tick_standing(self);
         self.ageable_ai_step();
     }
 
@@ -420,5 +456,43 @@ impl Mob for TraderLlamaEntity {
 impl RangedAttackMob for TraderLlamaEntity {
     fn perform_ranged_attack(&self, target: &Arc<dyn EntityBase>, _power: f32) {
         self.spit(target);
+    }
+}
+
+impl AbstractHorse for TraderLlamaEntity {
+    fn horse_flag(&self, flag: u8) -> bool {
+        (self.flags.load(Ordering::Relaxed) & flag) != 0
+    }
+
+    fn set_horse_flag(&self, flag: u8, value: bool) {
+        self.set_flag(flag, value);
+    }
+
+    fn set_horse_tamed(&self, tamed: bool) {
+        self.set_tame(tamed);
+    }
+
+    fn set_horse_owner(&self, owner: Uuid) {
+        self.owner.store(Some(owner));
+    }
+
+    fn horse_temper(&self) -> &AtomicI32 {
+        &self.temper
+    }
+
+    fn stand_counter(&self) -> &AtomicI32 {
+        &self.stand_counter
+    }
+
+    fn angry_sound(&self) -> Option<Sound> {
+        Some(Sound::EntityLlamaAngry)
+    }
+
+    fn max_temper(&self) -> i32 {
+        30
+    }
+
+    fn can_perform_rearing(&self) -> bool {
+        false
     }
 }
