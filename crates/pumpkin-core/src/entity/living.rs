@@ -2131,11 +2131,12 @@ impl LivingEntity {
             if fall_distance > 0.0 {
                 self.on_changed_block(caller, self.entity.block_pos.load());
             }
+            // Vanilla runs `fallOn` for fall-damage-immune entities too: the block still
+            // reacts and `causeFallDamage` overrides still run, only the damage is zero.
             if fall_distance <= 0.0
                 || dont_damage
                 || self.should_prevent_fall_damage()
                 || self.should_prevent_fall_damage_in_area()
-                || self.is_immune_to_fall_damage()
             {
                 return;
             }
@@ -2170,6 +2171,9 @@ impl LivingEntity {
         fall_distance: f32,
         damage_per_distance: f32,
     ) {
+        if let Some(mob) = caller.get_mob() {
+            mob.before_cause_fall_damage(fall_distance);
+        }
         let may_fly = caller.get_player().is_some_and(|player| {
             player
                 .abilities

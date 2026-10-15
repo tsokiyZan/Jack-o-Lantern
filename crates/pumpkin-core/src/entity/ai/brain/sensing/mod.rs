@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::atomic::{AtomicI32, Ordering};
 
 use rand::{Rng, RngExt};
 
@@ -12,6 +13,7 @@ use super::{BrainTick, VisibilityContext};
 
 pub mod adult;
 pub mod axolotl_attackables;
+pub mod breeze_attack_entity;
 pub mod dummy;
 pub mod frog_attackables;
 pub mod hoglin_specific;
@@ -27,6 +29,7 @@ pub mod tempting;
 
 pub use adult::{AdultSensor, AdultSensorAnyType};
 pub use axolotl_attackables::AxolotlAttackablesSensor;
+pub use breeze_attack_entity::BreezeAttackEntitySensor;
 pub use dummy::DummySensor;
 pub use frog_attackables::FrogAttackablesSensor;
 pub use hoglin_specific::HoglinSpecificSensor;
@@ -67,6 +70,7 @@ pub enum SensorType {
     FrogAttackables,
     IsInWater,
     ArmadilloScareDetected,
+    BreezeAttackEntitySensor,
 }
 
 impl SensorType {
@@ -89,6 +93,7 @@ impl SensorType {
             Self::FrogAttackables => "minecraft:frog_attackables",
             Self::IsInWater => "minecraft:is_in_water",
             Self::ArmadilloScareDetected => "minecraft:armadillo_scare_detected",
+            Self::BreezeAttackEntitySensor => "minecraft:breeze_attack_entity_sensor",
         }
     }
 
@@ -109,7 +114,8 @@ impl SensorType {
             | Self::FoodTemptations
             | Self::FrogTemptations
             | Self::FrogAttackables
-            | Self::IsInWater => DEFAULT_SCAN_RATE,
+            | Self::IsInWater
+            | Self::BreezeAttackEntitySensor => DEFAULT_SCAN_RATE,
             Self::ArmadilloScareDetected => ARMADILLO_SCARE_DETECTED_SCAN_RATE,
         }
     }
@@ -139,6 +145,7 @@ impl SensorType {
                 types::DANGER_DETECTED_RECENTLY,
                 armadillo::SCARE_CHECK_INTERVAL,
             )),
+            Self::BreezeAttackEntitySensor => Box::new(BreezeAttackEntitySensor),
         }
     }
 
@@ -285,6 +292,26 @@ pub fn remember_positives<T>(
         } else {
             positives_left -= 1;
             positives_left >= 0
+        }
+    }
+}
+
+/// Vanilla `Sensor.wasEntityAttackableLastNTicks`: `isEntityAttackable`, through vanilla's
+/// `rememberPositives`, so it stays true for `ticks` calls after the last time it held.
+pub fn was_entity_attackable_last_n_ticks(
+    ticks: i32,
+) -> impl Fn(&BrainTick<'_>, &dyn EntityBase) -> bool + Send + Sync {
+    let positives_left = AtomicI32::new(0);
+    move |tick: &BrainTick<'_>, target: &dyn EntityBase| {
+        if is_entity_attackable(&tick.visibility(), target) {
+            positives_left.store(ticks, Ordering::Relaxed);
+            true
+        } else {
+            // `AtomicInteger.decrementAndGet`, which wraps.
+            positives_left
+                .fetch_sub(1, Ordering::Relaxed)
+                .wrapping_sub(1)
+                >= 0
         }
     }
 }

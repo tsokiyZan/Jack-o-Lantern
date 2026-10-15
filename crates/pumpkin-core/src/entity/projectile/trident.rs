@@ -31,6 +31,8 @@ pub struct TridentEntity {
     pub life: AtomicU32,
     pub shake_time: AtomicU8,
     pub has_hit: AtomicBool,
+    /// Vanilla `Projectile.lastDeflectedBy`.
+    pub last_deflected_by: crossbeam::atomic::AtomicCell<Option<i32>>,
     /// Vanilla `ThrownTrident.dealtDamage`: once it has hurt something, it hits no more entities.
     pub dealt_damage: AtomicBool,
     pub last_block_pos: Arc<std::sync::RwLock<Option<BlockPos>>>,
@@ -54,6 +56,7 @@ impl TridentEntity {
             life: AtomicU32::new(0),
             shake_time: AtomicU8::new(0),
             has_hit: AtomicBool::new(false),
+            last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
             dealt_damage: AtomicBool::new(false),
             last_block_pos: Arc::new(std::sync::RwLock::new(None)),
         }
@@ -82,6 +85,7 @@ impl TridentEntity {
             life: AtomicU32::new(0),
             shake_time: AtomicU8::new(0),
             has_hit: AtomicBool::new(false),
+            last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
             dealt_damage: AtomicBool::new(false),
             last_block_pos: Arc::new(std::sync::RwLock::new(None)),
         }
@@ -298,6 +302,7 @@ impl EntityBase for TridentEntity {
 
         // Handle hit
         if let Some(h) = hit
+            && !super::is_deflected(caller, &self.last_deflected_by, &h)
             && !self.has_hit.swap(true, Ordering::SeqCst)
         {
             caller.on_hit(h);

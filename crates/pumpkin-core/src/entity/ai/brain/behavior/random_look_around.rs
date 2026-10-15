@@ -37,7 +37,8 @@ impl RandomLookAround {
 }
 
 /// Vanilla `Vec3.directionFromRotation`, in vanilla's float trigonometry.
-fn direction_from_rotation(rot_x: f32, rot_y: f32) -> Vector3<f64> {
+#[must_use]
+pub fn direction_from_rotation(rot_x: f32, rot_y: f32) -> Vector3<f64> {
     let to_radians = (std::f64::consts::PI / 180.0) as f32;
     let pi = std::f64::consts::PI as f32;
     let y_cos = pumpkin_util::math::cos(-rot_y * to_radians - pi);
