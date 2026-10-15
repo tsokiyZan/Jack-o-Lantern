@@ -130,7 +130,7 @@ impl CreeperEntity {
         self.spawn_lingering_cloud();
         // `triggerOnDeathMobEffects(level, KILLED)`, which then clears the effects.
         let living = &self.mob_entity.living_entity;
-        living.trigger_on_death_mob_effects(&pumpkin_data::damage::DamageType::GENERIC);
+        living.trigger_on_death_mob_effects();
         living
             .active_effects
             .lock()

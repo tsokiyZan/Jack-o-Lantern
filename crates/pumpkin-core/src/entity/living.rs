@@ -831,7 +831,11 @@ impl LivingEntity {
                 return;
             }
         }
-        self.set_health(self.health.load() + additional_health);
+        // Vanilla `heal` does nothing to a dead entity.
+        let health = self.health.load();
+        if health > 0.0 {
+            self.set_health(health + additional_health);
+        }
     }
 
     pub fn set_health(&self, health: f32) {
@@ -2314,15 +2318,12 @@ impl LivingEntity {
 
             // Broadcast death message if it's a player and the gamerule is enabled
             self.broadcast_death_message(&*dyn_self, damage_type, source, cause);
-
-            self.trigger_on_death_mob_effects(&damage_type);
-
-            self.reset_effects_and_attributes();
         }
     }
 
     /// Vanilla `triggerOnDeathMobEffects` for a kill: each active effect's `onMobRemoved`.
-    pub fn trigger_on_death_mob_effects(&self, damage_type: &DamageType) {
+    /// Clearing the effects is left to the caller.
+    pub fn trigger_on_death_mob_effects(&self) {
         let active_effects: Vec<_> = self
             .active_effects
             .lock()
@@ -2332,7 +2333,7 @@ impl LivingEntity {
             .collect();
         for (effect_type, amplifier) in active_effects {
             if let Some(mob_effect) = crate::entity::effect::get_mob_effect(effect_type) {
-                mob_effect.on_mob_death(self, amplifier, damage_type);
+                mob_effect.on_mob_death(self, amplifier);
             }
         }
     }
@@ -4027,6 +4028,12 @@ impl EntityBase for LivingEntity {
                 if let Some(mob) = caller.get_mob() {
                     mob.remove_killed();
                 }
+                // `LivingEntity.remove(KILLED)`.
+                self.trigger_on_death_mob_effects();
+                self.active_effects
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .clear();
                 self.entity
                     .world
                     .load()

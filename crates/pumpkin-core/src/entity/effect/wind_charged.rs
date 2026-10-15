@@ -1,4 +1,3 @@
-use pumpkin_data::damage::DamageType;
 use pumpkin_util::math::vector3::Vector3;
 
 use crate::entity::effect::MobEffect;
@@ -9,11 +8,12 @@ use crate::world::explosion::ExplosionInteraction;
 pub struct WindChargedMobEffect;
 
 impl MobEffect for WindChargedMobEffect {
-    fn on_mob_death(&self, living: &LivingEntity, _amplifier: u8, _damage_type: &DamageType) {
+    /// Vanilla `WindChargedMobEffect.onMobRemoved`.
+    fn on_mob_death(&self, living: &LivingEntity, _amplifier: u8) {
         let world = living.entity.world.load();
         let pos = living.entity.pos.load();
         let height = living.entity.height();
-        let center = Vector3::new(pos.x, pos.y + f64::from(height) / 2.0, pos.z);
+        let center = Vector3::new(pos.x, pos.y + f64::from(height / 2.0), pos.z);
 
         // gustStrength = 3.0 + random * 2.0
         let gust_strength = 3.0 + rand::random::<f32>() * 2.0;

@@ -4664,6 +4664,8 @@ impl Player {
     }
 
     pub async fn respawn(self: &Arc<Self>) {
+        // Vanilla `PlayerList.respawn` removes the dead player with `RemovalReason.KILLED`.
+        self.living_entity.trigger_on_death_mob_effects();
         self.world().respawn_player(self, false).await;
         // The client rebuilt its attribute state on respawn, so send the held
         // weapon modifiers again.

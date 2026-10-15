@@ -37,8 +37,9 @@ pub trait MobEffect: Send + Sync {
     ) {
     }
 
-    /// Called when an entity carrying this effect dies.
-    fn on_mob_death(&self, _living: &LivingEntity, _amplifier: u8, _damage_type: &DamageType) {}
+    /// Vanilla `onMobRemoved` with `RemovalReason.KILLED`: the entity carrying this effect
+    /// is removed after dying (a mob when its death animation ends, a player on respawn).
+    fn on_mob_death(&self, _living: &LivingEntity, _amplifier: u8) {}
 }
 
 pub static REGENERATION: regeneration::RegenerationMobEffect = regeneration::RegenerationMobEffect;
