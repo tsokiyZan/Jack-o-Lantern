@@ -1653,12 +1653,13 @@ impl Entity {
         movement: Vector3<f64>,
         caller: &dyn EntityBase,
     ) -> Vector3<f64> {
+        // A server-side move is authoritative, so vanilla resets both flags even for a
+        // move of nothing.
+        self.on_ground.store(false, Ordering::SeqCst);
+        self.horizontal_collision.store(false, Ordering::SeqCst);
         if movement.length_squared() == 0.0 {
             return movement;
         }
-
-        self.on_ground.store(false, Ordering::SeqCst);
-        self.horizontal_collision.store(false, Ordering::SeqCst);
 
         let bounding_box = self.bounding_box.load();
 
@@ -2284,14 +2285,13 @@ impl Entity {
 
         self.move_pos(final_move);
 
-        // Vanilla `setOnGroundWithMovement`, only run by `move` when the entity moved vertically.
-        if motion.y != 0.0 {
-            self.check_supporting_block(
-                caller,
-                self.on_ground.load(Ordering::SeqCst),
-                Some(final_move),
-            );
-        }
+        // Vanilla `setOnGroundWithMovement`: `move` runs it when the entity moved vertically
+        // or, as for every server-side mob here, when this side is authoritative.
+        self.check_supporting_block(
+            caller,
+            self.on_ground.load(Ordering::SeqCst),
+            Some(final_move),
+        );
 
         if let Some(living) = caller.get_living_entity()
             && caller.get_mob().is_none_or(mob::Mob::checks_fall_damage)
