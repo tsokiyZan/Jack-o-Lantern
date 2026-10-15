@@ -191,7 +191,7 @@ impl RedstoneGateBlock<RepeaterProperties> for RepeaterBlock {
         let powered = props.powered;
         let has_power = RedstoneGateBlock::has_power(self, world, pos, state, block);
 
-        if powered != has_power && !world.is_block_tick_scheduled(&pos, block) {
+        if powered != has_power && !world.will_block_tick_this_tick(&pos, block) {
             let priority =
                 if RedstoneGateBlock::is_target_not_aligned(self, world, pos, state, block) {
                     TickPriority::ExtremelyHigh
@@ -210,9 +210,9 @@ impl RedstoneGateBlock<RepeaterProperties> for RepeaterBlock {
         }
     }
 
-    fn get_update_delay_internal(&self, state_id: BlockStateId, _block: &Block) -> u8 {
+    fn get_update_delay_internal(&self, state_id: BlockStateId, _block: &Block) -> i32 {
         let props = RepeaterProperties::from_state_id(state_id);
-        props.delay * 2
+        i32::from(props.delay) * 2
     }
 }
 

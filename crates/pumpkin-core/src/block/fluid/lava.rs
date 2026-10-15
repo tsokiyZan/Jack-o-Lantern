@@ -142,8 +142,8 @@ impl FlowingLava {
     }
 }
 
-const LAVA_FLOW_SPEED_NETHER: u8 = 10;
-const LAVA_FLOW_SPEED_SLOW: u8 = 30;
+const LAVA_FLOW_SPEED_NETHER: i32 = 10;
+const LAVA_FLOW_SPEED_SLOW: i32 = 30;
 
 impl FluidBehaviour for FlowingLava {
     fn placed(
@@ -249,7 +249,7 @@ impl FlowingFluid for FlowingLava {
         if world.dimension.fast_lava { 1 } else { 2 }
     }
 
-    fn get_flow_speed(&self, world: &World) -> u8 {
+    fn get_flow_speed(&self, world: &World) -> i32 {
         // EnvironmentAttributes.FAST_LAVA
         if world.dimension.fast_lava {
             LAVA_FLOW_SPEED_NETHER

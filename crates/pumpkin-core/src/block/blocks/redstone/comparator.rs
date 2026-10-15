@@ -167,7 +167,7 @@ impl RedstoneGateBlock<ComparatorLikeProperties> for ComparatorBlock {
     }
 
     fn update_powered(&self, world: &World, pos: BlockPos, state: &BlockState, block: &Block) {
-        if world.is_block_tick_scheduled(&pos, block) {
+        if world.will_block_tick_this_tick(&pos, block) {
             return;
         }
         let i = self.calculate_output_signal(world, pos, state, block);
@@ -272,7 +272,7 @@ impl RedstoneGateBlock<ComparatorLikeProperties> for ComparatorBlock {
         result_signal
     }
 
-    fn get_update_delay_internal(&self, _state_id: BlockStateId, _block: &Block) -> u8 {
+    fn get_update_delay_internal(&self, _state_id: BlockStateId, _block: &Block) -> i32 {
         2 // Vanilla Delay
     }
 }

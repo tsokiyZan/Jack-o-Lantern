@@ -1,6 +1,5 @@
 use std::{
     path::PathBuf,
-    str::FromStr,
     sync::{
         RwLock,
         atomic::{AtomicBool, AtomicU64, Ordering},
@@ -10,7 +9,7 @@ use std::{
 use bytes::Bytes;
 use pumpkin_data::{Block, BlockStateId, chunk::ChunkStatus, fluid::Fluid};
 use pumpkin_nbt::compound::NbtCompound;
-use pumpkin_util::resource_location::{FromResourceLocation, ResourceLocation, ToResourceLocation};
+use pumpkin_util::resource_location::{FromResourceLocation, ToResourceLocation};
 use rustc_hash::FxHashMap;
 
 use crate::{
@@ -21,7 +20,7 @@ use crate::{
     },
     generation::section_coords,
     level::LevelFolder,
-    tick::{ScheduledTick, TickPriority, scheduler::ChunkTickScheduler},
+    tick::{SavedTick, scheduler::ChunkTickScheduler},
 };
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector2::Vector2;
@@ -179,24 +178,37 @@ fn extract_u8_array(tag: &pumpkin_nbt::tag::NbtTag) -> Option<Box<[u8]>> {
     }
 }
 
-fn parse_scheduled_tick<T>(nbt: &pumpkin_nbt::compound::NbtCompound) -> Option<ScheduledTick<T>>
+/// Vanilla `SavedTick.filterTickListForChunk` applied to the chunk's saved tick list.
+fn read_saved_ticks<T>(
+    root_tag: &NbtCompound,
+    key: &str,
+    chunk_pos: Vector2<i32>,
+) -> Vec<SavedTick<T>>
 where
     T: FromResourceLocation,
 {
-    let x = nbt.get_int("x")?;
-    let y = nbt.get_int("y")?;
-    let z = nbt.get_int("z")?;
-    let delay = nbt.get_int("t")? as u8;
-    let priority = TickPriority::try_from(nbt.get_int("p")?).ok()?;
-    let res_loc_str = nbt.get_string("i")?;
-    let res_loc = ResourceLocation::from_str(res_loc_str).ok()?;
-    let value = T::from_resource_location(&res_loc)?;
-    Some(ScheduledTick {
-        delay,
-        priority,
-        position: BlockPos::new(x, y, z),
-        value,
+    root_tag.get_list(key).map_or_else(Vec::new, |list| {
+        list.iter()
+            .filter_map(|tag| match tag {
+                pumpkin_nbt::tag::NbtTag::Compound(compound) => {
+                    SavedTick::from_nbt_compound(compound)
+                }
+                _ => None,
+            })
+            .filter(|tick| tick.position.chunk_position() == chunk_pos)
+            .collect()
     })
+}
+
+fn saved_ticks_to_nbt<T>(ticks: &ChunkTickScheduler<T>) -> Vec<pumpkin_nbt::tag::NbtTag>
+where
+    T: ToResourceLocation + Copy + std::hash::Hash + Eq,
+{
+    ticks
+        .to_saved_ticks()
+        .iter()
+        .map(|tick| pumpkin_nbt::tag::NbtTag::Compound(tick.to_nbt_compound()))
+        .collect()
 }
 
 impl ChunkData {
@@ -396,27 +408,8 @@ impl ChunkData {
                     .map(|a| a.to_vec().into_boxed_slice()),
             },
         );
-        let mut block_ticks = Vec::new();
-        if let Some(list) = root_tag.get_list("block_ticks") {
-            for tag in list {
-                if let pumpkin_nbt::tag::NbtTag::Compound(compound) = tag
-                    && let Some(tick) = parse_scheduled_tick::<&'static Block>(compound)
-                {
-                    block_ticks.push(tick);
-                }
-            }
-        }
-
-        let mut fluid_ticks = Vec::new();
-        if let Some(list) = root_tag.get_list("fluid_ticks") {
-            for tag in list {
-                if let pumpkin_nbt::tag::NbtTag::Compound(compound) = tag
-                    && let Some(tick) = parse_scheduled_tick::<&'static Fluid>(compound)
-                {
-                    fluid_ticks.push(tick);
-                }
-            }
-        }
+        let block_ticks = read_saved_ticks::<&'static Block>(&root_tag, "block_ticks", position);
+        let fluid_ticks = read_saved_ticks::<&'static Fluid>(&root_tag, "fluid_ticks", position);
 
         let mut block_entities = FxHashMap::default();
         if let Some(list) = root_tag.get_list("block_entities") {
@@ -470,8 +463,8 @@ impl ChunkData {
             z: position.y,
             // This chunk is read from disk, so it has not been modified
             dirty: AtomicBool::new(false),
-            block_ticks: ChunkTickScheduler::from_iter(block_ticks),
-            fluid_ticks: ChunkTickScheduler::from_iter(fluid_ticks),
+            block_ticks: ChunkTickScheduler::from_saved(block_ticks),
+            fluid_ticks: ChunkTickScheduler::from_saved(fluid_ticks),
             pending_block_entities: std::sync::Mutex::new(block_entities),
             light_engine: std::sync::Mutex::new(light_engine),
             light_populated: AtomicBool::new(light_correct),
@@ -640,31 +633,8 @@ impl ChunkData {
         }
         root_compound.put_list("sections", sections_list);
 
-        let mut block_ticks_list = Vec::new();
-        for tick in self.block_ticks.to_vec() {
-            let mut tick_comp = NbtCompound::new();
-            tick_comp.put_int("x", tick.position.0.x);
-            tick_comp.put_int("y", tick.position.0.y);
-            tick_comp.put_int("z", tick.position.0.z);
-            tick_comp.put_int("t", tick.delay as i32);
-            tick_comp.put_int("p", tick.priority as i32);
-            tick_comp.put_string("i", tick.value.to_resource_location());
-            block_ticks_list.push(NbtTag::Compound(tick_comp));
-        }
-        root_compound.put_list("block_ticks", block_ticks_list);
-
-        let mut fluid_ticks_list = Vec::new();
-        for tick in self.fluid_ticks.to_vec() {
-            let mut tick_comp = NbtCompound::new();
-            tick_comp.put_int("x", tick.position.0.x);
-            tick_comp.put_int("y", tick.position.0.y);
-            tick_comp.put_int("z", tick.position.0.z);
-            tick_comp.put_int("t", tick.delay as i32);
-            tick_comp.put_int("p", tick.priority as i32);
-            tick_comp.put_string("i", tick.value.to_resource_location());
-            fluid_ticks_list.push(NbtTag::Compound(tick_comp));
-        }
-        root_compound.put_list("fluid_ticks", fluid_ticks_list);
+        root_compound.put_list("block_ticks", saved_ticks_to_nbt(&self.block_ticks));
+        root_compound.put_list("fluid_ticks", saved_ticks_to_nbt(&self.fluid_ticks));
 
         let mut block_entities_list = Vec::new();
         for entity_comp in block_entities_nbt {

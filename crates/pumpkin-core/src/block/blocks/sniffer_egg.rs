@@ -62,7 +62,7 @@ impl SnifferEggBlock {
         world.schedule_block_tick(
             block,
             *pos,
-            u8::try_from(delay).unwrap_or(u8::MAX),
+            i32::from(u8::try_from(delay).unwrap_or(u8::MAX)),
             TickPriority::Normal,
         );
     }

@@ -534,21 +534,22 @@ impl World {
         self.update_forced_tickets(unforced, forced);
 
         for pos in newly_active {
-            if self.level.is_chunk_loaded(&pos) && tracker.loaded_active_chunks.insert(pos) {
-                self.migrate_pending_block_entities(pos);
+            if self.level.is_chunk_loaded(&pos) {
+                // Vanilla `startTickingChunk`; a no-op for a chunk already unpacked.
+                self.level.start_ticking_chunk(pos);
+                if tracker.loaded_active_chunks.insert(pos) {
+                    self.migrate_pending_block_entities(pos);
+                }
             }
         }
         for change in self.level.loaded_chunk_changes() {
             match change {
                 pumpkin_world::level::LoadedChunkChange::Loaded(pos) => {
-                    // Handled here, on the same thread as the tick loop, so the
-                    // loop cannot drop the entry for a chunk it has not seen yet.
-                    self.level.resume_scheduled_ticks(pos);
-                    if active_chunks.contains(&pos)
-                        && self.level.is_chunk_loaded(&pos)
-                        && tracker.loaded_active_chunks.insert(pos)
-                    {
-                        self.migrate_pending_block_entities(pos);
+                    if active_chunks.contains(&pos) && self.level.is_chunk_loaded(&pos) {
+                        self.level.start_ticking_chunk(pos);
+                        if tracker.loaded_active_chunks.insert(pos) {
+                            self.migrate_pending_block_entities(pos);
+                        }
                     }
                 }
                 pumpkin_world::level::LoadedChunkChange::Unloaded(pos) => {
@@ -1988,6 +1989,7 @@ impl World {
             // `forceGameTimeSynchronization` in `Server::tick_worlds`, *before*
             // this increment.
             level_time.tick(advance_time);
+            self.level.set_game_time(level_time.world_age);
 
             // Auto-save logic
             if level_time.world_age % 100 == 0 {
@@ -2079,53 +2081,31 @@ impl World {
         let tick_data = self.level.get_tick_data(&active_chunks, random_tick_speed);
         let handle = server.runtime.clone();
 
-        // 1. Parallel Block Ticks via Rayon
-        let world = self.clone();
-        let block_handle = handle.clone();
-        tick_data
-            .block_ticks
-            .par_chunks(BATCH_SIZE)
-            .for_each(|batch| {
-                let _guard = block_handle.enter();
-                let world = world.clone();
-                for scheduled_tick in batch {
-                    let pos = scheduled_tick.position;
-                    let block = world.get_block(&pos);
-                    // Vanilla `ServerLevel.tickBlock`: only if the block is still the tick's type.
-                    if block != scheduled_tick.value {
-                        continue;
-                    }
-                    if let Some(pumpkin_block) = world.block_registry.get_pumpkin_block(block.id) {
-                        pumpkin_block.on_scheduled_tick(OnScheduledTickArgs {
-                            world: &world,
-                            block,
-                            position: &pos,
-                        });
-                    }
-                }
-            });
-
-        // 2. Parallel Fluid Ticks via Rayon
-        let world = self.clone();
-        let fluid_handle = handle.clone();
-        tick_data
-            .fluid_ticks
-            .par_chunks(BATCH_SIZE)
-            .for_each(|batch| {
-                let _guard = fluid_handle.enter();
-                let world = world.clone();
-                for scheduled_tick in batch {
-                    let pos = scheduled_tick.position;
-                    let fluid = world.get_fluid(&pos);
-                    // Vanilla `ServerLevel.tickFluid`: only if the fluid is still the tick's type.
-                    if fluid.id != scheduled_tick.value.id {
-                        continue;
-                    }
-                    if let Some(pumpkin_fluid) = world.block_registry.get_pumpkin_fluid(fluid.id) {
-                        pumpkin_fluid.on_scheduled_tick(&world, fluid, &pos);
-                    }
-                }
-            });
+        // Vanilla `ServerLevel.tick` "tickPending": every block tick, then every fluid tick,
+        // one after another in drain order.
+        self.level.tick_block_ticks(&active_chunks, |pos, block| {
+            // Vanilla `ServerLevel.tickBlock`: only if the block is still the tick's type.
+            if self.get_block(&pos) != block {
+                return;
+            }
+            if let Some(pumpkin_block) = self.block_registry.get_pumpkin_block(block.id) {
+                pumpkin_block.on_scheduled_tick(OnScheduledTickArgs {
+                    world: self,
+                    block,
+                    position: &pos,
+                });
+            }
+        });
+        self.level.tick_fluid_ticks(&active_chunks, |pos, fluid| {
+            // Vanilla `ServerLevel.tickFluid`: only if the fluid is still the tick's type.
+            let current = self.get_fluid(&pos);
+            if current.id != fluid.id {
+                return;
+            }
+            if let Some(pumpkin_fluid) = self.block_registry.get_pumpkin_fluid(fluid.id) {
+                pumpkin_fluid.on_scheduled_tick(self, current, &pos);
+            }
+        });
 
         // 3. Parallel Random Ticks via Rayon
         let world = self.clone();
@@ -5804,34 +5784,48 @@ impl World {
         }
     }
 
+    /// Vanilla `LevelAccessor.scheduleTick` for a block.
     pub fn schedule_block_tick(
         &self,
         block: &Block,
         block_pos: BlockPos,
-        delay: u8,
+        delay: i32,
         priority: TickPriority,
     ) {
         self.level
-            .schedule_block_tick(block, block_pos, delay, priority);
+            .schedule_block_tick(Block::from_id(block.id), block_pos, delay, priority);
     }
 
+    /// Vanilla `LevelAccessor.scheduleTick` for a fluid.
     pub fn schedule_fluid_tick(
         &self,
         fluid: &Fluid,
         block_pos: BlockPos,
-        delay: u8,
+        delay: i32,
         priority: TickPriority,
     ) {
-        self.level
-            .schedule_fluid_tick(fluid, block_pos, delay, priority);
+        if let Some(fluid) = Fluid::from_id(fluid.id) {
+            self.level
+                .schedule_fluid_tick(fluid, block_pos, delay, priority);
+        }
     }
 
+    /// Vanilla `getBlockTicks().hasScheduledTick`.
     pub fn is_block_tick_scheduled(&self, block_pos: &BlockPos, block: &Block) -> bool {
-        self.level.is_block_tick_scheduled(block_pos, block)
+        self.level
+            .is_block_tick_scheduled(block_pos, Block::from_id(block.id))
     }
 
+    /// Vanilla `getFluidTicks().hasScheduledTick`.
     pub fn is_fluid_tick_scheduled(&self, block_pos: &BlockPos, fluid: &Fluid) -> bool {
-        self.level.is_fluid_tick_scheduled(block_pos, fluid)
+        Fluid::from_id(fluid.id)
+            .is_some_and(|fluid| self.level.is_fluid_tick_scheduled(block_pos, fluid))
+    }
+
+    /// Vanilla `getBlockTicks().willTickThisTick`.
+    pub fn will_block_tick_this_tick(&self, block_pos: &BlockPos, block: &Block) -> bool {
+        self.level
+            .will_block_tick_this_tick(block_pos, Block::from_id(block.id))
     }
 
     /// Close container screens for all players who have a container open at the given block position.

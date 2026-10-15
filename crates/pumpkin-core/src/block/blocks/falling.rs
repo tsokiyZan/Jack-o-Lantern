@@ -18,10 +18,10 @@ pub struct FallingBlock;
 
 impl FallingBlock {
     // FallingBlock.getDelayAfterPlace
-    const DELAY_AFTER_PLACE: u8 = 2;
+    const DELAY_AFTER_PLACE: i32 = 2;
 
     /// `FallingBlock.onPlace`, for subclasses that override `getDelayAfterPlace` in vanilla (`DragonEggBlock`).
-    pub fn placed_with_delay(args: &PlacedArgs<'_>, delay: u8) {
+    pub fn placed_with_delay(args: &PlacedArgs<'_>, delay: i32) {
         args.world
             .schedule_block_tick(args.block, *args.position, delay, TickPriority::Normal);
     }
@@ -30,7 +30,7 @@ impl FallingBlock {
     #[must_use]
     pub fn get_state_for_neighbor_update_with_delay(
         args: &GetStateForNeighborUpdateArgs<'_>,
-        delay: u8,
+        delay: i32,
     ) -> BlockStateId {
         args.world
             .schedule_block_tick(args.block, *args.position, delay, TickPriority::Normal);
