@@ -1,5 +1,6 @@
 use crate::entity::ai::goal::avoid_entity::AvoidEntityGoal;
 use crate::entity::mob::raider::{add_raider_goals, is_abstract_villager, raider_hurt_by_target};
+use crate::entity::mob::vex::VexEntity;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicI32, AtomicU8, Ordering};
 use std::sync::{Arc, Weak};
@@ -483,19 +484,36 @@ impl Goal for EvokerSummonSpellGoal {
             let evoker_ent = &evoker.mob_entity.living_entity.entity;
             evoker_ent.play_sound(Sound::EntityEvokerCastSpell);
 
-            let world = evoker_ent.world.load();
-            let evoker_pos = evoker_ent.pos.load();
+            let world = evoker_ent.world.load_full();
+            let evoker_block_pos = evoker_ent.block_pos.load();
 
+            // Vanilla `EvokerSummonSpellGoal.performSpellCasting`.
             for _ in 0..3 {
-                let offset_x = (rand::random::<i32>() % 5 - 2) as f64;
-                let offset_z = (rand::random::<i32>() % 5 - 2) as f64;
-                let spawn_pos = Vector3::new(
-                    evoker_pos.x + offset_x,
-                    evoker_pos.y + 1.0,
-                    evoker_pos.z + offset_z,
+                let pos = evoker_block_pos.offset(Vector3::new(
+                    -2 + rand::random_range(0..5),
+                    1,
+                    -2 + rand::random_range(0..5),
+                ));
+                let vex = from_type(
+                    &EntityType::VEX,
+                    // `snapTo(pos)`: the bottom centre of the block.
+                    Vector3::new(
+                        f64::from(pos.0.x) + 0.5,
+                        f64::from(pos.0.y),
+                        f64::from(pos.0.z) + 0.5,
+                    ),
+                    &world,
+                    Uuid::new_v4(),
                 );
-
-                let vex = from_type(&EntityType::VEX, spawn_pos, &world, Uuid::new_v4());
+                crate::entity::mob::spawn::finalize_spawn(&vex, &world, None);
+                if let Some(vex_mob) = vex
+                    .get_mob()
+                    .and_then(|mob| mob.cast_any().downcast_ref::<VexEntity>())
+                {
+                    vex_mob.set_owner(evoker_ent.entity_uuid);
+                    vex_mob.set_bound_origin(Some(pos));
+                    vex_mob.set_limited_life(20 * (30 + rand::random_range(0..90)));
+                }
                 world.spawn_entity(vex);
             }
         }
