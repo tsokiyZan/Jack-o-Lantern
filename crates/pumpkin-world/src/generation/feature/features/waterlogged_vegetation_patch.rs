@@ -1,10 +1,9 @@
-use std::collections::HashSet;
-
 use pumpkin_util::{
     math::position::BlockPos,
     random::{RandomGenerator, RandomImpl},
 };
 
+use crate::generation::java_hash_set::JavaBlockPosSet;
 use crate::generation::proto_chunk::GenerationCache;
 use crate::world::WorldPortalExt;
 use pumpkin_data::BlockDirection;
@@ -42,7 +41,7 @@ impl WaterloggedVegetationPatchFeature {
 
         // Waterlogged vegetation should occupy the water block itself rather
         // than sitting above it. We pass the water surface position directly.
-        for &surface_pos in &water_surface {
+        for surface_pos in water_surface.to_java_order() {
             if self.base.vegetation_chance > 0.0 && random.next_f32() < self.base.vegetation_chance
             {
                 self.place_vegetation(
@@ -70,7 +69,7 @@ impl WaterloggedVegetationPatchFeature {
         replaceable: &crate::generation::block_predicate::BlockPredicate,
         x_radius: i32,
         z_radius: i32,
-    ) -> HashSet<BlockPos> {
+    ) -> JavaBlockPosSet {
         let surface = self.base.place_ground_patch(
             chunk,
             block_registry,
@@ -81,13 +80,16 @@ impl WaterloggedVegetationPatchFeature {
             z_radius,
         );
 
-        // Filter the surface to only include unexposed positions, turning them into water
-        let water_surface: HashSet<BlockPos> = surface
-            .into_iter()
-            .filter(|&pos| !is_exposed(chunk, pos))
-            .collect();
+        // Vanilla collects the unexposed positions into a new `HashSet`, walking the surface set,
+        // then turns them into water.
+        let mut water_surface = JavaBlockPosSet::new();
+        for pos in surface.to_java_order() {
+            if !is_exposed(chunk, pos) {
+                water_surface.insert(pos);
+            }
+        }
 
-        for pos in &water_surface {
+        for pos in water_surface.to_java_order() {
             chunk.set_block_state(&pos.0, pumpkin_data::Block::WATER.default_state);
         }
 

@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use pumpkin_util::{
     math::{position::BlockPos, vector3::Vector3, vertical_surface_type::VerticalSurfaceType},
     random::{RandomGenerator, RandomImpl},
@@ -7,6 +5,7 @@ use pumpkin_util::{
 
 use crate::generation::block_predicate::BlockPredicate;
 use crate::generation::block_state_provider::BlockStateProvider;
+use crate::generation::java_hash_set::JavaBlockPosSet;
 use crate::generation::proto_chunk::GenerationCache;
 use crate::world::WorldPortalExt;
 
@@ -85,8 +84,8 @@ impl VegetationPatchFeature {
         replaceable: &BlockPredicate,
         x_radius: i32,
         z_radius: i32,
-    ) -> HashSet<BlockPos> {
-        let mut surface = HashSet::new();
+    ) -> JavaBlockPosSet {
+        let mut surface = JavaBlockPosSet::new();
 
         // Determine "inwards" and "outwards" directions based on the surface
         let inwards = self.surface_direction();
@@ -203,11 +202,12 @@ impl VegetationPatchFeature {
         min_y: i8,
         height: u16,
         feature_name: pumpkin_data::placed_feature::PlacedFeature,
-        surface: &HashSet<BlockPos>,
+        surface: &JavaBlockPosSet,
     ) {
         let opposite_dir = self.surface_direction().opposite();
 
-        for &surface_pos in surface {
+        // Vanilla walks its `HashSet`, drawing a float per position.
+        for surface_pos in surface.to_java_order() {
             if self.vegetation_chance > 0.0 && random.next_f32() < self.vegetation_chance {
                 let placement_pos = surface_pos.offset(opposite_dir.to_offset());
                 let _ = self.vegetation_feature.generate(
