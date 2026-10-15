@@ -671,14 +671,20 @@ impl MobEntity {
         if self.is_no_ai() {
             nbt.put_bool("NoAI", true);
         }
-        if self.is_left_handed() {
-            nbt.put_bool("LeftHanded", true);
-        }
-        if self.can_pick_up_loot() {
-            nbt.put_bool("CanPickUpLoot", true);
-        }
-        if self.persistence_required.load(Relaxed) {
-            nbt.put_bool("PersistenceRequired", true);
+        // Vanilla always writes these three, false included.
+        nbt.put_bool("LeftHanded", self.is_left_handed());
+        nbt.put_bool("CanPickUpLoot", self.can_pick_up_loot());
+        nbt.put_bool(
+            "PersistenceRequired",
+            self.persistence_required.load(Relaxed),
+        );
+        if self.has_position_target() {
+            let home = self.position_target.load();
+            nbt.put_int("home_radius", self.position_target_range.load(Relaxed));
+            nbt.put(
+                "home_pos",
+                pumpkin_nbt::tag::NbtTag::IntArray(vec![home.0.x, home.0.y, home.0.z]),
+            );
         }
         self.living_entity.entity.write_leash_nbt(nbt);
     }
@@ -697,6 +703,16 @@ impl MobEntity {
                 .store(persistence_required, Relaxed);
         }
         self.living_entity.entity.read_leash_nbt(nbt);
+        // Vanilla `home_radius` (-1 for no home), then `home_pos` (the origin if missing).
+        let radius = nbt.get_int("home_radius").unwrap_or(-1);
+        self.position_target_range.store(radius, Relaxed);
+        if radius >= 0 {
+            let home = match nbt.get_int_array("home_pos") {
+                Some(&[x, y, z]) => BlockPos::new(x, y, z),
+                _ => BlockPos::ZERO,
+            };
+            self.position_target.store(home);
+        }
     }
 
     pub fn add_goal<G: crate::entity::ai::goal::Goal + 'static>(&self, priority: u8, goal: G) {
