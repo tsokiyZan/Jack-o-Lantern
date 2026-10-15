@@ -2899,6 +2899,7 @@ impl LivingEntity {
     /// Writes living-entity tags.
     pub fn write_living_nbt(&self, nbt: &mut NbtCompound) {
         nbt.put("Health", NbtTag::Float(self.health.load()));
+        self.write_attributes_nbt(nbt);
         // Avoid persisting a lethal fall distance when the entity is dead to prevent death loops
         let fall_distance = if self.dead.load(Relaxed) {
             0.0
@@ -2951,7 +2952,54 @@ impl LivingEntity {
         }
     }
 
+    /// Vanilla `AttributeMap.pack` under `attributes`: each instance's id and base value.
+    /// Pumpkin's modifiers all come back on their own (equipment, sprinting, effects), which
+    /// vanilla keeps out of the save as transient, so none are written.
+    fn write_attributes_nbt(&self, nbt: &mut NbtCompound) {
+        let map = self
+            .attributes
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut ids: Vec<u8> = map.keys().copied().collect();
+        ids.sort_unstable();
+        let list = ids
+            .into_iter()
+            .filter_map(|id| {
+                let attribute = attributes_by_id(id)?;
+                let mut packed = NbtCompound::new();
+                packed.put_string("id", attribute.name.to_string());
+                packed.put("base", NbtTag::Double(map.get(&id)?.base_value));
+                Some(NbtTag::Compound(packed))
+            })
+            .collect();
+        nbt.put("attributes", NbtTag::List(list));
+    }
+
+    /// Vanilla `AttributeMap.apply` from `attributes`; unknown ids are skipped.
+    fn read_attributes_nbt(&self, nbt: &NbtCompound) {
+        let Some(list) = nbt.get_list("attributes") else {
+            return;
+        };
+        for packed in list.iter().filter_map(NbtTag::extract_compound) {
+            let Some(id) = packed.get_string("id") else {
+                continue;
+            };
+            let name = if id.contains(':') {
+                id.to_string()
+            } else {
+                format!("minecraft:{id}")
+            };
+            if let Some(attribute) = Attributes::ALL.iter().find(|attr| attr.name == name)
+                && let Some(base) = packed.get_double("base")
+            {
+                self.set_attribute_base(attribute, base);
+            }
+        }
+    }
+
     pub fn read_living_nbt_non_mut(&self, nbt: &NbtCompound) {
+        // Vanilla reads `attributes` before `Health`, so a raised max health holds.
+        self.read_attributes_nbt(nbt);
         // Vanilla LivingEntity.readAdditionalSaveData defaults to the mob's own max health,
         // not a flat 20; a hoglin (40 max) or iron golem (100 max) with no saved Health would
         // otherwise be silently reset to 20 here.
