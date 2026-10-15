@@ -127,8 +127,62 @@ impl CreeperEntity {
             radius * multiplier,
             crate::world::ExplosionInteraction::Mob,
         );
-        // TODO: spawn area effect cloud with potion effects
+        self.spawn_lingering_cloud();
+        // `triggerOnDeathMobEffects(level, KILLED)`, which then clears the effects.
+        let living = &self.mob_entity.living_entity;
+        living.trigger_on_death_mob_effects(&pumpkin_data::damage::DamageType::GENERIC);
+        living
+            .active_effects
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clear();
         entity.remove();
+    }
+
+    /// Vanilla `Creeper.spawnLingeringCloud`: its effects linger in a small cloud.
+    fn spawn_lingering_cloud(&self) {
+        let living = &self.mob_entity.living_entity;
+        let effects: Vec<_> = living
+            .active_effects
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .values()
+            .map(|e| {
+                (
+                    e.effect_type,
+                    e.duration,
+                    e.amplifier,
+                    e.ambient,
+                    e.show_particles,
+                    e.show_icon,
+                )
+            })
+            .collect();
+        if effects.is_empty() {
+            return;
+        }
+        let entity = &living.entity;
+        let world = entity.world.load_full();
+        let cloud_entity = crate::entity::Entity::from_uuid(
+            uuid::Uuid::new_v4(),
+            world.clone(),
+            entity.pos.load(),
+            &EntityType::AREA_EFFECT_CLOUD,
+        );
+        // Radius 2.5 shrinking 0.5 per use, 300 ticks after a 10-tick wait, durations
+        // scaled by 0.25 (the cloud's own scaling).
+        let cloud = crate::entity::area_effect_cloud::AreaEffectCloudEntity::create(
+            cloud_entity,
+            pumpkin_data::item_stack::ItemStack::EMPTY.clone(),
+            effects,
+            300,
+            2.5,
+            20,
+            10,
+            -0.5,
+            0,
+        );
+        world.spawn_entity(cloud);
     }
 }
 

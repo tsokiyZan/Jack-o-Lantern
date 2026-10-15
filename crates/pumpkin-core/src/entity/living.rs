@@ -2302,24 +2302,25 @@ impl LivingEntity {
             // Broadcast death message if it's a player and the gamerule is enabled
             self.broadcast_death_message(&*dyn_self, damage_type, source, cause);
 
-            // Trigger on_mob_death for active status effects
-            let active_effects_vec: Vec<_> = {
-                let effects = self
-                    .active_effects
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner);
-                effects
-                    .values()
-                    .map(|e| (e.effect_type, e.amplifier))
-                    .collect()
-            };
-            for (effect_type, amplifier) in active_effects_vec {
-                if let Some(mob_effect) = crate::entity::effect::get_mob_effect(effect_type) {
-                    mob_effect.on_mob_death(self, amplifier, &damage_type);
-                }
-            }
+            self.trigger_on_death_mob_effects(&damage_type);
 
             self.reset_effects_and_attributes();
+        }
+    }
+
+    /// Vanilla `triggerOnDeathMobEffects` for a kill: each active effect's `onMobRemoved`.
+    pub fn trigger_on_death_mob_effects(&self, damage_type: &DamageType) {
+        let active_effects: Vec<_> = self
+            .active_effects
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .values()
+            .map(|e| (e.effect_type, e.amplifier))
+            .collect();
+        for (effect_type, amplifier) in active_effects {
+            if let Some(mob_effect) = crate::entity::effect::get_mob_effect(effect_type) {
+                mob_effect.on_mob_death(self, amplifier, damage_type);
+            }
         }
     }
 
