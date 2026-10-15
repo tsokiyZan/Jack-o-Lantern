@@ -136,8 +136,13 @@ impl Path {
 
     #[must_use]
     pub fn same_as_path(&self, other: &Self) -> bool {
+        // Vanilla `Node.equals` compares coordinates only.
         self.nodes.len() == other.nodes.len()
-            && self.nodes.iter().zip(&other.nodes).all(|(a, b)| a == b)
+            && self
+                .nodes
+                .iter()
+                .zip(&other.nodes)
+                .all(|(a, b)| a.pos == b.pos)
     }
 
     #[must_use]

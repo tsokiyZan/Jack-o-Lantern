@@ -226,7 +226,7 @@ pub trait PathNavigationTrait: Send + Sync {
     /// Whether the mob can settle at `pos`, which random targets are checked
     /// against: vanilla's `PathNavigation.isStableDestination`.
     fn is_stable_destination(&self, world: &World, pos: &BlockPos) -> bool {
-        world.get_block_state(&pos.down()).is_solid()
+        world.get_block_state(&pos.down()).is_solid_render()
     }
 
     /// The waypoint and speed this tick's navigation wants the mob's move control
@@ -2127,7 +2127,7 @@ impl PathNavigationTrait for WaterBoundPathNavigation {
 
     /// A swimmer can hold still anywhere it is not inside a block.
     fn is_stable_destination(&self, world: &World, pos: &BlockPos) -> bool {
-        !world.get_block_state(pos).is_solid()
+        !world.get_block_state(pos).is_solid_render()
     }
 }
 
