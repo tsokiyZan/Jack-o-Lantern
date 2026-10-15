@@ -1950,7 +1950,8 @@ impl WaterBoundPathNavigation {
             if let Some(node) = path.get_next_node_pos() {
                 let close_enough = (pos.x - (f64::from(node.0.x) + 0.5)).abs() < max_distance
                     && (pos.z - (f64::from(node.0.z) + 0.5)).abs() < max_distance
-                    && (pos.y - f64::from(node.0.y)).abs() < 1.0;
+                    // `WaterBoundPathNavigation.getMaxVerticalDistanceToWaypoint`.
+                    && (pos.y - f64::from(node.0.y)).abs() < 0.5;
                 let can_cut_corner = path.get_next_node().is_some_and(|n| {
                     n.path_type != PathType::DangerFire
                         && n.path_type != PathType::DangerOther
