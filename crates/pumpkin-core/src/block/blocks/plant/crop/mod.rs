@@ -26,7 +26,7 @@ pub mod sweet_berry_bush;
 pub mod torch_flower;
 pub mod wheat;
 
-trait CropBlockBase: PlantBlockBase {
+pub(crate) trait CropBlockBase: PlantBlockBase {
     // Deliberately NOT named `can_plant_on_top`: that would collide with the
     // `PlantBlockBase` method of the same name without overriding it, and
     // `PlantBlockBase`'s defaults would silently keep using the generic
