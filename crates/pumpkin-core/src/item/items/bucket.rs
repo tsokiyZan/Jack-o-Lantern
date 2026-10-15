@@ -7,6 +7,7 @@ use crate::{
 };
 use pumpkin_data::{
     Block, BlockDirection,
+    data_component_impl::BucketEntityDataImpl,
     entity::EntityType,
     fluid::Fluid,
     item::Item,
@@ -432,6 +433,15 @@ impl ItemBehaviour for FilledBucketItem {
                 f64::from(place_pos.0.z) + 0.5,
             );
             let mob = from_type(entity_type, spawn_coord, &world, Uuid::new_v4());
+            // Vanilla `MobBucketItem.spawn`'s `loadFromBucketTag`.
+            if let Some(bucket_mob) = mob.get_mob()
+                && let Some(data) = player
+                    .inventory()
+                    .held_item()
+                    .get_data_component::<BucketEntityDataImpl>()
+            {
+                bucket_mob.load_from_bucket_tag(&data.nbt());
+            }
             world.spawn_entity(mob);
         }
 

@@ -1,164 +1,353 @@
-use crate::entity::ai::pathfinder::node::PathType;
-use crate::entity::breath::BreathManager;
-use std::sync::{Arc, Weak};
+use std::sync::{
+    Arc, PoisonError,
+    atomic::{AtomicBool, AtomicI32, Ordering},
+};
 
+use pumpkin_data::data_component_impl::{BucketEntityDataImpl, CustomNameImpl};
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
-use pumpkin_data::particle::Particle;
-use pumpkin_data::sound::{Sound, SoundCategory};
+use pumpkin_data::sound::Sound;
 use pumpkin_data::tag::{self, Taggable};
+use pumpkin_data::tracked_data;
 use pumpkin_nbt::compound::NbtCompound;
-use pumpkin_util::math::vector3::Vector3;
 
+use super::tadpole_ai;
 use crate::entity::{
-    Entity, EntityBase,
-    ageable::{AgeableData, AgeableMob},
-    ai::goal::{
-        escape_danger::EscapeDangerGoal, look_around::RandomLookAroundGoal,
-        look_at_entity::LookAtEntityGoal, tempt::TemptGoal, try_find_water::TryFindWaterGoal,
-        wander_around::WanderAroundGoal,
-    },
-    mob::{Mob, MobEntity},
+    Entity, EntityBase, ageable,
+    ai::brain::{Brain, BrainTick, behavior::utils::is_alive},
+    ai::control::look_control::LookControl,
+    ai::control::smooth_swimming_move_control::SmoothSwimmingMoveControl,
+    breath::BreathManager,
+    mob::{Mob, MobEntity, conversion::convert_single},
+    passive::fish,
     player::Player,
 };
 
-const TEMPT_ITEMS: &[&Item] = &[&Item::SLIME_BALL];
+/// Vanilla `Tadpole.ticksToBeFrog`.
+const TICKS_TO_BE_FROG: i32 = 24000;
+/// Vanilla `Tadpole.DEFAULT_AGE`.
+const DEFAULT_AGE: i32 = 0;
 
+/// Represents a Tadpole, the young of a frog, which grows into one after twenty minutes.
+///
+/// Wiki: <https://minecraft.wiki/w/Tadpole>
 pub struct TadpoleEntity {
     pub mob_entity: MobEntity,
-    pub ageable_data: AgeableData,
+    /// Vanilla `Tadpole.age`, separate from `AgeableMob`'s.
+    age: AtomicI32,
+    age_lock_particle_timer: AtomicI32,
+    age_locked: AtomicBool,
 }
 
 impl TadpoleEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
-        // Vanilla `WaterAnimal`'s constructor.
-        mob_entity.set_pathfinding_malus(PathType::Water, 0.0);
+        // Vanilla `AbstractFish`: water navigation and the fish goals, which tadpoles run
+        // alongside their brain.
+        fish::init(&mob_entity);
+        // Vanilla `Tadpole`'s constructor.
+        *mob_entity
+            .move_control
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) =
+            Box::new(SmoothSwimmingMoveControl::new(85, 10, 0.02, 0.1, true));
+        *mob_entity
+            .look_control
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = LookControl::smooth_swimming(10.0);
         let tadpole = Self {
             mob_entity,
-            ageable_data: AgeableData::default(),
+            age: AtomicI32::new(DEFAULT_AGE),
+            age_lock_particle_timer: AtomicI32::new(0),
+            age_locked: AtomicBool::new(false),
         };
         let mob_arc = Arc::new(tadpole);
-        let mob_weak: Weak<dyn Mob> = {
-            let mob_arc: Arc<dyn Mob> = mob_arc.clone();
-            Arc::downgrade(&mob_arc)
-        };
-
-        {
-            let mut goal_selector = mob_arc
-                .mob_entity
-                .goals_selector
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-
-            goal_selector.add_goal(0, Box::new(TryFindWaterGoal));
-            goal_selector.add_goal(1, EscapeDangerGoal::new(1.5));
-            goal_selector.add_goal(2, Box::new(TemptGoal::new(1.25, TEMPT_ITEMS, false)));
-            goal_selector.add_goal(
-                3,
-                Box::new(WanderAroundGoal::new(1.0).ignoring_no_action_time()),
-            );
-            goal_selector.add_goal(
-                4,
-                LookAtEntityGoal::with_default(mob_weak, &EntityType::PLAYER, 6.0),
-            );
-            goal_selector.add_goal(5, Box::new(RandomLookAroundGoal::default()));
-        };
-
+        mob_arc.mob_entity.init_brain(mob_arc.as_ref());
         mob_arc
     }
 
+    /// Vanilla `Tadpole.isAgeLocked`.
+    #[must_use]
+    pub fn is_age_locked(&self) -> bool {
+        self.age_locked.load(Ordering::Relaxed)
+    }
+
+    /// Vanilla `Tadpole.setAgeLocked`.
+    fn set_age_locked(&self, locked: bool) {
+        self.age_locked.store(locked, Ordering::Relaxed);
+        self.get_entity()
+            .set_synced_data(tracked_data::tadpole::AGE_LOCKED, locked);
+    }
+
+    /// Vanilla `Tadpole.setAgeLockedData`.
+    fn set_age_locked_data(&self) {
+        self.set_age_locked(!self.is_age_locked());
+        self.set_age(0);
+        self.age_lock_particle_timer.store(40, Ordering::Relaxed);
+    }
+
+    fn get_age(&self) -> i32 {
+        self.age.load(Ordering::Relaxed)
+    }
+
+    /// Vanilla `Tadpole.ageUp(int)`.
+    fn age_up_by(&self, ticks_to_age_up: i32) {
+        self.set_age(self.get_age() + ticks_to_age_up * 20);
+    }
+
+    /// Vanilla `Tadpole.setAge`.
+    fn set_age(&self, new_age: i32) {
+        self.age.store(new_age, Ordering::Relaxed);
+        if new_age >= TICKS_TO_BE_FROG {
+            self.age_up();
+        }
+    }
+
+    /// Vanilla `Tadpole.ageUp()`: turns into a frog.
+    fn age_up(&self) {
+        let world = self.get_entity().world.load_full();
+        convert_single(self, &EntityType::FROG, false, false, |frog| {
+            frog.finalize_spawn(&world, None);
+            frog.get_mob_entity()
+                .persistence_required
+                .store(true, Ordering::Relaxed);
+            // TODO: Entity.fudgePositionAfterSizeChange, which needs
+            // CollisionGetter.findFreePosition.
+            self.play_sound_at_self(Sound::EntityTadpoleGrowUp, 0.15, 1.0);
+        });
+    }
+
+    /// Vanilla `Tadpole.getTicksLeftUntilAdult`.
+    fn get_ticks_left_until_adult(&self) -> i32 {
+        (TICKS_TO_BE_FROG - self.get_age()).max(0)
+    }
+
+    /// Vanilla `Tadpole.isFood`.
     fn is_food(item_stack: &ItemStack) -> bool {
         item_stack.item.has_tag(&tag::Item::MINECRAFT_FROG_FOOD)
-            || item_stack.item == &Item::SLIME_BALL
-    }
-}
-
-impl AgeableMob for TadpoleEntity {
-    fn get_ageable_data(&self) -> &AgeableData {
-        &self.ageable_data
-    }
-}
-
-impl Mob for TadpoleEntity {
-    /// Vanilla `WaterAnimal.handleAirSupply`.
-    fn handle_air_supply(&self, pre_tick_air: i32) {
-        BreathManager::water_animal_handle_air_supply(self, pre_tick_air);
     }
 
-    fn as_ageable(&self) -> Option<&dyn AgeableMob> {
-        Some(self)
+    /// Vanilla `Tadpole.feed`. The happy-villager particle is client-side only.
+    fn feed(&self, player: &Player, item_stack: &mut ItemStack) {
+        item_stack.decrement_unless_creative(player.gamemode.load(), 1);
+        self.age_up_by(ageable::get_speed_up_seconds_when_feeding(
+            self.get_ticks_left_until_adult(),
+        ));
     }
 
-    fn mob_write_nbt(&self, nbt: &mut NbtCompound) {
-        self.write_ageable_nbt(nbt);
-    }
-
-    fn mob_read_nbt(&self, nbt: &NbtCompound) {
-        self.read_ageable_nbt(nbt);
-    }
-
-    fn get_mob_entity(&self) -> &MobEntity {
-        &self.mob_entity
-    }
-
-    fn mob_tick(&self, _caller: &dyn EntityBase) {
-        self.ageable_ai_step();
-    }
-
-    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
-        if Self::is_food(item_stack) {
-            item_stack.decrement_unless_creative(player.gamemode.load(), 1);
-            let age = self
-                .get_mob_entity()
-                .living_entity
-                .entity
-                .age
-                .load(std::sync::atomic::Ordering::Relaxed);
-            let speedup = (-age / 10).max(1);
-            self.get_mob_entity()
-                .living_entity
-                .entity
-                .age
-                .fetch_add(speedup, std::sync::atomic::Ordering::Relaxed);
-
-            let entity = self.get_entity();
-            let world = entity.world.load();
-            let pos = entity.pos.load();
-            world.spawn_particle(
-                pos + Vector3::new(0.0, f64::from(entity.height()), 0.0),
-                Vector3::new(0.5, 0.5, 0.5),
-                1.0,
-                7,
-                Particle::HappyVillager,
-            );
-            world.play_sound(Sound::EntityTadpoleGrowUp, SoundCategory::Neutral, &pos);
-            return true;
+    /// Vanilla `Tadpole.saveToBucketTag`, with `Bucketable.saveDefaultDataToBucketTag`.
+    fn save_to_bucket_tag(&self, bucket: &mut ItemStack) {
+        let entity = self.get_entity();
+        if let Some(name) = entity.custom_name.load().as_ref() {
+            bucket.set_data_component(CustomNameImpl { name: name.clone() });
         }
+        let mut tag = NbtCompound::new();
+        if self.mob_entity.is_no_ai() {
+            tag.put_bool("NoAI", true);
+        }
+        if entity.is_silent() {
+            tag.put_bool("Silent", true);
+        }
+        if entity.has_no_gravity() {
+            tag.put_bool("NoGravity", true);
+        }
+        if entity.glowing.load(Ordering::Relaxed) {
+            tag.put_bool("Glowing", true);
+        }
+        if entity.invulnerable.load(Ordering::Relaxed) {
+            tag.put_bool("Invulnerable", true);
+        }
+        if self.mob_entity.persistence_required.load(Ordering::Relaxed) {
+            tag.put_bool("PersistenceRequired", true);
+        }
+        tag.put_float("Health", self.mob_entity.living_entity.health.load());
+        tag.put_int("Age", self.get_age());
+        tag.put_bool("AgeLocked", self.is_age_locked());
+        bucket.set_data_component(BucketEntityDataImpl { nbt: Some(tag) });
+    }
 
-        if item_stack.get_item() == &Item::WATER_BUCKET {
-            let entity = self.get_entity();
-            let world = entity.world.load();
-            if let Some(server) = world.server.upgrade() {
-                let mut event = crate::plugin::api::events::player::player_bucket_entity::PlayerBucketEntityEvent {
+    /// Vanilla `Bucketable.bucketMobPickup` with `ItemUtils.createFilledResult`.
+    fn bucket_mob_pickup(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+        let entity = self.get_entity();
+        if item_stack.item != &Item::WATER_BUCKET || !entity.is_alive() {
+            return false;
+        }
+        let world = entity.world.load();
+        if let Some(server) = world.server.upgrade() {
+            let mut event =
+                crate::plugin::api::events::player::player_bucket_entity::PlayerBucketEntityEvent {
                     player: player.clone(),
                     entity_id: entity.entity_id,
                     bucket_item: "tadpole_bucket".to_string(),
                     cancelled: false,
                 };
-                server.plugin_manager.fire_blocking(&server, &mut event);
-                if event.cancelled {
-                    return false;
-                }
+            server.plugin_manager.fire_blocking(&server, &mut event);
+            if event.cancelled {
+                return false;
             }
-            item_stack.decrement_unless_creative(player.gamemode.load(), 1);
-            let pos = entity.pos.load();
-            world.play_sound(Sound::ItemBucketFillTadpole, SoundCategory::Neutral, &pos);
-            entity.remove();
+        }
+        self.play_sound_at_self(Sound::ItemBucketFillTadpole, 1.0, 1.0);
+        let mut bucket = ItemStack::new(1, &Item::TADPOLE_BUCKET);
+        self.save_to_bucket_tag(&mut bucket);
+        item_stack.decrement_unless_creative(player.gamemode.load(), 1);
+        if item_stack.is_empty() {
+            *item_stack = bucket;
+        } else if !player.inventory().insert_stack_anywhere(&mut bucket) {
+            player.drop_item(bucket);
+        }
+        if entity.is_leashed() {
+            entity.unleash();
+            entity.spawn_at_location(ItemStack::new(1, &Item::LEAD));
+        }
+        entity.remove();
+        true
+    }
+}
+
+impl Mob for TadpoleEntity {
+    fn get_mob_entity(&self) -> &MobEntity {
+        &self.mob_entity
+    }
+
+    /// Vanilla `WaterAnimal.handleAirSupply`.
+    fn handle_air_supply(&self, pre_tick_air: i32) {
+        BreathManager::water_animal_handle_air_supply(self, pre_tick_air);
+    }
+
+    /// Vanilla `AbstractFish.aiStep`.
+    fn ai_step(&self, _caller: &dyn EntityBase) {
+        fish::flop(self, Sound::EntityTadpoleFlop);
+    }
+
+    /// The rest of vanilla `Tadpole.aiStep`, after `super.aiStep()`.
+    fn ai_step_end(&self, _caller: &dyn EntityBase) {
+        if !self.is_age_locked() {
+            self.set_age(self.get_age() + 1);
+        }
+        let timer = ageable::make_age_locked_particle(
+            self,
+            self.age_lock_particle_timer.load(Ordering::Relaxed),
+            self.is_age_locked(),
+        );
+        self.age_lock_particle_timer.store(timer, Ordering::Relaxed);
+    }
+
+    /// Vanilla `AbstractFish.travelInWater`.
+    fn custom_travel(&self, caller: &dyn EntityBase) -> bool {
+        fish::travel(self, caller)
+    }
+
+    fn mob_is_pushed_by_fluids(&self) -> bool {
+        false
+    }
+
+    /// Vanilla `AbstractFish.requiresCustomPersistence`; tadpoles always count as from
+    /// a bucket.
+    fn requires_custom_persistence(&self) -> bool {
+        true
+    }
+
+    /// Vanilla `AbstractFish.removeWhenFarAway`.
+    fn remove_when_far_away(&self, _distance_sq: f64) -> bool {
+        false
+    }
+
+    /// Vanilla `Tadpole.shouldDropExperience`.
+    fn get_base_experience_reward(&self) -> u32 {
+        0
+    }
+
+    fn make_brain(&self, packed: &crate::entity::ai::brain::memory::PackedMemories) -> Brain {
+        tadpole_ai::TADPOLE_PROVIDER.make_brain(self, packed)
+    }
+
+    /// Vanilla `Tadpole.customServerAiStep`'s `TadpoleAi.updateActivity`.
+    fn after_brain_tick(&self, tick: &mut BrainTick<'_>) {
+        tadpole_ai::update_activity(tick);
+    }
+
+    /// Vanilla `Tadpole.customServerAiStep`.
+    fn custom_server_ai_step(&self, _caller: &dyn EntityBase) {
+        if !is_alive(self) {
+            self.mob_entity.apply_brain_inbox(self);
+            return;
+        }
+        self.mob_entity.tick_brain(self);
+    }
+
+    fn mob_write_nbt(&self, nbt: &mut NbtCompound) {
+        // Vanilla `AbstractFish.addAdditionalSaveData` writes `fromBucket()`, always true.
+        nbt.put_bool("FromBucket", true);
+        nbt.put_int("Age", self.get_age());
+        nbt.put_bool("AgeLocked", self.is_age_locked());
+    }
+
+    fn mob_read_nbt(&self, nbt: &NbtCompound) {
+        self.set_age(nbt.get_int("Age").unwrap_or(DEFAULT_AGE));
+        self.set_age_locked(nbt.get_bool("AgeLocked").unwrap_or(false));
+    }
+
+    /// Vanilla `Tadpole.loadFromBucketTag`, with
+    /// `Bucketable.loadDefaultDataFromBucketTag`.
+    fn load_from_bucket_tag(&self, tag: &NbtCompound) {
+        let entity = self.get_entity();
+        if let Some(no_ai) = tag.get_bool("NoAI") {
+            self.mob_entity.set_no_ai(no_ai);
+        }
+        if let Some(silent) = tag.get_bool("Silent") {
+            entity.set_silent(silent);
+        }
+        if let Some(no_gravity) = tag.get_bool("NoGravity") {
+            entity.set_has_no_gravity(no_gravity);
+        }
+        if let Some(glowing) = tag.get_bool("Glowing") {
+            entity.set_glowing(glowing);
+        }
+        if let Some(invulnerable) = tag.get_bool("Invulnerable") {
+            entity.invulnerable.store(invulnerable, Ordering::Relaxed);
+        }
+        if tag.get_bool("PersistenceRequired") == Some(true) {
+            self.mob_entity
+                .persistence_required
+                .store(true, Ordering::Relaxed);
+        }
+        if let Some(health) = tag.get_float("Health") {
+            self.mob_entity.living_entity.set_health(health);
+        }
+        if let Some(age) = tag.get_int("Age") {
+            self.set_age(age);
+        }
+        self.set_age_locked(tag.get_bool("AgeLocked").unwrap_or(false));
+    }
+
+    fn mob_init_data_tracker(&self) {
+        self.get_entity()
+            .set_synced_data(tracked_data::tadpole::AGE_LOCKED, self.is_age_locked());
+    }
+
+    /// Vanilla `Tadpole.mobInteract`.
+    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+        if Self::is_food(item_stack) && !self.is_age_locked() {
+            self.feed(player, item_stack);
             return true;
         }
-
-        false
+        if ageable::can_use_golden_dandelion(
+            item_stack,
+            true,
+            self.age_lock_particle_timer.load(Ordering::Relaxed),
+            self,
+        ) {
+            ageable::set_age_locked_by_player(
+                self,
+                || self.is_age_locked(),
+                player,
+                item_stack,
+                || self.set_age_locked_data(),
+            );
+            return true;
+        }
+        self.bucket_mob_pickup(player, item_stack)
+            || self.mob_entity.mob_interact(player, item_stack)
     }
 }

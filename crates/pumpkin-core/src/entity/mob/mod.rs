@@ -1660,6 +1660,10 @@ pub trait Mob: EntityBase + Send + Sync {
         false
     }
 
+    /// Vanilla `Bucketable.loadFromBucketTag`: what a mob placed from a bucket reads back
+    /// from the bucket's `bucket_entity_data`.
+    fn load_from_bucket_tag(&self, _tag: &NbtCompound) {}
+
     /// Vanilla `calculateFallDamage` overrides, given what `LivingEntity`'s returns.
     fn calculate_fall_damage(&self, base_damage: i32) -> i32 {
         base_damage
