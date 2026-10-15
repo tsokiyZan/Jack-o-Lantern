@@ -4,6 +4,7 @@ use pumpkin_protocol::java::client::play::{
 };
 
 use crate::net::java::JavaClient;
+use pumpkin_util::math::vector3::Vector3;
 
 use super::World;
 
@@ -140,6 +141,20 @@ impl Worldborder {
         let min_z = self.center_z - half;
         let max_z = self.center_z + half;
         x >= min_x && x < max_x && z >= min_z && z < max_z
+    }
+
+    /// Vanilla `WorldBorder.clampVec3ToBound`.
+    #[must_use]
+    pub fn clamp_vec3_to_bound(&self, x: f64, y: f64, z: f64) -> Vector3<f64> {
+        // Vanilla `Mth.clamp`, which never panics on an inverted range.
+        let clamp = |value: f64, min: f64, max: f64| if value < min { min } else { value.min(max) };
+        let half = self.new_diameter / 2.0;
+        let inset = f64::from(1.0E-5f32);
+        Vector3::new(
+            clamp(x, self.center_x - half, self.center_x + half - inset),
+            y,
+            clamp(z, self.center_z - half, self.center_z + half - inset),
+        )
     }
 
     #[must_use]

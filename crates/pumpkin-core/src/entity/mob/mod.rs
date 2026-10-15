@@ -1656,6 +1656,11 @@ pub trait Mob: EntityBase + Send + Sync {
     }
 
     /// Vanilla `Entity.omnidirectionalAirMover`: drags vertically like horizontally in the air.
+    /// Vanilla `Entity.isSteppingCarefully`, which cats and ocelots extend to crouching.
+    fn mob_is_stepping_carefully(&self) -> bool {
+        self.get_entity().is_sneaking()
+    }
+
     fn omnidirectional_air_mover(&self) -> bool {
         false
     }
@@ -2581,6 +2586,10 @@ impl<T: Mob + Send + 'static> EntityBase for T {
 
     fn is_flutterer(&self) -> bool {
         self.omnidirectional_air_mover()
+    }
+
+    fn is_stepping_carefully(&self) -> bool {
+        self.mob_is_stepping_carefully()
     }
 
     fn get_experience_reward(&self, _killer: Option<&dyn EntityBase>) -> u32 {

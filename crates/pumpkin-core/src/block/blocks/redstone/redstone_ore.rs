@@ -40,8 +40,10 @@ impl BlockBehaviour for RedstoneOreBlock {
     }
 
     fn on_entity_step(&self, args: OnEntityStepArgs<'_>) {
-        let state = args.world.get_block_state(args.position);
-        Self::light_up(args.world, args.position, args.block, state);
+        if !args.entity.is_stepping_carefully() {
+            let state = args.world.get_block_state(args.position);
+            Self::light_up(args.world, args.position, args.block, state);
+        }
     }
 
     fn random_tick(&self, args: RandomTickArgs<'_>) {

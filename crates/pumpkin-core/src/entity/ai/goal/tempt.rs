@@ -127,6 +127,49 @@ impl TemptGoal {
         self.running
     }
 
+    /// Vanilla's protected `player`: who the goal is following.
+    #[must_use]
+    pub const fn player(&self) -> Option<&Arc<dyn EntityBase>> {
+        self.target_player.as_ref()
+    }
+
+    /// Vanilla `TemptGoal.canScare`, before any subclass override.
+    #[must_use]
+    pub const fn can_scare(&self) -> bool {
+        self.can_scare
+    }
+
+    /// The scare check opening vanilla `canContinueToUse`, given the goal's `canScare()`.
+    /// False when the player moved or turned too fast while close; `canUse()` follows it.
+    pub fn passes_scare_check(&mut self, mob: &dyn Mob, can_scare: bool) -> bool {
+        if !can_scare {
+            return true;
+        }
+        let Some(player) = self.target_player.clone() else {
+            return false;
+        };
+        let entity = player.get_entity();
+        let player_pos = entity.pos.load();
+        let mob_pos = mob.get_mob_entity().living_entity.entity.pos.load();
+
+        if mob_pos.squared_distance_to_vec(&player_pos) < SCARE_RANGE_SQ {
+            if player_pos.squared_distance_to_vec(&self.watched_pos) > SCARE_MOVE_SQ {
+                return false;
+            }
+            if (f64::from(entity.pitch.load()) - self.watched_pitch).abs() > SCARE_ROTATION
+                || (f64::from(entity.yaw.load()) - self.watched_yaw).abs() > SCARE_ROTATION
+            {
+                return false;
+            }
+        } else {
+            self.watched_pos = player_pos;
+        }
+
+        self.watched_pitch = f64::from(entity.pitch.load());
+        self.watched_yaw = f64::from(entity.yaw.load());
+        true
+    }
+
     fn is_tempt_item(&self, mob: &dyn Mob, stack: &ItemStack) -> bool {
         stack.item_count > 0
             && match self.tempt_items {
@@ -218,32 +261,7 @@ impl Goal for TemptGoal {
     }
 
     fn should_continue(&mut self, mob: &dyn Mob) -> bool {
-        if self.can_scare {
-            let Some(player) = self.target_player.clone() else {
-                return false;
-            };
-            let entity = player.get_entity();
-            let player_pos = entity.pos.load();
-            let mob_pos = mob.get_mob_entity().living_entity.entity.pos.load();
-
-            if mob_pos.squared_distance_to_vec(&player_pos) < SCARE_RANGE_SQ {
-                if player_pos.squared_distance_to_vec(&self.watched_pos) > SCARE_MOVE_SQ {
-                    return false;
-                }
-                if (f64::from(entity.pitch.load()) - self.watched_pitch).abs() > SCARE_ROTATION
-                    || (f64::from(entity.yaw.load()) - self.watched_yaw).abs() > SCARE_ROTATION
-                {
-                    return false;
-                }
-            } else {
-                self.watched_pos = player_pos;
-            }
-
-            self.watched_pitch = f64::from(entity.pitch.load());
-            self.watched_yaw = f64::from(entity.yaw.load());
-        }
-
-        self.can_start(mob)
+        self.passes_scare_check(mob, self.can_scare) && self.can_start(mob)
     }
 
     fn start(&mut self, _mob: &dyn Mob) {

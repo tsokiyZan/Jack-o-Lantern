@@ -720,7 +720,7 @@ fn is_consumable_food(stack: &ItemStack) -> bool {
 fn is_sleeping(entity: &dyn EntityBase) -> bool {
     entity.get_player().map_or_else(
         || entity.get_mob().is_some_and(Mob::is_sleeping),
-        |player| player.sleeping_since.load().is_some(),
+        Player::is_sleeping,
     )
 }
 

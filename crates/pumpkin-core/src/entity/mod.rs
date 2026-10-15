@@ -495,6 +495,11 @@ pub trait EntityBase: Send + Sync + std::any::Any {
         false
     }
 
+    /// Vanilla `Entity.isSteppingCarefully`: sneaking, so blocks stepped on stay calm.
+    fn is_stepping_carefully(&self) -> bool {
+        self.get_entity().is_sneaking()
+    }
+
     /// Vanilla `Entity.getSoundSource`.
     fn entity_sound_source(&self) -> SoundCategory {
         SoundCategory::Neutral

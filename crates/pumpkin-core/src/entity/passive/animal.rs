@@ -1,8 +1,15 @@
 use std::sync::Arc;
 
+use pumpkin_data::data_component_impl::DyeImpl;
+use pumpkin_data::dye_color::DyeColor;
+use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::particle::Particle;
 use pumpkin_data::sound::{Sound, SoundCategory};
+use pumpkin_inventory::crafting::crafting_inventory::CraftingInventory;
+use pumpkin_inventory::crafting::crafting_screen_handler::match_crafting_recipe;
+use pumpkin_inventory::crafting::recipe_provider::RecipeProvider;
+use pumpkin_inventory::inventory::Inventory;
 
 use crate::entity::{
     EntityBase,
@@ -175,6 +182,61 @@ pub fn get_dye_color_from_item(item: &pumpkin_data::item::Item) -> Option<u8> {
         "black_dye" => Some(15),
         _ => None,
     }
+}
+
+/// Vanilla `DyeColor.getMixedColor`: what crafting the two dyes together makes, or either
+/// one at random when no recipe mixes them.
+#[must_use]
+pub fn get_mixed_color(world: &World, color1: DyeColor, color2: DyeColor) -> DyeColor {
+    find_color_mix_in_recipes(world, color1, color2).unwrap_or_else(|| {
+        if rand::random::<bool>() {
+            color1
+        } else {
+            color2
+        }
+    })
+}
+
+/// Vanilla `DyeColor.findColorMixInRecipes`.
+fn find_color_mix_in_recipes(
+    world: &World,
+    color1: DyeColor,
+    color2: DyeColor,
+) -> Option<DyeColor> {
+    let dye_color = |stack: &ItemStack| stack.get_data_component::<DyeImpl>().map(|dye| dye.color);
+    // Vanilla `findAll(DataComponents.DYE, color)`.
+    let dye_items = |color: DyeColor| {
+        (0..=u16::MAX)
+            .filter_map(Item::from_id)
+            .map(|item| ItemStack::new(1, item))
+            .filter(move |stack| dye_color(stack) == Some(color))
+            .collect::<Vec<_>>()
+    };
+    let dye1_items = dye_items(color1);
+    let dye2_items = dye_items(color2);
+    let server = world.server.upgrade();
+    let provider = server
+        .as_ref()
+        .map(|server| &*server.recipe_manager as &dyn RecipeProvider);
+    for dye1 in &dye1_items {
+        for dye2 in &dye2_items {
+            let input = CraftingInventory::new(2, 1);
+            input.set_stack(0, dye1.clone());
+            input.set_stack(1, dye2.clone());
+            if let Some(result) = match_crafting_recipe(&input, provider) {
+                let id = result
+                    .item_id
+                    .strip_prefix("minecraft:")
+                    .unwrap_or(&result.item_id);
+                if let Some(color) =
+                    Item::from_registry_key(id).and_then(|item| dye_color(&ItemStack::new(1, item)))
+                {
+                    return Some(color);
+                }
+            }
+        }
+    }
+    None
 }
 
 #[must_use]

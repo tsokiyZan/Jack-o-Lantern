@@ -4405,6 +4405,92 @@ impl LivingEntity {
         }
     }
 
+    /// Vanilla `LivingEntity.randomTeleport` with an avoidance tag: drops onto the first
+    /// block below `(x, y, z)` that entities can teleport to, then teleports there if the
+    /// spot is free, dry and clear of `avoidance_tag` blocks.
+    pub fn random_teleport(
+        &self,
+        caller: &dyn EntityBase,
+        x: f64,
+        y: f64,
+        z: f64,
+        show_particles: bool,
+        avoidance_tag: &'static pumpkin_data::tag::Tag,
+    ) -> bool {
+        let world = self.entity.world.load_full();
+        let clamped = world
+            .worldborder
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clamp_vec3_to_bound(x, y, z);
+        let mut pos = BlockPos::floored_v(clamped);
+        if world.get_block_state_if_loaded(&pos).is_none() {
+            return false;
+        }
+        let mut y = y;
+        while pos.0.y > world.get_bottom_y() {
+            pos = pos.down();
+            let block = world.get_block(&pos);
+            if block.has_tag(&tag::Block::MINECRAFT_ENTITIES_CAN_TELEPORT_TO) {
+                return self.check_position_and_teleport(
+                    caller,
+                    Vector3::new(clamped.x, y, clamped.z),
+                    show_particles,
+                    avoidance_tag,
+                    block,
+                );
+            }
+            y -= 1.0;
+        }
+        false
+    }
+
+    /// Vanilla `LivingEntity.checkPositionAndTeleport`.
+    fn check_position_and_teleport(
+        &self,
+        caller: &dyn EntityBase,
+        target: Vector3<f64>,
+        show_particles: bool,
+        avoidance_tag: &'static pumpkin_data::tag::Tag,
+        block: &Block,
+    ) -> bool {
+        if block.has_tag(avoidance_tag) {
+            return false;
+        }
+        let world = self.entity.world.load_full();
+        let bounding_box = BoundingBox::new_from_pos(
+            target.x,
+            target.y,
+            target.z,
+            &self.entity.entity_dimension.load(),
+        );
+        if !world.is_space_empty(bounding_box) || world.contains_any_liquid(bounding_box) {
+            return false;
+        }
+        // Vanilla `findBlocksIn(aabb)`: from the block holding the min corner to the one
+        // holding the max corner.
+        if BlockPos::iterate(
+            BlockPos::floored_v(bounding_box.min),
+            BlockPos::floored_v(bounding_box.max),
+        )
+        .any(|pos| world.get_block(&pos).has_tag(avoidance_tag))
+        {
+            return false;
+        }
+        caller.get_entity().teleport(target, None, None, &world);
+        if show_particles {
+            world.send_entity_status(&self.entity, EntityStatus::Teleport, None);
+        }
+        if let Some(mob) = caller.get_mob() {
+            mob.get_mob_entity()
+                .navigator
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .stop();
+        }
+        true
+    }
+
     fn find_random_teleport_target(&self, diameter: f32) -> Option<Vector3<f64>> {
         let center = self.entity.pos.load();
         let world = self.entity.world.load();
