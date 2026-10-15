@@ -3,6 +3,7 @@ use std::sync::Arc;
 use rand::{Rng, RngExt};
 
 use crate::entity::ai::target_predicate::TargetPredicate;
+use crate::entity::passive::armadillo;
 use crate::entity::{Entity, EntityBase};
 use crate::world::World;
 
@@ -15,6 +16,7 @@ pub mod dummy;
 pub mod frog_attackables;
 pub mod hurt_by;
 pub mod is_in_water;
+pub mod mob_sensor;
 pub mod nearest_items;
 pub mod nearest_living_entities;
 pub mod nearest_players;
@@ -28,6 +30,7 @@ pub use dummy::DummySensor;
 pub use frog_attackables::FrogAttackablesSensor;
 pub use hurt_by::HurtBySensor;
 pub use is_in_water::IsInWaterSensor;
+pub use mob_sensor::MobSensor;
 pub use nearest_items::NearestItemSensor;
 pub use nearest_living_entities::NearestLivingEntitySensor;
 pub use nearest_players::PlayerSensor;
@@ -36,6 +39,8 @@ pub use piglin_specific::PiglinSpecificSensor;
 pub use tempting::TemptingSensor;
 
 pub const DEFAULT_SCAN_RATE: i32 = 20;
+/// Vanilla `SensorType.ARMADILLO_SCARE_DETECTED`'s scan rate.
+const ARMADILLO_SCARE_DETECTED_SCAN_RATE: i32 = 5;
 
 pub trait Sensor: Send + Sync {
     fn requires(&self) -> &'static [MemoryModuleId];
@@ -58,6 +63,7 @@ pub enum SensorType {
     FrogTemptations,
     FrogAttackables,
     IsInWater,
+    ArmadilloScareDetected,
 }
 
 impl SensorType {
@@ -78,6 +84,7 @@ impl SensorType {
             Self::FrogTemptations => "minecraft:frog_temptations",
             Self::FrogAttackables => "minecraft:frog_attackables",
             Self::IsInWater => "minecraft:is_in_water",
+            Self::ArmadilloScareDetected => "minecraft:armadillo_scare_detected",
         }
     }
 
@@ -98,6 +105,7 @@ impl SensorType {
             | Self::FrogTemptations
             | Self::FrogAttackables
             | Self::IsInWater => DEFAULT_SCAN_RATE,
+            Self::ArmadilloScareDetected => ARMADILLO_SCARE_DETECTED_SCAN_RATE,
         }
     }
 
@@ -119,6 +127,12 @@ impl SensorType {
             })),
             Self::FrogAttackables => Box::new(FrogAttackablesSensor),
             Self::IsInWater => Box::new(IsInWaterSensor),
+            Self::ArmadilloScareDetected => Box::new(MobSensor::new(
+                armadillo::is_scared_by,
+                armadillo::can_stay_rolled_up,
+                types::DANGER_DETECTED_RECENTLY,
+                armadillo::SCARE_CHECK_INTERVAL,
+            )),
         }
     }
 

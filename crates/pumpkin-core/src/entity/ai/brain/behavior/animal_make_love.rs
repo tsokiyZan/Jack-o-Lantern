@@ -164,7 +164,9 @@ impl Behavior for AnimalMakeLove {
             && Self::can_mate(tick.mob, partner.as_ref())
             && entity_is_visible(&tick.visibility(), partner.as_ref())
             && tick.time <= self.spawn_child_at_time
-            && !tick.mob.is_panicking()
+            // Vanilla `PathfinderMob.isPanicking` on a live brain: the memory. Read here, as
+            // the mob's own `is_panicking` would need the brain lock this tick holds.
+            && !tick.brain.has_memory_value(types::IS_PANICKING.id())
             && !partner.is_panicking()
     }
 

@@ -11,7 +11,8 @@ use crate::entity::attributes::{Modifier, ModifierOperation};
 use crate::entity::mob::MobEntity;
 use crate::world::World;
 
-const RANDOM_SPAWN_BONUS_ID: &str = "minecraft:random_spawn_bonus";
+/// Vanilla `Mob.RANDOM_SPAWN_BONUS_ID`.
+pub(crate) const RANDOM_SPAWN_BONUS_ID: &str = "minecraft:random_spawn_bonus";
 
 /// State shared by every mob of one spawn group (vanilla `SpawnGroupData`).
 pub enum SpawnGroupData {
@@ -28,6 +29,11 @@ pub enum SpawnGroupData {
     Fox {
         variant: crate::entity::passive::fox::FoxVariant,
         group_size: i32,
+    },
+    /// Vanilla `Zombie.ZombieGroupData`.
+    Zombie {
+        is_baby: bool,
+        can_spawn_jockey: bool,
     },
 }
 
@@ -111,6 +117,22 @@ impl MobEntity {
                 .unwrap_or_else(std::sync::PoisonError::into_inner),
         )
     }
+
+    /// Queues an entity already in the world for this mob to mount when it enters the world,
+    /// as a vanilla `startRiding` during `finalizeSpawn` does.
+    pub fn set_pending_vehicle(&self, vehicle: Arc<dyn EntityBase>) {
+        *self
+            .pending_vehicle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(vehicle);
+    }
+
+    pub(crate) fn take_pending_vehicle(&self) -> Option<Arc<dyn EntityBase>> {
+        self.pending_vehicle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .take()
+    }
 }
 
 /// Finalizes `entity` if it is a mob, and returns the group data for the next mob of the group.
@@ -153,4 +175,11 @@ impl MobEntity {
             std::sync::atomic::Ordering::Relaxed,
         );
     }
+}
+
+/// Vanilla `SpecialDates.isHalloween`: October 31st on the server's clock.
+#[must_use]
+pub fn is_halloween() -> bool {
+    let now = time::OffsetDateTime::now_local().unwrap_or_else(|_| time::OffsetDateTime::now_utc());
+    now.month() == time::Month::October && now.day() == 31
 }

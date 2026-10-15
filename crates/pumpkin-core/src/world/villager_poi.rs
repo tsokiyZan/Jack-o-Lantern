@@ -124,6 +124,39 @@ impl VillagerPoiStorage {
             .fold(MAX_SECTIONS_TO_VILLAGE, i32::min)
     }
 
+    /// Vanilla `PoiManager.find` for `PoiTypeTags.VILLAGE` with `Occupancy.IS_OCCUPIED`: the
+    /// first occupied village POI within `radius` of `center` that `filter` accepts. Only
+    /// claimed job sites are tracked here, not beds or bells. Vanilla walks chunks z-major
+    /// then sections upwards; inside a section its order is a hash map's, so blocks are
+    /// taken bottom up here.
+    #[must_use]
+    pub fn find_occupied_village_poi(
+        &self,
+        center: BlockPos,
+        radius: i32,
+        filter: impl Fn(&BlockPos) -> bool,
+    ) -> Option<BlockPos> {
+        let radius_squared = i64::from(radius).pow(2);
+        self.job_sites
+            .iter()
+            .filter(|(_, site)| site.owner.as_ref().and_then(Self::live_owner).is_some())
+            .map(|(position, _)| *position)
+            .filter(|position| {
+                let delta = position.0 - center.0;
+                delta.x.abs() <= radius
+                    && delta.z.abs() <= radius
+                    && i64::from(delta.x).pow(2)
+                        + i64::from(delta.y).pow(2)
+                        + i64::from(delta.z).pow(2)
+                        <= radius_squared
+                    && filter(position)
+            })
+            .min_by_key(|position| {
+                let pos = position.0;
+                (pos.z >> 4, pos.x >> 4, pos.y >> 4, pos.y, pos.z, pos.x)
+            })
+    }
+
     #[must_use]
     pub fn get_nearest_job_site(&self, origin: BlockPos, radius: i32) -> Option<BlockPos> {
         let radius_squared = i64::from(radius).pow(2);

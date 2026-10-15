@@ -1,6 +1,6 @@
 use std::sync::{
     Arc, Weak,
-    atomic::{AtomicI32, AtomicU8, Ordering, Ordering::Relaxed},
+    atomic::{AtomicBool, AtomicI32, AtomicU8, Ordering, Ordering::Relaxed},
 };
 
 use crate::entity::ai::pathfinder::node::PathType;
@@ -38,6 +38,9 @@ const TEMPT_ITEMS: &[&Item] = &[
     &Item::PITCHER_POD,
 ];
 
+/// Experience a chicken jockey is worth.
+const CHICKEN_JOCKEY_EXPERIENCE: u32 = 10;
+
 /// Represents a Chicken, a passive mob that lays eggs and is immune to fall damage.
 ///
 /// Wiki: <https://minecraft.wiki/w/Chicken>
@@ -46,6 +49,8 @@ pub struct ChickenEntity {
     pub variant: AtomicU8,
     pub sound_variant: AtomicU8,
     egg_lay_time: AtomicI32,
+    /// Vanilla `isChickenJockey`: carried a baby zombie from its spawn.
+    is_chicken_jockey: AtomicBool,
     pub ageable_data: crate::entity::ageable::AgeableData,
 }
 
@@ -64,6 +69,7 @@ impl ChickenEntity {
             variant: AtomicU8::new(variant.id()),
             sound_variant: AtomicU8::new(ChickenSoundVariant::Classic as u8),
             egg_lay_time: AtomicI32::new(egg_lay_time),
+            is_chicken_jockey: AtomicBool::new(false),
             ageable_data: crate::entity::ageable::AgeableData::default(),
         };
         let mob_arc = Arc::new(chicken);
@@ -93,6 +99,16 @@ impl ChickenEntity {
         };
 
         mob_arc
+    }
+
+    #[must_use]
+    pub fn is_chicken_jockey(&self) -> bool {
+        self.is_chicken_jockey.load(Ordering::Relaxed)
+    }
+
+    pub fn set_chicken_jockey(&self, is_chicken_jockey: bool) {
+        self.is_chicken_jockey
+            .store(is_chicken_jockey, Ordering::Relaxed);
     }
 
     pub fn set_variant(&self, variant: ChickenVariant) {
@@ -198,6 +214,7 @@ impl Mob for ChickenEntity {
     }
 
     fn mob_write_nbt(&self, nbt: &mut NbtCompound) {
+        nbt.put_bool("IsChickenJockey", self.is_chicken_jockey());
         nbt.put_int("EggLayTime", self.egg_lay_time.load(Ordering::Relaxed));
         let variant =
             ChickenVariant::from_id(self.variant.load(Ordering::Relaxed)).unwrap_or_default();
@@ -212,6 +229,7 @@ impl Mob for ChickenEntity {
     }
 
     fn mob_read_nbt(&self, nbt: &NbtCompound) {
+        self.set_chicken_jockey(nbt.get_bool("IsChickenJockey").unwrap_or(false));
         self.egg_lay_time
             .store(nbt.get_int("EggLayTime").unwrap_or(6000), Ordering::Relaxed);
         if let Some(variant_str) = nbt.get_string("variant")
@@ -229,6 +247,20 @@ impl Mob for ChickenEntity {
 
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
+    }
+
+    /// Vanilla `Chicken.removeWhenFarAway`.
+    fn remove_when_far_away(&self, _distance_sq: f64) -> bool {
+        self.is_chicken_jockey()
+    }
+
+    /// Vanilla `Chicken.getBaseExperienceReward`.
+    fn get_base_experience_reward(&self) -> u32 {
+        if self.is_chicken_jockey() {
+            CHICKEN_JOCKEY_EXPERIENCE
+        } else {
+            self.get_entity().entity_type.experience_reward
+        }
     }
 
     fn mob_set_variant_name(&self, name: &str) {
@@ -271,7 +303,11 @@ impl Mob for ChickenEntity {
         if (!on_ground) && current_velocity.y < 0.0 {
             entity.set_velocity(current_velocity.multiply(1.0, 0.6, 1.0));
         }
-        if self.egg_lay_time.fetch_sub(1, Ordering::Relaxed) <= 1 {
+        // Vanilla `aiStep`: babies and jockeys lay no eggs, and their timer stands still.
+        if !self.is_baby()
+            && !self.is_chicken_jockey()
+            && self.egg_lay_time.fetch_sub(1, Ordering::Relaxed) <= 1
+        {
             let next_time = rand::rng().random_range(6000..12000);
             let world = entity.world.load_full();
             let entity_id = entity.entity_id;
