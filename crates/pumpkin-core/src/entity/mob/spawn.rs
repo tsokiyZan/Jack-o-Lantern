@@ -23,6 +23,12 @@ pub enum SpawnGroupData {
         should_spawn_baby: bool,
         baby_spawn_chance: f32,
     },
+    /// Vanilla `Fox.FoxGroupData`: an `AgeableMobGroupData(false)` carrying the group's
+    /// variant.
+    Fox {
+        variant: crate::entity::passive::fox::FoxVariant,
+        group_size: i32,
+    },
 }
 
 impl SpawnGroupData {
