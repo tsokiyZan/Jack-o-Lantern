@@ -265,3 +265,47 @@ impl Goal for ActiveTargetGoal {
         self.track_target_goal.controls()
     }
 }
+
+/// Vanilla `NonTameRandomTargetGoal`: hunts only while untamed, and keeps chasing while the
+/// prey still passes the targeting conditions (range, sight and the selector).
+pub struct NonTameRandomTargetGoal {
+    inner: Box<ActiveTargetGoal>,
+}
+
+impl NonTameRandomTargetGoal {
+    #[must_use]
+    pub fn new(inner: Box<ActiveTargetGoal>) -> Box<Self> {
+        Box::new(Self { inner })
+    }
+}
+
+impl Goal for NonTameRandomTargetGoal {
+    fn can_start(&mut self, mob: &dyn Mob) -> bool {
+        !mob.is_tamed() && self.inner.can_start(mob)
+    }
+
+    fn should_continue(&mut self, mob: &dyn Mob) -> bool {
+        let world = mob.get_entity().world.load();
+        self.inner.target.as_ref().is_some_and(|target| {
+            self.inner
+                .target_predicate
+                .test(&world, Some(mob), target.as_ref())
+        })
+    }
+
+    fn start(&mut self, mob: &dyn Mob) {
+        self.inner.start(mob);
+    }
+
+    fn stop(&mut self, mob: &dyn Mob) {
+        self.inner.stop(mob);
+    }
+
+    fn tick(&mut self, mob: &dyn Mob) {
+        self.inner.tick(mob);
+    }
+
+    fn controls(&self) -> Controls {
+        self.inner.controls()
+    }
+}

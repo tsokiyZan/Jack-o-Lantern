@@ -27,9 +27,14 @@ use crate::entity::custom_sound::CustomSound;
 use crate::entity::{
     Entity, EntityBase,
     ai::goal::{
-        active_target::ActiveTargetGoal, avoid_entity::AvoidEntityGoal, breed::BreedGoal,
-        escape_danger::EscapeDangerGoal, follow_owner::FollowOwnerGoal,
-        look_at_entity::LookAtEntityGoal, swim::SwimGoal, tempt::TemptGoal,
+        active_target::{ActiveTargetGoal, NonTameRandomTargetGoal},
+        avoid_entity::AvoidEntityGoal,
+        breed::BreedGoal,
+        escape_danger::EscapeDangerGoal,
+        follow_owner::FollowOwnerGoal,
+        look_at_entity::LookAtEntityGoal,
+        swim::SwimGoal,
+        tempt::TemptGoal,
         wander_around::WanderAroundGoal,
     },
     mob::{Mob, MobEntity},
@@ -160,20 +165,22 @@ impl CatEntity {
             // NonTameRandomTargetGoal: rabbits, and baby turtles on land.
             target_selector.add_goal(
                 1,
-                ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::RABBIT, false)
-                    .gated_by(|mob| !mob.is_tamed()),
+                NonTameRandomTargetGoal::new(ActiveTargetGoal::with_default(
+                    &mob_arc.mob_entity,
+                    &EntityType::RABBIT,
+                    false,
+                )),
             );
             target_selector.add_goal(
                 1,
-                Box::new(ActiveTargetGoal::new(
+                NonTameRandomTargetGoal::new(Box::new(ActiveTargetGoal::new(
                     &mob_arc.mob_entity,
                     &EntityType::TURTLE,
                     10,
                     false,
                     false,
                     Some(baby_on_land),
-                ))
-                .gated_by(|mob| !mob.is_tamed()),
+                ))),
             );
         };
 

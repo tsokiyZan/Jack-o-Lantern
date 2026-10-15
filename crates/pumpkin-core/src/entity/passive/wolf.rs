@@ -22,12 +22,21 @@ use crate::entity::{
     ageable::AgeableMob,
     ai::behavior::neutral::apply_targets,
     ai::goal::{
-        active_target::ActiveTargetGoal, avoid_entity::AvoidEntityGoal, beg::BegGoal,
-        breed::BreedGoal, escape_danger::EscapeDangerGoal, follow_owner::FollowOwnerGoal,
-        leap_at_target::LeapAtTargetGoal, look_around::RandomLookAroundGoal,
-        look_at_entity::LookAtEntityGoal, melee_attack::MeleeAttackGoal,
-        owner_hurt_by_target::OwnerHurtByTargetGoal, owner_hurt_target::OwnerHurtTargetGoal,
-        revenge::RevengeGoal, sit_when_ordered_to::SitWhenOrderedToGoal, swim::SwimGoal,
+        active_target::{ActiveTargetGoal, NonTameRandomTargetGoal},
+        avoid_entity::AvoidEntityGoal,
+        beg::BegGoal,
+        breed::BreedGoal,
+        escape_danger::EscapeDangerGoal,
+        follow_owner::FollowOwnerGoal,
+        leap_at_target::LeapAtTargetGoal,
+        look_around::RandomLookAroundGoal,
+        look_at_entity::LookAtEntityGoal,
+        melee_attack::MeleeAttackGoal,
+        owner_hurt_by_target::OwnerHurtByTargetGoal,
+        owner_hurt_target::OwnerHurtTargetGoal,
+        revenge::RevengeGoal,
+        sit_when_ordered_to::SitWhenOrderedToGoal,
+        swim::SwimGoal,
         wander_around::WanderAroundGoal,
     },
     mob::{
@@ -126,18 +135,31 @@ impl WolfEntity {
             target_selector.add_goal(3, Box::new(RevengeGoal::new(true).alerting_others()));
             // 4: NearestAttackableTarget (Player, angry only), 8: ResetUniversalAnger
             apply_targets(&mut target_selector, &mob_arc.mob_entity, 4, 8, true);
-            // 5: NonTameRandomTarget (Sheep, Rabbit, Fox)
+            // 5: NonTameRandomTarget (Animal, `PREY_SELECTOR`); 6: baby turtles on land.
             target_selector.add_goal(
                 5,
-                ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::SHEEP, false),
+                NonTameRandomTargetGoal::new(ActiveTargetGoal::predicated(
+                    &mob_arc.mob_entity,
+                    10,
+                    false,
+                    |target, _| {
+                        let entity_type = target.entity.entity_type;
+                        entity_type == &EntityType::SHEEP
+                            || entity_type == &EntityType::RABBIT
+                            || entity_type == &EntityType::FOX
+                    },
+                )),
             );
             target_selector.add_goal(
-                5,
-                ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::RABBIT, false),
-            );
-            target_selector.add_goal(
-                5,
-                ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::FOX, false),
+                6,
+                NonTameRandomTargetGoal::new(Box::new(ActiveTargetGoal::new(
+                    &mob_arc.mob_entity,
+                    &EntityType::TURTLE,
+                    10,
+                    false,
+                    false,
+                    Some(crate::entity::passive::cat::baby_on_land),
+                ))),
             );
             // 7: NearestAttackableTarget (AbstractSkeleton)
             target_selector.add_goal(
