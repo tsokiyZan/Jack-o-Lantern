@@ -142,11 +142,12 @@ impl NodeEvaluator for SwimNodeEvaluator {
             }
         }
 
+        // `Direction.Plane.HORIZONTAL` order (N, E, S, W), each paired with its clockwise turn.
         let horizontal = [
             (2usize, 5usize, 1, -1),
+            (5usize, 3usize, 1, 1),
             (3usize, 4usize, -1, 1),
             (4usize, 2usize, -1, -1),
-            (5usize, 3usize, 1, 1),
         ];
 
         for &(dir_idx, cw_idx, dx, dz) in &horizontal {

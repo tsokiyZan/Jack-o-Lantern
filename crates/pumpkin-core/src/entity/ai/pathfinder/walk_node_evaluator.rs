@@ -526,11 +526,12 @@ impl NodeEvaluator for WalkNodeEvaluator {
 
         self.reusable_neighbors.fill(None);
 
+        // `Direction.Plane.HORIZONTAL` order, indexed by `get2DDataValue`.
         let horizontal_directions = [
             (2usize, 0, -1, BlockDirection::North),
+            (3usize, 1, 0, BlockDirection::East),
             (0usize, 0, 1, BlockDirection::South),
             (1usize, -1, 0, BlockDirection::West),
-            (3usize, 1, 0, BlockDirection::East),
         ];
 
         for &(dir_idx, dx, dz, block_dir) in &horizontal_directions {
@@ -553,9 +554,9 @@ impl NodeEvaluator for WalkNodeEvaluator {
 
         let diagonal_directions = [
             (2usize, 3usize, 1, -1, BlockDirection::North),
+            (3usize, 0usize, 1, 1, BlockDirection::East),
             (0usize, 1usize, -1, 1, BlockDirection::South),
             (1usize, 2usize, -1, -1, BlockDirection::West),
-            (3usize, 0usize, 1, 1, BlockDirection::East),
         ];
 
         for &(dir_idx, cw_idx, dx, dz, block_dir) in &diagonal_directions {
