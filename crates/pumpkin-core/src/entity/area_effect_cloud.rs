@@ -52,11 +52,13 @@ pub struct AreaEffectCloudEntity {
     pub duration_on_use: Mutex<i32>,
     /// ticks to wait before the cloud becomes active and applies effects (grace period)
     pub wait_time: Mutex<i32>,
+    /// Vanilla `customParticle`, shown instead of the potion-coloured `entity_effect`.
+    custom_particle: Mutex<Option<ParticleMeta>>,
 }
 
 impl AreaEffectCloudEntity {
     /// Vanilla `setRadius`, synced to clients.
-    fn set_radius(&self, radius: f32) {
+    pub fn set_radius(&self, radius: f32) {
         *self
             .radius
             .lock()
@@ -85,9 +87,45 @@ impl AreaEffectCloudEntity {
             radius_on_use: Mutex::new(0.0),
             duration_on_use: Mutex::new(0),
             wait_time: Mutex::new(20),
+            custom_particle: Mutex::new(None),
         };
 
         Arc::new(cloud)
+    }
+
+    /// Vanilla `new AreaEffectCloud(level, x, y, z)`: no effects, a 3 block radius, and no
+    /// duration until one is set.
+    #[must_use]
+    pub fn with_vanilla_defaults(entity: Entity) -> Self {
+        entity
+            .no_physics
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+        Self {
+            entity,
+            item_stack: Mutex::new(ItemStack::EMPTY.clone()),
+            effects: Mutex::new(Vec::new()),
+            radius: Mutex::new(3.0),
+            duration: Mutex::new(-1),
+            age: Mutex::new(0),
+            reapplication_delay: Mutex::new(20),
+            reapplication_map: Mutex::new(HashMap::new()),
+            radius_on_tick: Mutex::new(0.0),
+            radius_on_use: Mutex::new(0.0),
+            duration_on_use: Mutex::new(0),
+            wait_time: Mutex::new(20),
+            custom_particle: Mutex::new(None),
+        }
+    }
+
+    /// Vanilla `setCustomParticle` for a particle whose options are `data`.
+    pub fn set_custom_particle(&self, particle: pumpkin_data::particle::Particle, data: Box<[u8]>) {
+        *self
+            .custom_particle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(ParticleMeta {
+            particle_id: pumpkin_protocol::codec::var_int::VarInt(particle as i32),
+            data,
+        });
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -118,6 +156,7 @@ impl AreaEffectCloudEntity {
             radius_on_use: Mutex::new(radius_on_use_in),
             duration_on_use: Mutex::new(duration_on_use_in),
             wait_time: Mutex::new(wait_time_in),
+            custom_particle: Mutex::new(None),
         };
 
         Arc::new(cloud)
@@ -188,12 +227,17 @@ impl EntityBase for AreaEffectCloudEntity {
         // Build raw particle option bytes for ENTITY_EFFECT
         let data_bytes = color.to_be_bytes();
 
-        let meta = ParticleMeta {
-            particle_id: pumpkin_protocol::codec::var_int::VarInt(
-                pumpkin_data::particle::Particle::EntityEffect as i32,
-            ),
-            data: Box::new(data_bytes),
-        };
+        let meta = self
+            .custom_particle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+            .unwrap_or_else(|| ParticleMeta {
+                particle_id: pumpkin_protocol::codec::var_int::VarInt(
+                    pumpkin_data::particle::Particle::EntityEffect as i32,
+                ),
+                data: Box::new(data_bytes),
+            });
 
         self.entity.set_synced_data(
             pumpkin_data::tracked_data::area_effect_cloud::PARTICLE,

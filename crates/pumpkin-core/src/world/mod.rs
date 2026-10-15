@@ -4546,6 +4546,13 @@ impl World {
         None
     }
 
+    /// Vanilla `ServerLevel.getEntityOrPart`: like [`Self::get_entity_by_id`], but also finds
+    /// ender dragon parts, which aren't level entities.
+    pub fn get_entity_or_part(&self, id: i32) -> Option<Arc<dyn EntityBase>> {
+        self.get_entity_by_id(id)
+            .or_else(|| crate::entity::boss::ender_dragon::find_part(self, id))
+    }
+
     // Gets all entities at a Box
     pub fn get_all_at_box(&self, aabb: &BoundingBox) -> Vec<Arc<dyn EntityBase>> {
         let entities_guard = self.entities.load();

@@ -18,7 +18,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::{
     block::{ExplodeArgs, SpawnAfterBreakArgs, block_loot_stacks, drop_block_experience},
-    entity::{Entity, EntityBase, tnt::TNTEntity},
+    entity::{Entity, EntityBase, boss::ender_dragon::parts_at_box, tnt::TNTEntity},
     world::loot::LootContextParameters,
 };
 
@@ -544,7 +544,8 @@ impl Explosion {
         let source_id = self.source.as_ref().map(|s| s.get_entity().entity_id);
 
         // `getEntities(source, box)`: everything but the source and spectators.
-        for entity_base in world.get_all_at_box(&search_box) {
+        let in_box = world.get_all_at_box(&search_box).into_iter();
+        for entity_base in in_box.chain(parts_at_box(world, &search_box)) {
             let entity = entity_base.get_entity();
             if Some(entity.entity_id) == source_id || entity_base.is_spectator() {
                 continue;

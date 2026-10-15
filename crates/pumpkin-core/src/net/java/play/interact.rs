@@ -31,7 +31,7 @@ impl JavaClient {
         let target: Option<Arc<dyn EntityBase>> = player_target
             .as_ref()
             .map(|p| Arc::clone(p) as Arc<dyn EntityBase>)
-            .or_else(|| world.get_entity_by_id(entity_id.0));
+            .or_else(|| world.get_entity_or_part(entity_id.0));
 
         if let Some(target) = target {
             if player.gamemode.load() == GameMode::Spectator {

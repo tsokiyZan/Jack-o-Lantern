@@ -94,7 +94,11 @@ pub fn handle_knockback(
             living.get_attribute_value(&Attributes::KNOCKBACK_RESISTANCE)
         });
         let strength = knockback_after_resistance(strength * 0.5, resistance);
-        if strength > 0.0 {
+        if strength > 0.0
+            && victim
+                .get_mob()
+                .is_none_or(super::mob::Mob::takes_knockback)
+        {
             victim.get_entity().knockback(strength, xd, zd);
         }
     }

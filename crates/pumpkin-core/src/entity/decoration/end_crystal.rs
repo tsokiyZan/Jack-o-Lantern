@@ -119,10 +119,19 @@ impl EntityBase for EndCrystalEntity {
             );
         }
 
-        if let Some(ref fight_mutex) = world.dragon_fight
-            && let Ok(mut fight) = fight_mutex.lock()
+        let dragon_uuid = world.dragon_fight.as_ref().and_then(|fight_mutex| {
+            fight_mutex
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .on_crystal_destroyed(&world, self.entity.entity_uuid)
+        });
+        if let Some(dragon) = dragon_uuid.and_then(|uuid| world.get_entity_by_uuid(uuid))
+            && let Some(dragon) = dragon
+                .cast_any()
+                .downcast_ref::<crate::entity::boss::ender_dragon::EnderDragonEntity>(
+            )
         {
-            fight.on_crystal_destroyed(&world, self.entity.entity_uuid);
+            dragon.on_crystal_destroyed(self, cause);
         }
 
         true
