@@ -69,74 +69,22 @@ jobs:
           mkdir -p dist
           EXT=""
           if [ "${{ runner.os }}" == "Windows" ]; then EXT=".exe"; fi
-          cp "target/release/pumpkin$EXT" "dist/pumpkin-${{ runner.arch }}-${{ runner.os }}$EXT"
+          cp "target/release/pumpkin$EXT" "dist/jack-o-lantern-${{ runner.arch }}-${{ runner.os }}$EXT"
           if [ "${{ runner.os }}" == "Linux" ]; then
             if [ "${{ runner.arch }}" == "X64" ]; then
               TARGET="x86_64-unknown-linux-musl"
             elif [ "${{ runner.arch }}" == "ARM64" ]; then
               TARGET="aarch64-unknown-linux-musl"
             fi
-            cp "target/$TARGET/release/pumpkin" "dist/pumpkin-${{ runner.arch }}-${{ runner.os }}-musl"
+            cp "target/$TARGET/release/pumpkin" "dist/jack-o-lantern-${{ runner.arch }}-${{ runner.os }}-musl"
           fi
 
-      - name: Upload unsigned Windows executable
-        if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v7
-        with:
-          name: unsigned-${{ runner.arch }}-${{ runner.os }}
-          path: dist/pumpkin-*
-          retention-days: 14
-
       - name: Export executable
-        if: runner.os != 'Windows'
         uses: actions/upload-artifact@v7
         with:
-          name: pumpkin-${{ runner.arch }}-${{ runner.os }}
+          name: jack-o-lantern-${{ runner.arch }}-${{ runner.os }}
           compression-level: 9
-          path: dist/pumpkin-*
-
-  sign_windows_release:
-    name: Sign Windows release
-    permissions:
-      actions: read
-    needs: build_release
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os:
-          - windows-latest
-          - windows-11-arm
-    steps:
-      - name: Find unsigned artifact
-        id: artifact
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          ARTIFACT_NAME: unsigned-${{ runner.arch }}-${{ runner.os }}
-        run: |
-          ARTIFACT_ID=$(gh api \
-            "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts" \
-            --jq '.artifacts | map(select(.name == env.ARTIFACT_NAME and .expired == false)) | first.id')
-          test -n "$ARTIFACT_ID"
-          echo "id=$ARTIFACT_ID" >> "$GITHUB_OUTPUT"
-
-      - name: Submit SignPath signing request
-        uses: signpath/github-action-submit-signing-request@v2
-        with:
-          api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
-          organization-id: '${{ secrets.SIGNPATH_ORGANIZATION_ID }}'
-          project-slug: '${{ secrets.SIGNPATH_PROJECT_SLUG }}'
-          signing-policy-slug: '${{ secrets.SIGNPATH_RELEASE_SIGNING_POLICY_SLUG || secrets.SIGNPATH_SIGNING_POLICY_SLUG }}'
-          github-artifact-id: '${{ steps.artifact.outputs.id }}'
-          wait-for-completion: true
-          output-artifact-directory: dist/
-
-      - name: Export signed executable
-        uses: actions/upload-artifact@v7
-        with:
-          name: pumpkin-${{ runner.arch }}-${{ runner.os }}
-          compression-level: 9
-          path: dist/pumpkin-*
+          path: dist/jack-o-lantern-*
 
   build_android_release:
     name: Build project in release for Android (AArch64)
@@ -162,19 +110,19 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          cp "target/aarch64-linux-android/release/pumpkin" "dist/pumpkin-aarch64-android"
+          cp "target/aarch64-linux-android/release/pumpkin" "dist/jack-o-lantern-aarch64-android"
       - name: Export executable
         uses: actions/upload-artifact@v7
         with:
-          name: pumpkin-aarch64-android
+          name: jack-o-lantern-aarch64-android
           compression-level: 9
-          path: dist/pumpkin-aarch64-android
+          path: dist/jack-o-lantern-aarch64-android
 
   publish_release:
     name: Publish GitHub Release
     permissions:
       contents: write
-    needs: [build_release, sign_windows_release, build_android_release]
+    needs: [build_release, build_android_release]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -199,7 +147,7 @@ jobs:
       - name: Download prebuilt binary artifacts
         uses: actions/download-artifact@v8
         with:
-          pattern: "pumpkin-*"
+          pattern: "jack-o-lantern-*"
           path: dist/
           merge-multiple: true
 
@@ -207,15 +155,16 @@ jobs:
         shell: bash
         run: |
           cd dist
-          sha256sum pumpkin-* > checksums.sha256
+          sha256sum jack-o-lantern-* > checksums.sha256
           cat checksums.sha256
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.tag.outputs.tag_name }}
-          name: Release ${{ steps.tag.outputs.tag_name }}
+          name: Jack o'Lantern ${{ steps.tag.outputs.tag_name }}
           files: |
-            dist/pumpkin*
+            dist/jack-o-lantern*
             dist/checksums.sha256
-          generate_release_notes: true
+          # Published as a draft; the notes are written by hand before it goes public.
+          draft: true
