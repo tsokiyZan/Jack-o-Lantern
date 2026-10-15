@@ -3,6 +3,7 @@ use std::sync::Arc;
 use rand::{Rng, RngExt};
 
 use crate::entity::ai::target_predicate::TargetPredicate;
+use crate::entity::passive::armadillo;
 use crate::entity::{Entity, EntityBase};
 use crate::world::World;
 
@@ -13,6 +14,7 @@ pub mod adult;
 pub mod axolotl_attackables;
 pub mod dummy;
 pub mod hurt_by;
+pub mod mob_sensor;
 pub mod nearest_items;
 pub mod nearest_living_entities;
 pub mod nearest_players;
@@ -24,6 +26,7 @@ pub use adult::{AdultSensor, AdultSensorAnyType};
 pub use axolotl_attackables::AxolotlAttackablesSensor;
 pub use dummy::DummySensor;
 pub use hurt_by::HurtBySensor;
+pub use mob_sensor::MobSensor;
 pub use nearest_items::NearestItemSensor;
 pub use nearest_living_entities::NearestLivingEntitySensor;
 pub use nearest_players::PlayerSensor;
@@ -32,6 +35,8 @@ pub use piglin_specific::PiglinSpecificSensor;
 pub use tempting::FoodTemptationsSensor;
 
 pub const DEFAULT_SCAN_RATE: i32 = 20;
+/// Vanilla `SensorType.ARMADILLO_SCARE_DETECTED`'s scan rate.
+const ARMADILLO_SCARE_DETECTED_SCAN_RATE: i32 = 5;
 
 pub trait Sensor: Send + Sync {
     fn requires(&self) -> &'static [MemoryModuleId];
@@ -51,6 +56,7 @@ pub enum SensorType {
     NearestAdultAnyType,
     AxolotlAttackables,
     FoodTemptations,
+    ArmadilloScareDetected,
 }
 
 impl SensorType {
@@ -68,6 +74,7 @@ impl SensorType {
             Self::NearestAdultAnyType => "minecraft:nearest_adult_any_type",
             Self::AxolotlAttackables => "minecraft:axolotl_attackables",
             Self::FoodTemptations => "minecraft:food_temptations",
+            Self::ArmadilloScareDetected => "minecraft:armadillo_scare_detected",
         }
     }
 
@@ -85,6 +92,7 @@ impl SensorType {
             | Self::NearestAdultAnyType
             | Self::AxolotlAttackables
             | Self::FoodTemptations => DEFAULT_SCAN_RATE,
+            Self::ArmadilloScareDetected => ARMADILLO_SCARE_DETECTED_SCAN_RATE,
         }
     }
 
@@ -101,6 +109,12 @@ impl SensorType {
             Self::NearestAdultAnyType => Box::new(AdultSensorAnyType),
             Self::AxolotlAttackables => Box::new(AxolotlAttackablesSensor),
             Self::FoodTemptations => Box::new(FoodTemptationsSensor),
+            Self::ArmadilloScareDetected => Box::new(MobSensor::new(
+                armadillo::is_scared_by,
+                armadillo::can_stay_rolled_up,
+                types::DANGER_DETECTED_RECENTLY,
+                armadillo::SCARE_CHECK_INTERVAL,
+            )),
         }
     }
 

@@ -2271,8 +2271,6 @@ impl<T: Mob + Send + 'static> EntityBase for T {
         // into `custom_server_ai_step`:
         // Bat `tick_flying`/`tick_roosting` (not `tick_ambient_sound`)
         // Bee sting death (`time_since_sting`)
-        // Armadillo scute drop, state switching, `danger_detected_recently_ticks`
-        // (not `in_state_ticks`, that is vanilla `tick`)
         // Wither `tick_wither` invulnerable countdown, healing, boss bar, head attacks
         // (not the movement towards the target, that is vanilla `aiStep`)
         // ZombifiedPiglin `maybe_alert_others`
