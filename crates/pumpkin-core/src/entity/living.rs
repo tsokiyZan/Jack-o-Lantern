@@ -43,7 +43,7 @@ use pumpkin_data::data_component_impl::Operation;
 use pumpkin_data::data_component_impl::food::{ConsumableImpl, ConsumeEffect};
 use pumpkin_data::data_component_impl::{
     AttributeModifiersImpl, BlocksAttacksImpl, DeathProtectionImpl, EnchantmentsImpl,
-    EquipmentSlot, EquippableImpl, FoodImpl,
+    EquipmentSlot, EquippableImpl, FoodImpl, IDSet, MobVisibilityImpl,
 };
 use pumpkin_data::effect::StatusEffect;
 use pumpkin_data::entity::{EntityPose, EntityStatus, EntityType};
@@ -2643,6 +2643,81 @@ impl LivingEntity {
     /// `Entity::is_alive` which only means "not removed".
     pub fn is_part_of_game(&self) -> bool {
         !self.is_spectator() && self.entity.is_alive() && self.health.load() > 0.0
+    }
+
+    /// Vanilla `LivingEntity.getVisibilityPercent`: how far `targeting_entity` can notice this entity.
+    pub fn get_visibility_percent(&self, targeting_entity: Option<&Entity>) -> f64 {
+        let mut visibility_percent = 1.0;
+        if self.entity.is_sneaking() {
+            visibility_percent *= 0.8;
+        }
+
+        if self.entity.invisible.load(Relaxed) {
+            let cover_percentage = self.get_armor_cover_percentage().max(0.1);
+            visibility_percent *= 0.7 * f64::from(cover_percentage);
+        }
+
+        if let Some(targeting_entity) = targeting_entity {
+            let targeting_type = targeting_entity.entity_type;
+            let equipment = self
+                .entity_equipment
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            for slot in [
+                EquipmentSlot::MAIN_HAND,
+                EquipmentSlot::OFF_HAND,
+                EquipmentSlot::FEET,
+                EquipmentSlot::LEGS,
+                EquipmentSlot::CHEST,
+                EquipmentSlot::HEAD,
+                EquipmentSlot::BODY,
+                EquipmentSlot::SADDLE,
+            ] {
+                let Some(item) = equipment.equipment.get(&slot) else {
+                    continue;
+                };
+                let Some(mob_visibility) = item.get_data_component::<MobVisibilityImpl>() else {
+                    continue;
+                };
+                let applies =
+                    item.get_data_component::<EquippableImpl>()
+                        .is_some_and(|equippable| {
+                            *equippable.slot == slot
+                                && match &mob_visibility.targeting_entity_types {
+                                    IDSet::Tag(tag) => {
+                                        targeting_type.is_tagged_with(tag).unwrap_or(false)
+                                    }
+                                    IDSet::IDs(types) => {
+                                        types.iter().any(|t| t.id == targeting_type.id)
+                                    }
+                                }
+                        });
+                if applies {
+                    visibility_percent *= f64::from(mob_visibility.visibility);
+                }
+            }
+        }
+
+        visibility_percent.clamp(0.0, 10.0)
+    }
+
+    /// Vanilla `LivingEntity.getArmorCoverPercentage`.
+    pub fn get_armor_cover_percentage(&self) -> f32 {
+        let equipment = self
+            .entity_equipment
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let slots = [
+            EquipmentSlot::FEET,
+            EquipmentSlot::LEGS,
+            EquipmentSlot::CHEST,
+            EquipmentSlot::HEAD,
+        ];
+        let count = slots
+            .iter()
+            .filter(|slot| equipment.equipment.get(slot).is_some_and(|s| !s.is_empty()))
+            .count();
+        count as f32 / slots.len() as f32
     }
 
     pub fn can_attack(&self, target: &dyn EntityBase) -> bool {

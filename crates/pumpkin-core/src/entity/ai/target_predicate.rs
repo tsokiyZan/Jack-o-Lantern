@@ -101,8 +101,13 @@ impl TargetPredicate {
             return false;
         }
 
+        if let Some(predicate) = &self.predicate
+            && !predicate(target_living, world)
+        {
+            return false;
+        }
+
         let Some(tester) = tester else {
-            // Without a tester only the plain "can be seen as enemy" rule applies.
             return !(self.attackable
                 && (!can_be_seen_as_enemy(target)
                     || world.level_info.load().difficulty == Difficulty::Peaceful));
@@ -121,18 +126,19 @@ impl TargetPredicate {
         }
 
         if self.base_max_distance > 0.0 {
-            // TODO: use distance_scaling_factor from target
-            // Vanilla `getVisibilityPercent`: sneaking, invisibility (by armor cover) and mob heads
-            // shrink the range, min 2 blocks. Only piglin_ai::visibility_percent has it, move to
-            // `LivingEntity` and gate on `use_distance_scaling_factor` (revenge ignores it).
-            let max_dist = self.base_max_distance.max(MIN_DISTANCE);
+            let modifier = if self.use_distance_scaling_factor {
+                target_living.get_visibility_percent(Some(tester.get_entity()))
+            } else {
+                1.0
+            };
+            let visibility_distance = (self.base_max_distance * modifier).max(MIN_DISTANCE);
             let dist_sq = tester
                 .get_entity()
                 .pos
                 .load()
                 .squared_distance_to_vec(&target.get_entity().pos.load());
 
-            if dist_sq > max_dist * max_dist {
+            if dist_sq > visibility_distance * visibility_distance {
                 return false;
             }
         }
@@ -140,14 +146,6 @@ impl TargetPredicate {
         if self.respects_visibility
             && let Some(mob) = tester.get_mob()
             && !mob.has_line_of_sight(target.get_entity())
-        {
-            return false;
-        }
-
-        // Mirrors vanilla `TargetingConditions.test`, which runs the custom
-        // selector last, after the generic attackability/range/visibility checks.
-        if let Some(predicate) = &self.predicate
-            && !predicate(target_living, world)
         {
             return false;
         }
