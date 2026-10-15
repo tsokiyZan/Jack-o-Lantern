@@ -80,8 +80,7 @@ impl OcelotEntity {
                 4,
                 Box::new(
                     AvoidEntityGoal::new(&EntityType::PLAYER, 16.0, 0.8, 1.33).gated_by(|mob| {
-                        mob.get_entity()
-                            .cast_any()
+                        mob.cast_any()
                             .downcast_ref::<Self>()
                             .is_none_or(|ocelot| !ocelot.is_trusting())
                     }),

@@ -273,8 +273,7 @@ impl Mob for RabbitEntity {
 
 /// `RabbitAvoidEntityGoal`: the killer bunny doesn't flee.
 fn is_not_evil_rabbit(mob: &dyn Mob) -> bool {
-    mob.get_entity()
-        .cast_any()
+    mob.cast_any()
         .downcast_ref::<RabbitEntity>()
         .is_none_or(|rabbit| rabbit.get_variant() != RabbitVariant::Evil)
 }
