@@ -59,11 +59,14 @@ pub fn is_deflected(
 #[must_use]
 pub fn is_projectile(entity_type: &EntityType) -> bool {
     *entity_type == EntityType::ARROW
+        || *entity_type == EntityType::SPECTRAL_ARROW
         || *entity_type == EntityType::TRIDENT
+        || *entity_type == EntityType::EXPERIENCE_BOTTLE
         || *entity_type == EntityType::EGG
         || *entity_type == EntityType::SNOWBALL
         || *entity_type == EntityType::FIREWORK_ROCKET
         || *entity_type == EntityType::WIND_CHARGE
+        || *entity_type == EntityType::BREEZE_WIND_CHARGE
         || *entity_type == EntityType::SPLASH_POTION
         || *entity_type == EntityType::LINGERING_POTION
         || *entity_type == EntityType::ENDER_PEARL
