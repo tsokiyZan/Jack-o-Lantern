@@ -51,7 +51,9 @@ pub fn melee_attack(
             );
             let mob_entity = tick.mob.get_mob_entity();
             mob_entity.living_entity.swing_hand();
-            mob_entity.try_attack(tick.mob.get_entity(), target.as_ref());
+            // The mob itself, not its bare `Entity`, so the victim knows who hurt it.
+            let attacker: &dyn crate::entity::EntityBase = tick.mob;
+            mob_entity.try_attack(attacker, target.as_ref());
             tick.brain.set_with_expiry(
                 types::ATTACK_COOLING_DOWN,
                 true,
