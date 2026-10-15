@@ -121,6 +121,30 @@ impl Vector3<f64> {
 
         Self::new(-cos_pitch * sin_yaw, -sin_pitch, cos_pitch * cos_yaw)
     }
+
+    /// Vanilla `Vec3.xRot`, with `Mth`'s sine table.
+    #[must_use]
+    pub fn x_rot(self, radians: f32) -> Self {
+        let cos = f64::from(crate::math::cos(radians));
+        let sin = f64::from(crate::math::sin(radians));
+        Self::new(
+            self.x,
+            self.y * cos + self.z * sin,
+            self.z * cos - self.y * sin,
+        )
+    }
+
+    /// Vanilla `Vec3.yRot`, with `Mth`'s sine table.
+    #[must_use]
+    pub fn y_rot(self, radians: f32) -> Self {
+        let cos = f64::from(crate::math::cos(radians));
+        let sin = f64::from(crate::math::sin(radians));
+        Self::new(
+            self.x * cos + self.z * sin,
+            self.y,
+            self.z * cos - self.x * sin,
+        )
+    }
 }
 
 impl<T: Math + PartialOrd + Copy> Vector3<T> {

@@ -37,6 +37,11 @@ pub trait Animal: Mob {
         animal_can_mate(self.get_mob_entity(), partner)
     }
 
+    /// Vanilla `Animal.canFallInLove`.
+    fn can_fall_in_love(&self) -> bool {
+        !self.get_mob_entity().is_in_love()
+    }
+
     /// Vanilla `AbstractHorse.canParent`; only the horse family breeds through it.
     fn can_parent(&self) -> bool {
         false
@@ -107,7 +112,7 @@ pub trait Animal: Mob {
                 .age
                 .load(std::sync::atomic::Ordering::Relaxed);
 
-            if age >= 0 && mob_entity.is_breeding_ready() && !mob_entity.is_in_love() {
+            if age >= 0 && mob_entity.is_breeding_ready() && self.can_fall_in_love() {
                 item_stack.decrement_unless_creative(player.gamemode.load(), 1);
 
                 mob_entity.set_love_ticks(600, Some(player.gameprofile.id));

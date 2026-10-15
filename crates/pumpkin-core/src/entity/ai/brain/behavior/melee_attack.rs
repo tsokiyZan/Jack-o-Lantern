@@ -49,11 +49,9 @@ pub fn melee_attack(
                 types::LOOK_TARGET,
                 Arc::new(EntityTracker::new(Arc::clone(&target), true)) as Arc<dyn PositionTracker>,
             );
-            let mob_entity = tick.mob.get_mob_entity();
-            mob_entity.living_entity.swing_hand();
-            // The mob itself, not its bare `Entity`, so the victim knows who hurt it.
-            let attacker: &dyn crate::entity::EntityBase = tick.mob;
-            mob_entity.try_attack(attacker, target.as_ref());
+            let mob = tick.mob;
+            mob.get_mob_entity().living_entity.swing_hand();
+            mob.do_hurt_target(tick, &target);
             tick.brain.set_with_expiry(
                 types::ATTACK_COOLING_DOWN,
                 true,
