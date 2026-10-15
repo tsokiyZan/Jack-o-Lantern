@@ -56,7 +56,7 @@ impl AllayEntity {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
 
-            goal_selector.add_goal(0, Box::new(SwimGoal::default()));
+            goal_selector.add_goal(0, SwimGoal::new(&mob_arc.mob_entity));
             goal_selector.add_goal(1, EscapeDangerGoal::new(1.25));
             goal_selector.add_goal(
                 6,

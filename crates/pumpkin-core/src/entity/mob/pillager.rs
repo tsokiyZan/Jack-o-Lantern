@@ -59,7 +59,7 @@ impl PillagerEntity {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
 
-            goal_selector.add_goal(0, Box::new(SwimGoal::default()));
+            goal_selector.add_goal(0, SwimGoal::new(&mob_arc.mob_entity));
             goal_selector.add_goal(1, Box::new(ObtainRaidLeaderBannerGoal));
             goal_selector.add_goal(2, Box::new(HoldGroundAttackGoal::new(10.0)));
             goal_selector.add_goal(3, Box::new(RangedCrossbowAttackGoal::new(1.0, 8.0)));

@@ -91,7 +91,7 @@ impl WitchEntity {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
 
-            goal_selector.add_goal(1, Box::new(SwimGoal::default()));
+            goal_selector.add_goal(1, SwimGoal::new(&mob_arc.mob_entity));
             goal_selector.add_goal(
                 2,
                 Box::new(RangedAttackGoal::new(ranged_weak, 1.0, 60, 10.0)),

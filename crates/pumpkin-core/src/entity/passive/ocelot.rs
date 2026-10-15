@@ -58,7 +58,7 @@ impl OcelotEntity {
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
 
             // Goal 1: FloatGoal (SwimGoal)
-            goal_selector.add_goal(1, Box::new(SwimGoal::default()));
+            goal_selector.add_goal(1, SwimGoal::new(&mob_arc.mob_entity));
             // Goal 1: PanicGoal (EscapeDangerGoal)
             goal_selector.add_goal(1, EscapeDangerGoal::new(1.5));
             // Goal 3: OcelotTemptGoal

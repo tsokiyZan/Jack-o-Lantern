@@ -1,22 +1,26 @@
 use std::sync::atomic::Ordering;
 
 use super::{Controls, Goal};
-use crate::entity::mob::Mob;
+use crate::entity::mob::{Mob, MobEntity};
 use rand::RngExt;
 
 pub struct SwimGoal {
     goal_control: Controls,
 }
 
-impl Default for SwimGoal {
-    fn default() -> Self {
-        Self {
-            goal_control: Controls::JUMP,
-        }
-    }
-}
-
 impl SwimGoal {
+    /// Vanilla `FloatGoal`, whose constructor lets the mob's navigation path through water.
+    #[must_use]
+    pub fn new(mob: &MobEntity) -> Box<Self> {
+        mob.navigator
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .set_can_float(true);
+        Box::new(Self {
+            goal_control: Controls::JUMP,
+        })
+    }
+
     fn is_in_fluid(mob: &dyn Mob) -> bool {
         let living = &mob.get_mob_entity().living_entity;
         let entity = &living.entity;
@@ -28,11 +32,6 @@ impl SwimGoal {
 
 impl Goal for SwimGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
-        mob.get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .set_can_float(true);
         Self::is_in_fluid(mob)
     }
 

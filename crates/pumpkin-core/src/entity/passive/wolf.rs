@@ -82,7 +82,7 @@ impl WolfEntity {
 
             // Goal selector (matching Vanilla registerGoals):
             // 1: SwimGoal (FloatGoal)
-            goal_selector.add_goal(1, Box::new(SwimGoal::default()));
+            goal_selector.add_goal(1, SwimGoal::new(&mob_arc.mob_entity));
             // 1: EscapeDangerGoal (TamableAnimalPanicGoal)
             goal_selector.add_goal(1, EscapeDangerGoal::new(1.5));
             // 3: Avoid Llama

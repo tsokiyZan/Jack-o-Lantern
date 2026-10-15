@@ -105,7 +105,7 @@ impl BeeEntity {
             goal_selector.add_goal(3, Box::new(TemptGoal::new(1.25, &[], false)));
             goal_selector.add_goal(5, Box::new(FollowParentGoal::new(1.25)));
             goal_selector.add_goal(8, Box::new(WanderAroundGoal::new(1.0)));
-            goal_selector.add_goal(9, Box::new(SwimGoal::default()));
+            goal_selector.add_goal(9, SwimGoal::new(&mob_arc.mob_entity));
             goal_selector.add_goal(
                 10,
                 LookAtEntityGoal::with_default(mob_weak, &EntityType::PLAYER, 6.0),

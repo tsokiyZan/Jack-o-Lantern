@@ -310,7 +310,7 @@ impl HostMob for PluginHostState {
                 crate::pumpkin::plugin::world::BuiltinAiGoal::Swim => {
                     mob_entity.add_goal(
                         priority,
-                        pumpkin_core::entity::ai::goal::swim::SwimGoal::default(),
+                        *pumpkin_core::entity::ai::goal::swim::SwimGoal::new(mob_entity),
                     );
                 }
                 crate::pumpkin::plugin::world::BuiltinAiGoal::WanderAround(speed) => {

@@ -212,12 +212,17 @@ impl Goal for ActiveTargetGoal {
         if self.gate.is_some_and(|gate| !gate(mob)) {
             return false;
         }
+        // Vanilla `SpiderTargetGoal` checks the light before the random interval roll.
+        let checked_before_roll = self.condition == TargetCondition::NoDaylight;
+        if checked_before_roll && !self.condition.allows_search(mob) {
+            return false;
+        }
         if self.reciprocal_chance > 0
             && mob.get_random().random_range(0..self.reciprocal_chance) != 0
         {
             return false;
         }
-        if !self.condition.allows_search(mob) {
+        if !checked_before_roll && !self.condition.allows_search(mob) {
             return false;
         }
         self.find_closest_target(mob);

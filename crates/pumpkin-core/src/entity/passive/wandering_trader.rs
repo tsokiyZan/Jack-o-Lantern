@@ -174,7 +174,7 @@ impl WanderingTraderEntity {
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
 
             // Priority 0: FloatGoal
-            goal_selector.add_goal(0, Box::new(SwimGoal::default()));
+            goal_selector.add_goal(0, SwimGoal::new(&mob_arc.mob_entity));
 
             // Priority 0: UseItemGoal (Invisibility potion at night / Milk bucket in daylight)
             goal_selector.add_goal(

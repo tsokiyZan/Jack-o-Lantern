@@ -113,7 +113,7 @@ impl CatEntity {
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
 
             // Goal 1: SwimGoal (FloatGoal)
-            goal_selector.add_goal(1, Box::new(SwimGoal::default()));
+            goal_selector.add_goal(1, SwimGoal::new(&mob_arc.mob_entity));
             // Goal 1: TamableAnimalPanicGoal (EscapeDangerGoal)
             goal_selector.add_goal(1, EscapeDangerGoal::new(1.5));
             // Goal 4: CatTemptGoal

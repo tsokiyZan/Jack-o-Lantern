@@ -36,7 +36,7 @@ impl BreezeEntity {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
 
-            goal_selector.add_goal(0, Box::new(SwimGoal::default()));
+            goal_selector.add_goal(0, SwimGoal::new(&mob_arc.mob_entity));
             goal_selector.add_goal(
                 5,
                 Box::new(WanderAroundGoal::new(1.0).ignoring_no_action_time()),
