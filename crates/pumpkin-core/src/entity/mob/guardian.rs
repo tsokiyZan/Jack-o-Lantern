@@ -38,33 +38,17 @@ impl GuardianEntity {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
 
-            goal_selector.add_goal(4, Box::new(WanderAroundGoal::new(1.0)));
-            goal_selector.add_goal(
-                5,
-                LookAtEntityGoal::with_default(mob_weak.clone(), &EntityType::PLAYER, 8.0),
-            );
-            goal_selector.add_goal(6, Box::new(RandomLookAroundGoal::default()));
-
             let mut target_selector = mob_arc
                 .mob_entity
                 .target_selector
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
-            target_selector.add_goal(
-                1,
-                ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::PLAYER, true),
-            );
-            target_selector.add_goal(
-                2,
-                ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::SQUID, true),
-            );
-            target_selector.add_goal(
-                2,
-                ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::GLOW_SQUID, true),
-            );
-            target_selector.add_goal(
-                3,
-                ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::AXOLOTL, true),
+            register_guardian_goals(
+                &mut goal_selector,
+                &mut target_selector,
+                &mob_arc.mob_entity,
+                &mob_weak,
+                80,
             );
         };
 
@@ -115,4 +99,64 @@ impl Mob for GuardianEntity {
             let _ = living.damage(src, 2.0, DamageType::THORNS);
         }
     }
+}
+
+/// Vanilla `Guardian.registerGoals`, also used by elder guardians, whose constructor sets the
+/// stroll interval to 400.
+pub fn register_guardian_goals(
+    goal_selector: &mut crate::entity::ai::goal::goal_selector::GoalSelector,
+    target_selector: &mut crate::entity::ai::goal::goal_selector::GoalSelector,
+    mob_entity: &MobEntity,
+    mob_weak: &Weak<dyn Mob>,
+    stroll_interval: i32,
+) {
+    use crate::entity::ai::goal::{Controls, move_towards_restriction::MoveTowardsRestrictionGoal};
+    let move_and_look = Controls::MOVE.union(Controls::LOOK);
+    // TODO: 4 GuardianAttackGoal (the laser) is not ported.
+    goal_selector.add_goal(
+        5,
+        Box::new(MoveTowardsRestrictionGoal::new(1.0).with_controls(move_and_look)),
+    );
+    goal_selector.add_goal(
+        7,
+        Box::new(
+            WanderAroundGoal::with_interval(1.0, stroll_interval).with_controls(move_and_look),
+        ),
+    );
+    goal_selector.add_goal(
+        8,
+        LookAtEntityGoal::with_default(mob_weak.clone(), &EntityType::PLAYER, 8.0),
+    );
+    goal_selector.add_goal(
+        8,
+        Box::new(LookAtEntityGoal::new(
+            mob_weak.clone(),
+            &EntityType::GUARDIAN,
+            12.0,
+            0.01,
+            false,
+        )),
+    );
+    goal_selector.add_goal(9, Box::new(RandomLookAroundGoal::default()));
+
+    // `GuardianAttackSelector`: players, squid and axolotls more than 3 blocks away.
+    let guardian = mob_weak.clone();
+    target_selector.add_goal(
+        1,
+        ActiveTargetGoal::predicated(mob_entity, 10, true, move |target, _world| {
+            let entity_type = target.entity.entity_type;
+            (entity_type == &EntityType::PLAYER
+                || entity_type == &EntityType::SQUID
+                || entity_type == &EntityType::GLOW_SQUID
+                || entity_type == &EntityType::AXOLOTL)
+                && guardian.upgrade().is_some_and(|guardian| {
+                    target
+                        .entity
+                        .pos
+                        .load()
+                        .squared_distance_to_vec(&guardian.get_entity().pos.load())
+                        > 9.0
+                })
+        }),
+    );
 }

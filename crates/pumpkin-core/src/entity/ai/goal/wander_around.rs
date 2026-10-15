@@ -79,6 +79,13 @@ impl WanderAroundGoal {
     }
 
     /// Run once on the next check, ignoring the interval.
+    /// Vanilla `Goal.setFlags`, e.g. a guardian strolls with `MOVE` and `LOOK`.
+    #[must_use]
+    pub const fn with_controls(mut self, controls: Controls) -> Self {
+        self.goal_control = controls;
+        self
+    }
+
     pub const fn trigger(&mut self) {
         self.force_trigger = true;
     }

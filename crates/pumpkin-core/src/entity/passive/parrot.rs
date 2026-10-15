@@ -1,5 +1,10 @@
 use std::sync::{Arc, Weak};
 
+use crate::entity::ai::control::flying_move_control::FlyingMoveControl;
+use crate::entity::ai::goal::escape_danger::EscapeDangerGoal;
+use crate::entity::ai::goal::follow_mob::FollowMobGoal;
+use crate::entity::ai::goal::water_avoiding_random_flying::WaterAvoidingRandomFlyingGoal;
+use crate::entity::ai::pathfinder::Navigator;
 use pumpkin_data::damage::DamageType;
 use pumpkin_data::effect::StatusEffect;
 use pumpkin_data::entity::EntityType;
@@ -9,10 +14,7 @@ use pumpkin_data::tag::{self, Taggable};
 use crate::entity::ai::pathfinder::node::PathType;
 use crate::entity::{
     Entity, EntityBase,
-    ai::goal::{
-        look_around::RandomLookAroundGoal, look_at_entity::LookAtEntityGoal, swim::SwimGoal,
-        wander_around::WanderAroundGoal,
-    },
+    ai::goal::{look_at_entity::LookAtEntityGoal, swim::SwimGoal},
     mob::{Mob, MobEntity},
     passive::animal::set_animal_pathfinding_malus,
     player::Player,
@@ -204,6 +206,21 @@ pub struct ParrotEntity {
 impl ParrotEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        // Vanilla `Parrot`: FlyingMoveControl(10, false) and flying navigation that doesn't
+        // open doors but floats.
+        *mob_entity
+            .move_control
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) =
+            Box::new(FlyingMoveControl::new(10, false));
+        let mut navigator = Navigator::flying();
+        navigator.set_can_open_doors(false);
+        navigator.set_can_float(true);
+        *mob_entity
+            .navigator
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = navigator;
+        // The path costs go on the flying navigation, made first as in `Mob`'s constructor.
         set_animal_pathfinding_malus(&mob_entity);
         // Vanilla `Parrot`'s constructor.
         mob_entity.set_pathfinding_malus(PathType::DangerFire, -1.0);
@@ -223,13 +240,18 @@ impl ParrotEntity {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
 
+            // TamableAnimalPanicGoal
+            goal_selector.add_goal(0, EscapeDangerGoal::new(1.25));
             goal_selector.add_goal(0, SwimGoal::new(&mob_arc.mob_entity));
-            goal_selector.add_goal(1, Box::new(WanderAroundGoal::new(1.0)));
             goal_selector.add_goal(
-                2,
-                LookAtEntityGoal::with_default(mob_weak, &EntityType::PLAYER, 6.0),
+                1,
+                LookAtEntityGoal::with_default(mob_weak, &EntityType::PLAYER, 8.0),
             );
-            goal_selector.add_goal(3, Box::new(RandomLookAroundGoal::default()));
+            // TODO: parrots are not tamable here yet, so 2 SitWhenOrderedToGoal,
+            // 2 FollowOwnerGoal(1.0, 5, 1) and 3 LandOnOwnersShoulderGoal are missing, and
+            // ParrotWanderGoal's preference for trees is not ported.
+            goal_selector.add_goal(2, Box::new(WaterAvoidingRandomFlyingGoal::new(1.0)));
+            goal_selector.add_goal(3, Box::new(FollowMobGoal::new(1.0, 3.0, 7.0)));
         };
 
         mob_arc
@@ -267,6 +289,10 @@ impl ParrotEntity {
 }
 
 impl Mob for ParrotEntity {
+    fn omnidirectional_air_mover(&self) -> bool {
+        true
+    }
+
     /// Vanilla `Parrot.getAmbient`: one time in a thousand, outside peaceful, a parrot
     /// imitates a mob.
     fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {

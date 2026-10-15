@@ -1374,6 +1374,11 @@ pub trait Mob: EntityBase + Send + Sync {
             .map_or(0.0, |animal| animal.animal_walk_target_value(pos))
     }
 
+    /// Vanilla `Entity.omnidirectionalAirMover`: drags vertically like horizontally in the air.
+    fn omnidirectional_air_mover(&self) -> bool {
+        false
+    }
+
     /// The horse family's shared `AbstractHorse` behaviour.
     fn as_abstract_horse(
         &self,
@@ -2079,6 +2084,10 @@ impl<T: Mob + Send + 'static> EntityBase for T {
 
     fn get_y_velocity_drag(&self) -> Option<f64> {
         self.get_mob_y_velocity_drag()
+    }
+
+    fn is_flutterer(&self) -> bool {
+        self.omnidirectional_air_mover()
     }
 
     fn get_experience_reward(&self, _killer: Option<&dyn EntityBase>) -> u32 {

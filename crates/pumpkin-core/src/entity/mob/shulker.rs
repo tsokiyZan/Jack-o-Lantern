@@ -89,7 +89,13 @@ impl ShulkerEntity {
 
             goal_selector.add_goal(
                 1,
-                LookAtEntityGoal::with_default(mob_weak, &EntityType::PLAYER, 8.0),
+                Box::new(LookAtEntityGoal::new(
+                    mob_weak,
+                    &EntityType::PLAYER,
+                    8.0,
+                    0.02,
+                    true,
+                )),
             );
             goal_selector.add_goal(4, Box::new(ShulkerAttackGoal::new(mob_arc.clone())));
             goal_selector.add_goal(7, Box::new(ShulkerPeekGoal::new(mob_arc.clone())));

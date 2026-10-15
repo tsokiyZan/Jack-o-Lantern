@@ -57,7 +57,15 @@ impl Goal for WaterAvoidingRandomFlyingGoal {
             return false;
         }
 
-        if mob.get_random().random_range(0..self.chance) != 0 {
+        // `RandomStrollGoal.canUse`: idle mobs (noActionTime >= 100) stop wandering.
+        if mob
+            .get_mob_entity()
+            .living_entity
+            .no_action_time
+            .load(std::sync::atomic::Ordering::Relaxed)
+            >= 100
+            || mob.get_random().random_range(0..self.chance) != 0
+        {
             return false;
         }
 
@@ -82,7 +90,12 @@ impl Goal for WaterAvoidingRandomFlyingGoal {
         }
     }
 
-    fn stop(&mut self, _mob: &dyn Mob) {
+    fn stop(&mut self, mob: &dyn Mob) {
+        mob.get_mob_entity()
+            .navigator
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .stop();
         self.target = None;
     }
 

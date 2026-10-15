@@ -297,6 +297,8 @@ pub struct PathNavigation {
     pub pending_move: Option<NavigatorGoal>,
     /// This tick's `moveControl.setWantedPosition`, taken by the mob's AI step (ground).
     pub wanted_position: Option<(Vector3<f64>, f64)>,
+    /// Vanilla `FlyingPathNavigation`'s overrides of the base navigation.
+    pub flying: bool,
 }
 
 impl Default for PathNavigation {
@@ -349,6 +351,7 @@ impl PathNavigation {
             jump: false,
             pending_move: None,
             wanted_position: None,
+            flying: false,
         }
     }
 
@@ -824,6 +827,30 @@ impl PathNavigation {
         }
     }
 
+    /// Vanilla `shouldTargetNextNodeInDirection` with its `canMoveDirectly` short-cut, which
+    /// runs after the node-count and distance checks.
+    fn should_target_next_node_in_direction_or_move_directly(
+        mob_pos: Vector3<f64>,
+        path: &Path,
+        moves_directly: impl FnOnce(&Path) -> bool,
+    ) -> bool {
+        if path.get_next_node_index() + 1 >= path.get_node_count() {
+            return false;
+        }
+        let Some(current) = path.get_next_node_pos() else {
+            return false;
+        };
+        let current_node = Vector3::new(
+            f64::from(current.0.x) + 0.5,
+            f64::from(current.0.y),
+            f64::from(current.0.z) + 0.5,
+        );
+        if mob_pos.squared_distance_to_vec(&current_node) >= 4.0 {
+            return false;
+        }
+        moves_directly(path) || Self::should_target_next_node_in_direction(mob_pos, path)
+    }
+
     #[must_use]
     pub fn should_target_next_node_in_direction(mob_pos: Vector3<f64>, path: &Path) -> bool {
         if path.get_next_node_index() + 1 >= path.get_node_count() {
@@ -906,13 +933,16 @@ impl PathNavigation {
     }
 
     #[allow(clippy::too_many_lines)]
-    /// Vanilla `GroundPathNavigation.canUpdatePath`.
-    fn ground_can_update_path(entity: &LivingEntity) -> bool {
+    /// Vanilla `GroundPathNavigation.canUpdatePath`, or `FlyingPathNavigation`'s.
+    fn can_update_path(&self, entity: &LivingEntity) -> bool {
         let e = &entity.entity;
-        e.on_ground.load(Ordering::Relaxed)
-            || e.touching_water.load(Ordering::Relaxed)
-            || e.touching_lava.load(Ordering::Relaxed)
-            || e.get_vehicle().is_some()
+        let in_liquid =
+            e.touching_water.load(Ordering::Relaxed) || e.touching_lava.load(Ordering::Relaxed);
+        if self.flying {
+            self.can_float && in_liquid || e.get_vehicle().is_none()
+        } else {
+            e.on_ground.load(Ordering::Relaxed) || in_liquid || e.get_vehicle().is_some()
+        }
     }
 
     /// Vanilla `GroundPathNavigation.getSurfaceY`.
@@ -942,9 +972,12 @@ impl PathNavigation {
         }
     }
 
-    /// Vanilla `GroundPathNavigation.getTempMobPos`.
+    /// Vanilla `GroundPathNavigation.getTempMobPos`; flying navigation uses the position.
     fn ground_temp_mob_pos(&self, entity: &LivingEntity) -> Vector3<f64> {
         let pos = entity.entity.pos.load();
+        if self.flying {
+            return pos;
+        }
         Vector3::new(pos.x, f64::from(self.ground_surface_y(entity)), pos.z)
     }
 
@@ -957,17 +990,20 @@ impl PathNavigation {
         reach_range: i32,
     ) -> Option<Path> {
         let world = entity.entity.world.load();
-        let chunk = Vector2::new(pos.0.x >> 4, pos.0.z >> 4);
-        if !world.level.is_chunk_loaded(&chunk) {
-            return None;
-        }
-        if !self.can_path_to_targets_below_surface {
-            pos = Self::find_surface_position(&world, pos);
+        // Only `GroundPathNavigation.createPath` needs a loaded chunk and moves to the surface.
+        if !self.flying {
+            let chunk = Vector2::new(pos.0.x >> 4, pos.0.z >> 4);
+            if !world.level.is_chunk_loaded(&chunk) {
+                return None;
+            }
+            if !self.can_path_to_targets_below_surface {
+                pos = Self::find_surface_position(&world, pos);
+            }
         }
         if entity.entity.pos.load().y < f64::from(world.get_bottom_y()) {
             return None;
         }
-        if !Self::ground_can_update_path(entity) {
+        if !self.can_update_path(entity) {
             return None;
         }
         if self.target_pos == Some(pos)
@@ -1059,7 +1095,7 @@ impl PathNavigation {
                 }
             }
         }
-        if self.avoid_sun {
+        if self.avoid_sun && !self.flying {
             let pos = entity.entity.pos.load();
             if world.can_see_sky(&BlockPos::floored(pos.x, pos.y + 0.5, pos.z)) {
                 return;
@@ -1079,8 +1115,7 @@ impl PathNavigation {
     /// Vanilla `PathNavigation.recomputePath` with the ground `createPath`.
     pub fn ground_recompute_path(&mut self, entity: &LivingEntity) {
         let game_time = entity.entity.world.load().get_world_age() as u64;
-        if game_time.saturating_sub(self.time_last_recompute) <= 20
-            || !Self::ground_can_update_path(entity)
+        if game_time.saturating_sub(self.time_last_recompute) <= 20 || !self.can_update_path(entity)
         {
             self.has_delayed_recomputation = true;
         } else if let Some(target_pos) = self.target_pos {
@@ -1126,16 +1161,25 @@ impl PathNavigation {
             return;
         }
         let width = entity.entity.entity_dimension.load().width;
-        if Self::ground_can_update_path(entity) {
+        if self.can_update_path(entity) {
             self.ground_follow_the_path(entity);
         } else {
             let mob_pos = self.ground_temp_mob_pos(entity);
+            let block_pos = entity.entity.block_pos.load().0;
+            let flying = self.flying;
             if let Some(path) = self.path.as_mut().filter(|path| !path.is_done())
                 && let Some(pos) = path.get_next_entity_pos(width)
-                && mob_pos.y > pos.y
-                && !entity.entity.on_ground.load(Ordering::Relaxed)
-                && mob_pos.x.floor() == pos.x.floor()
-                && mob_pos.z.floor() == pos.z.floor()
+                && if flying {
+                    // `FlyingPathNavigation.tick`: advance once inside the waypoint's block.
+                    block_pos.x == pos.x.floor() as i32
+                        && block_pos.y == pos.y.floor() as i32
+                        && block_pos.z == pos.z.floor() as i32
+                } else {
+                    mob_pos.y > pos.y
+                        && !entity.entity.on_ground.load(Ordering::Relaxed)
+                        && mob_pos.x.floor() == pos.x.floor()
+                        && mob_pos.z.floor() == pos.z.floor()
+                }
             {
                 path.advance();
             }
@@ -1147,10 +1191,12 @@ impl PathNavigation {
             .and_then(|path| path.get_next_entity_pos(width))
         {
             let world = entity.entity.world.load();
-            self.wanted_position = Some((
-                Vector3::new(target.x, Self::ground_y(&world, target), target.z),
-                self.speed_modifier,
-            ));
+            let y = if self.flying {
+                target.y
+            } else {
+                Self::ground_y(&world, target)
+            };
+            self.wanted_position = Some((Vector3::new(target.x, y, target.z), self.speed_modifier));
         }
     }
 
@@ -1180,12 +1226,30 @@ impl PathNavigation {
         let close_enough = x_distance < max_distance
             && z_distance < max_distance
             && y_distance < f64::from(Self::MAX_VERTICAL_DISTANCE_TO_WAYPOINT);
-        // `canCutCorner`; ground navigation never moves directly.
         let can_cut_corner = next_type != PathType::DangerFire
             && next_type != PathType::DangerOther
             && next_type != PathType::WalkableDoor;
+        let flying = self.flying;
+        // `canMoveDirectly`: ground navigation never does; flying clips (fluids included).
+        let moves_directly = |path: &Path| {
+            flying
+                && path.get_next_entity_pos(width).is_some_and(|next| {
+                    Self::can_move_directly(
+                        &entity.entity.world.load(),
+                        mob_pos,
+                        next,
+                        entity.entity.entity_dimension.load().height,
+                        true,
+                    )
+                })
+        };
         if close_enough
-            || can_cut_corner && Self::should_target_next_node_in_direction(mob_pos, path)
+            || can_cut_corner
+                && Self::should_target_next_node_in_direction_or_move_directly(
+                    mob_pos,
+                    path,
+                    moves_directly,
+                )
         {
             path.advance();
         }
@@ -1407,31 +1471,36 @@ impl Default for FlyingPathNavigation {
 impl FlyingPathNavigation {
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            inner: PathNavigation::new(EvaluatorKind::Fly(FlyNodeEvaluator::default())),
-        }
+        let mut inner = PathNavigation::new(EvaluatorKind::Fly(FlyNodeEvaluator::default()));
+        inner.flying = true;
+        Self { inner }
     }
 }
 
 impl PathNavigationTrait for FlyingPathNavigation {
+    /// A goal's `moveTo(x, y, z, reachRange, speed)`, run at the start of this tick's
+    /// navigation, before the path is followed, as in vanilla.
     fn set_progress(&mut self, goal: NavigatorGoal) {
-        self.inner.set_progress(goal);
+        self.inner.pending_move = Some(goal);
     }
 
     fn set_speed(&mut self, speed: f64) {
         self.inner.set_speed(speed);
     }
 
+    /// Vanilla `PathNavigation.stop`: drops the path, and any `moveTo` not yet run.
     fn stop(&mut self) {
-        self.inner.stop();
+        self.inner.path = None;
+        self.inner.pending_move = None;
     }
 
     fn is_idle(&self) -> bool {
-        self.inner.is_idle.load(Ordering::Relaxed)
+        self.is_done()
     }
 
+    /// Vanilla `isDone`. A `moveTo` waiting for this tick's navigation counts as moving.
     fn is_done(&self) -> bool {
-        self.inner.path.as_ref().is_none_or(Path::is_done)
+        self.inner.pending_move.is_none() && self.inner.path.as_ref().is_none_or(Path::is_done)
     }
 
     fn is_in_progress(&self) -> bool {
@@ -1471,94 +1540,12 @@ impl PathNavigationTrait for FlyingPathNavigation {
         self.inner.can_reach_within(entity, destination, distance)
     }
 
-    #[allow(clippy::too_many_lines)]
     fn tick(&mut self, entity: &LivingEntity) {
-        self.inner.tick_count += 1;
-        let world_age = entity.entity.world.load().get_world_age() as u64;
+        self.inner.tick_ground(entity);
+    }
 
-        if self.inner.has_delayed_recomputation {
-            self.recompute_path(entity);
-        }
-
-        if let Some(goal) = self.inner.current_goal.take() {
-            if self.inner.needs_new_path(&goal) {
-                self.inner.path = self.inner.compute_path(entity, goal.destination, 1);
-                self.inner.ticks_on_current_node = 0;
-                self.inner.last_node_index = 0;
-                self.inner.path_start_pos = Some(entity.entity.pos.load());
-                self.inner.repath_cooldown = 15;
-                self.inner.time_last_recompute = world_age;
-            }
-            self.inner.current_goal = Some(goal);
-        }
-
-        let mob_pos = entity.entity.pos.load();
-        self.inner.do_stuck_detection(mob_pos, entity);
-
-        if self.is_done() {
-            self.inner.finish_navigation(entity);
-        } else {
-            if let Some(path) = &mut self.inner.path
-                && let Some(pos) = path.get_next_node_pos()
-            {
-                let target_pos = Vector3::new(
-                    f64::from(pos.0.x) + 0.5,
-                    f64::from(pos.0.y) + 0.5,
-                    f64::from(pos.0.z) + 0.5,
-                );
-                let current_pos = entity.entity.pos.load();
-                let dx = target_pos.x - current_pos.x;
-                let dy = target_pos.y - current_pos.y;
-                let dz = target_pos.z - current_pos.z;
-                let dist_sq = dx * dx + dy * dy + dz * dz;
-
-                if dist_sq < 0.5 * 0.5 {
-                    path.advance();
-                }
-            }
-
-            if !self.is_done()
-                && let Some(path) = &self.inner.path
-                && let Some(next_block) = path.get_next_node_pos()
-            {
-                let target_pos = Vector3::new(
-                    f64::from(next_block.0.x) + 0.5,
-                    f64::from(next_block.0.y) + 0.5,
-                    f64::from(next_block.0.z) + 0.5,
-                );
-                let current_pos = entity.entity.pos.load();
-                let dx = target_pos.x - current_pos.x;
-                let dy = target_pos.y - current_pos.y;
-                let dz = target_pos.z - current_pos.z;
-                let sd = dx.hypot(dz);
-
-                let desired_yaw = wrap_degrees((dz.atan2(dx) as f32).to_degrees() - 90.0);
-                let desired_pitch = wrap_degrees(-(dy.atan2(sd) as f32).to_degrees());
-
-                entity.entity.yaw.store(desired_yaw);
-                entity.entity.head_yaw.store(desired_yaw);
-                entity.entity.body_yaw.store(desired_yaw);
-                entity.entity.pitch.store(desired_pitch);
-
-                let flying_speed = entity.get_attribute_value(&Attributes::FLYING_SPEED);
-                let base_speed = if flying_speed > 0.0 {
-                    flying_speed
-                } else {
-                    entity.get_attribute_value(&Attributes::MOVEMENT_SPEED)
-                };
-                let speed = self.inner.speed_modifier * base_speed;
-                let y_input = if dy.abs() > 0.1 {
-                    if dy > 0.0 { speed } else { -speed }
-                } else {
-                    0.0
-                };
-                entity.speed.store(speed as f32);
-                entity
-                    .movement_input
-                    .store(Vector3::new(0.0, y_input, speed));
-                entity.entity.set_has_no_gravity(true);
-            }
-        }
+    fn take_wanted_position(&mut self) -> Option<(Vector3<f64>, f64)> {
+        self.inner.wanted_position.take()
     }
 
     fn move_to_coords(
@@ -1569,37 +1556,33 @@ impl PathNavigationTrait for FlyingPathNavigation {
         speed: f64,
         entity: &LivingEntity,
     ) -> bool {
-        let pos = entity.entity.pos.load();
-        self.set_progress(NavigatorGoal::new(pos, Vector3::new(x, y, z), speed));
-        true
+        self.inner.pending_move = None;
+        let goal = NavigatorGoal::new(entity.entity.pos.load(), Vector3::new(x, y, z), speed);
+        self.inner.ground_move_to(entity, &goal)
     }
 
     fn move_to_pos(&mut self, pos: BlockPos, speed: f64, entity: &LivingEntity) -> bool {
-        let p = entity.entity.pos.load();
-        let target = Vector3::new(
-            f64::from(pos.0.x) + 0.5,
-            f64::from(pos.0.y) + 0.5,
-            f64::from(pos.0.z) + 0.5,
-        );
-        self.set_progress(NavigatorGoal::new(p, target, speed));
-        true
+        self.inner.pending_move = None;
+        let path = self
+            .inner
+            .ground_create_path(entity, pos, NavigatorGoal::DEFAULT_REACH_RANGE);
+        self.inner.ground_move_to_path(entity, path, speed)
     }
 
+    /// Vanilla `moveTo(Entity, speed)`; ground navigation paths to the entity's block.
     fn move_to_entity(&mut self, target: &LivingEntity, speed: f64, entity: &LivingEntity) -> bool {
-        let p = entity.entity.pos.load();
-        let target_pos = target.entity.pos.load();
-        self.set_progress(NavigatorGoal::new(p, target_pos, speed));
-        true
+        self.inner.pending_move = None;
+        let path = self.inner.ground_create_path(
+            entity,
+            target.entity.block_pos.load(),
+            NavigatorGoal::DEFAULT_REACH_RANGE,
+        );
+        path.is_some() && self.inner.ground_move_to_path(entity, path, speed)
     }
 
     fn move_to_path(&mut self, path: Option<Path>, speed: f64, entity: &LivingEntity) -> bool {
-        let Some(new_path) = path else {
-            self.inner.clear_path();
-            return false;
-        };
-        let stuck_check_pos = entity.entity.pos.load();
-        self.inner
-            .adopt_path(new_path, speed, entity, stuck_check_pos)
+        self.inner.pending_move = None;
+        self.inner.ground_move_to_path(entity, path, speed)
     }
 
     fn create_path(
@@ -1608,25 +1591,12 @@ impl PathNavigationTrait for FlyingPathNavigation {
         destination: Vector3<f64>,
         reach_range: i32,
     ) -> Option<Path> {
-        self.inner.compute_path(entity, destination, reach_range)
+        self.inner
+            .ground_create_path(entity, BlockPos::floored_v(destination), reach_range)
     }
 
     fn recompute_path(&mut self, entity: &LivingEntity) {
-        let world_age = entity.entity.world.load().get_world_age() as u64;
-        if world_age.saturating_sub(self.inner.time_last_recompute) <= 20 {
-            self.inner.has_delayed_recomputation = true;
-        } else if let Some(target_pos) = self.inner.target_pos {
-            let target_v = Vector3::new(
-                f64::from(target_pos.0.x) + 0.5,
-                f64::from(target_pos.0.y) + 0.5,
-                f64::from(target_pos.0.z) + 0.5,
-            );
-            self.inner.path = self
-                .inner
-                .compute_path(entity, target_v, self.inner.reach_range);
-            self.inner.time_last_recompute = world_age;
-            self.inner.has_delayed_recomputation = false;
-        }
+        self.inner.ground_recompute_path(entity);
     }
 
     fn set_avoid_sun(&mut self, avoid_sun: bool) {

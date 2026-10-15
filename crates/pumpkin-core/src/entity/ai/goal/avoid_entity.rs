@@ -16,7 +16,8 @@ const VERTICAL_RANGE: i32 = 7;
 
 pub struct AvoidEntityGoal {
     goal_control: Controls,
-    avoid_class: &'static EntityType,
+    /// `None` is any mob, narrowed by the avoid predicate (e.g. vanilla's `Monster.class`).
+    avoid_class: Option<&'static EntityType>,
     max_dist: f64,
     walk_speed_modifier: f64,
     sprint_speed_modifier: f64,
@@ -44,7 +45,7 @@ impl AvoidEntityGoal {
         });
         Self {
             goal_control: Controls::MOVE,
-            avoid_class,
+            avoid_class: Some(avoid_class),
             max_dist,
             walk_speed_modifier,
             sprint_speed_modifier,
@@ -53,6 +54,20 @@ impl AvoidEntityGoal {
             path: None,
             gate: None,
         }
+    }
+
+    /// Flees any mob passing the avoid predicate, for vanilla classes with no entity type of
+    /// their own (`Monster`).
+    #[must_use]
+    pub fn any_mob(max_dist: f64, walk_speed_modifier: f64, sprint_speed_modifier: f64) -> Self {
+        let mut goal = Self::new(
+            &EntityType::PLAYER,
+            max_dist,
+            walk_speed_modifier,
+            sprint_speed_modifier,
+        );
+        goal.avoid_class = None;
+        goal
     }
 
     /// Vanilla's `avoidPredicate`: only flee entities passing `predicate`, alongside the
@@ -91,7 +106,7 @@ impl Goal for AvoidEntityGoal {
             .expand(self.max_dist, 3.0, self.max_dist);
         self.to_avoid = self.avoid_entity_targeting.get_nearest_entity(
             &world,
-            goal_utils::get_entities_of_class(&world, Some(self.avoid_class), &area),
+            goal_utils::get_entities_of_class(&world, self.avoid_class, &area),
             Some(mob),
             mob_pos,
         );

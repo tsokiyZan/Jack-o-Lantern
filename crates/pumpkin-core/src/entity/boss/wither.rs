@@ -1,3 +1,6 @@
+use crate::entity::ai::control::flying_move_control::FlyingMoveControl;
+use crate::entity::ai::goal::water_avoiding_random_flying::WaterAvoidingRandomFlyingGoal;
+use crate::entity::ai::pathfinder::Navigator;
 use std::sync::{
     Arc, Mutex, Weak,
     atomic::{AtomicBool, AtomicI32, Ordering},
@@ -69,6 +72,22 @@ impl WitherEntity {
             bossbar_players: Mutex::new(Vec::new()),
             dropped_loot: AtomicBool::new(false),
         };
+        // Vanilla `WitherBoss`: FlyingMoveControl(10, false) and flying navigation that
+        // doesn't open doors but floats.
+        *wither
+            .mob_entity
+            .move_control
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) =
+            Box::new(FlyingMoveControl::new(10, false));
+        let mut navigator = Navigator::flying();
+        navigator.set_can_open_doors(false);
+        navigator.set_can_float(true);
+        *wither
+            .mob_entity
+            .navigator
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = navigator;
         let mob_arc = Arc::new(wither);
         let mob_weak: Weak<dyn Mob> = {
             let mob_arc: Arc<dyn Mob> = mob_arc.clone();
@@ -87,6 +106,9 @@ impl WitherEntity {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
 
+            // TODO: 0 WitherDoNothingGoal and 2 RangedAttackGoal(1.0, 40, 20) run through the
+            // wither's own head attacks here.
+            goal_selector.add_goal(5, Box::new(WaterAvoidingRandomFlyingGoal::new(1.0)));
             goal_selector.add_goal(
                 6,
                 LookAtEntityGoal::with_default(mob_weak, &EntityType::PLAYER, 8.0),

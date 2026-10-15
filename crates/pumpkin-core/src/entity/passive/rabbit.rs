@@ -3,6 +3,7 @@ use std::sync::{
     atomic::{AtomicI32, Ordering},
 };
 
+use crate::entity::ai::goal::revenge::RevengeGoal;
 use pumpkin_data::entity::EntityPose;
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::item::Item;
@@ -19,8 +20,7 @@ use crate::entity::{
     ageable::{AgeableData, AgeableMob},
     ai::goal::{
         active_target::ActiveTargetGoal, avoid_entity::AvoidEntityGoal, breed::BreedGoal,
-        escape_danger::EscapeDangerGoal, follow_parent::FollowParentGoal,
-        look_around::RandomLookAroundGoal, look_at_entity::LookAtEntityGoal,
+        escape_danger::EscapeDangerGoal, look_at_entity::LookAtEntityGoal,
         melee_attack::MeleeAttackGoal, swim::SwimGoal, tempt::TemptGoal,
         wander_around::WanderAroundGoal,
     },
@@ -108,29 +108,43 @@ impl RabbitEntity {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
 
-            goal_selector.add_goal(0, SwimGoal::new(&mob_arc.mob_entity));
+            goal_selector.add_goal(1, SwimGoal::new(&mob_arc.mob_entity));
+            // TODO: 1 ClimbOnTopOfPowderSnowGoal and 5 RaidGardenGoal are not ported.
+            // RabbitPanicGoal
             goal_selector.add_goal(1, EscapeDangerGoal::new(2.2));
             goal_selector.add_goal(2, BreedGoal::new(0.8));
             goal_selector.add_goal(3, Box::new(TemptGoal::new(1.0, TEMPT_ITEMS, false)));
+            // RabbitAvoidEntityGoal: only while not the killer bunny.
             goal_selector.add_goal(
                 4,
-                Box::new(AvoidEntityGoal::new(&EntityType::PLAYER, 8.0, 2.2, 2.2)),
+                Box::new(
+                    AvoidEntityGoal::new(&EntityType::PLAYER, 8.0, 2.2, 2.2)
+                        .gated_by(is_not_evil_rabbit),
+                ),
             );
             goal_selector.add_goal(
                 4,
-                Box::new(AvoidEntityGoal::new(&EntityType::WOLF, 10.0, 2.2, 2.2)),
+                Box::new(
+                    AvoidEntityGoal::new(&EntityType::WOLF, 10.0, 2.2, 2.2)
+                        .gated_by(is_not_evil_rabbit),
+                ),
             );
             goal_selector.add_goal(
                 4,
-                Box::new(AvoidEntityGoal::new(&EntityType::FOX, 10.0, 2.2, 2.2)),
+                Box::new(
+                    AvoidEntityGoal::any_mob(4.0, 2.2, 2.2)
+                        .avoiding_only(|target| {
+                            target.entity.entity_type.category
+                                == &pumpkin_data::entity::MobCategory::MONSTER
+                        })
+                        .gated_by(is_not_evil_rabbit),
+                ),
             );
-            goal_selector.add_goal(5, Box::new(FollowParentGoal::new(0.8)));
-            goal_selector.add_goal(6, Box::new(WanderAroundGoal::new(0.6)));
+            goal_selector.add_goal(6, Box::new(WanderAroundGoal::avoiding_water(0.6)));
             goal_selector.add_goal(
                 11,
                 LookAtEntityGoal::with_default(mob_weak, &EntityType::PLAYER, 10.0),
             );
-            goal_selector.add_goal(11, Box::new(RandomLookAroundGoal::default()));
         };
 
         mob_arc
@@ -162,17 +176,14 @@ impl RabbitEntity {
                 .target_selector
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
+            target_selector.add_goal(1, Box::new(RevengeGoal::new(true).alerting_others()));
             target_selector.add_goal(
-                1,
+                2,
                 ActiveTargetGoal::with_default(&self.mob_entity, &EntityType::PLAYER, true),
             );
             target_selector.add_goal(
                 2,
                 ActiveTargetGoal::with_default(&self.mob_entity, &EntityType::WOLF, true),
-            );
-            target_selector.add_goal(
-                2,
-                ActiveTargetGoal::with_default(&self.mob_entity, &EntityType::FOX, true),
             );
         }
     }
@@ -256,4 +267,12 @@ impl Mob for RabbitEntity {
     fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
         self.animal_interact(player, item_stack, Sound::EntityRabbitAmbient)
     }
+}
+
+/// `RabbitAvoidEntityGoal`: the killer bunny doesn't flee.
+fn is_not_evil_rabbit(mob: &dyn Mob) -> bool {
+    mob.get_entity()
+        .cast_any()
+        .downcast_ref::<RabbitEntity>()
+        .is_none_or(|rabbit| rabbit.get_variant() != RabbitVariant::Evil)
 }

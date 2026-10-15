@@ -1,19 +1,15 @@
 use crate::entity::ai::pathfinder::node::PathType;
+use crate::entity::mob::guardian::register_guardian_goals;
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::{Arc, Weak};
 
 use pumpkin_data::damage::DamageType;
 use pumpkin_data::effect::StatusEffect;
-use pumpkin_data::entity::EntityType;
 use pumpkin_data::potion::Effect;
 use pumpkin_protocol::java::client::play::{CGameEvent, GameEvent};
 
 use crate::entity::{
     Entity, EntityBase,
-    ai::goal::{
-        active_target::ActiveTargetGoal, look_around::RandomLookAroundGoal,
-        look_at_entity::LookAtEntityGoal, wander_around::WanderAroundGoal,
-    },
     mob::{Mob, MobEntity},
 };
 
@@ -44,21 +40,17 @@ impl ElderGuardianEntity {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
 
-            goal_selector.add_goal(4, Box::new(WanderAroundGoal::new(1.0)));
-            goal_selector.add_goal(
-                5,
-                LookAtEntityGoal::with_default(mob_weak.clone(), &EntityType::PLAYER, 8.0),
-            );
-            goal_selector.add_goal(6, Box::new(RandomLookAroundGoal::default()));
-
             let mut target_selector = mob_arc
                 .mob_entity
                 .target_selector
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
-            target_selector.add_goal(
-                1,
-                ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::PLAYER, true),
+            register_guardian_goals(
+                &mut goal_selector,
+                &mut target_selector,
+                &mob_arc.mob_entity,
+                &mob_weak,
+                400,
             );
         };
 
