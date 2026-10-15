@@ -18,16 +18,21 @@ use pumpkin_util::Hand;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
 
-/// Vanilla `ItemUtils.createFilledResult(stack, player, newStack)`: `stack` becomes what the
-/// hand holds once one of it was filled into `new_stack`.
-pub fn create_filled_result(stack: &mut ItemStack, player: &Player, mut new_stack: ItemStack) {
-    if player.has_infinite_materials() {
+/// Vanilla `ItemUtils.createFilledResult`: `stack` becomes what the hand holds once one of it
+/// was filled into `new_stack`.
+pub fn create_filled_result(
+    stack: &mut ItemStack,
+    player: &Player,
+    mut new_stack: ItemStack,
+    limit_creative_stack_size: bool,
+) {
+    if limit_creative_stack_size && player.has_infinite_materials() {
         if !player.inventory.contains_item(new_stack.item) {
             player.inventory.insert_stack_anywhere(&mut new_stack);
         }
         return;
     }
-    stack.decrement(1);
+    stack.decrement_unless_creative(player.gamemode.load(), 1);
     if stack.is_empty() {
         *stack = new_stack;
     } else if !player.inventory.insert_stack_anywhere(&mut new_stack) {

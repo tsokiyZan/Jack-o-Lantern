@@ -1703,6 +1703,15 @@ pub trait Mob: EntityBase + Send + Sync {
         false
     }
 
+    /// Vanilla `Bucketable.loadFromBucketTag`: what a mob placed from a bucket reads back
+    /// from the bucket's `bucket_entity_data`.
+    fn load_from_bucket_tag(&self, _tag: &NbtCompound) {}
+
+    /// Vanilla `calculateFallDamage` overrides, given what `LivingEntity`'s returns.
+    fn calculate_fall_damage(&self, base_damage: i32) -> i32 {
+        base_damage
+    }
+
     /// A vanilla `LivingEntity.knockback` override. Returns true when the mob moved itself;
     /// `attacker` is the damage source's responsible entity.
     fn custom_knockback(
@@ -1727,11 +1736,6 @@ pub trait Mob: EntityBase + Send + Sync {
 
     /// The end of a vanilla `LivingEntity.travelInFluid` override.
     fn travel_in_fluid_end(&self, _water: bool) {}
-
-    /// Vanilla `calculateFallDamage` overrides, given `LivingEntity`'s result.
-    fn calculate_fall_damage(&self, damage: i32) -> i32 {
-        damage
-    }
 
     /// Whether vanilla `checkFallDamage` runs after a move, adding up the fall and landing
     /// on the block below. Flyers such as the phantom override it to do nothing.

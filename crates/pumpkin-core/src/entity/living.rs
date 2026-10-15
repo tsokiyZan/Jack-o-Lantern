@@ -2371,6 +2371,14 @@ impl LivingEntity {
                         .get_living_entity()
                         .map(|living| living.held_item(direct))
                 }),
+                damage_source_entity: cause.map(|cause| cause.get_entity().entity_type),
+                damage_source_frog_variant: cause
+                    .and_then(crate::entity::passive::frog::frog_variant_of)
+                    .map(|variant| variant.asset_id()),
+                this_cube_mob_size: dyn_self
+                    .cast_any()
+                    .downcast_ref::<crate::entity::mob::cube_mob::CubeMobEntity>()
+                    .map(crate::entity::mob::cube_mob::CubeMobEntity::get_size),
                 ..Default::default()
             };
 

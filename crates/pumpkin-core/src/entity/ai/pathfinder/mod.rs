@@ -2477,6 +2477,8 @@ pub struct AmphibiousPathNavigation {
     /// Vanilla `TurtlePathNavigation`: while this is set (the turtle has a travel
     /// target), only water is a stable destination.
     water_destinations: Option<Arc<AtomicBool>>,
+    /// Vanilla `Frog.FrogPathNavigation.canCutCorner`: never across a water border.
+    keeps_water_border_corners: bool,
 }
 
 impl Default for AmphibiousPathNavigation {
@@ -2495,6 +2497,17 @@ impl AmphibiousPathNavigation {
             steered_by_move_control: false,
             wanted_position: None,
             water_destinations: None,
+            keeps_water_border_corners: false,
+        }
+    }
+
+    /// Vanilla `Frog.FrogPathNavigation`.
+    #[must_use]
+    pub fn frog() -> Self {
+        Self {
+            inner: PathNavigation::new(EvaluatorKind::Amphibious(AmphibiousNodeEvaluator::frog())),
+            keeps_water_border_corners: true,
+            ..Self::new(true)
         }
     }
 
@@ -2563,8 +2576,10 @@ impl AmphibiousPathNavigation {
                 let close_enough = (pos.x - (f64::from(node.0.x) + 0.5)).abs() < max_distance
                     && (pos.z - (f64::from(node.0.z) + 0.5)).abs() < max_distance
                     && (pos.y - f64::from(node.0.y)).abs() < 1.0;
+                let keeps_water_border_corners = self.keeps_water_border_corners;
                 let can_cut_corner = path.get_next_node().is_some_and(|n| {
-                    n.path_type != PathType::DangerFire
+                    !(keeps_water_border_corners && n.path_type == PathType::WaterBorder)
+                        && n.path_type != PathType::DangerFire
                         && n.path_type != PathType::DangerOther
                         && n.path_type != PathType::WalkableDoor
                 });

@@ -1325,8 +1325,18 @@ interface java-packets {
     particle: s32,
     /// The sound to play (e.g., `minecraft:entity.generic.explode`).
     sound: string,
-    /// The size of the block particles pool, used for debris visuals in 1.21.9+.
-    block-particles-pool-size: s32,
+    /// Vanilla `blockParticles`: weighted debris particles, 1.21.9+.
+    block-particles: list<explosion-particle-info>,
+    /// Whether the client plays the sound (silent sources don't), 26.3+.
+    play-sound: bool,
+  }
+  /// Vanilla `ExplosionParticleInfo` with its `Weighted` weight.
+  record explosion-particle-info {
+    /// A particle type without options.
+    particle: s32,
+    scaling: f32,
+    speed: f32,
+    weight: s32,
   }
   /// Updates the game state or triggers specific environmental changes.
   /// 

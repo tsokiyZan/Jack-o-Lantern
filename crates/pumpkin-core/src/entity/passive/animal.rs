@@ -14,6 +14,8 @@ use pumpkin_inventory::inventory::Inventory;
 use crate::entity::ageable::get_speed_up_seconds_when_feeding;
 use crate::entity::{
     EntityBase,
+    ai::brain::BrainTick,
+    ai::goal::breed::BreedGoal,
     ai::pathfinder::node::PathType,
     mob::{Mob, MobEntity},
     player::Player,
@@ -64,6 +66,12 @@ pub trait Animal: Mob {
             world,
             Uuid::new_v4(),
         ))
+    }
+
+    /// Vanilla `Animal.spawnChildFromBreeding`, run from `AnimalMakeLove` inside the
+    /// brain tick.
+    fn spawn_child_from_breeding(&self, tick: &mut BrainTick<'_>, partner: &dyn EntityBase) {
+        BreedGoal::breed(tick.mob, partner, None);
     }
 
     /// Animals prefer grass, then bright spots.

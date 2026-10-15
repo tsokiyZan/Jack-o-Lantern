@@ -13,8 +13,10 @@ use super::{BrainTick, VisibilityContext};
 pub mod adult;
 pub mod axolotl_attackables;
 pub mod dummy;
+pub mod frog_attackables;
 pub mod hoglin_specific;
 pub mod hurt_by;
+pub mod is_in_water;
 pub mod mob_sensor;
 pub mod nearest_items;
 pub mod nearest_living_entities;
@@ -26,15 +28,17 @@ pub mod tempting;
 pub use adult::{AdultSensor, AdultSensorAnyType};
 pub use axolotl_attackables::AxolotlAttackablesSensor;
 pub use dummy::DummySensor;
+pub use frog_attackables::FrogAttackablesSensor;
 pub use hoglin_specific::HoglinSpecificSensor;
 pub use hurt_by::HurtBySensor;
+pub use is_in_water::IsInWaterSensor;
 pub use mob_sensor::MobSensor;
 pub use nearest_items::NearestItemSensor;
 pub use nearest_living_entities::NearestLivingEntitySensor;
 pub use nearest_players::PlayerSensor;
 pub use piglin_brute_specific::PiglinBruteSpecificSensor;
 pub use piglin_specific::PiglinSpecificSensor;
-pub use tempting::FoodTemptationsSensor;
+pub use tempting::TemptingSensor;
 
 pub const DEFAULT_SCAN_RATE: i32 = 20;
 /// Vanilla `SensorType.ARMADILLO_SCARE_DETECTED`'s scan rate.
@@ -59,6 +63,9 @@ pub enum SensorType {
     NearestAdultAnyType,
     AxolotlAttackables,
     FoodTemptations,
+    FrogTemptations,
+    FrogAttackables,
+    IsInWater,
     ArmadilloScareDetected,
 }
 
@@ -78,6 +85,9 @@ impl SensorType {
             Self::NearestAdultAnyType => "minecraft:nearest_adult_any_type",
             Self::AxolotlAttackables => "minecraft:axolotl_attackables",
             Self::FoodTemptations => "minecraft:food_temptations",
+            Self::FrogTemptations => "minecraft:frog_temptations",
+            Self::FrogAttackables => "minecraft:frog_attackables",
+            Self::IsInWater => "minecraft:is_in_water",
             Self::ArmadilloScareDetected => "minecraft:armadillo_scare_detected",
         }
     }
@@ -96,7 +106,10 @@ impl SensorType {
             | Self::NearestAdult
             | Self::NearestAdultAnyType
             | Self::AxolotlAttackables
-            | Self::FoodTemptations => DEFAULT_SCAN_RATE,
+            | Self::FoodTemptations
+            | Self::FrogTemptations
+            | Self::FrogAttackables
+            | Self::IsInWater => DEFAULT_SCAN_RATE,
             Self::ArmadilloScareDetected => ARMADILLO_SCARE_DETECTED_SCAN_RATE,
         }
     }
@@ -114,7 +127,12 @@ impl SensorType {
             Self::NearestAdult => Box::new(AdultSensor),
             Self::NearestAdultAnyType => Box::new(AdultSensorAnyType),
             Self::AxolotlAttackables => Box::new(AxolotlAttackablesSensor),
-            Self::FoodTemptations => Box::new(FoodTemptationsSensor),
+            Self::FoodTemptations => Box::new(TemptingSensor::for_animal()),
+            Self::FrogTemptations => Box::new(TemptingSensor::new(|_, stack| {
+                crate::entity::passive::frog_ai::get_temptations(stack)
+            })),
+            Self::FrogAttackables => Box::new(FrogAttackablesSensor),
+            Self::IsInWater => Box::new(IsInWaterSensor),
             Self::ArmadilloScareDetected => Box::new(MobSensor::new(
                 armadillo::is_scared_by,
                 armadillo::can_stay_rolled_up,

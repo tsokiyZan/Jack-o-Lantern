@@ -1,10 +1,15 @@
+use pumpkin_data::item::Item;
+use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::particle::Particle;
+use pumpkin_data::sound::{Sound, SoundCategory};
+use pumpkin_data::tag::{self, Taggable};
 use pumpkin_data::tracked_data;
 use pumpkin_util::math::vector3::Vector3;
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering::Relaxed};
 
 use crate::entity::mob::Mob;
 use crate::entity::mob::spawn::SpawnGroupData;
+use crate::entity::player::Player;
 
 pub const BABY_START_AGE: i32 = -24000;
 pub const FORCED_AGE_PARTICLE_TICKS: i32 = 40;
@@ -243,4 +248,51 @@ pub fn make_age_locked_particle(
         }
         age_lock_particle_timer.store(timer - 1, Relaxed);
     }
+}
+
+/// Vanilla `AgeableMob.canUseGoldenDandelion`.
+#[must_use]
+pub fn can_use_golden_dandelion(
+    item_in_hand: &ItemStack,
+    is_baby: bool,
+    cooldown: i32,
+    mob: &dyn Mob,
+) -> bool {
+    item_in_hand.item == &Item::GOLDEN_DANDELION
+        && is_baby
+        && cooldown == 0
+        && !mob
+            .get_entity()
+            .entity_type
+            .has_tag(&tag::EntityType::MINECRAFT_CANNOT_BE_AGE_LOCKED)
+}
+
+/// Vanilla `AgeableMob.setAgeLocked(mob, isAgeLocked, player, itemInHand, setAgeLockData)`:
+/// toggles the lock through `set_age_lock_data`, uses up the golden dandelion and plays
+/// its sound.
+pub fn set_age_locked_by_player(
+    mob: &dyn Mob,
+    is_age_locked: impl FnOnce() -> bool,
+    player: &Player,
+    item_in_hand: &mut ItemStack,
+    set_age_lock_data: impl FnOnce(),
+) {
+    set_age_lock_data();
+    item_in_hand.decrement_unless_creative(player.gamemode.load(), 1);
+    let is_age_locked = is_age_locked();
+    if is_age_locked {
+        mob.get_mob_entity()
+            .persistence_required
+            .store(true, Relaxed);
+    }
+    let entity = mob.get_entity();
+    entity.world.load().play_sound(
+        if is_age_locked {
+            Sound::ItemGoldenDandelionUse
+        } else {
+            Sound::ItemGoldenDandelionUnuse
+        },
+        SoundCategory::Players,
+        &entity.block_pos.load().to_centered_f64(),
+    );
 }

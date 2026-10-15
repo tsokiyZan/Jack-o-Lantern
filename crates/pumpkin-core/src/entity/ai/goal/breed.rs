@@ -121,10 +121,7 @@ impl BreedGoal {
 
     /// Vanilla `Animal.spawnChildFromBreeding` and `finalizeSpawnChildFromBreeding`.
     pub(crate) fn breed(mob: &dyn Mob, mate: &dyn EntityBase, offspring: Option<OffspringFn>) {
-        let mob_entity = mob.get_mob_entity();
-        let entity = mob.get_entity();
-        let world = entity.world.load_full();
-        let parent_pos = entity.pos.load();
+        let world = mob.get_entity().world.load_full();
 
         let Some(baby) = mob
             .as_animal()
@@ -143,6 +140,18 @@ impl BreedGoal {
             baby.refresh_dimensions();
         }
 
+        Self::finalize_spawn_child_from_breeding(mob, mate);
+
+        world.spawn_entity(baby);
+    }
+
+    /// Vanilla `Animal.finalizeSpawnChildFromBreeding`: stats, cooldowns, hearts and
+    /// experience, whether or not a baby was made.
+    pub(crate) fn finalize_spawn_child_from_breeding(mob: &dyn Mob, mate: &dyn EntityBase) {
+        let mob_entity = mob.get_mob_entity();
+        let entity = mob.get_entity();
+        let world = entity.world.load_full();
+
         award_breeding(mob, mate);
 
         mob_entity
@@ -154,10 +163,12 @@ impl BreedGoal {
 
         world.send_entity_status(entity, EntityStatus::InLoveHearts, None);
         if world.level_info.load().game_rules.mob_drops {
-            ExperienceOrbEntity::spawn(&world, parent_pos, mob.get_random().random_range(1..8));
+            ExperienceOrbEntity::spawn(
+                &world,
+                entity.pos.load(),
+                mob.get_random().random_range(1..8),
+            );
         }
-
-        world.spawn_entity(baby);
     }
 }
 

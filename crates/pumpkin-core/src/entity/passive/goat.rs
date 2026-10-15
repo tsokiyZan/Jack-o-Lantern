@@ -469,6 +469,7 @@ impl Mob for GoatEntity {
                 item_stack,
                 player,
                 ItemStack::new(1, &Item::MILK_BUCKET),
+                true,
             );
             return true;
         }

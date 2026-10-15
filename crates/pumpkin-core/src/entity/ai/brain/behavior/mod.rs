@@ -8,6 +8,7 @@ pub mod back_up_if_too_close;
 pub mod become_passive_if_memory_present;
 pub mod copy_memory_with_expiry;
 pub mod count_down_cooldown_ticks;
+pub mod croak;
 pub mod crossbow_attack;
 pub mod dismount_or_skip_mounting;
 pub mod do_nothing;
@@ -20,7 +21,6 @@ pub mod interact_with;
 pub mod interact_with_door;
 pub mod long_jump_mid_jump;
 pub mod long_jump_to_random_pos;
-pub mod long_jump_util;
 pub mod look_at_target_sink;
 pub mod melee_attack;
 pub mod mount;
@@ -44,7 +44,10 @@ pub mod stop_being_angry_if_target_dead;
 pub mod stroll_to_poi;
 pub mod swim;
 pub mod timed;
+pub mod try_find_land;
+pub mod try_find_land_near_liquid;
 pub mod try_find_liquid;
+pub mod try_lay_spawn_on_fluid_near_land;
 pub mod utils;
 
 pub use animal_make_love::AnimalMakeLove;
@@ -54,6 +57,7 @@ pub use back_up_if_too_close::back_up_if_too_close;
 pub use become_passive_if_memory_present::become_passive_if_memory_present;
 pub use copy_memory_with_expiry::copy_memory_with_expiry;
 pub use count_down_cooldown_ticks::CountDownCooldownTicks;
+pub use croak::Croak;
 pub use crossbow_attack::CrossbowAttack;
 pub use dismount_or_skip_mounting::dismount_or_skip_mounting;
 pub use do_nothing::DoNothing;
@@ -98,7 +102,10 @@ pub use stop_being_angry_if_target_dead::stop_being_angry_if_target_dead;
 pub use stroll_to_poi::{stroll_around_poi, stroll_to_poi};
 pub use swim::Swim;
 pub use timed::{Behavior, DEFAULT_DURATION, Timed};
+pub use try_find_land::try_find_land;
+pub use try_find_land_near_liquid::try_find_land_near_liquid;
 pub use try_find_liquid::try_find_liquid;
+pub use try_lay_spawn_on_fluid_near_land::try_lay_spawn_on_fluid_near_land;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Status {

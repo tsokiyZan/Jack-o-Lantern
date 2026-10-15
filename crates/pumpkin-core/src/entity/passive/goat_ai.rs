@@ -184,6 +184,7 @@ fn init_long_jump_activity() -> ActivityData {
                             Sound::EntityGoatLongJump
                         }
                     },
+                    behavior::long_jump_to_random_pos::default_acceptable_landing_spot,
                 ))),
             ),
         ],
