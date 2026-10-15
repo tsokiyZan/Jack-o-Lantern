@@ -2,20 +2,25 @@ use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
 use crate::{
-    entity::{EntityBase, player::Player, r#type::from_type},
+    entity::{
+        EntityBase, mob::cube_mob::CubeMobEntity, mob::spawn::finalize_spawn, player::Player,
+        r#type::from_type,
+    },
     item::{ItemBehaviour, ItemMetadata},
 };
 use pumpkin_data::{
     Block, BlockDirection,
+    data_component_impl::CustomNameImpl,
     entity::EntityType,
     fluid::Fluid,
+    game_event::GameEvent,
     item::Item,
     item_stack::ItemStack,
     sound::{Sound, SoundCategory},
 };
 use pumpkin_util::{
     GameMode,
-    math::{position::BlockPos, vector3::Vector3},
+    math::{position::BlockPos, vector3::Vector3, wrap_degrees},
 };
 use pumpkin_world::{tick::TickPriority, world::BlockFlags};
 use uuid::Uuid;
@@ -25,6 +30,8 @@ use crate::world::World;
 pub struct EmptyBucketItem;
 pub struct FilledBucketItem;
 pub struct MilkBucketItem;
+/// Vanilla `MobBucketItem` for the sulfur cube, which holds no fluid.
+pub struct SulfurCubeBucketItem;
 
 impl ItemMetadata for EmptyBucketItem {
     fn ids() -> Box<[u16]> {
@@ -52,6 +59,83 @@ impl ItemMetadata for FilledBucketItem {
 impl ItemMetadata for MilkBucketItem {
     fn ids() -> Box<[u16]> {
         [Item::MILK_BUCKET.id].into()
+    }
+}
+
+impl ItemMetadata for SulfurCubeBucketItem {
+    fn ids() -> Box<[u16]> {
+        [Item::SULFUR_CUBE_BUCKET.id].into()
+    }
+}
+
+/// Vanilla `MobBucketItem.emptyContents` and `checkExtraContent` for a sulfur cube bucket:
+/// with no fluid to place, only the cube comes out at `pos`.
+pub(crate) fn empty_sulfur_cube_bucket(world: &Arc<World>, bucket: &ItemStack, pos: BlockPos) {
+    world.play_sound(
+        Sound::ItemBucketEmptySulfurCube,
+        SoundCategory::Neutral,
+        &pos.to_centered_f64(),
+    );
+    let spawn_pos = Vector3::new(
+        f64::from(pos.0.x) + 0.5,
+        f64::from(pos.0.y),
+        f64::from(pos.0.z) + 0.5,
+    );
+    let mob = from_type(&EntityType::SULFUR_CUBE, spawn_pos, world, Uuid::new_v4());
+    mob.get_entity()
+        .set_rotation(wrap_degrees(rand::random::<f32>() * 360.0), 0.0);
+    finalize_spawn(&mob, world, None);
+    if let Some(name) = bucket.get_data_component::<CustomNameImpl>() {
+        mob.get_entity().set_custom_name(name.name.clone());
+    }
+    if let Some(cube) = mob.cast_any().downcast_ref::<CubeMobEntity>() {
+        cube.load_from_bucket(bucket);
+    }
+    world.spawn_entity(mob);
+    world.emit_game_event(GameEvent::EntityPlace.name(), pos.to_centered_f64());
+}
+
+impl ItemBehaviour for SulfurCubeBucketItem {
+    fn normal_use(&self, item: &Item, player: &Player) {
+        let (yaw, pitch) = player.rotation();
+        self.normal_use_with_rotation(item, player, yaw, pitch);
+    }
+
+    /// Vanilla `BucketItem.use` with `MobBucketItem`'s `ClipContext.Fluid.NONE`.
+    fn normal_use_with_rotation(&self, item: &Item, player: &Player, yaw: f32, pitch: f32) {
+        let world = player.world();
+        let (start_pos, end_pos) = get_start_and_end_pos(player, yaw, pitch);
+        let hit = world.clip(&pumpkin_world::clip::ClipContext::new(
+            start_pos,
+            end_pos,
+            pumpkin_world::clip::ClipBlock::Outline,
+            pumpkin_world::clip::ClipFluid::None,
+        ));
+        if hit.is_miss {
+            return;
+        }
+        let pos = hit.block_pos;
+        let place_pos = pos.offset(hit.direction.to_offset());
+
+        if let Some(server) = world.server.upgrade()
+            && let Some(player_arc) = world.get_player_by_uuid(player.gameprofile.id)
+        {
+            let mut event =
+                crate::plugin::api::events::player::player_bucket::PlayerBucketEmptyEvent::new(
+                    player_arc,
+                    pos,
+                    item.registry_key.to_string(),
+                );
+            server.plugin_manager.fire_blocking(&server, &mut event);
+        }
+
+        empty_sulfur_cube_bucket(&world, &player.inventory.held_item(), place_pos);
+        // `ItemUtils.createFilledResult` with the creative stack limit.
+        give_player_bucket_item(player, &Item::BUCKET);
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }
 
