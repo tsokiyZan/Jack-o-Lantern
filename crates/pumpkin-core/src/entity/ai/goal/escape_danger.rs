@@ -5,7 +5,7 @@ use std::sync::atomic::Ordering::Relaxed;
 
 use super::{Controls, Goal};
 use crate::entity::ai::goal::try_find_water::TryFindWaterGoal;
-use crate::entity::ai::util::default_random_pos;
+use crate::entity::ai::util::{default_random_pos, goal_utils};
 use crate::entity::{ai::pathfinder::NavigatorGoal, mob::Mob};
 
 const WATER_SEARCH_XZ: i32 = 5;
@@ -47,7 +47,8 @@ impl EscapeDangerGoal {
             })
     }
 
-    /// Nearest water within 5 blocks horizontally, only when the mob is not stuck in a block.
+    /// Vanilla `PanicGoal.lookForWater`: the first water in Manhattan order within 5 blocks
+    /// horizontally and 1 vertically, only when the mob is not stuck in a block.
     fn look_for_water(mob: &dyn Mob) -> Option<BlockPos> {
         let entity = mob.get_entity();
         let world = entity.world.load();
@@ -62,23 +63,14 @@ impl EscapeDangerGoal {
             return None;
         }
 
-        let mut best: Option<(i32, BlockPos)> = None;
-        for dx in -WATER_SEARCH_XZ..=WATER_SEARCH_XZ {
-            for dy in -WATER_SEARCH_Y..=WATER_SEARCH_Y {
-                for dz in -WATER_SEARCH_XZ..=WATER_SEARCH_XZ {
-                    let pos = BlockPos::new(mob_pos.0.x + dx, mob_pos.0.y + dy, mob_pos.0.z + dz);
-                    if !TryFindWaterGoal::is_water(&world, &pos) {
-                        continue;
-                    }
-                    let distance = dx.abs() + dy.abs() + dz.abs();
-                    if best.is_none_or(|(best_distance, _)| distance < best_distance) {
-                        best = Some((distance, pos));
-                    }
-                }
-            }
-        }
-
-        best.map(|(_, pos)| pos)
+        goal_utils::within_box_by_manhattan_distance(
+            mob_pos,
+            WATER_SEARCH_XZ,
+            WATER_SEARCH_Y,
+            WATER_SEARCH_XZ,
+        )
+        .into_iter()
+        .find(|pos| TryFindWaterGoal::is_water(&world, pos))
     }
 
     fn find_random_position(mob: &dyn Mob) -> Option<Vector3<f64>> {

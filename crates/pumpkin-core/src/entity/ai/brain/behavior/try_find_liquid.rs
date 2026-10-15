@@ -1,3 +1,4 @@
+use crate::entity::ai::util::goal_utils;
 use std::sync::Arc;
 
 use pumpkin_data::Block;
@@ -36,7 +37,7 @@ pub fn try_find_liquid(range: i32, speed_modifier: f32, fluid_tag: &'static Tag)
 
             let body = entity.pos.load();
             let mut found: Option<BlockPos> = None;
-            for pos in within_box_by_manhattan_distance(body_pos, range, range, range) {
+            for pos in goal_utils::within_box_by_manhattan_distance(body_pos, range, range, range) {
                 if pos.0.x == body_pos.0.x && pos.0.z == body_pos.0.z {
                     continue;
                 }
@@ -77,53 +78,4 @@ fn closer_to_center_than(pos: &BlockPos, point: Vector3<f64>, distance: f64) -> 
         f64::from(pos.0.z) + 0.5,
     );
     center.squared_distance_to_vec(&point) < distance * distance
-}
-
-/// Vanilla `BlockPos.withinBoxByManhattanDistance`: every position in the box, in
-/// order of Manhattan distance, in vanilla's exact iteration order.
-fn within_box_by_manhattan_distance(
-    origin: BlockPos,
-    reach_x: i32,
-    reach_y: i32,
-    reach_z: i32,
-) -> Vec<BlockPos> {
-    let max_depth = reach_x + reach_y + reach_z;
-    let mut out = Vec::new();
-    let (mut depth, mut max_x, mut max_y, mut x, mut y) = (0, 0, 0, 0, 0);
-    loop {
-        let found = loop {
-            if y > max_y {
-                x += 1;
-                if x > max_x {
-                    depth += 1;
-                    if depth > max_depth {
-                        return out;
-                    }
-                    max_x = reach_x.min(depth);
-                    x = -max_x;
-                }
-                max_y = reach_y.min(depth - x.abs());
-                y = -max_y;
-            }
-            let z = depth - x.abs() - y.abs();
-            let candidate = (z <= reach_z).then_some((x, y, z));
-            y += 1;
-            if let Some(found) = candidate {
-                break found;
-            }
-        };
-        let (dx, dy, dz) = found;
-        out.push(BlockPos::new(
-            origin.0.x + dx,
-            origin.0.y + dy,
-            origin.0.z + dz,
-        ));
-        if dz != 0 {
-            out.push(BlockPos::new(
-                origin.0.x + dx,
-                origin.0.y + dy,
-                origin.0.z - dz,
-            ));
-        }
-    }
 }

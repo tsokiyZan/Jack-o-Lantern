@@ -188,3 +188,77 @@ pub fn nearby_same_type(mob: &dyn Mob) -> Vec<Arc<dyn EntityBase>> {
         })
         .collect()
 }
+
+/// Vanilla `BlockPos.withinBoxByManhattanDistance`: every position in the box, in
+/// order of Manhattan distance, in vanilla's exact iteration order.
+#[must_use]
+pub fn within_box_by_manhattan_distance(
+    origin: BlockPos,
+    reach_x: i32,
+    reach_y: i32,
+    reach_z: i32,
+) -> Vec<BlockPos> {
+    let max_depth = reach_x + reach_y + reach_z;
+    let mut out = Vec::new();
+    let (mut depth, mut max_x, mut max_y, mut x, mut y) = (0, 0, 0, 0, 0);
+    loop {
+        let found = loop {
+            if y > max_y {
+                x += 1;
+                if x > max_x {
+                    depth += 1;
+                    if depth > max_depth {
+                        return out;
+                    }
+                    max_x = reach_x.min(depth);
+                    x = -max_x;
+                }
+                max_y = reach_y.min(depth - x.abs());
+                y = -max_y;
+            }
+            let z = depth - x.abs() - y.abs();
+            let candidate = (z <= reach_z).then_some((x, y, z));
+            y += 1;
+            if let Some(found) = candidate {
+                break found;
+            }
+        };
+        let (dx, dy, dz) = found;
+        out.push(BlockPos::new(
+            origin.0.x + dx,
+            origin.0.y + dy,
+            origin.0.z + dz,
+        ));
+        if dz != 0 {
+            out.push(BlockPos::new(
+                origin.0.x + dx,
+                origin.0.y + dy,
+                origin.0.z - dz,
+            ));
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::within_box_by_manhattan_distance;
+    use pumpkin_util::math::position::BlockPos;
+
+    #[test]
+    fn manhattan_box_visits_positive_z_before_negative() {
+        // First seven positions of vanilla `withinBoxByManhattanDistance(origin, 5, 1, 5)`.
+        let expected = [
+            (0, 0, 0),
+            (-1, 0, 0),
+            (0, -1, 0),
+            (0, 0, 1),
+            (0, 0, -1),
+            (0, 1, 0),
+            (1, 0, 0),
+        ];
+        let visited = within_box_by_manhattan_distance(BlockPos::new(0, 0, 0), 5, 1, 5);
+        for (pos, (x, y, z)) in visited.iter().zip(expected) {
+            assert_eq!((pos.0.x, pos.0.y, pos.0.z), (x, y, z));
+        }
+    }
+}
