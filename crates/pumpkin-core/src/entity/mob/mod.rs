@@ -2451,11 +2451,10 @@ impl<T: Mob + Send + 'static> EntityBase for T {
     }
 
     fn get_experience_reward(&self, _killer: Option<&dyn EntityBase>) -> u32 {
-        if self
-            .get_entity()
-            .age
-            .load(std::sync::atomic::Ordering::Relaxed)
-            < 0
+        // Vanilla `shouldDropExperience`: no babies, though `Monster` drops it for its babies too.
+        let entity = self.get_entity();
+        if entity.age.load(std::sync::atomic::Ordering::Relaxed) < 0
+            && !is_monster(entity.entity_type)
         {
             return 0;
         }
