@@ -2014,7 +2014,13 @@ impl World {
             };
             level_time.send_time(self);
 
-            for player in self.players.load().iter() {
+            // Vanilla `wakeUpAllPlayers` wakes only the sleeping players.
+            for player in self
+                .players
+                .load()
+                .iter()
+                .filter(|player| player.is_sleeping())
+            {
                 player.wake_up();
             }
 
@@ -4351,12 +4357,7 @@ impl World {
         let player_count = players.len();
         let sleeping_player_count = players
             .iter()
-            .filter(|player| {
-                player
-                    .sleeping_since
-                    .load()
-                    .is_some_and(|since| since >= 100)
-            })
+            .filter(|player| player.is_sleeping_long_enough())
             .count();
         drop(players);
 

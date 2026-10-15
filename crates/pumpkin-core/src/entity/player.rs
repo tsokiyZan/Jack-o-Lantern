@@ -422,8 +422,10 @@ pub struct Player {
     pub camera_target_id: AtomicCell<Option<i32>>,
     /// The player's spawnpoint
     pub respawn_point: std::sync::Mutex<Option<RespawnPoint>>,
-    /// The player's sleep status
-    pub sleeping_since: AtomicCell<Option<u8>>,
+    /// Whether the player is sleeping in a bed.
+    pub sleeping: AtomicBool,
+    /// Vanilla `sleepCounter`: counts up to 100 while asleep, and from 100 to 110 after waking.
+    pub sleep_counter: AtomicI32,
     /// Head position of the bed the player is currently sleeping in.
     pub sleeping_bed_pos: AtomicCell<Option<BlockPos>>,
     /// Manages the player's hunger level.
@@ -759,7 +761,8 @@ impl Player {
             is_movement_locked: AtomicBool::new(false),
             // TODO: Send the CPlayerSpawnPosition packet when the client connects with proper values
             respawn_point: std::sync::Mutex::new(None),
-            sleeping_since: AtomicCell::new(None),
+            sleeping: AtomicBool::new(false),
+            sleep_counter: AtomicI32::new(0),
             sleeping_bed_pos: AtomicCell::new(None),
             // We want this to be an impossible watched section so that `chunker::update_position`
             // will mark chunks as watched for a new join rather than a respawn.
@@ -2173,7 +2176,8 @@ impl Player {
         );
         self.get_entity().set_velocity(Vector3::default());
 
-        self.sleeping_since.store(Some(0));
+        self.sleeping.store(true, Ordering::Relaxed);
+        self.sleep_counter.store(0, Ordering::Relaxed);
         self.sleeping_bed_pos.store(Some(bed_head_pos));
         self.set_stat(
             statistics::StatisticCategory::Custom,
@@ -2212,9 +2216,11 @@ impl Player {
         self.living_entity.get_block_speed_factor()
     }
 
-    fn is_sleeping(&self) -> bool {
+    /// Vanilla `LivingEntity.isSleeping` for a player.
+    #[must_use]
+    pub fn is_sleeping(&self) -> bool {
         // TODO: Track sleeping position state explicitly (vanilla checks sleepingPosition.isPresent()).
-        self.sleeping_since.load().is_some()
+        self.sleeping.load(Ordering::Relaxed)
     }
 
     #[must_use]
@@ -2305,11 +2311,26 @@ impl Player {
         self.set_pose(actual_pose);
     }
 
+    /// The sleep-state part of vanilla `stopSleepInBed(false, _)`, which every caller of
+    /// `wake_up` uses.
+    fn stop_sleep_in_bed(&self) {
+        self.sleeping.store(false, Ordering::Relaxed);
+        self.sleep_counter.store(100, Ordering::Relaxed);
+    }
+
+    /// Vanilla `Player.isSleepingLongEnough`.
+    #[must_use]
+    pub fn is_sleeping_long_enough(&self) -> bool {
+        self.is_sleeping() && self.sleep_counter.load(Ordering::Relaxed) >= 100
+    }
+
     pub fn wake_up(&self) {
         let world = self.world();
         let Some(bed_pos) = self.sleeping_bed_pos.load() else {
             self.set_pose(EntityPose::Standing);
-            self.sleeping_since.store(None);
+            if self.is_sleeping() {
+                self.stop_sleep_in_bed();
+            }
             return;
         };
 
@@ -2351,7 +2372,7 @@ impl Player {
             &CEntityAnimation::new(self.entity_id().into(), Animation::LeaveBed),
         );
 
-        self.sleeping_since.store(None);
+        self.stop_sleep_in_bed();
         self.sleeping_bed_pos.store(None);
     }
 
@@ -2908,10 +2929,18 @@ impl Player {
             .entity
             .age
             .fetch_add(1, Ordering::Relaxed);
-        if let Some(sleeping_since) = self.sleeping_since.load()
-            && sleeping_since < 101
-        {
-            self.sleeping_since.store(Some(sleeping_since + 1));
+        // Vanilla `Player.tick`'s sleep counter.
+        if self.is_sleeping() {
+            let counter = self.sleep_counter.load(Ordering::Relaxed) + 1;
+            self.sleep_counter
+                .store(counter.min(100), Ordering::Relaxed);
+        } else {
+            let counter = self.sleep_counter.load(Ordering::Relaxed);
+            if counter > 0 {
+                let counter = counter + 1;
+                self.sleep_counter
+                    .store(if counter >= 110 { 0 } else { counter }, Ordering::Relaxed);
+            }
         }
 
         if self.mining.load(Ordering::Relaxed)
@@ -7073,7 +7102,10 @@ impl EntityBase for Player {
         nbt.put_int("XpTotal", total_exp);
         nbt.put_int("XpSeed", self.enchantment_seed.load(Ordering::Relaxed));
         nbt.put_int("Score", self.score.load(Ordering::Relaxed));
-        nbt.put_short("SleepTimer", self.sleeping_since.load().unwrap_or(0) as i16);
+        nbt.put_short(
+            "SleepTimer",
+            self.sleep_counter.load(Ordering::Relaxed) as i16,
+        );
 
         nbt.put_int("playerGameType", self.gamemode.load() as i32);
         if let Some(previous_gamemode) = self.previous_gamemode.load() {
@@ -7187,11 +7219,10 @@ impl EntityBase for Player {
 
         self.score
             .store(nbt.get_int("Score").unwrap_or(0), Ordering::Relaxed);
-        if let Some(sleep_timer) = nbt.get_short("SleepTimer")
-            && sleep_timer > 0
-        {
-            self.sleeping_since.store(Some(sleep_timer as u8));
-        }
+        self.sleep_counter.store(
+            i32::from(nbt.get_short("SleepTimer").unwrap_or(0)),
+            Ordering::Relaxed,
+        );
 
         self.seen_credits.store(
             nbt.get_bool("seenCredits").unwrap_or(false),
