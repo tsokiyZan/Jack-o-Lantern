@@ -1,4 +1,9 @@
+use crate::entity::ai::goal::leap_at_target::LeapAtTargetGoal;
+use crate::entity::ai::goal::ocelot_attack::OcelotAttackGoal;
+use crate::entity::ai::goal::sit_when_ordered_to::SitWhenOrderedToGoal;
+use crate::entity::living::LivingEntity;
 use crate::entity::passive::animal::animal_can_mate;
+use crate::world::World;
 use std::sync::{
     Arc, Weak,
     atomic::{AtomicBool, AtomicU8, Ordering},
@@ -24,7 +29,6 @@ use crate::entity::{
     ai::goal::{
         active_target::ActiveTargetGoal, avoid_entity::AvoidEntityGoal, breed::BreedGoal,
         escape_danger::EscapeDangerGoal, follow_owner::FollowOwnerGoal,
-        follow_parent::FollowParentGoal, look_around::RandomLookAroundGoal,
         look_at_entity::LookAtEntityGoal, swim::SwimGoal, tempt::TemptGoal,
         wander_around::WanderAroundGoal,
     },
@@ -113,32 +117,37 @@ impl CatEntity {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
 
-            // Goal 1: SwimGoal (FloatGoal)
             goal_selector.add_goal(1, SwimGoal::new(&mob_arc.mob_entity));
-            // Goal 1: TamableAnimalPanicGoal (EscapeDangerGoal)
+            // TamableAnimalPanicGoal
             goal_selector.add_goal(1, EscapeDangerGoal::new(1.5));
-            // Goal 4: CatTemptGoal
+            goal_selector.add_goal(2, Box::new(SitWhenOrderedToGoal::new()));
+            // TODO: 3 CatRelaxOnOwnerGoal, 5 CatLieOnBlockGoal(1.1, 8) and
+            // 7 CatSitOnBlockGoal(0.8) are not ported.
+            // CatTemptGoal
             goal_selector.add_goal(4, Box::new(TemptGoal::new(0.6, TEMPT_ITEMS, true)));
-            // Goal 4: CatAvoidEntityGoal (when untamed)
-            goal_selector.add_goal(
-                4,
-                Box::new(AvoidEntityGoal::new(&EntityType::PLAYER, 16.0, 0.8, 1.33)),
-            );
-            // Goal 5: BreedGoal
-            goal_selector.add_goal(5, BreedGoal::new(0.8));
-            // Goal 6: FollowOwnerGoal
             goal_selector.add_goal(6, FollowOwnerGoal::new(1.0, 10.0, 5.0));
-            // Goal 9: FollowParentGoal
-            goal_selector.add_goal(9, Box::new(FollowParentGoal::new(0.8)));
-            // Goal 11: WanderAroundGoal
-            goal_selector.add_goal(11, Box::new(WanderAroundGoal::new(0.8)));
-            // Goal 12: LookAtPlayerGoal
+            goal_selector.add_goal(8, Box::new(LeapAtTargetGoal::new(0.3)));
+            goal_selector.add_goal(9, Box::new(OcelotAttackGoal::new()));
+            goal_selector.add_goal(10, BreedGoal::new(0.8));
+            goal_selector.add_goal(
+                11,
+                Box::new(WanderAroundGoal::avoiding_water_with_probability(
+                    0.8,
+                    1.000_000_1E-5,
+                )),
+            );
             goal_selector.add_goal(
                 12,
                 LookAtEntityGoal::with_default(mob_weak, &EntityType::PLAYER, 10.0),
             );
-            // Goal 12: RandomLookAroundGoal
-            goal_selector.add_goal(12, Box::new(RandomLookAroundGoal::default()));
+            // `reassessTameGoals` in the constructor: added last, used only while untamed.
+            goal_selector.add_goal(
+                4,
+                Box::new(
+                    AvoidEntityGoal::new(&EntityType::PLAYER, 16.0, 0.8, 1.33)
+                        .gated_by(|mob| !mob.is_tamed()),
+                ),
+            );
         };
 
         {
@@ -148,14 +157,23 @@ impl CatEntity {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
 
-            // Target Goal 1: NonTameRandomTargetGoal for Rabbit and Turtle
+            // NonTameRandomTargetGoal: rabbits, and baby turtles on land.
             target_selector.add_goal(
                 1,
-                ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::RABBIT, false),
+                ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::RABBIT, false)
+                    .gated_by(|mob| !mob.is_tamed()),
             );
             target_selector.add_goal(
                 1,
-                ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::TURTLE, false),
+                Box::new(ActiveTargetGoal::new(
+                    &mob_arc.mob_entity,
+                    &EntityType::TURTLE,
+                    10,
+                    false,
+                    false,
+                    Some(baby_on_land),
+                ))
+                .gated_by(|mob| !mob.is_tamed()),
             );
         };
 
@@ -492,4 +510,9 @@ impl Mob for CatEntity {
 
         self.mob_entity.mob_interact(player, item_stack)
     }
+}
+
+/// Vanilla `Turtle.BABY_ON_LAND_SELECTOR`.
+pub fn baby_on_land(target: &LivingEntity, _world: &World) -> bool {
+    target.entity.is_baby() && !target.entity.is_in_water()
 }

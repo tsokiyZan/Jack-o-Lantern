@@ -1,9 +1,11 @@
 use std::sync::Arc;
 
+use super::revenge::MobFilter;
 use super::{Controls, Goal};
 use crate::entity::ai::pathfinder::path::Path;
 use crate::entity::ai::target_predicate::TargetPredicate;
 use crate::entity::ai::util::{default_random_pos, goal_utils};
+use crate::entity::living::LivingEntity;
 use crate::entity::predicate::EntityPredicate;
 use crate::entity::{EntityBase, mob::Mob};
 use pumpkin_data::entity::EntityType;
@@ -21,6 +23,9 @@ pub struct AvoidEntityGoal {
     avoid_entity_targeting: TargetPredicate,
     to_avoid: Option<Arc<dyn EntityBase>>,
     path: Option<Path>,
+    /// What vanilla subclasses (cat, ocelot, wolf, rabbit) add to `canUse` and
+    /// `canContinueToUse`.
+    gate: Option<MobFilter>,
 }
 
 impl AvoidEntityGoal {
@@ -46,12 +51,37 @@ impl AvoidEntityGoal {
             avoid_entity_targeting,
             to_avoid: None,
             path: None,
+            gate: None,
         }
+    }
+
+    /// Vanilla's `avoidPredicate`: only flee entities passing `predicate`, alongside the
+    /// no-creative-or-spectator rule.
+    #[must_use]
+    pub fn avoiding_only(
+        mut self,
+        predicate: impl Fn(&LivingEntity) -> bool + Send + Sync + 'static,
+    ) -> Self {
+        self.avoid_entity_targeting
+            .set_predicate(move |target, _world| {
+                predicate(target) && EntityPredicate::ExceptCreativeOrSpectator.test(&target.entity)
+            });
+        self
+    }
+
+    /// A condition the mob must meet to start and keep fleeing.
+    #[must_use]
+    pub const fn gated_by(mut self, gate: MobFilter) -> Self {
+        self.gate = Some(gate);
+        self
     }
 }
 
 impl Goal for AvoidEntityGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
+        if self.gate.is_some_and(|gate| !gate(mob)) {
+            return false;
+        }
         let entity = &mob.get_mob_entity().living_entity.entity;
         let world = entity.world.load();
         let mob_pos = entity.pos.load();
@@ -90,7 +120,7 @@ impl Goal for AvoidEntityGoal {
     }
 
     fn should_continue(&mut self, mob: &dyn Mob) -> bool {
-        !mob.is_navigator_idle()
+        self.gate.is_none_or(|gate| gate(mob)) && !mob.is_navigator_idle()
     }
 
     fn start(&mut self, mob: &dyn Mob) {

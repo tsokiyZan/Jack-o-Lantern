@@ -3,6 +3,8 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 
+use crate::entity::ai::goal::leap_at_target::LeapAtTargetGoal;
+use crate::entity::ai::goal::ocelot_attack::OcelotAttackGoal;
 use pumpkin_data::entity::EntityPose;
 use pumpkin_data::entity::{EntityStatus, EntityType};
 use pumpkin_data::item::Item;
@@ -17,9 +19,8 @@ use crate::entity::{
     Entity, EntityBase,
     ai::goal::{
         active_target::ActiveTargetGoal, avoid_entity::AvoidEntityGoal, breed::BreedGoal,
-        escape_danger::EscapeDangerGoal, follow_parent::FollowParentGoal,
-        look_around::RandomLookAroundGoal, look_at_entity::LookAtEntityGoal, swim::SwimGoal,
-        tempt::TemptGoal, wander_around::WanderAroundGoal,
+        look_at_entity::LookAtEntityGoal, swim::SwimGoal, tempt::TemptGoal,
+        wander_around::WanderAroundGoal,
     },
     mob::{Mob, MobEntity},
     passive::animal::{Animal, set_animal_pathfinding_malus},
@@ -57,30 +58,35 @@ impl OcelotEntity {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
 
-            // Goal 1: FloatGoal (SwimGoal)
             goal_selector.add_goal(1, SwimGoal::new(&mob_arc.mob_entity));
-            // Goal 1: PanicGoal (EscapeDangerGoal)
-            goal_selector.add_goal(1, EscapeDangerGoal::new(1.5));
-            // Goal 3: OcelotTemptGoal
+            // OcelotTemptGoal
             goal_selector.add_goal(3, Box::new(TemptGoal::new(0.6, TEMPT_ITEMS, true)));
-            // Goal 4: OcelotAvoidEntityGoal (when not trusting)
-            goal_selector.add_goal(
-                4,
-                Box::new(AvoidEntityGoal::new(&EntityType::PLAYER, 16.0, 0.8, 1.33)),
-            );
-            // Goal 9: BreedGoal
+            goal_selector.add_goal(7, Box::new(LeapAtTargetGoal::new(0.3)));
+            goal_selector.add_goal(8, Box::new(OcelotAttackGoal::new()));
             goal_selector.add_goal(9, BreedGoal::new(0.8));
-            // Goal 9: FollowParentGoal
-            goal_selector.add_goal(9, Box::new(FollowParentGoal::new(0.8)));
-            // Goal 10: WaterAvoidingRandomStrollGoal (WanderAroundGoal)
-            goal_selector.add_goal(10, Box::new(WanderAroundGoal::new(0.8)));
-            // Goal 11: LookAtPlayerGoal
+            goal_selector.add_goal(
+                10,
+                Box::new(WanderAroundGoal::avoiding_water_with_probability(
+                    0.8,
+                    1.000_000_1E-5,
+                )),
+            );
             goal_selector.add_goal(
                 11,
                 LookAtEntityGoal::with_default(mob_weak, &EntityType::PLAYER, 10.0),
             );
-            // Goal 11: RandomLookAroundGoal
-            goal_selector.add_goal(11, Box::new(RandomLookAroundGoal::default()));
+            // `reassessTrustingGoals` in the constructor: added last, used only while not trusting.
+            goal_selector.add_goal(
+                4,
+                Box::new(
+                    AvoidEntityGoal::new(&EntityType::PLAYER, 16.0, 0.8, 1.33).gated_by(|mob| {
+                        mob.get_entity()
+                            .cast_any()
+                            .downcast_ref::<Self>()
+                            .is_none_or(|ocelot| !ocelot.is_trusting())
+                    }),
+                ),
+            );
         };
 
         {
@@ -90,14 +96,20 @@ impl OcelotEntity {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
 
-            // Target Goal 1: NearestAttackableTargetGoal for Chicken and Turtle
             target_selector.add_goal(
                 1,
                 ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::CHICKEN, false),
             );
             target_selector.add_goal(
                 1,
-                ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::TURTLE, false),
+                Box::new(ActiveTargetGoal::new(
+                    &mob_arc.mob_entity,
+                    &EntityType::TURTLE,
+                    10,
+                    false,
+                    false,
+                    Some(crate::entity::passive::cat::baby_on_land),
+                )),
             );
         };
 
