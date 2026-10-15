@@ -673,8 +673,7 @@ impl Mob for WitherEntity {
             let world = entity.world.load_full();
             self.remove_all_bossbar(&world);
             if !self.dropped_loot.swap(true, Ordering::SeqCst) {
-                let pos = entity.get_entity().block_pos.load();
-                world.drop_stack(&pos, ItemStack::new(1, &Item::NETHER_STAR));
+                entity.spawn_at_location(ItemStack::new(1, &Item::NETHER_STAR));
             }
         }
     }

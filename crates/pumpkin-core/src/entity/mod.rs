@@ -3972,9 +3972,7 @@ impl Entity {
                 self.unleash();
                 let lead_item =
                     pumpkin_data::item_stack::ItemStack::new(1, &pumpkin_data::item::Item::LEAD);
-                self.world
-                    .load()
-                    .drop_stack(&self.block_pos.load(), lead_item);
+                self.spawn_at_location(lead_item);
             } else if distance > Self::LEASH_ELASTIC_DISTANCE {
                 // Elastic pull force towards leash holder
                 let dir = (holder_pos - self_pos).normalize();
@@ -3986,16 +3984,11 @@ impl Entity {
         }
     }
 
+    /// Vanilla `Entity.spawnAtLocation`: drops `stack` where the entity stands.
     pub fn spawn_at_location(&self, stack: ItemStack) {
-        if stack.is_empty() {
-            return;
+        if !stack.is_empty() {
+            self.world.load_full().spawn_item_at(self.pos.load(), stack);
         }
-        let world = self.world.load();
-        let item_entity = ItemEntity::new(
-            Self::new(world.clone(), self.pos.load(), &EntityType::ITEM),
-            stack,
-        );
-        world.spawn_entity(Arc::new(item_entity));
     }
 
     pub fn has_passengers(&self) -> bool {

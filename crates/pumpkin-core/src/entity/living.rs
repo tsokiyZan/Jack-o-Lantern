@@ -2302,9 +2302,6 @@ impl LivingEntity {
     }
 
     fn drop_equipment(&self, looting_level: u32) {
-        let world = self.entity.world.load();
-        let block_pos = self.entity.block_pos.load();
-
         let drop_chances = self
             .equipment_drop_chances
             .lock()
@@ -2349,7 +2346,7 @@ impl LivingEntity {
                 let outer = rng.random_range(0..=inner);
                 item.set_damage((max_damage - outer).max(0));
             }
-            world.drop_stack(&block_pos, item);
+            self.entity.spawn_at_location(item);
         }
     }
 
@@ -2479,9 +2476,8 @@ impl LivingEntity {
         let world = self.entity.world.load();
         if let Some(loot_table) = world.get_loot_table(&key) {
             let seed: i64 = rand::random();
-            let pos = self.entity.block_pos.load();
             for stack in crate::world::loot::generate_loot_from_handle(&loot_table, seed, params) {
-                world.drop_stack(&pos, stack);
+                self.entity.spawn_at_location(stack);
             }
         }
     }

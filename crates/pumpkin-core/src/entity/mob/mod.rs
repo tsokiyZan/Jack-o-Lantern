@@ -1014,10 +1014,7 @@ impl MobEntity {
             entity.unleash();
             let lead_item =
                 pumpkin_data::item_stack::ItemStack::new(1, &pumpkin_data::item::Item::LEAD);
-            entity
-                .world
-                .load()
-                .drop_stack(&entity.block_pos.load(), lead_item);
+            entity.spawn_at_location(lead_item);
             return true;
         }
 

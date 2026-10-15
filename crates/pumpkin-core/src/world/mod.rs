@@ -5811,6 +5811,11 @@ impl World {
             )
         };
 
+        self.spawn_item_at(spawn_pos, stack);
+    }
+
+    /// A new item entity at `spawn_pos`, as vanilla's `ItemEntity` constructor makes it.
+    pub fn spawn_item_at(self: &Arc<Self>, spawn_pos: Vector3<f64>, stack: ItemStack) {
         let entity = Entity::new(self.clone(), spawn_pos, &EntityType::ITEM);
         let mut item_event = crate::plugin::api::events::entity::item_spawn::ItemSpawnEvent::new(
             entity.entity_id,

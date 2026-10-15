@@ -510,7 +510,7 @@ impl Mob for EndermanEntity {
         };
         let pos = entity.block_pos.load();
         for stack in crate::block::block_loot_stacks(&world, block, &pos, &params) {
-            world.drop_stack(&pos, stack);
+            entity.spawn_at_location(stack);
         }
     }
 

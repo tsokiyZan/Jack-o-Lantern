@@ -274,7 +274,6 @@ impl Mob for ChickenEntity {
         if self.egg_lay_time.fetch_sub(1, Ordering::Relaxed) <= 1 {
             let next_time = rand::rng().random_range(6000..12000);
             let world = entity.world.load_full();
-            let pos = entity.block_pos.load();
             let entity_id = entity.entity_id;
             let mut drop_event =
                 crate::plugin::api::events::entity::entity_drop_item::EntityDropItemEvent::new(
@@ -288,7 +287,8 @@ impl Mob for ChickenEntity {
                     .fire_blocking(&server, &mut drop_event);
             }
             if !drop_event.cancelled {
-                world.drop_stack(&pos, ItemStack::new(1, &Item::EGG));
+                self.get_entity()
+                    .spawn_at_location(ItemStack::new(1, &Item::EGG));
             }
             self.egg_lay_time.store(next_time, Ordering::Relaxed);
         }
