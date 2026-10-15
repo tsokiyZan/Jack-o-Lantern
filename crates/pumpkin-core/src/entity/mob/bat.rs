@@ -166,16 +166,13 @@ impl Mob for BatEntity {
             *target_position = None;
         }
         let mut rng = self.get_random();
-        let pick_new = match *target_position {
-            None => true,
-            Some(target) => {
-                rng.random_range(0..30) == 0 || {
-                    // `closerToCenterThan(position, 2.0)`.
-                    let center = target.0.to_f64() + Vector3::new(0.5, 0.5, 0.5);
-                    center.squared_distance_to_vec(&position) < 4.0
-                }
+        let pick_new = target_position.is_none_or(|target| {
+            rng.random_range(0..30) == 0 || {
+                // `closerToCenterThan(position, 2.0)`.
+                let center = target.0.to_f64() + Vector3::new(0.5, 0.5, 0.5);
+                center.squared_distance_to_vec(&position) < 4.0
             }
-        };
+        });
         if pick_new {
             let (x1, x2) = (rng.random_range(0..7), rng.random_range(0..7));
             let y = rng.random_range(0..6);
