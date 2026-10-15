@@ -60,6 +60,15 @@ impl DataComponentImpl for AttributeModifiersImpl {
     default_impl!(AttributeModifiers);
 }
 
+/// `ItemEnchantments.CODEC`: a map of enchantment id to level.
+fn enchantments_hash(enchantments: &[(&'static Enchantment, i32)]) -> i32 {
+    get_map_hash(
+        enchantments
+            .iter()
+            .map(|(enchantment, level)| (get_str_hash(enchantment.name), get_i32_hash(*level))),
+    ) as i32
+}
+
 #[derive(Clone, Hash, PartialEq, Eq, Default)]
 pub struct EnchantmentsImpl {
     pub enchantment: Cow<'static, [(&'static Enchantment, i32)]>,
@@ -92,14 +101,7 @@ impl DataComponentImpl for EnchantmentsImpl {
         NbtTag::Compound(data)
     }
     fn get_hash(&self) -> i32 {
-        let mut digest = Digest::new();
-        digest.update(&[2u8]);
-        for (enc, level) in self.enchantment.iter() {
-            digest.update(&get_str_hash(enc.name).to_le_bytes());
-            digest.update(&get_i32_hash(*level).to_le_bytes());
-        }
-        digest.update(&[3u8]);
-        digest.finalize() as i32
+        enchantments_hash(&self.enchantment)
     }
     default_impl!(Enchantments);
 }
@@ -1447,14 +1449,7 @@ impl DataComponentImpl for StoredEnchantmentsImpl {
         NbtTag::Compound(data)
     }
     fn get_hash(&self) -> i32 {
-        let mut digest = Digest::new();
-        digest.update(&[2u8]);
-        for (enc, level) in self.enchantment.iter() {
-            digest.update(&get_str_hash(enc.name).to_le_bytes());
-            digest.update(&get_i32_hash(*level).to_le_bytes());
-        }
-        digest.update(&[3u8]);
-        digest.finalize() as i32
+        enchantments_hash(&self.enchantment)
     }
     default_impl!(StoredEnchantments);
 }

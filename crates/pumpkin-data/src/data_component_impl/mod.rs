@@ -1060,6 +1060,18 @@ mod tests {
             .get_hash(),
             -1580618251i32
         );
+        // Map entries are sorted by hash, so insertion order does not matter.
+        let sharpness = (&crate::Enchantment::SHARPNESS, 5);
+        let unbreaking = (&crate::Enchantment::UNBREAKING, 3);
+        for enchantment in [vec![sharpness, unbreaking], vec![unbreaking, sharpness]] {
+            assert_eq!(
+                EnchantmentsImpl {
+                    enchantment: Cow::Owned(enchantment),
+                }
+                .get_hash(),
+                1_231_404_551
+            );
+        }
         assert_eq!(MaxStackSizeImpl { size: 99 }.get_hash(), -1632321551i32);
         assert_eq!(MapIdImpl { id: 10 }.get_hash(), -919192125i32);
     }
