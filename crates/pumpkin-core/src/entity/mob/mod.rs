@@ -610,6 +610,7 @@ impl MobEntity {
         if self.persistence_required.load(Relaxed) {
             nbt.put_bool("PersistenceRequired", true);
         }
+        self.living_entity.entity.write_leash_nbt(nbt);
     }
 
     pub fn read_mob_nbt(&self, nbt: &NbtCompound) {
@@ -625,6 +626,7 @@ impl MobEntity {
             self.persistence_required
                 .store(persistence_required, Relaxed);
         }
+        self.living_entity.entity.read_leash_nbt(nbt);
     }
 
     pub fn add_goal<G: crate::entity::ai::goal::Goal + 'static>(&self, priority: u8, goal: G) {

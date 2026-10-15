@@ -971,6 +971,13 @@ struct SpawnState {
 }
 
 /// Represents a non-living Entity (e.g. Item, Egg, Snowball...)
+/// Vanilla `LeashData.delayedLeashInfo`: who or what a saved leash is tied to.
+#[derive(Clone, Copy, Debug)]
+pub enum DelayedLeash {
+    Holder(uuid::Uuid),
+    Knot(BlockPos),
+}
+
 pub struct Entity {
     /// A unique identifier for the entity
     pub entity_id: i32,
@@ -1061,6 +1068,8 @@ pub struct Entity {
     pub vehicle: std::sync::Mutex<Option<Arc<dyn EntityBase>>>,
     /// The entity this entity is attached/leashed to (if any)
     pub leashed_to: std::sync::Mutex<Option<Arc<dyn EntityBase>>>,
+    /// Vanilla `LeashData.delayedLeashInfo`: a saved leash waiting for its holder to load.
+    pub delayed_leash: std::sync::Mutex<Option<DelayedLeash>>,
     /// Cooldown before entity can mount again after dismounting
     pub riding_cooldown: AtomicI32,
     /// The age of the entity in ticks. Negative values indicate a baby.
@@ -1224,6 +1233,7 @@ impl Entity {
             passengers: std::sync::Mutex::new(Vec::new()),
             vehicle: std::sync::Mutex::new(None),
             leashed_to: std::sync::Mutex::new(None),
+            delayed_leash: std::sync::Mutex::new(None),
 
             riding_cooldown: AtomicI32::new(0),
             age: AtomicI32::new(0),
@@ -3649,7 +3659,98 @@ impl Entity {
         );
     }
 
+    /// Vanilla `Leashable.restoreLeashFromSave`: attaches a saved leash once its holder is
+    /// around, and gives up with a dropped lead after 100 ticks.
+    fn restore_leash_from_save(&self) {
+        let Some(delayed) = *self
+            .delayed_leash
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+        else {
+            return;
+        };
+        let world = self.world.load_full();
+        let holder: Option<Arc<dyn EntityBase>> = match delayed {
+            DelayedLeash::Holder(uuid) => world.get_entity_by_uuid(uuid),
+            DelayedLeash::Knot(pos) => Some(
+                crate::entity::decoration::leash_knot::LeashKnotEntity::get_or_create(&world, pos),
+            ),
+        };
+        if let Some(holder) = holder {
+            *self
+                .delayed_leash
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
+            self.leash_to(holder);
+        } else if self.tick_count.load(Ordering::Relaxed) > 100 {
+            *self
+                .delayed_leash
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
+            world.drop_stack(
+                &self.block_pos.load(),
+                pumpkin_data::item_stack::ItemStack::new(1, &pumpkin_data::item::Item::LEAD),
+            );
+        }
+    }
+
+    /// Vanilla `writeLeashData`: a knot's block position, or the holder's UUID.
+    pub fn write_leash_nbt(&self, nbt: &mut NbtCompound) {
+        let holder = self
+            .leashed_to
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        let leash = match holder {
+            Some(holder) => holder
+                .cast_any()
+                .downcast_ref::<crate::entity::decoration::leash_knot::LeashKnotEntity>()
+                .map_or_else(
+                    || DelayedLeash::Holder(holder.get_entity().entity_uuid),
+                    |knot| DelayedLeash::Knot(knot.block_pos()),
+                ),
+            None => match *self
+                .delayed_leash
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+            {
+                Some(delayed) => delayed,
+                None => return,
+            },
+        };
+        match leash {
+            DelayedLeash::Knot(pos) => {
+                nbt.put("leash", NbtTag::IntArray(vec![pos.0.x, pos.0.y, pos.0.z]));
+            }
+            DelayedLeash::Holder(uuid) => {
+                let mut holder = NbtCompound::new();
+                holder.put_uuid("UUID", uuid);
+                nbt.put("leash", NbtTag::Compound(holder));
+            }
+        }
+    }
+
+    /// Vanilla `readLeashData`.
+    pub fn read_leash_nbt(&self, nbt: &NbtCompound) {
+        let leash = match nbt.get("leash") {
+            Some(NbtTag::IntArray(pos)) => match pos.as_slice() {
+                &[x, y, z] => Some(DelayedLeash::Knot(BlockPos::new(x, y, z))),
+                _ => None,
+            },
+            Some(NbtTag::Compound(holder)) => holder.get_uuid("UUID").map(DelayedLeash::Holder),
+            _ => None,
+        };
+        if leash.is_none() && self.is_leashed() {
+            self.unleash();
+        }
+        *self
+            .delayed_leash
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = leash;
+    }
+
     pub fn tick_leash(&self) {
+        self.restore_leash_from_save();
         let holder = {
             let Ok(guard) = self.leashed_to.try_lock() else {
                 return;
