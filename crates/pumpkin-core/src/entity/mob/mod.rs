@@ -1771,6 +1771,17 @@ pub trait Mob: EntityBase + Send + Sync {
     }
 
     /// Whether currents push this mob along. Water animals hold their ground.
+    /// Vanilla `isPushable`, which some mobs turn off.
+    fn mob_is_pushable(&self) -> bool {
+        true
+    }
+
+    /// Whether the mob pushes the entities it touches; vanilla bats override
+    /// `pushEntities` to do nothing.
+    fn pushes_entities(&self) -> bool {
+        true
+    }
+
     fn mob_is_pushed_by_fluids(&self) -> bool {
         true
     }
@@ -2166,7 +2177,7 @@ impl<T: Mob + Send + 'static> EntityBase for T {
     }
 
     fn is_pushable(&self) -> bool {
-        self.get_mob_entity().living_entity.is_pushable()
+        self.mob_is_pushable() && self.get_mob_entity().living_entity.is_pushable()
     }
 
     /// Vanilla `LivingEntity.push`: a sleeping entity is not pushed.
@@ -2248,7 +2259,6 @@ impl<T: Mob + Send + 'static> EntityBase for T {
         //
         // TODO NoAI: move these vanilla `customServerAiStep` parts of `mob_tick`
         // into `custom_server_ai_step`:
-        // Bat `tick_flying`/`tick_roosting` (not `tick_ambient_sound`)
         // Bee sting death (`time_since_sting`)
         // Armadillo scute drop, state switching, `danger_detected_recently_ticks`
         // (not `in_state_ticks`, that is vanilla `tick`)

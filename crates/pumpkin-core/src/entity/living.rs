@@ -1524,7 +1524,12 @@ impl LivingEntity {
             caller.damage(caller, 1.0, DamageType::IN_WALL);
         }
 
-        self.push_entities(caller);
+        if caller
+            .get_mob()
+            .is_none_or(super::mob::Mob::pushes_entities)
+        {
+            self.push_entities(caller);
+        }
 
         if caller
             .get_mob()
