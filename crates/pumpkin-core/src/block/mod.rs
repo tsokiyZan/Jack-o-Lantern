@@ -101,6 +101,10 @@ pub trait BlockBehaviour: Send + Sync {
 
     fn explode(&self, _args: ExplodeArgs<'_>) {}
 
+    /// The part of a vanilla `onExplosionHit` override that runs before
+    /// `super.onExplosionHit`, for an explosion that destroys this block.
+    fn on_explosion_hit(&self, _args: ExplodeArgs<'_>) {}
+
     /// Vanilla `spawnAfterBreak`: runs before the drops whenever the block drops its resources,
     /// whether a player, an explosion or `destroyBlock` broke it.
     fn spawn_after_break(&self, _args: SpawnAfterBreakArgs<'_>) {}
@@ -145,6 +149,10 @@ pub trait BlockBehaviour: Send + Sync {
     fn attack(&self, _args: AttackArgs<'_>) {}
 
     fn broken(&self, _args: BrokenArgs<'_>) {}
+
+    /// Vanilla `Block.playerWillDestroy`: a player is about to break this block, which is
+    /// still in place.
+    fn player_will_destroy(&self, _args: PlayerWillDestroyArgs<'_>) {}
 
     fn on_neighbor_update(&self, _args: OnNeighborUpdateArgs<'_>) {}
 
@@ -390,6 +398,14 @@ pub struct BrokenArgs<'a> {
     pub server: &'a Server,
     pub world: &'a Arc<World>,
     pub state: &'a BlockState,
+}
+
+pub struct PlayerWillDestroyArgs<'a> {
+    pub world: &'a Arc<World>,
+    pub block: &'a Block,
+    pub state: &'a BlockState,
+    pub position: &'a BlockPos,
+    pub player: &'a Arc<Player>,
 }
 
 pub struct OnNeighborUpdateArgs<'a> {

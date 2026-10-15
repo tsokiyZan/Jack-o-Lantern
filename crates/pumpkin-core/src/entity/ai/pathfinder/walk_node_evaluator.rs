@@ -16,6 +16,9 @@ use crate::entity::ai::pathfinder::{
 /// amphibious evaluators override it while inheriting the rest of the walk logic.
 pub type PathTypeFn = fn(&mut PathfindingContext, Vector3<i32>) -> PathType;
 
+/// Vanilla `Creaking.HomeNodeEvaluator.MAX_DISTANCE_TO_HOME_SQ`.
+const MAX_DISTANCE_TO_HOME_SQ: i32 = 1024;
+
 pub struct WalkNodeEvaluator {
     pub base: BaseNodeEvaluator,
     path_types_cache: FxHashMap<Vector3<i32>, PathType>,
@@ -656,6 +659,16 @@ impl NodeEvaluator for WalkNodeEvaluator {
     }
 
     fn get_path_type(&mut self, context: &mut PathfindingContext, pos: Vector3<i32>) -> PathType {
+        // Vanilla `Creaking.HomeNodeEvaluator.getPathType`: nothing far from home that is
+        // no closer to it than the creaking.
+        if let Some(home) = self.base.mob_data.as_ref().and_then(|data| data.home_pos) {
+            let home_distance = home.squared_distance(&BlockPos(pos));
+            if home_distance > MAX_DISTANCE_TO_HOME_SQ
+                && home_distance >= home.squared_distance(&BlockPos(context.mob_position()))
+            {
+                return PathType::Blocked;
+            }
+        }
         (self.path_type_fn)(context, pos)
     }
 

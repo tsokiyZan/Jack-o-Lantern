@@ -64,6 +64,8 @@ pub struct MobData {
     /// `#entity_floatable` holds only water.
     pub is_in_water: bool,
     pub path_type_malus: [Option<f32>; PATH_TYPE_COUNT],
+    /// Vanilla `Creaking.getHomePos`, which its `HomeNodeEvaluator` keeps paths near.
+    pub home_pos: Option<BlockPos>,
 }
 
 impl MobData {
@@ -79,6 +81,7 @@ impl MobData {
             on_ground: true,
             is_in_water: false,
             path_type_malus: [None; PATH_TYPE_COUNT],
+            home_pos: None,
         }
     }
 

@@ -54,6 +54,7 @@ pub mod breeze;
 pub mod cave_spider;
 pub mod conversion;
 pub mod creaking;
+pub mod creaking_ai;
 pub mod creeper;
 pub mod crossbow_attack_mob;
 pub mod cube_mob;
@@ -1493,6 +1494,12 @@ pub trait Mob: EntityBase + Send + Sync {
 
     /// The part of a vanilla `die` override that runs before `super.die`.
     fn before_die(&self) {}
+
+    /// The mob's own part of vanilla `Entity.canUsePortal`, which portal blocks check before
+    /// they move an entity.
+    fn can_use_portal(&self) -> bool {
+        true
+    }
 
     /// Vanilla `Mob.onPathfindingStart`, applied to the snapshot the search reads; vanilla's
     /// `onPathfindingDone` then only undoes it, so it has no hook.
