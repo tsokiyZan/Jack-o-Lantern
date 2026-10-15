@@ -1,4 +1,5 @@
 use pumpkin_data::BlockDirection;
+use pumpkin_data::tag::{self, Taggable};
 use pumpkin_util::math::{position::BlockPos, vector3::Vector3};
 
 use crate::entity::ai::pathfinder::{
@@ -11,6 +12,8 @@ use crate::entity::ai::pathfinder::{
 pub struct AmphibiousNodeEvaluator {
     pub walk: WalkNodeEvaluator,
     prefers_shallow_swimming: bool,
+    /// Vanilla `Frog.FrogNodeEvaluator`'s `getStart` in water.
+    starts_at_bounding_box_min: bool,
     old_walkable_cost: f32,
     old_water_border_cost: f32,
 }
@@ -23,8 +26,32 @@ impl AmphibiousNodeEvaluator {
         Self {
             walk,
             prefers_shallow_swimming,
+            starts_at_bounding_box_min: false,
             old_walkable_cost: 0.0,
             old_water_border_cost: 0.0,
+        }
+    }
+
+    /// Vanilla `Frog.FrogNodeEvaluator`, which always prefers shallow swimming.
+    #[must_use]
+    pub fn frog() -> Self {
+        let mut evaluator = Self::new(true);
+        evaluator.walk = WalkNodeEvaluator::with_path_type(Self::frog_get_path_type);
+        evaluator.walk.is_amphibious = true;
+        evaluator.starts_at_bounding_box_min = true;
+        evaluator
+    }
+
+    /// Vanilla `Frog.FrogNodeEvaluator.getPathType`: open above a block frogs prefer to
+    /// jump to.
+    fn frog_get_path_type(context: &mut PathfindingContext, pos: Vector3<i32>) -> PathType {
+        let below = BlockPos(pos.add_raw(0, -1, 0));
+        if pumpkin_data::Block::from_state_id(context.get_block_state(&below).id)
+            .has_tag(&tag::Block::MINECRAFT_FROG_PREFER_JUMP_TO)
+        {
+            PathType::Open
+        } else {
+            Self::get_path_type_static(context, pos)
         }
     }
 
@@ -73,7 +100,11 @@ impl NodeEvaluator for AmphibiousNodeEvaluator {
         if mob_data.is_in_water {
             let half_width = f64::from(mob_data.width) / 2.0;
             let min_x = (mob_data.position.x - half_width).floor() as i32;
-            let min_y = (mob_data.position.y + 0.5).floor() as i32;
+            let min_y = if self.starts_at_bounding_box_min {
+                mob_data.position.y.floor() as i32
+            } else {
+                (mob_data.position.y + 0.5).floor() as i32
+            };
             let min_z = (mob_data.position.z - half_width).floor() as i32;
             Some(self.walk.get_start_node(Vector3::new(min_x, min_y, min_z)))
         } else {

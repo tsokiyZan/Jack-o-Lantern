@@ -35,7 +35,11 @@ impl Sensor for FrogAttackablesSensor {
                             && !unreachable.is_some_and(|targets| {
                                 targets.contains(&mob.get_entity().entity_uuid)
                             })
-                            && mob.get_entity().pos.load().squared_distance_to_vec(&body_pos)
+                            && mob
+                                .get_entity()
+                                .pos
+                                .load()
+                                .squared_distance_to_vec(&body_pos)
                                 < TARGET_DETECTION_DISTANCE * TARGET_DETECTION_DISTANCE
                     })
                 })

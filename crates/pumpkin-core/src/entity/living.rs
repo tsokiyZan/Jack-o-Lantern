@@ -140,6 +140,8 @@ pub struct LivingEntity {
     pub equipment_slots: Arc<FxHashMap<usize, EquipmentSlot>>,
 
     pub jumping: AtomicBool,
+    /// Vanilla `discardFriction`: air travel keeps the whole velocity.
+    pub discard_friction: AtomicBool,
 
     pub jumping_cooldown: AtomicU8,
 
@@ -341,6 +343,7 @@ impl LivingEntity {
             equipment_drop_chances: Arc::new(std::sync::Mutex::new(FxHashMap::default())),
             equipment_slots: Arc::new(build_equipment_slots()),
             jumping: AtomicBool::new(false),
+            discard_friction: AtomicBool::new(false),
             jumping_cooldown: AtomicU8::new(0),
             climbing: AtomicBool::new(false),
             climbing_pos: AtomicCell::new(None),
@@ -1768,7 +1771,10 @@ impl LivingEntity {
             // if below world's bottom y then -0.1, else 0.0
         }
 
-        // If entity has no drag: store velo and return
+        if self.discard_friction.load(Relaxed) {
+            self.entity.velocity.store(velo);
+            return;
+        }
 
         let air_drag_modifier = self.get_attribute_value(&Attributes::AIR_DRAG_MODIFIER) as f32;
         let air_drag = Self::compute_modified_friction(0.91, air_drag_modifier);
@@ -2052,13 +2058,16 @@ impl LivingEntity {
     /// Vanilla `getJumpPower(multiplier)`: jump strength times the block jump factor, plus
     /// jump boost, all floats.
     pub fn get_jump_velocity(&self, multiplier: f32) -> f32 {
-        let boost = self
-            .get_effect(&StatusEffect::JUMP_BOOST)
-            .map_or(0.0, |effect| 0.1 * (effect.amplifier as f32 + 1.0));
         self.get_attribute_value(&Attributes::JUMP_STRENGTH) as f32
             * multiplier
             * self.entity.get_jump_velocity_multiplier()
-            + boost
+            + self.get_jump_boost_power()
+    }
+
+    /// Vanilla `LivingEntity.getJumpBoostPower`.
+    pub fn get_jump_boost_power(&self) -> f32 {
+        self.get_effect(&StatusEffect::JUMP_BOOST)
+            .map_or(0.0, |effect| 0.1 * (effect.amplifier as f32 + 1.0))
     }
 
     pub fn fall(
