@@ -376,3 +376,45 @@ impl Goal for RaiderMoveThroughVillageGoal {
 }
 
 pub use crate::entity::ai::goal::pathfind_to_raid::PathfindToRaidGoal;
+
+/// Vanilla `PatrollingMonster.registerGoals` then `Raider.registerGoals`, which every raider
+/// runs before registering its own goals.
+pub fn add_raider_goals(goal_selector: &mut crate::entity::ai::goal::goal_selector::GoalSelector) {
+    goal_selector.add_goal(
+        4,
+        Box::new(crate::entity::mob::patrol::LongDistancePatrolGoal::new(
+            0.7, 0.595,
+        )),
+    );
+    goal_selector.add_goal(1, Box::new(ObtainRaidLeaderBannerGoal));
+    goal_selector.add_goal(3, Box::new(PathfindToRaidGoal::default()));
+    goal_selector.add_goal(4, Box::new(RaiderMoveThroughVillageGoal::new(1.05)));
+    goal_selector.add_goal(5, Box::new(RaiderCelebrationGoal));
+}
+
+/// Vanilla `Raider` class membership.
+#[must_use]
+pub fn is_raider(entity_type: &'static EntityType) -> bool {
+    use pumpkin_data::tag::Taggable;
+    entity_type.has_tag(&pumpkin_data::tag::EntityType::MINECRAFT_RAIDERS)
+}
+
+/// Vanilla `HurtByTargetGoal(this, Raider.class).setAlertOthers()`.
+#[must_use]
+pub fn raider_hurt_by_target() -> Box<crate::entity::ai::goal::revenge::RevengeGoal> {
+    Box::new(
+        crate::entity::ai::goal::revenge::RevengeGoal::new(true)
+            .ignoring(is_raider)
+            .alerting_others(),
+    )
+}
+
+/// Vanilla `AbstractVillager` class membership, as a target predicate.
+#[must_use]
+pub fn is_abstract_villager(
+    target: &crate::entity::living::LivingEntity,
+    _world: &crate::world::World,
+) -> bool {
+    let entity_type = target.entity.entity_type;
+    entity_type == &EntityType::VILLAGER || entity_type == &EntityType::WANDERING_TRADER
+}

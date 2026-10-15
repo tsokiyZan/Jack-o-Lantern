@@ -105,6 +105,13 @@ impl ActiveTargetGoal {
         self
     }
 
+    /// Vanilla `TargetGoal.setUnseenMemoryTicks`.
+    #[must_use]
+    pub const fn with_unseen_memory_ticks(mut self: Box<Self>, ticks: i32) -> Box<Self> {
+        self.track_target_goal.max_time_without_visibility = ticks;
+        self
+    }
+
     /// Extra condition for starting and for continuing, e.g. an angry, unspent bee.
     #[must_use]
     pub fn gated_by(mut self: Box<Self>, gate: MobFilter) -> Box<Self> {

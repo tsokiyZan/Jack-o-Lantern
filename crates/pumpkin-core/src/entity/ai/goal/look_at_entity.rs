@@ -17,7 +17,8 @@ pub struct LookAtEntityGoal {
     look_time: i32,
     chance: f32,
     look_forward: bool,
-    target_type: &'static EntityType,
+    /// `None` is vanilla's `Mob.class`: any mob.
+    target_type: Option<&'static EntityType>,
     target_predicate: TargetPredicate,
 }
 
@@ -38,9 +39,26 @@ impl LookAtEntityGoal {
             look_time: 0,
             chance,
             look_forward,
-            target_type,
+            target_type: Some(target_type),
             target_predicate,
         }
+    }
+
+    /// Vanilla `LookAtPlayerGoal(mob, Mob.class, range)`: looks at any nearby mob.
+    #[must_use]
+    pub fn at_mobs(range: f32) -> Box<Self> {
+        let mut target_predicate = TargetPredicate::create_non_attackable();
+        target_predicate.base_max_distance = f64::from(range);
+        Box::new(Self {
+            goal_control: Controls::LOOK,
+            target: None,
+            range,
+            look_time: 0,
+            chance: 0.02,
+            look_forward: false,
+            target_type: None,
+            target_predicate,
+        })
     }
 
     #[must_use]
@@ -94,7 +112,7 @@ impl Goal for LookAtEntityGoal {
         let pos = entity.pos.load();
         let search_pos = Vector3::new(pos.x, entity.get_eye_y(), pos.z);
 
-        self.target = if *self.target_type == EntityType::PLAYER {
+        self.target = if self.target_type == Some(&EntityType::PLAYER) {
             self.target_predicate
                 .get_nearest_player(&world, Some(mob), search_pos)
         } else {
@@ -102,7 +120,7 @@ impl Goal for LookAtEntityGoal {
             let area = entity.bounding_box.load().expand(range, 3.0, range);
             self.target_predicate.get_nearest_entity(
                 &world,
-                goal_utils::get_entities_of_class(&world, Some(self.target_type), &area),
+                goal_utils::get_entities_of_class(&world, self.target_type, &area),
                 Some(mob),
                 search_pos,
             )

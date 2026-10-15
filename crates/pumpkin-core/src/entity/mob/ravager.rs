@@ -1,5 +1,6 @@
 use std::sync::{Arc, Weak};
 
+use crate::entity::mob::raider::{add_raider_goals, is_abstract_villager, raider_hurt_by_target};
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::sound::Sound;
 use pumpkin_nbt::compound::NbtCompound;
@@ -8,17 +9,13 @@ use crate::entity::ai::pathfinder::node::PathType;
 use crate::entity::{
     Entity,
     ai::goal::{
-        active_target::ActiveTargetGoal, look_around::RandomLookAroundGoal,
-        look_at_entity::LookAtEntityGoal, melee_attack::MeleeAttackGoal, swim::SwimGoal,
-        wander_around::WanderAroundGoal,
+        active_target::ActiveTargetGoal, look_at_entity::LookAtEntityGoal,
+        melee_attack::MeleeAttackGoal, swim::SwimGoal, wander_around::WanderAroundGoal,
     },
     mob::{
         Mob, MobEntity,
-        patrol::{LongDistancePatrolGoal, PatrolData, PatrollingMonster},
-        raider::{
-            HoldGroundAttackGoal, PathfindToRaidGoal, Raider, RaiderCelebrationGoal, RaiderData,
-            RaiderMoveThroughVillageGoal,
-        },
+        patrol::{PatrolData, PatrollingMonster},
+        raider::{Raider, RaiderData},
     },
 };
 
@@ -50,35 +47,33 @@ impl RavagerEntity {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
 
+            add_raider_goals(&mut goal_selector);
             goal_selector.add_goal(0, SwimGoal::new(&mob_arc.mob_entity));
-            goal_selector.add_goal(2, Box::new(HoldGroundAttackGoal::new(10.0)));
             goal_selector.add_goal(4, Box::new(MeleeAttackGoal::new(1.0, true)));
-            goal_selector.add_goal(4, Box::new(LongDistancePatrolGoal::new(0.7, 0.595)));
-            goal_selector.add_goal(4, Box::new(RaiderMoveThroughVillageGoal::new(1.05)));
-            goal_selector.add_goal(4, Box::new(PathfindToRaidGoal::default()));
-            goal_selector.add_goal(5, Box::new(RaiderCelebrationGoal));
-            goal_selector.add_goal(5, Box::new(WanderAroundGoal::new(1.0)));
+            goal_selector.add_goal(5, Box::new(WanderAroundGoal::avoiding_water(0.4)));
             goal_selector.add_goal(
                 6,
-                LookAtEntityGoal::with_default(mob_weak, &EntityType::PLAYER, 8.0),
+                LookAtEntityGoal::with_default(mob_weak, &EntityType::PLAYER, 6.0),
             );
-            goal_selector.add_goal(7, Box::new(RandomLookAroundGoal::default()));
-
+            goal_selector.add_goal(10, LookAtEntityGoal::at_mobs(8.0));
             let mut target_selector = mob_arc
                 .mob_entity
                 .target_selector
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
+            target_selector.add_goal(2, raider_hurt_by_target());
             target_selector.add_goal(
-                1,
+                3,
                 ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::PLAYER, true),
             );
             target_selector.add_goal(
-                2,
-                ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::VILLAGER, true),
+                4,
+                ActiveTargetGoal::predicated(&mob_arc.mob_entity, 10, true, |target, world| {
+                    is_abstract_villager(target, world) && !target.entity.is_baby()
+                }),
             );
             target_selector.add_goal(
-                3,
+                4,
                 ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::IRON_GOLEM, true),
             );
         };

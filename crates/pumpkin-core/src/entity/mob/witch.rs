@@ -1,3 +1,4 @@
+use crate::entity::mob::raider::{add_raider_goals, is_raider};
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 use std::sync::{Arc, Weak};
 
@@ -22,10 +23,7 @@ use crate::entity::{
     mob::{
         Mob, MobEntity, RangedAttackMob,
         patrol::{PatrolData, PatrollingMonster},
-        raider::{
-            PathfindToRaidGoal, Raider, RaiderCelebrationGoal, RaiderData,
-            RaiderMoveThroughVillageGoal,
-        },
+        raider::{Raider, RaiderData},
     },
     projectile::splash_potion::SplashPotionEntity,
 };
@@ -91,29 +89,25 @@ impl WitchEntity {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
 
+            add_raider_goals(&mut goal_selector);
             goal_selector.add_goal(1, SwimGoal::new(&mob_arc.mob_entity));
             goal_selector.add_goal(
                 2,
                 Box::new(RangedAttackGoal::new(ranged_weak, 1.0, 60, 10.0)),
             );
-            goal_selector.add_goal(3, Box::new(RaiderMoveThroughVillageGoal::new(1.05)));
-            goal_selector.add_goal(3, Box::new(PathfindToRaidGoal::default()));
-            goal_selector.add_goal(4, Box::new(RaiderCelebrationGoal));
-            goal_selector.add_goal(4, Box::new(WanderAroundGoal::new(1.0)));
+            goal_selector.add_goal(2, Box::new(WanderAroundGoal::avoiding_water(1.0)));
             goal_selector.add_goal(
-                5,
+                3,
                 LookAtEntityGoal::with_default(mob_weak, &EntityType::PLAYER, 8.0),
             );
-            goal_selector.add_goal(6, Box::new(RandomLookAroundGoal::default()));
+            goal_selector.add_goal(3, Box::new(RandomLookAroundGoal::default()));
 
+            // `HurtByTargetGoal(this, Raider.class)`, without alerting others.
+            target_selector.add_goal(1, Box::new(RevengeGoal::new(true).ignoring(is_raider)));
+            // TODO: 2 NearestHealableRaiderTargetGoal; 3 is NearestAttackableWitchTargetGoal,
+            // which only targets players while the witch may (outside a raid).
             target_selector.add_goal(
-                1,
-                Box::new(RevengeGoal::new(true).ignoring(|entity_type| {
-                    entity_type.has_tag(&tag::EntityType::MINECRAFT_RAIDERS)
-                })),
-            );
-            target_selector.add_goal(
-                2,
+                3,
                 ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::PLAYER, true),
             );
         };
