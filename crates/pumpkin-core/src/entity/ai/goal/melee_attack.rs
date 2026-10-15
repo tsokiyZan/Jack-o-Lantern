@@ -14,6 +14,9 @@ const CAN_USE_CHECK_INTERVAL: i64 = 20;
 /// target once the attack is ready.
 pub type MeleeAttackFn = fn(&dyn Mob, &dyn EntityBase);
 
+/// A vanilla `checkAndPerformAttack` override, run every tick with the goal's cooldown.
+pub type CheckAndPerformAttackFn = fn(&mut MeleeAttackGoal, &dyn Mob, &dyn EntityBase);
+
 pub struct MeleeAttackGoal {
     goal_control: Controls,
     speed: f64,
@@ -25,6 +28,9 @@ pub struct MeleeAttackGoal {
     last_can_use_check: i64,
     gate: Option<MobFilter>,
     attack: Option<MeleeAttackFn>,
+    check_and_perform: Option<CheckAndPerformAttackFn>,
+    /// What a vanilla subclass does in `stop` before the base goal's own.
+    on_stop: Option<fn(&dyn Mob)>,
 }
 
 impl MeleeAttackGoal {
@@ -41,6 +47,8 @@ impl MeleeAttackGoal {
             last_can_use_check: 0,
             gate: None,
             attack: None,
+            check_and_perform: None,
+            on_stop: None,
         }
     }
 
@@ -50,6 +58,45 @@ impl MeleeAttackGoal {
     pub const fn attacking_with(mut self, attack: MeleeAttackFn) -> Self {
         self.attack = Some(attack);
         self
+    }
+
+    /// Replaces vanilla `checkAndPerformAttack`, like `PolarBearMeleeAttackGoal`.
+    #[must_use]
+    pub const fn checking_attack_with(mut self, check: CheckAndPerformAttackFn) -> Self {
+        self.check_and_perform = Some(check);
+        self
+    }
+
+    /// Runs first in `stop`, like a subclass's `stop` before `super.stop()`.
+    #[must_use]
+    pub const fn stopping_with(mut self, on_stop: fn(&dyn Mob)) -> Self {
+        self.on_stop = Some(on_stop);
+        self
+    }
+
+    /// Vanilla `canPerformAttack`.
+    #[must_use]
+    pub fn can_perform_attack(&self, mob: &dyn Mob, target: &dyn EntityBase) -> bool {
+        self.is_time_to_attack()
+            && mob.get_mob_entity().is_in_attack_range(target)
+            && mob.has_line_of_sight(target.get_entity())
+    }
+
+    /// Vanilla `isTimeToAttack`.
+    #[must_use]
+    pub const fn is_time_to_attack(&self) -> bool {
+        self.cooldown <= 0
+    }
+
+    /// Vanilla `getTicksUntilNextAttack`.
+    #[must_use]
+    pub const fn ticks_until_next_attack(&self) -> i32 {
+        self.cooldown
+    }
+
+    /// Vanilla `resetAttackCooldown`.
+    pub fn reset_attack_cooldown(&mut self) {
+        self.cooldown = self.get_max_cooldown();
     }
 
     /// Extra condition for starting and for continuing, checked after the base goal's own.
@@ -133,6 +180,9 @@ impl Goal for MeleeAttackGoal {
     }
 
     fn stop(&mut self, mob: &dyn Mob) {
+        if let Some(on_stop) = self.on_stop {
+            on_stop(mob);
+        }
         // Only clear target if they switched to creative/spectator
         let should_clear = mob
             .get_mob_entity()
@@ -214,11 +264,12 @@ impl Goal for MeleeAttackGoal {
 
         self.cooldown = (self.cooldown - 1).max(0);
 
-        if self.cooldown <= 0
-            && mob.get_mob_entity().is_in_attack_range(target.as_ref())
-            && mob.has_line_of_sight(target.get_entity())
-        {
-            self.cooldown = self.get_max_cooldown();
+        if let Some(check) = self.check_and_perform {
+            check(self, mob, target.as_ref());
+            return;
+        }
+        if self.can_perform_attack(mob, target.as_ref()) {
+            self.reset_attack_cooldown();
             if let Some(attack) = self.attack {
                 attack(mob, target.as_ref());
                 return;

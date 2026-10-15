@@ -25,6 +25,8 @@ pub struct EscapeDangerGoal {
     gate: Option<MobFilter>,
     /// Vanilla `panicCausingDamageTypes`.
     panic_causes: &'static Tag,
+    /// The same, chosen per mob, like a polar bear cub panicking where an adult would not.
+    panic_causes_for: Option<fn(&dyn Mob) -> &'static Tag>,
     /// What a vanilla subclass adds to `canContinueToUse`, like `PandaPanicGoal`.
     continue_while: Option<MobFilter>,
     /// What a vanilla subclass does in `tick`, given the speed, like `RabbitPanicGoal`.
@@ -42,6 +44,7 @@ impl EscapeDangerGoal {
             always_seek_water: None,
             gate: None,
             panic_causes: &tag::DamageType::MINECRAFT_PANIC_CAUSES,
+            panic_causes_for: None,
             continue_while: None,
             on_tick: None,
         })
@@ -53,6 +56,17 @@ impl EscapeDangerGoal {
     pub fn with_panic_causes(speed: f64, panic_causes: &'static Tag) -> Box<Self> {
         let mut goal = Self::new(speed);
         goal.panic_causes = panic_causes;
+        goal
+    }
+
+    /// Vanilla `PanicGoal(mob, speed, mob -> tag)`: the panic causes depend on the mob.
+    #[must_use]
+    pub fn with_panic_causes_for(
+        speed: f64,
+        panic_causes: fn(&dyn Mob) -> &'static Tag,
+    ) -> Box<Self> {
+        let mut goal = Self::new(speed);
+        goal.panic_causes_for = Some(panic_causes);
         goal
     }
 
@@ -100,7 +114,9 @@ impl EscapeDangerGoal {
                 .get_mob_entity()
                 .living_entity
                 .get_last_damage_type()
-                .is_some_and(|damage_type| damage_type.has_tag(self.panic_causes))
+                .is_some_and(|damage_type| {
+                    damage_type.has_tag(self.panic_causes_for.map_or(self.panic_causes, |f| f(mob)))
+                })
     }
 
     /// Vanilla `PanicGoal.lookForWater`: the first water in Manhattan order within `range` blocks

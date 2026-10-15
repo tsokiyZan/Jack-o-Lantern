@@ -1,7 +1,9 @@
 use std::sync::{
     Arc, Weak,
-    atomic::{AtomicBool, Ordering},
+    atomic::{AtomicBool, AtomicI32, Ordering},
 };
+
+use pumpkin_data::tag;
 
 use pumpkin_data::entity::EntityPose;
 use pumpkin_data::entity::EntityType;
@@ -25,6 +27,7 @@ use crate::entity::{
         swim::SwimGoal,
         wander_around::WanderAroundGoal,
     },
+    ai::util::goal_utils,
     mob::{
         Mob, MobEntity,
         neutral::{NeutralData, NeutralMob},
@@ -42,6 +45,8 @@ pub struct PolarBearEntity {
     pub ageable_data: AgeableData,
     pub neutral_data: NeutralData,
     pub standing: AtomicBool,
+    /// Vanilla `warningSoundTicks`.
+    warning_sound_ticks: AtomicI32,
 }
 
 impl PolarBearEntity {
@@ -53,6 +58,7 @@ impl PolarBearEntity {
             ageable_data: AgeableData::default(),
             neutral_data: NeutralData::default(),
             standing: AtomicBool::new(false),
+            warning_sound_ticks: AtomicI32::new(0),
         };
         let mob_arc = Arc::new(polar_bear);
         let mob_weak: Weak<dyn Mob> = {
@@ -68,8 +74,29 @@ impl PolarBearEntity {
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
 
             goal_selector.add_goal(0, SwimGoal::new(&mob_arc.mob_entity));
-            goal_selector.add_goal(1, Box::new(MeleeAttackGoal::new(1.25, true)));
-            goal_selector.add_goal(1, EscapeDangerGoal::new(2.0));
+            // `PolarBearMeleeAttackGoal`.
+            goal_selector.add_goal(
+                1,
+                Box::new(
+                    MeleeAttackGoal::new(1.25, true)
+                        .checking_attack_with(polar_bear_check_and_perform_attack)
+                        .stopping_with(|mob| {
+                            if let Some(bear) = as_polar_bear(mob) {
+                                bear.set_standing(false);
+                            }
+                        }),
+                ),
+            );
+            goal_selector.add_goal(
+                1,
+                EscapeDangerGoal::with_panic_causes_for(2.0, |mob| {
+                    if is_baby(mob) {
+                        &tag::DamageType::MINECRAFT_PANIC_CAUSES
+                    } else {
+                        &tag::DamageType::MINECRAFT_PANIC_ENVIRONMENTAL_CAUSES
+                    }
+                }),
+            );
             goal_selector.add_goal(4, Box::new(FollowParentGoal::new(1.25)));
             goal_selector.add_goal(5, Box::new(WanderAroundGoal::new(1.0)));
             goal_selector.add_goal(
@@ -94,11 +121,26 @@ impl PolarBearEntity {
                         .alerting_only(|other| !is_baby(other)),
                 ),
             );
-            // TODO: PolarBearAttackPlayersGoal at 2 -> adults charge when a cub is near.
+            // `PolarBearAttackPlayersGoal`: adults go for players while a cub is near.
+            target_selector.add_goal(
+                2,
+                Box::new(ActiveTargetGoal::new(
+                    &mob_arc.mob_entity,
+                    &EntityType::PLAYER,
+                    20,
+                    true,
+                    true,
+                    None::<fn(&crate::entity::living::LivingEntity, &crate::world::World) -> bool>,
+                ))
+                .starting_only_when(|mob| !is_baby(mob))
+                .confirmed_by(cub_nearby)
+                .with_follow_distance_scale(0.5),
+            );
             apply_targets(&mut target_selector, &mob_arc.mob_entity, 3, 5, false);
             target_selector.add_goal(
                 4,
                 ActiveTargetGoal::with_default(&mob_arc.mob_entity, &EntityType::FOX, true)
+                    .must_reach()
                     .when(TargetCondition::Adult),
             );
         };
@@ -118,6 +160,69 @@ impl PolarBearEntity {
             pumpkin_data::tracked_data::polar_bear::DATA_STANDING_ID,
             standing,
         );
+    }
+}
+
+impl PolarBearEntity {
+    /// Vanilla `PolarBear.playWarningSound`.
+    fn play_warning_sound(&self) {
+        if self.warning_sound_ticks.load(Ordering::Relaxed) <= 0 {
+            self.make_sound(Sound::EntityPolarBearWarning);
+            self.warning_sound_ticks.store(40, Ordering::Relaxed);
+        }
+    }
+}
+
+fn as_polar_bear(mob: &dyn Mob) -> Option<&PolarBearEntity> {
+    mob.cast_any().downcast_ref::<PolarBearEntity>()
+}
+
+/// `PolarBearAttackPlayersGoal.canUse`: any polar bear cub within 8 blocks (4 vertically).
+fn cub_nearby(mob: &dyn Mob) -> bool {
+    let entity = mob.get_entity();
+    let area = entity.bounding_box.load().expand(8.0, 4.0, 8.0);
+    goal_utils::get_entities_of_class(&entity.world.load(), Some(&EntityType::POLAR_BEAR), &area)
+        .iter()
+        .any(|bear| bear.get_mob().is_some_and(is_baby))
+}
+
+/// Vanilla `PolarBearMeleeAttackGoal.checkAndPerformAttack`: rear up and growl when close,
+/// swipe (without a swing) when in reach.
+fn polar_bear_check_and_perform_attack(
+    goal: &mut MeleeAttackGoal,
+    mob: &dyn Mob,
+    target: &dyn EntityBase,
+) {
+    let Some(bear) = as_polar_bear(mob) else {
+        return;
+    };
+    if goal.can_perform_attack(mob, target) {
+        goal.reset_attack_cooldown();
+        let attacker: &dyn EntityBase = mob;
+        if mob.get_mob_entity().try_attack(attacker, target) {
+            mob.on_attack(target);
+        }
+        bear.set_standing(false);
+        return;
+    }
+    let width = target.get_entity().entity_dimension.load().width + 3.0;
+    let dist_sq = mob
+        .get_entity()
+        .pos
+        .load()
+        .squared_distance_to_vec(&target.get_entity().pos.load());
+    if dist_sq < f64::from(width * width) {
+        if goal.is_time_to_attack() {
+            bear.set_standing(false);
+            goal.reset_attack_cooldown();
+        }
+        if goal.ticks_until_next_attack() <= 10 {
+            bear.set_standing(true);
+            bear.play_warning_sound();
+        }
+    } else {
+        goal.reset_attack_cooldown();
+        bear.set_standing(false);
     }
 }
 
@@ -189,6 +294,11 @@ impl Mob for PolarBearEntity {
 
     fn mob_tick(&self, _caller: &dyn EntityBase) {
         self.ageable_ai_step();
+        // Vanilla `PolarBear.tick`.
+        let ticks = self.warning_sound_ticks.load(Ordering::Relaxed);
+        if ticks > 0 {
+            self.warning_sound_ticks.store(ticks - 1, Ordering::Relaxed);
+        }
     }
 
     fn mob_init_data_tracker(&self) {

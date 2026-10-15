@@ -66,6 +66,8 @@ pub struct ActiveTargetGoal {
     gate: Option<MobFilter>,
     /// A subclass `canUse` check that, unlike `gate`, leaves `canContinueToUse` alone.
     start_gate: Option<MobFilter>,
+    /// A subclass `canUse` check made after `super.canUse()` found a target.
+    confirm: Option<MobFilter>,
     /// Vanilla `getTargetSearchArea` overrides: the box searched for non-player targets.
     search_area: Option<fn(&dyn Mob, f64) -> BoundingBox>,
 }
@@ -101,6 +103,7 @@ impl ActiveTargetGoal {
             condition: TargetCondition::Always,
             gate: None,
             start_gate: None,
+            confirm: None,
             search_area: None,
         }
     }
@@ -137,6 +140,13 @@ impl ActiveTargetGoal {
     #[must_use]
     pub fn starting_only_when(mut self: Box<Self>, gate: MobFilter) -> Box<Self> {
         self.start_gate = Some(gate);
+        self
+    }
+
+    /// A subclass `canUse` check made only once `super.canUse()` succeeded.
+    #[must_use]
+    pub fn confirmed_by(mut self: Box<Self>, confirm: MobFilter) -> Box<Self> {
+        self.confirm = Some(confirm);
         self
     }
 
@@ -178,6 +188,7 @@ impl ActiveTargetGoal {
             condition: TargetCondition::Always,
             gate: None,
             start_gate: None,
+            confirm: None,
             search_area: None,
         })
     }
@@ -208,6 +219,7 @@ impl ActiveTargetGoal {
             condition: TargetCondition::Always,
             gate: None,
             start_gate: None,
+            confirm: None,
             search_area: None,
         })
     }
@@ -290,7 +302,7 @@ impl Goal for ActiveTargetGoal {
             return false;
         }
         self.find_closest_target(mob);
-        self.target.is_some()
+        self.target.is_some() && self.confirm.is_none_or(|confirm| confirm(mob))
     }
 
     fn should_continue(&mut self, mob: &dyn Mob) -> bool {
