@@ -3442,20 +3442,24 @@ impl Entity {
         )
     }
 
-    /// No visual-blocking block between the two eye positions (matching vanilla `ClipContext.Block.VISUAL`).
+    /// Vanilla `LivingEntity.hasLineOfSight`: no colliding block between the two eye positions.
     #[must_use]
     pub fn has_line_of_sight(&self, other: &Self) -> bool {
-        let from = self.get_eye_pos();
-        let to = other.get_eye_pos();
-        if from.squared_distance_to_vec(&to) > 128.0 * 128.0 {
+        let world = self.world.load_full();
+        if !Arc::ptr_eq(&world, &other.world.load()) {
             return false;
         }
-        self.world
-            .load_full()
+        let from = self.get_eye_pos();
+        let to = other.get_eye_pos();
+        if to.squared_distance_to_vec(&from).sqrt() > 128.0 {
+            return false;
+        }
+        // TODO: vanilla clips with CollisionContext.of(this); Pumpkin's clip has no entity context.
+        world
             .clip(&pumpkin_world::clip::ClipContext::new(
                 from,
                 to,
-                pumpkin_world::clip::ClipBlock::Visual,
+                pumpkin_world::clip::ClipBlock::Collider,
                 pumpkin_world::clip::ClipFluid::None,
             ))
             .is_miss
