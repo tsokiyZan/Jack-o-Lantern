@@ -111,6 +111,7 @@ impl CopperGolemEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
         // Vanilla `CopperGolem`'s constructor.
+        mob_entity.set_required_path_length(48.0);
         mob_entity.set_pathfinding_malus(PathType::DangerFire, 16.0);
         mob_entity.set_pathfinding_malus(PathType::DangerOther, 16.0);
         mob_entity.set_pathfinding_malus(PathType::DamageFire, -1.0);

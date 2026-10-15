@@ -85,6 +85,7 @@ impl FoxEntity {
         // Vanilla `Fox`'s constructor.
         mob_entity.set_pathfinding_malus(PathType::DangerOther, 0.0);
         mob_entity.set_pathfinding_malus(PathType::DamageOther, 0.0);
+        mob_entity.set_required_path_length(32.0);
         let fox = Self {
             mob_entity,
             ageable_data: AgeableData::default(),

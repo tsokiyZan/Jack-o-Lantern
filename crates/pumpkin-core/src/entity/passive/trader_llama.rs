@@ -93,6 +93,8 @@ impl TraderLlamaEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
         set_animal_pathfinding_malus(&mob_entity);
+        // Vanilla `Llama`'s constructor.
+        mob_entity.set_required_path_length(40.0);
         let mut rng = rand::rng();
         let variant = TraderLlamaVariant::random_variant();
         let strength = rng.random_range(1..=5);

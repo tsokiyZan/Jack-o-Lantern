@@ -72,6 +72,8 @@ impl BeeEntity {
         mob_entity.set_pathfinding_malus(PathType::WaterBorder, 16.0);
         mob_entity.set_pathfinding_malus(PathType::Cocoa, -1.0);
         mob_entity.set_pathfinding_malus(PathType::Fence, -1.0);
+        // Vanilla `Bee.createNavigation`.
+        mob_entity.set_required_path_length(48.0);
         let bee = Self {
             mob_entity,
             ageable_data: AgeableData::default(),

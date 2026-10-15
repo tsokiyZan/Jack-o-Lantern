@@ -155,6 +155,15 @@ impl MobEntity {
             .set_pathfinding_malus(path_type, malus);
     }
 
+    /// Vanilla `getNavigation().setRequiredPathLength`: how far this mob's paths
+    /// may reach whatever its follow range.
+    pub fn set_required_path_length(&self, length: f32) {
+        self.navigator
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .set_required_path_length(length, &self.living_entity);
+    }
+
     #[must_use]
     pub const fn get_equipment_for_slot(
         slot: &EquipmentSlot,

@@ -34,6 +34,8 @@ pub struct AllayEntity {
 impl AllayEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        // Vanilla `Allay.createNavigation`.
+        mob_entity.set_required_path_length(48.0);
         let allay = Self {
             mob_entity,
             dancing: AtomicBool::new(false),

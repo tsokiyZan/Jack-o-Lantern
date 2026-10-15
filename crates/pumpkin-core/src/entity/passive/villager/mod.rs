@@ -401,6 +401,8 @@ impl VillagerEntity {
         // Vanilla `AbstractVillager`'s constructor.
         mob_entity.set_pathfinding_malus(PathType::DangerFire, 16.0);
         mob_entity.set_pathfinding_malus(PathType::DamageFire, -1.0);
+        // Vanilla `Villager`'s constructor.
+        mob_entity.set_required_path_length(48.0);
         let villager_data = VillagerData::new(VillagerType::Plains, VillagerProfession::None, 1);
         let inventory = std::sync::Mutex::new((0..8).map(|_| ItemStack::EMPTY.clone()).collect());
 
