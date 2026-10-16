@@ -230,7 +230,7 @@ impl SulfurCubeArchetype {
             AttributeEntry {
                 attribute: &Attributes::FRICTION_MODIFIER,
                 id: "minecraft:fast_sliding_mul_friction_modifier",
-                amount: -0.949999999254942f64,
+                amount: -0.9499999992549419f64,
                 operation: Operation::AddMultipliedTotal,
             },
             AttributeEntry {
@@ -485,7 +485,7 @@ impl SulfurCubeArchetype {
             AttributeEntry {
                 attribute: &Attributes::AIR_DRAG_MODIFIER,
                 id: "minecraft:slow_bouncy_mul_air_drag_modifier",
-                amount: -0.949999999254942f64,
+                amount: -0.9499999992549419f64,
                 operation: Operation::AddMultipliedTotal,
             },
         ],
@@ -577,7 +577,7 @@ impl SulfurCubeArchetype {
             AttributeEntry {
                 attribute: &Attributes::FRICTION_MODIFIER,
                 id: "minecraft:slow_sliding_mul_friction_modifier",
-                amount: -0.949999999254942f64,
+                amount: -0.9499999992549419f64,
                 operation: Operation::AddMultipliedTotal,
             },
             AttributeEntry {
