@@ -324,7 +324,7 @@ fn create_spell_entity(
             entity,
             delay_ticks,
             yaw,
-            Some(evoker.entity_id),
+            Some(evoker),
         )));
     }
 }

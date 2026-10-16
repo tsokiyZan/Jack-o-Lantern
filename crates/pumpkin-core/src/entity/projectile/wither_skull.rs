@@ -70,12 +70,8 @@ impl WitherSkullEntity {
 }
 
 impl EntityBase for WitherSkullEntity {
-    fn get_owner_id(&self) -> Option<i32> {
-        self.hurting.get_owner_id()
-    }
-
-    fn set_owner_id(&self, owner: Option<i32>) {
-        self.hurting.set_owner_id(owner);
+    fn get_projectile(&self) -> Option<&crate::entity::projectile::Projectile> {
+        Some(&self.hurting.thrown.projectile)
     }
 
     /// Vanilla `WitherSkull.getBlockExplosionResistance`: a blue skull breaks what the wither
@@ -154,8 +150,8 @@ impl EntityBase for WitherSkullEntity {
             // owner, who heals 5 on a kill; plain `magic` for 5 without one.
             let this = world.get_entity_by_id(self.get_entity().entity_id);
             let owner = self
-                .get_owner_id()
-                .and_then(|id| world.get_entity_by_id(id))
+                .hurting
+                .get_owner()
                 .filter(|owner| owner.get_living_entity().is_some());
             let was_hurt = owner.as_ref().map_or_else(
                 || entity.damage(entity.as_ref(), 5.0, DamageType::MAGIC),

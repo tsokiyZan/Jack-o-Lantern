@@ -1,5 +1,4 @@
 use pumpkin_data::world::WorldEvent;
-use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, PoisonError, RwLock};
 
 use crate::{
@@ -24,15 +23,7 @@ pub struct SplashPotionEntity {
 impl SplashPotionEntity {
     pub fn new(entity: Entity) -> Self {
         entity.set_velocity(Vector3::new(0.0, 0.1, 0.0));
-        let thrown = ThrownItemEntity {
-            entity,
-            owner_id: crossbeam::atomic::AtomicCell::new(None),
-            collides_with_projectiles: false,
-            has_hit: AtomicBool::new(false),
-            last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
-            gravity: GRAVITY,
-            left_owner: std::sync::atomic::AtomicBool::new(false),
-        };
+        let thrown = ThrownItemEntity::unowned(entity, GRAVITY);
 
         Self {
             thrown,
@@ -197,8 +188,8 @@ pub(crate) fn affect_entities_around(potion: &dyn EntityBase, stack: &ItemStack)
 }
 
 impl EntityBase for SplashPotionEntity {
-    fn get_owner_id(&self) -> Option<i32> {
-        self.thrown.owner_id.load()
+    fn get_projectile(&self) -> Option<&crate::entity::projectile::Projectile> {
+        Some(&self.thrown.projectile)
     }
 
     fn init_data_tracker(&self) {

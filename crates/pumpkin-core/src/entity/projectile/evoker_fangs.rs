@@ -7,6 +7,7 @@ use pumpkin_data::sound::Sound;
 
 use crate::enchantment::EnchantmentHelper;
 use crate::entity::damage_source::DamageSource;
+use crate::entity::entity_reference::EntityReference;
 use crate::world::World;
 use crate::{
     entity::{Entity, EntityBase},
@@ -17,7 +18,8 @@ pub struct EvokerFangsEntity {
     pub entity: Entity,
     pub warmup_delay_ticks: AtomicI32,
     pub life_ticks: AtomicI32,
-    pub owner_id: Option<i32>,
+    /// Vanilla `EvokerFangs.owner`.
+    pub owner: EntityReference,
     pub sent_spike_event: AtomicBool,
 }
 
@@ -25,17 +27,21 @@ impl EvokerFangsEntity {
     /// Vanilla `EvokerFangs.dealDamageTo`.
     fn deal_damage_to(&self, world: &Arc<World>, target: &dyn EntityBase) {
         let target_entity = target.get_entity();
-        if !target_entity.is_alive()
-            || target_entity.invulnerable.load(Ordering::Relaxed)
-            || Some(target_entity.entity_id) == self.owner_id
+        if !target_entity.is_alive() || target_entity.invulnerable.load(Ordering::Relaxed) {
+            return;
+        }
+        // `getOwner`, an `EntityReference<LivingEntity>`.
+        let owner = self
+            .owner
+            .get(world)
+            .filter(|owner| owner.get_living_entity().is_some());
+        if owner
+            .as_ref()
+            .is_some_and(|owner| owner.get_entity().entity_id == target_entity.entity_id)
         {
             return;
         }
-        let Some(owner) = self
-            .owner_id
-            .and_then(|id| world.get_entity_by_id(id))
-            .filter(|owner| owner.get_living_entity().is_some())
-        else {
+        let Some(owner) = owner else {
             target.damage(target, 6.0, DamageType::MAGIC);
             return;
         };
@@ -60,13 +66,13 @@ impl EvokerFangsEntity {
     }
 
     #[must_use]
-    pub fn new(entity: Entity, warmup_ticks: u32, yaw: f32, owner_id: Option<i32>) -> Self {
+    pub fn new(entity: Entity, warmup_ticks: u32, yaw: f32, owner: Option<&Entity>) -> Self {
         entity.set_rotation(yaw, 0.0);
         Self {
             entity,
             warmup_delay_ticks: AtomicI32::new(warmup_ticks as i32),
             life_ticks: AtomicI32::new(22),
-            owner_id,
+            owner: EntityReference::of(owner),
             sent_spike_event: AtomicBool::new(false),
         }
     }
@@ -75,12 +81,15 @@ impl EvokerFangsEntity {
 impl EntityBase for EvokerFangsEntity {
     fn write_custom_nbt(&self, nbt: &mut pumpkin_nbt::compound::NbtCompound) {
         nbt.put_int("Warmup", self.warmup_delay_ticks.load(Ordering::Relaxed));
+        if let Some(owner) = self.owner.uuid() {
+            nbt.put_uuid("Owner", owner);
+        }
     }
 
     fn read_custom_nbt(&self, nbt: &pumpkin_nbt::compound::NbtCompound) {
-        if let Some(warmup) = nbt.get_int("Warmup") {
-            self.warmup_delay_ticks.store(warmup, Ordering::Relaxed);
-        }
+        self.warmup_delay_ticks
+            .store(nbt.get_int("Warmup").unwrap_or(0), Ordering::Relaxed);
+        self.owner.set_uuid(nbt.get_uuid("Owner"));
     }
 
     fn tick(&self, _caller: &dyn EntityBase, _server: &Server) {

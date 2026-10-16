@@ -1,9 +1,7 @@
 //! Vanilla `Shoot`.
 
 use std::sync::Arc;
-use std::sync::atomic::AtomicBool;
 
-use crossbeam::atomic::AtomicCell;
 use pumpkin_data::entity::{EntityPose, EntityType};
 use pumpkin_data::sound::Sound;
 use pumpkin_util::math::vector3::Vector3;
@@ -150,19 +148,15 @@ impl Behavior for Shoot {
         let uncertainty = UNCERTAINTY_BASE - difficulty * UNCERTAINTY_MULTIPLIER;
         // Vanilla `new BreezeWindCharge(breeze, level)` through
         // `Projectile.spawnProjectileUsingShoot`.
-        let wind_charge = ThrownItemEntity {
-            entity: Entity::new(
+        let wind_charge = ThrownItemEntity::unowned(
+            Entity::new(
                 Arc::clone(tick.world),
                 Vector3::new(breeze_pos.x, get_firing_y_position(breeze), breeze_pos.z),
                 &EntityType::BREEZE_WIND_CHARGE,
             ),
-            owner_id: AtomicCell::new(Some(breeze.entity_id)),
-            collides_with_projectiles: false,
-            has_hit: AtomicBool::new(false),
-            last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
-            gravity: WIND_CHARGE_GRAVITY,
-            left_owner: std::sync::atomic::AtomicBool::new(false),
-        };
+            WIND_CHARGE_GRAVITY,
+        );
+        wind_charge.projectile.set_owner(Some(breeze));
         wind_charge.set_velocity(
             delta.x,
             delta.y,

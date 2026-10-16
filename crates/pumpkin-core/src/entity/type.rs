@@ -126,7 +126,6 @@ use crate::entity::vehicle::minecart::MinecartEntity;
 use crate::entity::{Entity, EntityBase, mob};
 use crate::world::World;
 use pumpkin_data::Block;
-use std::sync::atomic::AtomicBool;
 
 /// Builds the entity for `entity_type` at `position`.
 #[expect(clippy::too_many_lines)]
@@ -273,9 +272,9 @@ pub fn from_type(
             TNTEntity::DEFAULT_FUSE,
         )),
         id if id == EntityType::ITEM.id => Arc::new(ItemEntity::new_empty(entity)),
-        id if id == EntityType::ARROW.id => Arc::new(ArrowEntity::new(entity, None)),
-        id if id == EntityType::SPECTRAL_ARROW.id => Arc::new(ArrowEntity::new(entity, None)),
-        id if id == EntityType::TRIDENT.id => Arc::new(TridentEntity::new(entity, None)),
+        id if id == EntityType::ARROW.id => Arc::new(ArrowEntity::new(entity)),
+        id if id == EntityType::SPECTRAL_ARROW.id => Arc::new(ArrowEntity::new(entity)),
+        id if id == EntityType::TRIDENT.id => Arc::new(TridentEntity::new(entity)),
         id if id == EntityType::MINECART.id
             || id == EntityType::CHEST_MINECART.id
             || id == EntityType::FURNACE_MINECART.id
@@ -291,27 +290,11 @@ pub fn from_type(
         id if id == EntityType::WITHER_SKULL.id => Arc::new(WitherSkullEntity::new(entity)),
         id if id == EntityType::DRAGON_FIREBALL.id => Arc::new(DragonFireballEntity::new(entity)),
         id if id == EntityType::WIND_CHARGE.id => {
-            let thrown = ThrownItemEntity {
-                entity,
-                owner_id: crossbeam::atomic::AtomicCell::new(None),
-                collides_with_projectiles: false,
-                has_hit: AtomicBool::new(false),
-                last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
-                gravity: WIND_CHARGE_GRAVITY,
-                left_owner: std::sync::atomic::AtomicBool::new(false),
-            };
+            let thrown = ThrownItemEntity::unowned(entity, WIND_CHARGE_GRAVITY);
             Arc::new(WindChargeEntity::new_normal(thrown))
         }
         id if id == EntityType::BREEZE_WIND_CHARGE.id => {
-            let thrown = ThrownItemEntity {
-                entity,
-                owner_id: crossbeam::atomic::AtomicCell::new(None),
-                collides_with_projectiles: false,
-                has_hit: AtomicBool::new(false),
-                last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
-                gravity: WIND_CHARGE_GRAVITY,
-                left_owner: std::sync::atomic::AtomicBool::new(false),
-            };
+            let thrown = ThrownItemEntity::unowned(entity, WIND_CHARGE_GRAVITY);
             Arc::new(WindChargeEntity::new_breeze(thrown))
         }
         id if id == EntityType::LIGHTNING_BOLT.id => Arc::new(LightningBoltEntity::new(entity)),

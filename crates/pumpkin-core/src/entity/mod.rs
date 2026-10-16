@@ -80,6 +80,7 @@ pub mod custom_sound;
 pub mod damage_source;
 pub mod decoration;
 pub mod effect;
+pub mod entity_reference;
 pub mod experience_orb;
 pub mod falling;
 pub mod hunger;
@@ -205,6 +206,9 @@ pub trait EntityBase: Send + Sync + std::any::Any {
             // Vanilla `saveWithoutId` writes `Air` for every entity; only living ones use it.
             nbt.put_short("Air", breath::MAX_AIR as i16);
         }
+        if let Some(projectile) = self.get_projectile() {
+            projectile.write_nbt(nbt);
+        }
         self.write_custom_nbt(nbt);
     }
 
@@ -229,6 +233,9 @@ pub trait EntityBase: Send + Sync + std::any::Any {
                 .get_mob()
                 .map_or(breath::MAX_AIR, mob::Mob::max_air_supply);
             living.breath.read_nbt(nbt, max_air);
+        }
+        if let Some(projectile) = self.get_projectile() {
+            projectile.read_nbt(nbt);
         }
         self.read_custom_nbt(nbt);
     }
@@ -272,7 +279,14 @@ pub trait EntityBase: Send + Sync + std::any::Any {
         None
     }
 
+    /// Vanilla `TraceableEntity.getOwner`, as a runtime entity id.
     fn get_owner_id(&self) -> Option<i32> {
+        self.get_projectile()
+            .and_then(|projectile| projectile.get_owner_id(self.get_entity()))
+    }
+
+    /// The vanilla `Projectile` state of a projectile entity.
+    fn get_projectile(&self) -> Option<&projectile::Projectile> {
         None
     }
 
@@ -336,9 +350,6 @@ pub trait EntityBase: Send + Sync + std::any::Any {
     ) -> bool {
         true
     }
-
-    /// Vanilla `Projectile.setOwner`, for projectiles an explosion redirects.
-    fn set_owner_id(&self, _owner: Option<i32>) {}
 
     /// Whether the entity is immune from explosion knockback and damage
     fn is_immune_to_explosion(&self) -> bool {

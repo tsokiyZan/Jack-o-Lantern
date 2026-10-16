@@ -1,4 +1,4 @@
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::Ordering;
 
 use crossbeam::atomic::AtomicCell;
 use pumpkin_nbt::compound::NbtCompound;
@@ -54,15 +54,7 @@ impl HurtingProjectile {
     #[must_use]
     pub const fn new(entity: Entity) -> Self {
         Self {
-            thrown: ThrownItemEntity {
-                entity,
-                owner_id: AtomicCell::new(None),
-                collides_with_projectiles: false,
-                has_hit: AtomicBool::new(false),
-                last_deflected_by: AtomicCell::new(None),
-                gravity: 0.0,
-                left_owner: AtomicBool::new(false),
-            },
+            thrown: ThrownItemEntity::unowned(entity, 0.0),
             acceleration_power: AtomicCell::new(INITIAL_ACCELERATION_POWER),
         }
     }
@@ -82,7 +74,7 @@ impl HurtingProjectile {
     pub fn new_from_mob(entity: Entity, mob: &Entity, direction: Vector3<f64>) -> Self {
         entity.set_pos(mob.pos.load());
         let projectile = Self::new_directional(entity, direction);
-        projectile.thrown.owner_id.store(Some(mob.entity_id));
+        projectile.thrown.projectile.set_owner(Some(mob));
         // `setRot`.
         let entity = projectile.get_entity();
         entity.yaw.store(mob.yaw.load() % 360.0);
@@ -94,12 +86,9 @@ impl HurtingProjectile {
         &self.thrown.entity
     }
 
-    pub fn get_owner_id(&self) -> Option<i32> {
-        self.thrown.owner_id.load()
-    }
-
-    pub fn set_owner_id(&self, owner: Option<i32>) {
-        self.thrown.owner_id.store(owner);
+    /// Vanilla `Projectile.getOwner`.
+    pub fn get_owner(&self) -> Option<std::sync::Arc<dyn EntityBase>> {
+        self.thrown.projectile.get_owner(&self.thrown.entity)
     }
 
     /// Vanilla `AbstractHurtingProjectile.assignDirectionalMovement`.
@@ -160,7 +149,7 @@ impl HurtingProjectile {
         // `applyEffectsFromBlocks`.
         Entity::check_block_collision(caller, server);
         // `Projectile.tick`.
-        self.thrown.check_left_owner();
+        self.thrown.projectile.tick(entity);
         EntityBase::tick(entity, caller, server);
         if overrides.should_burn {
             caller.set_on_fire_for(1.0);

@@ -46,12 +46,8 @@ impl SmallFireballEntity {
 }
 
 impl EntityBase for SmallFireballEntity {
-    fn get_owner_id(&self) -> Option<i32> {
-        self.fireball.hurting.get_owner_id()
-    }
-
-    fn set_owner_id(&self, owner: Option<i32>) {
-        self.fireball.hurting.set_owner_id(owner);
+    fn get_projectile(&self) -> Option<&crate::entity::projectile::Projectile> {
+        Some(&self.fireball.hurting.thrown.projectile)
     }
 
     fn write_custom_nbt(&self, nbt: &mut NbtCompound) {
@@ -84,9 +80,7 @@ impl EntityBase for SmallFireballEntity {
 
     fn on_hit(&self, hit: ProjectileHit) {
         let world = self.get_entity().world.load();
-        let owner = self
-            .get_owner_id()
-            .and_then(|id| world.get_entity_by_id(id));
+        let owner = self.fireball.hurting.get_owner();
         match hit {
             // Vanilla `SmallFireball.onHitEntity`: the fire stays only if the hit lands.
             ProjectileHit::Entity { ref entity, .. } => {

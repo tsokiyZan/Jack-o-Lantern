@@ -48,12 +48,8 @@ impl DragonFireballEntity {
 }
 
 impl EntityBase for DragonFireballEntity {
-    fn get_owner_id(&self) -> Option<i32> {
-        self.hurting.get_owner_id()
-    }
-
-    fn set_owner_id(&self, owner: Option<i32>) {
-        self.hurting.set_owner_id(owner);
+    fn get_projectile(&self) -> Option<&crate::entity::projectile::Projectile> {
+        Some(&self.hurting.thrown.projectile)
     }
 
     fn write_custom_nbt(&self, nbt: &mut NbtCompound) {

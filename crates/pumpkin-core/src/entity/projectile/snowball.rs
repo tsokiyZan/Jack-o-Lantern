@@ -1,5 +1,3 @@
-use std::sync::atomic::AtomicBool;
-
 use crate::entity::projectile::ProjectileHit;
 use crate::{
     entity::{Entity, EntityBase, projectile::ThrownItemEntity},
@@ -22,15 +20,7 @@ impl SnowballEntity {
         entity.set_velocity(Vector3::new(0.0, 0.1, 0.0));
 
         // Initialize without owner
-        let thrown = ThrownItemEntity {
-            entity,
-            owner_id: crossbeam::atomic::AtomicCell::new(None),
-            collides_with_projectiles: false,
-            has_hit: AtomicBool::new(false),
-            last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
-            gravity: GRAVITY,
-            left_owner: std::sync::atomic::AtomicBool::new(false),
-        };
+        let thrown = ThrownItemEntity::unowned(entity, GRAVITY);
 
         Self { thrown }
     }
@@ -43,8 +33,8 @@ impl SnowballEntity {
 }
 
 impl EntityBase for SnowballEntity {
-    fn get_owner_id(&self) -> Option<i32> {
-        self.thrown.owner_id.load()
+    fn get_projectile(&self) -> Option<&crate::entity::projectile::Projectile> {
+        Some(&self.thrown.projectile)
     }
 
     fn tick(&self, caller: &dyn EntityBase, _server: &Server) {
@@ -79,11 +69,7 @@ impl EntityBase for SnowballEntity {
             let is_blaze = entity.get_entity().entity_type.id == EntityType::BLAZE.id;
             let damage = if is_blaze { 3.0 } else { 0.0 };
             let this = world.get_entity_by_id(self.get_entity().entity_id);
-            let owner = self
-                .thrown
-                .owner_id
-                .load()
-                .and_then(|id| world.get_entity_by_id(id));
+            let owner = self.thrown.projectile.get_owner(&self.thrown.entity);
             entity.damage_with_context(
                 entity.as_ref(),
                 damage,
