@@ -131,8 +131,6 @@ pub fn update_activity(tick: &mut BrainTick<'_>) {
 }
 
 /// Vanilla `AllayAi.hearNoteblock`.
-// TODO: called from vanilla `Allay.VibrationUser.onReceiveVibration`, which needs the
-// `VibrationSystem` game event listener Pumpkin doesn't have yet.
 pub fn hear_noteblock(tick: &mut BrainTick<'_>, pos: BlockPos) {
     let Some(global_pos) = behavior::utils::global_pos_in(tick.world, pos) else {
         return;

@@ -1,5 +1,5 @@
 use std::sync::{
-    Arc, Mutex, PoisonError,
+    Arc, Mutex, PoisonError, Weak,
     atomic::{AtomicBool, AtomicI64, Ordering},
 };
 
@@ -8,9 +8,10 @@ use pumpkin_data::Block;
 use pumpkin_data::damage::DamageType;
 use pumpkin_data::data_component_impl::{EnchantmentsImpl, EquipmentSlot, PotionContentsImpl};
 use pumpkin_data::entity::{EntityStatus, EntityType};
+use pumpkin_data::game_event::GameEvent;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::{Sound, SoundCategory};
-use pumpkin_data::tag::{self, Taggable};
+use pumpkin_data::tag::{self, Tag, Taggable};
 use pumpkin_data::tracked_data;
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_nbt::tag::NbtTag;
@@ -30,6 +31,14 @@ use crate::entity::passive::allay_ai;
 use crate::entity::player::Player;
 use crate::entity::r#type::from_type;
 use crate::entity::{Entity, EntityBase};
+use crate::world::World;
+use crate::world::game_event::vibrations::{
+    self, VibrationData, VibrationListener, VibrationSystem, VibrationUser,
+};
+use crate::world::game_event::{
+    DynamicGameEventListener, GameEventContext, GameEventListener, PositionSource,
+    notification_radius,
+};
 
 /// Vanilla `Allay.ITEM_PICKUP_REACH`.
 const ITEM_PICKUP_REACH: Vector3<i32> = Vector3::new(1, 1, 1);
@@ -45,8 +54,8 @@ pub const THROW_SOUND_PITCHES: [f32; 16] = [
 const REQUIRED_PATH_LENGTH: f32 = 48.0;
 /// The max turn vanilla `Allay`'s constructor gives its `FlyingMoveControl`.
 const MAX_TURN: i32 = 20;
-/// Vanilla `GameEvent.JUKEBOX_PLAY`'s notification radius.
-const JUKEBOX_PLAY_NOTIFICATION_RADIUS: f64 = 10.0;
+/// Vanilla `Allay.VibrationUser.VIBRATION_EVENT_LISTENER_RANGE`.
+const VIBRATION_EVENT_LISTENER_RANGE: i32 = 16;
 /// The interval of vanilla `Allay.aiStep`'s healing, one health each time.
 const HEAL_INTERVAL: i32 = 10;
 /// The interval at which vanilla `Allay.aiStep` checks whether to stop dancing.
@@ -160,16 +169,6 @@ impl AllayInventory {
     }
 }
 
-/// Vanilla `VibrationSystem.Data`'s encoding for an allay that never heard anything.
-fn default_vibration_data() -> NbtCompound {
-    let mut selector = NbtCompound::new();
-    selector.put_long("tick", -1);
-    let mut data = NbtCompound::new();
-    data.put_compound("selector", selector);
-    data.put_int("event_delay", 0);
-    data
-}
-
 /// Vanilla `EnchantmentHelper.has(stack, PREVENT_EQUIPMENT_DROP)`.
 fn prevents_equipment_drop(stack: &ItemStack) -> bool {
     stack
@@ -195,10 +194,44 @@ pub struct AllayEntity {
     /// `considersEntityAsAlly` from inside this allay's own brain tick, where the brain is
     /// locked.
     liked_player: AtomicCell<Option<Uuid>>,
-    // TODO: vanilla `VibrationSystem.Data`, run by `VibrationSystem.Ticker` and filled by
-    // `VibrationSystem.Listener`; Pumpkin has no game event listeners, so the saved state is
-    // only kept as read.
-    vibration_data: Mutex<NbtCompound>,
+    vibration_data: Mutex<VibrationData>,
+    /// Vanilla `Allay.VibrationUser.positionSource`, the allay at its eye height.
+    vibration_position_source: PositionSource,
+}
+
+/// Vanilla `Allay.JukeboxListener`.
+struct JukeboxListener {
+    allay: Weak<AllayEntity>,
+    listener_source: PositionSource,
+    listener_radius: i32,
+}
+
+impl GameEventListener for JukeboxListener {
+    fn get_listener_source(&self) -> &PositionSource {
+        &self.listener_source
+    }
+
+    fn get_listener_radius(&self) -> i32 {
+        self.listener_radius
+    }
+
+    fn handle_game_event(
+        &self,
+        _world: &World,
+        event: GameEvent,
+        _context: &GameEventContext<'_>,
+        source_position: Vector3<f64>,
+    ) -> bool {
+        let is_playing = match event {
+            GameEvent::JukeboxPlay => true,
+            GameEvent::JukeboxStopPlay => false,
+            _ => return false,
+        };
+        if let Some(allay) = self.allay.upgrade() {
+            allay.set_jukebox_playing(BlockPos::floored_v(source_position), is_playing);
+        }
+        true
+    }
 }
 
 impl AllayEntity {
@@ -220,15 +253,44 @@ impl AllayEntity {
             .lock()
             .unwrap_or_else(PoisonError::into_inner) =
             Box::new(FlyingMoveControl::new(MAX_TURN, true));
-        let allay = Arc::new(Self {
-            mob_entity,
-            inventory: AllayInventory::new(),
-            jukebox_pos: AtomicCell::new(None),
-            duplication_cooldown: AtomicI64::new(0),
-            dancing: AtomicBool::new(false),
-            can_duplicate: AtomicBool::new(true),
-            liked_player: AtomicCell::new(None),
-            vibration_data: Mutex::new(default_vibration_data()),
+        let allay = Arc::new_cyclic(|allay: &Weak<Self>| {
+            let vibration_position_source = PositionSource::Entity {
+                entity: allay.clone(),
+                y_offset: mob_entity
+                    .living_entity
+                    .entity
+                    .entity_dimension
+                    .load()
+                    .eye_height,
+            };
+            let dynamic_vibration_listener = DynamicGameEventListener::new(Arc::new(
+                VibrationListener::new(allay.clone(), vibration_position_source.clone()),
+            ));
+            let dynamic_jukebox_listener =
+                DynamicGameEventListener::new(Arc::new(JukeboxListener {
+                    allay: allay.clone(),
+                    listener_source: vibration_position_source.clone(),
+                    listener_radius: notification_radius(GameEvent::JukeboxPlay),
+                }));
+            let _ = mob_entity
+                .living_entity
+                .entity
+                .dynamic_game_event_listeners
+                .set(Box::new([
+                    dynamic_vibration_listener,
+                    dynamic_jukebox_listener,
+                ]));
+            Self {
+                mob_entity,
+                inventory: AllayInventory::new(),
+                jukebox_pos: AtomicCell::new(None),
+                duplication_cooldown: AtomicI64::new(0),
+                dancing: AtomicBool::new(false),
+                can_duplicate: AtomicBool::new(true),
+                liked_player: AtomicCell::new(None),
+                vibration_data: Mutex::new(VibrationData::default()),
+                vibration_position_source,
+            }
         });
         allay.mob_entity.init_brain(allay.as_ref());
         allay
@@ -263,8 +325,6 @@ impl AllayEntity {
     }
 
     /// Vanilla `Allay.setJukeboxPlaying`.
-    // TODO: called from vanilla `Allay.JukeboxListener`, which needs the game event
-    // dispatcher (`GameEventDispatcher` and `DynamicGameEventListener`) Pumpkin doesn't have.
     pub fn set_jukebox_playing(&self, jukebox: BlockPos, is_playing: bool) {
         if is_playing {
             if !self.is_dancing() {
@@ -297,10 +357,11 @@ impl AllayEntity {
             return true;
         };
         let entity = self.get_entity();
+        let radius = f64::from(notification_radius(GameEvent::JukeboxPlay));
         jukebox_pos
             .to_centered_f64()
             .squared_distance_to_vec(&entity.pos.load())
-            >= JUKEBOX_PLAY_NOTIFICATION_RADIUS * JUKEBOX_PLAY_NOTIFICATION_RADIUS
+            >= radius * radius
             || entity.world.load().get_block(&jukebox_pos) != &Block::JUKEBOX
     }
 
@@ -543,8 +604,12 @@ impl Mob for AllayEntity {
     }
 
     /// The server half of vanilla `Allay.tick` after `super.tick()`.
-    // TODO: vanilla `VibrationSystem.Ticker.tick` runs first; see `vibration_data`.
     fn post_tick(&self) {
+        vibrations::tick(
+            &self.get_entity().world.load_full(),
+            &self.vibration_data,
+            self,
+        );
         if self.is_panicking() {
             self.set_dancing(false);
         }
@@ -643,11 +708,11 @@ impl Mob for AllayEntity {
         nbt.put_bool("CanPickUpLoot", can_pick_up_loot);
         self.inventory.write_inventory_to_tag(nbt);
         nbt.put_compound(
-            "listener",
+            VibrationData::NBT_TAG_KEY,
             self.vibration_data
                 .lock()
                 .unwrap_or_else(PoisonError::into_inner)
-                .clone(),
+                .write_nbt(),
         );
         nbt.put_long(
             "DuplicationCooldown",
@@ -660,10 +725,7 @@ impl Mob for AllayEntity {
         *self
             .vibration_data
             .lock()
-            .unwrap_or_else(PoisonError::into_inner) = nbt
-            .get_compound("listener")
-            .cloned()
-            .unwrap_or_else(default_vibration_data);
+            .unwrap_or_else(PoisonError::into_inner) = VibrationData::read_nbt(nbt);
         self.set_duplication_cooldown(i64::from(
             nbt.get("DuplicationCooldown")
                 .and_then(NbtTag::as_numeric_int)
@@ -682,5 +744,67 @@ impl Mob for AllayEntity {
             tracked_data::allay::DATA_CAN_DUPLICATE,
             self.can_duplicate(),
         );
+    }
+}
+
+impl VibrationSystem for AllayEntity {
+    fn get_vibration_data(&self) -> &Mutex<VibrationData> {
+        &self.vibration_data
+    }
+
+    fn get_vibration_user(&self) -> &dyn VibrationUser {
+        self
+    }
+}
+
+/// Vanilla `Allay.VibrationUser`.
+impl VibrationUser for AllayEntity {
+    fn get_listener_radius(&self) -> i32 {
+        VIBRATION_EVENT_LISTENER_RANGE
+    }
+
+    fn get_position_source(&self) -> &PositionSource {
+        &self.vibration_position_source
+    }
+
+    fn can_receive_vibration(
+        &self,
+        world: &World,
+        pos: BlockPos,
+        _event: GameEvent,
+        _context: &GameEventContext<'_>,
+    ) -> bool {
+        if self.mob_entity.is_no_ai() {
+            return false;
+        }
+        let liked_noteblock_pos = self.mob_entity.with_brain(self, |tick| {
+            tick.brain.get(types::LIKED_NOTEBLOCK_POSITION).copied()
+        });
+        liked_noteblock_pos.is_none_or(|global_pos| {
+            global_pos.is_close_enough(
+                &world.dimension,
+                self.get_entity().block_pos.load(),
+                MAX_NOTEBLOCK_DISTANCE,
+            ) && global_pos.pos == pos
+        })
+    }
+
+    fn on_receive_vibration(
+        &self,
+        _world: &Arc<World>,
+        pos: BlockPos,
+        event: GameEvent,
+        _source_entity: Option<&dyn EntityBase>,
+        _projectile_owner: Option<&dyn EntityBase>,
+        _receiving_distance: f32,
+    ) {
+        if event == GameEvent::NoteBlockPlay {
+            self.mob_entity
+                .with_brain(self, |tick| allay_ai::hear_noteblock(tick, pos));
+        }
+    }
+
+    fn get_listenable_events(&self) -> &'static Tag {
+        &tag::GameEvent::MINECRAFT_ALLAY_CAN_LISTEN
     }
 }
