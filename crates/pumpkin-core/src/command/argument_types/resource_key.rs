@@ -13,7 +13,7 @@ use pumpkin_util::text::TextComponent;
 use std::string::ToString;
 
 pub static ADVANCEMENT_REGISTRY: &Identifier = &Identifier::vanilla_static("advancement");
-pub static BIOME_REGISTRY: &Identifier = &Identifier::vanilla_static("worldgen/biome");
+pub use pumpkin_command::argument_types::resource::BIOME_REGISTRY;
 
 pub const ERROR_INVALID_ADVANCEMENT: CommandErrorType<1> = CommandErrorType::new(
     translation::java::ADVANCEMENT_ADVANCEMENTNOTFOUND,

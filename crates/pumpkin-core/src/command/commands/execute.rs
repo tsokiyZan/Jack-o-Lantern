@@ -23,10 +23,11 @@ use crate::command::argument_types::coordinates::rotation::RotationArgumentType;
 use crate::command::argument_types::coordinates::swizzle::SwizzleArgumentType;
 use crate::command::argument_types::coordinates::vec3::Vec3ArgumentType;
 use crate::command::argument_types::core::double::DoubleArgumentType;
-use crate::command::argument_types::core::string::StringArgumentType;
+use crate::command::argument_types::dimension::{DIMENSION_REGISTRY, DimensionArgumentType};
 use crate::command::argument_types::entity::EntityArgumentType;
 use crate::command::argument_types::entity_anchor::{EntityAnchorArgumentType, EntityAnchorExt};
 use crate::command::argument_types::function::FunctionArgumentType;
+use crate::command::argument_types::heightmap::HeightmapTypeArgumentType;
 use crate::command::argument_types::identifier::IdentifierArgumentType;
 use crate::command::argument_types::nbt_path::{NbtPath, NbtPathArgumentType};
 use crate::command::argument_types::objective::ObjectiveArgumentType;
@@ -57,6 +58,7 @@ use crate::world::World;
 use crate::world::custom_bossbar::BossbarUpdateError;
 use crate::world::scoreboard::Scoreboard;
 use crate::world::stopwatches::Stopwatches;
+use pumpkin_command::argument_types::coordinates::block_pos::NOT_LOADED_ERROR_TYPE;
 use pumpkin_command::execution;
 use pumpkin_command::source::ResultValueTaker;
 use pumpkin_command::source::ReturnValue;
@@ -97,8 +99,6 @@ const ERROR_CONDITIONAL_FAILED_COUNT: CommandErrorType<1> = CommandErrorType::ne
     translation::java::COMMANDS_EXECUTE_CONDITIONAL_FAIL_COUNT,
     translation::java::COMMANDS_EXECUTE_CONDITIONAL_FAIL_COUNT,
 );
-
-static DIMENSION_REGISTRY: &Identifier = &Identifier::vanilla_static("dimension");
 
 fn execute_as_modifier(context: &CommandContext) -> crate::command::node::RedirectModifierResult {
     let targets = EntityArgumentType::get_optional_entities(context, "targets")?;
@@ -161,15 +161,18 @@ fn execute_positioned_as_modifier(
 fn execute_positioned_over_modifier(
     context: &CommandContext,
 ) -> crate::command::node::RedirectModifierResult {
+    let heightmap = HeightmapTypeArgumentType::get(context, "heightmap")?;
     let mut source = context.source.as_ref().clone();
     let pos = source.position;
-    let block_x = pos.x.floor() as i32;
-    let block_z = pos.z.floor() as i32;
-
-    if let Some(ref world) = source.world {
-        let top_y = world.get_top_block(Vector2::new(block_x, block_z));
-        source.position.y = (top_y + 1) as f64;
+    let world = context.world();
+    let (block_x, block_z) = (pos.x.floor() as i32, pos.z.floor() as i32);
+    if !world
+        .level
+        .is_chunk_loaded(&Vector2::new(block_x >> 4, block_z >> 4))
+    {
+        return Err(NOT_LOADED_ERROR_TYPE.create_without_context());
     }
+    source.position.y = f64::from(world.get_height(heightmap, block_x, block_z));
     Ok(vec![Arc::new(source)])
 }
 
@@ -865,7 +868,13 @@ fn check_biome(context: &CommandContext) -> Result<bool, CommandSyntaxError> {
     let world = context.source.world();
     let biome =
         world.get_zoomed_biome(&BlockPosArgumentType::get_loaded_block_pos(context, "pos")?);
-    Ok(match biome_arg {
+    Ok(biome_matches(biome_arg, biome))
+}
+
+/// Whether `biome` is the biome or in the tag a biome `resource_or_tag` argument names.
+#[must_use]
+pub fn biome_matches(biome_arg: &ResourceOrTag, biome: &Biome) -> bool {
+    match biome_arg {
         ResourceOrTag::Resource(id) => {
             Biome::from_name(id.path()).is_some_and(|b| b.id == biome.id)
         }
@@ -876,7 +885,7 @@ fn check_biome(context: &CommandContext) -> Result<bool, CommandSyntaxError> {
                     .filter_map(|name| Biome::from_name(name))
                     .any(|b| b.id == biome.id)
             }),
-    })
+    }
 }
 
 fn check_loaded(context: &CommandContext) -> Result<bool, CommandSyntaxError> {
@@ -1158,7 +1167,7 @@ fn add_conditionals(parent: LiteralArgumentBuilder, expected: bool) -> LiteralAr
             check_loaded,
         )))
         .then(literal("dimension").then(add_conditional(
-            argument("dimension", ResourceKeyArgument(DIMENSION_REGISTRY)),
+            argument("dimension", DimensionArgumentType),
             expected,
             check_dimension,
         )))
@@ -1262,7 +1271,7 @@ pub fn register(dispatcher: &mut CommandDispatcher, registry: &PermissionRegistr
             )),
         )
         .then(literal("in").then(
-            argument("dimension", ResourceKeyArgument(DIMENSION_REGISTRY)).redirect_with_modifier(
+            argument("dimension", DimensionArgumentType).redirect_with_modifier(
                 Redirection::Root,
                 RedirectModifier::Custom(Arc::new(execute_in_modifier)),
             ),
@@ -1276,7 +1285,7 @@ pub fn register(dispatcher: &mut CommandDispatcher, registry: &PermissionRegistr
                     )),
                 )
                 .then(literal("over").then(
-                    argument("heightmap", StringArgumentType::SingleWord).redirect_with_modifier(
+                    argument("heightmap", HeightmapTypeArgumentType).redirect_with_modifier(
                         Redirection::Root,
                         RedirectModifier::Custom(Arc::new(execute_positioned_over_modifier)),
                     ),

@@ -283,7 +283,7 @@ pub fn register(dispatcher: &mut CommandDispatcher, registry: &PermissionRegistr
         PermissionDefault::Op(PermissionLvl::Two),
     ));
 
-    let seconds_node = argument("seconds", IntegerArgumentType::new(0, 1_000_000))
+    let seconds_node = argument("seconds", IntegerArgumentType::new(1, 1_000_000))
         .executes(GiveExecutor {
             duration: Duration::Specified,
             has_amplifier: false,

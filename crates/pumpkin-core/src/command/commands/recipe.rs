@@ -1,6 +1,7 @@
 use crate::command::argument_builder::{ArgumentBuilder, argument, command, literal};
+use crate::command::argument_types::argument_type::JavaClientArgumentType;
 use crate::command::argument_types::entity::EntityArgumentType;
-use crate::command::argument_types::identifier::IdentifierArgumentType;
+use crate::command::argument_types::identifier::RegistryIdentifierArgumentType;
 use crate::command::context::command_context::CommandContext;
 use crate::command::errors::error_types::CommandErrorType;
 use crate::command::node::dispatcher::CommandDispatcher;
@@ -245,9 +246,14 @@ pub fn register(dispatcher: &mut CommandDispatcher, registry: &PermissionRegistr
                 argument("targets", EntityArgumentType::Players)
                     .then(literal("*").executes(RecipeGiveExecutor { all: true }))
                     .then(
-                        argument("recipe", IdentifierArgumentType)
-                            .suggests(RecipeSuggestionProvider)
-                            .executes(RecipeGiveExecutor { all: false }),
+                        argument(
+                            "recipe",
+                            RegistryIdentifierArgumentType(JavaClientArgumentType::ResourceKey {
+                                identifier: Identifier::vanilla_static("recipe"),
+                            }),
+                        )
+                        .suggests(RecipeSuggestionProvider)
+                        .executes(RecipeGiveExecutor { all: false }),
                     ),
             ),
         )
@@ -256,9 +262,14 @@ pub fn register(dispatcher: &mut CommandDispatcher, registry: &PermissionRegistr
                 argument("targets", EntityArgumentType::Players)
                     .then(literal("*").executes(RecipeTakeExecutor { all: true }))
                     .then(
-                        argument("recipe", IdentifierArgumentType)
-                            .suggests(RecipeSuggestionProvider)
-                            .executes(RecipeTakeExecutor { all: false }),
+                        argument(
+                            "recipe",
+                            RegistryIdentifierArgumentType(JavaClientArgumentType::ResourceKey {
+                                identifier: Identifier::vanilla_static("recipe"),
+                            }),
+                        )
+                        .suggests(RecipeSuggestionProvider)
+                        .executes(RecipeTakeExecutor { all: false }),
                     ),
             ),
         );
