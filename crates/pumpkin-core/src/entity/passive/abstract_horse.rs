@@ -46,6 +46,18 @@ pub trait AbstractHorse: Mob {
         100
     }
 
+    /// Vanilla `playJumpSound`'s sound.
+    fn jump_sound(&self) -> Sound {
+        Sound::EntityHorseJump
+    }
+
+    /// Vanilla `AbstractHorse.handleStartJump`: the rider began a jump. The stand sliding it
+    /// also allows only matters to the steering client.
+    fn horse_handle_start_jump(&self) {
+        self.stand_if_possible();
+        self.play_sound_at_self(self.jump_sound(), 0.4, 1.0);
+    }
+
     /// Vanilla `canPerformRearing`.
     fn can_perform_rearing(&self) -> bool {
         true

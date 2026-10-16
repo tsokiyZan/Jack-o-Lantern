@@ -8,15 +8,16 @@ use crate::entity::passive::animal::horse_can_parent;
 use pumpkin_inventory::inventory::SimpleInventory;
 use std::sync::{
     Arc, Weak,
-    atomic::{AtomicBool, AtomicU8, Ordering},
+    atomic::{AtomicBool, AtomicI32, AtomicU8, Ordering},
 };
 
 use pumpkin_data::data_component_impl::EquipmentSlot;
 use pumpkin_data::entity::EntityPose;
 use pumpkin_data::entity::EntityType;
+use pumpkin_data::game_event::GameEvent;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
-use pumpkin_data::sound::Sound;
+use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::math::boundingbox::EntityDimensions;
@@ -41,11 +42,16 @@ pub const FLAG_BRED: u8 = 8;
 pub const FLAG_EATING: u8 = 16;
 pub const FLAG_STANDING: u8 = 32;
 
+/// Vanilla `Camel.DASH_COOLDOWN_TICKS`.
+const DASH_COOLDOWN_TICKS: i32 = 55;
+
 pub struct CamelEntity {
     pub mob_entity: MobEntity,
     pub ageable_data: AgeableData,
     pub flags: AtomicU8,
     pub dashing: AtomicBool,
+    /// Vanilla `Camel.dashCooldown`.
+    pub dash_cooldown: AtomicI32,
 }
 
 impl CamelEntity {
@@ -57,6 +63,7 @@ impl CamelEntity {
             ageable_data: AgeableData::default(),
             flags: AtomicU8::new(0),
             dashing: AtomicBool::new(false),
+            dash_cooldown: AtomicI32::new(0),
         };
         let mob_arc = Arc::new(camel);
         let mob_weak: Weak<dyn Mob> = {
@@ -111,10 +118,22 @@ impl CamelEntity {
         self.dashing.load(Ordering::Relaxed)
     }
 
+    /// Vanilla `Camel.setDashing`, with the dash cooldown its `onSyncedDataUpdated` starts.
     pub fn set_dashing(&self, dashing: bool) {
-        self.dashing.store(dashing, Ordering::Relaxed);
+        if self.dashing.swap(dashing, Ordering::Relaxed) == dashing {
+            return;
+        }
         let entity = self.get_entity();
         entity.set_synced_data(pumpkin_data::tracked_data::camel::DASH, dashing);
+        // Vanilla's `firstTick` holds until the entity first ticks.
+        if entity.tick_count.load(Ordering::Relaxed) > 0 {
+            let _ = self.dash_cooldown.compare_exchange(
+                0,
+                DASH_COOLDOWN_TICKS,
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            );
+        }
     }
 }
 
@@ -215,6 +234,50 @@ impl Mob for CamelEntity {
             0,
             |_, _| true,
         );
+    }
+
+    /// Vanilla `Camel.canJump`. A Pumpkin camel never sits, so it never refuses to move.
+    fn can_jump(&self) -> bool {
+        self.is_saddled()
+    }
+
+    /// Vanilla `Camel.handleStartJump`: the rider began a dash.
+    fn handle_start_jump(&self, _jump_scale: i32) {
+        self.make_sound(Sound::EntityCamelDash);
+        let entity = self.get_entity();
+        entity
+            .world
+            .load()
+            .emit_game_event(GameEvent::EntityAction.name(), entity.pos.load());
+        self.set_dashing(true);
+    }
+
+    /// The part of vanilla `Camel.tick` after `super.tick()`.
+    fn post_tick(&self) {
+        let entity = self.get_entity();
+        if self.is_dashing()
+            && self.dash_cooldown.load(Ordering::Relaxed) < 50
+            && (entity.on_ground.load(Ordering::Relaxed)
+                || entity.touching_water.load(Ordering::Relaxed)
+                || entity.touching_lava.load(Ordering::Relaxed)
+                || entity.has_vehicle())
+        {
+            self.set_dashing(false);
+        }
+        let dash_cooldown = self.dash_cooldown.load(Ordering::Relaxed);
+        if dash_cooldown > 0 {
+            self.dash_cooldown
+                .store(dash_cooldown - 1, Ordering::Relaxed);
+            if dash_cooldown == 1 {
+                entity.world.load().play_sound_fine(
+                    Sound::EntityCamelDashReady,
+                    SoundCategory::Neutral,
+                    &entity.block_pos.load().to_centered_f64(),
+                    1.0,
+                    1.0,
+                );
+            }
+        }
     }
 
     fn get_mob_entity(&self) -> &MobEntity {

@@ -219,6 +219,15 @@ impl Mob for MuleEntity {
         self.drop_horse_inventory();
     }
 
+    /// Vanilla `AbstractHorse.canJump`.
+    fn can_jump(&self) -> bool {
+        self.is_saddled()
+    }
+
+    fn handle_start_jump(&self, _jump_scale: i32) {
+        self.horse_handle_start_jump();
+    }
+
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
     }
@@ -286,6 +295,11 @@ impl AbstractHorse for MuleEntity {
 
     fn horse_inventory(&self) -> &MountInventory {
         &self.inventory
+    }
+
+    /// Vanilla `Mule.playJumpSound`.
+    fn jump_sound(&self) -> Sound {
+        Sound::EntityMuleJump
     }
 
     fn chest(&self) -> Option<(&AtomicBool, TrackedData)> {

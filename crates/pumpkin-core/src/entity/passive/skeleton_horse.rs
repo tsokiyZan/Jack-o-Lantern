@@ -406,6 +406,15 @@ impl Mob for SkeletonHorseEntity {
         self.drop_horse_inventory();
     }
 
+    /// Vanilla `AbstractHorse.canJump`.
+    fn can_jump(&self) -> bool {
+        self.is_saddled()
+    }
+
+    fn handle_start_jump(&self, _jump_scale: i32) {
+        self.horse_handle_start_jump();
+    }
+
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
     }
@@ -486,5 +495,14 @@ impl AbstractHorse for SkeletonHorseEntity {
 
     fn horse_inventory(&self) -> &MountInventory {
         &self.inventory
+    }
+
+    /// Vanilla `SkeletonHorse.playJumpSound`.
+    fn jump_sound(&self) -> Sound {
+        if self.get_entity().is_in_water() {
+            Sound::EntitySkeletonHorseJumpWater
+        } else {
+            Sound::EntityHorseJump
+        }
     }
 }

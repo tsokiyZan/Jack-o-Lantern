@@ -234,6 +234,15 @@ impl Mob for DonkeyEntity {
         self.drop_horse_inventory();
     }
 
+    /// Vanilla `AbstractHorse.canJump`.
+    fn can_jump(&self) -> bool {
+        self.is_saddled()
+    }
+
+    fn handle_start_jump(&self, _jump_scale: i32) {
+        self.horse_handle_start_jump();
+    }
+
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
     }
@@ -301,6 +310,11 @@ impl AbstractHorse for DonkeyEntity {
 
     fn horse_inventory(&self) -> &MountInventory {
         &self.inventory
+    }
+
+    /// Vanilla `Donkey.playJumpSound`.
+    fn jump_sound(&self) -> Sound {
+        Sound::EntityDonkeyJump
     }
 
     fn chest(&self) -> Option<(&AtomicBool, TrackedData)> {
