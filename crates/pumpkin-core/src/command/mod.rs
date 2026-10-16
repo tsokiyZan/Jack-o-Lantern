@@ -145,8 +145,7 @@ impl fmt::Display for CommandSender {
 impl CommandSender {
     pub fn send_message(&self, text: TextComponent) {
         match self {
-            #[allow(clippy::print_stdout)]
-            Self::Console => println!("{}", text.to_pretty_console()),
+            Self::Console => crate::server::Server::send_system_message(&text),
             Self::Player(c) => c.send_system_message(&text),
             Self::CommandBlock(block_entity, _) => {
                 let mut last_output = block_entity
