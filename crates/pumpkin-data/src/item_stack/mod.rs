@@ -834,8 +834,10 @@ impl ItemStack {
             }
         }
 
-        // Store custom data like enchantments, display name, etc. would go here
-        compound.put_compound("components", tag);
+        // Vanilla `optionalFieldOf("components", DataComponentPatch.EMPTY)`: left out when empty.
+        if !tag.is_empty() {
+            compound.put_compound("components", tag);
+        }
     }
 
     #[must_use]

@@ -3313,6 +3313,11 @@ impl LivingEntity {
         // Persist current absorption amount
         nbt.put("AbsorptionAmount", NbtTag::Float(self.absorption.load()));
         nbt.put("FallDistance", NbtTag::Float(fall_distance));
+        // Vanilla `Entity.saveWithoutId`'s `invulnerable_time`, the hurt cooldown.
+        let invulnerable_time = self.hurt_cooldown.load(Relaxed);
+        if invulnerable_time > 0 {
+            nbt.put_int("invulnerable_time", invulnerable_time);
+        }
         nbt.put_int(
             "current_impulse_context_reset_grace_time",
             self.current_impulse_context_reset_grace_time.load(Relaxed),
@@ -3491,6 +3496,9 @@ impl LivingEntity {
 
         // Load fall distance, but if this entity is currently marked dead ensure we don't restore
         // a lethal fall distance that would immediately re-kill on spawn.
+        if let Some(invulnerable_time) = nbt.get_int("invulnerable_time") {
+            self.hurt_cooldown.store(invulnerable_time, Relaxed);
+        }
         let fd = nbt
             .get_float("FallDistance")
             .or_else(|| nbt.get_float("fall_distance"))

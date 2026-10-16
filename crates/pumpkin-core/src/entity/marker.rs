@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex, atomic::Ordering};
+use std::sync::{Arc, atomic::Ordering};
 
 use crate::{
     entity::{Entity, EntityBase, living::LivingEntity},
@@ -6,44 +6,21 @@ use crate::{
     server::Server,
 };
 use pumpkin_data::damage::DamageType;
-use pumpkin_nbt::{compound::NbtCompound, tag::NbtTag};
 use pumpkin_util::math::vector3::Vector3;
 
+/// Vanilla `Marker`: its `data` is the entity-wide custom data.
 pub struct MarkerEntity {
     pub entity: Entity,
-    pub data: Mutex<NbtCompound>,
 }
 
 impl MarkerEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         entity.no_physics.store(true, Ordering::Relaxed);
-        Arc::new(Self {
-            entity,
-            data: Mutex::new(NbtCompound::new()),
-        })
+        Arc::new(Self { entity })
     }
 }
 
 impl EntityBase for MarkerEntity {
-    fn write_custom_nbt(&self, nbt: &mut NbtCompound) {
-        let data = self
-            .data
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        if !data.is_empty() {
-            nbt.put("data", NbtTag::Compound(data.clone()));
-        }
-    }
-
-    fn read_custom_nbt(&self, nbt: &NbtCompound) {
-        if let Some(data) = nbt.get_compound("data") {
-            *self
-                .data
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner) = data.clone();
-        }
-    }
-
     fn tick(&self, _caller: &dyn EntityBase, _server: &Server) {}
 
     fn init_data_tracker(&self) {}
