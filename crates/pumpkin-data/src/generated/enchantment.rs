@@ -1,6 +1,7 @@
 /* This file is generated. Do not edit manually. */
 use crate::data_component_impl::EnchantmentsImpl;
 use crate::item::Item;
+use crate::tag::Block as BlockTag;
 use crate::tag::DamageType as DamageTypeTag;
 use crate::tag::Enchantment as EnchantmentTag;
 use crate::tag::EntityType as EntityTypeTag;
@@ -83,6 +84,8 @@ pub struct TargetedConditionalEffect<T> {
 #[derive(Clone, Debug, PartialEq)]
 pub enum LootItemCondition {
     AllOf(&'static [Self]),
+    AnyOf(&'static [Self]),
+    Inverted(&'static Self),
     RandomChance {
         chance: ContextFloatProvider,
     },
@@ -95,6 +98,15 @@ pub enum LootItemCondition {
     },
     WeatherCheck {
         thundering: Option<bool>,
+    },
+    MatchTool {
+        predicate: Option<ItemPredicate>,
+    },
+    LocationCheck {
+        predicate: LocationPredicate,
+    },
+    EnchantmentActiveCheck {
+        active: bool,
     },
 }
 #[derive(Clone, Debug, PartialEq)]
@@ -115,6 +127,50 @@ pub struct EntityPredicate {
     pub location: Option<LocationPredicate>,
     pub flags: Option<EntityFlagsPredicate>,
     pub movement: Option<MovementPredicate>,
+    pub vehicle: Option<&'static EntityPredicate>,
+    #[doc = r" `minecraft:type_specific/player`."]
+    pub player: Option<PlayerPredicate>,
+    pub movement_affected_by: Option<LocationPredicate>,
+    pub periodic_tick: Option<i32>,
+}
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PlayerPredicate {
+    pub gamemodes: Option<&'static [pumpkin_util::GameMode]>,
+    pub food_level: IntBounds,
+}
+#[doc = r" Vanilla `MinMaxBounds.Ints`."]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct IntBounds {
+    pub min: Option<i32>,
+    pub max: Option<i32>,
+}
+impl IntBounds {
+    #[must_use]
+    pub fn matches(&self, value: i32) -> bool {
+        self.min.is_none_or(|min| min <= value) && self.max.is_none_or(|max| value <= max)
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ItemPredicate {
+    pub items: ItemSet,
+}
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ItemSet {
+    Item(&'static Item),
+    Tag(&'static Tag),
+}
+impl ItemSet {
+    #[must_use]
+    pub fn contains(&self, item: &Item) -> bool {
+        match self {
+            Self::Item(i) => i.id == item.id,
+            Self::Tag(tag) => item.has_tag(tag),
+        }
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BlockPredicate {
+    pub blocks: &'static Tag,
 }
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum EntityTypePredicate {
@@ -130,17 +186,22 @@ impl EntityTypePredicate {
         }
     }
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct LocationPredicate {
+    pub block: Option<BlockPredicate>,
     pub can_see_sky: Option<bool>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct EntityFlagsPredicate {
+    pub is_on_ground: Option<bool>,
     pub is_flying: Option<bool>,
+    pub is_fall_flying: Option<bool>,
+    pub is_in_water: Option<bool>,
 }
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MovementPredicate {
     pub fall_distance: DoubleBounds,
+    pub horizontal_speed: DoubleBounds,
 }
 #[doc = r" Vanilla `MinMaxBounds.Doubles`."]
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -154,13 +215,21 @@ impl DoubleBounds {
         self.min.is_none_or(|min| min <= value) && self.max.is_none_or(|max| value <= max)
     }
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct DamageSourcePredicate {
+    pub tags: &'static [DamageTypeTagPredicate],
     pub is_direct: Option<bool>,
 }
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[doc = r" Vanilla `TagPredicate<DamageType>`."]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct DamageTypeTagPredicate {
+    pub tag: &'static Tag,
+    pub expected: bool,
+}
+#[derive(Clone, Debug, PartialEq)]
 pub struct ConditionalEffect<T> {
     pub effect: T,
+    pub requirements: Option<LootItemCondition>,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum ReplaceDiskPredicate {
@@ -428,6 +497,8 @@ pub struct EnchantmentEffects {
     pub trident_spin_attack_strength: Option<EnchantmentValueEffect>,
     pub crossbow_charge_time: Option<EnchantmentValueEffect>,
     pub location_changed: &'static [ConditionalEffect<EnchantmentEntityEffect>],
+    #[doc = r" `minecraft:damage_immunity`, whose effect carries no data."]
+    pub damage_immunity: &'static [ConditionalEffect<()>],
     pub prevent_armor_change: bool,
     pub prevent_equipment_drop: bool,
 }
@@ -609,6 +680,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -658,10 +730,15 @@ impl Enchantment {
                             location: None,
                             flags: None,
                             movement: None,
+                            vehicle: None,
+                            player: None,
+                            movement_affected_by: None,
+                            periodic_tick: None,
                         }),
                     },
                     LootItemCondition::DamageSourceProperties {
                         predicate: Some(DamageSourcePredicate {
+                            tags: &[],
                             is_direct: Some(true),
                         }),
                     },
@@ -675,6 +752,21 @@ impl Enchantment {
                 effect: EnchantmentValueEffect::Add(LevelBasedValue::Linear {
                     base: 2.5f32,
                     per_level_above_first: 2.5f32,
+                }),
+                requirements: Some(LootItemCondition::EntityProperties {
+                    entity: LootContextEntityTarget::This,
+                    predicate: Some(EntityPredicate {
+                        entity_type: Some(EntityTypePredicate::Tag(
+                            &EntityTypeTag::MINECRAFT_SENSITIVE_TO_BANE_OF_ARTHROPODS,
+                        )),
+                        location: None,
+                        flags: None,
+                        movement: None,
+                        vehicle: None,
+                        player: None,
+                        movement_affected_by: None,
+                        periodic_tick: None,
+                    }),
                 }),
             }],
             knockback: &[],
@@ -693,6 +785,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -741,6 +834,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: true,
             prevent_equipment_drop: false,
         },
@@ -780,6 +874,21 @@ impl Enchantment {
                     base: 2f32,
                     per_level_above_first: 2f32,
                 }),
+                requirements: Some(LootItemCondition::DamageSourceProperties {
+                    predicate: Some(DamageSourcePredicate {
+                        tags: &[
+                            DamageTypeTagPredicate {
+                                tag: &DamageTypeTag::MINECRAFT_IS_EXPLOSION,
+                                expected: true,
+                            },
+                            DamageTypeTagPredicate {
+                                tag: &DamageTypeTag::MINECRAFT_BYPASSES_INVULNERABILITY,
+                                expected: false,
+                            },
+                        ],
+                        is_direct: None,
+                    }),
+                }),
             }],
             hit_block: &[],
             item_damage: &[],
@@ -794,6 +903,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -832,6 +942,7 @@ impl Enchantment {
                     base: -0.15f32,
                     per_level_above_first: -0.15f32,
                 }),
+                requirements: None,
             }],
             damage_protection: &[],
             hit_block: &[],
@@ -847,6 +958,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -896,10 +1008,15 @@ impl Enchantment {
                         predicate: Some(EntityPredicate {
                             entity_type: None,
                             location: Some(LocationPredicate {
+                                block: None,
                                 can_see_sky: Some(true),
                             }),
                             flags: None,
                             movement: None,
+                            vehicle: None,
+                            player: None,
+                            movement_affected_by: None,
+                            periodic_tick: None,
                         }),
                     },
                     LootItemCondition::EntityProperties {
@@ -911,6 +1028,10 @@ impl Enchantment {
                             location: None,
                             flags: None,
                             movement: None,
+                            vehicle: None,
+                            player: None,
+                            movement_affected_by: None,
+                            periodic_tick: None,
                         }),
                     },
                 ])),
@@ -935,6 +1056,34 @@ impl Enchantment {
                         pitch: pumpkin_util::math::float_provider::FloatProvider::Constant(1f32),
                     },
                 ]),
+                requirements: Some(LootItemCondition::AllOf(&[
+                    LootItemCondition::WeatherCheck {
+                        thundering: Some(true),
+                    },
+                    LootItemCondition::EntityProperties {
+                        entity: LootContextEntityTarget::This,
+                        predicate: Some(EntityPredicate {
+                            entity_type: Some(EntityTypePredicate::Type(
+                                &crate::entity::EntityType::TRIDENT,
+                            )),
+                            location: None,
+                            flags: None,
+                            movement: None,
+                            vehicle: None,
+                            player: None,
+                            movement_affected_by: None,
+                            periodic_tick: None,
+                        }),
+                    },
+                    LootItemCondition::LocationCheck {
+                        predicate: LocationPredicate {
+                            block: Some(BlockPredicate {
+                                blocks: &BlockTag::MINECRAFT_LIGHTNING_RODS,
+                            }),
+                            can_see_sky: Some(true),
+                        },
+                    },
+                ])),
             }],
             item_damage: &[],
             equipment_drops: &[],
@@ -948,6 +1097,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -996,11 +1146,13 @@ impl Enchantment {
                     base: 0.5f32,
                     per_level_above_first: 0.5f32,
                 }),
+                requirements: None,
             }],
             trident_return_acceleration: &[],
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -1049,6 +1201,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -1097,6 +1250,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -1136,6 +1290,21 @@ impl Enchantment {
                     base: 3f32,
                     per_level_above_first: 3f32,
                 }),
+                requirements: Some(LootItemCondition::DamageSourceProperties {
+                    predicate: Some(DamageSourcePredicate {
+                        tags: &[
+                            DamageTypeTagPredicate {
+                                tag: &DamageTypeTag::MINECRAFT_IS_FALL,
+                                expected: true,
+                            },
+                            DamageTypeTagPredicate {
+                                tag: &DamageTypeTag::MINECRAFT_BYPASSES_INVULNERABILITY,
+                                expected: false,
+                            },
+                        ],
+                        is_direct: None,
+                    }),
+                }),
             }],
             hit_block: &[],
             item_damage: &[],
@@ -1150,6 +1319,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -1187,6 +1357,7 @@ impl Enchantment {
                 },
                 requirements: Some(LootItemCondition::DamageSourceProperties {
                     predicate: Some(DamageSourcePredicate {
+                        tags: &[],
                         is_direct: Some(true),
                     }),
                 }),
@@ -1212,6 +1383,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -1251,6 +1423,21 @@ impl Enchantment {
                     base: 2f32,
                     per_level_above_first: 2f32,
                 }),
+                requirements: Some(LootItemCondition::DamageSourceProperties {
+                    predicate: Some(DamageSourcePredicate {
+                        tags: &[
+                            DamageTypeTagPredicate {
+                                tag: &DamageTypeTag::MINECRAFT_IS_FIRE,
+                                expected: true,
+                            },
+                            DamageTypeTagPredicate {
+                                tag: &DamageTypeTag::MINECRAFT_BYPASSES_INVULNERABILITY,
+                                expected: false,
+                            },
+                        ],
+                        is_direct: None,
+                    }),
+                }),
             }],
             hit_block: &[],
             item_damage: &[],
@@ -1265,6 +1452,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -1294,6 +1482,7 @@ impl Enchantment {
                 effect: EnchantmentEntityEffect::Ignite {
                     duration: LevelBasedValue::Constant(100f32),
                 },
+                requirements: None,
             }],
             post_attack: &[],
             projectile_count: &[],
@@ -1317,6 +1506,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -1365,6 +1555,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -1444,6 +1635,66 @@ impl Enchantment {
                     block_state: crate::Block::AIR.default_state,
                     trigger_game_event: Some(crate::game_event::GameEvent::BlockPlace),
                 },
+                requirements: Some(LootItemCondition::AllOf(&[
+                    LootItemCondition::EntityProperties {
+                        entity: LootContextEntityTarget::This,
+                        predicate: Some(EntityPredicate {
+                            entity_type: None,
+                            location: None,
+                            flags: Some(EntityFlagsPredicate {
+                                is_on_ground: Some(true),
+                                is_flying: None,
+                                is_fall_flying: None,
+                                is_in_water: None,
+                            }),
+                            movement: None,
+                            vehicle: None,
+                            player: None,
+                            movement_affected_by: None,
+                            periodic_tick: None,
+                        }),
+                    },
+                    LootItemCondition::Inverted(&LootItemCondition::EntityProperties {
+                        entity: LootContextEntityTarget::This,
+                        predicate: Some(EntityPredicate {
+                            entity_type: None,
+                            location: None,
+                            flags: None,
+                            movement: None,
+                            vehicle: Some(&EntityPredicate {
+                                entity_type: None,
+                                location: None,
+                                flags: None,
+                                movement: None,
+                                vehicle: None,
+                                player: None,
+                                movement_affected_by: None,
+                                periodic_tick: None,
+                            }),
+                            player: None,
+                            movement_affected_by: None,
+                            periodic_tick: None,
+                        }),
+                    }),
+                ])),
+            }],
+            damage_immunity: &[ConditionalEffect {
+                effect: (),
+                requirements: Some(LootItemCondition::DamageSourceProperties {
+                    predicate: Some(DamageSourcePredicate {
+                        tags: &[
+                            DamageTypeTagPredicate {
+                                tag: &DamageTypeTag::MINECRAFT_BURN_FROM_STEPPING,
+                                expected: true,
+                            },
+                            DamageTypeTagPredicate {
+                                tag: &DamageTypeTag::MINECRAFT_BYPASSES_INVULNERABILITY,
+                                expected: false,
+                            },
+                        ],
+                        is_direct: None,
+                    }),
+                }),
             }],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -1481,6 +1732,21 @@ impl Enchantment {
                     base: 2.5f32,
                     per_level_above_first: 2.5f32,
                 }),
+                requirements: Some(LootItemCondition::EntityProperties {
+                    entity: LootContextEntityTarget::This,
+                    predicate: Some(EntityPredicate {
+                        entity_type: Some(EntityTypePredicate::Tag(
+                            &EntityTypeTag::MINECRAFT_SENSITIVE_TO_IMPALING,
+                        )),
+                        location: None,
+                        flags: None,
+                        movement: None,
+                        vehicle: None,
+                        player: None,
+                        movement_affected_by: None,
+                        periodic_tick: None,
+                    }),
+                }),
             }],
             knockback: &[],
             armor_effectiveness: &[],
@@ -1498,6 +1764,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -1530,6 +1797,11 @@ impl Enchantment {
             projectile_piercing: &[],
             ammo_use: &[ConditionalEffect {
                 effect: EnchantmentValueEffect::Set(LevelBasedValue::Constant(0f32)),
+                requirements: Some(LootItemCondition::MatchTool {
+                    predicate: Some(ItemPredicate {
+                        items: ItemSet::Item(&Item::ARROW),
+                    }),
+                }),
             }],
             damage: &[],
             knockback: &[],
@@ -1548,6 +1820,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -1585,6 +1858,7 @@ impl Enchantment {
                     base: 1f32,
                     per_level_above_first: 1f32,
                 }),
+                requirements: None,
             }],
             armor_effectiveness: &[],
             damage_protection: &[],
@@ -1601,6 +1875,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -1654,6 +1929,10 @@ impl Enchantment {
                         location: None,
                         flags: None,
                         movement: None,
+                        vehicle: None,
+                        player: None,
+                        movement_affected_by: None,
+                        periodic_tick: None,
                     }),
                 }),
             }],
@@ -1667,6 +1946,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -1716,10 +1996,12 @@ impl Enchantment {
                     base: 1f32,
                     per_level_above_first: 1f32,
                 }),
+                requirements: None,
             }],
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -1764,6 +2046,7 @@ impl Enchantment {
                     base: 1f32,
                     per_level_above_first: 1f32,
                 }),
+                requirements: None,
             }],
             block_experience: &[],
             mob_experience: &[],
@@ -1773,6 +2056,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -1821,6 +2105,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -1864,6 +2149,7 @@ impl Enchantment {
                     base: 5f32,
                     per_level_above_first: 5f32,
                 }),
+                requirements: None,
             }],
             fishing_luck_bonus: &[],
             block_experience: &[],
@@ -1874,6 +2160,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -1918,12 +2205,14 @@ impl Enchantment {
             mob_experience: &[],
             repair_with_xp: &[ConditionalEffect {
                 effect: EnchantmentValueEffect::Multiply(LevelBasedValue::Constant(2f32)),
+                requirements: None,
             }],
             smash_damage_per_fallen_block: &[],
             trident_return_acceleration: &[],
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -1956,12 +2245,14 @@ impl Enchantment {
                     base: 2f32,
                     per_level_above_first: 2f32,
                 }),
+                requirements: None,
             }],
             projectile_spread: &[ConditionalEffect {
                 effect: EnchantmentValueEffect::Add(LevelBasedValue::Linear {
                     base: 10f32,
                     per_level_above_first: 10f32,
                 }),
+                requirements: None,
             }],
             projectile_piercing: &[],
             ammo_use: &[],
@@ -1982,6 +2273,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -2016,6 +2308,7 @@ impl Enchantment {
                     base: 1f32,
                     per_level_above_first: 1f32,
                 }),
+                requirements: None,
             }],
             ammo_use: &[],
             damage: &[],
@@ -2035,6 +2328,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -2071,6 +2365,21 @@ impl Enchantment {
                     base: 1f32,
                     per_level_above_first: 0.5f32,
                 }),
+                requirements: Some(LootItemCondition::EntityProperties {
+                    entity: LootContextEntityTarget::DirectAttacker,
+                    predicate: Some(EntityPredicate {
+                        entity_type: Some(EntityTypePredicate::Tag(
+                            &EntityTypeTag::MINECRAFT_ARROWS,
+                        )),
+                        location: None,
+                        flags: None,
+                        movement: None,
+                        vehicle: None,
+                        player: None,
+                        movement_affected_by: None,
+                        periodic_tick: None,
+                    }),
+                }),
             }],
             knockback: &[],
             armor_effectiveness: &[],
@@ -2088,6 +2397,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -2127,6 +2437,21 @@ impl Enchantment {
                     base: 2f32,
                     per_level_above_first: 2f32,
                 }),
+                requirements: Some(LootItemCondition::DamageSourceProperties {
+                    predicate: Some(DamageSourcePredicate {
+                        tags: &[
+                            DamageTypeTagPredicate {
+                                tag: &DamageTypeTag::MINECRAFT_IS_PROJECTILE,
+                                expected: true,
+                            },
+                            DamageTypeTagPredicate {
+                                tag: &DamageTypeTag::MINECRAFT_BYPASSES_INVULNERABILITY,
+                                expected: false,
+                            },
+                        ],
+                        is_direct: None,
+                    }),
+                }),
             }],
             hit_block: &[],
             item_damage: &[],
@@ -2141,6 +2466,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -2180,6 +2506,15 @@ impl Enchantment {
                     base: 1f32,
                     per_level_above_first: 1f32,
                 }),
+                requirements: Some(LootItemCondition::DamageSourceProperties {
+                    predicate: Some(DamageSourcePredicate {
+                        tags: &[DamageTypeTagPredicate {
+                            tag: &DamageTypeTag::MINECRAFT_BYPASSES_INVULNERABILITY,
+                            expected: false,
+                        }],
+                        is_direct: None,
+                    }),
+                }),
             }],
             hit_block: &[],
             item_damage: &[],
@@ -2194,6 +2529,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -2231,6 +2567,21 @@ impl Enchantment {
                     base: 1f32,
                     per_level_above_first: 1f32,
                 }),
+                requirements: Some(LootItemCondition::EntityProperties {
+                    entity: LootContextEntityTarget::DirectAttacker,
+                    predicate: Some(EntityPredicate {
+                        entity_type: Some(EntityTypePredicate::Tag(
+                            &EntityTypeTag::MINECRAFT_ARROWS,
+                        )),
+                        location: None,
+                        flags: None,
+                        movement: None,
+                        vehicle: None,
+                        player: None,
+                        movement_affected_by: None,
+                        periodic_tick: None,
+                    }),
+                }),
             }],
             armor_effectiveness: &[],
             damage_protection: &[],
@@ -2247,6 +2598,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -2301,6 +2653,7 @@ impl Enchantment {
                 per_level_above_first: -0.25f32,
             })),
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -2349,6 +2702,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -2402,6 +2756,7 @@ impl Enchantment {
             )),
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -2438,6 +2793,7 @@ impl Enchantment {
                     base: 1f32,
                     per_level_above_first: 0.5f32,
                 }),
+                requirements: None,
             }],
             knockback: &[],
             armor_effectiveness: &[],
@@ -2455,6 +2811,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -2497,6 +2854,7 @@ impl Enchantment {
             fishing_luck_bonus: &[],
             block_experience: &[ConditionalEffect {
                 effect: EnchantmentValueEffect::Set(LevelBasedValue::Constant(0f32)),
+                requirements: None,
             }],
             mob_experience: &[],
             repair_with_xp: &[],
@@ -2505,6 +2863,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -2541,6 +2900,21 @@ impl Enchantment {
                     base: 2.5f32,
                     per_level_above_first: 2.5f32,
                 }),
+                requirements: Some(LootItemCondition::EntityProperties {
+                    entity: LootContextEntityTarget::This,
+                    predicate: Some(EntityPredicate {
+                        entity_type: Some(EntityTypePredicate::Tag(
+                            &EntityTypeTag::MINECRAFT_SENSITIVE_TO_SMITE,
+                        )),
+                        location: None,
+                        flags: None,
+                        movement: None,
+                        vehicle: None,
+                        player: None,
+                        movement_affected_by: None,
+                        periodic_tick: None,
+                    }),
+                }),
             }],
             knockback: &[],
             armor_effectiveness: &[],
@@ -2558,6 +2932,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -2611,13 +2986,155 @@ impl Enchantment {
                         EnchantmentEntityEffect::Other,
                         EnchantmentEntityEffect::Other,
                     ]),
+                    requirements: Some(LootItemCondition::AllOf(&[
+                        LootItemCondition::Inverted(&LootItemCondition::EntityProperties {
+                            entity: LootContextEntityTarget::This,
+                            predicate: Some(EntityPredicate {
+                                entity_type: None,
+                                location: None,
+                                flags: None,
+                                movement: None,
+                                vehicle: Some(&EntityPredicate {
+                                    entity_type: None,
+                                    location: None,
+                                    flags: None,
+                                    movement: None,
+                                    vehicle: None,
+                                    player: None,
+                                    movement_affected_by: None,
+                                    periodic_tick: None,
+                                }),
+                                player: None,
+                                movement_affected_by: None,
+                                periodic_tick: None,
+                            }),
+                        }),
+                        LootItemCondition::AnyOf(&[
+                            LootItemCondition::AllOf(&[
+                                LootItemCondition::EnchantmentActiveCheck { active: true },
+                                LootItemCondition::EntityProperties {
+                                    entity: LootContextEntityTarget::This,
+                                    predicate: Some(EntityPredicate {
+                                        entity_type: None,
+                                        location: None,
+                                        flags: Some(EntityFlagsPredicate {
+                                            is_on_ground: None,
+                                            is_flying: Some(false),
+                                            is_fall_flying: None,
+                                            is_in_water: None,
+                                        }),
+                                        movement: None,
+                                        vehicle: None,
+                                        player: None,
+                                        movement_affected_by: None,
+                                        periodic_tick: None,
+                                    }),
+                                },
+                                LootItemCondition::AnyOf(&[
+                                    LootItemCondition::EntityProperties {
+                                        entity: LootContextEntityTarget::This,
+                                        predicate: Some(EntityPredicate {
+                                            entity_type: None,
+                                            location: None,
+                                            flags: None,
+                                            movement: None,
+                                            vehicle: None,
+                                            player: None,
+                                            movement_affected_by: Some(LocationPredicate {
+                                                block: Some(BlockPredicate {
+                                                    blocks: &BlockTag::MINECRAFT_SOUL_SPEED_BLOCKS,
+                                                }),
+                                                can_see_sky: None,
+                                            }),
+                                            periodic_tick: None,
+                                        }),
+                                    },
+                                    LootItemCondition::EntityProperties {
+                                        entity: LootContextEntityTarget::This,
+                                        predicate: Some(EntityPredicate {
+                                            entity_type: None,
+                                            location: None,
+                                            flags: Some(EntityFlagsPredicate {
+                                                is_on_ground: Some(false),
+                                                is_flying: None,
+                                                is_fall_flying: None,
+                                                is_in_water: None,
+                                            }),
+                                            movement: None,
+                                            vehicle: None,
+                                            player: None,
+                                            movement_affected_by: None,
+                                            periodic_tick: None,
+                                        }),
+                                    },
+                                ]),
+                            ]),
+                            LootItemCondition::AllOf(&[
+                                LootItemCondition::EnchantmentActiveCheck { active: false },
+                                LootItemCondition::EntityProperties {
+                                    entity: LootContextEntityTarget::This,
+                                    predicate: Some(EntityPredicate {
+                                        entity_type: None,
+                                        location: None,
+                                        flags: Some(EntityFlagsPredicate {
+                                            is_on_ground: None,
+                                            is_flying: Some(false),
+                                            is_fall_flying: None,
+                                            is_in_water: None,
+                                        }),
+                                        movement: None,
+                                        vehicle: None,
+                                        player: None,
+                                        movement_affected_by: Some(LocationPredicate {
+                                            block: Some(BlockPredicate {
+                                                blocks: &BlockTag::MINECRAFT_SOUL_SPEED_BLOCKS,
+                                            }),
+                                            can_see_sky: None,
+                                        }),
+                                        periodic_tick: None,
+                                    }),
+                                },
+                            ]),
+                        ]),
+                    ])),
                 },
                 ConditionalEffect {
                     effect: EnchantmentEntityEffect::ChangeItemDamage {
                         amount: LevelBasedValue::Constant(1f32),
                     },
+                    requirements: Some(LootItemCondition::AllOf(&[
+                        LootItemCondition::RandomChance {
+                            chance: ContextFloatProvider::EnchantmentLevel(
+                                LevelBasedValue::Constant(0.04f32),
+                            ),
+                        },
+                        LootItemCondition::EntityProperties {
+                            entity: LootContextEntityTarget::This,
+                            predicate: Some(EntityPredicate {
+                                entity_type: None,
+                                location: None,
+                                flags: Some(EntityFlagsPredicate {
+                                    is_on_ground: Some(true),
+                                    is_flying: None,
+                                    is_fall_flying: None,
+                                    is_in_water: None,
+                                }),
+                                movement: None,
+                                vehicle: None,
+                                player: None,
+                                movement_affected_by: Some(LocationPredicate {
+                                    block: Some(BlockPredicate {
+                                        blocks: &BlockTag::MINECRAFT_SOUL_SPEED_BLOCKS,
+                                    }),
+                                    can_see_sky: None,
+                                }),
+                                periodic_tick: None,
+                            }),
+                        },
+                    ])),
                 },
             ],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -2666,6 +3183,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -2714,6 +3232,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -2781,6 +3300,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -2829,6 +3349,11 @@ impl Enchantment {
                             per_level_above_first: 5f32,
                         },
                     }),
+                    requirements: Some(LootItemCondition::MatchTool {
+                        predicate: Some(ItemPredicate {
+                            items: ItemSet::Tag(&ItemTag::MINECRAFT_ENCHANTABLE_ARMOR),
+                        }),
+                    }),
                 },
                 ConditionalEffect {
                     effect: EnchantmentValueEffect::RemoveBinomial(LevelBasedValue::Fraction {
@@ -2841,6 +3366,13 @@ impl Enchantment {
                             per_level_above_first: 1f32,
                         },
                     }),
+                    requirements: Some(LootItemCondition::Inverted(
+                        &LootItemCondition::MatchTool {
+                            predicate: Some(ItemPredicate {
+                                items: ItemSet::Tag(&ItemTag::MINECRAFT_ENCHANTABLE_ARMOR),
+                            }),
+                        },
+                    )),
                 },
             ],
             equipment_drops: &[],
@@ -2854,6 +3386,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -2902,6 +3435,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: true,
         },
@@ -2958,14 +3492,25 @@ impl Enchantment {
                         entity_type: None,
                         location: None,
                         flags: Some(EntityFlagsPredicate {
+                            is_on_ground: None,
                             is_flying: Some(false),
+                            is_fall_flying: None,
+                            is_in_water: None,
                         }),
                         movement: Some(MovementPredicate {
                             fall_distance: DoubleBounds {
                                 min: Some(1.5f64),
                                 max: None,
                             },
+                            horizontal_speed: DoubleBounds {
+                                min: None,
+                                max: None,
+                            },
                         }),
+                        vehicle: None,
+                        player: None,
+                        movement_affected_by: None,
+                        periodic_tick: None,
                     }),
                 }),
             }],
@@ -2990,6 +3535,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
         },
@@ -3255,55 +3801,6 @@ impl Enchantment {
     ) -> &'static [TargetedConditionalEffect<EnchantmentEntityEffect>] {
         self.effects.post_attack
     }
-    pub fn modify_damage_against(
-        &self,
-        level: i32,
-        damage: &mut f64,
-        victim_type: Option<&crate::entity::EntityType>,
-    ) {
-        let is_applicable = if self == &Self::SHARPNESS {
-            true
-        } else if self == &Self::SMITE {
-            victim_type.is_some_and(|t| t.has_tag(&EntityTypeTag::MINECRAFT_SENSITIVE_TO_SMITE))
-        } else if self == &Self::BANE_OF_ARTHROPODS {
-            victim_type.is_some_and(|t| {
-                t.has_tag(&EntityTypeTag::MINECRAFT_SENSITIVE_TO_BANE_OF_ARTHROPODS)
-            })
-        } else if self == &Self::IMPALING {
-            victim_type.is_some_and(|t| t.has_tag(&EntityTypeTag::MINECRAFT_SENSITIVE_TO_IMPALING))
-        } else {
-            false
-        };
-        if is_applicable {
-            self.modify_damage(level, damage);
-        }
-    }
-    pub fn modify_damage_protection_against(
-        &self,
-        level: i32,
-        damage_type: &crate::damage::DamageType,
-        protection: &mut f32,
-    ) {
-        let is_applicable = if self == &Self::PROTECTION {
-            !damage_type.has_tag(&DamageTypeTag::MINECRAFT_BYPASSES_INVULNERABILITY)
-                && damage_type != &crate::damage::DamageType::STARVE
-                && damage_type != &crate::damage::DamageType::GENERIC_KILL
-                && damage_type != &crate::damage::DamageType::OUT_OF_WORLD
-        } else if self == &Self::FIRE_PROTECTION {
-            damage_type.has_tag(&DamageTypeTag::MINECRAFT_IS_FIRE)
-        } else if self == &Self::BLAST_PROTECTION {
-            damage_type.has_tag(&DamageTypeTag::MINECRAFT_IS_EXPLOSION)
-        } else if self == &Self::PROJECTILE_PROTECTION {
-            damage_type.has_tag(&DamageTypeTag::MINECRAFT_IS_PROJECTILE)
-        } else if self == &Self::FEATHER_FALLING {
-            damage_type.has_tag(&DamageTypeTag::MINECRAFT_IS_FALL)
-        } else {
-            false
-        };
-        if is_applicable {
-            self.modify_damage_protection(level, protection);
-        }
-    }
     pub fn modify_durability_damage(&self, level: i32, is_armor: bool, damage: &mut f32) {
         if self == &Self::UNBREAKING {
             let effect = if is_armor {
@@ -3325,49 +3822,6 @@ impl Enchantment {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test]
-    fn sharpness_damage() {
-        let mut dmg = 0.0;
-        Enchantment::SHARPNESS.modify_damage_against(1, &mut dmg, None);
-        assert_eq!(dmg, 1.0);
-        let mut dmg5 = 0.0;
-        Enchantment::SHARPNESS.modify_damage_against(5, &mut dmg5, None);
-        assert_eq!(dmg5, 3.0);
-    }
-    #[test]
-    fn smite_damage() {
-        let mut dmg = 0.0;
-        Enchantment::SMITE.modify_damage_against(
-            1,
-            &mut dmg,
-            Some(&crate::entity::EntityType::ZOMBIE),
-        );
-        assert_eq!(dmg, 2.5);
-        let mut dmg_pig = 0.0;
-        Enchantment::SMITE.modify_damage_against(
-            1,
-            &mut dmg_pig,
-            Some(&crate::entity::EntityType::PIG),
-        );
-        assert_eq!(dmg_pig, 0.0);
-    }
-    #[test]
-    fn protection_absorb() {
-        let mut prot = 0.0;
-        Enchantment::PROTECTION.modify_damage_protection_against(
-            4,
-            &crate::damage::DamageType::GENERIC,
-            &mut prot,
-        );
-        assert_eq!(prot, 4.0);
-        let mut fire_prot = 0.0;
-        Enchantment::FIRE_PROTECTION.modify_damage_protection_against(
-            4,
-            &crate::damage::DamageType::IN_FIRE,
-            &mut fire_prot,
-        );
-        assert_eq!(fire_prot, 8.0);
-    }
     #[test]
     fn primary_items() {
         assert!(Enchantment::SHARPNESS.primary_items.is_some());

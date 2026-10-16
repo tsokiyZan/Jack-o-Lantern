@@ -2,6 +2,7 @@ use std::sync::atomic::Ordering;
 
 use crate::enchantment::EnchantmentHelper;
 use crate::entity::EntityBase;
+use crate::entity::damage_source::DamageSource;
 use crate::entity::decoration::armor_stand::ArmorStandEntity;
 use crate::entity::living::LivingEntity;
 use crate::entity::player::Player;
@@ -88,7 +89,12 @@ impl MaceItem {
     /// Vanilla `MaceItem.getAttackDamageBonus`: falling turns into damage, steeply for the first
     /// blocks and less after that.
     #[must_use]
-    pub fn get_attack_damage_bonus(attacker: &LivingEntity, weapon: &ItemStack) -> f32 {
+    pub fn get_attack_damage_bonus(
+        attacker: &LivingEntity,
+        weapon: &ItemStack,
+        victim: &dyn EntityBase,
+        damage_source: &DamageSource<'_>,
+    ) -> f32 {
         if !Self::can_smash_attack(attacker) {
             return 0.0;
         }
@@ -100,7 +106,9 @@ impl MaceItem {
         } else {
             22.0 + fall_distance - 8.0
         };
-        let per_block = EnchantmentHelper::modify_fall_based_damage(weapon, 0.0) as f32;
+        let world = attacker.entity.world.load();
+        let per_block =
+            EnchantmentHelper::modify_fall_based_damage(&world, weapon, victim, damage_source, 0.0);
         (damage + f64::from(per_block) * fall_distance) as f32
     }
 

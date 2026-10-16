@@ -311,15 +311,6 @@ pub fn perform_bow_attack(
     );
     let difficulty = world.level_info.load().difficulty as i32;
     arrow.set_base_damage_from_mob(f64::from(power), difficulty);
-    // Pumpkin's arrow takes the bow's enchantments when shot instead of on hit.
-    arrow.set_base_damage(crate::enchantment::EnchantmentHelper::modify_damage(
-        &bow_item,
-        arrow.get_base_damage(),
-    ));
-    arrow.punch_level.store(
-        crate::enchantment::EnchantmentHelper::modify_knockback(&bow_item, 0.0) as u8,
-        Ordering::Relaxed,
-    );
     get_arrow(&arrow);
 
     let mob_pos = entity.pos.load();

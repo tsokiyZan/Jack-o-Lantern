@@ -1339,8 +1339,6 @@ impl Player {
 
         let mut damage_multiplier = 1.0;
         let mut add_speed = 0.0;
-        let mut extra_ench_damage = 0.0;
-        let mut knockback_level = 0u32;
 
         {
             let stack = &item_stack;
@@ -1359,19 +1357,37 @@ impl Player {
                     }
                 }
             }
-            if let Some(enchantments) = stack.get_data_component::<EnchantmentsImpl>() {
-                for (enchantment, level) in enchantments.enchantment.iter() {
-                    enchantment.modify_damage_against(
-                        *level,
-                        &mut extra_ench_damage,
-                        Some(victim_entity.entity_type),
-                    );
-                    let mut kb = 0.0f32;
-                    enchantment.modify_knockback(*level, &mut kb);
-                    knockback_level += kb as u32;
-                }
-            }
         }
+
+        // Vanilla `createAttackSource`: the mace's while it can smash.
+        let is_mace_smash = item_stack.item.id == pumpkin_data::item::Item::MACE.id
+            && MaceItem::can_smash_attack(&self.living_entity);
+        let damage_source = DamageSource {
+            damage_type: if is_mace_smash {
+                DamageType::MACE_SMASH
+            } else {
+                DamageType::PLAYER_ATTACK
+            },
+            direct: Some(self),
+            causing: Some(self),
+        };
+        // Vanilla `getEnchantedDamage` and `getKnockback`, against this target.
+        let extra_ench_damage = f64::from(
+            EnchantmentHelper::modify_damage(
+                &world,
+                &item_stack,
+                victim.as_ref(),
+                &damage_source,
+                base_damage as f32,
+            ) - base_damage as f32,
+        );
+        let knockback_level = EnchantmentHelper::modify_knockback(
+            &world,
+            &item_stack,
+            victim.as_ref(),
+            &damage_source,
+            0.0,
+        ) as u32;
 
         let attack_speed = base_attack_speed + add_speed;
 
@@ -1412,12 +1428,12 @@ impl Player {
 
         // Vanilla `Item.getAttackDamageBonus`, before the critical hit multiplies it; only the
         // mace has one. Its damage source is `mace` while it can smash.
-        let is_mace_smash = item_stack.item.id == pumpkin_data::item::Item::MACE.id
-            && MaceItem::can_smash_attack(&self.living_entity);
         if is_mace_smash {
             damage += f64::from(MaceItem::get_attack_damage_bonus(
                 &self.living_entity,
                 &item_stack,
+                victim.as_ref(),
+                &damage_source,
             ));
         }
 
@@ -1425,15 +1441,6 @@ impl Player {
             damage *= 1.5;
         }
 
-        let damage_source = DamageSource {
-            damage_type: if is_mace_smash {
-                DamageType::MACE_SMASH
-            } else {
-                DamageType::PLAYER_ATTACK
-            },
-            direct: Some(self),
-            causing: Some(self),
-        };
         if !victim.damage_with_context(
             victim.as_ref(),
             damage as f32,
@@ -7013,6 +7020,12 @@ impl NBTStorage for EnderChestInventory {
 impl NBTStorageInit for EnderChestInventory {}
 
 impl EntityBase for Player {
+    /// Vanilla `LivingEntity.getWeaponItem`; Pumpkin doesn't track the riptide spin stack.
+    fn get_weapon_item(&self) -> Option<ItemStack> {
+        self.get_living_entity()
+            .map(|living| living.held_item(self))
+    }
+
     fn damage_with_context(
         &self,
         caller: &dyn EntityBase,

@@ -4,7 +4,7 @@ use pumpkin_data::enchantment::{
     Enchantment, EnchantmentEntityEffect, EnchantmentTarget, TargetedConditionalEffect,
 };
 
-use super::condition::{DamageLootContext, LootItemConditionExt};
+use super::condition::{EnchantmentLootContext, LootItemConditionExt};
 use super::effects::EnchantmentEntityEffectExt;
 use super::enchanted_item_in_use::EnchantedItemInUse;
 use crate::entity::EntityBase;
@@ -44,7 +44,7 @@ pub fn do_post_attack_effect(
     victim: &dyn EntityBase,
     damage_source: &DamageSource<'_>,
 ) {
-    let context = DamageLootContext::new(world, enchantment_level, victim, damage_source);
+    let context = EnchantmentLootContext::damage(world, enchantment_level, victim, damage_source);
     if effect
         .requirements
         .as_ref()

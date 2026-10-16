@@ -1,6 +1,4 @@
-use pumpkin_data::{
-    Enchantment, damage::DamageType, data_component_impl::EquipmentSlot, effect::StatusEffect,
-};
+use pumpkin_data::{damage::DamageType, effect::StatusEffect};
 use pumpkin_macros::pumpkin_block;
 
 use crate::block::{BlockBehaviour, OnEntityStepArgs};
@@ -24,22 +22,6 @@ impl BlockBehaviour for MagmaBlock {
 
             // Fire immune entities don't take damage
             if ent.is_fire_immune() {
-                return;
-            }
-
-            let has_frost_walker = {
-                let equipment = living_entity
-                    .entity_equipment
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner);
-                equipment
-                    .equipment
-                    .get(&EquipmentSlot::FEET)
-                    .is_some_and(|boots| {
-                        boots.get_enchantment_level(&Enchantment::FROST_WALKER) != 0
-                    })
-            };
-            if has_frost_walker {
                 return;
             }
 

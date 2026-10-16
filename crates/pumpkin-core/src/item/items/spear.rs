@@ -14,16 +14,16 @@ use crate::world::World;
 use pumpkin_data::attributes::Attributes;
 use pumpkin_data::damage::DamageType;
 use pumpkin_data::data_component_impl::{
-    AttackRangeImpl, AttributeModifiersImpl, EnchantmentsImpl, EquipmentSlot, KineticWeaponImpl,
-    Operation, PiercingWeaponImpl, WeaponImpl,
+    AttackRangeImpl, AttributeModifiersImpl, EquipmentSlot, KineticWeaponImpl, Operation,
+    PiercingWeaponImpl, WeaponImpl,
 };
 use pumpkin_data::effect::StatusEffect;
 use pumpkin_data::entity::{EntityStatus, EntityType};
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::SoundCategory;
+use pumpkin_data::tag;
 use pumpkin_data::tag::Taggable;
-use pumpkin_data::{Enchantment, tag};
 use pumpkin_util::math::boundingbox::BoundingBox;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
@@ -168,8 +168,21 @@ impl SpearItem {
         effects: StabEffects,
     ) -> bool {
         let target_entity = target.get_entity();
+        let world = player.world();
+        let damage_source = DamageSource {
+            damage_type: DamageType::SPEAR,
+            direct: Some(player),
+            causing: Some(player),
+        };
         let mut base_damage = base_damage;
-        let mut magic_boost = Self::enchantment_damage(stack, target_entity) as f32;
+        // Vanilla `getEnchantedDamage(target, baseDamage, source) - baseDamage`.
+        let mut magic_boost = EnchantmentHelper::modify_damage(
+            &world,
+            stack,
+            target.as_ref(),
+            &damage_source,
+            base_damage,
+        ) - base_damage;
         if !Self::is_using_hand(player, hand) {
             let tps = f64::from(server.basic_config.tps);
             let charge =
@@ -183,11 +196,6 @@ impl SpearItem {
             base_damage + magic_boost
         } else {
             0.0
-        };
-        let damage_source = DamageSource {
-            damage_type: DamageType::SPEAR,
-            direct: Some(player),
-            causing: Some(player),
         };
         let was_hurt = effects.damage
             && target.damage_with_context(
@@ -203,8 +211,14 @@ impl SpearItem {
         if effects.knockback && config.knockback && target.get_living_entity().is_some() {
             let attacker = player.get_entity();
             combat::handle_knockback(attacker, target.as_ref(), 0.8, total_damage, false);
-            let knockback_level = Self::knockback_level(stack);
-            if knockback_level > 0 {
+            let knockback_level = EnchantmentHelper::modify_knockback(
+                &world,
+                stack,
+                target.as_ref(),
+                &damage_source,
+                0.0,
+            );
+            if knockback_level > 0.0 {
                 combat::handle_knockback(
                     attacker,
                     target.as_ref(),
@@ -485,14 +499,20 @@ impl SpearItem {
         let living = &mob.get_mob_entity().living_entity;
         let attacker = &living.entity;
         let target_entity = target.get_entity();
-        let post_enchantment_damage =
-            base_damage + Self::enchantment_damage(stack, target_entity) as f32;
-        let mut affected = effects.knockback;
+        let world = attacker.world.load_full();
         let damage_source = DamageSource {
             damage_type: DamageType::SPEAR,
             direct: Some(mob),
             causing: Some(mob),
         };
+        let post_enchantment_damage = EnchantmentHelper::modify_damage(
+            &world,
+            stack,
+            target.as_ref(),
+            &damage_source,
+            base_damage,
+        );
+        let mut affected = effects.knockback;
         let dealt_damage = effects.damage
             && target.damage_with_context(
                 target.as_ref(),
@@ -512,8 +532,13 @@ impl SpearItem {
                 false,
             );
             // `getKnockback`, which `handle_knockback` halves.
-            let knockback = living.get_attribute_value(&Attributes::ATTACK_KNOCKBACK)
-                + f64::from(Self::knockback_level(stack));
+            let knockback = f64::from(EnchantmentHelper::modify_knockback(
+                &world,
+                stack,
+                target.as_ref(),
+                &damage_source,
+                living.get_attribute_value(&Attributes::ATTACK_KNOCKBACK) as f32,
+            ));
             if knockback > 0.0 {
                 combat::handle_knockback(
                     attacker,
@@ -649,47 +674,6 @@ impl SpearItem {
                 modifier.id == modifier_id && modifier.operation == Operation::AddValue
             })
             .fold(value, |value, modifier| value + modifier.amount)
-    }
-
-    fn enchantment_damage(stack: &ItemStack, target: &Entity) -> f64 {
-        let Some(enchantments) = stack.get_data_component::<EnchantmentsImpl>() else {
-            return 0.0;
-        };
-        enchantments
-            .enchantment
-            .iter()
-            .map(|(enchantment, level)| {
-                let level = f64::from(*level);
-                let smite = **enchantment == Enchantment::SMITE
-                    && target
-                        .entity_type
-                        .has_tag(&tag::EntityType::MINECRAFT_SENSITIVE_TO_SMITE);
-                let bane = **enchantment == Enchantment::BANE_OF_ARTHROPODS
-                    && target
-                        .entity_type
-                        .has_tag(&tag::EntityType::MINECRAFT_SENSITIVE_TO_BANE_OF_ARTHROPODS);
-                if **enchantment == Enchantment::SHARPNESS {
-                    0.5 * level + 0.5
-                } else if smite || bane {
-                    2.5 * level
-                } else {
-                    0.0
-                }
-            })
-            .sum()
-    }
-
-    fn knockback_level(stack: &ItemStack) -> u32 {
-        stack
-            .get_data_component::<EnchantmentsImpl>()
-            .and_then(|enchantments| {
-                enchantments
-                    .enchantment
-                    .iter()
-                    .find(|(enchantment, _)| **enchantment == Enchantment::KNOCKBACK)
-                    .map(|(_, level)| u32::try_from(*level).unwrap_or(0))
-            })
-            .unwrap_or(0)
     }
 
     fn targets_in_range(

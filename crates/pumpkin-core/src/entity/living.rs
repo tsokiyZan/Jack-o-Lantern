@@ -25,25 +25,28 @@ use super::breath::BreathManager;
 use super::experience_orb::ExperienceOrbEntity;
 use super::{Entity, EntityBase, NBTStorageInit};
 use crate::block::OnLandedUponArgs;
+use crate::enchantment::EnchantmentHelper;
 use crate::entity::NBTStorage;
 use crate::entity::ageable::AgeableMob;
 use crate::entity::attributes::AttributeInstance;
 use crate::entity::attributes::Modifier;
 use crate::entity::attributes::ModifierOperation;
 use crate::entity::combat::{CombatRules, CombatTracker, FallLocation, knockback_after_resistance};
+use crate::entity::damage_source::DamageSource;
 use crate::entity::mob::equipment::DEFAULT_EQUIPMENT_DROP_CHANCE;
 use crate::entity::player::statistics::{CustomStatistic, StatisticCategory};
 use crate::server::Server;
 use crate::world::loot::LootContextParameters;
 use crossbeam::atomic::AtomicCell;
 use pumpkin_data::AttributeModifierSlot;
+use pumpkin_data::Block;
 use pumpkin_data::attributes::Attributes;
 use pumpkin_data::data_component_impl::IdOr;
 use pumpkin_data::data_component_impl::Operation;
 use pumpkin_data::data_component_impl::food::{ConsumableImpl, ConsumeAnimation, ConsumeEffect};
 use pumpkin_data::data_component_impl::{
-    AttributeModifiersImpl, BlocksAttacksImpl, DeathProtectionImpl, EnchantmentsImpl,
-    EquipmentSlot, EquippableImpl, FoodImpl, IDSet, MobVisibilityImpl,
+    AttributeModifiersImpl, BlocksAttacksImpl, DeathProtectionImpl, EquipmentSlot, EquippableImpl,
+    FoodImpl, IDSet, MobVisibilityImpl,
 };
 use pumpkin_data::effect::StatusEffect;
 use pumpkin_data::entity::{EntityPose, EntityStatus, EntityType};
@@ -52,7 +55,6 @@ use pumpkin_data::game_event::GameEvent;
 use pumpkin_data::game_rules::{GameRule, GameRuleValue};
 use pumpkin_data::item_stack::{DamageResult, ItemStack};
 use pumpkin_data::sound::SoundCategory;
-use pumpkin_data::{Block, Enchantment};
 use pumpkin_data::{damage::DamageType, sound::Sound};
 use pumpkin_inventory::entity_equipment::EntityEquipment;
 use pumpkin_nbt::compound::NbtCompound;
@@ -2451,27 +2453,18 @@ impl LivingEntity {
                 .and_then(EntityBase::get_mob)
                 .is_none_or(|mob| mob.killed_entity(&*dyn_self));
             world.send_entity_status(&self.entity, EntityStatus::Death, Some(ActorEventID::Death));
-            let looting_level;
-            let tool = if let Some(cause_ent) = cause {
-                if let Some(player) = cause_ent
-                    .cast_any()
-                    .downcast_ref::<crate::entity::player::Player>()
-                {
-                    let hand_stack = player
+            let tool = cause
+                .and_then(|cause_ent| {
+                    cause_ent
+                        .cast_any()
+                        .downcast_ref::<crate::entity::player::Player>()
+                })
+                .map(|player| {
+                    player
                         .inventory()
-                        .get_stack_in_hand(pumpkin_util::Hand::Right);
-                    looting_level = hand_stack
-                        .get_enchantment_level(&Enchantment::LOOTING)
-                        .max(0) as u32;
-                    (!hand_stack.is_empty()).then(|| hand_stack.clone())
-                } else {
-                    looting_level = 0;
-                    None
-                }
-            } else {
-                looting_level = 0;
-                None
-            };
+                        .get_stack_in_hand(pumpkin_util::Hand::Right)
+                })
+                .filter(|hand_stack| !hand_stack.is_empty());
 
             let is_raining = world.is_raining();
             let is_thundering = world.is_thundering();
@@ -2532,7 +2525,11 @@ impl LivingEntity {
             self.entity.pose.store(EntityPose::Dying);
 
             if perished {
-                self.drop_equipment(looting_level);
+                self.drop_equipment(&DamageSource {
+                    damage_type,
+                    direct: source,
+                    causing: cause,
+                });
                 if let Some(mob) = dyn_self.get_mob() {
                     mob.drop_custom_death_loot();
                 }
@@ -2560,7 +2557,8 @@ impl LivingEntity {
         }
     }
 
-    fn drop_equipment(&self, looting_level: u32) {
+    fn drop_equipment(&self, killing_blow: &DamageSource<'_>) {
+        let world = self.entity.world.load();
         let drop_chances = self
             .equipment_drop_chances
             .lock()
@@ -2579,10 +2577,19 @@ impl LivingEntity {
                 .unwrap_or(DEFAULT_EQUIPMENT_DROP_CHANCE);
             // A chance above 1.0 marks a guaranteed, undamaged drop.
             let preserved = chance > 1.0;
-            // Vanilla approximation: EnchantmentHelper.processEquipmentDropChance
-            // adds lootingLevel * 0.01 to the per-slot equipment drop chance.
-            chance += looting_level as f32 * 0.01;
-            chance = chance.min(1.0);
+            // Vanilla `Mob.dropCustomDeathLoot` hands the killer to
+            // `processEquipmentDropChance` (Looting adds 0.01 per level).
+            if let Some(killer) = killing_blow.causing
+                && let Some(killer_living) = killer.get_living_entity()
+            {
+                chance = EnchantmentHelper::process_equipment_drop_chance(
+                    &world,
+                    killer,
+                    killer_living,
+                    killing_blow,
+                    chance,
+                );
+            }
             if !preserved && rand::random::<f32>() >= chance {
                 continue;
             }
@@ -3543,46 +3550,37 @@ impl LivingEntity {
         // todo more...
     }
 
-    /// Calculates damage after armor reduction, mirroring vanilla `LivingEntity.getDamageAfterArmorAbsorb`.
+    /// Vanilla `LivingEntity.getDamageAfterArmorAbsorb`.
     pub fn get_damage_after_armor_absorb(
         &self,
         caller: &dyn EntityBase,
         damage: f32,
-        damage_type: &DamageType,
-        attacker: Option<&dyn EntityBase>,
+        damage_source: &DamageSource<'_>,
     ) -> f32 {
-        if damage_type.has_tag(&tag::DamageType::MINECRAFT_BYPASSES_ARMOR) {
+        if damage_source
+            .damage_type
+            .has_tag(&tag::DamageType::MINECRAFT_BYPASSES_ARMOR)
+        {
             return damage;
         }
-        self.hurt_armor(caller, *damage_type, damage);
+        self.hurt_armor(caller, damage_source.damage_type, damage);
 
         // Vanilla `getArmorValue` (the floored ARMOR attribute, worn armor included through
         // its attribute modifiers) and the ARMOR_TOUGHNESS attribute.
         let armor = self.get_attribute_value(&Attributes::ARMOR).floor() as f32;
         let toughness = self.get_attribute_value(&Attributes::ARMOR_TOUGHNESS) as f32;
-
-        let breach_level = attacker
-            .and_then(|att| {
-                let player = att.get_player()?;
-                let hand_stack = player
-                    .inventory()
-                    .get_stack_in_hand(pumpkin_util::Hand::Right);
-                let level = hand_stack.get_enchantment_level(&Enchantment::BREACH);
-                (level > 0).then_some(level as u32)
-            })
-            .unwrap_or(0);
-
-        CombatRules::get_damage_after_absorb(damage, armor, toughness, breach_level)
+        CombatRules::get_damage_after_absorb(caller, damage, damage_source, armor, toughness)
     }
 
     /// Calculates damage after magic/resistance/enchantment reduction, mirroring vanilla `LivingEntity.getDamageAfterMagicAbsorb`.
     pub fn get_damage_after_magic_absorb(
         &self,
         mut damage: f32,
-        damage_type: &DamageType,
         caller: &dyn EntityBase,
-        cause: Option<&dyn EntityBase>,
+        damage_source: &DamageSource<'_>,
     ) -> f32 {
+        let damage_type = &damage_source.damage_type;
+        let cause = damage_source.causing;
         if damage_type.has_tag(&tag::DamageType::MINECRAFT_BYPASSES_EFFECTS) {
             return damage;
         }
@@ -3623,28 +3621,12 @@ impl LivingEntity {
             return damage;
         }
 
-        let mut epf = 0.0f32;
-        {
-            let equipment_lock = self
-                .entity_equipment
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            for slot in [
-                EquipmentSlot::HEAD,
-                EquipmentSlot::CHEST,
-                EquipmentSlot::LEGS,
-                EquipmentSlot::FEET,
-            ] {
-                if let Some(stack) = equipment_lock.equipment.get(&slot)
-                    && !stack.is_empty()
-                    && let Some(enchantments) = stack.get_data_component::<EnchantmentsImpl>()
-                {
-                    for (enchantment, level) in enchantments.enchantment.iter() {
-                        enchantment.modify_damage_protection_against(*level, damage_type, &mut epf);
-                    }
-                }
-            }
-        }
+        let epf = EnchantmentHelper::get_damage_protection(
+            &self.entity.world.load(),
+            caller,
+            self,
+            damage_source,
+        );
 
         if epf > 0.0 {
             damage = CombatRules::get_damage_after_magic_absorb(damage, epf);
@@ -3665,8 +3647,19 @@ impl LivingEntity {
     ) -> bool {
         let mut amount = amount;
 
-        // Check invulnerability before applying damage
-        if self.entity.is_invulnerable_to(&damage_type, cause) {
+        // Vanilla `LivingEntity.isInvulnerableTo`: the base check, then enchantment immunities.
+        if self.entity.is_invulnerable_to(&damage_type, cause)
+            || EnchantmentHelper::is_immune_to_damage(
+                &self.entity.world.load(),
+                caller,
+                self,
+                &DamageSource {
+                    damage_type,
+                    direct: source,
+                    causing: cause,
+                },
+            )
+        {
             return false;
         }
 
@@ -3892,14 +3885,15 @@ impl LivingEntity {
         };
 
         // Vanilla `actuallyHurt`: armour (which wears it), then effects and enchantments.
+        let damage_source = DamageSource {
+            damage_type,
+            direct: source,
+            causing: cause,
+        };
         let damage_after_armor =
-            self.get_damage_after_armor_absorb(caller, hurt_amount, &damage_type, cause.or(source));
-        let effective_amount = self.get_damage_after_magic_absorb(
-            damage_after_armor,
-            &damage_type,
-            caller,
-            cause.or(source),
-        );
+            self.get_damage_after_armor_absorb(caller, hurt_amount, &damage_source);
+        let effective_amount =
+            self.get_damage_after_magic_absorb(damage_after_armor, caller, &damage_source);
         let play_sound = took_full_damage && self.health.load() > effective_amount;
 
         self.last_damage_taken.store(amount);
@@ -4219,6 +4213,12 @@ impl LivingEntity {
 }
 
 impl EntityBase for LivingEntity {
+    /// Vanilla `LivingEntity.getWeaponItem`; Pumpkin doesn't track the riptide spin stack.
+    fn get_weapon_item(&self) -> Option<ItemStack> {
+        self.get_living_entity()
+            .map(|living| living.held_item(self))
+    }
+
     fn damage_with_context(
         &self,
         caller: &dyn EntityBase,

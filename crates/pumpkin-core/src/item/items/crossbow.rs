@@ -68,7 +68,8 @@ impl ItemBehaviour for CrossbowItem {
                     },
                 );
 
-                let drawn = ProjectileWeaponItem::draw(&stack, &projectile, is_creative);
+                let drawn =
+                    ProjectileWeaponItem::draw(&player.world(), &stack, &projectile, is_creative);
                 if !drawn.is_empty() {
                     let mut charged_nbts = Vec::new();
                     for item in drawn {

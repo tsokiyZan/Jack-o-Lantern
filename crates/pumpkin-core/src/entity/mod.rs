@@ -937,6 +937,11 @@ pub trait EntityBase: Send + Sync + std::any::Any {
         None
     }
 
+    /// Vanilla `Entity.getWeaponItem`: the item this entity attacks with, if any.
+    fn get_weapon_item(&self) -> Option<ItemStack> {
+        None
+    }
+
     /// Should return the name of the entity without click or hover events.
     fn get_name(&self) -> TextComponent {
         let entity = self.get_entity();

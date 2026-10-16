@@ -1,6 +1,7 @@
 use std::any::Any;
 use std::sync::atomic::Ordering;
 
+use crate::enchantment::EnchantmentHelper;
 use crate::entity::EntityBase;
 use crate::entity::player::Player;
 use crate::entity::projectile::arrow::ArrowEntity;
@@ -86,20 +87,12 @@ impl BowItem {
                 stack.copy_with_count(1)
             },
         );
-        let infinite_projectile = projectile.item.id == Item::ARROW.id;
+        // Vanilla `useAmmo`: Infinity's requirement looks at the ammo.
+        let ammo_to_use =
+            EnchantmentHelper::process_ammo_use(&player.world(), weapon, &projectile, 1);
 
         // Calculate power and fire
         let power = Self::get_power_for_time(use_ticks);
-
-        // Check for Infinity enchantment
-        let has_infinity = weapon
-            .get_data_component::<pumpkin_data::data_component_impl::EnchantmentsImpl>()
-            .is_some_and(|enchantments| {
-                enchantments
-                    .enchantment
-                    .iter()
-                    .any(|(e, _)| **e == pumpkin_data::Enchantment::INFINITY)
-            });
 
         let is_crit = (power - 1.0).abs() < f32::EPSILON;
         Self::shoot(
@@ -114,7 +107,7 @@ impl BowItem {
         // Consume arrow (if not creative and no Infinity)
         if let Some(slot) = arrow_slot
             && gamemode != GameMode::Creative
-            && !(has_infinity && infinite_projectile)
+            && ammo_to_use > 0
         {
             player.consume_arrow(slot);
         }

@@ -5,11 +5,13 @@ use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU32, AtomicU64, Ordering};
 use crate::enchantment::EnchantmentHelper;
 use crate::entity::damage_source::DamageSource;
 use crate::entity::projectile::{ProjectileHit, calculate_ray_intersection};
+use crate::world::World;
 use crate::{
     entity::{Entity, EntityBase, living::LivingEntity, player::Player},
     server::Server,
 };
 use bytes::BufMut;
+use pumpkin_data::attributes::Attributes;
 use pumpkin_data::damage::DamageType;
 use pumpkin_data::data_component_impl::PotionDurationScaleImpl;
 use pumpkin_data::effect::StatusEffect;
@@ -62,7 +64,6 @@ pub struct ArrowEntity {
     pub is_critical: AtomicBool,
     pub no_physics: AtomicBool,
     pub pierce_level: AtomicU8,
-    pub punch_level: AtomicU8,
     pub is_flame: AtomicBool,
     pub in_ground: AtomicBool,
     pub in_ground_time: AtomicU32,
@@ -103,7 +104,6 @@ impl ArrowEntity {
             is_critical: AtomicBool::new(false),
             no_physics: AtomicBool::new(false),
             pierce_level: AtomicU8::new(0),
-            punch_level: AtomicU8::new(0),
             is_flame: AtomicBool::new(false),
             in_ground: AtomicBool::new(false),
             in_ground_time: AtomicU32::new(0),
@@ -146,7 +146,6 @@ impl ArrowEntity {
             is_critical: AtomicBool::new(false),
             no_physics: AtomicBool::new(false),
             pierce_level: AtomicU8::new(0),
-            punch_level: AtomicU8::new(0),
             is_flame: AtomicBool::new(false),
             in_ground: AtomicBool::new(false),
             in_ground_time: AtomicU32::new(0),
@@ -175,6 +174,37 @@ impl ArrowEntity {
     #[must_use]
     pub fn get_weapon_item(&self) -> Option<ItemStack> {
         self.weapon.read().ok().and_then(|w| w.clone())
+    }
+
+    /// Vanilla `AbstractArrow.doKnockback`: the weapon's Punch pushes along the arrow's flight.
+    fn do_knockback(
+        &self,
+        world: &World,
+        target: &dyn EntityBase,
+        living: &LivingEntity,
+        damage_source: &DamageSource<'_>,
+    ) {
+        let knockback = self.get_weapon_item().map_or(0.0, |weapon| {
+            f64::from(EnchantmentHelper::modify_knockback(
+                world,
+                &weapon,
+                target,
+                damage_source,
+                0.0,
+            ))
+        });
+        if knockback > 0.0 {
+            let resistance =
+                (1.0 - living.get_attribute_value(&Attributes::KNOCKBACK_RESISTANCE)).max(0.0);
+            let velocity = self.entity.velocity.load();
+            let movement = Vector3::new(velocity.x, 0.0, velocity.z).normalize()
+                * (knockback * 0.6 * resistance);
+            if movement.length_squared() > 0.0 {
+                target
+                    .get_entity()
+                    .push_impulse(Vector3::new(movement.x, 0.1, movement.z));
+            }
+        }
     }
 
     /// Applies projectile-spawned enchantment effects matching vanilla `Projectile::applyOnProjectileSpawned`.
@@ -453,6 +483,11 @@ impl ArrowEntity {
 }
 
 impl EntityBase for ArrowEntity {
+    /// Vanilla `AbstractArrow.getWeaponItem`: the weapon it was fired from.
+    fn get_weapon_item(&self) -> Option<ItemStack> {
+        Self::get_weapon_item(self)
+    }
+
     fn get_owner_id(&self) -> Option<i32> {
         self.owner_id
     }
@@ -959,10 +994,30 @@ impl EntityBase for ArrowEntity {
                     .unwrap_or_else(std::sync::PoisonError::into_inner)
                     .push(target_entity_id);
 
-                // Calculate damage
+                let owner_entity = self.owner_id.and_then(|id| world.get_entity_by_id(id));
+                // Vanilla `damageSources().arrow(this, owner)`: the arrow hits, its owner (or the
+                // arrow itself when it has none) is responsible.
+                let damage_source = DamageSource {
+                    damage_type: DamageType::ARROW,
+                    direct: Some(self),
+                    causing: owner_entity.as_deref().or(Some(self)),
+                };
+                let weapon = self.get_weapon_item();
+
+                // The weapon's enchantments (Power) apply on hit, against this target.
+                let mut arrow_damage = self.get_base_damage();
+                if let Some(weapon) = &weapon {
+                    arrow_damage = f64::from(EnchantmentHelper::modify_damage(
+                        &world,
+                        weapon,
+                        target.as_ref(),
+                        &damage_source,
+                        arrow_damage as f32,
+                    ));
+                }
                 let velocity = entity.velocity.load();
-                let power = velocity.length();
-                let mut damage = (power * self.get_base_damage()).ceil() as i32;
+                let power = f64::from(velocity.length() as f32);
+                let mut damage = (power * arrow_damage).clamp(0.0, 2.147_483_647E9).ceil() as i32;
 
                 // Apply critical hit bonus
                 if self.is_critical.load(Ordering::Relaxed) {
@@ -977,20 +1032,9 @@ impl EntityBase for ArrowEntity {
                     target.get_entity().set_on_fire_for(5.0);
                 }
 
-                let punch = self.punch_level.load(Ordering::Relaxed);
                 let is_spectral = entity.entity_type.id == EntityType::SPECTRAL_ARROW.id;
-                let owner_id = self.owner_id;
                 let pierce = self.pierce_level.load(Ordering::Relaxed);
 
-                let owner_entity = owner_id.and_then(|id| world.get_entity_by_id(id));
-
-                // Vanilla `damageSources().arrow(this, owner)`: the arrow hits, its owner (or the
-                // arrow itself when it has none) is responsible.
-                let damage_source = DamageSource {
-                    damage_type: DamageType::ARROW,
-                    direct: Some(self),
-                    causing: owner_entity.as_deref().or(Some(self)),
-                };
                 let damage_succeeded = target.damage_with_context(
                     target.as_ref(),
                     damage as f32,
@@ -1001,18 +1045,6 @@ impl EntityBase for ArrowEntity {
                 );
 
                 if let Some(living) = target.get_living_entity() {
-                    if punch > 0 {
-                        let norm = Vector3::new(velocity.x, 0.0, velocity.z).normalize();
-                        let push_scale = f64::from(punch) * 0.6;
-                        target.get_entity().velocity.store(
-                            target.get_entity().velocity.load().add(&Vector3::new(
-                                norm.x * push_scale,
-                                0.1,
-                                norm.z * push_scale,
-                            )),
-                        );
-                    }
-
                     // Play hit sound
                     let sound_pitch = 1.2 / (rand::random::<f32>() * 0.2 + 0.9);
                     let sound_packet = CSoundEffect::new(
@@ -1027,9 +1059,9 @@ impl EntityBase for ArrowEntity {
                     world.broadcast_to_chunk(chunk_pos, &sound_packet);
 
                     if damage_succeeded {
+                        self.do_knockback(&world, target.as_ref(), living, &damage_source);
                         // The weapon is the arrow's own copy, so item damage never reaches the
                         // bow still held.
-                        let weapon = self.get_weapon_item();
                         let detached = weapon.clone().map(std::sync::Mutex::new);
                         EnchantmentHelper::do_post_attack_effects_with_item_source_on_break(
                             &world,

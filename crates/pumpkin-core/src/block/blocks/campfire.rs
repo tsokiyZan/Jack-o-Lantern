@@ -1,8 +1,7 @@
 use pumpkin_data::{
-    Block, BlockDirection, BlockState, BlockStateId, Enchantment,
+    Block, BlockDirection, BlockState, BlockStateId,
     block_properties::CampfireLikeProperties,
     damage::DamageType,
-    data_component_impl::EquipmentSlot,
     effect::StatusEffect,
     fluid::Fluid,
     recipes::{CookingRecipeKind, get_cooking_recipe_with_ingredient},
@@ -84,23 +83,10 @@ impl BlockBehaviour for CampfireBlock {
         if CampfireLikeProperties::from_state_id(args.state.id).lit
             && let Some(living_entity) = args.entity.get_living_entity()
         {
-            let has_frost_walker_enchantment = {
-                let equipment = living_entity
-                    .entity_equipment
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner);
-                equipment
-                    .equipment
-                    .get(&EquipmentSlot::FEET)
-                    .is_some_and(|boots| {
-                        boots.get_enchantment_level(&Enchantment::FROST_WALKER) != 0
-                    })
-            };
             let has_fire_res = living_entity
                 .get_effect(&StatusEffect::FIRE_RESISTANCE)
                 .is_some();
-            if has_frost_walker_enchantment || has_fire_res {
-                // Campfire damage is prevented by Frost Walker boots or fire resistance.
+            if has_fire_res {
                 return;
             }
             let damage_amount = if args.block == &Block::SOUL_CAMPFIRE {
