@@ -1,3 +1,4 @@
+use crate::entity::mob::mount_inventory::MountInventory;
 use crate::entity::mob::{first_passenger_player, horse_tick_ridden, mob_controlling_passenger};
 use crate::entity::passive::abstract_horse::add_abstract_horse_goals;
 use crate::entity::passive::abstract_horse::{AbstractHorse, horse_mob_interact};
@@ -115,6 +116,7 @@ pub struct HorseEntity {
     pub owner: AtomicCell<Option<Uuid>>,
     /// Vanilla `AbstractHorse.standCounter`.
     pub stand_counter: AtomicI32,
+    pub inventory: MountInventory,
 }
 
 impl HorseEntity {
@@ -135,6 +137,7 @@ impl HorseEntity {
             gallop_sound_counter: AtomicI32::new(0),
             owner: AtomicCell::new(None),
             stand_counter: AtomicI32::new(0),
+            inventory: MountInventory::default(),
         };
         let mob_arc = Arc::new(horse);
         let mob_weak: Weak<dyn Mob> = {
@@ -319,6 +322,14 @@ impl Mob for HorseEntity {
         horse_tick_ridden(self.get_entity(), controller);
     }
 
+    fn open_custom_inventory_screen(&self, player: &Arc<Player>) {
+        self.open_horse_inventory(player);
+    }
+
+    fn drop_custom_death_loot(&self) {
+        self.drop_horse_inventory();
+    }
+
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
     }
@@ -382,6 +393,10 @@ impl AbstractHorse for HorseEntity {
 
     fn stand_counter(&self) -> &AtomicI32 {
         &self.stand_counter
+    }
+
+    fn horse_inventory(&self) -> &MountInventory {
+        &self.inventory
     }
 
     fn angry_sound(&self) -> Option<Sound> {

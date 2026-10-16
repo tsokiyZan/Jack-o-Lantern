@@ -1,9 +1,11 @@
 use crate::entity::ai::util::goal_utils;
+use crate::entity::mob::mount_inventory::open_mount_inventory;
 use crate::entity::mob::{
     first_passenger_player, horse_tick_ridden, is_player_holding, mob_controlling_passenger,
     read_legacy_saddle,
 };
 use crate::entity::passive::animal::horse_can_parent;
+use pumpkin_inventory::inventory::SimpleInventory;
 use std::sync::{
     Arc, Weak,
     atomic::{AtomicBool, AtomicU8, Ordering},
@@ -202,6 +204,17 @@ impl Mob for CamelEntity {
 
     fn tick_ridden(&self, controller: &Player) {
         horse_tick_ridden(self.get_entity(), controller);
+    }
+
+    /// Vanilla `Camel.openCustomInventoryScreen`: the saddle slot, as camels carry nothing.
+    fn open_custom_inventory_screen(&self, player: &Arc<Player>) {
+        open_mount_inventory(
+            player,
+            self,
+            Arc::new(SimpleInventory::new(0)),
+            0,
+            |_, _| true,
+        );
     }
 
     fn get_mob_entity(&self) -> &MobEntity {

@@ -11,9 +11,11 @@ use rand::RngExt;
 use uuid::Uuid;
 
 use crate::entity::EntityBase;
+use crate::entity::mob::mount_inventory::{MountInventory, open_mount_inventory};
 use crate::entity::mob::{Mob, is_player_holding};
 use crate::entity::passive::animal::Animal;
 use crate::entity::player::Player;
+use pumpkin_nbt::compound::NbtCompound;
 
 /// `AbstractHorse` data flag: tamed.
 pub const FLAG_TAME: u8 = 2;
@@ -31,6 +33,8 @@ pub trait AbstractHorse: Mob {
     fn set_horse_owner(&self, owner: Uuid);
     fn horse_temper(&self) -> &AtomicI32;
     fn stand_counter(&self) -> &AtomicI32;
+    /// Vanilla `AbstractHorse.inventory`.
+    fn horse_inventory(&self) -> &MountInventory;
 
     /// Vanilla `getAngrySound`; plain `AbstractHorse` has none.
     fn angry_sound(&self) -> Option<Sound> {
@@ -74,6 +78,65 @@ pub trait AbstractHorse: Mob {
         }
     }
 
+    /// Vanilla `getInventoryColumns`: none for most kinds, five with a chest
+    /// (`AbstractChestedHorse`).
+    fn inventory_columns(&self) -> usize {
+        if self.has_chest() { 5 } else { 0 }
+    }
+
+    /// Vanilla `AbstractHorse.createInventory`.
+    fn create_inventory(&self) {
+        self.horse_inventory().create(self.inventory_columns());
+    }
+
+    /// Vanilla `AbstractHorse.openCustomInventoryScreen`.
+    fn open_horse_inventory(&self, player: &Arc<Player>) {
+        let entity = self.get_entity();
+        if (!self.is_vehicle() || entity.has_passenger(player.entity_id()))
+            && self.is_horse_tamed()
+            && let Some(mob) = self.get_mob()
+        {
+            open_mount_inventory(
+                player,
+                mob,
+                self.horse_inventory().current(),
+                self.inventory_columns(),
+                |mob, inventory| {
+                    mob.as_abstract_horse()
+                        .is_some_and(|horse| !horse.horse_inventory().has_changed(inventory))
+                },
+            );
+        }
+    }
+
+    /// Vanilla `AbstractHorse.dropEquipment` and `AbstractChestedHorse.dropEquipment`, after
+    /// the equipment itself.
+    fn drop_horse_inventory(&self) {
+        self.horse_inventory().drop_items(self.get_entity());
+        if self.has_chest() {
+            self.get_entity()
+                .spawn_at_location(ItemStack::new(1, &Item::CHEST));
+            self.set_chest(false);
+        }
+    }
+
+    /// The chest and `Items` of vanilla `AbstractChestedHorse.addAdditionalSaveData`.
+    fn write_chest_nbt(&self, nbt: &mut NbtCompound) {
+        nbt.put_bool("ChestedHorse", self.has_chest());
+        if self.has_chest() {
+            self.horse_inventory().write_items(nbt);
+        }
+    }
+
+    /// The chest and `Items` of vanilla `AbstractChestedHorse.readAdditionalSaveData`.
+    fn read_chest_nbt(&self, nbt: &NbtCompound) {
+        self.set_chest(nbt.get_bool("ChestedHorse").unwrap_or(false));
+        self.create_inventory();
+        if self.has_chest() {
+            self.horse_inventory().read_items(nbt);
+        }
+    }
+
     /// Vanilla `AbstractChestedHorse.equipChest`. Returns `false` for a kind that carries no
     /// chest.
     fn equip_chest(&self, player: &Player, item_stack: &mut ItemStack) -> bool {
@@ -86,6 +149,7 @@ pub trait AbstractHorse: Mob {
         let pitch = (rng.random::<f32>() - rng.random::<f32>()) * 0.2 + 1.0;
         self.play_sound_at_self(Sound::EntityDonkeyChest, 1.0, pitch);
         item_stack.decrement_unless_creative(player.gamemode.load(), 1);
+        self.create_inventory();
         true
     }
 

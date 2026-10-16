@@ -21,7 +21,6 @@ use crossbeam::channel::Receiver;
 use crossbeam::queue::SegQueue;
 use pumpkin_data::dimension::Dimension;
 use pumpkin_inventory::Inventory;
-use pumpkin_inventory::merchant::merchant_screen_handler::MerchantScreenHandler;
 use pumpkin_inventory::player::ender_chest_inventory::EnderChestInventory;
 use pumpkin_protocol::RawPacket;
 use pumpkin_protocol::bedrock::client::play_status::CPlayStatus;
@@ -2821,12 +2820,10 @@ impl Player {
         if let Ok(current_screen_handler_guard) = self.current_screen_handler.try_lock() {
             let current_screen_handler = current_screen_handler_guard.clone();
             drop(current_screen_handler_guard);
+            // Vanilla `ServerPlayer.doTick`: `containerMenu.stillValid`.
             let is_invalid = current_screen_handler
                 .try_lock()
-                .is_ok_and(|screen_handler| {
-                    screen_handler.as_any().is::<MerchantScreenHandler>()
-                        && !screen_handler.can_use(self)
-                });
+                .is_ok_and(|screen_handler| !screen_handler.can_use(self));
 
             if is_invalid {
                 if let Some(p) = self.world().get_player_by_uuid(self.gameprofile.id) {

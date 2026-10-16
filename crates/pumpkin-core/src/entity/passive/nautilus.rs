@@ -32,6 +32,7 @@ use crate::entity::ai::control::look_control::LookControl;
 use crate::entity::ai::control::smooth_swimming_move_control::SmoothSwimmingMoveControl;
 use crate::entity::ai::pathfinder::{Navigator, WaterBoundPathNavigation, node::PathType};
 use crate::entity::breath::BreathManager;
+use crate::entity::mob::mount_inventory::open_mount_inventory;
 use crate::entity::mob::spawn::SpawnGroupData;
 use crate::entity::mob::{
     first_passenger_player, mob_controlling_passenger, mob_hurt_server, set_ridden_rotation,
@@ -51,6 +52,7 @@ use crate::entity::{
     player::Player,
 };
 use crate::world::World;
+use pumpkin_inventory::inventory::SimpleInventory;
 use pumpkin_util::math::wrap_degrees;
 
 /// Vanilla `AbstractNautilus.SMALL_RESTRICTION_RADIUS`.
@@ -511,6 +513,20 @@ impl Mob for NautilusEntity {
         set_ridden_rotation(entity, y_rot, controller_entity.pitch.load() * 0.5);
     }
 
+    /// Vanilla `AbstractNautilus.openCustomInventoryScreen`. Its inventory has no columns.
+    fn open_custom_inventory_screen(&self, player: &Arc<Player>) {
+        let entity = self.get_entity();
+        if (!self.is_vehicle() || entity.has_passenger(player.entity_id())) && self.is_tame() {
+            open_mount_inventory(
+                player,
+                self,
+                Arc::new(SimpleInventory::new(0)),
+                0,
+                |_, _| true,
+            );
+        }
+    }
+
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
     }
@@ -776,7 +792,6 @@ impl Mob for NautilusEntity {
     }
 
     /// Vanilla `AbstractNautilus.interact` and `mobInteract`.
-    // TODO: vanilla `openCustomInventoryScreen`; Pumpkin opens no mount inventories yet.
     fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
         self.mob_entity
             .persistence_required
@@ -789,6 +804,7 @@ impl Mob for NautilusEntity {
         }
         let secondary_use = player.get_entity().is_sneaking();
         if self.is_tame() && secondary_use {
+            self.open_custom_inventory_screen(player);
             return true;
         }
         if !item_stack.is_empty() {

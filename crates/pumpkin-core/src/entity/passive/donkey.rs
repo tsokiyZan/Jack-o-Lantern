@@ -1,3 +1,4 @@
+use crate::entity::mob::mount_inventory::MountInventory;
 use crate::entity::mob::{first_passenger_player, horse_tick_ridden, mob_controlling_passenger};
 use crate::entity::passive::abstract_horse::add_abstract_horse_goals;
 use crate::entity::passive::abstract_horse::{AbstractHorse, horse_mob_interact};
@@ -50,6 +51,7 @@ pub struct DonkeyEntity {
     pub owner: AtomicCell<Option<Uuid>>,
     /// Vanilla `AbstractHorse.standCounter`.
     pub stand_counter: AtomicI32,
+    pub inventory: MountInventory,
 }
 
 impl DonkeyEntity {
@@ -64,6 +66,7 @@ impl DonkeyEntity {
             temper: AtomicI32::new(0),
             owner: AtomicCell::new(None),
             stand_counter: AtomicI32::new(0),
+            inventory: MountInventory::default(),
         };
         let mob_arc = Arc::new(donkey);
         let mob_weak: Weak<dyn Mob> = {
@@ -187,7 +190,7 @@ impl Mob for DonkeyEntity {
 
     fn mob_write_nbt(&self, nbt: &mut NbtCompound) {
         self.write_ageable_nbt(nbt);
-        nbt.put_bool("ChestedHorse", self.has_chest());
+        self.write_chest_nbt(nbt);
         nbt.put_bool("Tame", self.is_tame());
         nbt.put_int("Temper", self.temper.load(Ordering::Relaxed));
         if let Some(owner) = self.owner.load() {
@@ -197,9 +200,7 @@ impl Mob for DonkeyEntity {
 
     fn mob_read_nbt(&self, nbt: &NbtCompound) {
         self.read_ageable_nbt(nbt);
-        if let Some(chested) = nbt.get_bool("ChestedHorse") {
-            self.set_chest(chested);
-        }
+        self.read_chest_nbt(nbt);
         if let Some(tame) = nbt.get_bool("Tame") {
             self.set_tame(tame);
         }
@@ -223,6 +224,14 @@ impl Mob for DonkeyEntity {
 
     fn tick_ridden(&self, controller: &Player) {
         horse_tick_ridden(self.get_entity(), controller);
+    }
+
+    fn open_custom_inventory_screen(&self, player: &Arc<Player>) {
+        self.open_horse_inventory(player);
+    }
+
+    fn drop_custom_death_loot(&self) {
+        self.drop_horse_inventory();
     }
 
     fn get_mob_entity(&self) -> &MobEntity {
@@ -288,6 +297,10 @@ impl AbstractHorse for DonkeyEntity {
 
     fn stand_counter(&self) -> &AtomicI32 {
         &self.stand_counter
+    }
+
+    fn horse_inventory(&self) -> &MountInventory {
+        &self.inventory
     }
 
     fn chest(&self) -> Option<(&AtomicBool, TrackedData)> {

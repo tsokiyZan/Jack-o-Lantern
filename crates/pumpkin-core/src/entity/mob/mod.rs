@@ -70,6 +70,7 @@ pub mod hoglin;
 pub mod hoglin_ai;
 pub mod hoglin_base;
 pub mod illusioner;
+pub mod mount_inventory;
 pub mod neutral;
 pub mod patrol;
 pub mod phantom;
