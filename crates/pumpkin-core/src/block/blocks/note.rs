@@ -48,9 +48,6 @@ impl NoteBlock {
             world.game_event_from(source, GameEvent::NoteBlockPlay, pos.to_centered_f64());
         }
     }
-    fn get_note_pitch(note: u16) -> f32 {
-        ((f32::from(note) - 12.0) / 12.0).exp2()
-    }
 
     fn get_state_with_instrument(
         world: &World,
@@ -154,7 +151,7 @@ impl BlockBehaviour for NoteBlock {
         let instrument = note_props.instrument;
         let pitch = if is_base_block(instrument) {
             // checks if can be pitched
-            Self::get_note_pitch(u16::from(note_props.note))
+            get_pitch_from_note(u16::from(note_props.note))
         } else {
             1.0 // default pitch
         };
@@ -245,4 +242,10 @@ const fn is_base_block(instrument: NoteblockInstrument) -> bool {
             | NoteblockInstrument::Bit
             | NoteblockInstrument::Banjo
     )
+}
+
+/// Vanilla `NoteBlock.getPitchFromNote`.
+#[must_use]
+pub fn get_pitch_from_note(note: u16) -> f32 {
+    2.0f64.powf((f64::from(note) - 12.0) / 12.0) as f32
 }
