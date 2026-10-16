@@ -813,7 +813,17 @@ impl PotDecorationsImpl {
         [&self.back, &self.left, &self.right, &self.front]
     }
 
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.back.is_none() && self.left.is_none() && self.right.is_none() && self.front.is_none()
+    }
+
+    /// Also reads the flat list of item ids saved before 26.3, as vanilla's
+    /// `PotDecorationsComponentUnflatteningFix.unpackList` upgrades it.
     pub fn read_data(data: &NbtTag) -> Option<Self> {
+        if let NbtTag::List(ids) = data {
+            return Self::unpack_list(ids);
+        }
         let compound = data.extract_compound()?;
         let side = |name: &str| match compound.get(name) {
             Some(tag) => read_item_stack_template(tag).map(Some),
@@ -824,6 +834,26 @@ impl PotDecorationsImpl {
             left: side("left")?,
             right: side("right")?,
             front: side("front")?,
+        })
+    }
+
+    /// Missing or non-string entries are bricks; an empty id leaves the list unreadable.
+    fn unpack_list(ids: &[NbtTag]) -> Option<Self> {
+        let side = |i: usize| {
+            let id = ids
+                .get(i)
+                .and_then(NbtTag::extract_string)
+                .unwrap_or("minecraft:brick");
+            if id.is_empty() {
+                return None;
+            }
+            read_item_stack_template(&NbtTag::String(id.into())).map(Some)
+        };
+        Some(Self {
+            back: side(0)?,
+            left: side(1)?,
+            right: side(2)?,
+            front: side(3)?,
         })
     }
 }
