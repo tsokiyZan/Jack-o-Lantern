@@ -5,8 +5,8 @@ use pumpkin_util::text::TextComponent;
 use pumpkin_util::text::color::NamedColor;
 
 use crate::command::argument_builder::{ArgumentBuilder, argument, command};
-use crate::command::argument_types::core::string::StringArgumentType;
 use crate::command::argument_types::entity::EntityArgumentType;
+use crate::command::argument_types::message::MessageArgumentType;
 use crate::command::context::command_context::CommandContext;
 use crate::command::node::dispatcher::CommandDispatcher;
 use crate::command::node::{CommandExecutor, CommandExecutorResult};
@@ -25,8 +25,7 @@ impl CommandExecutor for KickExecutor {
         let targets = EntityArgumentType::get_players(context, "targets")?;
 
         let reason = if self.has_reason {
-            let custom_reason = StringArgumentType::get(context, "reason")?;
-            TextComponent::text(custom_reason.to_string())
+            MessageArgumentType::get_message(context, "reason")?
         } else {
             TextComponent::translate_cross(
                 translation::java::MULTIPLAYER_DISCONNECT_KICKED,
@@ -73,7 +72,7 @@ pub fn register(dispatcher: &mut CommandDispatcher, registry: &PermissionRegistr
             argument("targets", EntityArgumentType::Players)
                 .executes(KickExecutor { has_reason: false })
                 .then(
-                    argument("reason", StringArgumentType::GreedyPhrase)
+                    argument("reason", MessageArgumentType)
                         .executes(KickExecutor { has_reason: true }),
                 ),
         ),

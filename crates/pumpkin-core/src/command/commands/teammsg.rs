@@ -1,5 +1,5 @@
 use crate::command::argument_builder::{ArgumentBuilder, argument, command};
-use crate::command::argument_types::core::string::StringArgumentType;
+use crate::command::argument_types::message::MessageArgumentType;
 use crate::command::context::command_context::CommandContext;
 use crate::command::errors::error_types::CommandErrorType;
 use crate::command::node::dispatcher::CommandDispatcher;
@@ -24,7 +24,7 @@ impl CommandExecutor for TeamMsgCommandExecutor {
         let player = context.source.player_or_err()?;
         let sender_name = player.gameprofile.name.clone();
         let world = context.world().clone();
-        let message_text = StringArgumentType::get(context, ARG_MESSAGE)?.to_string();
+        let message_component = MessageArgumentType::get_message(context, ARG_MESSAGE)?;
         let sender_display_name = context.source.display_name.clone();
 
         let scoreboard = world
@@ -45,7 +45,6 @@ impl CommandExecutor for TeamMsgCommandExecutor {
         };
 
         let team_display_name = team.display_name.clone().color_named(team.color);
-        let message_component = TextComponent::text(message_text);
 
         let online_players = world.players.load();
         let mut recipients = 0;
@@ -91,12 +90,16 @@ pub fn register(dispatcher: &mut CommandDispatcher, registry: &PermissionRegistr
     ));
 
     // Register /teammsg <message>
-    dispatcher.register(command("teammsg", DESCRIPTION).requires(PERMISSION).then(
-        argument(ARG_MESSAGE, StringArgumentType::GreedyPhrase).executes(TeamMsgCommandExecutor),
-    ));
+    dispatcher.register(
+        command("teammsg", DESCRIPTION)
+            .requires(PERMISSION)
+            .then(argument(ARG_MESSAGE, MessageArgumentType).executes(TeamMsgCommandExecutor)),
+    );
 
     // Register alias /tm <message>
-    dispatcher.register(command("tm", DESCRIPTION).requires(PERMISSION).then(
-        argument(ARG_MESSAGE, StringArgumentType::GreedyPhrase).executes(TeamMsgCommandExecutor),
-    ));
+    dispatcher.register(
+        command("tm", DESCRIPTION)
+            .requires(PERMISSION)
+            .then(argument(ARG_MESSAGE, MessageArgumentType).executes(TeamMsgCommandExecutor)),
+    );
 }

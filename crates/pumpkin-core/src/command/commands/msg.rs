@@ -2,11 +2,10 @@ use pumpkin_data::chat_type::ChatType;
 use pumpkin_data::world::{MSG_COMMAND_INCOMING, MSG_COMMAND_OUTGOING};
 use pumpkin_util::PermissionLvl;
 use pumpkin_util::permission::{Permission, PermissionDefault, PermissionRegistry};
-use pumpkin_util::text::TextComponent;
 
 use crate::command::argument_builder::{ArgumentBuilder, argument, command};
-use crate::command::argument_types::core::string::StringArgumentType;
 use crate::command::argument_types::entity::EntityArgumentType;
+use crate::command::argument_types::message::MessageArgumentType;
 use crate::command::context::command_context::CommandContext;
 use crate::command::node::dispatcher::CommandDispatcher;
 use crate::command::node::{CommandExecutor, CommandExecutorResult};
@@ -22,10 +21,8 @@ struct MsgExecutor;
 impl CommandExecutor for MsgExecutor {
     fn execute(&self, context: &CommandContext) -> CommandExecutorResult {
         let targets = EntityArgumentType::get_players(context, "targets")?;
-        let msg = StringArgumentType::get(context, "message")?;
-
         let sender_name = &context.source.display_name;
-        let msg_text = TextComponent::text(msg.to_string());
+        let msg_text = MessageArgumentType::get_message(context, "message")?;
 
         if let Some(player) = context.source.player_or_none() {
             for target in &targets {
@@ -69,9 +66,8 @@ pub fn register(dispatcher: &mut CommandDispatcher, registry: &PermissionRegistr
     for name in NAMES {
         dispatcher.register(
             command(name, DESCRIPTION).requires(PERMISSION).then(
-                argument("targets", EntityArgumentType::Players).then(
-                    argument("message", StringArgumentType::GreedyPhrase).executes(MsgExecutor),
-                ),
+                argument("targets", EntityArgumentType::Players)
+                    .then(argument("message", MessageArgumentType).executes(MsgExecutor)),
             ),
         );
     }

@@ -18,6 +18,7 @@ pub mod entity_selector;
 pub mod function;
 pub mod game_profile;
 pub mod heightmap;
+pub mod message;
 pub mod objective;
 pub mod operation;
 pub mod pool;
