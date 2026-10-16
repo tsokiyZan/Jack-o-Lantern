@@ -1,11 +1,12 @@
 use std::sync::Arc;
 
-use pumpkin_data::data_component_impl::EquipmentSlot;
+use pumpkin_data::data_component_impl::{EquipmentSlot, SwingAnimationImpl};
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::Sound;
 use pumpkin_data::tag::{self, Taggable};
+use pumpkin_util::Hand;
 use pumpkin_util::math::vector3::Vector3;
 use pumpkin_util::random::RandomImpl;
 use pumpkin_util::random::legacy_rand::LegacyRand;
@@ -955,7 +956,7 @@ fn throw_items_toward_pos(piglin: &PiglinEntity, stacks: Vec<ItemStack>, target:
         return;
     }
     let living = &piglin.get_mob_entity().living_entity;
-    living.swing_off_hand();
+    living.swing(Hand::Left, SwingAnimationImpl::DEFAULT, false);
 
     let entity = &living.entity;
     let world = entity.world.load();

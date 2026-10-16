@@ -43,6 +43,7 @@ use pumpkin_data::Block;
 use pumpkin_data::attributes::Attributes;
 use pumpkin_data::data_component_impl::IdOr;
 use pumpkin_data::data_component_impl::Operation;
+use pumpkin_data::data_component_impl::SwingAnimationImpl;
 use pumpkin_data::data_component_impl::food::{ConsumableImpl, ConsumeAnimation, ConsumeEffect};
 use pumpkin_data::data_component_impl::{
     AttributeModifiersImpl, BlocksAttacksImpl, DeathProtectionImpl, EquipmentSlot, EquippableImpl,
@@ -127,6 +128,7 @@ pub struct LivingEntity {
     pub item_in_use: std::sync::Mutex<Option<ItemStack>>,
     pub active_hand: std::sync::Mutex<Option<Hand>>,
     pub recent_kinetic_enemies: std::sync::Mutex<FxHashMap<i32, i32>>,
+    swing_state: std::sync::Mutex<SwingState>,
     pub death_time: AtomicU8,
     /// Indicates whether the entity is dead. (`on_death` called)
     pub dead: AtomicBool,
@@ -344,6 +346,7 @@ impl LivingEntity {
             item_in_use: std::sync::Mutex::new(None),
             active_hand: std::sync::Mutex::new(None),
             recent_kinetic_enemies: std::sync::Mutex::new(FxHashMap::default()),
+            swing_state: std::sync::Mutex::new(SwingState::default()),
             livings_flags: AtomicU8::new(0),
             active_effects: std::sync::Mutex::new(FxHashMap::default()),
             entity_equipment: Arc::new(std::sync::Mutex::new(EntityEquipment::new())),
@@ -1465,29 +1468,64 @@ impl LivingEntity {
         }
     }
 
+    /// Swings the main hand with the default animation, like vanilla `Mob.swing(MAIN_HAND)`.
     pub fn swing_hand(&self) {
-        let world = self.entity.world.load();
-        let entity_id = self.entity_id();
-
-        let je_packet =
-            pumpkin_protocol::java::client::play::CSwingArm::new(entity_id.into(), false);
-        let be_packet = pumpkin_protocol::bedrock::server::animate::SAnimate {
-            action: pumpkin_protocol::bedrock::server::animate::AnimateAction::SwingArm,
-            target_actor_runtime_id: pumpkin_protocol::codec::var_ulong::VarULong(entity_id as u64),
-            data: 0.0,
-            swing_source: None,
-        };
-
-        world.broadcast_editioned(&je_packet, &be_packet);
+        self.swing(Hand::Right, SwingAnimationImpl::DEFAULT, false);
     }
 
-    pub fn swing_off_hand(&self) {
+    /// Vanilla `MobEffectUtil.hasDigSpeed`.
+    #[must_use]
+    pub fn has_dig_speed(&self) -> bool {
+        self.has_effect(&StatusEffect::HASTE) || self.has_effect(&StatusEffect::CONDUIT_POWER)
+    }
+
+    /// Vanilla `MobEffectUtil.getDigSpeedAmplification`.
+    #[must_use]
+    pub fn get_dig_speed_amplification(&self) -> i32 {
+        let haste = self
+            .get_effect(&StatusEffect::HASTE)
+            .map_or(0, |effect| effect.amplifier);
+        let conduit_power = self
+            .get_effect(&StatusEffect::CONDUIT_POWER)
+            .map_or(0, |effect| effect.amplifier);
+        i32::from(haste.max(conduit_power))
+    }
+
+    /// Vanilla `LivingEntity.getModifiedSwingDuration`.
+    fn get_modified_swing_duration(&self, animation: SwingAnimationImpl) -> i32 {
+        let swing_duration = animation.duration;
+        if self.has_dig_speed() {
+            swing_duration - (1 + self.get_dig_speed_amplification())
+        } else if let Some(fatigue) = self.get_effect(&StatusEffect::MINING_FATIGUE) {
+            swing_duration + (1 + i32::from(fatigue.amplifier)) * 2
+        } else {
+            swing_duration
+        }
+    }
+
+    /// Vanilla `LivingEntity.swing(hand, animation, sendToSwingingEntity)`: starts the swing
+    /// unless one is still in its first half, and returns whether it started.
+    pub fn swing(
+        &self,
+        hand: Hand,
+        animation: SwingAnimationImpl,
+        send_to_swinging_entity: bool,
+    ) -> bool {
+        let duration = self.get_modified_swing_duration(animation);
+        if !self
+            .swing_state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .start_if_able(duration)
+        {
+            return false;
+        }
         let world = self.entity.world.load();
         let entity_id = self.entity_id();
-
-        let je_packet = pumpkin_protocol::java::client::play::CEntityAnimation::new(
+        let je_packet = pumpkin_protocol::java::client::play::CSwingArm::with_animation(
             entity_id.into(),
-            pumpkin_protocol::java::client::play::Animation::SwingOffhand,
+            hand == Hand::Left,
+            animation,
         );
         let be_packet = pumpkin_protocol::bedrock::server::animate::SAnimate {
             action: pumpkin_protocol::bedrock::server::animate::AnimateAction::SwingArm,
@@ -1495,8 +1533,16 @@ impl LivingEntity {
             data: 0.0,
             swing_source: None,
         };
-
-        world.broadcast_editioned(&je_packet, &be_packet);
+        if send_to_swinging_entity {
+            world.broadcast_editioned(&je_packet, &be_packet);
+        } else {
+            world.broadcast_packet_except_editioned(
+                &[self.entity.entity_uuid],
+                &je_packet,
+                &be_packet,
+            );
+        }
+        true
     }
 
     #[expect(clippy::too_many_lines, reason = "mirrors vanilla LivingEntity.aiStep")]
@@ -4263,6 +4309,11 @@ impl EntityBase for LivingEntity {
         if self.applied_scale.swap(scale) != scale {
             caller.refresh_dimensions();
         }
+        // The start of vanilla `LivingEntity.baseTick`.
+        self.swing_state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .tick();
         self.entity.tick(caller, server);
 
         // Only tick movement if the entity is alive. This prevents a dead "corpse"
@@ -5136,5 +5187,38 @@ mod tests {
             .unwrap();
 
         assert_eq!(bytes, [10, 17, 1, 28, 0xff, 0xcd, 0x5c, 0xab]);
+    }
+}
+
+/// Vanilla `LivingEntity.SwingState`, without the animation progress only the client and
+/// `tickHeadTurn` read.
+#[derive(Default)]
+struct SwingState {
+    /// The `durationTicks` of vanilla's `currentSwing`.
+    current_swing_duration: Option<i32>,
+    ticks: i32,
+}
+
+impl SwingState {
+    const fn start_if_able(&mut self, duration: i32) -> bool {
+        if let Some(current_duration) = self.current_swing_duration
+            && self.ticks <= current_duration / 2
+            && self.ticks > 0
+        {
+            return false;
+        }
+        self.current_swing_duration = Some(duration);
+        self.ticks = 0;
+        true
+    }
+
+    const fn tick(&mut self) {
+        if let Some(duration) = self.current_swing_duration {
+            let ticks = self.ticks;
+            self.ticks += 1;
+            if ticks > duration {
+                self.current_swing_duration = None;
+            }
+        }
     }
 }
