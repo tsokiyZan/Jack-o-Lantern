@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 
 use pumpkin_data::damage::DamageType;
@@ -6,6 +7,7 @@ use pumpkin_data::sound::Sound;
 
 use crate::enchantment::EnchantmentHelper;
 use crate::entity::damage_source::DamageSource;
+use crate::world::World;
 use crate::{
     entity::{Entity, EntityBase},
     server::Server,
@@ -20,6 +22,43 @@ pub struct EvokerFangsEntity {
 }
 
 impl EvokerFangsEntity {
+    /// Vanilla `EvokerFangs.dealDamageTo`.
+    fn deal_damage_to(&self, world: &Arc<World>, target: &dyn EntityBase) {
+        let target_entity = target.get_entity();
+        if !target_entity.is_alive()
+            || target_entity.invulnerable.load(Ordering::Relaxed)
+            || Some(target_entity.entity_id) == self.owner_id
+        {
+            return;
+        }
+        let Some(owner) = self
+            .owner_id
+            .and_then(|id| world.get_entity_by_id(id))
+            .filter(|owner| owner.get_living_entity().is_some())
+        else {
+            target.damage(target, 6.0, DamageType::MAGIC);
+            return;
+        };
+        if owner.as_ref().is_allied_to(target) {
+            return;
+        }
+        let damage_source = DamageSource {
+            damage_type: DamageType::INDIRECT_MAGIC,
+            direct: Some(&self.entity),
+            causing: Some(owner.as_ref()),
+        };
+        if target.damage_with_context(
+            target,
+            6.0,
+            damage_source.damage_type,
+            None,
+            damage_source.direct,
+            damage_source.causing,
+        ) {
+            EnchantmentHelper::do_post_attack_effects(world, target, &damage_source);
+        }
+    }
+
     #[must_use]
     pub fn new(entity: Entity, warmup_ticks: u32, yaw: f32, owner_id: Option<i32>) -> Self {
         entity.set_rotation(yaw, 0.0);
@@ -52,43 +91,9 @@ impl EntityBase for EvokerFangsEntity {
         if warmup < 0 {
             if warmup == -8 {
                 let bb = entity.bounding_box.load().expand(0.2, 0.0, 0.2);
-                let candidates = world.get_entities_at_box(&bb);
-
-                let owner = self.owner_id.and_then(|id| world.get_entity_by_id(id));
-
-                for cand in candidates {
-                    let cand_ent = cand.get_entity();
-                    if Some(cand_ent.entity_id) == self.owner_id {
-                        continue;
-                    }
-
-                    if cand_ent.entity_id != entity.entity_id && cand.get_living_entity().is_some()
-                    {
-                        let damage_source = DamageSource {
-                            damage_type: if owner.is_some() {
-                                DamageType::INDIRECT_MAGIC
-                            } else {
-                                DamageType::MAGIC
-                            },
-                            direct: Some(entity),
-                            causing: owner.as_deref(),
-                        };
-                        // Vanilla `dealDamageTo`: only an owned fang's hit runs post-attack effects.
-                        if cand.damage_with_context(
-                            cand.as_ref(),
-                            6.0,
-                            damage_source.damage_type,
-                            Some(entity.pos.load()),
-                            damage_source.direct,
-                            damage_source.causing,
-                        ) && owner.is_some()
-                        {
-                            EnchantmentHelper::do_post_attack_effects(
-                                &world,
-                                cand.as_ref(),
-                                &damage_source,
-                            );
-                        }
+                for target in world.get_all_at_box(&bb) {
+                    if target.get_living_entity().is_some() {
+                        self.deal_damage_to(&world, target.as_ref());
                     }
                 }
             }
