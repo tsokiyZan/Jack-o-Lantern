@@ -25,6 +25,7 @@ use crate::command::argument_types::coordinates::vec3::Vec3ArgumentType;
 use crate::command::argument_types::core::string::StringArgumentType;
 use crate::command::argument_types::entity::EntityArgumentType;
 use crate::command::argument_types::entity_anchor::{EntityAnchorArgumentType, EntityAnchorExt};
+use crate::command::argument_types::function::FunctionArgumentType;
 use crate::command::argument_types::identifier::IdentifierArgumentType;
 use crate::command::argument_types::nbt_path::{NbtPath, NbtPathArgumentType};
 use crate::command::argument_types::objective::ObjectiveArgumentType;
@@ -37,6 +38,9 @@ use crate::command::commands::data::{
     BlockDataAccessor, DataAccessor, EntityDataAccessor, StorageDataAccessor,
 };
 use crate::command::commands::fill::matches_filter;
+use crate::command::commands::function::{
+    FunctionSuggestionProvider, get_functions, modify_sender_for_execution,
+};
 use crate::command::context::command_context::CommandContext;
 use crate::command::errors::command_syntax_error::CommandSyntaxError;
 use crate::command::errors::error_types::CommandErrorType;
@@ -44,11 +48,14 @@ use crate::command::node::attached::{CommandNodeId, NodeId};
 use crate::command::node::dispatcher::CommandDispatcher;
 use crate::command::node::tree::Tree;
 use crate::command::node::{CommandExecutor, CommandExecutorResult, RedirectModifier, Redirection};
+use crate::data::datapack::DatapackManager;
 use crate::entity::EntityBase;
 use crate::entity::r#type::from_type;
 use crate::world::World;
 use crate::world::scoreboard::Scoreboard;
 use crate::world::stopwatches::Stopwatches;
+use pumpkin_command::execution;
+use pumpkin_command::source::ResultValueTaker;
 use pumpkin_data::biome::Biome;
 use pumpkin_data::tag::{self, RegistryKey};
 use pumpkin_data::{BlockId, translation};
@@ -61,6 +68,7 @@ use pumpkin_util::math::vector2::Vector2;
 use pumpkin_util::permission::{Permission, PermissionDefault, PermissionRegistry};
 use pumpkin_util::text::TextComponent;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use uuid::Uuid;
 
 const DESCRIPTION: &str = "Execute a command with a modified context.";
@@ -584,6 +592,60 @@ fn add_numeric_conditional(
         })
 }
 
+/// Vanilla `ExecuteCommand.scheduleFunctionConditionsAndTest` for one source: the functions
+/// run in an isolated frame, and the source passes on when their return value matches.
+fn execute_if_function(
+    context: &CommandContext,
+    expected: bool,
+) -> Result<Vec<Arc<CommandSource>>, CommandSyntaxError> {
+    let functions = get_functions(context, FunctionArgumentType::get(context, "name")?)?;
+    if functions.is_empty() {
+        return Ok(Vec::new());
+    }
+    let server = context.server();
+    let function_source = modify_sender_for_execution(
+        &context
+            .source
+            .as_ref()
+            .clone()
+            .with_command_result_taker(ResultValueTaker::new()),
+    );
+    let passed = Arc::new(AtomicBool::new(false));
+    let callback = {
+        let passed = passed.clone();
+        ResultValueTaker::from_fn(move |result| {
+            if (result.result_value() != 0) == expected {
+                passed.store(true, Ordering::Relaxed);
+            }
+        })
+    };
+    // Vanilla IsolatedCall, then FallthroughTask if no function returned.
+    execution::run_in_new_frame(callback, false, |frame| {
+        let generation = frame.generation();
+        for (_, lines) in &functions {
+            if frame.generation() != generation {
+                return;
+            }
+            DatapackManager::call_function(
+                server,
+                lines,
+                &function_source,
+                frame.return_value_consumer().clone(),
+                true,
+            );
+        }
+        if frame.generation() == generation {
+            frame.return_failure();
+            frame.discard();
+        }
+    });
+    Ok(if passed.load(Ordering::Relaxed) {
+        vec![context.source.clone()]
+    } else {
+        Vec::new()
+    })
+}
+
 fn check_block(context: &CommandContext) -> Result<bool, CommandSyntaxError> {
     let predicate = BlockPredicateArgumentType::get(context, "block")?;
     let world = context.source.world();
@@ -931,6 +993,18 @@ fn add_conditionals(parent: LiteralArgumentBuilder, expected: bool) -> LiteralAr
             expected,
             count_entities,
         )))
+        .then(
+            literal("function").then(
+                argument("name", FunctionArgumentType)
+                    .suggests(FunctionSuggestionProvider)
+                    .fork(
+                        Redirection::Root,
+                        RedirectModifier::Custom(Arc::new(move |context: &CommandContext| {
+                            execute_if_function(context, expected)
+                        })),
+                    ),
+            ),
+        )
         .then(
             literal("stopwatch").then(argument("id", IdentifierArgumentType).then(
                 add_conditional(
