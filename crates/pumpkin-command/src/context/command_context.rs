@@ -1,6 +1,7 @@
 use crate::context::string_range::StringRange;
 use crate::errors::command_syntax_error::CommandSyntaxError;
 use crate::errors::error_types::DISPATCHER_PARSE_EXCEPTION;
+use crate::execution::{self, ChainModifiers, Frame};
 use crate::node::attached::NodeId;
 use crate::node::dispatcher::{CommandDispatcher, ResultConsumer};
 use crate::node::tree::Tree;
@@ -87,6 +88,13 @@ pub struct CommandContext<'a, S: CommandSource = DummySource> {
     /// The command stored in this context which
     /// is run to get a command result.
     pub command: Option<Command<S>>,
+
+    /// The chain modifiers this context is executed with.
+    pub chain_modifiers: ChainModifiers,
+
+    /// The current frame's generation when this context's execution was queued. Work a custom
+    /// executor queues is dropped if the frame has been discarded since.
+    pub frame_generation: Option<u64>,
 }
 
 impl<S: CommandSource> std::ops::Deref for CommandContext<'_, S> {
@@ -113,6 +121,8 @@ impl<S: CommandSource> CommandContext<'_, S> {
             command: self.command.clone(),
             tree: self.tree,
             root: self.root,
+            chain_modifiers: self.chain_modifiers,
+            frame_generation: self.frame_generation,
         }
     }
 
@@ -178,6 +188,19 @@ impl<S: CommandSource> CommandContext<'_, S> {
     }
 }
 
+/// Vanilla `CommandResultCallback.chain(source.callback(), frame.returnValueConsumer())`.
+struct ReturnToFrame<'c, S: CommandSource> {
+    inner: &'c dyn ResultConsumer<S>,
+    frame: &'c Frame,
+}
+
+impl<S: CommandSource> ResultConsumer<S> for ReturnToFrame<'_, S> {
+    fn on_command_completion(&self, context: &CommandContext<S>, result: ReturnValue) {
+        self.inner.on_command_completion(context, result);
+        self.frame.return_value_consumer().call(result);
+    }
+}
+
 /// Represents a linked chain of [`CommandContext`]s, where the previous links to the next as a child.
 #[derive(Clone)]
 pub struct ContextChain<'a, S: CommandSource = DummySource> {
@@ -235,7 +258,10 @@ impl<'a, S: CommandSource> ContextChain<'a, S> {
     ) -> Result<Vec<Arc<S>>, CommandSyntaxError> {
         let source_modifier = &modifier.modifier;
 
-        if matches!(source_modifier, RedirectModifier::KeepSource) {
+        if matches!(
+            source_modifier,
+            RedirectModifier::KeepSource | RedirectModifier::ReturnRun
+        ) {
             return Ok(vec![source.clone()]);
         }
 
@@ -283,40 +309,110 @@ impl<'a, S: CommandSource> ContextChain<'a, S> {
     }
 
     /// Executes all contexts in the chain, returning the ultimate result.
+    ///
+    /// Mirrors vanilla `BuildContexts.execute`: modifiers run stage by stage over every source,
+    /// then the command runs once per source until the current frame is discarded.
     pub fn execute_all(
         &self,
         source: &Arc<S>,
         result_consumer: &dyn ResultConsumer<S>,
     ) -> Result<i32, CommandSyntaxError> {
-        if self.modifiers.is_empty() {
-            return Self::run_executable(&self.execute, source, result_consumer, false);
-        }
-
-        let mut forked_mode = false;
+        let frame = execution::current_frame();
+        let mut modifiers = ChainModifiers::default();
         let mut current_sources: Vec<Arc<S>> = vec![source.clone()];
 
         for modifier in &self.modifiers {
-            forked_mode |= modifier.forks;
+            if modifier.forks {
+                modifiers = modifiers.set_forked();
+            }
+            if matches!(modifier.modifier, RedirectModifier::ReturnRun) {
+                if let Some(frame) = &frame {
+                    frame.discard();
+                }
+                modifiers = modifiers.set_return();
+                continue;
+            }
 
             let mut next_sources = Vec::new();
             for source in current_sources {
                 let mut to_add =
-                    Self::run_modifier(modifier, &source, result_consumer, forked_mode)?;
+                    Self::run_modifier(modifier, &source, result_consumer, modifiers.is_forked())?;
                 next_sources.append(&mut to_add);
             }
-            if next_sources.is_empty() {
-                return Ok(0);
-            }
             current_sources = next_sources;
+            if current_sources.is_empty() {
+                break;
+            }
+        }
+
+        if current_sources.is_empty() {
+            // Vanilla FallthroughTask.
+            if modifiers.is_return()
+                && let Some(frame) = &frame
+            {
+                frame.return_failure();
+                frame.discard();
+            }
+            return Ok(0);
+        }
+
+        let generation = frame.as_ref().map(|frame| frame.generation());
+        let discarded = || {
+            frame
+                .as_ref()
+                .is_some_and(|frame| Some(frame.generation()) != generation)
+        };
+        let executable = self.execute.as_ref().clone();
+        let executable = CommandContext {
+            chain_modifiers: modifiers,
+            frame_generation: generation,
+            ..executable
+        };
+
+        if executable
+            .command
+            .as_ref()
+            .is_some_and(|command| command.reports_own_result())
+        {
+            // Vanilla runs every source's custom executor before anything they queue.
+            for execution_source in current_sources {
+                let context = executable.with_source(execution_source);
+                if let Some(command) = &context.command
+                    && let Err(error) = command.execute(&context)
+                    && !modifiers.is_forked()
+                {
+                    return Err(error);
+                }
+            }
+            return Ok(0);
+        }
+
+        if modifiers.is_return()
+            && let Some(frame) = &frame
+        {
+            // Only the first source runs, and its result also returns from the frame.
+            let consumer = ReturnToFrame {
+                inner: result_consumer,
+                frame,
+            };
+            return Self::run_executable(
+                &executable,
+                &current_sources[0],
+                &consumer,
+                modifiers.is_forked(),
+            );
         }
 
         let mut result = 0;
         for execution_source in current_sources {
+            if discarded() {
+                break;
+            }
             result += Self::run_executable(
-                &self.execute,
+                &executable,
                 &execution_source,
                 result_consumer,
-                forked_mode,
+                modifiers.is_forked(),
             )?;
         }
 
@@ -445,6 +541,8 @@ impl<'a, S: CommandSource> CommandContextBuilder<'a, S> {
             modifier: self.modifier,
             forks: self.forks,
             command: self.command,
+            chain_modifiers: ChainModifiers::default(),
+            frame_generation: None,
         }
     }
 
@@ -541,12 +639,14 @@ mod test {
     };
     use crate::context::string_range::StringRange;
     use crate::errors::command_syntax_error::CommandSyntaxError;
+    use crate::execution;
     use crate::node::dispatcher::{CommandDispatcher, EmptyResultConsumer};
     use crate::node::tree::ROOT_NODE_ID;
     use crate::node::{CommandExecutor, CommandExecutorResult, RedirectModifier, Redirection};
-    use crate::source::DummySource;
+    use crate::source::{DummySource, ResultValueTaker, ReturnValue};
     use pumpkin_util::math::vector3::Vector3;
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicI32, Ordering};
 
     struct TenExecutor;
     impl CommandExecutor for TenExecutor {
@@ -726,5 +826,91 @@ mod test {
         assert!(chain2.next_stage().is_none());
         let res = chain.execute_all(&source, dispatcher.consumer.as_ref());
         assert!(res.is_ok_and(|val| val == 1));
+    }
+
+    struct CustomDiscard(Arc<AtomicI32>);
+    impl CommandExecutor for CustomDiscard {
+        fn execute(&self, _context: &CommandContext) -> CommandExecutorResult {
+            self.0.fetch_add(1, Ordering::Relaxed);
+            if let Some(frame) = execution::current_frame() {
+                frame.discard();
+            }
+            Ok(1)
+        }
+
+        fn reports_own_result(&self) -> bool {
+            true
+        }
+    }
+
+    /// Runs `input` as a function entry, returning how often the executors ran and what the
+    /// frame returned.
+    fn run_in_frame(input: &str) -> (i32, Vec<ReturnValue>) {
+        let runs = Arc::new(AtomicI32::new(0));
+        let mut dispatcher = CommandDispatcher::new();
+        let count = runs.clone();
+        dispatcher.register(
+            CommandArgumentBuilder::new("count", "")
+                .executes(move |_: &CommandContext| Ok(count.fetch_add(1, Ordering::Relaxed) + 1)),
+        );
+        let count = runs.clone();
+        dispatcher.register(CommandArgumentBuilder::new("discard", "").executes(
+            move |_: &CommandContext| {
+                count.fetch_add(1, Ordering::Relaxed);
+                if let Some(frame) = execution::current_frame() {
+                    frame.discard();
+                }
+                Ok(1)
+            },
+        ));
+        dispatcher.register(
+            CommandArgumentBuilder::new("custom", "").executes(CustomDiscard(runs.clone())),
+        );
+        dispatcher.register(CommandArgumentBuilder::new("fork3", "").fork(
+            Redirection::Root,
+            RedirectModifier::Custom(Arc::new(|context: &CommandContext<DummySource>| {
+                Ok(vec![context.source.clone(); 3])
+            })),
+        ));
+        dispatcher.register(
+            CommandArgumentBuilder::new("returnrun", "")
+                .redirect_with_modifier(Redirection::Root, RedirectModifier::ReturnRun),
+        );
+
+        let returned = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let taker = {
+            let returned = returned.clone();
+            ResultValueTaker::from_fn(move |value| returned.lock().unwrap().push(value))
+        };
+        let source = DummySource::dummy();
+        execution::run_in_new_frame(taker, false, |_| {
+            let _ = dispatcher.execute_input_in_current_frame(input, &source);
+        });
+        let returned = returned.lock().unwrap().clone();
+        (runs.load(Ordering::Relaxed), returned)
+    }
+
+    #[test]
+    fn discarding_the_frame_drops_the_remaining_forks() {
+        assert_eq!(run_in_frame("fork3 count"), (3, vec![]));
+        assert_eq!(run_in_frame("fork3 discard"), (1, vec![]));
+        // Vanilla runs every source's custom executor before anything they queue.
+        assert_eq!(run_in_frame("fork3 custom"), (3, vec![]));
+    }
+
+    #[test]
+    fn return_run_returns_the_first_source_result() {
+        assert_eq!(
+            run_in_frame("returnrun fork3 count"),
+            (1, vec![ReturnValue::Success(1)])
+        );
+        assert_eq!(
+            run_in_frame("fork3 returnrun count"),
+            (1, vec![ReturnValue::Success(1)])
+        );
+        assert_eq!(
+            run_in_frame("returnrun fork3 returnrun count"),
+            (1, vec![ReturnValue::Success(1)])
+        );
     }
 }

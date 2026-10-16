@@ -433,10 +433,10 @@ impl Server {
             .datapack_manager
             .load_all(&world_path, &enabled_packs, &server.recipe_manager);
 
-        let source = crate::command::CommandSender::Console.into_source(&server);
-        let _ = server
-            .datapack_manager
-            .execute_function(&server, &source, "#minecraft:load");
+        let _ = crate::data::datapack::DatapackManager::execute_function_from_game_loop(
+            &server,
+            "#minecraft:load",
+        );
 
         Ok(server)
     }
@@ -545,10 +545,10 @@ impl Server {
         self.datapack_manager
             .load_all(&world_path, &enabled_packs, &self.recipe_manager);
 
-        let source = crate::command::CommandSender::Console.into_source(server);
-        let _ = self
-            .datapack_manager
-            .execute_function(server, &source, "#minecraft:load");
+        let _ = crate::data::datapack::DatapackManager::execute_function_from_game_loop(
+            server,
+            "#minecraft:load",
+        );
 
         let dynamic_recipes = self.recipe_manager.get_dynamic_recipes_internal();
         for player in self.get_all_players() {
@@ -1199,12 +1199,10 @@ impl Server {
 
     /// Ticks the game logic for all worlds. This is the part that is affected by `/tick freeze`.
     pub fn tick_worlds(self: &Arc<Self>) {
-        let source = crate::command::CommandSender::Console
-            .into_source(self)
-            .with_silent();
-        let _ = self
-            .datapack_manager
-            .execute_function(self, &source, "#minecraft:tick");
+        let _ = crate::data::datapack::DatapackManager::execute_function_from_game_loop(
+            self,
+            "#minecraft:tick",
+        );
 
         self.plugin_manager.tick_loaders(self);
         self.scheduled_functions.tick(
