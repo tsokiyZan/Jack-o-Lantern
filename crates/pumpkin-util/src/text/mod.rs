@@ -1980,7 +1980,13 @@ impl TextComponent {
     /// # Returns
     /// The resultant text component with all the elements joined in it.
     #[must_use]
-    pub fn join(elements: Vec<Self>, separator: &Self) -> Self {
+    pub fn join(mut elements: Vec<Self>, separator: &Self) -> Self {
+        // Vanilla ComponentUtils.formatList returns a lone element as it is.
+        if elements.len() == 1
+            && let Some(element) = elements.pop()
+        {
+            return element;
+        }
         let mut result = Self::empty();
         let mut first = true;
 
