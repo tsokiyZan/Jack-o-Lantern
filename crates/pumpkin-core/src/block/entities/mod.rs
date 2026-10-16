@@ -92,13 +92,16 @@ pub trait BlockEntity: Any + Send + Sync {
         false
     }
 
+    /// Vanilla `BlockEntity.saveWithFullMetadata`: the entity's own data, its leftover
+    /// components (which Pumpkin doesn't keep, so always none), then the id and position.
     fn write_internal(&self, nbt: &mut NbtCompound) {
+        self.write_nbt(nbt);
+        nbt.put_compound("components", NbtCompound::new());
         nbt.put_string("id", self.resource_location().to_string());
         let position = self.get_position();
         nbt.put_int("x", position.0.x);
         nbt.put_int("y", position.0.y);
         nbt.put_int("z", position.0.z);
-        self.write_nbt(nbt);
     }
     fn get_id(&self) -> u32 {
         let name = self
