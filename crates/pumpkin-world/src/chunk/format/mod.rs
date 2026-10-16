@@ -35,6 +35,27 @@ pub mod anvil;
 pub mod linear;
 pub mod pump;
 
+/// Chunk tags Pumpkin reads into `ChunkData` and writes back itself; the rest are kept as they
+/// were.
+const MODELLED_CHUNK_KEYS: [&str; 16] = [
+    "DataVersion",
+    "xPos",
+    "zPos",
+    "yPos",
+    "Status",
+    "sections",
+    "Heightmaps",
+    "block_ticks",
+    "fluid_ticks",
+    "block_entities",
+    "isLightOn",
+    "InhabitedTime",
+    "LastUpdate",
+    "PumpkinCustomData",
+    "BukkitValues",
+    TERRAIN_COMPLETE_TAG,
+];
+
 /// Marker that Pumpkin's 26.2-stamped saves put on chunks with finished terrain. Earlier builds
 /// also saved half-built terrain as `minecraft:terrain`.
 const TERRAIN_COMPLETE_TAG: &str = "pumpkin:terrain_complete";
@@ -444,6 +465,13 @@ impl ChunkData {
             _ => ChunkStatus::Empty,
         };
 
+        let mut unmodelled_nbt = NbtCompound::new();
+        for (key, tag) in &root_tag.child_tags {
+            if !MODELLED_CHUNK_KEYS.contains(&key.as_ref()) {
+                unmodelled_nbt.put(key, tag.clone());
+            }
+        }
+
         let custom_data = root_tag
             .get_compound("PumpkinCustomData")
             .or_else(|| root_tag.get_compound("BukkitValues"))
@@ -466,6 +494,10 @@ impl ChunkData {
             blending_data: None,
             inhabited_time: AtomicU64::new(root_tag.get_long("InhabitedTime").unwrap_or(0) as u64),
             custom_data: std::sync::Mutex::new(custom_data),
+            last_update: std::sync::atomic::AtomicI64::new(
+                root_tag.get_long("LastUpdate").unwrap_or(0),
+            ),
+            unmodelled_nbt,
         })
     }
 
@@ -625,6 +657,10 @@ impl ChunkData {
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         if !custom_data.is_empty() {
             root_compound.put_compound("PumpkinCustomData", custom_data.clone());
+        }
+        root_compound.put_long("LastUpdate", self.last_update.load(Ordering::Relaxed));
+        for (key, tag) in &self.unmodelled_nbt.child_tags {
+            root_compound.put(key, tag.clone());
         }
 
         let nbt = pumpkin_nbt::Nbt::from(root_compound);
@@ -1046,6 +1082,26 @@ mod tests {
         };
         assert_eq!(sign_allows_op_features(4903), Some(true));
         assert_eq!(sign_allows_op_features(5002), None);
+    }
+
+    #[test]
+    fn unmodelled_chunk_tags_survive_a_save() {
+        use crate::chunk::ChunkData;
+        use pumpkin_util::math::vector2::Vector2;
+
+        let mut structures = NbtCompound::new();
+        structures.put_compound("starts", NbtCompound::new());
+        let mut nbt = test_chunk(vec![test_section(-4, "minecraft:stone", true)]);
+        nbt.root_tag.put_compound("structures", structures.clone());
+        nbt.root_tag.put_long("LastUpdate", 77);
+        let chunk = ChunkData::from_bytes(&nbt.write(), Vector2::new(0, 0)).expect("parses");
+        let saved = chunk.to_bytes().expect("serializes");
+        let saved = pumpkin_nbt::Nbt::read(&mut pumpkin_nbt::deserializer::NbtReadHelperJava::new(
+            &mut std::io::Cursor::new(saved.as_ref()),
+        ))
+        .expect("saved chunk is NBT");
+        assert_eq!(saved.root_tag.get_compound("structures"), Some(&structures));
+        assert_eq!(saved.root_tag.get_long("LastUpdate"), Some(77));
     }
 
     #[test]

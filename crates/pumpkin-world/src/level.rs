@@ -830,6 +830,11 @@ impl Level {
             return;
         }
 
+        // Vanilla `SerializableChunkData.copyOf`: `LastUpdate` is the level's game time.
+        let game_time = self.game_time();
+        for (_, chunk) in &chunks_to_write {
+            chunk.last_update.store(game_time, Ordering::Relaxed);
+        }
         let chunk_saver = self.chunk_saver.clone();
         let level_folder = self.level_folder.clone();
 

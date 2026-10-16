@@ -296,6 +296,8 @@ impl Chunk {
                 dirty: AtomicBool::new(false),
                 inhabited_time: AtomicU64::new(0),
                 custom_data: Mutex::new(NbtCompound::new()),
+                last_update: std::sync::atomic::AtomicI64::new(0),
+                unmodelled_nbt: NbtCompound::new(),
             })),
         ) {
             Self::Proto(proto) => proto,
@@ -343,6 +345,8 @@ impl Chunk {
             blending_data: proto_chunk.blending_data,
             inhabited_time: AtomicU64::new(0),
             custom_data: Mutex::new(NbtCompound::new()),
+            last_update: std::sync::atomic::AtomicI64::new(0),
+            unmodelled_nbt: NbtCompound::new(),
         };
 
         *self = Self::Level(Arc::new(chunk));
