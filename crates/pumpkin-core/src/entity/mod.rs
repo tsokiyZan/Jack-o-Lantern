@@ -1089,6 +1089,8 @@ pub struct Entity {
     pub velocity: AtomicCell<Vector3<f64>>,
     /// Tracks a horizontal collision
     pub horizontal_collision: AtomicBool,
+    /// Vanilla `verticalCollisionBelow`: the last move was stopped on its way down.
+    pub vertical_collision_below: AtomicBool,
     /// Indicates whether the entity is on the ground (may not always be accurate).
     pub on_ground: AtomicBool,
     /// Indicates whether the entity is touching water
@@ -1261,6 +1263,7 @@ impl Entity {
             touching_lava: AtomicBool::new(false),
             lava_height: AtomicCell::new(0.0),
             horizontal_collision: AtomicBool::new(false),
+            vertical_collision_below: AtomicBool::new(false),
             pos: AtomicCell::new(position),
             last_pos: AtomicCell::new(position),
             movement: AtomicCell::new(Vector3::default()),
@@ -2361,6 +2364,8 @@ impl Entity {
         if self.no_physics.load(Ordering::Relaxed) || caller.is_spectator() {
             self.move_pos(motion);
             self.horizontal_collision.store(false, Ordering::Relaxed);
+            self.vertical_collision_below
+                .store(false, Ordering::Relaxed);
             self.on_ground.store(false, Ordering::Relaxed);
 
             return;
@@ -2379,8 +2384,19 @@ impl Entity {
         }
 
         let final_move = self.adjust_movement_for_collisions(motion, caller);
+        #[expect(
+            clippy::float_cmp,
+            reason = "vanilla compares the collided movement exactly"
+        )]
+        let vertical_collision = motion.y != final_move.y;
+        self.vertical_collision_below
+            .store(vertical_collision && motion.y < 0.0, Ordering::Relaxed);
 
-        self.move_pos(final_move);
+        // Vanilla `Entity.move` leaves out a negligible move unless collisions cut it short.
+        let movement_length = final_move.length_squared();
+        if movement_length > 1.0E-7 || motion.length_squared() - movement_length < 1.0E-7 {
+            self.move_pos(final_move);
+        }
 
         // Vanilla `setOnGroundWithMovement`: `move` runs it when the entity moved vertically
         // or, as for every server-side mob here, when this side is authoritative.
