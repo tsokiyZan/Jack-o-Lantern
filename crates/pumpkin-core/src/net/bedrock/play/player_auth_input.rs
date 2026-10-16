@@ -148,7 +148,6 @@ impl BedrockClient {
 
             if pos_changed {
                 chunker::update_position(player);
-                player.check_location_enchantments(new_pos, on_ground);
                 player.progress_motion(new_pos - old_pos);
             }
         }
@@ -186,7 +185,7 @@ impl BedrockClient {
                     server;
                     PlayerToggleFlightEvent::new(player.clone(), true);
                     'after: {
-                        player.living_entity.fall_distance.store(0.0);
+                        player.living_entity.entity.reset_fall_distance();
                         {
                             player.abilities.lock().unwrap_or_else(std::sync::PoisonError::into_inner).flying = true;
                         };

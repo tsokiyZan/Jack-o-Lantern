@@ -10,7 +10,6 @@ use pumpkin_util::GameMode;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_world::world::BlockFlags;
 
-use crate::block::OnLandedUponArgs;
 use crate::block::registry::BlockActionResult;
 use crate::block::{
     BlockBehaviour, BrokenArgs, CanPlaceAtArgs, NormalUseArgs, OnPlaceArgs, OnStateReplacedArgs,
@@ -76,12 +75,6 @@ impl BlockBehaviour for BedBlock {
                     .replaceable();
         }
         false
-    }
-
-    fn on_landed_upon(&self, args: OnLandedUponArgs<'_>) {
-        if let Some(living) = args.entity.get_living_entity() {
-            living.handle_fall_damage(args.entity, args.fall_distance * 0.5, 1.0);
-        }
     }
 
     fn on_place(&self, args: OnPlaceArgs<'_>) -> BlockStateId {

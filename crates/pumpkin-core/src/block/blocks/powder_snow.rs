@@ -2,7 +2,6 @@ use pumpkin_data::BlockState;
 use pumpkin_data::data_component_impl::EquipmentSlot;
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::item::Item;
-use pumpkin_data::sound::Sound;
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_macros::pumpkin_block;
 use pumpkin_util::math::boundingbox::BoundingBox;
@@ -10,7 +9,7 @@ use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
 use pumpkin_world::world::BlockFlags;
 
-use crate::block::{BlockBehaviour, OnEntityCollisionArgs, OnLandedUponArgs, PathComputationType};
+use crate::block::{BlockBehaviour, FallOnArgs, OnEntityCollisionArgs, PathComputationType};
 use crate::entity::EntityBase;
 
 #[pumpkin_block("minecraft:powder_snow")]
@@ -56,11 +55,7 @@ pub(crate) fn collision_shape_for_entity(
     entity: &dyn EntityBase,
     position: &BlockPos,
 ) -> Option<BoundingBox> {
-    let fall_distance = entity
-        .get_living_entity()
-        .map_or(0.0, |living| living.fall_distance.load());
-
-    if fall_distance > 2.5f32 {
+    if entity.get_entity().fall_distance.load() > 2.5 {
         return Some(FALLING_COLLISION_SHAPE);
     }
 
@@ -87,17 +82,14 @@ pub(crate) fn inside_collision_shape_for_entity(
 }
 
 impl BlockBehaviour for PowderSnowBlock {
-    fn on_landed_upon(&self, args: OnLandedUponArgs<'_>) {
-        if let Some(living) = args.entity.get_living_entity()
-            && args.fall_distance >= 4.0
+    /// Vanilla `PowderSnowBlock.fallOn`: no fall damage, only the entity's fall sound.
+    fn fall_on(&self, args: FallOnArgs<'_>) {
+        if args.fall_distance >= 4.0
+            && let Some(living) = args.entity.get_living_entity()
         {
-            let sound = if args.fall_distance < 7.0 {
-                Sound::EntityGenericSmallFall
-            } else {
-                Sound::EntityGenericBigFall
-            };
-
-            living.entity.play_sound(sound);
+            let (small, big) = living.get_fall_sounds();
+            let sound = if args.fall_distance < 7.0 { small } else { big };
+            args.entity.play_sound_at_self(sound, 1.0, 1.0);
         }
     }
 

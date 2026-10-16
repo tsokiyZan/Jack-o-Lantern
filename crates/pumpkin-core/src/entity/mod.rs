@@ -803,6 +803,56 @@ pub trait EntityBase: Send + Sync + std::any::Any {
         self.get_entity().move_entity(caller, motion);
     }
 
+    /// Vanilla `Entity.getKnownMovement`: a player steering this entity knows its movement best.
+    fn get_known_movement(&self) -> Vector3<f64> {
+        let entity = self.get_entity();
+        if entity.is_alive()
+            && let Some(controller) = self.controlling_passenger()
+            && controller.get_player().is_some()
+        {
+            return controller.get_known_movement();
+        }
+        entity.velocity.load()
+    }
+
+    /// Vanilla `Entity.checkFallDamage` and its overrides: adds the vertical move `ya` to the
+    /// fall, and on landing hands the fall to the block below (`pos`, `state`).
+    fn check_fall_damage(
+        &self,
+        caller: &dyn EntityBase,
+        ya: f64,
+        on_ground: bool,
+        state: &'static BlockState,
+        pos: BlockPos,
+    ) {
+        if let Some(living) = self.get_living_entity() {
+            living.check_fall_damage(caller, ya, on_ground, state, pos);
+        } else {
+            self.get_entity()
+                .check_fall_damage_default(caller, ya, on_ground, state, pos);
+        }
+    }
+
+    /// Vanilla `Entity.causeFallDamage` and its overrides: whether the fall hurt this entity.
+    fn cause_fall_damage(
+        &self,
+        caller: &dyn EntityBase,
+        fall_distance: f64,
+        damage_modifier: f32,
+        damage_type: DamageType,
+    ) -> bool {
+        self.get_living_entity().map_or_else(
+            || {
+                self.get_entity().cause_fall_damage_default(
+                    fall_distance,
+                    damage_modifier,
+                    damage_type,
+                )
+            },
+            |living| living.cause_fall_damage(caller, fall_distance, damage_modifier, damage_type),
+        )
+    }
+
     fn is_pushable(&self) -> bool {
         false
     }
@@ -1100,6 +1150,8 @@ pub struct Entity {
     pub block_pos: AtomicCell<BlockPos>,
     /// The block supporting the entity
     pub supporting_block_pos: AtomicCell<Option<BlockPos>>,
+    /// Vanilla `Entity.fallDistance`.
+    pub fall_distance: AtomicCell<f64>,
     /// Vanilla `Entity.onGroundNoBlocks`: on the ground last check with no block found under it.
     pub on_ground_no_blocks: AtomicBool,
     /// The chunk coordinates of the entity's current position
@@ -1304,6 +1356,7 @@ impl Entity {
             movement: AtomicCell::new(Vector3::default()),
             block_pos: AtomicCell::new(BlockPos(Vector3::new(floor_x, floor_y, floor_z))),
             supporting_block_pos: AtomicCell::new(None),
+            fall_distance: AtomicCell::new(0.0),
             on_ground_no_blocks: AtomicBool::new(false),
             chunk_pos: AtomicCell::new(Vector2::new(
                 get_section_cord(floor_x),
@@ -2183,9 +2236,7 @@ impl Entity {
         let in_water = in_fluid[0];
 
         if in_water {
-            if let Some(living) = caller.get_living_entity() {
-                living.fall_distance.store(0.0);
-            }
+            self.reset_fall_distance();
 
             // Vanilla `firstTick`: the world bumps `tick_count` before the first tick.
             if !self.touching_water.load(Ordering::SeqCst)
@@ -2204,14 +2255,6 @@ impl Entity {
         let lava_height = fluid_height[1];
 
         let in_lava = in_fluid[1];
-
-        if in_lava && let Some(living) = caller.get_living_entity() {
-            let halved_fall = living.fall_distance.load() / 2.0;
-
-            if halved_fall != 0.0 {
-                living.fall_distance.store(halved_fall);
-            }
-        }
 
         self.lava_height.store(lava_height);
 
@@ -2289,6 +2332,135 @@ impl Entity {
             let (b, s) = self.world.load().get_block_and_state(&pos);
 
             (pos, b, s)
+        }
+    }
+
+    /// Vanilla `Entity.getOnPosLegacy`: the block 0.2 under the feet.
+    #[must_use]
+    pub fn get_on_pos_legacy(&self) -> BlockPos {
+        self.get_pos_with_y_offset(f64::from(0.2f32)).0
+    }
+
+    /// Vanilla `Entity.resetFallDistance`, with `ServerPlayer`'s `fall_from_height` trigger.
+    pub fn reset_fall_distance(&self) {
+        // A player only has a fall start to report while it is falling.
+        if self.fall_distance.swap(0.0) != 0.0
+            && self.entity_type == &EntityType::PLAYER
+            && let Some(player) = self.world.load().get_player_by_id(self.entity_id)
+        {
+            player.track_fall_reset();
+        }
+    }
+
+    /// Vanilla `Entity.checkFallDistanceAccumulation`: a slow fall counts as at most a block.
+    pub fn check_fall_distance_accumulation(&self) {
+        if self.velocity.load().y > -0.5 && self.fall_distance.load() > 1.0 {
+            self.fall_distance.store(1.0);
+        }
+    }
+
+    /// The start of vanilla `Entity.move`: a move of a block or more that passes through a
+    /// block resetting falls (a ladder, a cobweb, water...) ends the fall.
+    pub fn reset_fall_on_long_move(&self, from: Vector3<f64>, movement: Vector3<f64>) {
+        let movement_length = movement.length_squared();
+        if self.fall_distance.load() == 0.0 || movement_length < 1.0 {
+            return;
+        }
+        let check_distance = movement_length.sqrt().min(8.0);
+        let to = from + movement.normalize() * check_distance;
+        let hit = self
+            .world
+            .load()
+            .clip(&pumpkin_world::clip::ClipContext::new(
+                from,
+                to,
+                pumpkin_world::clip::ClipBlock::FallDamageResetting,
+                pumpkin_world::clip::ClipFluid::Water,
+            ));
+        if !hit.is_miss {
+            self.reset_fall_distance();
+        }
+    }
+
+    /// Vanilla `Entity.doCheckFallDamage`: `checkFallDamage` for a move the client made.
+    pub fn do_check_fall_damage(
+        &self,
+        caller: &dyn EntityBase,
+        movement: Vector3<f64>,
+        on_ground: bool,
+    ) {
+        self.check_supporting_block(caller, on_ground, Some(movement));
+        let pos = self.get_on_pos_legacy();
+        let state = self.world.load().get_block_state(&pos);
+        caller.check_fall_damage(caller, movement.y, on_ground, state, pos);
+    }
+
+    /// Vanilla `Entity.checkFallDamage`.
+    pub fn check_fall_damage_default(
+        &self,
+        caller: &dyn EntityBase,
+        ya: f64,
+        on_ground: bool,
+        state: &'static BlockState,
+        pos: BlockPos,
+    ) {
+        if !self.touching_water.load(Ordering::SeqCst) && ya < 0.0 {
+            // `fallDistance -= (float)ya`.
+            self.fall_distance
+                .store(self.fall_distance.load() - f64::from(ya as f32));
+        }
+        if on_ground {
+            let fall_distance = self.fall_distance.load();
+            if fall_distance > 0.0 {
+                let world = self.world.load();
+                world
+                    .block_registry
+                    .fall_on(&world, state, &pos, caller, fall_distance);
+                world.emit_game_event(
+                    pumpkin_data::game_event::GameEvent::HitGround.name(),
+                    self.pos.load(),
+                );
+            }
+            self.reset_fall_distance();
+        }
+    }
+
+    /// Vanilla `Entity.causeFallDamage`: no damage, but the passengers take the fall.
+    pub fn cause_fall_damage_default(
+        &self,
+        fall_distance: f64,
+        damage_modifier: f32,
+        damage_type: DamageType,
+    ) -> bool {
+        if self
+            .entity_type
+            .has_tag(&tag::EntityType::MINECRAFT_FALL_DAMAGE_IMMUNE)
+        {
+            return false;
+        }
+        self.propagate_fall_to_passengers(fall_distance, damage_modifier, damage_type);
+        false
+    }
+
+    /// Vanilla `Entity.propagateFallToPassengers`.
+    pub fn propagate_fall_to_passengers(
+        &self,
+        fall_distance: f64,
+        damage_modifier: f32,
+        damage_type: DamageType,
+    ) {
+        let passengers = self
+            .passengers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        for passenger in passengers {
+            passenger.cause_fall_damage(
+                passenger.as_ref(),
+                fall_distance,
+                damage_modifier,
+                damage_type,
+            );
         }
     }
 
@@ -2432,6 +2604,7 @@ impl Entity {
         // Vanilla `Entity.move` leaves out a negligible move unless collisions cut it short.
         let movement_length = final_move.length_squared();
         if movement_length > 1.0E-7 || motion.length_squared() - movement_length < 1.0E-7 {
+            self.reset_fall_on_long_move(self.pos.load(), final_move);
             self.move_pos(final_move);
         }
 
@@ -2444,12 +2617,20 @@ impl Entity {
         );
 
         // `checkFallDamage` only runs on the authoritative side, the client for a player.
-        if !is_player
-            && let Some(living) = caller.get_living_entity()
-            && caller.get_mob().is_none_or(mob::Mob::checks_fall_damage)
-        {
-            let on_ground = self.on_ground.load(Ordering::SeqCst);
-            living.fall(caller, final_move.y, on_ground, false);
+        if !is_player {
+            let effect_pos = self.get_on_pos_legacy();
+            let effect_state = self.world.load().get_block_state(&effect_pos);
+            caller.check_fall_damage(
+                caller,
+                final_move.y,
+                self.on_ground.load(Ordering::SeqCst),
+                effect_state,
+                effect_pos,
+            );
+        }
+
+        if self.is_removed() {
+            return;
         }
 
         self.restitute_movement_after_collisions(caller, motion, final_move);
@@ -4652,9 +4833,7 @@ impl Entity {
             }
             _ => {}
         }
-        if let Some(living) = self.get_living_entity() {
-            living.fall_distance.store(0f32);
-        }
+        self.reset_fall_distance();
         self.movement_multiplier.store(multiplier);
     }
 
@@ -4744,6 +4923,7 @@ impl Entity {
             "Rotation",
             NbtTag::List(vec![self.yaw.load().into(), self.pitch.load().into()]),
         );
+        nbt.put_double("fall_distance", self.fall_distance.load());
         nbt.put_short("Fire", self.fire_ticks.load(Relaxed) as i16);
         nbt.put_bool("OnGround", self.on_ground.load(Relaxed));
         nbt.put_bool("Invulnerable", self.invulnerable.load(Relaxed));
@@ -4865,6 +5045,13 @@ impl Entity {
             self.last_sent_head_yaw.store(yaw_byte, Relaxed);
         }
         // Only keys present are applied, so partial NBT leaves the rest untouched.
+        // `FallDistance` is the float from before 1.21.5.
+        if let Some(fall_distance) = nbt
+            .get_double("fall_distance")
+            .or_else(|| nbt.get_float("FallDistance").map(f64::from))
+        {
+            self.fall_distance.store(fall_distance);
+        }
         if let Some(fire) = nbt.get_short("Fire") {
             self.fire_ticks.store(i32::from(fire), Relaxed);
         }

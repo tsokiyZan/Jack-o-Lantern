@@ -171,7 +171,7 @@ fn default_vibration_data() -> NbtCompound {
 }
 
 /// Vanilla `EnchantmentHelper.has(stack, PREVENT_EQUIPMENT_DROP)`.
-fn prevents_equipment_drop(stack: &ItemStack) -> bool {
+pub(crate) fn prevents_equipment_drop(stack: &ItemStack) -> bool {
     stack
         .get_data_component::<EnchantmentsImpl>()
         .is_some_and(|enchantments| {
@@ -473,8 +473,14 @@ impl Mob for AllayEntity {
     }
 
     /// Vanilla `Allay.checkFallDamage` does nothing.
-    fn checks_fall_damage(&self) -> bool {
-        false
+    fn mob_check_fall_damage(
+        &self,
+        _caller: &dyn crate::entity::EntityBase,
+        _ya: f64,
+        _on_ground: bool,
+        _state: &'static pumpkin_data::BlockState,
+        _pos: pumpkin_util::math::position::BlockPos,
+    ) {
     }
 
     /// Vanilla `Allay.getAmbientSound`.
@@ -620,9 +626,8 @@ impl Mob for AllayEntity {
         false
     }
 
-    /// Vanilla `Allay.dropEquipment`, which `dropAllDeathLoot` runs after the equipment's
-    /// chance drops.
-    fn drop_custom_death_loot(&self) {
+    /// Vanilla `Allay.dropEquipment`.
+    fn drop_equipment(&self) {
         let entity = self.get_entity();
         for stack in self.inventory.remove_all_items() {
             entity.spawn_at_location(stack);

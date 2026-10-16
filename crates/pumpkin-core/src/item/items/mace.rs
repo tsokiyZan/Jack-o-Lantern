@@ -16,8 +16,8 @@ use pumpkin_data::world::WorldEvent;
 use pumpkin_util::GameMode;
 use pumpkin_util::math::vector3::Vector3;
 
-const SMASH_ATTACK_FALL_THRESHOLD: f32 = 1.5;
-const SMASH_ATTACK_HEAVY_THRESHOLD: f32 = 5.0;
+const SMASH_ATTACK_FALL_THRESHOLD: f64 = 1.5;
+const SMASH_ATTACK_HEAVY_THRESHOLD: f64 = 5.0;
 const SMASH_ATTACK_KNOCKBACK_RADIUS: f32 = 3.5;
 const SMASH_ATTACK_KNOCKBACK_POWER: f32 = 0.7;
 
@@ -42,7 +42,7 @@ impl MaceItem {
     /// Vanilla `MaceItem.canSmashAttack`.
     #[must_use]
     pub fn can_smash_attack(attacker: &LivingEntity) -> bool {
-        attacker.fall_distance.load() > SMASH_ATTACK_FALL_THRESHOLD
+        attacker.entity.fall_distance.load() > SMASH_ATTACK_FALL_THRESHOLD
             && !attacker.entity.is_fall_flying()
     }
 
@@ -66,8 +66,10 @@ impl MaceItem {
 
         let world = living.entity.world.load_full();
         let sound = if victim.get_entity().on_ground.load(Ordering::Relaxed) {
-            // TODO: `ServerPlayer.setSpawnExtraParticlesOnFall`.
-            if living.fall_distance.load() > SMASH_ATTACK_HEAVY_THRESHOLD {
+            attacker
+                .spawn_extra_particles_on_fall
+                .store(true, Ordering::Relaxed);
+            if living.entity.fall_distance.load() > SMASH_ATTACK_HEAVY_THRESHOLD {
                 Sound::ItemMaceSmashGroundHeavy
             } else {
                 Sound::ItemMaceSmashGround
@@ -98,7 +100,7 @@ impl MaceItem {
         if !Self::can_smash_attack(attacker) {
             return 0.0;
         }
-        let fall_distance = f64::from(attacker.fall_distance.load());
+        let fall_distance = attacker.entity.fall_distance.load();
         let damage = if fall_distance <= 3.0 {
             4.0 * fall_distance
         } else if fall_distance <= 8.0 {
@@ -125,7 +127,7 @@ impl MaceItem {
     /// Vanilla `MaceItem.postHurtEnemy`.
     pub fn post_hurt_enemy(attacker: &LivingEntity) {
         if Self::can_smash_attack(attacker) {
-            attacker.fall_distance.store(0.0);
+            attacker.entity.reset_fall_distance();
         }
     }
 
@@ -214,7 +216,7 @@ impl MaceItem {
         direction: Vector3<f64>,
     ) -> f64 {
         let fall_multiplier =
-            if attacker.living_entity.fall_distance.load() > SMASH_ATTACK_HEAVY_THRESHOLD {
+            if attacker.living_entity.entity.fall_distance.load() > SMASH_ATTACK_HEAVY_THRESHOLD {
                 2.0
             } else {
                 1.0

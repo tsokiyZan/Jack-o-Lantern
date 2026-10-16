@@ -62,6 +62,29 @@ pub fn bounce_restitution(block: &Block) -> f32 {
     }
 }
 
+/// Vanilla `Block.getFallDistanceReduction`, from the `fallDistanceReduction` the block's
+/// properties set in `Blocks`: beds and shelf mushrooms take half the fall.
+// TODO: extract `fallDistanceReduction` with the other block properties.
+#[must_use]
+pub fn fall_distance_reduction(block: &Block) -> f32 {
+    if block.has_tag(&pumpkin_data::tag::Block::MINECRAFT_BEDS) || block == &Block::SHELF_MUSHROOM {
+        0.5
+    } else {
+        0.0
+    }
+}
+
+/// Vanilla `Block.fallOn`: the entity takes the fall, less the block's fall distance reduction.
+pub fn default_fall_on(args: &FallOnArgs<'_>) {
+    let reduced = args.fall_distance * f64::from(1.0 - fall_distance_reduction(args.block));
+    args.entity.cause_fall_damage(
+        args.entity,
+        reduced,
+        1.0,
+        pumpkin_data::damage::DamageType::FALL,
+    );
+}
+
 pub trait BlockBehaviour: Send + Sync {
     fn is_valid_bonemeal_target(&self, _args: BonemealArgs<'_>) -> bool {
         false
@@ -136,10 +159,9 @@ pub trait BlockBehaviour: Send + Sync {
 
     fn player_placed(&self, _args: PlayerPlacedArgs<'_>) {}
 
-    fn on_landed_upon(&self, args: OnLandedUponArgs<'_>) {
-        if let Some(living) = args.entity.get_living_entity() {
-            living.handle_fall_damage(args.entity, args.fall_distance, 1.0);
-        }
+    /// Vanilla `Block.fallOn`: an entity ended a fall of `fall_distance` on this block.
+    fn fall_on(&self, args: FallOnArgs<'_>) {
+        default_fall_on(&args);
     }
 
     /// Vanilla `Block.bounceOn`: an entity bounced off this block.
@@ -371,10 +393,13 @@ pub struct PlayerPlacedArgs<'a> {
     pub player: &'a Player,
 }
 
-pub struct OnLandedUponArgs<'a> {
+pub struct FallOnArgs<'a> {
     pub world: &'a Arc<World>,
-    pub fall_distance: f32,
+    pub block: &'a Block,
+    pub state: &'a BlockState,
+    pub position: &'a BlockPos,
     pub entity: &'a dyn EntityBase,
+    pub fall_distance: f64,
 }
 
 pub struct BounceOnArgs<'a> {

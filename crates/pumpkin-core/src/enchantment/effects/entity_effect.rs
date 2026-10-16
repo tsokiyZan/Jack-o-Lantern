@@ -129,6 +129,7 @@ impl EnchantmentEntityEffectExt for EnchantmentEntityEffect {
                 offset_z,
                 predicate,
                 block_state,
+                block_state_properties,
                 trigger_game_event,
             } => {
                 let offset = Vector3::new(*offset_x, *offset_y, *offset_z);
@@ -139,6 +140,7 @@ impl EnchantmentEntityEffectExt for EnchantmentEntityEffect {
                         offset,
                         predicate: predicate.clone(),
                         block_state,
+                        block_state_properties,
                         trigger_game_event: *trigger_game_event,
                     },
                     world,
@@ -293,7 +295,8 @@ impl EnchantmentEntityEffectExt for EnchantmentEntityEffect {
                     position,
                 );
             }
-            Self::Other => {}
+            // Only a location-based effect: `EnchantmentHelper::run_location_changed_effects`.
+            Self::Attribute { .. } | Self::Other => {}
         }
     }
 }

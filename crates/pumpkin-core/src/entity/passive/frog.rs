@@ -287,8 +287,11 @@ impl Mob for FrogEntity {
     }
 
     /// Vanilla `Frog.calculateFallDamage`.
-    fn calculate_fall_damage(&self, base_damage: i32) -> i32 {
-        base_damage - FROG_FALL_DAMAGE_REDUCTION
+    fn calculate_fall_damage(&self, fall_distance: f64, damage_modifier: f32) -> i32 {
+        self.get_mob_entity()
+            .living_entity
+            .calculate_fall_damage(fall_distance, damage_modifier)
+            - FROG_FALL_DAMAGE_REDUCTION
     }
 
     /// Vanilla `Frog.isPushedByFluid`.

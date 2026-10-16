@@ -1,20 +1,36 @@
 use crate::entity::player::Player;
+use pumpkin_data::entity::EntityType;
+use pumpkin_util::math::vector3::Vector3;
 
 #[derive(Debug, Clone)]
 pub enum AdvancementTrigger {
     InventoryChanged,
-    PlayerKilledEntity { entity_type_resource: String },
-    EnterBlock { block_id: String },
-    PlacedBlock { block_id: String },
-    ConsumeItem { item_id: String },
+    PlayerKilledEntity {
+        entity_type_resource: String,
+    },
+    EnterBlock {
+        block_id: String,
+    },
+    PlacedBlock {
+        block_id: String,
+    },
+    ConsumeItem {
+        item_id: String,
+    },
     SleptInBed,
-    FishedItem { item_id: String },
-    EnterDimension { dimension: String },
+    FishedItem {
+        item_id: String,
+    },
+    EnterDimension {
+        dimension: String,
+    },
     PlayerKilled,
     DeflectedDamage,
     LaunchedEyeOfEnder,
     GlowedSign,
-    BredAnimal { parent_type: String },
+    BredAnimal {
+        parent_type: String,
+    },
     DealtOverkillDamage,
     SniperDuel,
     TwoBirdsOneArrow,
@@ -22,6 +38,16 @@ pub enum AdvancementTrigger {
     Bullseye,
     CuredZombieVillager,
     TradedWithVillager,
+    /// Vanilla `CriteriaTriggers.FALL_FROM_HEIGHT`: a fall that started at `start` ended.
+    FallFromHeight {
+        start: Vector3<f64>,
+    },
+    /// Vanilla `CriteriaTriggers.FALL_AFTER_EXPLOSION`: a fall started after an explosion
+    /// at `start`, caused by an entity of type `cause`.
+    FallAfterExplosion {
+        start: Vector3<f64>,
+        cause: Option<&'static EntityType>,
+    },
 }
 
 impl Player {
@@ -608,6 +634,34 @@ impl Player {
                     self.trigger_advancement_criterion(
                         Advancement::STORY_CURE_ZOMBIE_VILLAGER,
                         "cured_zombie",
+                    );
+                }
+            }
+            AdvancementTrigger::FallFromHeight { start } => {
+                // `DistancePredicate` compares float differences.
+                let pos = self.living_entity.entity.pos.load();
+                let distance_y = ((start.y - pos.y) as f32).abs();
+                if !self.has_advancement(Advancement::ADVENTURE_FALL_FROM_WORLD_HEIGHT)
+                    && start.y >= 319.0
+                    && pos.y <= -59.0
+                    && distance_y >= 379.0
+                {
+                    self.trigger_advancement_criterion(
+                        Advancement::ADVENTURE_FALL_FROM_WORLD_HEIGHT,
+                        "fall_from_world_height",
+                    );
+                }
+            }
+            AdvancementTrigger::FallAfterExplosion { start, cause } => {
+                let pos = self.living_entity.entity.pos.load();
+                let distance_y = ((start.y - pos.y) as f32).abs();
+                if !self.has_advancement(Advancement::ADVENTURE_WHO_NEEDS_ROCKETS)
+                    && cause == Some(&EntityType::WIND_CHARGE)
+                    && distance_y >= 7.0
+                {
+                    self.trigger_advancement_criterion(
+                        Advancement::ADVENTURE_WHO_NEEDS_ROCKETS,
+                        "who_needs_rockets",
                     );
                 }
             }

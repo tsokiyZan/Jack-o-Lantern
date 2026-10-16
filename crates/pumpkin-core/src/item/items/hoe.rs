@@ -1,4 +1,5 @@
 use crate::block::registry::BlockActionResult;
+use crate::enchantment::HurtAndBreak;
 use crate::entity::player::Player;
 use crate::item::{ItemBehaviour, ItemMetadata};
 use crate::server::Server;
@@ -64,7 +65,7 @@ impl ItemBehaviour for HoeItem {
             }
 
             if player.gamemode.load() != GameMode::Creative {
-                let _ = item.damage_item(i32::from(result.entry.item_damage_per_use));
+                let _ = item.hurt_and_break(&world, i32::from(result.entry.item_damage_per_use));
             }
             return BlockActionResult::Success;
         }

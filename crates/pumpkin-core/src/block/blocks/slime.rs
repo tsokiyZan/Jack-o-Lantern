@@ -1,14 +1,17 @@
+use pumpkin_data::damage::DamageType;
 use pumpkin_macros::pumpkin_block;
 
-use crate::block::{BlockBehaviour, OnLandedUponArgs};
+use crate::block::{BlockBehaviour, FallOnArgs};
 
 #[pumpkin_block("minecraft:slime_block")]
 pub struct SlimeBlock;
 
 impl BlockBehaviour for SlimeBlock {
-    fn on_landed_upon(&self, args: OnLandedUponArgs<'_>) {
-        if let Some(living) = args.entity.get_living_entity() {
-            living.handle_fall_damage(args.entity, args.fall_distance, 0.0);
+    /// Vanilla `SlimeBlock.fallOn`: no fall damage, unless the entity doesn't bounce.
+    fn fall_on(&self, args: FallOnArgs<'_>) {
+        if !args.entity.get_entity().is_sneaking() {
+            args.entity
+                .cause_fall_damage(args.entity, args.fall_distance, 0.0, DamageType::FALL);
         }
     }
 }

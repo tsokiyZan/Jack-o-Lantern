@@ -320,6 +320,17 @@ impl TamableAnimal for ParrotEntity {
 }
 
 impl Mob for ParrotEntity {
+    /// Vanilla `Parrot.checkFallDamage` does nothing.
+    fn mob_check_fall_damage(
+        &self,
+        _caller: &dyn crate::entity::EntityBase,
+        _ya: f64,
+        _on_ground: bool,
+        _state: &'static pumpkin_data::BlockState,
+        _pos: pumpkin_util::math::position::BlockPos,
+    ) {
+    }
+
     fn omnidirectional_air_mover(&self) -> bool {
         true
     }

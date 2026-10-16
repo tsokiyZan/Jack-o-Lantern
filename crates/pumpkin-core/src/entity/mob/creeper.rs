@@ -3,6 +3,7 @@ use std::sync::{
     atomic::{AtomicBool, AtomicI32, Ordering},
 };
 
+use crate::enchantment::HurtAndBreak;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::{
     entity::EntityType,
@@ -187,6 +188,27 @@ impl CreeperEntity {
 }
 
 impl Mob for CreeperEntity {
+    /// Vanilla `Creeper.causeFallDamage`: a fall brings the creeper closer to exploding.
+    fn mob_cause_fall_damage(
+        &self,
+        caller: &dyn EntityBase,
+        fall_distance: f64,
+        damage_modifier: f32,
+        damage_type: pumpkin_data::damage::DamageType,
+    ) -> bool {
+        let damaged = self.get_mob_entity().living_entity.cause_fall_damage(
+            caller,
+            fall_distance,
+            damage_modifier,
+            damage_type,
+        );
+        let max_swell = self.fuse_time.load(Ordering::Relaxed);
+        let swell = self.current_fuse_time.load(Ordering::Relaxed) + (fall_distance * 1.5) as i32;
+        self.current_fuse_time
+            .store(swell.min(max_swell - 5), Ordering::Relaxed);
+        damaged
+    }
+
     /// Vanilla `Creeper.getMaxFallDistance`: with a target it will drop as far as
     /// it can survive.
     fn get_max_fall_distance(&self) -> i32 {
@@ -304,7 +326,7 @@ impl Mob for CreeperEntity {
         entity.set_synced_data(pumpkin_data::tracked_data::creeper::IS_IGNITED, true);
 
         if player.gamemode.load() != pumpkin_util::GameMode::Creative {
-            let _ = item_stack.damage_item(1);
+            let _ = item_stack.hurt_and_break(&entity.world.load(), 1);
         }
 
         true

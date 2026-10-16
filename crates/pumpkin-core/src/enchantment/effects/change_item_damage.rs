@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::enchantment::HurtAndBreak;
 use pumpkin_data::data_component_impl::DamageImpl;
 use pumpkin_data::enchantment::LevelBasedValue;
 use pumpkin_data::item_stack::DamageResult;
@@ -29,7 +30,7 @@ impl EnchantmentEntityEffectExt for ChangeItemDamage {
         _world: &Arc<World>,
         enchantment_level: i32,
         item: &EnchantedItemInUse<'_>,
-        _entity: &dyn EntityBase,
+        entity: &dyn EntityBase,
         _position: Vector3<f64>,
     ) {
         let stack = item.item_stack;
@@ -49,7 +50,7 @@ impl EnchantmentEntityEffectExt for ChangeItemDamage {
             let result = detached
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .damage_item(change);
+                .hurt_and_break(&entity.get_entity().world.load(), change);
             if result == DamageResult::Broken {
                 if let Some(on_break) = item.on_break {
                     on_break();

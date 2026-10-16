@@ -19,6 +19,17 @@ impl JavaClient {
         }
         let entity = &player.get_entity();
         entity.on_ground.store(rotation.ground, Ordering::Relaxed);
+        // Vanilla `handleMovePlayer` for a packet without a position: no move, but the fall
+        // still ends on the ground.
+        if player
+            .awaiting_teleport
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .is_none()
+        {
+            player.known_movement.store(Vector3::default());
+            entity.do_check_fall_damage(player, Vector3::default(), rotation.ground);
+        }
         entity.set_rotation(
             wrap_degrees(rotation.yaw) % 360.0,
             wrap_degrees(rotation.pitch),

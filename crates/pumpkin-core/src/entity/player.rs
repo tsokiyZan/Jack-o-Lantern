@@ -2,6 +2,7 @@ pub mod advancement;
 pub mod statistics;
 
 use crate::enchantment::EnchantmentHelper;
+use crate::enchantment::HurtAndBreak;
 use crate::entity::damage_source::DamageSource;
 use crate::entity::movement_emission::MovementEmission;
 use crate::item::items::mace::MaceItem;
@@ -485,6 +486,14 @@ pub struct Player {
     pub bedrock_spawned: AtomicBool,
     /// Whether the player is frozen in place (movement locked for dialogues/cutscenes).
     pub is_movement_locked: AtomicBool,
+    /// Vanilla `ServerPlayer.lastKnownClientMovement`: the client's last move.
+    pub known_movement: AtomicCell<Vector3<f64>>,
+    /// Vanilla `ServerPlayer.startingToFallPosition`.
+    pub starting_to_fall_position: AtomicCell<Option<Vector3<f64>>>,
+    /// Vanilla `ServerPlayer.currentExplosionImpactPos`.
+    pub current_explosion_impact_pos: AtomicCell<Option<Vector3<f64>>>,
+    /// The type of vanilla's `ServerPlayer.currentExplosionCause`.
+    pub current_explosion_cause: AtomicCell<Option<&'static EntityType>>,
     /// The amount of time (in ticks) the client has to report having finished loading before being timed out.
     pub client_loaded_timeout: AtomicU32,
     /// Counter for tracking chat and command spam. Decays each server tick.
@@ -760,6 +769,10 @@ impl Player {
             previous_gamemode: AtomicCell::new(None),
             camera_target_id: AtomicCell::new(None),
             is_movement_locked: AtomicBool::new(false),
+            known_movement: AtomicCell::new(Vector3::default()),
+            starting_to_fall_position: AtomicCell::new(None),
+            current_explosion_impact_pos: AtomicCell::new(None),
+            current_explosion_cause: AtomicCell::new(None),
             // TODO: Send the CPlayerSpawnPosition packet when the client connects with proper values
             respawn_point: std::sync::Mutex::new(None),
             sleeping: AtomicBool::new(false),
@@ -1712,7 +1725,7 @@ impl Player {
 
         let mut stack = self.inventory.get_slot(slot_index);
         let original_item = stack.item;
-        let result = stack.damage_item(amount);
+        let result = stack.hurt_and_break(&self.world(), amount);
         let updated = (result != pumpkin_data::item_stack::DamageResult::Untouched)
             .then_some((result, stack.clone()));
 
@@ -1763,20 +1776,6 @@ impl Player {
         }
 
         false
-    }
-
-    /// Checks and triggers location-based enchantments (e.g. Frost Walker) on the player's equipped armor.
-    pub fn check_location_enchantments(&self, pos: Vector3<f64>, on_ground: bool) {
-        if on_ground {
-            let boots = self.inventory.get_slot(36);
-            if !boots.is_empty() {
-                crate::enchantment::EnchantmentHelper::on_location_changed(
-                    self.get_entity(),
-                    &boots,
-                    pos,
-                );
-            }
-        }
     }
 
     /// Convenience wrapper – damages the currently held (main-hand) item.
@@ -2629,11 +2628,75 @@ impl Player {
         ));
     }
 
-    /// Vanilla `ServerPlayer.onExplosionHit`: a wind charge's blast doesn't count towards the
-    /// fall it starts.
-    // TODO: `currentExplosionImpactPos` and `currentExplosionCause` for the fall_after_explosion
-    // advancement trigger.
+    /// The part of vanilla `ServerPlayer.resetFallDistance` before the fall distance is zeroed:
+    /// a fall that ends while alive counts for `fall_from_height`.
+    pub fn track_fall_reset(&self) {
+        if let Some(start) = self.starting_to_fall_position.take()
+            && self.living_entity.health.load() > 0.0
+        {
+            self.trigger_advancement(advancement::trigger::AdvancementTrigger::FallFromHeight {
+                start,
+            });
+        }
+    }
+
+    /// Vanilla `ServerPlayer.trackStartFallingPosition`: a fall starts, and one that starts
+    /// no lower than an explosion pushed the player counts for `fall_after_explosion`.
+    pub fn track_start_falling_position(&self) {
+        let entity = &self.living_entity.entity;
+        if entity.fall_distance.load() > 0.0 && self.starting_to_fall_position.load().is_none() {
+            let start = entity.pos.load();
+            self.starting_to_fall_position.store(Some(start));
+            if let Some(impact) = self.current_explosion_impact_pos.load()
+                && impact.y <= start.y
+            {
+                self.trigger_advancement(
+                    advancement::trigger::AdvancementTrigger::FallAfterExplosion {
+                        start: impact,
+                        cause: self.current_explosion_cause.load(),
+                    },
+                );
+            }
+            self.current_explosion_impact_pos.store(None);
+            self.current_explosion_cause.store(None);
+        }
+    }
+
+    /// Vanilla `ServerPlayer.checkFallDamage`: after a mace smash on the ground, the landing
+    /// throws up extra particles.
+    fn check_fall_damage_extra_particles(
+        &self,
+        on_ground: bool,
+        state: &'static BlockState,
+        pos: BlockPos,
+    ) {
+        let fall_distance = self.living_entity.entity.fall_distance.load();
+        if self.spawn_extra_particles_on_fall.load(Ordering::Relaxed)
+            && on_ground
+            && fall_distance > 0.0
+        {
+            let centered = pos.to_centered_f64() + Vector3::new(0.0, 0.5, 0.0);
+            let particles = (50.0 * fall_distance).clamp(0.0, 200.0) as i32;
+            self.world().spawn_block_particle(
+                Particle::Block,
+                state.id,
+                centered,
+                Vector3::new(0.3, 0.3, 0.3),
+                0.15,
+                particles,
+            );
+            self.spawn_extra_particles_on_fall
+                .store(false, Ordering::Relaxed);
+        }
+    }
+
+    /// Vanilla `ServerPlayer.onExplosionHit`: remembers where and by what the player was hit,
+    /// and a wind charge's blast doesn't count towards the fall it starts.
     pub fn on_explosion_hit(&self, explosion_caused_by: Option<&dyn EntityBase>) {
+        self.current_explosion_impact_pos
+            .store(Some(self.living_entity.entity.pos.load()));
+        self.current_explosion_cause
+            .store(explosion_caused_by.map(|cause| cause.get_entity().entity_type));
         self.living_entity
             .set_ignore_fall_damage_from_current_impulse(
                 explosion_caused_by.is_some_and(|cause| {
@@ -3028,6 +3091,10 @@ impl Player {
         }
         self.last_attacked_ticks.fetch_add(1, Ordering::Relaxed);
 
+        // Vanilla `Player.aiStep`: flying ends any fall.
+        if self.is_flying() && !self.living_entity.entity.has_vehicle() {
+            self.living_entity.entity.reset_fall_distance();
+        }
         self.living_entity.tick(self, server);
 
         let level_info = self.world().level_info.load();
@@ -3056,6 +3123,7 @@ impl Player {
         // Vanilla updates pose in PlayerEntity#tick after super.tick().
         self.update_player_pose();
         self.check_inventory_advancements();
+        self.track_start_falling_position();
         if let Ok(mut adv) = self.advancements.try_lock() {
             adv.flush_dirty(self, true);
         }
@@ -3244,7 +3312,7 @@ impl Player {
             (0.01, delta_pos.length())
         } else if entity.is_in_water() {
             (0.01, delta_pos.horizontal_length())
-        } else if self.living_entity.climbing.load(Ordering::Relaxed) {
+        } else if self.living_entity.on_climbable(self) {
             return;
         } else if entity.on_ground.load(Ordering::Relaxed) {
             let rate = if entity.is_sprinting() { 0.1 } else { 0.0 };
@@ -4767,7 +4835,7 @@ impl Player {
 
     pub fn set_flying(&self, flying: bool) {
         if flying {
-            self.living_entity.fall_distance.store(0.0);
+            self.living_entity.entity.reset_fall_distance();
         }
         self.abilities
             .lock()
@@ -5040,6 +5108,7 @@ impl Player {
         if self.gamemode.load() == gamemode {
             return false;
         }
+        let was_spectator = self.gamemode.load() == GameMode::Spectator;
         let Some(server) = self.world().server.upgrade() else {
             return false;
         };
@@ -5087,7 +5156,13 @@ impl Player {
                 entity.set_sneaking(false);
             }
             entity.on_ground.store(false, Ordering::Relaxed);
-            self.living_entity.fall_distance.store(0.0);
+            self.living_entity.entity.reset_fall_distance();
+            crate::enchantment::EnchantmentHelper::stop_location_based_effects(&self.living_entity);
+        } else if was_spectator {
+            crate::enchantment::EnchantmentHelper::run_location_changed_effects(
+                self.as_ref(),
+                &self.living_entity,
+            );
         }
 
         if gamemode != GameMode::Spectator && self.camera_target_id.load().is_some() {
@@ -7036,6 +7111,39 @@ impl NBTStorage for EnderChestInventory {
 impl NBTStorageInit for EnderChestInventory {}
 
 impl EntityBase for Player {
+    /// Vanilla `ServerPlayer.getKnownMovement`: the client's last move, or the vehicle's when
+    /// someone else steers it.
+    fn get_known_movement(&self) -> Vector3<f64> {
+        let vehicle = self
+            .living_entity
+            .entity
+            .vehicle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        if let Some(vehicle) = vehicle
+            && vehicle
+                .controlling_passenger()
+                .is_none_or(|controller| controller.get_entity().entity_id != self.entity_id())
+        {
+            return vehicle.get_known_movement();
+        }
+        self.known_movement.load()
+    }
+
+    fn check_fall_damage(
+        &self,
+        caller: &dyn EntityBase,
+        ya: f64,
+        on_ground: bool,
+        state: &'static BlockState,
+        pos: BlockPos,
+    ) {
+        self.check_fall_damage_extra_particles(on_ground, state, pos);
+        self.living_entity
+            .check_fall_damage(caller, ya, on_ground, state, pos);
+    }
+
     /// Vanilla `LivingEntity.getWeaponItem`; Pumpkin doesn't track the riptide spin stack.
     fn get_weapon_item(&self) -> Option<ItemStack> {
         self.get_living_entity()
@@ -7279,16 +7387,26 @@ impl EntityBase for Player {
         }
 
         nbt.put_bool("seenCredits", self.seen_credits.load(Ordering::Relaxed));
+        if let Some(pos) = self.current_explosion_impact_pos.load() {
+            nbt.put(
+                "last_explosion_impact_pos",
+                NbtTag::List(vec![
+                    NbtTag::Double(pos.x),
+                    NbtTag::Double(pos.y),
+                    NbtTag::Double(pos.z),
+                ]),
+            );
+        }
+        nbt.put_bool(
+            "spawn_extra_particles_on_fall",
+            self.spawn_extra_particles_on_fall.load(Ordering::Relaxed),
+        );
         nbt.put_compound(
             "warden_spawn_tracker",
             self.warden_spawn_tracker
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
                 .to_nbt(),
-        );
-        nbt.put_bool(
-            "spawn_extra_particles_on_fall",
-            self.spawn_extra_particles_on_fall.load(Ordering::Relaxed),
         );
         nbt.put_bool(
             "HasPlayedBefore",
@@ -7393,6 +7511,15 @@ impl EntityBase for Player {
         self.seen_credits.store(
             nbt.get_bool("seenCredits").unwrap_or(false),
             Ordering::Relaxed,
+        );
+        self.current_explosion_impact_pos.store(
+            nbt.get_list("last_explosion_impact_pos")
+                .and_then(|list| match list {
+                    [NbtTag::Double(x), NbtTag::Double(y), NbtTag::Double(z)] => {
+                        Some(Vector3::new(*x, *y, *z))
+                    }
+                    _ => None,
+                }),
         );
         *self
             .warden_spawn_tracker

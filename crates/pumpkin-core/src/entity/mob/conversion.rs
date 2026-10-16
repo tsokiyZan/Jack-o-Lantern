@@ -197,8 +197,9 @@ fn convert_single_type(from: &dyn Mob, to: &dyn Mob, params: ConversionParams) {
     }
 
     new_living
+        .entity
         .fall_distance
-        .store(old_living.fall_distance.load());
+        .store(old_living.entity.fall_distance.load());
     // Vanilla `setSharedFlag(7, ...)`, not `set_fall_flying`, which asserts a player's
     // glide state actually changes.
     let fall_flying = old_entity.is_fall_flying();

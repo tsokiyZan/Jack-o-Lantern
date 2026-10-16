@@ -87,6 +87,17 @@ fn signum(value: f64) -> f64 {
 }
 
 impl Mob for BatEntity {
+    /// Vanilla `Bat.checkFallDamage` does nothing.
+    fn mob_check_fall_damage(
+        &self,
+        _caller: &dyn crate::entity::EntityBase,
+        _ya: f64,
+        _on_ground: bool,
+        _state: &'static pumpkin_data::BlockState,
+        _pos: pumpkin_util::math::position::BlockPos,
+    ) {
+    }
+
     /// Vanilla `Bat.getAmbientSound`: a resting bat squeaks one time in four.
     fn ambient_sound(&self) -> Option<Sound> {
         if self.is_roosting() && self.get_random().random_range(0..4) != 0 {

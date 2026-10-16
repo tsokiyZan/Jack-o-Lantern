@@ -5,16 +5,17 @@ use crate::enchantment::effects::EnchantmentEntityEffectExt;
 use crate::enchantment::enchanted_item_in_use::EnchantedItemInUse;
 use crate::enchantment::post_attack::do_post_attack;
 use crate::entity::EntityBase;
+use crate::entity::attributes::{Modifier, ModifierOperation, send_attribute_updates_for_living};
 use crate::entity::damage_source::DamageSource;
 use crate::entity::living::LivingEntity;
 use crate::entity::projectile::arrow::ArrowEntity;
 use crate::world::World;
-use pumpkin_data::data_component_impl::{EnchantmentsImpl, EquipmentSlot};
+use pumpkin_data::data_component_impl::{EnchantmentsImpl, EquipmentSlot, Operation};
 use pumpkin_data::enchantment::{
     ConditionalEffect, Enchantment, EnchantmentEntityEffect, EnchantmentTarget,
     EnchantmentValueEffect,
 };
-use pumpkin_data::item_stack::ItemStack;
+use pumpkin_data::item_stack::{DamageResult, ItemStack};
 
 /// Data-driven helper for enchantment effects matching vanilla `EnchantmentHelper`.
 pub struct EnchantmentHelper;
@@ -422,8 +423,6 @@ impl EnchantmentHelper {
     }
 
     /// Vanilla `EnchantmentHelper.processDurabilityChange`.
-    // TODO: `ItemStack::damage_item` in pumpkin-data still applies Unbreaking itself, with the
-    // armour check its requirements make.
     #[must_use]
     pub fn process_durability_change(world: &World, item: &ItemStack, amount: i32) -> i32 {
         let mut value = amount as f32;
@@ -518,24 +517,91 @@ impl EnchantmentHelper {
         luck
     }
 
-    /// Applies location-changed enchantment effects (e.g. Frost Walker replacing water with frosted ice).
-    // TODO: vanilla `Enchantment.runLocationChangedEffects` tracks which location-based effects
-    // are active per slot and deactivates them; Pumpkin runs them as plain entity effects and
-    // always reports them inactive to `enchantment_active_check`.
-    pub fn on_location_changed(
-        entity: &dyn EntityBase,
-        item: &ItemStack,
-        position: pumpkin_util::math::vector3::Vector3<f64>,
-    ) {
+    /// Vanilla `EnchantmentHelper.runLocationChangedEffects` over the equipment, with
+    /// `Enchantment.runLocationChangedEffects`: each location-changed effect is applied while
+    /// its requirements hold (they can ask whether it already was), and deactivated once they
+    /// stop holding.
+    pub fn run_location_changed_effects(entity: &dyn EntityBase, living: &LivingEntity) {
         let world = entity.get_entity().world.load_full();
-        let item_in_use = EnchantedItemInUse::in_slot(item, EquipmentSlot::FEET, entity);
-        Self::run_iteration_on_item(item, |enchantment, level| {
-            let context = EnchantmentLootContext::location(&world, level, entity, false);
-            for conditional_effect in enchantment.effects.location_changed {
+        let position = entity.get_entity().pos.load();
+        Self::run_iteration_on_equipment(entity, living, |enchantment, level, item| {
+            let Some(slot) = item.in_slot.clone() else {
+                return;
+            };
+            for (index, conditional_effect) in
+                enchantment.effects.location_changed.iter().enumerate()
+            {
+                let key = (slot.clone(), enchantment, index);
+                let was_active = living
+                    .active_location_effects
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .iter()
+                    .any(|active| active_matches(active, &key));
+                let context = EnchantmentLootContext::location(&world, level, entity, was_active);
+                if matches(conditional_effect, &context) {
+                    if !was_active {
+                        living
+                            .active_location_effects
+                            .lock()
+                            .unwrap_or_else(std::sync::PoisonError::into_inner)
+                            .push(key);
+                    }
+                    location_effect_changed_block(
+                        &conditional_effect.effect,
+                        &world,
+                        level,
+                        item,
+                        entity,
+                        living,
+                        position,
+                        !was_active,
+                    );
+                } else if remove_active(living, &key) {
+                    location_effect_deactivated(&conditional_effect.effect, living, &slot);
+                }
+            }
+        });
+    }
+
+    /// Vanilla `EnchantmentHelper.stopLocationBasedEffects` for the stack leaving `slot`.
+    pub fn stop_location_based_effects_in_slot(living: &LivingEntity, slot: &EquipmentSlot) {
+        let stopped: Vec<_> = {
+            let mut active = living
+                .active_location_effects
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let (stopped, kept) = active
+                .drain(..)
+                .partition(|(active_slot, _, _)| active_slot == slot);
+            *active = kept;
+            stopped
+        };
+        for (slot, enchantment, index) in stopped {
+            if let Some(effect) = enchantment.effects.location_changed.get(index) {
+                location_effect_deactivated(&effect.effect, living, &slot);
+            }
+        }
+    }
+
+    /// Vanilla `EnchantmentHelper.stopLocationBasedEffects(entity)`: every slot.
+    pub fn stop_location_based_effects(living: &LivingEntity) {
+        for slot in &EquipmentSlot::VALUES {
+            Self::stop_location_based_effects_in_slot(living, slot);
+        }
+    }
+
+    /// Vanilla `EnchantmentHelper.tickEffects`: the `tick` effects of everything worn.
+    pub fn tick_effects(entity: &dyn EntityBase, living: &LivingEntity) {
+        let world = entity.get_entity().world.load_full();
+        let position = entity.get_entity().pos.load();
+        Self::run_iteration_on_equipment(entity, living, |enchantment, level, item| {
+            let context = EnchantmentLootContext::entity(&world, level, entity, position);
+            for conditional_effect in enchantment.effects.tick {
                 if matches(conditional_effect, &context) {
                     conditional_effect
                         .effect
-                        .apply(&world, level, &item_in_use, entity, position);
+                        .apply(&world, level, item, entity, position);
                 }
             }
         });
@@ -581,5 +647,138 @@ fn apply_value_effects(
         if matches(effect, context) {
             *value = effect.effect.process(level, *value);
         }
+    }
+}
+
+/// Vanilla `ItemStack.hurtAndBreak`: the wear goes through `processDurabilityChange` (Unbreaking)
+/// before it is applied.
+pub trait HurtAndBreak {
+    fn hurt_and_break(&mut self, world: &World, amount: i32) -> DamageResult;
+}
+
+impl HurtAndBreak for ItemStack {
+    fn hurt_and_break(&mut self, world: &World, amount: i32) -> DamageResult {
+        if !self.is_damageable() || self.is_unbreakable() {
+            return DamageResult::Untouched;
+        }
+        let amount = if amount > 0 {
+            EnchantmentHelper::process_durability_change(world, self, amount)
+        } else {
+            amount
+        };
+        self.damage_item(amount)
+    }
+}
+
+fn active_matches(
+    active: &(EquipmentSlot, &'static Enchantment, usize),
+    key: &(EquipmentSlot, &'static Enchantment, usize),
+) -> bool {
+    active.0 == key.0 && std::ptr::eq(active.1, key.1) && active.2 == key.2
+}
+
+/// Removes `key` from the active location effects; whether it was active.
+fn remove_active(
+    living: &LivingEntity,
+    key: &(EquipmentSlot, &'static Enchantment, usize),
+) -> bool {
+    let mut active = living
+        .active_location_effects
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let before = active.len();
+    active.retain(|entry| !active_matches(entry, key));
+    active.len() != before
+}
+
+/// Vanilla `EnchantmentAttributeEffect.idForSlot`: one modifier per slot.
+fn attribute_effect_id(id: &str, slot: &EquipmentSlot) -> String {
+    let slot_name = match slot {
+        EquipmentSlot::MainHand(data)
+        | EquipmentSlot::OffHand(data)
+        | EquipmentSlot::Feet(data)
+        | EquipmentSlot::Legs(data)
+        | EquipmentSlot::Chest(data)
+        | EquipmentSlot::Head(data)
+        | EquipmentSlot::Body(data)
+        | EquipmentSlot::Saddle(data) => &data.name,
+    };
+    format!("{id}/{slot_name}")
+}
+
+/// Vanilla `EnchantmentLocationBasedEffect.onChangedBlock`: an attribute effect adds its
+/// modifier when it becomes active; an entity effect is applied on every block change.
+#[allow(clippy::too_many_arguments)]
+fn location_effect_changed_block(
+    effect: &EnchantmentEntityEffect,
+    world: &Arc<World>,
+    level: i32,
+    item: &EnchantedItemInUse<'_>,
+    entity: &dyn EntityBase,
+    living: &LivingEntity,
+    position: pumpkin_util::math::vector3::Vector3<f64>,
+    became_active: bool,
+) {
+    match effect {
+        EnchantmentEntityEffect::Attribute {
+            id,
+            attribute,
+            amount,
+            operation,
+        } => {
+            if became_active && let Some(slot) = &item.in_slot {
+                let operation = match operation {
+                    Operation::AddValue => ModifierOperation::Add,
+                    Operation::AddMultipliedBase => ModifierOperation::MultiplyBase,
+                    Operation::AddMultipliedTotal => ModifierOperation::MultiplyTotal,
+                };
+                let modifier = Modifier {
+                    id: attribute_effect_id(id, slot),
+                    amount: f64::from(amount.calculate(level)),
+                    operation,
+                };
+                living.update_attribute(attribute, |instance| {
+                    instance.add_or_replace_modifier(modifier);
+                });
+                send_attribute_updates_for_living(living, vec![(*attribute).clone()]);
+            }
+        }
+        EnchantmentEntityEffect::AllOf(effects) => {
+            for effect in *effects {
+                location_effect_changed_block(
+                    effect,
+                    world,
+                    level,
+                    item,
+                    entity,
+                    living,
+                    position,
+                    became_active,
+                );
+            }
+        }
+        _ => effect.apply(world, level, item, entity, position),
+    }
+}
+
+/// Vanilla `EnchantmentLocationBasedEffect.onDeactivated`: an attribute effect takes its
+/// modifier back; entity effects have nothing to undo.
+fn location_effect_deactivated(
+    effect: &EnchantmentEntityEffect,
+    living: &LivingEntity,
+    slot: &EquipmentSlot,
+) {
+    match effect {
+        EnchantmentEntityEffect::Attribute { id, attribute, .. } => {
+            let modifier_id = attribute_effect_id(id, slot);
+            living.update_attribute(attribute, |instance| instance.remove_modifier(&modifier_id));
+            send_attribute_updates_for_living(living, vec![(*attribute).clone()]);
+        }
+        EnchantmentEntityEffect::AllOf(effects) => {
+            for effect in *effects {
+                location_effect_deactivated(effect, living, slot);
+            }
+        }
+        _ => {}
     }
 }

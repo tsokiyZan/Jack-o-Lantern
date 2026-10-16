@@ -24,7 +24,7 @@ impl JavaClient {
                 PlayerToggleFlightEvent::new(player.clone(), new_flying);
                 'after: {
                     if event.is_flying {
-                        player.living_entity.fall_distance.store(0.0);
+                        player.living_entity.entity.reset_fall_distance();
                     }
                     player.abilities.lock().unwrap_or_else(std::sync::PoisonError::into_inner).flying = event.is_flying;
                 }

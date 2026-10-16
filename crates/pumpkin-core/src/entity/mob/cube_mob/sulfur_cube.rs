@@ -1,6 +1,7 @@
 //! Vanilla `SulfurCube`: a passive cube mob that swallows a block and takes on its
 //! `SulfurCubeArchetype`.
 
+use crate::enchantment::HurtAndBreak;
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering::Relaxed};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError, Weak};
 
@@ -955,7 +956,8 @@ impl CubeMobEntity {
             self.prime_time(false);
             if game_mode != GameMode::Creative {
                 if stack.item == &Item::FLINT_AND_STEEL {
-                    let _ = stack.damage_item(1);
+                    let _ =
+                        stack.hurt_and_break(&self.mob_entity.living_entity.entity.world.load(), 1);
                 } else {
                     stack.decrement(1);
                 }
@@ -970,7 +972,7 @@ impl CubeMobEntity {
                 .load()
                 .emit_game_event(GameEvent::Shear.name(), entity.pos.load());
             if game_mode != GameMode::Creative {
-                let _ = stack.damage_item(1);
+                let _ = stack.hurt_and_break(&self.mob_entity.living_entity.entity.world.load(), 1);
             }
             return true;
         }

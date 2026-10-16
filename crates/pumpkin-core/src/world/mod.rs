@@ -1381,6 +1381,34 @@ impl World {
         }
     }
 
+    /// Vanilla `sendParticles(new BlockParticleOption(particle, state), ...)`.
+    pub fn spawn_block_particle(
+        &self,
+        particle: Particle,
+        state: BlockStateId,
+        position: Vector3<f64>,
+        offset: Vector3<f32>,
+        max_speed: f32,
+        particle_count: i32,
+    ) {
+        let mut data = Vec::new();
+        if pumpkin_protocol::ser::NetworkWriteExt::write_var_int(
+            &mut data,
+            &pumpkin_protocol::VarInt(i32::from(state.as_u16())),
+        )
+        .is_ok()
+        {
+            self.spawn_particle_with_data(
+                position,
+                offset,
+                max_speed,
+                particle_count,
+                particle,
+                &data,
+            );
+        }
+    }
+
     pub fn play_sound(&self, sound: Sound, category: SoundCategory, position: &Vector3<f64>) {
         self.play_sound_raw(sound as u16, category, position, 1.0, 1.0);
     }

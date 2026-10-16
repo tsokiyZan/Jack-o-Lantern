@@ -6,5 +6,5 @@ pub mod post_attack;
 
 pub use effects::*;
 pub use enchanted_item_in_use::EnchantedItemInUse;
-pub use helper::EnchantmentHelper;
+pub use helper::{EnchantmentHelper, HurtAndBreak};
 pub use pumpkin_data::enchantment::*;

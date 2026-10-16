@@ -1,3 +1,4 @@
+use crate::enchantment::HurtAndBreak;
 use pumpkin_data::item::Item;
 use pumpkin_data::particle::Particle;
 use pumpkin_data::potion::Effect;
@@ -24,7 +25,6 @@ use tracing::warn;
 use super::breath::BreathManager;
 use super::experience_orb::ExperienceOrbEntity;
 use super::{Entity, EntityBase, NBTStorageInit};
-use crate::block::OnLandedUponArgs;
 use crate::enchantment::EnchantmentHelper;
 use crate::entity::NBTStorage;
 use crate::entity::ageable::AgeableMob;
@@ -40,7 +40,9 @@ use crate::world::loot::LootContextParameters;
 use crossbeam::atomic::AtomicCell;
 use pumpkin_data::AttributeModifierSlot;
 use pumpkin_data::Block;
+use pumpkin_data::BlockState;
 use pumpkin_data::attributes::Attributes;
+use pumpkin_data::block_sound_type::SoundType;
 use pumpkin_data::data_component_impl::IdOr;
 use pumpkin_data::data_component_impl::Operation;
 use pumpkin_data::data_component_impl::food::{ConsumableImpl, ConsumeAnimation, ConsumeEffect};
@@ -136,8 +138,6 @@ pub struct LivingEntity {
     /// Vanilla `LivingEntity.discardFriction`: travel in air keeps the horizontal and
     /// vertical speed undamped, as a long jump needs.
     pub discard_friction: AtomicBool,
-    /// The distance the entity has been falling.
-    pub fall_distance: AtomicCell<f32>,
     /// Vanilla `currentImpulseContextResetGraceTime`.
     pub current_impulse_context_reset_grace_time: AtomicI32,
     /// Vanilla `currentImpulseImpactPos`: while set, falls are measured from this height.
@@ -151,8 +151,6 @@ pub struct LivingEntity {
     pub jumping: AtomicBool,
 
     pub jumping_cooldown: AtomicU8,
-
-    pub climbing: AtomicBool,
 
     /// The position where the entity was last climbing, used for death messages
     pub climbing_pos: AtomicCell<Option<BlockPos>>,
@@ -189,6 +187,10 @@ pub struct LivingEntity {
     /// Modifier ids applied from the current item in each equipment slot.
     /// Used to remove them on unequip without the previous stack.
     equipment_attribute_modifier_ids: std::sync::Mutex<FxHashMap<EquipmentSlot, Vec<(u8, String)>>>,
+    /// Vanilla `activeLocationDependentEnchantments`: the location-changed effects active per
+    /// slot, as the enchantment and the effect's index in its `location_changed` list.
+    pub active_location_effects:
+        std::sync::Mutex<Vec<(EquipmentSlot, &'static pumpkin_data::Enchantment, usize)>>,
 }
 
 #[derive(Clone)]
@@ -277,13 +279,6 @@ impl LivingEntity {
     #[expect(dead_code)]
     const USING_RIPTIDE_FLAG: u8 = 4;
 
-    const PREVENT_AREA_FALL_DAMAGE_BLOCKS: [&'static Block; 4] = [
-        &Block::COBWEB,
-        &Block::LADDER,
-        &Block::POWDER_SNOW,
-        &Block::SLIME_BLOCK,
-    ];
-
     fn hurt_sound_for_entity(entity_type: &'static EntityType) -> Sound {
         entity_type.hurt_sound.unwrap_or(Sound::EntityGenericHurt)
     }
@@ -334,7 +329,6 @@ impl LivingEntity {
             speed: AtomicCell::new(0.0),
             last_damage_taken: AtomicCell::new(0.0),
             absorption: AtomicCell::new(0.0),
-            fall_distance: AtomicCell::new(0.0),
             current_impulse_context_reset_grace_time: AtomicI32::new(0),
             current_impulse_impact_pos: AtomicCell::new(None),
             death_time: AtomicU8::new(0),
@@ -351,7 +345,6 @@ impl LivingEntity {
             equipment_slots: Arc::new(build_equipment_slots()),
             jumping: AtomicBool::new(false),
             jumping_cooldown: AtomicU8::new(0),
-            climbing: AtomicBool::new(false),
             climbing_pos: AtomicCell::new(None),
             last_attacker_id: AtomicI32::new(0),
             last_attacked_time: AtomicI32::new(0),
@@ -366,6 +359,7 @@ impl LivingEntity {
             water_movement_speed_multiplier,
             last_block_pos: AtomicCell::new(None),
             equipment_attribute_modifier_ids: std::sync::Mutex::new(FxHashMap::default()),
+            active_location_effects: std::sync::Mutex::new(Vec::new()),
             breath: BreathManager::default(),
         }
     }
@@ -384,31 +378,11 @@ impl LivingEntity {
         self.get_last_hurt_by_mob()
     }
 
-    /// Triggers location-based enchantment effects (e.g. Frost Walker) when the entity's block position changes.
+    /// Vanilla `LivingEntity.onChangedBlock`: the location-changed enchantment effects.
     pub fn on_changed_block(&self, caller: &dyn EntityBase, _pos: BlockPos) {
-        let pos_f64 = self.entity.pos.load();
-        if let Some(player) = caller.get_player() {
-            let boots = player.inventory.get_slot(36);
-            if !boots.is_empty() {
-                crate::enchantment::EnchantmentHelper::on_location_changed(
-                    &self.entity,
-                    &boots,
-                    pos_f64,
-                );
-            }
-        } else {
-            let boots = self
-                .entity_equipment
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .get(&EquipmentSlot::FEET);
-            if !boots.is_empty() {
-                crate::enchantment::EnchantmentHelper::on_location_changed(
-                    &self.entity,
-                    &boots,
-                    pos_f64,
-                );
-            }
+        // `ServerPlayer.onChangedBlock`: not for spectators.
+        if !caller.is_spectator() {
+            crate::enchantment::EnchantmentHelper::run_location_changed_effects(caller, self);
         }
     }
 
@@ -417,22 +391,6 @@ impl LivingEntity {
             return;
         }
         self.apply_and_send_equipment_attribute_modifiers(equipment);
-
-        if equipment
-            .iter()
-            .any(|(slot, _)| *slot == EquipmentSlot::FEET)
-        {
-            let pos_f64 = self.entity.pos.load();
-            for (slot, stack) in equipment {
-                if *slot == EquipmentSlot::FEET && !stack.is_empty() {
-                    crate::enchantment::EnchantmentHelper::on_location_changed(
-                        &self.entity,
-                        stack,
-                        pos_f64,
-                    );
-                }
-            }
-        }
 
         let equipment_java: Vec<(i8, ItemStackSerializer)> = equipment
             .iter()
@@ -598,6 +556,8 @@ impl LivingEntity {
         stack: &ItemStack,
         touched: &mut Vec<Attributes>,
     ) {
+        // Vanilla `collectEquipmentChanges`: the previous stack's location effects stop.
+        crate::enchantment::EnchantmentHelper::stop_location_based_effects_in_slot(self, slot);
         let previous = {
             let mut map = self
                 .equipment_attribute_modifier_ids
@@ -1399,15 +1359,6 @@ impl LivingEntity {
             .cloned()
     }
 
-    pub fn is_in_fall_damage_resetting(&self) -> (bool, &Block) {
-        let block_pos = self.entity.block_pos.load();
-        let block = self.entity.world.load().get_block(&block_pos);
-        (
-            block.has_tag(&tag::Block::MINECRAFT_FALL_DAMAGE_RESETTING),
-            block,
-        )
-    }
-
     // Check if the entity is in water
     pub fn is_in_water(&self) -> bool {
         self.entity.touching_water.load(Ordering::Relaxed)
@@ -1416,72 +1367,6 @@ impl LivingEntity {
     // Check if the entity is in powder snow
     pub fn is_in_powder_snow(&self) -> bool {
         self.entity.is_in_powder_snow.load(Ordering::Relaxed)
-    }
-
-    pub fn should_prevent_fall_damage(&self) -> bool {
-        let (prevents, block) = self.is_in_fall_damage_resetting();
-
-        if block == &Block::SCAFFOLDING && !self.entity.is_sneaking() {
-            return false;
-        }
-
-        if block == &Block::WATER {
-            return true;
-        }
-
-        if self.entity.entity_type == &EntityType::PLAYER {
-            if block == &Block::END_GATEWAY || block == &Block::END_PORTAL {
-                return true;
-            }
-
-            if block == &Block::NETHER_PORTAL {
-                let world = self.entity.world.load();
-                let level_info = world.level_info.load();
-
-                return level_info.game_rules.players_nether_portal_default_delay == 0;
-            }
-        }
-
-        prevents
-    }
-
-    pub fn should_prevent_fall_damage_in_area(&self) -> bool {
-        let world = self.entity.world.load();
-        let block_pos = self.entity.block_pos.load().down();
-        let entity_pos = self.entity.pos.load();
-
-        let min = BlockPos(Vector3::new(
-            block_pos.0.x - 1,
-            block_pos.0.y,
-            block_pos.0.z - 1,
-        ));
-        let max = BlockPos(Vector3::new(
-            block_pos.0.x + 1,
-            block_pos.0.y,
-            block_pos.0.z + 1,
-        ));
-        let pos_iter = BlockPos::iterate(min, max);
-
-        // FIXME: it seems the java server checks all blocks around with a raycast and check if miss or hit,
-        // then added to a collision checker to handle in the tick handler
-        for pos in pos_iter {
-            let block = world.get_block(&pos);
-
-            if Self::PREVENT_AREA_FALL_DAMAGE_BLOCKS.contains(&block) {
-                let block_center = Vector3::new(
-                    f64::from(pos.0.x) + 0.5,
-                    f64::from(pos.0.y) + 0.5,
-                    f64::from(pos.0.z) + 0.5,
-                );
-                let distance = entity_pos.squared_distance_to_vec(&block_center);
-
-                // Fetch safe fall distance from attribute
-                let safe_distance = self.get_attribute_value(&Attributes::SAFE_FALL_DISTANCE);
-                return distance.sqrt() <= safe_distance * safe_distance;
-            }
-        }
-
-        false
     }
 
     /// Vanilla `LivingEntity.knockback`, or the mob's override of it. `attacker` is the
@@ -1549,12 +1434,6 @@ impl LivingEntity {
     /// Vanilla `LivingEntity.wasHurtRecently`.
     pub fn was_hurt_recently(&self) -> bool {
         self.hurt_time.load(Relaxed) > 0
-    }
-
-    pub fn is_immune_to_fall_damage(&self) -> bool {
-        self.entity
-            .entity_type
-            .has_tag(&tag::EntityType::MINECRAFT_FALL_DAMAGE_IMMUNE)
     }
 
     pub(crate) fn get_effective_gravity(&self, caller: &dyn EntityBase) -> f64 {
@@ -1671,7 +1550,7 @@ impl LivingEntity {
         if self.has_effect(&StatusEffect::SLOW_FALLING)
             || self.has_effect(&StatusEffect::LEVITATION)
         {
-            self.fall_distance.store(0.0);
+            self.entity.reset_fall_distance();
         }
 
         let touching_water = self.entity.touching_water.load(SeqCst);
@@ -1864,7 +1743,7 @@ impl LivingEntity {
         self.entity
             .update_velocity_from_input(self.movement_input.load(), f64::from(speed));
 
-        self.apply_climbing_speed();
+        self.handle_on_climbable(caller);
 
         self.make_move(caller);
 
@@ -1877,7 +1756,7 @@ impl LivingEntity {
         };
 
         if (self.entity.horizontal_collision.load(SeqCst) || self.jumping.load(SeqCst))
-            && (self.climbing.load(Relaxed) || can_powder_snow_climb)
+            && (self.on_climbable(caller) || can_powder_snow_climb)
         {
             velo.y = 0.2;
         }
@@ -1935,8 +1814,16 @@ impl LivingEntity {
 
     /// Vanilla `LivingEntity.travelFallFlying`.
     pub(crate) fn travel_fall_flying(&self, caller: &dyn EntityBase) {
-        // TODO: the `onClimbable` branch once climbing is tracked, and
-        // `LivingEntity.handleFallFlyingCollisions` (flying into a wall).
+        // A climbable block catches the glider.
+        if self.on_climbable(caller) {
+            self.travel_in_air(caller);
+            // `stopFallFlying`.
+            if self.entity.is_fall_flying() {
+                self.entity.set_fall_flying(false);
+            }
+            return;
+        }
+        // TODO: `LivingEntity.handleFallFlyingCollisions` (flying into a wall).
         let movement = self.update_fall_flying_movement(caller, self.entity.velocity.load());
         self.entity.velocity.store(movement);
         self.make_move(caller);
@@ -2023,7 +1910,7 @@ impl LivingEntity {
             self.make_move(caller);
 
             let mut velo = self.entity.velocity.load();
-            if self.entity.horizontal_collision.load(SeqCst) && self.climbing.load(Relaxed) {
+            if self.entity.horizontal_collision.load(SeqCst) && self.on_climbable(caller) {
                 velo.y = 0.2;
             }
 
@@ -2085,113 +1972,75 @@ impl LivingEntity {
 
     pub(crate) fn make_move(&self, caller: &dyn EntityBase) {
         self.entity.move_entity(caller, self.entity.velocity.load());
-
-        self.check_climbing();
     }
 
-    fn check_climbing(&self) {
-        // If spectator: return false
-
-        // TODO
-        // let mut pos = self.entity.block_pos.load();
-
-        // let world = self.entity.world.read().await;
-
-        // let (block, state) = world.get_block_and_state(&pos);
-
-        // let name = block.properties(state.id).map(|props| props.name());
-
-        // if let Some(name) = name {
-        //     if name == "LadderLikeProperties"
-        //         || name == "ScaffoldingLikeProperties"
-        //         || name == "CaveVinesLikeProperties"
-        //         || name == "CaveVinesPlantLikeProperties"
-        //     {
-        //         self.climbing.store(true, Relaxed);
-
-        //         self.climbing_pos.store(Some(pos));
-
-        //         return;
-        //     }
-
-        //     if name == "OakTrapdoorLikeProperties" {
-        //         let trapdoor = OakTrapdoorLikeProperties::from_state_id(state.id);
-
-        //         pos.0.y -= 1;
-
-        //         let (down_block, down_state) = world.get_block_and_state(&pos);
-
-        //         let is_ladder = down_block
-        //             .properties(down_state.id)
-        //             .is_some_and(|down_props| down_props.name() == "LadderLikeProperties");
-
-        //         if is_ladder {
-        //             let ladder = LadderLikeProperties::from_state_id(down_state.id);
-
-        //             if trapdoor.r#facing == ladder.r#facing {
-        //                 self.climbing.store(true, Relaxed);
-
-        //                 self.climbing_pos.store(Some(pos));
-
-        //                 return;
-        //             }
-        //         }
-        //     }
-        // }
-
-        self.climbing.store(false, Relaxed);
-
-        if self.entity.on_ground.load(SeqCst) {
-            self.climbing_pos.store(None);
+    /// Vanilla `LivingEntity.onClimbable`: in a climbable block, or in an open trapdoor over a
+    /// ladder facing the same way. Remembers where, for the death message.
+    pub fn on_climbable(&self, caller: &dyn EntityBase) -> bool {
+        if caller.is_spectator() {
+            return false;
         }
+        if let Some(climbing) = caller.get_mob().and_then(super::mob::Mob::mob_on_climbable) {
+            return climbing;
+        }
+        let pos = self.entity.block_pos.load();
+        let world = self.entity.world.load();
+        let (block, state) = world.get_block_and_state(&pos);
+        if self.entity.is_fall_flying() && block.has_tag(&tag::Block::MINECRAFT_CAN_GLIDE_THROUGH) {
+            return false;
+        }
+        let climbable = block.has_tag(&tag::Block::MINECRAFT_CLIMBABLE)
+            || (block.has_tag(&tag::Block::MINECRAFT_TRAPDOORS)
+                && Self::trapdoor_usable_as_ladder(&world, &pos, state.id));
+        if climbable {
+            self.climbing_pos.store(Some(pos));
+        }
+        climbable
     }
 
-    fn apply_climbing_speed(&self) {
-        if self.climbing.load(Relaxed) {
-            self.fall_distance.store(0.0);
-
-            let mut velo = self.entity.velocity.load();
-
-            let pos = 0.15;
-
-            let neg = -0.15;
-
-            if velo.x < neg {
-                velo.x = neg;
-            } else if velo.x > pos {
-                velo.x = pos;
-            }
-
-            if velo.z < neg {
-                velo.z = neg;
-            } else if velo.z > pos {
-                velo.z = pos;
-            }
-
-            velo.y = velo.y.max(neg);
-
-            // TODO
-            // if velo.y < 0.0
-            //     && self.entity.entity_type == &EntityType::PLAYER
-            //     && self.entity.sneaking.load(Relaxed)
-            // {
-            //     let block = self
-            //         .entity
-            //         .world
-            //         .read()
-            //         .await
-            //         .get_block(&self.entity.block_pos.load())
-            //         .await;
-
-            //     if let Some(props) = block.properties(block.default_state.id) {
-            //         if props.name() == "ScaffoldingLikeProperties" {
-            //             velo.y = 0.0;
-            //         }
-            //     }
-            // }
-
-            self.entity.velocity.store(velo);
+    /// Vanilla `LivingEntity.trapdoorUsableAsLadder`.
+    fn trapdoor_usable_as_ladder(
+        world: &crate::world::World,
+        pos: &BlockPos,
+        state_id: pumpkin_data::BlockStateId,
+    ) -> bool {
+        use pumpkin_data::block_properties::{LadderLikeProperties, OakTrapdoorLikeProperties};
+        let trapdoor = OakTrapdoorLikeProperties::from_state_id(state_id);
+        if !trapdoor.open {
+            return false;
         }
+        let (below_block, below_state) = world.get_block_and_state(&pos.down());
+        below_block == &Block::LADDER
+            && LadderLikeProperties::from_state_id(below_state.id).facing == trapdoor.facing
+    }
+
+    /// Vanilla `LivingEntity.handleOnClimbable`: climbing ends a fall and caps the speed, and a
+    /// sneaking player holds on.
+    fn handle_on_climbable(&self, caller: &dyn EntityBase) {
+        if !self.on_climbable(caller) {
+            return;
+        }
+        self.entity.reset_fall_distance();
+        let max = f64::from(0.15f32);
+        let velo = self.entity.velocity.load();
+        let mut yd = velo.y.max(-max);
+        if yd < 0.0
+            && caller.get_player().is_some()
+            && self.entity.is_sneaking()
+            && self
+                .entity
+                .world
+                .load()
+                .get_block(&self.entity.block_pos.load())
+                != &Block::SCAFFOLDING
+        {
+            yd = 0.0;
+        }
+        self.entity.velocity.store(Vector3::new(
+            velo.x.clamp(-max, max),
+            yd,
+            velo.z.clamp(-max, max),
+        ));
     }
 
     /// Vanilla `getFluidJumpThreshold`, with the mob's override.
@@ -2267,127 +2116,175 @@ impl LivingEntity {
             .map_or(0.0, |effect| 0.1 * (effect.amplifier as f32 + 1.0))
     }
 
-    pub fn fall(
+    /// Vanilla `LivingEntity.checkFallDamage`: the landing also refreshes the fluid state,
+    /// runs the location effects and throws up particles of the block landed on.
+    pub fn check_fall_damage(
         &self,
         caller: &dyn EntityBase,
-        height_difference: f64,
-        ground: bool,
-        dont_damage: bool,
+        ya: f64,
+        on_ground: bool,
+        state: &'static BlockState,
+        pos: BlockPos,
     ) {
-        if ground {
-            let fall_distance = self.fall_distance.swap(0.0);
-            if fall_distance > 0.0 {
-                self.on_changed_block(caller, self.entity.block_pos.load());
+        if !self.entity.touching_water.load(SeqCst) {
+            self.entity.update_fluid_interaction(caller);
+        }
+        let fall_distance = self.entity.fall_distance.load();
+        if on_ground && fall_distance > 0.0 {
+            self.on_changed_block(caller, pos);
+            let power = f64::from(self.calculate_fall_power(fall_distance).floor().max(0.0) as i32);
+            if power > 0.0 && !state.is_air() {
+                let entity_pos = self.entity.pos.load();
+                let (mut x, y, mut z) = (entity_pos.x, entity_pos.y, entity_pos.z);
+                let entity_block_pos = self.entity.block_pos.load();
+                if pos.0.x != entity_block_pos.0.x || pos.0.z != entity_block_pos.0.z {
+                    let x_diff = x - f64::from(pos.0.x) - 0.5;
+                    let z_diff = z - f64::from(pos.0.z) - 0.5;
+                    let max_diff = x_diff.abs().max(z_diff.abs());
+                    x = f64::from(pos.0.x) + 0.5 + x_diff / max_diff * 0.5;
+                    z = f64::from(pos.0.z) + 0.5 + z_diff / max_diff * 0.5;
+                }
+                let scale = (f64::from(0.2f32) + power / 15.0).min(2.5);
+                let particles = (150.0 * scale) as i32;
+                self.entity.world.load().spawn_block_particle(
+                    Particle::Block,
+                    state.id,
+                    Vector3::new(x, y, z),
+                    Vector3::new(0.0, 0.0, 0.0),
+                    0.15,
+                    particles,
+                );
             }
-            // Vanilla runs `fallOn` for fall-damage-immune entities too: the block still
-            // reacts and `causeFallDamage` overrides still run, only the damage is zero.
-            if fall_distance <= 0.0
-                || dont_damage
-                || self.should_prevent_fall_damage()
-                || self.should_prevent_fall_damage_in_area()
-            {
-                return;
-            }
-            let world = self.entity.world.load();
-            let block = world.get_block(&self.entity.get_pos_with_y_offset(0.2).0);
-            let pumpkin_block = world.block_registry.get_pumpkin_block(block.id);
-            if let Some(pumpkin_block) = pumpkin_block {
-                pumpkin_block.on_landed_upon(OnLandedUponArgs {
-                    world: &world,
-                    fall_distance,
-                    entity: caller,
-                });
-            } else {
-                self.handle_fall_damage(caller, fall_distance, 1.0);
-            }
-        } else if height_difference < 0.0 {
-            let new_fall_distance = if !self.should_prevent_fall_damage()
-                && !self.should_prevent_fall_damage_in_area()
-            {
-                let distance = self.fall_distance.load();
-                distance - (height_difference as f32)
-            } else {
-                0f32
-            };
-            self.fall_distance.store(new_fall_distance);
+        }
+        self.entity
+            .check_fall_damage_default(caller, ya, on_ground, state, pos);
+        if on_ground {
+            self.climbing_pos.store(None);
         }
     }
 
-    pub fn handle_fall_damage(
+    /// Vanilla `LivingEntity.causeFallDamage`, with `Player`'s: a player that may fly takes
+    /// no fall damage, and a fall of two blocks or more counts towards its statistic.
+    pub fn cause_fall_damage(
         &self,
         caller: &dyn EntityBase,
-        fall_distance: f32,
-        damage_per_distance: f32,
-    ) {
-        if let Some(mob) = caller.get_mob() {
-            mob.before_cause_fall_damage(fall_distance);
-        }
-        let may_fly = caller.get_player().is_some_and(|player| {
-            player
+        fall_distance: f64,
+        damage_modifier: f32,
+        damage_type: DamageType,
+    ) -> bool {
+        if let Some(player) = caller.get_player() {
+            if player
                 .abilities
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
                 .allow_flying
-        });
-        if may_fly || self.is_immune_to_fall_damage() {
-            return;
+            {
+                return false;
+            }
+            if fall_distance >= 2.0 {
+                player.increment_stat(
+                    StatisticCategory::Custom,
+                    CustomStatistic::FallOneCm as i32,
+                    (fall_distance * 100.0).round() as i32,
+                );
+            }
         }
 
-        // Vanilla parity: the fall_damage gamerule only affects players.
-        if caller.get_player().is_some()
-            && !self
-                .entity
-                .world
-                .load()
-                .level_info
-                .load()
-                .game_rules
-                .fall_damage
-        {
-            return;
-        }
-
-        if fall_distance >= 2.0
-            && let Some(player) = caller.get_player()
-        {
-            player.increment_stat(
-                StatisticCategory::Custom,
-                CustomStatistic::FallOneCm as i32,
-                (fall_distance * 100.0).round() as i32,
-            );
-        }
-
-        // Vanilla `LivingEntity.causeFallDamage`: after an ignored impulse only the drop below
-        // where it struck counts.
-        let fall_distance =
+        // After an ignored impulse only the drop below where it struck counts.
+        let effective_fall_distance =
             self.current_impulse_impact_pos
                 .load()
                 .map_or(fall_distance, |impact| {
-                    let effective =
-                        f64::from(fall_distance).min(impact.y - self.entity.pos.load().y);
+                    let effective = fall_distance.min(impact.y - self.entity.pos.load().y);
                     if effective <= 0.0 {
                         self.reset_current_impulse_context();
                     } else {
                         self.try_reset_current_impulse_context();
                     }
-                    effective as f32
+                    effective
                 });
 
-        let safe_fall_distance = self.get_attribute_value(&Attributes::SAFE_FALL_DISTANCE) as f32;
-        let unsafe_fall_distance = fall_distance + 1.0E-6 - safe_fall_distance;
-
-        let damage = (unsafe_fall_distance * damage_per_distance).floor() as i32;
-        let damage = caller
-            .get_mob()
-            .map_or(damage, |mob| mob.calculate_fall_damage(damage));
+        let damaged = self.entity.cause_fall_damage_default(
+            effective_fall_distance,
+            damage_modifier,
+            damage_type,
+        );
+        let damage = caller.get_mob().map_or_else(
+            || self.calculate_fall_damage(effective_fall_distance, damage_modifier),
+            |mob| mob.calculate_fall_damage(effective_fall_distance, damage_modifier),
+        );
         if damage > 0 {
             self.reset_current_impulse_context();
-            let check_damage = self.damage(caller, damage as f32, DamageType::FALL); // Fall
-            if check_damage {
-                // Vanilla `getFallDamageSound(dmg)` picks by the damage, not the distance.
-                self.entity.play_sound(Self::get_fall_sound(damage));
-            }
+            caller.play_sound_at_self(self.get_fall_damage_sound(damage), 1.0, 1.0);
+            self.play_block_fall_sound(caller);
+            caller.damage(caller, damage as f32, damage_type);
+            true
+        } else {
+            damaged
         }
+    }
+
+    /// Vanilla `LivingEntity.calculateFallDamage`.
+    #[must_use]
+    pub fn calculate_fall_damage(&self, fall_distance: f64, damage_modifier: f32) -> i32 {
+        if self
+            .entity
+            .entity_type
+            .has_tag(&tag::EntityType::MINECRAFT_FALL_DAMAGE_IMMUNE)
+        {
+            return 0;
+        }
+        let base_damage = self.calculate_fall_power(fall_distance);
+        (base_damage
+            * f64::from(damage_modifier)
+            * self.get_attribute_value(&Attributes::FALL_DAMAGE_MULTIPLIER))
+        .floor() as i32
+    }
+
+    /// Vanilla `LivingEntity.calculateFallPower`.
+    fn calculate_fall_power(&self, fall_distance: f64) -> f64 {
+        fall_distance + 1.0E-6 - self.get_attribute_value(&Attributes::SAFE_FALL_DISTANCE)
+    }
+
+    /// Vanilla `LivingEntity.playBlockFallSound`: the fall sound of the block under the feet.
+    pub fn play_block_fall_sound(&self, caller: &dyn EntityBase) {
+        let pos = self.entity.pos.load();
+        let block_pos = BlockPos::new(
+            pos.x.floor() as i32,
+            (pos.y - f64::from(0.2f32)).floor() as i32,
+            pos.z.floor() as i32,
+        );
+        let state = self.entity.world.load().get_block_state(&block_pos);
+        if !state.is_air() {
+            let sound_type = SoundType::from_state_id(state.id.as_u16());
+            caller.play_sound_at_self(
+                sound_type.fall_sound,
+                sound_type.volume * 0.5,
+                sound_type.pitch * 0.75,
+            );
+        }
+    }
+
+    /// Vanilla `LivingEntity.getFallSounds` and its overrides: the small and big fall sounds.
+    #[must_use]
+    pub fn get_fall_sounds(&self) -> (Sound, Sound) {
+        let entity_type = self.entity.entity_type;
+        if entity_type == &EntityType::PLAYER {
+            (Sound::EntityPlayerSmallFall, Sound::EntityPlayerBigFall)
+        } else if entity_type == &EntityType::ARMOR_STAND {
+            (Sound::EntityArmorStandFall, Sound::EntityArmorStandFall)
+        } else if super::mob::is_monster(entity_type) {
+            (Sound::EntityHostileSmallFall, Sound::EntityHostileBigFall)
+        } else {
+            (Sound::EntityGenericSmallFall, Sound::EntityGenericBigFall)
+        }
+    }
+
+    /// Vanilla `LivingEntity.getFallDamageSound`.
+    #[must_use]
+    pub fn get_fall_damage_sound(&self, damage: i32) -> Sound {
+        let (small, big) = self.get_fall_sounds();
+        if damage > 4 { big } else { small }
     }
 
     /// Vanilla `LivingEntity.setIgnoreFallDamageFromCurrentImpulse`.
@@ -2429,14 +2326,6 @@ impl LivingEntity {
         self.current_impulse_context_reset_grace_time
             .store(0, Relaxed);
         self.current_impulse_impact_pos.store(None);
-    }
-
-    const fn get_fall_sound(damage: i32) -> Sound {
-        if damage > 4 {
-            Sound::EntityGenericBigFall
-        } else {
-            Sound::EntityGenericSmallFall
-        }
     }
 
     #[allow(clippy::redundant_closure_for_method_calls)]
@@ -2607,14 +2496,31 @@ impl LivingEntity {
                 ..Default::default()
             };
 
+            // Vanilla `dropAllDeathLoot`.
             if perished {
                 if let Some(mob) = dyn_self.get_mob() {
                     mob.before_drop_all_death_loot();
                 }
-                // Drop loot
-                self.drop_loot(&params);
+                // `shouldDropLoot`.
+                if !self.entity.is_baby() && world.level_info.load().game_rules.mob_drops {
+                    self.drop_loot(&params);
+                    if let Some(mob) = dyn_self.get_mob() {
+                        self.drop_mob_equipment(
+                            &DamageSource {
+                                damage_type,
+                                direct: source,
+                                causing: cause,
+                            },
+                            has_player_kill,
+                        );
+                        mob.drop_custom_death_loot();
+                    }
+                }
+                if let Some(mob) = dyn_self.get_mob() {
+                    mob.drop_equipment();
+                }
 
-                // Award experience
+                // `dropExperience`.
                 if params.killed_by_player.unwrap_or(false)
                     && world.level_info.load().game_rules.mob_drops
                 {
@@ -2625,17 +2531,6 @@ impl LivingEntity {
                 }
             }
             self.entity.pose.store(EntityPose::Dying);
-
-            if perished {
-                self.drop_equipment(&DamageSource {
-                    damage_type,
-                    direct: source,
-                    causing: cause,
-                });
-                if let Some(mob) = dyn_self.get_mob() {
-                    mob.drop_custom_death_loot();
-                }
-            }
 
             // Broadcast death message if it's a player and the gamerule is enabled
             self.broadcast_death_message(&*dyn_self, damage_type, source, cause);
@@ -2659,28 +2554,24 @@ impl LivingEntity {
         }
     }
 
-    fn drop_equipment(&self, killing_blow: &DamageSource<'_>) {
+    /// Vanilla `Mob.dropCustomDeathLoot`: each slot's equipment drops by its chance (Looting
+    /// raising it), but only for a kill a player had a hand in unless the chance marks the
+    /// item as preserved. A dropped item that isn't preserved comes out worn.
+    fn drop_mob_equipment(&self, killing_blow: &DamageSource<'_>, killed_by_player: bool) {
         let world = self.entity.world.load();
-        let drop_chances = self
-            .equipment_drop_chances
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-
-        let slots_to_drop: Vec<EquipmentSlot> = {
-            let mut slots: Vec<_> = self.equipment_slots.values().cloned().collect();
-            slots.push(EquipmentSlot::MAIN_HAND);
-            slots
-        };
-
-        for slot in &slots_to_drop {
-            let mut chance = drop_chances
+        for slot in &EquipmentSlot::VALUES {
+            let mut chance = self
+                .equipment_drop_chances
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
                 .get(slot)
                 .copied()
                 .unwrap_or(DEFAULT_EQUIPMENT_DROP_CHANCE);
-            // A chance above 1.0 marks a guaranteed, undamaged drop.
+            if chance == 0.0 {
+                continue;
+            }
+            // `DropChances.isPreserved`.
             let preserved = chance > 1.0;
-            // Vanilla `Mob.dropCustomDeathLoot` hands the killer to
-            // `processEquipmentDropChance` (Looting adds 0.01 per level).
             if let Some(killer) = killing_blow.causing
                 && let Some(killer_living) = killer.get_living_entity()
             {
@@ -2692,29 +2583,29 @@ impl LivingEntity {
                     chance,
                 );
             }
-            if !preserved && rand::random::<f32>() >= chance {
-                continue;
-            }
             let mut item = self
                 .entity_equipment
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .equipment
-                .remove(slot)
-                .unwrap_or_else(|| ItemStack::EMPTY.clone());
-            if item.is_empty() {
+                .get(slot);
+            if item.is_empty()
+                || crate::entity::passive::allay::prevents_equipment_drop(&item)
+                || !(killed_by_player || preserved)
+                || rand::random::<f32>() >= chance
+            {
                 continue;
             }
-            // Vanilla approximation: Mob.dropCustomDeathLoot applies random
-            // damage to dropped equipment using two chained random calls:
-            // setDamageValue(maxDamage - random.nextInt(1 + random.nextInt(max(maxDamage - 3, 1))))
             if !preserved && let Some(max_damage) = item.get_max_damage() {
                 let mut rng = rand::rng();
                 let inner = rng.random_range(0..(max_damage - 3).max(1));
                 let outer = rng.random_range(0..=inner);
-                item.set_damage((max_damage - outer).max(0));
+                item.set_damage(max_damage - outer);
             }
             self.entity.spawn_at_location(item);
+            self.entity_equipment
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .put(slot, ItemStack::EMPTY.clone());
         }
     }
 
@@ -3103,7 +2994,7 @@ impl LivingEntity {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             let mut stack = equipment.get(slot);
-            let result = stack.damage_item(amount);
+            let result = stack.hurt_and_break(&self.entity.world.load(), amount);
             if result != DamageResult::Untouched {
                 equipment.put(slot, stack.clone());
             }
@@ -3320,7 +3211,7 @@ impl LivingEntity {
             .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
 
         // Clear fall/fire state
-        self.fall_distance.store(0f32);
+        self.entity.fall_distance.store(0.0);
         self.death_time.store(0, Relaxed);
         self.entity.extinguish();
         self.entity.fire_ticks.store(0, Relaxed);
@@ -3406,15 +3297,8 @@ impl LivingEntity {
             );
         }
         self.write_attributes_nbt(nbt);
-        // Avoid persisting a lethal fall distance when the entity is dead to prevent death loops
-        let fall_distance = if self.dead.load(Relaxed) {
-            0.0
-        } else {
-            self.fall_distance.load()
-        };
         // Persist current absorption amount
         nbt.put("AbsorptionAmount", NbtTag::Float(self.absorption.load()));
-        nbt.put("FallDistance", NbtTag::Float(fall_distance));
         // Vanilla `Entity.saveWithoutId`'s `invulnerable_time`, the hurt cooldown.
         let invulnerable_time = self.hurt_cooldown.load(Relaxed);
         if invulnerable_time > 0 {
@@ -3596,19 +3480,8 @@ impl LivingEntity {
         let clamped_abs = raw_abs.max(0.0).min(max_abs);
         self.absorption.store(clamped_abs);
 
-        // Load fall distance, but if this entity is currently marked dead ensure we don't restore
-        // a lethal fall distance that would immediately re-kill on spawn.
         if let Some(invulnerable_time) = nbt.get_int("invulnerable_time") {
             self.hurt_cooldown.store(invulnerable_time, Relaxed);
-        }
-        let fd = nbt
-            .get_float("FallDistance")
-            .or_else(|| nbt.get_float("fall_distance"))
-            .unwrap_or(0.0);
-        if self.dead.load(Relaxed) {
-            self.fall_distance.store(0.0);
-        } else {
-            self.fall_distance.store(fd);
         }
         self.current_impulse_context_reset_grace_time.store(
             nbt.get_int("current_impulse_context_reset_grace_time")
@@ -3852,6 +3725,13 @@ impl LivingEntity {
         }
 
         let world = self.entity.world.load();
+        // Vanilla `Player.isInvulnerableTo`: the fall_damage game rule.
+        if self.entity.entity_type == &EntityType::PLAYER
+            && damage_type.has_tag(&tag::DamageType::MINECRAFT_IS_FALL)
+            && !world.level_info.load().game_rules.fall_damage
+        {
+            return false;
+        }
         let is_fire_damage = damage_type.has_tag(&tag::DamageType::MINECRAFT_IS_FIRE);
 
         // Fire damage can be prevented by either game rules or fire resistance
@@ -3937,7 +3817,8 @@ impl LivingEntity {
                             .lock()
                             .unwrap_or_else(std::sync::PoisonError::into_inner);
                         if let Some(stack) = equipment_guard.equipment.get_mut(&slot)
-                            && stack.damage_item(durability_damage) == DamageResult::Broken
+                            && stack.hurt_and_break(&self.entity.world.load(), durability_damage)
+                                == DamageResult::Broken
                         {
                             world.send_entity_status(
                                 &self.entity,
@@ -4000,10 +3881,17 @@ impl LivingEntity {
             direct: source,
             causing: cause,
         };
-        let damage_after_armor =
-            self.get_damage_after_armor_absorb(caller, hurt_amount, &damage_source);
-        let effective_amount =
-            self.get_damage_after_magic_absorb(damage_after_armor, caller, &damage_source);
+        // A `actuallyHurt` override may take the whole hit, as wolf armour does.
+        let effective_amount = if caller
+            .get_mob()
+            .is_some_and(|mob| mob.absorb_hurt(caller, damage_type, hurt_amount))
+        {
+            0.0
+        } else {
+            let damage_after_armor =
+                self.get_damage_after_armor_absorb(caller, hurt_amount, &damage_source);
+            self.get_damage_after_magic_absorb(damage_after_armor, caller, &damage_source)
+        };
         let play_sound = took_full_damage && self.health.load() > effective_amount;
 
         self.last_damage_taken.store(amount);
@@ -4021,49 +3909,58 @@ impl LivingEntity {
         };
         let config = &server.advanced_config.pvp;
 
-        if config.hurt_animation {
-            let entity_id = self.entity.entity_id;
-            let hurt_yaw = source.map_or(0.0, |source| {
-                let src = source.get_entity().pos.load();
-                let tgt = self.entity.pos.load();
-                (src.z - tgt.z).atan2(src.x - tgt.x).to_degrees() as f32 - self.entity.yaw.load()
-            });
-            let hurt_event = SActorEvent {
-                target_runtime_id: VarULong(entity_id as u64),
-                event_id: ActorEventID::Hurt,
-                data: VarInt(0),
-                fire_at_position: None,
-            };
-            let hurt_animation = CHurtAnimation::new(entity_id.into(), hurt_yaw);
-            world.send_to_tracking_players_and_self_editioned(
+        if took_full_damage {
+            world.broadcast_damage_event(
                 &self.entity,
-                &hurt_animation,
-                &hurt_event,
+                i32::from(damage_type.id),
+                source.map(|e| e.get_entity().entity_id),
+                cause.map(|e| e.get_entity().entity_id),
+                position,
             );
+            // Bedrock clients animate the hurt from the actor event instead.
+            if config.hurt_animation {
+                let hurt_event = SActorEvent {
+                    target_runtime_id: VarULong(self.entity.entity_id as u64),
+                    event_id: ActorEventID::Hurt,
+                    data: VarInt(0),
+                    fire_at_position: None,
+                };
+                world.send_to_tracking_players_bedrock(&self.entity, &hurt_event);
+                if let Some(player) = caller.get_player()
+                    && let crate::net::ClientPlatform::Bedrock(client) = player.client.as_ref()
+                    && let Ok(data) = client.serialize_packet(&hurt_event)
+                {
+                    client.try_enqueue_packet(data);
+                }
+            }
         }
-
-        world.broadcast_damage_event(
-            &self.entity,
-            i32::from(damage_type.id),
-            source.map(|e| e.get_entity().entity_id),
-            cause.map(|e| e.get_entity().entity_id),
-            position,
-        );
         // Vanilla `hurtServer`: `markHurt` (the velocity also goes to the hurt entity's client).
         if took_full_damage && !damage_type.has_tag(&tag::DamageType::MINECRAFT_NO_IMPACT) {
             self.entity.sync_velocity.store(true, SeqCst);
         }
 
         // Vanilla `hurtServer`: `dealDefaultKnockback` on every full-damage hit.
-        if took_full_damage
-            && !damage_type.has_tag(&tag::DamageType::MINECRAFT_NO_KNOCKBACK)
-            && caller
+        if took_full_damage && !damage_type.has_tag(&tag::DamageType::MINECRAFT_NO_KNOCKBACK) {
+            let (dx, dz) = self.default_knockback_direction(source, position);
+            if caller
                 .get_mob()
                 .is_none_or(super::mob::Mob::takes_knockback)
-        {
-            let (dx, dz) = self.default_knockback_direction(source, position);
-            // `knockback(0.4F, ...)`: the float strength, widened.
-            self.knockback(caller, f64::from(0.4f32), dx, dz, cause, amount, false);
+            {
+                // `knockback(0.4F, ...)`: the float strength, widened.
+                self.knockback(caller, f64::from(0.4f32), dx, dz, cause, amount, false);
+            }
+            // `ServerPlayer.indicateDamage`: the hurt player's own client tilts the camera.
+            if config.hurt_animation
+                && let Some(player) = caller.get_player()
+            {
+                let hurt_dir = (dz.atan2(dx) * f64::from(180.0f32)
+                    / f64::from(std::f32::consts::PI)
+                    - f64::from(self.entity.yaw.load())) as f32;
+                player.try_send_client_packet(&CHurtAnimation::new(
+                    self.entity.entity_id.into(),
+                    hurt_dir,
+                ));
+            }
         }
 
         // Vanilla parity: actuallyHurt
@@ -4122,7 +4019,7 @@ impl LivingEntity {
         if dmg_to_health > 0.0 || absorbed_damage > 0.0 {
             let current_tick = world.get_time_of_day();
             let fall_location = FallLocation::get_current_fall_location(self, &world);
-            let fall_distance = self.fall_distance.load();
+            let fall_distance = self.entity.fall_distance.load();
 
             {
                 let mut tracker = self
@@ -4367,6 +4264,8 @@ impl EntityBase for LivingEntity {
         if self.applied_scale.swap(scale) != scale {
             caller.refresh_dimensions();
         }
+        // The start of vanilla `LivingEntity.baseTick`.
+        crate::enchantment::EnchantmentHelper::tick_effects(caller, self);
         self.entity.tick(caller, server);
 
         // Only tick movement if the entity is alive. This prevents a dead "corpse"
@@ -4824,7 +4723,7 @@ impl LivingEntity {
 
                     let destination = self.entity.pos.load();
                     if destination != center {
-                        self.fall_distance.store(0.0);
+                        self.entity.reset_fall_distance();
                         self.reset_current_impulse_context();
                         // Vanilla broadcasts entity event 46 (teleport particles) on success.
                         world.send_entity_status(&self.entity, EntityStatus::Teleport, None);

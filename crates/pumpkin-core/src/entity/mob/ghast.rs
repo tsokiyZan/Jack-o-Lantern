@@ -130,8 +130,14 @@ impl Mob for GhastEntity {
     }
 
     /// Vanilla `Ghast.checkFallDamage` does nothing.
-    fn checks_fall_damage(&self) -> bool {
-        false
+    fn mob_check_fall_damage(
+        &self,
+        _caller: &dyn crate::entity::EntityBase,
+        _ya: f64,
+        _on_ground: bool,
+        _state: &'static pumpkin_data::BlockState,
+        _pos: pumpkin_util::math::position::BlockPos,
+    ) {
     }
 
     fn mob_init_data_tracker(&self) {

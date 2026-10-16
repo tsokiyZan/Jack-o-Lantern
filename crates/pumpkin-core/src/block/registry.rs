@@ -175,9 +175,9 @@ use crate::block::blocks::wither_skull::WitherSkeletonSkullBlock;
 use crate::block::fluid::lava::FlowingLava;
 use crate::block::fluid::water::FlowingWater;
 use crate::block::{
-    BlockBehaviour, BlockHitResult, BlockMetadata, BonemealArgs, BounceOnArgs, FluidMetadata,
-    GetInsideCollisionShapeArgs, GetScreenHandlerFactoryArgs, OnEntityCollisionArgs,
-    OnEntityStepArgs, OnLandedUponArgs, OnProjectileHitArgs, PathComputationType,
+    BlockBehaviour, BlockHitResult, BlockMetadata, BonemealArgs, BounceOnArgs, FallOnArgs,
+    FluidMetadata, GetInsideCollisionShapeArgs, GetScreenHandlerFactoryArgs, OnEntityCollisionArgs,
+    OnEntityStepArgs, OnProjectileHitArgs, PathComputationType,
 };
 use crate::entity::EntityBase;
 use crate::entity::player::Player;
@@ -1207,20 +1207,28 @@ impl BlockRegistry {
         }
     }
 
-    pub fn on_landed_upon(
+    /// Vanilla `Block.fallOn` for the block `state` at `position`.
+    pub fn fall_on(
         &self,
-        block: &Block,
         world: &Arc<World>,
-        fall_distance: f32,
+        state: &BlockState,
+        position: &BlockPos,
         entity: &dyn EntityBase,
+        fall_distance: f64,
     ) {
-        let pumpkin_block = self.get_pumpkin_block(block.id);
-        if let Some(pumpkin_block) = pumpkin_block {
-            pumpkin_block.on_landed_upon(OnLandedUponArgs {
-                world,
-                fall_distance,
-                entity,
-            });
+        let block = Block::from_state_id(state.id);
+        let args = FallOnArgs {
+            world,
+            block,
+            state,
+            position,
+            entity,
+            fall_distance,
+        };
+        if let Some(pumpkin_block) = self.get_pumpkin_block(block.id) {
+            pumpkin_block.fall_on(args);
+        } else {
+            crate::block::default_fall_on(&args);
         }
     }
 

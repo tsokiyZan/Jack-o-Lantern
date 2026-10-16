@@ -1,5 +1,6 @@
 use std::sync::atomic::Ordering::Relaxed;
 
+use crate::enchantment::HurtAndBreak;
 use pumpkin_data::item_stack::DamageResult;
 
 use crate::entity::mob::Mob;
@@ -75,7 +76,7 @@ fn burn(mob: &dyn Mob) {
     }
 
     // 0 or 1 wear, thinned out by Unbreaking.
-    match stack.damage_item(rand::random_range(0..2)) {
+    match stack.hurt_and_break(&entity.world.load(), rand::random_range(0..2)) {
         DamageResult::Untouched => {}
         DamageResult::Damaged => {
             mob_entity.set_item_slot(&slot, stack);
