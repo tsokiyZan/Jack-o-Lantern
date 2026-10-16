@@ -3,6 +3,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use pumpkin_data::damage::DamageType;
 use pumpkin_util::math::vector3::Vector3;
 
+use crate::enchantment::EnchantmentHelper;
+use crate::entity::damage_source::DamageSource;
 use crate::{
     entity::{
         Entity, EntityBase,
@@ -91,16 +93,28 @@ impl EntityBase for LlamaSpitEntity {
         {
             let world = self.get_entity().world.load();
             let owner_id = self.thrown.owner_id.load();
-            let owner = owner_id.and_then(|id| world.get_entity_by_id(id));
-
-            let _ = entity.damage_with_context(
+            // Vanilla `LlamaSpit.onHitEntity` only hurts for a living owner.
+            let Some(owner) = owner_id
+                .and_then(|id| world.get_entity_by_id(id))
+                .filter(|owner| owner.get_living_entity().is_some())
+            else {
+                return;
+            };
+            let damage_source = DamageSource {
+                damage_type: DamageType::SPIT,
+                direct: Some(self.get_entity()),
+                causing: Some(owner.as_ref()),
+            };
+            if entity.damage_with_context(
                 entity.as_ref(),
                 1.0,
-                DamageType::SPIT,
+                damage_source.damage_type,
                 Some(hit_pos),
-                Some(self.get_entity()),
-                owner.as_deref(),
-            );
+                damage_source.direct,
+                damage_source.causing,
+            ) {
+                EnchantmentHelper::do_post_attack_effects(&world, entity.as_ref(), &damage_source);
+            }
         }
     }
 }

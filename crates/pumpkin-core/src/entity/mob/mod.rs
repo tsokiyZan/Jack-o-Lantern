@@ -2,6 +2,7 @@ use super::{
     Entity, EntityBase, ai::pathfinder::Navigator, ai::pathfinder::node::PathType,
     ai::pathfinder::node_evaluator::MobData, living::LivingEntity,
 };
+use crate::enchantment::EnchantmentHelper;
 use crate::entity::ai::brain::memory::PackedMemories;
 use crate::entity::ai::brain::{Brain, BrainTick};
 use crate::entity::ai::control::MoveControlTrait;
@@ -14,6 +15,7 @@ use crate::entity::ai::control::move_control::MoveControl;
 use crate::entity::ai::goal::escape_danger::EscapeDangerGoal;
 use crate::entity::ai::goal::goal_selector::GoalSelector;
 use crate::entity::ai::sensing::Sensing;
+use crate::entity::damage_source::DamageSource;
 use crate::entity::item::ItemEntity;
 use crate::entity::movement_emission::MovementEmission;
 use crate::entity::player::Player;
@@ -989,19 +991,28 @@ impl MobEntity {
             self.living_entity
                 .get_attribute_value(&Attributes::ATTACK_DAMAGE) as f32;
 
-        let damage_type = caller
-            .get_mob()
-            .map_or(DamageType::MOB_ATTACK, Mob::melee_damage_type);
+        let damage_source = DamageSource {
+            damage_type: caller
+                .get_mob()
+                .map_or(DamageType::MOB_ATTACK, Mob::melee_damage_type),
+            direct: Some(caller),
+            causing: Some(caller),
+        };
         let damaged = target.damage_with_context(
             target,
             attack_damage,
-            damage_type,
+            damage_source.damage_type,
             None,
-            Some(caller),
-            Some(caller),
+            damage_source.direct,
+            damage_source.causing,
         );
 
         if damaged {
+            EnchantmentHelper::do_post_attack_effects(
+                &self.living_entity.entity.world.load_full(),
+                target,
+                &damage_source,
+            );
             self.living_entity
                 .last_attacking_id
                 .store(target.get_entity().entity_id, Relaxed);

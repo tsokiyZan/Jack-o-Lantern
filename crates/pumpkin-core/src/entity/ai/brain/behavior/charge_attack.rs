@@ -9,7 +9,9 @@ use pumpkin_util::math::vector3::Vector3;
 use super::super::BrainTick;
 use super::super::memory::{MemoryModuleId, MemoryStatus, types};
 use super::timed::Behavior;
+use crate::enchantment::EnchantmentHelper;
 use crate::entity::ai::target_predicate::TargetPredicate;
+use crate::entity::damage_source::DamageSource;
 use crate::entity::passive::tamable::TamableAnimal;
 use crate::entity::{EntityBase, mob::Mob};
 
@@ -78,15 +80,21 @@ impl ChargeAttack {
             .living_entity
             .get_attribute_value(&Attributes::ATTACK_DAMAGE) as f32;
         let body: &dyn EntityBase = tick.mob;
-        // TODO: vanilla `EnchantmentHelper.doPostAttackEffects` when the hit lands.
-        target.damage_with_context(
+        let damage_source = DamageSource {
+            damage_type: DamageType::MOB_ATTACK,
+            direct: Some(body),
+            causing: Some(body),
+        };
+        if target.damage_with_context(
             target,
             damage,
-            DamageType::MOB_ATTACK,
+            damage_source.damage_type,
             None,
-            Some(body),
-            Some(body),
-        );
+            damage_source.direct,
+            damage_source.causing,
+        ) {
+            EnchantmentHelper::do_post_attack_effects(tick.world, target, &damage_source);
+        }
     }
 
     /// Vanilla `ChargeAttack.dealKnockBack`.

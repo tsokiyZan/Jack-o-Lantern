@@ -2,6 +2,8 @@ use std::sync::Arc;
 use std::sync::RwLock;
 use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU32, AtomicU64, Ordering};
 
+use crate::enchantment::EnchantmentHelper;
+use crate::entity::damage_source::DamageSource;
 use crate::entity::projectile::{ProjectileHit, calculate_ray_intersection};
 use crate::{
     entity::{Entity, EntityBase, living::LivingEntity, player::Player},
@@ -982,15 +984,20 @@ impl EntityBase for ArrowEntity {
 
                 let owner_entity = owner_id.and_then(|id| world.get_entity_by_id(id));
 
+                // Vanilla `damageSources().arrow(this, owner)`: the arrow hits, its owner (or the
+                // arrow itself when it has none) is responsible.
+                let damage_source = DamageSource {
+                    damage_type: DamageType::ARROW,
+                    direct: Some(self),
+                    causing: owner_entity.as_deref().or(Some(self)),
+                };
                 let damage_succeeded = target.damage_with_context(
                     target.as_ref(),
                     damage as f32,
-                    DamageType::ARROW,
+                    damage_source.damage_type,
                     Some(hit_pos),
-                    // Vanilla `damageSources().arrow(this, owner)`: the arrow hits, its owner
-                    // is responsible.
-                    Some(self),
-                    owner_entity.as_deref(),
+                    damage_source.direct,
+                    damage_source.causing,
                 );
 
                 if let Some(living) = target.get_living_entity() {
@@ -1018,6 +1025,20 @@ impl EntityBase for ArrowEntity {
                     );
                     let chunk_pos = entity.chunk_pos.load();
                     world.broadcast_to_chunk(chunk_pos, &sound_packet);
+
+                    if damage_succeeded {
+                        // The weapon is the arrow's own copy, so item damage never reaches the
+                        // bow still held.
+                        let weapon = self.get_weapon_item();
+                        let detached = weapon.clone().map(std::sync::Mutex::new);
+                        EnchantmentHelper::do_post_attack_effects_with_item_source_on_break(
+                            &world,
+                            target.as_ref(),
+                            &damage_source,
+                            weapon.as_ref().map(|weapon| (weapon, detached.as_ref())),
+                            None,
+                        );
+                    }
 
                     if Self::should_apply_post_hurt_effects(damage_succeeded) {
                         let item_stack = self

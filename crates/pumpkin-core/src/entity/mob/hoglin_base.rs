@@ -7,7 +7,9 @@ use pumpkin_data::damage::DamageType;
 use pumpkin_util::math::vector3::Vector3;
 use rand::RngExt;
 
+use crate::enchantment::EnchantmentHelper;
 use crate::entity::EntityBase;
+use crate::entity::damage_source::DamageSource;
 use crate::entity::mob::Mob;
 
 /// Vanilla `HoglinBase.ATTACK_ANIMATION_DURATION`.
@@ -29,16 +31,25 @@ pub fn hurt_and_throw_target(body: &dyn Mob, target: &dyn EntityBase) -> bool {
     };
 
     let attacker: &dyn EntityBase = body;
+    let damage_source = DamageSource {
+        damage_type: DamageType::MOB_ATTACK,
+        direct: Some(attacker),
+        causing: Some(attacker),
+    };
     let was_hurt = target.damage_with_context(
         target,
         actual_damage,
-        DamageType::MOB_ATTACK,
+        damage_source.damage_type,
         None,
-        Some(attacker),
-        Some(attacker),
+        damage_source.direct,
+        damage_source.causing,
     );
     if was_hurt {
-        // TODO: EnchantmentHelper.doPostAttackEffects; no mob melee attack runs it yet.
+        EnchantmentHelper::do_post_attack_effects(
+            &body.get_entity().world.load_full(),
+            target,
+            &damage_source,
+        );
         if !is_baby {
             throw_target(body, target);
         }

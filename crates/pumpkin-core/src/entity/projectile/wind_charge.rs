@@ -10,6 +10,8 @@ use std::{
     },
 };
 
+use crate::enchantment::EnchantmentHelper;
+use crate::entity::damage_source::DamageSource;
 use crate::{
     entity::{
         Entity, EntityBase,
@@ -183,14 +185,26 @@ impl EntityBase for WindChargeEntity {
                         );
                     }
                 }
-                let _ = entity.damage_with_context(
+                let damage_source = DamageSource {
+                    damage_type: DamageType::WIND_CHARGE,
+                    direct: Some(self.get_entity()),
+                    causing: owner.as_deref(),
+                };
+                if entity.damage_with_context(
                     entity.as_ref(),
                     1.0,
-                    DamageType::WIND_CHARGE,
+                    damage_source.damage_type,
                     None,
-                    Some(self.get_entity()),
-                    owner.as_deref(),
-                );
+                    damage_source.direct,
+                    damage_source.causing,
+                ) && entity.get_living_entity().is_some()
+                {
+                    EnchantmentHelper::do_post_attack_effects(
+                        &world,
+                        entity.as_ref(),
+                        &damage_source,
+                    );
+                }
                 self.create_explosion(self.get_entity().pos.load());
             }
             // Vanilla `AbstractWindCharge.onHitBlock`: a quarter block out of the hit face.

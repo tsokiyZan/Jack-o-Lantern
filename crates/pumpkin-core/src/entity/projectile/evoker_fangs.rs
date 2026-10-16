@@ -4,6 +4,8 @@ use pumpkin_data::damage::DamageType;
 use pumpkin_data::entity::EntityStatus;
 use pumpkin_data::sound::Sound;
 
+use crate::enchantment::EnchantmentHelper;
+use crate::entity::damage_source::DamageSource;
 use crate::{
     entity::{Entity, EntityBase},
     server::Server,
@@ -62,19 +64,31 @@ impl EntityBase for EvokerFangsEntity {
 
                     if cand_ent.entity_id != entity.entity_id && cand.get_living_entity().is_some()
                     {
-                        let damage_type = if owner.is_some() {
-                            DamageType::INDIRECT_MAGIC
-                        } else {
-                            DamageType::MAGIC
+                        let damage_source = DamageSource {
+                            damage_type: if owner.is_some() {
+                                DamageType::INDIRECT_MAGIC
+                            } else {
+                                DamageType::MAGIC
+                            },
+                            direct: Some(entity),
+                            causing: owner.as_deref(),
                         };
-                        let _ = cand.damage_with_context(
+                        // Vanilla `dealDamageTo`: only an owned fang's hit runs post-attack effects.
+                        if cand.damage_with_context(
                             cand.as_ref(),
                             6.0,
-                            damage_type,
+                            damage_source.damage_type,
                             Some(entity.pos.load()),
-                            Some(entity),
-                            owner.as_deref(),
-                        );
+                            damage_source.direct,
+                            damage_source.causing,
+                        ) && owner.is_some()
+                        {
+                            EnchantmentHelper::do_post_attack_effects(
+                                &world,
+                                cand.as_ref(),
+                                &damage_source,
+                            );
+                        }
                     }
                 }
             }
