@@ -6473,14 +6473,15 @@ impl World {
         state_id: BlockStateId,
         pos: &BlockPos,
     ) -> BlockStateId {
+        // Vanilla `Block.updateFromNeighbourShapes`: each `updateShape` goes to the block the
+        // state is by then, in `UPDATE_SHAPE_ORDER`.
         let mut current_state_id = state_id;
-        let block = Block::from_state_id(state_id);
-        for direction in BlockDirection::all() {
+        for direction in BlockDirection::abstract_block_update_order() {
             let neighbor_pos = pos.offset(direction.to_offset());
             let neighbor_state_id = self.get_block_state_id(&neighbor_pos);
             current_state_id = self.block_registry.get_state_for_neighbor_update(
                 self,
-                block,
+                Block::from_state_id(current_state_id),
                 current_state_id,
                 pos,
                 direction,
