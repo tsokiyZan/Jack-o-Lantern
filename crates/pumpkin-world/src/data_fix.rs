@@ -6,6 +6,8 @@
 
 use pumpkin_nbt::{compound::NbtCompound, tag::NbtTag};
 
+/// Schema version of vanilla's `MergeTerrainChunkStatusFix`.
+pub const MERGE_TERRAIN_CHUNK_STATUS_FIX_VERSION: i32 = 5013;
 /// Schema version of vanilla's `SignsOpFlagFix`.
 const SIGNS_OP_FLAG_FIX_VERSION: i32 = 5002;
 /// Schema version of vanilla's `ExplorerMapItemFix`; the item renames at 5012 are folded in.

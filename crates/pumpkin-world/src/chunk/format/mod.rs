@@ -15,13 +15,14 @@ use rustc_hash::FxHashMap;
 use crate::{
     chunk::{
         ChunkEntityData, ChunkReadingError, ChunkSerializingError,
-        format::anvil::{SingleChunkDataSerializer, WORLD_DATA_VERSION},
+        format::anvil::SingleChunkDataSerializer,
         io::{Dirtiable, file_manager::PathFromLevelFolder},
     },
     data_fix,
     generation::section_coords,
     level::LevelFolder,
     tick::{SavedTick, scheduler::ChunkTickScheduler},
+    world_info::WORLD_VERSION,
 };
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector2::Vector2;
@@ -34,8 +35,8 @@ pub mod anvil;
 pub mod linear;
 pub mod pump;
 
-/// Pumpkin-only marker on chunks saved with finished terrain. Earlier Pumpkin builds also saved
-/// half-built terrain as `minecraft:terrain`; vanilla ignores the extra tag.
+/// Marker that Pumpkin's 26.2-stamped saves put on chunks with finished terrain. Earlier builds
+/// also saved half-built terrain as `minecraft:terrain`.
 const TERRAIN_COMPLETE_TAG: &str = "pumpkin:terrain_complete";
 
 impl SingleChunkDataSerializer for ChunkData {
@@ -424,11 +425,11 @@ impl ChunkData {
             "minecraft:structure_starts" => ChunkStatus::StructureStarts,
             "minecraft:structure_references" => ChunkStatus::StructureReferences,
             // MergeTerrainChunkStatusFix: carvers -> terrain, noise/surface -> biomes.
-            // Pumpkin used to save its half-built noise and surface stages as `terrain` too;
-            // those saves (Pumpkin's data version, no completeness marker) start over from
-            // biomes rather than load as finished terrain.
+            // Vanilla never saved `terrain` before that fix, but Pumpkin did, for its
+            // half-built noise and surface stages too; those saves (no completeness marker)
+            // start over from biomes rather than load as finished terrain.
             "minecraft:terrain"
-                if root_tag.get_int("DataVersion") == Some(WORLD_DATA_VERSION)
+                if data_version < data_fix::MERGE_TERRAIN_CHUNK_STATUS_FIX_VERSION
                     && root_tag.get_bool(TERRAIN_COMPLETE_TAG) != Some(true) =>
             {
                 ChunkStatus::Biomes
@@ -513,7 +514,7 @@ impl ChunkData {
         let min_section_y = (self.section.min_y >> 4) as i8;
 
         let mut root_compound = NbtCompound::new();
-        root_compound.put_int("DataVersion", WORLD_DATA_VERSION);
+        root_compound.put_int("DataVersion", WORLD_VERSION);
         root_compound.put_int("xPos", self.x);
         root_compound.put_int("zPos", self.z);
         root_compound.put_int("yPos", section_coords::block_to_section(self.section.min_y));
@@ -531,9 +532,6 @@ impl ChunkData {
             ChunkStatus::Full => "minecraft:full",
         };
         root_compound.put_string("Status", status_str.to_string());
-        if self.status == ChunkStatus::Terrain {
-            root_compound.put_bool(TERRAIN_COMPLETE_TAG, true);
-        }
 
         let mut heightmaps_compound = NbtCompound::new();
         if let Some(ref arr) = heightmap_lock.world_surface {
@@ -800,7 +798,7 @@ impl ChunkEntityData {
 
     fn internal_to_bytes(&self) -> Bytes {
         let mut root = NbtCompound::new();
-        root.put_int("DataVersion", WORLD_DATA_VERSION);
+        root.put_int("DataVersion", WORLD_VERSION);
         root.put(
             "Position",
             pumpkin_nbt::tag::NbtTag::IntArray(vec![self.x, self.z]),
@@ -1011,19 +1009,13 @@ mod tests {
     }
 
     // Before the marker, Pumpkin saved its half-built noise and surface stages as `terrain`
-    // too; only chunks it marks complete, or that another server wrote, are carved terrain.
+    // too; only chunks it marked complete, or saved at 26.3's version, are carved terrain.
     #[test]
     fn unmarked_pumpkin_terrain_chunk_restarts_from_biomes() {
+        assert_eq!(terrain_chunk_status(4903, false), ChunkStatus::Biomes);
+        assert_eq!(terrain_chunk_status(4903, true), ChunkStatus::Terrain);
         assert_eq!(
-            terrain_chunk_status(WORLD_DATA_VERSION, false),
-            ChunkStatus::Biomes
-        );
-        assert_eq!(
-            terrain_chunk_status(WORLD_DATA_VERSION, true),
-            ChunkStatus::Terrain
-        );
-        assert_eq!(
-            terrain_chunk_status(WORLD_DATA_VERSION + 1, false),
+            terrain_chunk_status(WORLD_VERSION, false),
             ChunkStatus::Terrain
         );
     }

@@ -10,6 +10,8 @@ use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
 use serde::{Deserialize, Serialize};
 
+use crate::world_info::WORLD_VERSION;
+
 /// POI type identifier for nether portals
 pub const POI_TYPE_NETHER_PORTAL: &str = "minecraft:nether_portal";
 
@@ -21,9 +23,6 @@ const HEADER_SIZE: usize = SECTOR_SIZE * 2; // Location table + timestamp table
 
 /// Compression type for MCA format
 const COMPRESSION_ZLIB: u8 = 2;
-
-// Data version for 1.21
-const DATA_VERSION: i32 = 3955;
 
 /// A single Point of Interest entry (serializable)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -168,7 +167,7 @@ impl PoiRegion {
             None
         } else {
             Some(PoiChunkData {
-                data_version: DATA_VERSION,
+                data_version: WORLD_VERSION,
                 sections,
             })
         }
@@ -221,7 +220,7 @@ impl PoiRegion {
         let nbt = pumpkin_nbt::Nbt::read(&mut reader)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))?;
 
-        let data_version = nbt.get_int("DataVersion").unwrap_or(DATA_VERSION);
+        let data_version = nbt.get_int("DataVersion").unwrap_or(WORLD_VERSION);
         let mut sections = FxHashMap::default();
 
         if let Some(sec_tag) = nbt.get_compound("Sections") {
