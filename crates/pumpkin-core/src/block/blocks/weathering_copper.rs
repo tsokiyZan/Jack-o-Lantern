@@ -22,6 +22,7 @@ use crate::block::{
     BlockBehaviour, BlockMetadata, BrokenArgs, CanPlaceAtArgs, CanUpdateAtArgs,
     GetComparatorOutputArgs, GetStateForNeighborUpdateArgs, NormalUseArgs, OnNeighborUpdateArgs,
     OnPlaceArgs, OnStateReplacedArgs, PathComputationType, PlacedArgs, RandomTickArgs,
+    UseWithItemArgs,
 };
 use crate::world::World;
 
@@ -639,6 +640,14 @@ impl BlockMetadata for WeatheringCopperBlock {
 impl BlockBehaviour for WeatheringCopperBlock {
     fn random_tick(&self, args: RandomTickArgs<'_>) {
         change_over_time(args.world, args.position, args.block);
+    }
+
+    fn use_with_item(&self, mut args: UseWithItemArgs<'_>) -> BlockActionResult {
+        if is_copper_golem_statue(args.block.id) {
+            crate::block::blocks::copper_golem_statue::weathering_use_item_on(&mut args)
+        } else {
+            BlockActionResult::PassToDefaultBlockAction
+        }
     }
 
     /// Only statues carry a pose, every other copper block here reads nothing.
