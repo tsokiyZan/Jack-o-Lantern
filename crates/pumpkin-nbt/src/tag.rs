@@ -93,6 +93,26 @@ pub enum NbtTag {
 }
 
 impl NbtTag {
+    /// Vanilla `TagType.getName` of this tag's type.
+    #[must_use]
+    pub const fn get_type_name(&self) -> &'static str {
+        match self {
+            Self::End => "END",
+            Self::Byte(_) => "BYTE",
+            Self::Short(_) => "SHORT",
+            Self::Int(_) => "INT",
+            Self::Long(_) => "LONG",
+            Self::Float(_) => "FLOAT",
+            Self::Double(_) => "DOUBLE",
+            Self::ByteArray(_) => "BYTE[]",
+            Self::String(_) => "STRING",
+            Self::List(_) => "LIST",
+            Self::Compound(_) => "COMPOUND",
+            Self::IntArray(_) => "INT[]",
+            Self::LongArray(_) => "LONG[]",
+        }
+    }
+
     /// Returns the numeric id associated with the data type.
     #[must_use]
     pub const fn get_type_id(&self) -> u8 {

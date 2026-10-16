@@ -168,9 +168,144 @@ fn to_java_string<T: JavaFloat>(value: T) -> String {
     out
 }
 
+/// Formats `value` like Java's `DecimalFormat("#")` in `Locale.ROOT` with at most
+/// `max_fraction_digits` fraction digits.
+///
+/// That prints no leading zero before the point, no trailing zeros after it, and the shortest
+/// decimal of `value` rounded half-even. Java takes the digits from its older `FloatingDecimal`,
+/// which for a few large values (1.0E23) gives a longer decimal than the shortest one used here.
+#[must_use]
+pub fn decimal_format(value: f64, max_fraction_digits: usize) -> String {
+    if value.is_nan() {
+        return "NaN".to_owned();
+    }
+    let negative = value.is_sign_negative();
+    let sign = if negative { "-" } else { "" };
+    if value.is_infinite() {
+        return format!("{sign}\u{221e}");
+    }
+    let abs = value.abs();
+    let (mut digits, mut exponent) = if abs == 0.0 {
+        (vec![0], 0)
+    } else {
+        split_exp(&format!("{abs:e}"))
+    };
+
+    // Digit `i` stands for 10^(exponent - i); keep those down to 10^-max_fraction_digits.
+    let keep = i64::from(exponent) + max_fraction_digits as i64 + 1;
+    if keep < digits.len() as i64 {
+        let round_up = keep >= 0 && {
+            let keep = keep as usize;
+            match digits[keep] {
+                d if d > 5 => true,
+                5 if keep + 1 < digits.len() => true,
+                // Java keeps no digit for a lone trailing 5 in the first place it could round
+                // to (5e-16 prints as 0), whatever the exact value is.
+                5 if keep == 0 => false,
+                // DigitList.shouldRoundUp: a trailing 5 is a tie only if it is the exact value.
+                5 => match compare_to_exact(&digits, exponent, abs) {
+                    std::cmp::Ordering::Greater => false,
+                    std::cmp::Ordering::Less => true,
+                    std::cmp::Ordering::Equal => keep > 0 && digits[keep - 1] % 2 == 1,
+                },
+                _ => false,
+            }
+        };
+        digits.truncate(keep.max(0) as usize);
+        if round_up {
+            if let Some(i) = digits.iter().rposition(|&d| d != 9) {
+                digits[i] += 1;
+                digits.truncate(i + 1);
+            } else {
+                digits = vec![1];
+                exponent += 1;
+            }
+        } else if digits.is_empty() {
+            digits.push(0);
+        }
+    }
+    while digits.len() > 1 && digits.last() == Some(&0) {
+        digits.pop();
+    }
+    if digits == [0] {
+        return format!("{sign}0");
+    }
+
+    let digit = |d: u8| char::from(b'0' + d);
+    let mut out = String::from(sign);
+    if exponent >= 0 {
+        let int_len = exponent as usize + 1;
+        for i in 0..int_len {
+            out.push(digits.get(i).copied().map_or('0', digit));
+        }
+        if digits.len() > int_len {
+            out.push('.');
+            out.extend(digits[int_len..].iter().copied().map(digit));
+        }
+    } else {
+        out.push('.');
+        for _ in 0..(-exponent - 1) {
+            out.push('0');
+        }
+        out.extend(digits.iter().copied().map(digit));
+    }
+    out
+}
+
+/// Compares the decimal `digits` (the first standing for 10^`exponent`) with `value`'s exact
+/// value.
+fn compare_to_exact(digits: &[u8], exponent: i32, value: f64) -> std::cmp::Ordering {
+    let (exact, exact_exponent) = split_exp(&format!("{value:.*e}", f64::EXACT_DIGITS));
+    exponent.cmp(&exact_exponent).then_with(|| {
+        let len = digits.len().max(exact.len());
+        let at = |d: &[u8], i: usize| d.get(i).copied().unwrap_or(0);
+        (0..len)
+            .map(|i| at(digits, i).cmp(&at(&exact, i)))
+            .find(|ordering| ordering.is_ne())
+            .unwrap_or(std::cmp::Ordering::Equal)
+    })
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{double_to_string, float_to_string};
+    use super::{decimal_format, double_to_string, float_to_string};
+
+    #[test]
+    fn decimal_format_matches_java() {
+        // Expected strings come from Java 25's DecimalFormat("#") with 15 fraction digits.
+        for (value, expected) in [
+            (2f64.powi(-16), ".000015258789062"),
+            (2f64.powi(-16) * 3.0, ".000045776367188"),
+            (0.1 + 0.2, ".3"),
+            (0.125, ".125"),
+            (1e20, "100000000000000000000"),
+            (-0.0, "-0"),
+            (f64::from(0.1f32), ".100000001490116"),
+            (2.5e-16, "0"),
+            (7.5e-16, ".000000000000001"),
+            (f64::NAN, "NaN"),
+            (f64::INFINITY, "\u{221e}"),
+            (1e-20, "0"),
+            (-1e-20, "-0"),
+            (123_456_789_012_345_678.0, "123456789012345680"),
+            (0.999_999_999_999_999_9, "1"),
+            (0.5e-15, "0"),
+            (3.5e-15, ".000000000000004"),
+            (4.5e-15, ".000000000000004"),
+            (0.123_456_789_012_346_5, ".123456789012346"),
+            (1.15e-14, ".000000000000011"),
+            (1.5e-15, ".000000000000001"),
+            (1234.5678, "1234.5678"),
+            (
+                f64::from(f32::MAX),
+                "340282346638528860000000000000000000000",
+            ),
+            (5.0, "5"),
+            (-2.5, "-2.5"),
+        ] {
+            assert_eq!(decimal_format(value, 15), expected, "{value:e}");
+        }
+    }
 
     // Expected strings come from Java 25's Double.toString and Float.toString.
     #[test]
