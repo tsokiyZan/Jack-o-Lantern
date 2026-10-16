@@ -173,6 +173,27 @@ const BABY_DIMENSIONS: EntityDimensions =
     EntityDimensions::scalable(0.45, 0.85).with_eye_height(0.4375);
 
 impl Mob for StriderEntity {
+    /// Vanilla `Strider.checkFallDamage`: lava ends a fall.
+    fn mob_check_fall_damage(
+        &self,
+        caller: &dyn EntityBase,
+        ya: f64,
+        on_ground: bool,
+        state: &'static pumpkin_data::BlockState,
+        pos: pumpkin_util::math::position::BlockPos,
+    ) {
+        let living = &self.get_mob_entity().living_entity;
+        if living
+            .entity
+            .touching_lava
+            .load(std::sync::atomic::Ordering::SeqCst)
+        {
+            living.entity.reset_fall_distance();
+        } else {
+            living.check_fall_damage(caller, ya, on_ground, state, pos);
+        }
+    }
+
     /// Vanilla `Strider.getWalkTargetValue`.
     fn get_walk_target_value(&self, pos: &pumpkin_util::math::position::BlockPos) -> f32 {
         let world = self.get_entity().world.load();

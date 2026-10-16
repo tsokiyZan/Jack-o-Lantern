@@ -1,14 +1,15 @@
+use pumpkin_data::damage::DamageType;
 use pumpkin_macros::pumpkin_block;
 
-use crate::block::{BlockBehaviour, OnLandedUponArgs};
+use crate::block::{BlockBehaviour, FallOnArgs};
 
 #[pumpkin_block("minecraft:hay_block")]
 pub struct HayBlock;
 
 impl BlockBehaviour for HayBlock {
-    fn on_landed_upon(&self, args: OnLandedUponArgs<'_>) {
-        if let Some(living) = args.entity.get_living_entity() {
-            living.handle_fall_damage(args.entity, args.fall_distance, 0.2);
-        }
+    /// Vanilla `HayBlock.fallOn`: a fifth of the fall damage.
+    fn fall_on(&self, args: FallOnArgs<'_>) {
+        args.entity
+            .cause_fall_damage(args.entity, args.fall_distance, 0.2, DamageType::FALL);
     }
 }

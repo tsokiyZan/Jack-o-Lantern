@@ -13,9 +13,9 @@ use pumpkin_world::world::{BlockAccessor, BlockFlags};
 use uuid::Uuid;
 
 use crate::block::{
-    BlockBehaviour, BlockIsReplacing, BrokenArgs, CanPlaceAtArgs, CanUpdateAtArgs,
-    GetStateForNeighborUpdateArgs, OnEntityStepArgs, OnLandedUponArgs, OnPlaceArgs,
-    OnScheduledTickArgs, RandomTickArgs,
+    BlockBehaviour, BlockIsReplacing, BrokenArgs, CanPlaceAtArgs, CanUpdateAtArgs, FallOnArgs,
+    GetStateForNeighborUpdateArgs, OnEntityStepArgs, OnPlaceArgs, OnScheduledTickArgs,
+    RandomTickArgs,
 };
 use crate::entity::EntityBase;
 use crate::entity::r#type::from_type;
@@ -149,23 +149,29 @@ impl BlockBehaviour for TurtleEggBlock {
         }
     }
 
-    fn on_landed_upon(&self, args: OnLandedUponArgs<'_>) {
-        if let Some(living) = args.entity.get_living_entity() {
-            living.handle_fall_damage(args.entity, args.fall_distance, 1.0);
+    /// Vanilla `TurtleEggBlock.fallOn`: anything but a zombie may crush an egg on landing.
+    fn fall_on(&self, args: FallOnArgs<'_>) {
+        let entity_type = args.entity.get_entity().entity_type;
+        // `entity instanceof Zombie`.
+        let is_zombie = [
+            &EntityType::ZOMBIE,
+            &EntityType::HUSK,
+            &EntityType::DROWNED,
+            &EntityType::ZOMBIE_VILLAGER,
+            &EntityType::ZOMBIFIED_PIGLIN,
+        ]
+        .contains(&entity_type);
+        if !is_zombie {
+            Self::destroy_egg(
+                args.world,
+                args.position,
+                args.state.id,
+                args.block,
+                args.entity,
+                3,
+            );
         }
-
-        if args.entity.get_entity().entity_type.id != EntityType::ZOMBIE.id {
-            let entity_pos = args.entity.get_entity().pos.load();
-            let pos = BlockPos(Vector3::new(
-                entity_pos.x.floor() as i32,
-                entity_pos.y.floor() as i32,
-                entity_pos.z.floor() as i32,
-            ));
-            let (block, state) = args.world.get_block_and_state(&pos);
-            if block == &Block::TURTLE_EGG {
-                Self::destroy_egg(args.world, &pos, state.id, block, args.entity, 3);
-            }
-        }
+        crate::block::default_fall_on(&args);
     }
 
     fn random_tick(&self, args: RandomTickArgs<'_>) {

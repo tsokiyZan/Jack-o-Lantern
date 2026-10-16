@@ -111,6 +111,27 @@ impl MinecartEntity {
 }
 
 impl EntityBase for MinecartEntity {
+    /// Vanilla `MinecartTNT.causeFallDamage`: a TNT minecart that falls three blocks or more
+    /// explodes.
+    // TODO: the `ignitionSource` that lit the minecart.
+    fn cause_fall_damage(
+        &self,
+        _caller: &dyn EntityBase,
+        fall_distance: f64,
+        damage_modifier: f32,
+        damage_type: DamageType,
+    ) -> bool {
+        if let MinecartKind::Tnt(minecart) = &self.kind
+            && fall_distance >= 3.0
+        {
+            let power = fall_distance / 10.0;
+            minecart.explode(&self.vehicle.entity, None, power * power);
+        }
+        self.vehicle
+            .entity
+            .cause_fall_damage_default(fall_distance, damage_modifier, damage_type)
+    }
+
     fn get_block_explosion_resistance(
         &self,
         world: &crate::world::World,

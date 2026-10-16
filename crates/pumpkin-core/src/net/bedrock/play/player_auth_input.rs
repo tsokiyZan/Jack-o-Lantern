@@ -186,7 +186,7 @@ impl BedrockClient {
                     server;
                     PlayerToggleFlightEvent::new(player.clone(), true);
                     'after: {
-                        player.living_entity.fall_distance.store(0.0);
+                        player.living_entity.entity.reset_fall_distance();
                         {
                             player.abilities.lock().unwrap_or_else(std::sync::PoisonError::into_inner).flying = true;
                         };

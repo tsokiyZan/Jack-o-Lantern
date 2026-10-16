@@ -51,6 +51,35 @@ impl BoatEntity {
 }
 
 impl EntityBase for BoatEntity {
+    /// Vanilla `AbstractBoat.checkFallDamage`: a boat's fall ends on the ground without
+    /// landing on anything, and doesn't add up over water.
+    fn check_fall_damage(
+        &self,
+        _caller: &dyn EntityBase,
+        ya: f64,
+        on_ground: bool,
+        _state: &'static pumpkin_data::BlockState,
+        _pos: pumpkin_util::math::position::BlockPos,
+    ) {
+        let entity = self.get_entity();
+        if entity.has_vehicle() {
+            return;
+        }
+        if on_ground {
+            entity.reset_fall_distance();
+        } else if ya < 0.0 {
+            let below = entity.block_pos.load().down();
+            let fluid = entity.world.load().get_fluid(&below);
+            let water = fluid.id == pumpkin_data::fluid::Fluid::WATER.id
+                || fluid.id == pumpkin_data::fluid::Fluid::FLOWING_WATER.id;
+            if !water {
+                entity
+                    .fall_distance
+                    .store(entity.fall_distance.load() - f64::from(ya as f32));
+            }
+        }
+    }
+
     fn get_entity(&self) -> &Entity {
         &self.vehicle.entity
     }

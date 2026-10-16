@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use crate::{
     block::{
-        BlockBehaviour, BrokenArgs, CanPlaceAtArgs, GetStateForNeighborUpdateArgs, OnPlaceArgs,
-        PathComputationType, PlacedArgs,
+        BlockBehaviour, BrokenArgs, CanPlaceAtArgs, FallOnArgs, GetStateForNeighborUpdateArgs,
+        OnPlaceArgs, PathComputationType, PlacedArgs,
     },
     entity::player::Player,
     world::World,
@@ -20,6 +20,23 @@ use pumpkin_world::world::{BlockAccessor, BlockFlags};
 pub struct DripstoneBlock;
 
 impl BlockBehaviour for DripstoneBlock {
+    /// Vanilla `PointedDripstoneBlock.fallOn`: landing on a stalagmite's tip hurts double.
+    fn fall_on(&self, args: FallOnArgs<'_>) {
+        let props = PointedDripstoneLikeProperties::from_state_id(args.state.id);
+        if props.vertical_direction == VerticalDirection::Up
+            && props.thickness == SpeleothemThickness::Tip
+        {
+            args.entity.cause_fall_damage(
+                args.entity,
+                args.fall_distance + 2.5,
+                2.0,
+                pumpkin_data::damage::DamageType::STALAGMITE,
+            );
+        } else {
+            crate::block::default_fall_on(&args);
+        }
+    }
+
     fn can_place_at(&self, args: CanPlaceAtArgs<'_>) -> bool {
         can_place_at_pos(
             args.block_accessor,

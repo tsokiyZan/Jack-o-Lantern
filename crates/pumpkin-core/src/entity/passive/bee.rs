@@ -510,6 +510,17 @@ fn get_block_pos(nbt: &NbtCompound, key: &str) -> Option<BlockPos> {
 }
 
 impl Mob for BeeEntity {
+    /// Vanilla `Bee.checkFallDamage` does nothing.
+    fn mob_check_fall_damage(
+        &self,
+        _caller: &dyn crate::entity::EntityBase,
+        _ya: f64,
+        _on_ground: bool,
+        _state: &'static pumpkin_data::BlockState,
+        _pos: pumpkin_util::math::position::BlockPos,
+    ) {
+    }
+
     fn as_ageable(&self) -> Option<&dyn AgeableMob> {
         Some(self)
     }

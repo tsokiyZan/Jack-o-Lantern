@@ -1762,12 +1762,59 @@ pub trait Mob: EntityBase + Send + Sync {
     /// from the bucket's `bucket_entity_data`.
     fn load_from_bucket_tag(&self, _tag: &NbtCompound) {}
 
-    /// The start of a vanilla `causeFallDamage` override, before `LivingEntity`'s.
-    fn before_cause_fall_damage(&self, _fall_distance: f32) {}
+    /// A vanilla `checkFallDamage` override. Flyers such as the phantom don't add up falls.
+    fn mob_check_fall_damage(
+        &self,
+        caller: &dyn EntityBase,
+        ya: f64,
+        on_ground: bool,
+        state: &'static BlockState,
+        pos: BlockPos,
+    ) {
+        self.get_mob_entity()
+            .living_entity
+            .check_fall_damage(caller, ya, on_ground, state, pos);
+    }
 
-    /// Vanilla `calculateFallDamage` overrides, given what `LivingEntity`'s returns.
-    fn calculate_fall_damage(&self, base_damage: i32) -> i32 {
-        base_damage
+    /// A vanilla `causeFallDamage` override.
+    fn mob_cause_fall_damage(
+        &self,
+        caller: &dyn EntityBase,
+        fall_distance: f64,
+        damage_modifier: f32,
+        damage_type: DamageType,
+    ) -> bool {
+        let living = &self.get_mob_entity().living_entity;
+        let entity_type = living.entity.entity_type;
+        if entity_type == &EntityType::LLAMA || entity_type == &EntityType::TRADER_LLAMA {
+            return llama_cause_fall_damage(
+                self,
+                caller,
+                fall_distance,
+                damage_modifier,
+                damage_type,
+            );
+        }
+        if self.as_abstract_horse().is_some()
+            || entity_type == &EntityType::CAMEL
+            || entity_type == &EntityType::CAMEL_HUSK
+        {
+            return abstract_horse_cause_fall_damage(
+                self,
+                caller,
+                fall_distance,
+                damage_modifier,
+                damage_type,
+            );
+        }
+        living.cause_fall_damage(caller, fall_distance, damage_modifier, damage_type)
+    }
+
+    /// A vanilla `calculateFallDamage` override.
+    fn calculate_fall_damage(&self, fall_distance: f64, damage_modifier: f32) -> i32 {
+        self.get_mob_entity()
+            .living_entity
+            .calculate_fall_damage(fall_distance, damage_modifier)
     }
 
     /// A vanilla `LivingEntity.knockback` override. Returns true when the mob moved itself;
@@ -1799,12 +1846,6 @@ pub trait Mob: EntityBase + Send + Sync {
 
     /// The end of a vanilla `LivingEntity.travelInFluid` override.
     fn travel_in_fluid_end(&self, _water: bool) {}
-
-    /// Whether vanilla `checkFallDamage` runs after a move, adding up the fall and landing
-    /// on the block below. Flyers such as the phantom override it to do nothing.
-    fn checks_fall_damage(&self) -> bool {
-        true
-    }
 
     /// The horse family's shared `AbstractHorse` behaviour.
     fn as_abstract_horse(
@@ -2277,6 +2318,59 @@ pub fn set_mob_target_base<M: Mob + ?Sized>(mob: &M, target: Option<Arc<dyn Enti
     }
 }
 
+/// Vanilla `AbstractHorse.causeFallDamage`: a landing sound, and the fall hurts the riders
+/// only when it hurts the horse.
+fn abstract_horse_cause_fall_damage<M: Mob + ?Sized>(
+    mob: &M,
+    caller: &dyn EntityBase,
+    fall_distance: f64,
+    damage_modifier: f32,
+    damage_type: DamageType,
+) -> bool {
+    let living = &mob.get_mob_entity().living_entity;
+    if fall_distance > 1.0 {
+        let sound = if living.entity.is_baby() {
+            Sound::EntityBabyHorseLand
+        } else {
+            Sound::EntityHorseLand
+        };
+        caller.play_sound_at_self(sound, 0.4, 1.0);
+    }
+    let damage = mob.calculate_fall_damage(fall_distance, damage_modifier);
+    if damage <= 0 {
+        return false;
+    }
+    caller.damage(caller, damage as f32, damage_type);
+    living
+        .entity
+        .propagate_fall_to_passengers(fall_distance, damage_modifier, damage_type);
+    living.play_block_fall_sound(caller);
+    true
+}
+
+/// Vanilla `Llama.causeFallDamage`: only a fall of six blocks or more hurts.
+fn llama_cause_fall_damage<M: Mob + ?Sized>(
+    mob: &M,
+    caller: &dyn EntityBase,
+    fall_distance: f64,
+    damage_modifier: f32,
+    damage_type: DamageType,
+) -> bool {
+    let living = &mob.get_mob_entity().living_entity;
+    let damage = mob.calculate_fall_damage(fall_distance, damage_modifier);
+    if damage <= 0 {
+        return false;
+    }
+    if fall_distance >= 6.0 {
+        caller.damage(caller, damage as f32, damage_type);
+        living
+            .entity
+            .propagate_fall_to_passengers(fall_distance, damage_modifier, damage_type);
+    }
+    living.play_block_fall_sound(caller);
+    true
+}
+
 /// Whether vanilla's class for `entity_type` extends `Monster`: every `Enemy` except the
 /// slimes, phantoms, ghasts, shulkers, hoglins and the ender dragon.
 #[must_use]
@@ -2469,6 +2563,27 @@ impl<T: Mob + Send + 'static> EntityBase for T {
 
     fn get_mob(&self) -> Option<&dyn Mob> {
         Some(self)
+    }
+
+    fn check_fall_damage(
+        &self,
+        caller: &dyn EntityBase,
+        ya: f64,
+        on_ground: bool,
+        state: &'static BlockState,
+        pos: BlockPos,
+    ) {
+        self.mob_check_fall_damage(caller, ya, on_ground, state, pos);
+    }
+
+    fn cause_fall_damage(
+        &self,
+        caller: &dyn EntityBase,
+        fall_distance: f64,
+        damage_modifier: f32,
+        damage_type: DamageType,
+    ) -> bool {
+        self.mob_cause_fall_damage(caller, fall_distance, damage_modifier, damage_type)
     }
 
     fn controlling_passenger(&self) -> Option<Arc<dyn EntityBase>> {

@@ -33,7 +33,7 @@ impl AttackType {
 
         let sprinting = entity.is_sprinting();
         let on_ground = entity.on_ground.load(Ordering::Relaxed);
-        let fall_distance = player.living_entity.fall_distance.load();
+        let fall_distance = player.living_entity.entity.fall_distance.load();
         let held_item = player.inventory().held_item();
         let sword = held_item.is_sword();
         let is_bedrock = matches!(player.client.as_ref(), ClientPlatform::Bedrock(_));
@@ -260,7 +260,7 @@ pub struct CombatEntry {
     pub damage_type: pumpkin_data::damage::DamageType,
     pub damage: f32,
     pub fall_location: Option<FallLocation>,
-    pub fall_distance: f32,
+    pub fall_distance: f64,
     pub timestamp: i64,
     pub source_id: Option<i32>,
     pub attacker_id: Option<i32>,
@@ -291,7 +291,7 @@ impl CombatTracker {
         &mut self,
         current_tick: i64,
         is_alive: bool,
-        fall_distance: f32,
+        fall_distance: f64,
         fall_location: FallLocation,
         damage_type: pumpkin_data::damage::DamageType,
         damage: f32,
@@ -487,7 +487,7 @@ impl CombatTracker {
         let mut result = None;
         let mut alternative = None;
         let mut alt_damage = 0.0f32;
-        let mut best_fall = 0.0f32;
+        let mut best_fall = 0.0f64;
 
         for i in 0..self.entries.len() {
             let entry = &self.entries[i];
@@ -496,7 +496,7 @@ impl CombatTracker {
             let is_fake_fall = damage_type
                 .has_tag(&pumpkin_data::tag::DamageType::MINECRAFT_ALWAYS_MOST_SIGNIFICANT_FALL);
             let fall_distance = if is_fake_fall {
-                f32::MAX
+                f64::MAX
             } else {
                 entry.fall_distance
             };

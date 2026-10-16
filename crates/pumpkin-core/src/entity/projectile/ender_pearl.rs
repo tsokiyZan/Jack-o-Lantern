@@ -150,8 +150,8 @@ impl EntityBase for EnderPearlEntity {
             );
 
             // Vanilla `resetFallDistance` and `resetCurrentImpulseContext` on the teleported owner.
+            owner.get_entity().reset_fall_distance();
             if let Some(living) = owner.get_living_entity() {
-                living.fall_distance.store(0.0);
                 living.reset_current_impulse_context();
             }
 

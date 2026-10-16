@@ -346,8 +346,11 @@ impl Mob for GoatEntity {
     }
 
     /// Vanilla `Goat.calculateFallDamage`.
-    fn calculate_fall_damage(&self, damage: i32) -> i32 {
-        damage - GOAT_FALL_DAMAGE_REDUCTION
+    fn calculate_fall_damage(&self, fall_distance: f64, damage_modifier: f32) -> i32 {
+        self.get_mob_entity()
+            .living_entity
+            .calculate_fall_damage(fall_distance, damage_modifier)
+            - GOAT_FALL_DAMAGE_REDUCTION
     }
 
     /// Vanilla `Goat.getMaxHeadYRot`.
