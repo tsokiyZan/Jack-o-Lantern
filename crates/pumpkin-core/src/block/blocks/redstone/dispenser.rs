@@ -119,6 +119,9 @@ fn triangle<R: Rng>(rng: &mut R, min: f64, max: f64) -> f64 {
     min + max * (rng.random::<f64>() - rng.random::<f64>())
 }
 
+/// Vanilla `FireChargeItem.createDispenseConfig`'s `uncertainty`.
+const FIRE_CHARGE_UNCERTAINTY: f32 = 6.666_666_5;
+
 const fn to_normal(facing: Facing) -> Vector3<f64> {
     match facing {
         Facing::North => Vector3::new(0., 0., -1.),
@@ -728,27 +731,29 @@ impl DispenserBlock {
         );
     }
 
+    /// Vanilla `FireChargeItem` through `ProjectileDispenseBehavior`: a block out, and
+    /// `Projectile.shoot` replaces the direction `asProjectile` gave it.
     fn dispense_fire_charge(ctx: &DispenseContext<'_>, item: &mut ItemStack) {
-        let _ = item.split(1);
+        let facing = to_normal(ctx.facing);
         let entity = Entity::new(
             ctx.world.clone(),
-            Self::projectile_spawn_position(ctx),
+            ctx.position.to_centered_f64().add(&facing),
             &EntityType::SMALL_FIREBALL,
         );
         let fireball = SmallFireballEntity::new(entity);
-        let facing = to_normal(ctx.facing);
-        let dir = Vector3::new(
-            triangle(&mut rng(), facing.x, 0.114_850_000_000_000_01),
-            triangle(&mut rng(), facing.y, 0.114_850_000_000_000_01),
-            triangle(&mut rng(), facing.z, 0.114_850_000_000_000_01),
-        )
-        .normalize();
-        fireball.get_entity().set_velocity(dir);
-        let len = dir.horizontal_length();
-        fireball.get_entity().set_rotation(
-            dir.x.atan2(dir.z) as f32 * 57.295_776,
-            dir.y.atan2(len) as f32 * 57.295_776,
+        fireball.fireball.set_item(item.clone());
+        fireball.fireball.thrown.set_velocity(
+            facing.x,
+            facing.y,
+            facing.z,
+            1.0,
+            f64::from(FIRE_CHARGE_UNCERTAINTY),
         );
+        fireball
+            .get_entity()
+            .velocity_dirty
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+        let _ = item.split(1);
         Self::finish_projectile_launch(ctx, Arc::new(fireball), WorldEvent::SoundBlazeFireball);
     }
 

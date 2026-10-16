@@ -48,8 +48,7 @@ pub fn is_deflected(
     }
     let target_id = target.get_entity().entity_id;
     if last_deflected_by.load() != Some(target_id) {
-        // Vanilla `Projectile.deflect` keeps the owner; `onDeflection` only slows
-        // fireballs, which do not track their acceleration here.
+        // Vanilla `Projectile.deflect` keeps the owner; the caller runs `onDeflection`.
         deflection.deflect(projectile, Some(target.as_ref()));
         last_deflected_by.store(Some(target_id));
     }
@@ -206,6 +205,29 @@ impl ThrownItemEntity {
         let chunk_pos = entity.chunk_pos.load();
         world.broadcast_to_chunk(chunk_pos, &packet);
 
+        // Handle hit or continue
+        if let Some(h) = self.hit_result_on_move_vector(start_pos, delta) {
+            if is_deflected(caller, &self.last_deflected_by, &h) {
+                return;
+            }
+            // Vanilla moves the projectile to the hit location, not the full step, before
+            // `hitTargetOrDeflectSelf`, so effects such as a wind charge's burst start there.
+            entity.set_pos(h.hit_pos());
+            self.on_hit_result(caller, h);
+        }
+    }
+
+    /// Vanilla `ProjectileUtil.getHitResultOnMoveVector` with a `COLLIDER` clip, from
+    /// `start_pos` along `delta`.
+    pub(crate) fn hit_result_on_move_vector(
+        &self,
+        start_pos: Vector3<f64>,
+        delta: Vector3<f64>,
+    ) -> Option<ProjectileHit> {
+        let entity = &self.entity;
+        let world = entity.world.load();
+        let new_pos = start_pos.add(&delta);
+
         // Calculate search box for collisions
         let search_box = BoundingBox::new(
             Vector3::new(
@@ -272,34 +294,30 @@ impl ThrownItemEntity {
                 });
             }
         }
+        hit
+    }
 
-        // Handle hit or continue
-        if let Some(h) = hit {
-            if is_deflected(caller, &self.last_deflected_by, &h) {
-                return;
-            }
-            // Ensure hit is only processed once per projectile
-            if self.has_hit.swap(true, Ordering::SeqCst) {
-                return;
-            }
-            // Vanilla moves the projectile to the hit location, not the full step, before
-            // `hitTargetOrDeflectSelf`, so effects such as a wind charge's burst start there.
-            entity.set_pos(h.hit_pos());
-
-            if let ProjectileHit::Block { pos, hit_pos, .. } = &h {
-                let block = world.get_block(pos);
-                let state = world.get_block_state(pos);
-                if let Some(server) = world.server.upgrade() {
-                    world
-                        .block_registry
-                        .on_projectile_hit(block, &world, caller, pos, state, hit_pos, &server);
-                }
-            }
-
-            // Just trigger hit effects and remove
-            caller.on_hit(h);
-            entity.remove();
+    /// The `onHit` half of vanilla `Projectile.hitTargetOrDeflectSelf`, then the `discard`
+    /// every projectile here does after a hit.
+    pub(crate) fn on_hit_result(&self, caller: &dyn EntityBase, h: ProjectileHit) {
+        // Ensure hit is only processed once per projectile
+        if self.has_hit.swap(true, Ordering::SeqCst) {
+            return;
         }
+        let world = self.entity.world.load();
+        if let ProjectileHit::Block { pos, hit_pos, .. } = &h {
+            let block = world.get_block(pos);
+            let state = world.get_block_state(pos);
+            if let Some(server) = world.server.upgrade() {
+                world
+                    .block_registry
+                    .on_projectile_hit(block, &world, caller, pos, state, hit_pos, &server);
+            }
+        }
+
+        // Just trigger hit effects and remove
+        caller.on_hit(h);
+        self.entity.remove();
     }
 
     /// Returns if collision should be skipped (e.g. owner or projectile vs projectile)

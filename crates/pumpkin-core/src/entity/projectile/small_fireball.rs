@@ -1,95 +1,126 @@
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
 
+use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::math::vector3::Vector3;
 
 use crate::{
+    block::blocks::fire::FireBlockBase,
     entity::{
         Entity, EntityBase,
-        projectile::{ProjectileHit, ThrownItemEntity, fireball::INITIAL_ACCELERATION_POWER},
+        projectile::{ProjectileHit, fireball::Fireball},
     },
     server::Server,
 };
 
-const GRAVITY: f64 = 0.0;
-
+/// Vanilla `SmallFireball`: the blaze's and the dispenser's fireball, which sets fire instead
+/// of exploding.
 pub struct SmallFireballEntity {
-    pub thrown: ThrownItemEntity,
+    pub fireball: Fireball,
 }
 
 impl SmallFireballEntity {
     #[must_use]
-    pub const fn new(entity: Entity) -> Self {
-        let thrown = ThrownItemEntity {
-            entity,
-            owner_id: crossbeam::atomic::AtomicCell::new(None),
-            collides_with_projectiles: false,
-            has_hit: AtomicBool::new(false),
-            last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
-            gravity: GRAVITY,
-        };
-
-        Self { thrown }
+    pub fn new(entity: Entity) -> Self {
+        Self {
+            fireball: Fireball::new(entity),
+        }
     }
 
+    /// Vanilla `SmallFireball(level, x, y, z, direction)`, at the entity's position.
     #[must_use]
-    pub fn new_shot(entity: Entity, shooter: &Entity, direction: Vector3<f64>) -> Self {
-        let thrown = ThrownItemEntity::new(entity, shooter, GRAVITY);
-        let accel = INITIAL_ACCELERATION_POWER;
-        thrown
-            .entity
-            .velocity
-            .store(direction.normalize().multiply(accel, accel, accel));
-        Self { thrown }
+    pub fn new_directional(entity: Entity, direction: Vector3<f64>) -> Self {
+        Self {
+            fireball: Fireball::new_directional(entity, direction),
+        }
+    }
+
+    /// Vanilla `SmallFireball(level, mob, direction)`.
+    #[must_use]
+    pub fn new_from_mob(entity: Entity, mob: &Entity, direction: Vector3<f64>) -> Self {
+        Self {
+            fireball: Fireball::new_from_mob(entity, mob, direction),
+        }
     }
 }
 
 impl EntityBase for SmallFireballEntity {
     fn get_owner_id(&self) -> Option<i32> {
-        self.thrown.owner_id.load()
+        self.fireball.thrown.owner_id.load()
     }
 
-    fn tick(&self, caller: &dyn EntityBase, _server: &Server) {
-        self.thrown.process_tick(caller);
+    fn set_owner_id(&self, owner: Option<i32>) {
+        self.fireball.thrown.owner_id.store(owner);
+    }
+
+    fn write_custom_nbt(&self, nbt: &mut NbtCompound) {
+        self.fireball.write_nbt(nbt);
+    }
+
+    fn read_custom_nbt(&self, nbt: &NbtCompound) {
+        self.fireball.read_nbt(nbt);
+    }
+
+    fn init_data_tracker(&self) {
+        self.fireball.init_data_tracker();
+    }
+
+    fn tick(&self, caller: &dyn EntityBase, server: &Server) {
+        self.fireball.tick(caller, server);
     }
 
     fn get_entity(&self) -> &Entity {
-        self.thrown.get_entity()
+        self.fireball.get_entity()
     }
 
     fn get_living_entity(&self) -> Option<&crate::entity::living::LivingEntity> {
         None
     }
+
     fn cast_any(&self) -> &dyn std::any::Any {
         self
     }
 
     fn on_hit(&self, hit: ProjectileHit) {
+        let world = self.get_entity().world.load();
+        let owner = self
+            .get_owner_id()
+            .and_then(|id| world.get_entity_by_id(id));
         match hit {
+            // Vanilla `SmallFireball.onHitEntity`: the fire stays only if the hit lands.
             ProjectileHit::Entity { ref entity, .. } => {
-                entity.get_entity().set_on_fire_for(5.0);
-                let _ = entity.damage(
+                let target = entity.get_entity();
+                let remaining_fire_ticks = target.fire_ticks.load(Ordering::Relaxed);
+                entity.set_on_fire_for(5.0);
+                let this = world.get_entity_by_id(self.get_entity().entity_id);
+                // TODO: vanilla `EnchantmentHelper.doPostAttackEffects` (the target's thorns).
+                if !entity.damage_with_context(
                     entity.as_ref(),
                     5.0,
-                    pumpkin_data::damage::DamageType::FIREBALL,
-                );
+                    Fireball::damage_type(owner.as_deref()),
+                    None,
+                    this.as_deref(),
+                    owner.as_deref(),
+                ) {
+                    target
+                        .fire_ticks
+                        .store(remaining_fire_ticks, Ordering::Relaxed);
+                }
             }
+            // Vanilla `SmallFireball.onHitBlock`: a mob's fireball only lights with mob griefing.
             ProjectileHit::Block { pos, face, .. } => {
-                // Try to place fire
-                let block_to_place = match face {
-                    pumpkin_data::BlockDirection::Up => pos.up(),
-                    pumpkin_data::BlockDirection::Down => pos.down(),
-                    pumpkin_data::BlockDirection::North => pos.north(),
-                    pumpkin_data::BlockDirection::South => pos.south(),
-                    pumpkin_data::BlockDirection::West => pos.west(),
-                    pumpkin_data::BlockDirection::East => pos.east(),
-                };
-                let world = self.get_entity().world.load();
-                let fire_state = pumpkin_data::Block::FIRE.default_state.id;
-                world.set_block_state(
-                    &block_to_place,
-                    fire_state,
-                    pumpkin_world::world::BlockFlags::NOTIFY_ALL,
-                );
+                let mob_owned = owner
+                    .as_ref()
+                    .is_some_and(|owner| owner.get_mob().is_some());
+                if !mob_owned || world.level_info.load().game_rules.mob_griefing {
+                    let fire_pos = pos.offset(face.to_offset());
+                    if world.get_block_state(&fire_pos).is_air() {
+                        world.set_block_state(
+                            &fire_pos,
+                            FireBlockBase::get_state(&world, &fire_pos),
+                            pumpkin_world::world::BlockFlags::NOTIFY_ALL,
+                        );
+                    }
+                }
             }
         }
     }

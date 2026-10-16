@@ -459,13 +459,13 @@ impl Goal for GhastShootFireballGoal {
                     spawn_pos,
                     &EntityType::FIREBALL,
                 );
-                let fireball =
-                    FireballEntity::new_shot(fireball_base, entity, direction.normalize());
-                // `ThrownItemEntity::new` puts the projectile at the shooter's eye, re-anchor it.
-                fireball.thrown.entity.pos.store(spawn_pos);
-                fireball
-                    .explosion_power
-                    .store(f32::from(ghast.get_explosion_power()), Ordering::Relaxed);
+                let fireball = FireballEntity::new_from_mob(
+                    fireball_base,
+                    entity,
+                    direction.normalize(),
+                    f32::from(ghast.get_explosion_power()),
+                );
+                fireball.get_entity().set_pos(spawn_pos);
                 world.spawn_entity(Arc::new(fireball));
                 self.charge_time = -40;
             }

@@ -80,7 +80,7 @@ impl EntityBase for DragonFireballEntity {
     }
 
     fn tick(&self, caller: &dyn EntityBase, _server: &Server) {
-        // `AbstractHurtingProjectile.applyInertia`, like `FireballEntity`.
+        // `AbstractHurtingProjectile.applyInertia`, like `Fireball`.
         let entity = self.get_entity();
         let velocity = entity.velocity.load();
         let inertia = if entity.touching_water.load(Ordering::Relaxed) {
