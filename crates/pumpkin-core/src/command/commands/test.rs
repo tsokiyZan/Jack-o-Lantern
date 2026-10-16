@@ -93,7 +93,9 @@ impl ArgumentType<CommandSource> for TestInstanceArgumentType {
     }
 
     fn client_side_parser(&self) -> JavaClientArgumentType {
-        JavaClientArgumentType::ResourceLocation
+        JavaClientArgumentType::ResourceSelector {
+            identifier: Identifier::vanilla_static("test_instance"),
+        }
     }
 
     fn override_suggestion_providers(&self) -> Option<SuggestionProviders> {

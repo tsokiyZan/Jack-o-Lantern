@@ -113,6 +113,17 @@ impl CommandExecutor for SetBoolExecutor {
     }
 }
 
+/// The bounds vanilla `GameRules.registerInteger` gives each integer rule.
+fn integer_range(rule: &GameRule) -> (i32, i32) {
+    match rule.to_string().as_str() {
+        "fire_spread_radius_around_player" => (-1, i32::MAX),
+        "max_block_modifications" => (1, i32::MAX),
+        "max_minecart_speed" => (1, 1000),
+        "max_snow_accumulation_height" => (0, 8),
+        _ => (0, i32::MAX),
+    }
+}
+
 pub fn register(dispatcher: &mut CommandDispatcher, registry: &PermissionRegistry) {
     registry.register_permission_or_panic(Permission::new(
         PERMISSION,
@@ -124,16 +135,23 @@ pub fn register(dispatcher: &mut CommandDispatcher, registry: &PermissionRegistr
     let rule_registry = GameRuleRegistry::default();
 
     for rule in GameRule::all() {
-        let rule_literal = literal(rule.to_string()).executes(QueryExecutor(rule.clone()));
-        let branch = match rule_registry.get(rule) {
-            GameRuleValue::Int(_) => rule_literal.then(
-                argument("value", IntegerArgumentType::any())
-                    .executes(SetIntExecutor(rule.clone())),
-            ),
-            GameRuleValue::Bool(_) => rule_literal
-                .then(argument("value", BoolArgumentType).executes(SetBoolExecutor(rule.clone()))),
-        };
-        cmd = cmd.then(branch);
+        // Vanilla registers each rule under its id and its namespaced identifier.
+        for name in [rule.to_string(), format!("minecraft:{rule}")] {
+            let rule_literal = literal(name).executes(QueryExecutor(rule.clone()));
+            let branch = match rule_registry.get(rule) {
+                GameRuleValue::Int(_) => {
+                    let (min, max) = integer_range(rule);
+                    rule_literal.then(
+                        argument("value", IntegerArgumentType::new(min, max))
+                            .executes(SetIntExecutor(rule.clone())),
+                    )
+                }
+                GameRuleValue::Bool(_) => rule_literal.then(
+                    argument("value", BoolArgumentType).executes(SetBoolExecutor(rule.clone())),
+                ),
+            };
+            cmd = cmd.then(branch);
+        }
     }
 
     dispatcher.register(cmd);

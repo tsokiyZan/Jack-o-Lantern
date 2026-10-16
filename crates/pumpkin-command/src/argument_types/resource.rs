@@ -18,6 +18,7 @@ pub static ENTITY_TYPE_REGISTRY: &Identifier = &Identifier::vanilla_static("enti
 pub static ENCHANTMENT_REGISTRY: &Identifier = &Identifier::vanilla_static("enchantment");
 pub static MOB_EFFECT_REGISTRY: &Identifier = &Identifier::vanilla_static("mob_effect");
 pub static DAMAGE_TYPE_REGISTRY: &Identifier = &Identifier::vanilla_static("damage_type");
+pub static BIOME_REGISTRY: &Identifier = &Identifier::vanilla_static("worldgen/biome");
 
 static DAMAGE_TYPES: [pumpkin_data::damage::DamageType; 51] = [
     pumpkin_data::damage::DamageType::ARROW,
@@ -100,6 +101,12 @@ pub static ENCHANTMENT_ARGUMENT: ResourceArgument =
             .map(|value| value as &'static (dyn Any + Send + Sync))
     });
 
+pub static BIOME_ARGUMENT: ResourceArgument =
+    ResourceArgument(BIOME_REGISTRY, &|id: Identifier| {
+        pumpkin_data::biome::Biome::from_name(id.path())
+            .map(|value| value as &'static (dyn Any + Send + Sync))
+    });
+
 pub static MOB_EFFECT_ARGUMENT: ResourceArgument =
     ResourceArgument(MOB_EFFECT_REGISTRY, &|id: Identifier| {
         pumpkin_data::effect::StatusEffect::from_name(id.path())
@@ -158,7 +165,7 @@ impl<S: crate::source::CommandSource> ArgumentType<S> for ResourceArgument {
         self.1(identifier.clone()).ok_or_else(|| {
             ERROR_UNKNOWN_RESOURCE.create(
                 reader,
-                TextComponent::text(identifier.path().to_string()),
+                TextComponent::text(identifier.to_string()),
                 TextComponent::text(self.0.to_string()),
             )
         })
@@ -230,6 +237,11 @@ impl<S: crate::source::CommandSource> ArgumentType<S> for ResourceArgument {
             .iter()
             .map(|e| e.minecraft_name.to_string());
             suggestions_builder.filter_and_suggest_iter(effects).build()
+        } else if self.0 == BIOME_REGISTRY {
+            let biomes = pumpkin_data::biome::Biome::ALL
+                .iter()
+                .map(|biome| format!("minecraft:{}", biome.registry_id));
+            suggestions_builder.filter_and_suggest_iter(biomes).build()
         } else if self.0 == DAMAGE_TYPE_REGISTRY {
             let types = DAMAGE_TYPES
                 .iter()

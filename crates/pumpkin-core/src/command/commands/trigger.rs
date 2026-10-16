@@ -50,7 +50,7 @@ impl CommandExecutor for SimpleTriggerExecutor {
             return Err(INVALID_TRIGGER_ERROR.create_without_context());
         }
 
-        let objective_display_name = objective.display_name.clone();
+        let objective_display_name = objective.formatted_display_name();
 
         let is_locked = scoreboard
             .get_scores()
@@ -118,7 +118,7 @@ impl CommandExecutor for AddTriggerExecutor {
             return Err(INVALID_TRIGGER_ERROR.create_without_context());
         }
 
-        let objective_display_name = objective.display_name.clone();
+        let objective_display_name = objective.formatted_display_name();
 
         let is_locked = scoreboard
             .get_scores()
@@ -189,7 +189,7 @@ impl CommandExecutor for SetTriggerExecutor {
             return Err(INVALID_TRIGGER_ERROR.create_without_context());
         }
 
-        let objective_display_name = objective.display_name.clone();
+        let objective_display_name = objective.formatted_display_name();
 
         let is_locked = scoreboard
             .get_scores()

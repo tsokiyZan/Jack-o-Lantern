@@ -845,6 +845,11 @@ impl Server {
         }
     }
 
+    /// Vanilla `MinecraftServer.sendSystemMessage`: system messages to the server go to the log.
+    pub fn send_system_message(message: &TextComponent) {
+        info!("System chat: {}", message.clone().get_text());
+    }
+
     /// Vanilla `MinecraftServer.logChatMessage`, given the message already decorated with its chat type.
     pub fn log_chat_message(decorated: &TextComponent, tag: Option<&str>) {
         let decorated = decorated.clone().get_text();

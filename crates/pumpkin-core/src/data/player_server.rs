@@ -44,6 +44,12 @@ impl ServerPlayerData {
     /// # Returns
     ///
     /// A Result indicating success or the error that occurred.
+    /// The directory player data files are saved in.
+    #[must_use]
+    pub fn data_path(&self) -> &PathBuf {
+        self.storage.get_data_path()
+    }
+
     pub fn handle_player_leave(&self, player: &Arc<Player>) -> Result<(), PlayerDataError> {
         player
             .player_screen_handler

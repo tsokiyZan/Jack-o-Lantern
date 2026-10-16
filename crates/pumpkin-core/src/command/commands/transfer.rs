@@ -128,7 +128,7 @@ pub fn register(dispatcher: &mut CommandDispatcher, registry: &PermissionRegistr
 
     dispatcher.register(
         command("transfer", DESCRIPTION).requires(PERMISSION).then(
-            argument("hostname", StringArgumentType::SingleWord)
+            argument("hostname", StringArgumentType::QuotablePhrase)
                 .executes(TransferExecutor {
                     step: TransferStep::HostOnly,
                 })
