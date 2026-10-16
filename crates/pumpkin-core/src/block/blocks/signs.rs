@@ -12,6 +12,7 @@ use pumpkin_data::HorizontalFacingExt;
 use pumpkin_data::block_properties::EnumVariants;
 use pumpkin_data::fluid::Fluid;
 use pumpkin_data::tag::Taggable;
+use pumpkin_data::translation;
 use pumpkin_inventory::screen_handler::InventoryPlayer;
 use pumpkin_macros::pumpkin_block_from_tag;
 use pumpkin_util::math::position::BlockPos;
@@ -19,6 +20,7 @@ use pumpkin_util::math::vector2::Vector2;
 use pumpkin_util::math::vector3::Vector3;
 use pumpkin_util::text::TextComponent;
 use pumpkin_util::text::click::ClickEvent;
+use pumpkin_util::text::color::NamedColor;
 use pumpkin_world::tick::TickPriority;
 use uuid::Uuid;
 
@@ -501,8 +503,13 @@ impl BlockBehaviour for SignBlock {
             is_facing_front_text(args.world, args.position, args.block, args.player);
         let text = sign_entity.get_text(is_front_text);
 
-        let executed_click_command =
-            execute_click_commands_if_present(args.world, args.player, args.position, text);
+        let executed_click_command = execute_click_commands_if_present(
+            args.world,
+            args.player,
+            args.position,
+            text,
+            sign_entity.allow_op_features(),
+        );
 
         if sign_entity.is_waxed() {
             let is_hanging = args.block.name.contains("hanging");
@@ -599,7 +606,13 @@ impl BlockBehaviour for SignBlock {
             };
 
             if result == BlockActionResult::Success {
-                execute_click_commands_if_present(args.world, args.player, args.position, text);
+                execute_click_commands_if_present(
+                    args.world,
+                    args.player,
+                    args.position,
+                    text,
+                    sign_entity.allow_op_features(),
+                );
                 if pumpkin_item.as_any().is::<GlowingInkSacItem>() {
                     args.player.trigger_advancement(
                         crate::entity::player::advancement::trigger::AdvancementTrigger::GlowedSign,
@@ -679,12 +692,14 @@ fn is_plain_or_empty_text(text: &str) -> bool {
     }
 }
 
-/// Executes any `run_command` click events defined in the sign's text messages.
+/// Vanilla `SignBlockEntity.executeClickCommandsIfPresent`: runs the `run_command` click events
+/// in the sign's text messages if the sign allows op features.
 fn execute_click_commands_if_present(
     world: &Arc<World>,
     player: &Arc<Player>,
     position: &BlockPos,
     text: &Text,
+    allow_op_features: bool,
 ) -> bool {
     let Some(server) = world.server.upgrade() else {
         return false;
@@ -703,6 +718,10 @@ fn execute_click_commands_if_present(
         if let Ok(component) = serde_json::from_str::<TextComponent>(msg)
             && let Some(ClickEvent::RunCommand { command }) = &component.0.style.click_event
         {
+            has_run_command = true;
+            if !allow_op_features {
+                continue;
+            }
             let source = CommandSource::new(
                 CommandSender::Dummy,
                 world.clone(),
@@ -716,8 +735,14 @@ fn execute_click_commands_if_present(
             let command_str = command.strip_prefix('/').unwrap_or(command);
             let dispatcher = server.command_dispatcher.load();
             dispatcher.handle_command(&source, command_str);
-            has_run_command = true;
         }
+    }
+    if !allow_op_features && has_run_command {
+        player.send_system_message_raw(
+            &TextComponent::translate(translation::java::SIGN_CLICK_ACTIONS_DISABLED, [])
+                .color_named(NamedColor::Red),
+            true,
+        );
     }
     has_run_command
 }

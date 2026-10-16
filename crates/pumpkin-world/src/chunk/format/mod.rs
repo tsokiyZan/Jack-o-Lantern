@@ -15,12 +15,14 @@ use rustc_hash::FxHashMap;
 use crate::{
     chunk::{
         ChunkEntityData, ChunkReadingError, ChunkSerializingError,
-        format::anvil::{SingleChunkDataSerializer, WORLD_DATA_VERSION},
+        format::anvil::SingleChunkDataSerializer,
         io::{Dirtiable, file_manager::PathFromLevelFolder},
     },
+    data_fix,
     generation::section_coords,
     level::LevelFolder,
     tick::{SavedTick, scheduler::ChunkTickScheduler},
+    world_info::WORLD_VERSION,
 };
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector2::Vector2;
@@ -33,8 +35,8 @@ pub mod anvil;
 pub mod linear;
 pub mod pump;
 
-/// Pumpkin-only marker on chunks saved with finished terrain. Earlier Pumpkin builds also saved
-/// half-built terrain as `minecraft:terrain`; vanilla ignores the extra tag.
+/// Marker that Pumpkin's 26.2-stamped saves put on chunks with finished terrain. Earlier builds
+/// also saved half-built terrain as `minecraft:terrain`.
 const TERRAIN_COMPLETE_TAG: &str = "pumpkin:terrain_complete";
 
 impl SingleChunkDataSerializer for ChunkData {
@@ -131,19 +133,8 @@ fn extract_u16_array(tag: &pumpkin_nbt::tag::NbtTag) -> Option<Box<[BlockStateId
                     pumpkin_nbt::tag::NbtTag::Short(x) => BlockStateId::new_or_air(*x as u16),
                     pumpkin_nbt::tag::NbtTag::Byte(x) => BlockStateId::new_or_air(*x as u16),
                     pumpkin_nbt::tag::NbtTag::Long(x) => BlockStateId::new_or_air(*x as u16),
-                    pumpkin_nbt::tag::NbtTag::Compound(compound) => {
-                        if let Ok(entry) =
-                            crate::generation::structure::template::PaletteEntry::from_nbt_compound(
-                                compound,
-                            )
-                            && let Some(state) =
-                                crate::generation::structure::template::BlockStateResolver::resolve_simple(
-                                    &entry,
-                                )
-                        {
-                            return state.id;
-                        }
-                        BlockStateId::AIR
+                    pumpkin_nbt::tag::NbtTag::Compound(_) | pumpkin_nbt::tag::NbtTag::String(_) => {
+                        Block::state_from_nbt(t).unwrap_or(BlockStateId::AIR)
                     }
                     _ => BlockStateId::AIR,
                 })
@@ -411,6 +402,7 @@ impl ChunkData {
         let block_ticks = read_saved_ticks::<&'static Block>(&root_tag, "block_ticks", position);
         let fluid_ticks = read_saved_ticks::<&'static Fluid>(&root_tag, "fluid_ticks", position);
 
+        let data_version = data_fix::data_version(&root_tag);
         let mut block_entities = FxHashMap::default();
         if let Some(list) = root_tag.get_list("block_entities") {
             for tag in list {
@@ -419,7 +411,9 @@ impl ChunkData {
                     && let Some(y) = nbt.get_int("y")
                     && let Some(z) = nbt.get_int("z")
                 {
-                    block_entities.insert(BlockPos::new(x, y, z), nbt.clone());
+                    let mut nbt = nbt.clone();
+                    data_fix::upgrade_block_entity(&mut nbt, data_version);
+                    block_entities.insert(BlockPos::new(x, y, z), nbt);
                 }
             }
         }
@@ -431,11 +425,11 @@ impl ChunkData {
             "minecraft:structure_starts" => ChunkStatus::StructureStarts,
             "minecraft:structure_references" => ChunkStatus::StructureReferences,
             // MergeTerrainChunkStatusFix: carvers -> terrain, noise/surface -> biomes.
-            // Pumpkin used to save its half-built noise and surface stages as `terrain` too;
-            // those saves (Pumpkin's data version, no completeness marker) start over from
-            // biomes rather than load as finished terrain.
+            // Vanilla never saved `terrain` before that fix, but Pumpkin did, for its
+            // half-built noise and surface stages too; those saves (no completeness marker)
+            // start over from biomes rather than load as finished terrain.
             "minecraft:terrain"
-                if root_tag.get_int("DataVersion") == Some(WORLD_DATA_VERSION)
+                if data_version < data_fix::MERGE_TERRAIN_CHUNK_STATUS_FIX_VERSION
                     && root_tag.get_bool(TERRAIN_COMPLETE_TAG) != Some(true) =>
             {
                 ChunkStatus::Biomes
@@ -520,7 +514,7 @@ impl ChunkData {
         let min_section_y = (self.section.min_y >> 4) as i8;
 
         let mut root_compound = NbtCompound::new();
-        root_compound.put_int("DataVersion", WORLD_DATA_VERSION);
+        root_compound.put_int("DataVersion", WORLD_VERSION);
         root_compound.put_int("xPos", self.x);
         root_compound.put_int("zPos", self.z);
         root_compound.put_int("yPos", section_coords::block_to_section(self.section.min_y));
@@ -538,9 +532,6 @@ impl ChunkData {
             ChunkStatus::Full => "minecraft:full",
         };
         root_compound.put_string("Status", status_str.to_string());
-        if self.status == ChunkStatus::Terrain {
-            root_compound.put_bool(TERRAIN_COMPLETE_TAG, true);
-        }
 
         let mut heightmaps_compound = NbtCompound::new();
         if let Some(ref arr) = heightmap_lock.world_surface {
@@ -569,27 +560,7 @@ impl ChunkData {
             let palette_tags: Vec<NbtTag> = block_states_nbt
                 .palette
                 .iter()
-                .map(|&id| {
-                    let block = Block::from_state_id(id);
-                    let mut comp = NbtCompound::new();
-                    let name = if block.name.starts_with("minecraft:") {
-                        block.name.to_string()
-                    } else {
-                        format!("minecraft:{}", block.name)
-                    };
-                    comp.put_string("Name", name);
-                    if let Some(props) = block.properties(id) {
-                        let prop_vec = props.to_props();
-                        if !prop_vec.is_empty() {
-                            let mut props_comp = NbtCompound::new();
-                            for (k, v) in prop_vec {
-                                props_comp.put_string(k, v.to_string());
-                            }
-                            comp.put_compound("Properties", props_comp);
-                        }
-                    }
-                    NbtTag::Compound(comp)
-                })
+                .map(|&id| Block::state_to_nbt(id))
                 .collect();
             bs_comp.put_list("palette", palette_tags);
             section_comp.put_compound("block_states", bs_comp);
@@ -800,11 +771,16 @@ impl ChunkEntityData {
             )));
         }
 
+        let data_version = data_fix::data_version(&nbt.root_tag);
         let entities = match nbt.get("Entities") {
             Some(pumpkin_nbt::tag::NbtTag::List(list)) => list
                 .iter()
                 .filter_map(|t| match t {
-                    pumpkin_nbt::tag::NbtTag::Compound(c) => Some(c.clone()),
+                    pumpkin_nbt::tag::NbtTag::Compound(c) => {
+                        let mut c = c.clone();
+                        data_fix::upgrade_item_stacks(&mut c, data_version);
+                        Some(c)
+                    }
                     _ => None,
                 })
                 .collect(),
@@ -822,7 +798,7 @@ impl ChunkEntityData {
 
     fn internal_to_bytes(&self) -> Bytes {
         let mut root = NbtCompound::new();
-        root.put_int("DataVersion", WORLD_DATA_VERSION);
+        root.put_int("DataVersion", WORLD_VERSION);
         root.put(
             "Position",
             pumpkin_nbt::tag::NbtTag::IntArray(vec![self.x, self.z]),
@@ -1033,21 +1009,43 @@ mod tests {
     }
 
     // Before the marker, Pumpkin saved its half-built noise and surface stages as `terrain`
-    // too; only chunks it marks complete, or that another server wrote, are carved terrain.
+    // too; only chunks it marked complete, or saved at 26.3's version, are carved terrain.
     #[test]
     fn unmarked_pumpkin_terrain_chunk_restarts_from_biomes() {
+        assert_eq!(terrain_chunk_status(4903, false), ChunkStatus::Biomes);
+        assert_eq!(terrain_chunk_status(4903, true), ChunkStatus::Terrain);
         assert_eq!(
-            terrain_chunk_status(WORLD_DATA_VERSION, false),
-            ChunkStatus::Biomes
-        );
-        assert_eq!(
-            terrain_chunk_status(WORLD_DATA_VERSION, true),
+            terrain_chunk_status(WORLD_VERSION, false),
             ChunkStatus::Terrain
         );
-        assert_eq!(
-            terrain_chunk_status(WORLD_DATA_VERSION + 1, false),
-            ChunkStatus::Terrain
-        );
+    }
+
+    #[test]
+    fn block_entities_get_the_fixes_for_their_chunk_version() {
+        use crate::chunk::ChunkData;
+        use pumpkin_util::math::vector2::Vector2;
+
+        let sign_allows_op_features = |data_version: i32| {
+            let mut sign = NbtCompound::new();
+            sign.put_string("id", "minecraft:sign".to_string());
+            sign.put_int("x", 1);
+            sign.put_int("y", 2);
+            sign.put_int("z", 3);
+            let mut nbt = test_chunk(vec![test_section(-4, "minecraft:stone", true)]);
+            nbt.root_tag.put_int("DataVersion", data_version);
+            nbt.root_tag
+                .put_list("block_entities", vec![NbtTag::Compound(sign)]);
+            let chunk = ChunkData::from_bytes(&nbt.write(), Vector2::new(0, 0)).expect("parses");
+            let block_entities = chunk
+                .pending_block_entities
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            block_entities
+                .get(&BlockPos::new(1, 2, 3))
+                .and_then(|sign| sign.get_bool("allow_op_features"))
+        };
+        assert_eq!(sign_allows_op_features(4903), Some(true));
+        assert_eq!(sign_allows_op_features(5002), None);
     }
 
     #[test]
@@ -1225,6 +1223,97 @@ mod tests {
             ])
             .to_state_id(&Block::REPEATER);
         assert_eq!(result[1], repeater_state);
+    }
+
+    // 26.3's `BlockState.CODEC` saves a default state as the bare block id; a palette mixing
+    // both forms is a list of compounds with the ids wrapped as `{"": id}`.
+    #[test]
+    fn palette_round_trips_26_3_block_states() {
+        use crate::chunk::ChunkData;
+        use pumpkin_util::math::vector2::Vector2;
+
+        let repeater = Block::REPEATER
+            .from_properties(&[
+                ("facing", "east"),
+                ("delay", "3"),
+                ("locked", "false"),
+                ("powered", "true"),
+            ])
+            .to_state_id(&Block::REPEATER);
+        let mut repeater_nbt = NbtCompound::new();
+        repeater_nbt.put_string("id", "minecraft:repeater".to_string());
+        let mut props = NbtCompound::new();
+        for (key, value) in [
+            ("facing", "east"),
+            ("delay", "3"),
+            ("locked", "false"),
+            ("powered", "true"),
+        ] {
+            props.put_string(key, value.to_string());
+        }
+        repeater_nbt.put_compound("properties", props);
+
+        let mut block_states = NbtCompound::new();
+        block_states.put(
+            "palette",
+            NbtTag::List(vec![
+                NbtTag::String("minecraft:stone".into()),
+                NbtTag::Compound(repeater_nbt),
+            ]),
+        );
+        let mut data = vec![0; 256];
+        data[0] = 1;
+        block_states.put("data", NbtTag::LongArray(data));
+        let mut section = test_section(-4, "minecraft:air", true);
+        section.put("block_states", NbtTag::Compound(block_states));
+        let mut nbt = test_chunk(vec![section]);
+        nbt.root_tag.put_int("yPos", -4);
+
+        let chunk = ChunkData::from_bytes(&nbt.write(), Vector2::new(0, 0)).expect("parses");
+        assert_eq!(
+            chunk.section.get_block_absolute_y(0, -64, 0),
+            Some(repeater)
+        );
+        assert_eq!(
+            chunk.section.get_block_absolute_y(1, -64, 0),
+            Some(Block::STONE.default_state.id)
+        );
+
+        let saved = chunk.to_bytes().expect("serializes");
+        let saved = pumpkin_nbt::Nbt::read(&mut pumpkin_nbt::deserializer::NbtReadHelperJava::new(
+            &mut std::io::Cursor::new(saved.as_ref()),
+        ))
+        .expect("saved chunk is NBT");
+        let sections = saved.root_tag.get_list("sections").expect("sections");
+        let NbtTag::Compound(section) = &sections[0] else {
+            panic!("section is a compound");
+        };
+        let palette = section
+            .get_compound("block_states")
+            .and_then(|states| states.get_list("palette"))
+            .expect("palette");
+        let mut ids = Vec::new();
+        for entry in palette {
+            match entry {
+                NbtTag::String(id) => ids.push((id.to_string(), None)),
+                NbtTag::Compound(entry) => ids.push((
+                    entry.get_string("id").expect("id").to_string(),
+                    entry
+                        .get_compound("properties")
+                        .and_then(|props| props.get_string("delay"))
+                        .map(str::to_string),
+                )),
+                _ => panic!("unexpected palette entry"),
+            }
+        }
+        ids.sort();
+        assert_eq!(
+            ids,
+            vec![
+                ("minecraft:repeater".to_string(), Some("3".to_string())),
+                ("minecraft:stone".to_string(), None),
+            ]
+        );
     }
 
     #[test]

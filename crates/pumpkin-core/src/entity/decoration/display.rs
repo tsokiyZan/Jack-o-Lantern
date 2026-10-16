@@ -3,7 +3,7 @@ use std::sync::{
     atomic::{AtomicI8, AtomicI32, AtomicU8, Ordering},
 };
 
-use pumpkin_data::{damage::DamageType, item_stack::ItemStack};
+use pumpkin_data::{Block, BlockStateId, damage::DamageType, item_stack::ItemStack};
 use pumpkin_nbt::{compound::NbtCompound, tag::NbtTag};
 use pumpkin_protocol::{
     codec::{item_stack_seralizer::ItemStackSerializer, var_int::VarInt},
@@ -691,14 +691,22 @@ impl BlockDisplayEntity {
 impl EntityBase for BlockDisplayEntity {
     fn write_custom_nbt(&self, nbt: &mut NbtCompound) {
         self.display.write_display_nbt(nbt);
-        nbt.put_int("block_state", self.block_state.load(Ordering::Relaxed));
+        let state = BlockStateId::new_or_air(self.block_state.load(Ordering::Relaxed) as u16);
+        nbt.put("block_state", Block::state_to_nbt(state));
     }
 
     fn read_custom_nbt(&self, nbt: &NbtCompound) {
         self.display.read_display_nbt(nbt);
-        if let Some(state) = nbt.get_int("block_state") {
-            self.block_state.store(state, Ordering::Relaxed);
-        }
+        // Vanilla `BlockState.CODEC`, air when missing; older Pumpkin saves held a raw id.
+        let state = nbt
+            .get("block_state")
+            .and_then(|tag| match tag {
+                NbtTag::Int(id) => BlockStateId::new(*id as u16),
+                tag => Block::state_from_nbt(tag),
+            })
+            .unwrap_or(BlockStateId::AIR);
+        self.block_state
+            .store(i32::from(state.as_u16()), Ordering::Relaxed);
     }
 
     fn tick(&self, _caller: &dyn EntityBase, _server: &Server) {}

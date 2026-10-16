@@ -1,13 +1,13 @@
 use super::BlockEntity;
+use pumpkin_data::data_component_impl::{ContainerImpl, DataComponentImpl, PotDecorationsImpl};
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_nbt::compound::NbtCompound;
-use pumpkin_nbt::tag::NbtTag;
 use pumpkin_util::math::position::BlockPos;
 use std::sync::Mutex;
 
 pub struct DecoratedPotBlockEntity {
     pub position: BlockPos,
-    pub sherds: Mutex<Option<Vec<NbtTag>>>,
+    pub decorations: Mutex<PotDecorationsImpl>,
     pub item: Mutex<Option<ItemStack>>,
 }
 
@@ -24,22 +24,25 @@ impl BlockEntity for DecoratedPotBlockEntity {
     where
         Self: Sized,
     {
-        let sherds = nbt.get_list("sherds").map(<[_]>::to_vec);
+        let decorations = nbt
+            .get("sherds")
+            .and_then(PotDecorationsImpl::read_data)
+            .unwrap_or_default();
         let item = nbt
             .get_compound("item")
             .and_then(ItemStack::read_item_stack);
         Self {
             position,
-            sherds: Mutex::new(sherds),
+            decorations: Mutex::new(decorations),
             item: Mutex::new(item),
         }
     }
 
     fn write_nbt(&self, nbt: &mut NbtCompound) {
-        if let Ok(sherds) = self.sherds.lock()
-            && let Some(sh) = sherds.as_ref()
+        if let Ok(decorations) = self.decorations.lock()
+            && !decorations.is_empty()
         {
-            nbt.put_list("sherds", sh.clone());
+            nbt.put("sherds", decorations.write_data());
         }
         if let Ok(item) = self.item.lock()
             && let Some(it) = item.as_ref()
@@ -52,10 +55,10 @@ impl BlockEntity for DecoratedPotBlockEntity {
 
     fn chunk_data_nbt(&self) -> Option<NbtCompound> {
         let mut nbt = NbtCompound::new();
-        if let Ok(sherds) = self.sherds.try_lock()
-            && let Some(ref sh) = *sherds
+        if let Ok(decorations) = self.decorations.try_lock()
+            && !decorations.is_empty()
         {
-            nbt.put_list("sherds", sh.clone());
+            nbt.put("sherds", decorations.write_data());
         }
         if let Ok(item) = self.item.try_lock()
             && let Some(ref it) = *item
@@ -65,6 +68,36 @@ impl BlockEntity for DecoratedPotBlockEntity {
             nbt.put_compound("item", it_nbt);
         }
         Some(nbt)
+    }
+
+    /// Vanilla `DecoratedPotBlockEntity.collectImplicitComponents`; the contained item is
+    /// left to the container drop.
+    fn collect_item_components(&self, stack: &mut ItemStack) {
+        let decorations = self
+            .decorations
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if !decorations.is_empty() {
+            stack.set_data_component(decorations.clone());
+        }
+    }
+
+    /// Vanilla `DecoratedPotBlockEntity.applyImplicitComponents`.
+    fn apply_item_components(&self, stack: &ItemStack) {
+        *self
+            .decorations
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = stack
+            .get_data_component::<PotDecorationsImpl>()
+            .cloned()
+            .unwrap_or_default();
+        *self
+            .item
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = stack
+            .get_data_component::<ContainerImpl>()
+            .and_then(|container| container.items.iter().find(|(slot, _)| *slot == 0))
+            .map(|(_, item)| item.clone());
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
@@ -79,7 +112,12 @@ impl DecoratedPotBlockEntity {
     pub const fn new(position: BlockPos) -> Self {
         Self {
             position,
-            sherds: Mutex::new(None),
+            decorations: Mutex::new(PotDecorationsImpl {
+                back: None,
+                left: None,
+                right: None,
+                front: None,
+            }),
             item: Mutex::new(None),
         }
     }

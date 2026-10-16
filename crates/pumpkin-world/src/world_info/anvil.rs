@@ -15,9 +15,8 @@ use pumpkin_util::{Difficulty, world_seed::Seed};
 use serde::{Deserialize, Serialize};
 
 use crate::world_info::{
-    DataPacks, MAXIMUM_READABLE_WORLD_DATA_VERSION, MAXIMUM_SUPPORTED_LEVEL_VERSION,
-    MAXIMUM_SUPPORTED_WORLD_DATA_VERSION, MINIMUM_SUPPORTED_LEVEL_VERSION,
-    MINIMUM_SUPPORTED_WORLD_DATA_VERSION, WorldVersion,
+    DataPacks, MAXIMUM_SUPPORTED_LEVEL_VERSION, MINIMUM_SUPPORTED_LEVEL_VERSION,
+    MINIMUM_SUPPORTED_WORLD_DATA_VERSION, WORLD_VERSION, WorldVersion,
     data_files::{
         minecraft_data_dir, read_game_rules, read_wandering_trader, read_weather,
         read_world_clocks, read_world_gen_settings, write_custom_boss_events_stub,
@@ -48,9 +47,7 @@ fn check_data_version(data: &NbtCompound) -> Result<(), WorldInfoError> {
         ));
     };
 
-    if (MINIMUM_SUPPORTED_WORLD_DATA_VERSION..=MAXIMUM_READABLE_WORLD_DATA_VERSION)
-        .contains(&data_version)
-    {
+    if (MINIMUM_SUPPORTED_WORLD_DATA_VERSION..=WORLD_VERSION).contains(&data_version) {
         Ok(())
     } else {
         Err(WorldInfoError::UnsupportedDataVersion(data_version))
@@ -345,7 +342,7 @@ fn level_data_to_nbt(info: &LevelData, data: &mut NbtCompound) {
 }
 
 fn stamp_current_version(level_data: &mut LevelData) {
-    level_data.data_version = MAXIMUM_SUPPORTED_WORLD_DATA_VERSION;
+    level_data.data_version = WORLD_VERSION;
     level_data.level_version = MAXIMUM_SUPPORTED_LEVEL_VERSION;
     level_data.world_version = WorldVersion::default();
 }
@@ -559,9 +556,9 @@ mod test {
     use crate::{
         CURRENT_MC_VERSION,
         world_info::{
-            DataPacks, LevelData, MAXIMUM_SUPPORTED_LEVEL_VERSION,
-            MAXIMUM_SUPPORTED_WORLD_DATA_VERSION, MINIMUM_SUPPORTED_LEVEL_VERSION,
-            MINIMUM_SUPPORTED_WORLD_DATA_VERSION, WorldGenSettings, WorldInfoError, WorldVersion,
+            DataPacks, LevelData, MAXIMUM_SUPPORTED_LEVEL_VERSION, MINIMUM_SUPPORTED_LEVEL_VERSION,
+            MINIMUM_SUPPORTED_WORLD_DATA_VERSION, WORLD_VERSION, WorldGenSettings, WorldInfoError,
+            WorldVersion,
             data_files::{minecraft_data_dir, read_world_gen_settings, write_world_gen_settings},
         },
     };
@@ -773,10 +770,7 @@ mod test {
 
         let root = read_level_dat(temp_dir.path());
         let data = root.get_compound("Data").unwrap();
-        assert_eq!(
-            data.get_int("DataVersion"),
-            Some(MAXIMUM_SUPPORTED_WORLD_DATA_VERSION)
-        );
+        assert_eq!(data.get_int("DataVersion"), Some(WORLD_VERSION));
         assert_eq!(
             data.get_int("version"),
             Some(MAXIMUM_SUPPORTED_LEVEL_VERSION)
@@ -784,20 +778,12 @@ mod test {
 
         let version = data.get_compound("Version").unwrap();
         assert_eq!(version.get_string("Name"), Some(CURRENT_MC_VERSION));
-        assert_eq!(
-            version.get_int("Id"),
-            Some(MAXIMUM_SUPPORTED_WORLD_DATA_VERSION)
-        );
+        assert_eq!(version.get_int("Id"), Some(WORLD_VERSION));
 
         let game_rules_path = minecraft_data_dir(temp_dir.path()).join("game_rules.dat");
         let game_rules = read_gzip_compound_tag(File::open(game_rules_path).unwrap()).unwrap();
-        assert_eq!(
-            game_rules
-                .get_compound("data")
-                .unwrap()
-                .get_int("DataVersion"),
-            Some(MAXIMUM_SUPPORTED_WORLD_DATA_VERSION)
-        );
+        assert_eq!(game_rules.get_int("DataVersion"), Some(WORLD_VERSION));
+        assert!(!game_rules.get_compound("data").unwrap().has("DataVersion"));
     }
 
     #[test]
@@ -836,10 +822,7 @@ mod test {
 
         let root = read_level_dat(temp_dir.path());
         let data = root.get_compound("Data").unwrap();
-        assert_eq!(
-            data.get_int("DataVersion"),
-            Some(MAXIMUM_SUPPORTED_WORLD_DATA_VERSION)
-        );
+        assert_eq!(data.get_int("DataVersion"), Some(WORLD_VERSION));
         assert_eq!(
             data.get_int("version"),
             Some(MAXIMUM_SUPPORTED_LEVEL_VERSION)
@@ -859,10 +842,7 @@ mod test {
 
         let version = data.get_compound("Version").unwrap();
         assert_eq!(version.get_string("Name"), Some(CURRENT_MC_VERSION));
-        assert_eq!(
-            version.get_int("Id"),
-            Some(MAXIMUM_SUPPORTED_WORLD_DATA_VERSION)
-        );
+        assert_eq!(version.get_int("Id"), Some(WORLD_VERSION));
         assert_eq!(version.get_bool("Snapshot"), Some(false));
         assert_eq!(version.get_string("Series"), Some("main"));
 
