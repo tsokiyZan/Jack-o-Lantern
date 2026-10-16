@@ -662,6 +662,12 @@ const COS_TAB: [u64; 257] = [
     0x3c91a62633145c07,
 ];
 
+/// Vanilla `Mth.RAD_TO_DEG`, a float. Java folds `x * 180.0F / (float)Math.PI` into
+/// `x * (double)RAD_TO_DEG`, so the decompiled form must be ported as this constant.
+pub const RAD_TO_DEG: f32 = 180.0 / std::f32::consts::PI;
+/// Vanilla `Mth.DEG_TO_RAD`, a float.
+pub const DEG_TO_RAD: f32 = (std::f64::consts::PI / 180.0) as f32;
+
 /// Vanilla `Mth.atan2`: a table lookup refined by a short series, which rounds differently from
 /// the exact `f64::atan2`. Mobs turn by it, so rotations must use this one.
 #[must_use]

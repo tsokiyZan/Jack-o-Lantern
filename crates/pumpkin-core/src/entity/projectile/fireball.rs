@@ -1,3 +1,4 @@
+use pumpkin_data::tag::Taggable;
 use std::sync::RwLock;
 use std::sync::atomic::Ordering;
 
@@ -170,6 +171,13 @@ impl FireballEntity {
 }
 
 impl EntityBase for FireballEntity {
+    /// Vanilla `Projectile.isPickable`: only redirectable projectiles.
+    fn can_hit(&self) -> bool {
+        self.get_entity()
+            .entity_type
+            .has_tag(&pumpkin_data::tag::EntityType::MINECRAFT_REDIRECTABLE_PROJECTILE)
+    }
+
     fn get_owner_id(&self) -> Option<i32> {
         self.fireball.hurting.get_owner_id()
     }

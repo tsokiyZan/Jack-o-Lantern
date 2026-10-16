@@ -97,8 +97,10 @@ impl PlayerDataStorage {
         };
 
         match pumpkin_nbt::nbt_compress::read_gzip_compound_tag(file) {
-            Ok(nbt) => {
+            Ok(mut nbt) => {
                 debug!("Loaded player data for {uuid} from disk");
+                let data_version = crate::data_fix::data_version(&nbt);
+                crate::data_fix::upgrade_item_stacks(&mut nbt, data_version);
                 Ok((true, nbt))
             }
             Err(e) => {

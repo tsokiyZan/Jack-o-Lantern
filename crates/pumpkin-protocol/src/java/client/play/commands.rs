@@ -233,7 +233,7 @@ pub enum ArgumentType {
     ResourceOrTagKey { identifier: Identifier },
     Resource { identifier: Identifier },
     ResourceKey { identifier: Identifier },
-    ResourceSelector,
+    ResourceSelector { identifier: Identifier },
     TemplateMirror,
     TemplateRotation,
     Heightmap,
@@ -411,6 +411,9 @@ impl ArgumentType {
                 }
                 Self::Resource { identifier } => Self::write_with_identifier(identifier, write),
                 Self::ResourceKey { identifier } => Self::write_with_identifier(identifier, write),
+                Self::ResourceSelector { identifier } => {
+                    Self::write_with_identifier(identifier, write)
+                }
                 _ => Ok(()),
             }
         } else {

@@ -253,7 +253,6 @@ impl<'a, S: CommandSource> ContextChain<'a, S> {
     pub fn run_modifier(
         modifier: &CommandContext<'a, S>,
         source: &Arc<S>,
-        result_consumer: &dyn ResultConsumer<S>,
         forked_mode: bool,
     ) -> Result<Vec<Arc<S>>, CommandSyntaxError> {
         let source_modifier = &modifier.modifier;
@@ -265,16 +264,13 @@ impl<'a, S: CommandSource> ContextChain<'a, S> {
             return Ok(vec![source.clone()]);
         }
 
+        // Vanilla BuildContexts runs modifiers with an empty result consumer, so a failing
+        // modifier never reaches the source's callbacks.
         let context_to_use = modifier.with_source(source.clone());
-        let mut result = source_modifier.sources(&context_to_use);
-
-        if result.is_err() {
-            result_consumer.on_command_completion(&context_to_use, ReturnValue::Failure);
-            if forked_mode {
-                result = Ok(vec![]);
-            }
+        let result = source_modifier.sources(&context_to_use);
+        if result.is_err() && forked_mode {
+            return Ok(vec![]);
         }
-
         result
     }
 
@@ -335,8 +331,7 @@ impl<'a, S: CommandSource> ContextChain<'a, S> {
 
             let mut next_sources = Vec::new();
             for source in current_sources {
-                let mut to_add =
-                    Self::run_modifier(modifier, &source, result_consumer, modifiers.is_forked())?;
+                let mut to_add = Self::run_modifier(modifier, &source, modifiers.is_forked())?;
                 next_sources.append(&mut to_add);
             }
             current_sources = next_sources;

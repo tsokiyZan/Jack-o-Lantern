@@ -572,9 +572,7 @@ impl EntitySelectorPredicate {
                 true
             }
             Self::Nbt(expected_nbt, invert) => {
-                let mut actual_nbt = NbtCompound::default();
-                entity.write_nbt(&mut actual_nbt);
-                matches_nbt_compound(expected_nbt, &actual_nbt) ^ invert
+                matches_nbt_compound(expected_nbt, &entity.tag_to_compare()) ^ invert
             }
             Self::Predicate(_predicate_id, invert) => {
                 // Since loot-table predicates are not yet fully implemented, we default to false (or true ^ invert)

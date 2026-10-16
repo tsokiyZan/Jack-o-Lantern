@@ -18,6 +18,9 @@ use crate::command::node::dispatcher::CommandDispatcher;
 use crate::command::node::{CommandExecutor, CommandExecutorResult};
 
 const DESCRIPTION: &str = "Manages the world border.";
+
+/// Vanilla `WorldBorder.MAX_SIZE`, a float literal widened to double.
+const MAX_SIZE: f64 = 5.999_997e7f32 as f64;
 const PERMISSION: &str = "minecraft:command.worldborder";
 
 const ERROR_SAME_CENTER: CommandErrorType<0> = CommandErrorType::new(
@@ -76,7 +79,7 @@ fn set_size(
         if distance < 1.0 {
             return Err(ERROR_TOO_SMALL.create_without_context());
         }
-        if distance > 5.999_997e7 {
+        if distance > MAX_SIZE {
             return Err(ERROR_TOO_BIG.create_without_context());
         }
 
@@ -382,38 +385,32 @@ pub fn register(dispatcher: &mut CommandDispatcher, registry: &PermissionRegistr
             .requires(PERMISSION)
             .then(
                 literal("add").then(
-                    argument(
-                        "distance",
-                        DoubleArgumentType::new(-5.999_997e7, 5.999_997e7),
-                    )
-                    .executes(SetSizeExecutor {
-                        is_add: true,
-                        has_time: false,
-                    })
-                    .then(
-                        argument("time", TimeArgumentType::new(0)).executes(SetSizeExecutor {
+                    argument("distance", DoubleArgumentType::new(-MAX_SIZE, MAX_SIZE))
+                        .executes(SetSizeExecutor {
                             is_add: true,
-                            has_time: true,
-                        }),
-                    ),
+                            has_time: false,
+                        })
+                        .then(argument("time", TimeArgumentType::new(0)).executes(
+                            SetSizeExecutor {
+                                is_add: true,
+                                has_time: true,
+                            },
+                        )),
                 ),
             )
             .then(
                 literal("set").then(
-                    argument(
-                        "distance",
-                        DoubleArgumentType::new(-5.999_997e7, 5.999_997e7),
-                    )
-                    .executes(SetSizeExecutor {
-                        is_add: false,
-                        has_time: false,
-                    })
-                    .then(
-                        argument("time", TimeArgumentType::new(0)).executes(SetSizeExecutor {
+                    argument("distance", DoubleArgumentType::new(-MAX_SIZE, MAX_SIZE))
+                        .executes(SetSizeExecutor {
                             is_add: false,
-                            has_time: true,
-                        }),
-                    ),
+                            has_time: false,
+                        })
+                        .then(argument("time", TimeArgumentType::new(0)).executes(
+                            SetSizeExecutor {
+                                is_add: false,
+                                has_time: true,
+                            },
+                        )),
                 ),
             )
             .then(

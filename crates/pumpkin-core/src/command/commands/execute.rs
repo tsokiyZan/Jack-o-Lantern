@@ -22,10 +22,12 @@ use crate::command::argument_types::coordinates::block_pos::BlockPosArgumentType
 use crate::command::argument_types::coordinates::rotation::RotationArgumentType;
 use crate::command::argument_types::coordinates::swizzle::SwizzleArgumentType;
 use crate::command::argument_types::coordinates::vec3::Vec3ArgumentType;
-use crate::command::argument_types::core::string::StringArgumentType;
+use crate::command::argument_types::core::double::DoubleArgumentType;
+use crate::command::argument_types::dimension::{DIMENSION_REGISTRY, DimensionArgumentType};
 use crate::command::argument_types::entity::EntityArgumentType;
 use crate::command::argument_types::entity_anchor::{EntityAnchorArgumentType, EntityAnchorExt};
 use crate::command::argument_types::function::FunctionArgumentType;
+use crate::command::argument_types::heightmap::HeightmapTypeArgumentType;
 use crate::command::argument_types::identifier::IdentifierArgumentType;
 use crate::command::argument_types::nbt_path::{NbtPath, NbtPathArgumentType};
 use crate::command::argument_types::objective::ObjectiveArgumentType;
@@ -34,8 +36,9 @@ use crate::command::argument_types::resource::{ENTITY_TYPE_ARGUMENT, ResourceArg
 use crate::command::argument_types::resource_key::{BIOME_REGISTRY, ResourceKeyArgument};
 use crate::command::argument_types::resource_or_tag::{ResourceOrTag, ResourceOrTagArgument};
 use crate::command::argument_types::score_holder::ScoreHolderArgumentType;
+use crate::command::commands::bossbar::{BossbarIdArgumentType, handle_bossbar_error};
 use crate::command::commands::data::{
-    BlockDataAccessor, DataAccessor, EntityDataAccessor, StorageDataAccessor,
+    BlockDataAccessor, DataAccessor, EntityDataAccessor, StorageDataAccessor, TargetKind,
 };
 use crate::command::commands::fill::matches_filter;
 use crate::command::commands::function::{
@@ -52,10 +55,13 @@ use crate::data::datapack::DatapackManager;
 use crate::entity::EntityBase;
 use crate::entity::r#type::from_type;
 use crate::world::World;
+use crate::world::custom_bossbar::BossbarUpdateError;
 use crate::world::scoreboard::Scoreboard;
 use crate::world::stopwatches::Stopwatches;
+use pumpkin_command::argument_types::coordinates::block_pos::NOT_LOADED_ERROR_TYPE;
 use pumpkin_command::execution;
 use pumpkin_command::source::ResultValueTaker;
+use pumpkin_command::source::ReturnValue;
 use pumpkin_data::biome::Biome;
 use pumpkin_data::tag::{self, RegistryKey};
 use pumpkin_data::{BlockId, translation};
@@ -93,8 +99,6 @@ const ERROR_CONDITIONAL_FAILED_COUNT: CommandErrorType<1> = CommandErrorType::ne
     translation::java::COMMANDS_EXECUTE_CONDITIONAL_FAIL_COUNT,
     translation::java::COMMANDS_EXECUTE_CONDITIONAL_FAIL_COUNT,
 );
-
-static DIMENSION_REGISTRY: &Identifier = &Identifier::vanilla_static("dimension");
 
 fn execute_as_modifier(context: &CommandContext) -> crate::command::node::RedirectModifierResult {
     let targets = EntityArgumentType::get_optional_entities(context, "targets")?;
@@ -157,15 +161,18 @@ fn execute_positioned_as_modifier(
 fn execute_positioned_over_modifier(
     context: &CommandContext,
 ) -> crate::command::node::RedirectModifierResult {
+    let heightmap = HeightmapTypeArgumentType::get(context, "heightmap")?;
     let mut source = context.source.as_ref().clone();
     let pos = source.position;
-    let block_x = pos.x.floor() as i32;
-    let block_z = pos.z.floor() as i32;
-
-    if let Some(ref world) = source.world {
-        let top_y = world.get_top_block(Vector2::new(block_x, block_z));
-        source.position.y = (top_y + 1) as f64;
+    let world = context.world();
+    let (block_x, block_z) = (pos.x.floor() as i32, pos.z.floor() as i32);
+    if !world
+        .level
+        .is_chunk_loaded(&Vector2::new(block_x >> 4, block_z >> 4))
+    {
+        return Err(NOT_LOADED_ERROR_TYPE.create_without_context());
     }
+    source.position.y = f64::from(world.get_height(heightmap, block_x, block_z));
     Ok(vec![Arc::new(source)])
 }
 
@@ -592,6 +599,204 @@ fn add_numeric_conditional(
         })
 }
 
+/// Builds the tag `execute store` writes from the value and the scale.
+type StoredTag = fn(i32, f64) -> NbtTag;
+
+/// The value vanilla `execute store` writes: the result, or 1/0 for success.
+const fn stored_value(store_result: bool, result: ReturnValue) -> i32 {
+    if store_result {
+        result.result_value()
+    } else {
+        result.success_value() as i32
+    }
+}
+
+/// Vanilla `CommandSourceStack.withCallback(callback, CommandResultCallback::chain)`.
+fn with_store_callback(
+    context: &CommandContext,
+    callback: impl Fn(ReturnValue) + Send + Sync + 'static,
+) -> Vec<Arc<CommandSource>> {
+    vec![Arc::new(
+        context
+            .source
+            .as_ref()
+            .clone()
+            .merge_command_result_taker(&ResultValueTaker::from_fn(callback)),
+    )]
+}
+
+/// Vanilla `ExecuteCommand.storeValue` for scores.
+fn store_score(
+    context: &CommandContext,
+    store_result: bool,
+) -> Result<Vec<Arc<CommandSource>>, CommandSyntaxError> {
+    let holders = ScoreHolderArgumentType::get_score_holders(context, "targets")?;
+    let objective = ObjectiveArgumentType::get(context, "objective")?.to_string();
+    let world = context.world().clone();
+    ObjectiveArgumentType::objective_or_error(
+        &world
+            .scoreboard
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
+        &objective,
+    )?;
+    Ok(with_store_callback(context, move |result| {
+        let value = stored_value(store_result, result);
+        let mut scoreboard = world
+            .scoreboard
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        for holder in &holders {
+            scoreboard.set_score_value(
+                world.as_ref(),
+                holder.name.clone(),
+                objective.clone(),
+                value,
+            );
+        }
+    }))
+}
+
+/// Vanilla `ExecuteCommand.storeValue` for boss bars.
+fn store_bossbar(
+    context: &CommandContext,
+    store_into_value: bool,
+    store_result: bool,
+) -> Result<Vec<Arc<CommandSource>>, CommandSyntaxError> {
+    let id = BossbarIdArgumentType::get(context, "id")?;
+    let server = context.server().clone();
+    if !server
+        .bossbars
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .has_bossbar(&id)
+    {
+        return Err(handle_bossbar_error(
+            BossbarUpdateError::InvalidResourceLocation(id),
+        ));
+    }
+    Ok(with_store_callback(context, move |result| {
+        let value = stored_value(store_result, result);
+        let mut bossbars = server
+            .bossbars
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        // An unchanged value is not an error here; the boss bar just keeps it.
+        let _ = if store_into_value {
+            bossbars.update_value(&server, id.clone(), value)
+        } else {
+            bossbars.update_max(&server, id.clone(), value)
+        };
+    }))
+}
+
+/// Vanilla `ExecuteCommand.storeData`.
+fn store_data(
+    context: &CommandContext,
+    target: TargetKind,
+    constructor: StoredTag,
+    store_result: bool,
+) -> Result<Vec<Arc<CommandSource>>, CommandSyntaxError> {
+    let accessor: Arc<dyn DataAccessor> = match target {
+        TargetKind::Entity => Arc::new(EntityDataAccessor::new(EntityArgumentType::get_entity(
+            context, "target",
+        )?)),
+        TargetKind::Block => Arc::new(BlockDataAccessor::new(
+            BlockPosArgumentType::get_loaded_block_pos(context, "target")?,
+            context.world().clone(),
+        )?),
+        TargetKind::Storage => Arc::new(StorageDataAccessor::new(
+            context.get_argument::<Identifier>("target")?.to_string(),
+            context.server().clone(),
+        )),
+    };
+    let path = NbtPathArgumentType::get(context, "path")?.clone();
+    let scale = DoubleArgumentType::get(context, "scale")?;
+    Ok(with_store_callback(context, move |result| {
+        let Ok(data) = accessor.get_data() else {
+            return;
+        };
+        let mut data = NbtTag::Compound(data);
+        let value = stored_value(store_result, result);
+        if path.set(&mut data, constructor(value, scale)).is_ok()
+            && let NbtTag::Compound(data) = data
+        {
+            let _ = accessor.set_data(&data);
+        }
+    }))
+}
+
+/// Vanilla `ExecuteCommand.wrapStores`.
+fn wrap_stores(parent: LiteralArgumentBuilder, store_result: bool) -> LiteralArgumentBuilder {
+    let bossbar = |store_into_value: bool| {
+        RedirectModifier::Custom(Arc::new(move |context: &CommandContext| {
+            store_bossbar(context, store_into_value, store_result)
+        }))
+    };
+    let data_types: [(&str, StoredTag); 6] = [
+        ("int", |v, scale| NbtTag::Int((f64::from(v) * scale) as i32)),
+        ("float", |v, scale| {
+            NbtTag::Float((f64::from(v) * scale) as f32)
+        }),
+        // Java narrows double to int first, then int to short or byte.
+        ("short", |v, scale| {
+            NbtTag::Short((f64::from(v) * scale) as i32 as i16)
+        }),
+        ("long", |v, scale| {
+            NbtTag::Long((f64::from(v) * scale) as i64)
+        }),
+        ("double", |v, scale| NbtTag::Double(f64::from(v) * scale)),
+        ("byte", |v, scale| {
+            NbtTag::Byte((f64::from(v) * scale) as i32 as i8)
+        }),
+    ];
+    let data_path = |target: TargetKind| {
+        let mut path = argument("path", NbtPathArgumentType);
+        for (name, constructor) in data_types {
+            path = path.then(literal(name).then(
+                argument("scale", DoubleArgumentType::any()).redirect_with_modifier(
+                    Redirection::Root,
+                    RedirectModifier::Custom(Arc::new(move |context: &CommandContext| {
+                        store_data(context, target, constructor, store_result)
+                    })),
+                ),
+            ));
+        }
+        path
+    };
+
+    parent
+        .then(
+            literal("score").then(argument("targets", ScoreHolderArgumentType::Multiple).then(
+                argument("objective", ObjectiveArgumentType).redirect_with_modifier(
+                    Redirection::Root,
+                    RedirectModifier::Custom(Arc::new(move |context: &CommandContext| {
+                        store_score(context, store_result)
+                    })),
+                ),
+            )),
+        )
+        .then(
+            literal("bossbar").then(
+                argument("id", BossbarIdArgumentType)
+                    .then(literal("value").redirect_with_modifier(Redirection::Root, bossbar(true)))
+                    .then(literal("max").redirect_with_modifier(Redirection::Root, bossbar(false))),
+            ),
+        )
+        .then(literal("entity").then(
+            argument("target", EntityArgumentType::Entity).then(data_path(TargetKind::Entity)),
+        ))
+        .then(
+            literal("block")
+                .then(argument("target", BlockPosArgumentType).then(data_path(TargetKind::Block))),
+        )
+        .then(
+            literal("storage").then(
+                argument("target", IdentifierArgumentType).then(data_path(TargetKind::Storage)),
+            ),
+        )
+}
+
 /// Vanilla `ExecuteCommand.scheduleFunctionConditionsAndTest` for one source: the functions
 /// run in an isolated frame, and the source passes on when their return value matches.
 fn execute_if_function(
@@ -663,7 +868,13 @@ fn check_biome(context: &CommandContext) -> Result<bool, CommandSyntaxError> {
     let world = context.source.world();
     let biome =
         world.get_zoomed_biome(&BlockPosArgumentType::get_loaded_block_pos(context, "pos")?);
-    Ok(match biome_arg {
+    Ok(biome_matches(biome_arg, biome))
+}
+
+/// Whether `biome` is the biome or in the tag a biome `resource_or_tag` argument names.
+#[must_use]
+pub fn biome_matches(biome_arg: &ResourceOrTag, biome: &Biome) -> bool {
+    match biome_arg {
         ResourceOrTag::Resource(id) => {
             Biome::from_name(id.path()).is_some_and(|b| b.id == biome.id)
         }
@@ -674,7 +885,7 @@ fn check_biome(context: &CommandContext) -> Result<bool, CommandSyntaxError> {
                     .filter_map(|name| Biome::from_name(name))
                     .any(|b| b.id == biome.id)
             }),
-    })
+    }
 }
 
 fn check_loaded(context: &CommandContext) -> Result<bool, CommandSyntaxError> {
@@ -956,7 +1167,7 @@ fn add_conditionals(parent: LiteralArgumentBuilder, expected: bool) -> LiteralAr
             check_loaded,
         )))
         .then(literal("dimension").then(add_conditional(
-            argument("dimension", ResourceKeyArgument(DIMENSION_REGISTRY)),
+            argument("dimension", DimensionArgumentType),
             expected,
             check_dimension,
         )))
@@ -1043,6 +1254,11 @@ pub fn register(dispatcher: &mut CommandDispatcher, registry: &PermissionRegistr
         .requires(PERMISSION)
         .then(literal("run").redirect(Redirection::Root))
         .then(
+            literal("store")
+                .then(wrap_stores(literal("result"), true))
+                .then(wrap_stores(literal("success"), false)),
+        )
+        .then(
             literal("as").then(argument("targets", EntityArgumentType::Entities).fork(
                 Redirection::Root,
                 RedirectModifier::Custom(Arc::new(execute_as_modifier)),
@@ -1055,7 +1271,7 @@ pub fn register(dispatcher: &mut CommandDispatcher, registry: &PermissionRegistr
             )),
         )
         .then(literal("in").then(
-            argument("dimension", ResourceKeyArgument(DIMENSION_REGISTRY)).redirect_with_modifier(
+            argument("dimension", DimensionArgumentType).redirect_with_modifier(
                 Redirection::Root,
                 RedirectModifier::Custom(Arc::new(execute_in_modifier)),
             ),
@@ -1069,7 +1285,7 @@ pub fn register(dispatcher: &mut CommandDispatcher, registry: &PermissionRegistr
                     )),
                 )
                 .then(literal("over").then(
-                    argument("heightmap", StringArgumentType::SingleWord).redirect_with_modifier(
+                    argument("heightmap", HeightmapTypeArgumentType).redirect_with_modifier(
                         Redirection::Root,
                         RedirectModifier::Custom(Arc::new(execute_positioned_over_modifier)),
                     ),

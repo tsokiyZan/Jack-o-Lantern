@@ -16,6 +16,67 @@ pub mod player_server;
 pub mod usercache;
 pub mod whitelist;
 
+/// Moves what Pumpkin saved under its old offline UUID for `name` to the vanilla one.
+///
+/// Covers player data, advancements, and operator, whitelist and ban entries. Data already
+/// saved under the vanilla UUID is kept.
+pub fn migrate_legacy_offline_uuid(server: &crate::server::Server, name: &str, uuid: uuid::Uuid) {
+    let legacy = crate::net::legacy_offline_uuid(name);
+    let move_file = |dir: &Path, extension: &str| {
+        let from = dir.join(format!("{legacy}.{extension}"));
+        let to = dir.join(format!("{uuid}.{extension}"));
+        if from.exists() && !to.exists() {
+            match fs::rename(&from, &to) {
+                Ok(()) => tracing::info!(
+                    "Moved {} to the vanilla offline UUID of {name}",
+                    from.display()
+                ),
+                Err(error) => warn!("Failed to move {}: {error}", from.display()),
+            }
+        }
+    };
+    move_file(server.player_data_storage.data_path(), "dat");
+    move_file(&server.advancement_manager.advancement_path, "json");
+
+    let mut ops = server
+        .data
+        .operator_config
+        .write()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if let Some(op) = ops.ops.iter_mut().find(|op| op.uuid == legacy) {
+        op.uuid = uuid;
+        ops.save();
+    }
+    drop(ops);
+    let mut whitelist = server
+        .data
+        .whitelist_config
+        .write()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if let Some(entry) = whitelist
+        .whitelist
+        .iter_mut()
+        .find(|entry| entry.uuid == legacy)
+    {
+        entry.uuid = uuid;
+        whitelist.save();
+    }
+    drop(whitelist);
+    let mut bans = server
+        .data
+        .banned_player_list
+        .write()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if let Some(entry) = bans
+        .banned_players
+        .iter_mut()
+        .find(|entry| entry.uuid == legacy)
+    {
+        entry.uuid = uuid;
+        bans.save();
+    }
+}
+
 pub struct VanillaData {
     pub banned_ip_list: RwLock<banned_ip::BannedIpList>,
     pub banned_player_list: RwLock<banned_player::BannedPlayerList>,

@@ -201,8 +201,20 @@ pub trait EntityBase: Send + Sync + std::any::Any {
         self.get_entity().write_nbt(nbt);
         if let Some(living) = self.get_living_entity() {
             living.write_living_nbt(nbt);
+        } else {
+            // Vanilla `saveWithoutId` writes `Air` for every entity; only living ones use it.
+            nbt.put_short("Air", breath::MAX_AIR as i16);
         }
         self.write_custom_nbt(nbt);
+    }
+
+    /// Vanilla `NbtPredicate.getEntityTagToCompare`: the save without `id`, which `/data`
+    /// and `nbt=` selectors read.
+    fn tag_to_compare(&self) -> NbtCompound {
+        let mut nbt = NbtCompound::new();
+        self.write_nbt(&mut nbt);
+        nbt.child_tags.remove("id");
+        nbt
     }
 
     fn write_custom_nbt(&self, _nbt: &mut NbtCompound) {}
@@ -505,6 +517,14 @@ pub trait EntityBase: Send + Sync + std::any::Any {
     /// Vanilla `isPickable`: `false` for `Entity`, "not removed" for `LivingEntity`.
     fn can_hit(&self) -> bool {
         self.get_living_entity().is_some() && !self.get_entity().is_removed()
+    }
+
+    /// Vanilla `canBeHitByProjectile`: alive and pickable.
+    fn can_be_hit_by_projectile(&self) -> bool {
+        let alive = self
+            .get_living_entity()
+            .map_or_else(|| self.get_entity().is_alive(), LivingEntity::is_alive);
+        alive && self.can_hit()
     }
 
     fn is_flutterer(&self) -> bool {
@@ -1258,6 +1278,10 @@ pub struct Entity {
     pub last_sent_velocity: AtomicCell<Vector3<f64>>,
     /// Persistent custom data container for plugins
     pub custom_data: std::sync::Mutex<NbtCompound>,
+    /// Vanilla `customData`, saved as `data`.
+    pub entity_custom_data: std::sync::Mutex<NbtCompound>,
+    /// Vanilla `hasGlowingTag`, saved as `Glowing`; the glowing effect is separate.
+    pub has_glowing_tag: AtomicBool,
 }
 
 impl Entity {
@@ -1394,6 +1418,8 @@ impl Entity {
             last_sent_pos: AtomicCell::new(position),
             last_sent_velocity: AtomicCell::new(Vector3::default()),
             custom_data: std::sync::Mutex::new(NbtCompound::new()),
+            entity_custom_data: std::sync::Mutex::new(NbtCompound::new()),
+            has_glowing_tag: AtomicBool::new(false),
         }
     }
 
@@ -4900,7 +4926,13 @@ impl Entity {
         if self.has_visual_fire.load(Relaxed) {
             nbt.put_bool("HasVisualFire", true);
         }
-        nbt.put_int("TicksFrozen", self.frozen_ticks.load(Relaxed));
+        let ticks_frozen = self.frozen_ticks.load(Relaxed);
+        if ticks_frozen > 0 {
+            nbt.put_int("TicksFrozen", ticks_frozen);
+        }
+        if self.has_glowing_tag.load(Relaxed) {
+            nbt.put_bool("Glowing", true);
+        }
         if let Some(custom_name) = &**self.custom_name.load() {
             let mut tag = custom_name
                 .to_nbt_tag_for_version(&pumpkin_util::version::JavaMinecraftVersion::V_26_3);
@@ -4914,7 +4946,9 @@ impl Entity {
             }
             nbt.put("CustomName", tag);
         }
-        nbt.put_bool("CustomNameVisible", self.custom_name_visible.load(Relaxed));
+        if self.custom_name_visible.load(Relaxed) {
+            nbt.put_bool("CustomNameVisible", true);
+        }
 
         let tags = self
             .scoreboard_tags
@@ -4931,6 +4965,15 @@ impl Entity {
             );
         }
 
+        let data = self
+            .entity_custom_data
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if !data.is_empty() {
+            nbt.put_compound("data", data.clone());
+        }
+        drop(data);
+
         let custom_data = self
             .custom_data
             .lock()
@@ -4940,6 +4983,21 @@ impl Entity {
         }
 
         // todo more...
+    }
+
+    /// Vanilla `Entity.load`'s `Glowing` and `data`.
+    fn read_glowing_and_custom_data(&self, nbt: &NbtCompound) {
+        if let Some(glowing) = nbt.get_bool("Glowing") {
+            // `setGlowingTag`: the shared flag follows the tag on the server.
+            self.has_glowing_tag.store(glowing, Relaxed);
+            self.set_glowing(glowing);
+        }
+        if let Some(data) = nbt.get_compound("data") {
+            *self
+                .entity_custom_data
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) = data.clone();
+        }
     }
 
     pub fn read_nbt_non_mut(&self, nbt: &NbtCompound) {
@@ -5007,6 +5065,7 @@ impl Entity {
         if let Some(frozen) = nbt.get_int("TicksFrozen") {
             self.frozen_ticks.store(frozen, Relaxed);
         }
+        self.read_glowing_and_custom_data(nbt);
         if let Some(name) = nbt.get("CustomName") {
             // Vanilla stores a text component tag; a string is literal text. Older
             // Pumpkin saves hold a JSON string (same data version, so it can't be told

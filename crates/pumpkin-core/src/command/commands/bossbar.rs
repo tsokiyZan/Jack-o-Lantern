@@ -189,7 +189,7 @@ fn bossbar_prefix(title: TextComponent, namespace: String) -> TextComponent {
         .hover_event(HoverEvent::show_text(TextComponent::text(namespace)))
 }
 
-fn handle_bossbar_error(error: BossbarUpdateError) -> CommandSyntaxError {
+pub fn handle_bossbar_error(error: BossbarUpdateError) -> CommandSyntaxError {
     match error {
         BossbarUpdateError::InvalidResourceLocation(location) => {
             ERROR_UNKNOWN_BOSSBAR.create_without_context(TextComponent::text(location))

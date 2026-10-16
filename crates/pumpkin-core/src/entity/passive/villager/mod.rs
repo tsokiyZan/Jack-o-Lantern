@@ -2007,15 +2007,17 @@ impl Mob for VillagerEntity {
             .inventory
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        if !inventory.is_empty() {
-            let mut inventory_list = Vec::new();
-            for item in inventory.iter() {
+        // Vanilla `SimpleContainer.storeAsItemList`: empty slots are left out.
+        let inventory_list = inventory
+            .iter()
+            .filter(|item| !item.is_empty())
+            .map(|item| {
                 let mut item_compound = NbtCompound::new();
                 item.write_item_stack(&mut item_compound);
-                inventory_list.push(NbtTag::Compound(item_compound));
-            }
-            nbt.put("Inventory", NbtTag::List(inventory_list));
-        }
+                NbtTag::Compound(item_compound)
+            })
+            .collect();
+        nbt.put("Inventory", NbtTag::List(inventory_list));
 
         let gossips = self
             .gossips
@@ -2164,12 +2166,28 @@ impl Mob for VillagerEntity {
                 .inventory
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
-            inventory.clear();
+            // Vanilla `SimpleContainer.fromItemList`: clear the slots, then `addItem` each stack.
+            for slot in inventory.iter_mut() {
+                *slot = ItemStack::EMPTY.clone();
+            }
             for tag in inventory_list {
                 if let Some(item_compound) = tag.extract_compound()
-                    && let Some(stack) = ItemStack::read_item_stack(item_compound)
+                    && let Some(mut stack) = ItemStack::read_item_stack(item_compound)
                 {
-                    inventory.push(stack);
+                    for slot in inventory.iter_mut() {
+                        if !slot.is_empty() && slot.are_items_and_components_equal(&stack) {
+                            let moved = stack
+                                .item_count
+                                .min(slot.get_max_stack_size().saturating_sub(slot.item_count));
+                            slot.item_count += moved;
+                            stack.item_count -= moved;
+                        }
+                    }
+                    if stack.item_count > 0
+                        && let Some(slot) = inventory.iter_mut().find(|slot| slot.is_empty())
+                    {
+                        *slot = stack;
+                    }
                 }
             }
         }

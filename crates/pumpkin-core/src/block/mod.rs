@@ -510,50 +510,6 @@ pub struct BlockEvent {
     pub data: u8,
 }
 
-/// Vanilla `BlockState.CODEC` (26.3: `{id, properties}`), for entity data such as an
-/// enderman's carried block.
-#[must_use]
-pub fn write_block_state_nbt(state_id: BlockStateId) -> pumpkin_nbt::compound::NbtCompound {
-    let block = Block::from_state_id(state_id);
-    let mut nbt = pumpkin_nbt::compound::NbtCompound::new();
-    nbt.put_string("id", format!("minecraft:{}", block.name));
-    if let Some(props) = block.properties(state_id) {
-        let props = props.to_props();
-        if !props.is_empty() {
-            let mut props_nbt = pumpkin_nbt::compound::NbtCompound::new();
-            for (key, value) in props {
-                props_nbt.put_string(key, value.to_string());
-            }
-            nbt.put_compound("properties", props_nbt);
-        }
-    }
-    nbt
-}
-
-/// Reads [`write_block_state_nbt`]'s format; unknown blocks are `None`, missing or unknown
-/// property values fall back to the block's defaults.
-#[must_use]
-pub fn read_block_state_nbt(nbt: &pumpkin_nbt::compound::NbtCompound) -> Option<BlockStateId> {
-    let block = Block::from_name(nbt.get_string("id")?)?;
-    let has_properties = block.properties(block.default_state.id).is_some();
-    let Some(props_nbt) = nbt.get_compound("properties").filter(|_| has_properties) else {
-        return Some(block.default_state.id);
-    };
-    let props: Vec<(String, String)> = props_nbt
-        .child_tags
-        .iter()
-        .filter_map(|(key, value)| match value {
-            pumpkin_nbt::tag::NbtTag::String(value) => Some((key.to_string(), value.to_string())),
-            _ => None,
-        })
-        .collect();
-    let props: Vec<(&str, &str)> = props
-        .iter()
-        .map(|(k, v)| (k.as_str(), v.as_str()))
-        .collect();
-    Some(block.from_properties(&props).to_state_id(block))
-}
-
 pub fn drop_loot(
     world: &Arc<World>,
     block: &Block,

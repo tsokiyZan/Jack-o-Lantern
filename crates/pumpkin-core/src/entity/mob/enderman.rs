@@ -5,7 +5,7 @@ use std::sync::{
 
 use crate::entity::attributes::Modifier;
 use crate::entity::attributes::ModifierOperation;
-use pumpkin_data::{BlockStateId, attributes::Attributes};
+use pumpkin_data::{Block, BlockStateId, attributes::Attributes};
 
 use crossbeam::atomic::AtomicCell;
 use pumpkin_data::{
@@ -17,7 +17,7 @@ use pumpkin_data::{
     tag,
     tag::Taggable,
 };
-use pumpkin_nbt::compound::NbtCompound;
+use pumpkin_nbt::{compound::NbtCompound, tag::NbtTag};
 use pumpkin_protocol::codec::var_int::VarInt;
 use pumpkin_util::math::{boundingbox::BoundingBox, position::BlockPos, vector3::Vector3};
 use rand::RngExt;
@@ -433,21 +433,17 @@ impl Mob for EndermanEntity {
     fn mob_write_nbt(&self, nbt: &mut NbtCompound) {
         // Vanilla `BlockState.CODEC`.
         if let Some(block_state) = self.carried_block.load() {
-            nbt.put_compound(
-                "carriedBlockState",
-                crate::block::write_block_state_nbt(block_state),
-            );
+            nbt.put("carriedBlockState", Block::state_to_nbt(block_state));
         }
     }
 
     fn mob_read_nbt(&self, nbt: &NbtCompound) {
         // Vanilla `BlockState.CODEC`, air read as nothing; older Pumpkin saves held a raw id.
         let carried = nbt
-            .get_compound("carriedBlockState")
-            .and_then(crate::block::read_block_state_nbt)
-            .or_else(|| {
-                nbt.get_int("carriedBlockState")
-                    .and_then(|id| BlockStateId::new(id as u16))
+            .get("carriedBlockState")
+            .and_then(|tag| match tag {
+                NbtTag::Int(id) => BlockStateId::new(*id as u16),
+                tag => Block::state_from_nbt(tag),
             })
             .filter(|state| !pumpkin_data::BlockState::from_id(*state).is_air());
         self.set_carried_block(carried);

@@ -2811,6 +2811,38 @@ impl World {
             .unwrap_or(self.dimension.min_y)
     }
 
+    /// Vanilla `Level.getHeight(type, x, z)`: the y just above the column's highest block
+    /// matching the heightmap.
+    pub fn get_height(
+        &self,
+        heightmap: crate::command::argument_types::heightmap::HeightmapType,
+        x: i32,
+        z: i32,
+    ) -> i32 {
+        use crate::command::argument_types::heightmap::HeightmapType;
+        let tracked = match heightmap {
+            HeightmapType::WorldSurface => ChunkHeightmapType::WorldSurface,
+            HeightmapType::MotionBlocking => ChunkHeightmapType::MotionBlocking,
+            HeightmapType::MotionBlockingNoLeaves => ChunkHeightmapType::MotionBlockingNoLeaves,
+            HeightmapType::OceanFloor => {
+                // Chunks keep no OCEAN_FLOOR heightmap here, so scan for its
+                // MATERIAL_MOTION_BLOCKING predicate below the surface.
+                let surface = self.get_heightmap_height(ChunkHeightmapType::WorldSurface, x, z);
+                return (self.dimension.min_y..=surface)
+                    .rev()
+                    .find(|&y| {
+                        let state = self.get_block_state(&BlockPos::new(x, y, z));
+                        pumpkin_data::block_properties::blocks_movement(
+                            state,
+                            state.id.to_block_id(),
+                        )
+                    })
+                    .map_or(self.dimension.min_y, |y| y + 1);
+            }
+        };
+        self.get_heightmap_height(tracked, x, z) + 1
+    }
+
     pub fn get_heightmap_height(&self, height_map: ChunkHeightmapType, x: i32, z: i32) -> i32 {
         let chunk_pos = Vector2::new(x >> 4, z >> 4);
         self.level

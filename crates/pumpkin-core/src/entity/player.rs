@@ -366,8 +366,6 @@ fn read_root_vehicle(nbt: &NbtCompound) -> Option<Uuid> {
     ))
 }
 
-pub const DATA_VERSION: i32 = 4903; // 26.2
-
 /// Food exhaustion applied for every block a player mines.
 ///
 /// Vanilla: `Block#playerDestroy` calls `player.causeFoodExhaustion(0.005F)`.
@@ -7344,7 +7342,7 @@ impl EntityBase for Player {
 
     /// Writes player-only tags.
     fn write_custom_nbt(&self, nbt: &mut NbtCompound) {
-        nbt.put_int("DataVersion", DATA_VERSION);
+        nbt.put_int("DataVersion", pumpkin_world::world_info::WORLD_VERSION);
         self.inventory.write_nbt(nbt);
         self.ender_chest_inventory.write_nbt(nbt);
 

@@ -1,6 +1,5 @@
 use pumpkin_data::BlockStateId;
 use pumpkin_data::biome::Biome;
-use pumpkin_data::block_properties::HorizontalAxis;
 use pumpkin_data::dimension::Dimension;
 use pumpkin_data::fluid::Fluid;
 use pumpkin_data::tag::{self, Taggable};
@@ -19,7 +18,6 @@ use crate::block::{
     OnEntityCollisionArgs, OnScheduledTickArgs, PlacedArgs,
 };
 use crate::world::World;
-use crate::world::portal::nether::NetherPortal;
 
 type FireProperties = pumpkin_data::block_properties::FireLikeProperties;
 
@@ -194,22 +192,21 @@ impl FireBlock {
 }
 
 impl BlockBehaviour for FireBlock {
+    /// Vanilla `FireBlock.onPlace`: `BaseFireBlock.onPlace`, then always the next fire tick.
     fn placed(&self, args: PlacedArgs<'_>) {
-        if args.old_state_id == args.state_id {
-            // Already a fire
-            return;
-        }
-
-        let dimension = &args.world.dimension;
-        // First lets check if we are in OverWorld or Nether, its not possible to place an Nether portal in other dimensions in Vanilla
-        if (dimension == &Dimension::OVERWORLD || dimension == &Dimension::THE_NETHER)
-            && let Some(portal) =
-                NetherPortal::get_new_portal(args.world, args.position, HorizontalAxis::X)
-        {
-            portal.create(args.world);
-            return;
-        }
-
+        FireBlockBase::on_place(&args, || {
+            self.can_place_at(CanPlaceAtArgs {
+                server: None,
+                world: Some(args.world),
+                block_accessor: args.world.as_ref(),
+                block: args.block,
+                state: args.block.default_state,
+                position: args.position,
+                direction: None,
+                player: None,
+                use_item_on: None,
+            })
+        });
         args.world.schedule_block_tick(
             args.block,
             *args.position,

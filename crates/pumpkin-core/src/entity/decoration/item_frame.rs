@@ -270,6 +270,11 @@ impl ItemFrameEntity {
 }
 
 impl EntityBase for ItemFrameEntity {
+    /// Vanilla `BlockAttachedEntity.isPickable`.
+    fn can_hit(&self) -> bool {
+        true
+    }
+
     fn write_custom_nbt(&self, nbt: &mut NbtCompound) {
         let item = self
             .item_stack

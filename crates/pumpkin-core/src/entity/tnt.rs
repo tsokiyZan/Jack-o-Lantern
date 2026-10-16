@@ -129,6 +129,11 @@ impl TNTEntity {
 }
 
 impl EntityBase for TNTEntity {
+    /// Vanilla `isPickable`: not removed.
+    fn can_hit(&self) -> bool {
+        !self.get_entity().is_removed()
+    }
+
     /// Vanilla `PrimedTnt.addAdditionalSaveData`. Without it a chunk reload resets a
     /// nearly-detonated fuse and the TNT explodes late.
     fn write_custom_nbt(&self, nbt: &mut NbtCompound) {

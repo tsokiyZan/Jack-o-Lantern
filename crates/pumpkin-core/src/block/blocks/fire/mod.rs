@@ -11,7 +11,7 @@ use rand::RngExt;
 use soul_fire::SoulFireBlock;
 
 use crate::block::blocks::fire::fire::FireBlock;
-use crate::block::{BlockBehaviour, CanPlaceAtArgs, OnEntityCollisionArgs};
+use crate::block::{BlockBehaviour, CanPlaceAtArgs, OnEntityCollisionArgs, PlacedArgs};
 use crate::entity::EntityBase;
 use crate::world::World;
 use crate::world::portal::nether::NetherPortal;
@@ -26,6 +26,34 @@ pub mod soul_fire;
 pub struct FireBlockBase;
 
 impl FireBlockBase {
+    /// Vanilla `BaseFireBlock.onPlace`: light a nether portal, else go out at once where the
+    /// fire can't survive.
+    pub fn on_place(args: &PlacedArgs<'_>, can_survive: impl FnOnce() -> bool) {
+        if Block::from_state_id(args.old_state_id) == args.block {
+            return;
+        }
+        let dimension = &args.world.dimension;
+        // `inPortalDimension`.
+        if (dimension == &Dimension::OVERWORLD || dimension == &Dimension::THE_NETHER)
+            && let Some(portal) = NetherPortal::get_new_portal(
+                args.world,
+                args.position,
+                pumpkin_data::block_properties::HorizontalAxis::X,
+            )
+        {
+            portal.create(args.world);
+            return;
+        }
+        if !can_survive() {
+            // `removeBlock(pos, false)`: fire holds no fluid, so this leaves air.
+            args.world.set_block_state(
+                args.position,
+                Block::AIR.default_state.id,
+                pumpkin_world::world::BlockFlags::NOTIFY_ALL,
+            );
+        }
+    }
+
     pub fn get_fire_type(world: &World, pos: &BlockPos) -> Block {
         let block = world.get_block(&pos.down());
         if SoulFireBlock::is_soul_base(block) {

@@ -29,7 +29,9 @@ impl<S: CommandSource> ArgumentType<S> for PoolNameArgumentType {
     }
 
     fn client_side_parser(&'_ self) -> JavaClientArgumentType {
-        JavaClientArgumentType::ResourceLocation
+        JavaClientArgumentType::ResourceKey {
+            identifier: Identifier::vanilla_static("worldgen/template_pool"),
+        }
     }
 
     fn override_suggestion_providers(&self) -> Option<SuggestionProviders> {

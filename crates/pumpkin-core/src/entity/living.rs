@@ -3197,6 +3197,11 @@ impl LivingEntity {
         self.write_attributes_nbt(nbt);
         // Persist current absorption amount
         nbt.put("AbsorptionAmount", NbtTag::Float(self.absorption.load()));
+        // Vanilla `Entity.saveWithoutId`'s `invulnerable_time`, the hurt cooldown.
+        let invulnerable_time = self.hurt_cooldown.load(Relaxed);
+        if invulnerable_time > 0 {
+            nbt.put_int("invulnerable_time", invulnerable_time);
+        }
         nbt.put_int(
             "current_impulse_context_reset_grace_time",
             self.current_impulse_context_reset_grace_time.load(Relaxed),
@@ -3373,6 +3378,9 @@ impl LivingEntity {
         let clamped_abs = raw_abs.max(0.0).min(max_abs);
         self.absorption.store(clamped_abs);
 
+        if let Some(invulnerable_time) = nbt.get_int("invulnerable_time") {
+            self.hurt_cooldown.store(invulnerable_time, Relaxed);
+        }
         self.current_impulse_context_reset_grace_time.store(
             nbt.get_int("current_impulse_context_reset_grace_time")
                 .unwrap_or(0),

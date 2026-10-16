@@ -234,9 +234,7 @@ impl DataAccessor for EntityDataAccessor {
     }
 
     fn get_data(&self) -> Result<NbtCompound, CommandSyntaxError> {
-        let mut nbt = NbtCompound::new();
-        self.entity.write_nbt(&mut nbt);
-        Ok(nbt)
+        Ok(self.entity.tag_to_compare())
     }
 
     fn get_modified_success(&self) -> TextComponent {

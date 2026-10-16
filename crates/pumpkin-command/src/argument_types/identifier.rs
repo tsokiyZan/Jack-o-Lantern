@@ -36,3 +36,23 @@ impl IdentifierArgumentType {
         Ok(context.get_argument::<Identifier>(name)?.clone())
     }
 }
+
+/// An identifier naming an element of a registry the client parses as `client_parser` (vanilla
+/// `ResourceKeyArgument` or `ResourceArgument`); the command resolves the element itself.
+pub struct RegistryIdentifierArgumentType(pub JavaClientArgumentType);
+
+impl<S: crate::source::CommandSource> ArgumentType<S> for RegistryIdentifierArgumentType {
+    type Item = Identifier;
+
+    fn parse(&self, reader: &mut StringReader) -> Result<Self::Item, CommandSyntaxError> {
+        Identifier::from_reader(reader)
+    }
+
+    fn client_side_parser(&'_ self) -> JavaClientArgumentType {
+        self.0.clone()
+    }
+
+    fn examples(&self) -> Vec<String> {
+        examples!("foo", "foo:bar")
+    }
+}

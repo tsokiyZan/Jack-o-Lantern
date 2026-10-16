@@ -808,8 +808,10 @@ impl ItemStack {
             }
         }
 
-        // Store custom data like enchantments, display name, etc. would go here
-        compound.put_compound("components", tag);
+        // Vanilla `ItemStack.CODEC` leaves out an empty component patch.
+        if !tag.is_empty() {
+            compound.put_compound("components", tag);
+        }
     }
 
     #[must_use]
@@ -831,6 +833,27 @@ impl ItemStack {
         // Process any additional data in the components compound
         if let Some(tag) = compound.get_compound("components") {
             for (name, data) in &tag.child_tags {
+                // Components 26.3's data fixes rename or drop in saves from before it.
+                match name.as_ref() {
+                    // `MapColorComponentRemovalFix`
+                    "minecraft:map_color" => continue,
+                    // `SwingAnimationComponentSplitFix`
+                    "minecraft:swing_animation" => {
+                        for id in [
+                            DataComponent::AttackAnimation,
+                            DataComponent::InteractAnimation,
+                        ] {
+                            item_stack.patch.push((id, Some(read_data(id, data)?)));
+                        }
+                        continue;
+                    }
+                    // `RemoveBlockTransformerComponentFix`: 26.3 only refers to registered
+                    // transformers by id, older saves held them inline.
+                    "minecraft:block_transformer" if !matches!(data, NbtTag::String(_)) => {
+                        continue;
+                    }
+                    _ => {}
+                }
                 if let Some(name) = name.strip_prefix("!") {
                     let id = DataComponent::try_from_name(name)?;
                     if id.is_persistent() {
@@ -1594,5 +1617,59 @@ mod tests {
         let loaded = ItemStack::read_item_stack(&compound).expect("failed to load item stack");
         assert_eq!(loaded.patch.len(), 1);
         assert_eq!(loaded.patch[0].0, DataComponent::Damage);
+    }
+
+    /// A stack saved before 26.3 loads the way 26.3's data fixes upgrade it.
+    #[test]
+    fn pre_26_3_components_load_in_their_26_3_form() {
+        let mut swing = NbtCompound::new();
+        swing.put_string("type", "stab".to_string());
+        swing.put_int("duration", 9);
+        let mut components = NbtCompound::new();
+        components.put("minecraft:swing_animation", NbtTag::Compound(swing));
+        components.put_int("minecraft:map_color", 0x00FF_0000);
+        components.put(
+            "minecraft:block_transformer",
+            NbtTag::List(vec![NbtTag::Compound(NbtCompound::new())]),
+        );
+        components.put(
+            "minecraft:pot_decorations",
+            NbtTag::List(vec![
+                NbtTag::String("minecraft:angler_pottery_sherd".into()),
+                NbtTag::String("minecraft:brick".into()),
+            ]),
+        );
+        let mut compound = NbtCompound::new();
+        compound.put_string("id", "minecraft:decorated_pot".to_string());
+        compound.put_int("count", 1);
+        compound.put_compound("components", components);
+
+        let stack = ItemStack::read_item_stack(&compound).expect("stack should decode");
+        let mut ids: Vec<_> = stack.patch.iter().map(|(id, _)| id.to_name()).collect();
+        ids.sort_unstable();
+        assert_eq!(
+            ids,
+            [
+                "minecraft:attack_animation",
+                "minecraft:interact_animation",
+                "minecraft:pot_decorations",
+            ]
+        );
+        let stab = crate::data_component_impl::SwingAnimationImpl {
+            animation_type: crate::data_component_impl::SwingAnimationType::Stab,
+            duration: 9,
+        };
+        assert_eq!(
+            stack.get_data_component::<crate::data_component_impl::SwingAnimationImpl>(),
+            Some(&stab)
+        );
+        let decorations = stack
+            .get_data_component::<crate::data_component_impl::PotDecorationsImpl>()
+            .expect("pot decorations");
+        let side = |side: &Option<ItemStack>| side.as_ref().map(|stack| stack.item.id);
+        assert_eq!(side(&decorations.back), Some(Item::ANGLER_POTTERY_SHERD.id));
+        assert_eq!(side(&decorations.left), Some(Item::BRICK.id));
+        assert_eq!(side(&decorations.right), Some(Item::BRICK.id));
+        assert_eq!(side(&decorations.front), Some(Item::BRICK.id));
     }
 }

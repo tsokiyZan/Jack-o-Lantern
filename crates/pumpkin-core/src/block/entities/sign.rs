@@ -15,6 +15,7 @@ pub struct SignBlockEntity {
     pub front_text: SignText,
     pub back_text: SignText,
     pub is_waxed: AtomicBool,
+    pub allow_op_features: AtomicBool,
     position: BlockPos,
     pub currently_editing_player: Arc<Mutex<Option<uuid::Uuid>>>,
 }
@@ -277,16 +278,21 @@ impl BlockEntity for SignBlockEntity {
             .map(SignText::from)
             .unwrap_or_default();
         let is_waxed = nbt.get_bool("is_waxed").unwrap_or(false);
+        let allow_op_features = nbt.get_bool("allow_op_features").unwrap_or(false);
         Self {
             position,
             front_text,
             back_text,
             is_waxed: AtomicBool::new(is_waxed),
+            allow_op_features: AtomicBool::new(allow_op_features),
             currently_editing_player: Arc::new(Mutex::new(None)),
         }
     }
 
     fn write_nbt(&self, nbt: &mut NbtCompound) {
+        if self.allow_op_features.load(Ordering::Relaxed) {
+            nbt.put_bool("allow_op_features", true);
+        }
         nbt.put("front_text", self.front_text.clone());
         nbt.put("back_text", self.back_text.clone());
         nbt.put_bool("is_waxed", self.is_waxed.load(Ordering::Relaxed));
@@ -294,6 +300,9 @@ impl BlockEntity for SignBlockEntity {
 
     fn chunk_data_nbt(&self) -> Option<NbtCompound> {
         let mut nbt = NbtCompound::new();
+        if self.allow_op_features.load(Ordering::Relaxed) {
+            nbt.put_bool("allow_op_features", true);
+        }
         nbt.put("front_text", self.front_text.clone());
         nbt.put("back_text", self.back_text.clone());
         nbt.put_bool("is_waxed", self.is_waxed.load(Ordering::Relaxed));
@@ -313,6 +322,7 @@ impl SignBlockEntity {
         Self {
             position,
             is_waxed: AtomicBool::new(false),
+            allow_op_features: AtomicBool::new(false),
             front_text: if is_front {
                 SignText::from_messages(messages.clone())
             } else {
@@ -332,6 +342,7 @@ impl SignBlockEntity {
         Self {
             position,
             is_waxed: AtomicBool::new(false),
+            allow_op_features: AtomicBool::new(false),
             front_text: SignText::default(),
             back_text: SignText::default(),
             currently_editing_player: Arc::new(Mutex::new(None)),
@@ -388,6 +399,16 @@ impl<'a> SignEntityRef<'a> {
         match self {
             Self::Sign(s) => s.is_waxed.load(Ordering::Relaxed),
             Self::Hanging(s) => s.is_waxed.load(Ordering::Relaxed),
+        }
+    }
+
+    /// Vanilla `SignBlockEntity.allowOpFeatures`: only set from saved data, it lets the
+    /// sign's click events run.
+    #[must_use]
+    pub fn allow_op_features(&self) -> bool {
+        match self {
+            Self::Sign(s) => s.allow_op_features.load(Ordering::Relaxed),
+            Self::Hanging(s) => s.allow_op_features.load(Ordering::Relaxed),
         }
     }
 

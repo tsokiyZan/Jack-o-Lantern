@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use crossbeam::atomic::AtomicCell;
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::math::vector3::Vector3;
-use pumpkin_util::math::{atan2, lerp};
+use pumpkin_util::math::{RAD_TO_DEG, atan2, lerp};
 
 use crate::{
     entity::{
@@ -217,7 +217,7 @@ pub fn rotate_towards_movement(entity: &Entity, rotation_speed: f32) {
     // `xRotO` and `yRotO`: nothing else turns a projectile during its tick.
     let mut x_rot_o = entity.pitch.load();
     let mut y_rot_o = entity.yaw.load();
-    let degrees = 180.0 / f64::from(std::f32::consts::PI);
+    let degrees = f64::from(RAD_TO_DEG);
     let sd = movement.horizontal_length();
     let y_rot = (atan2(movement.z, movement.x) * degrees) as f32 + 90.0;
     entity.set_pitch((atan2(sd, movement.y) * degrees) as f32 - 90.0);

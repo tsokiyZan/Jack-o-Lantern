@@ -187,11 +187,12 @@ impl ThrownItemEntity {
             velocity.y -= self.get_gravity();
         }
 
-        let inertia = if entity.touching_water.load(Ordering::Relaxed) {
-            0.8
+        // Vanilla `ThrowableProjectile.applyInertia`: float inertia, widened.
+        let inertia = f64::from(if entity.touching_water.load(Ordering::Relaxed) {
+            0.8f32
         } else {
-            0.99
-        };
+            0.99f32
+        });
         velocity = velocity.multiply(inertia, inertia, inertia);
 
         // Store velocity
@@ -393,26 +394,9 @@ impl ThrownItemEntity {
             return true;
         }
 
-        // Vanilla `canBeHitByProjectile`: spectators aren't pickable.
-        if other.is_spectator() {
-            return true;
-        }
-
-        // Projectiles should pass through lingering clouds
-        if *other_ent.entity_type == EntityType::AREA_EFFECT_CLOUD {
-            return true;
-        }
-
-        // Vanilla `canBeHitByProjectile`: the ender dragon isn't pickable, only its parts are.
-        if other
-            .cast_any()
-            .is::<crate::entity::boss::ender_dragon::EnderDragonEntity>()
-        {
-            return true;
-        }
-
-        // Projectile vs projectile logic
-        if !self.collides_with_projectiles && is_projectile(other_ent.entity_type) {
+        // Vanilla `canHitEntity`'s `canBeHitByProjectile`: alive and pickable, which leaves out
+        // spectators, clouds, the dragon's body, dying mobs and most projectiles.
+        if !other.can_be_hit_by_projectile() {
             return true;
         }
 

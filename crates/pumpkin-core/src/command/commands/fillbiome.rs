@@ -1,13 +1,17 @@
+use crate::command::CommandSource;
 use crate::command::argument_builder::{ArgumentBuilder, argument, command, literal};
 use crate::command::argument_types::coordinates::block_pos::{
     BlockPosArgumentType, OUT_OF_BOUNDS_ERROR_TYPE,
 };
-use crate::command::argument_types::resource_key::{BIOME_REGISTRY, ResourceKeyArgument};
+use crate::command::argument_types::resource::{BIOME_ARGUMENT, BIOME_REGISTRY, ResourceArgument};
+use crate::command::argument_types::resource_or_tag::{ResourceOrTag, ResourceOrTagArgument};
+use crate::command::commands::execute::biome_matches;
 use crate::command::context::command_context::CommandContext;
 use crate::command::errors::error_types::CommandErrorType;
 use crate::command::node::dispatcher::CommandDispatcher;
 use crate::command::node::{CommandExecutor, CommandExecutorResult};
 use crate::net::java::chunk_data::CChunkData;
+use pumpkin_data::biome::Biome;
 use pumpkin_data::translation;
 use pumpkin_util::PermissionLvl;
 use pumpkin_util::math::vector2::Vector2;
@@ -17,8 +21,6 @@ use rustc_hash::FxHashMap;
 
 const DESCRIPTION: &str = "Changes biomes of an area.";
 const PERMISSION: &str = "minecraft:command.fillbiome";
-
-const MAX_BIOME_BLOCKS: i64 = 32768;
 
 static ERROR_TOOBIG: CommandErrorType<2> = CommandErrorType::new(
     translation::java::COMMANDS_FILLBIOME_TOOBIG,
@@ -30,6 +32,7 @@ struct FillBiomeExecutor {
 }
 
 impl CommandExecutor for FillBiomeExecutor {
+    #[expect(clippy::too_many_lines)]
     fn execute(&self, context: &CommandContext) -> CommandExecutorResult {
         let from_pos = BlockPosArgumentType::get_block_pos(context, "from")?;
         let to_pos = BlockPosArgumentType::get_block_pos(context, "to")?;
@@ -39,12 +42,14 @@ impl CommandExecutor for FillBiomeExecutor {
             return Err(OUT_OF_BOUNDS_ERROR_TYPE.create_without_context());
         }
 
-        let min_x = from_pos.0.x.min(to_pos.0.x);
-        let max_x = from_pos.0.x.max(to_pos.0.x);
-        let min_y = from_pos.0.y.min(to_pos.0.y);
-        let max_y = from_pos.0.y.max(to_pos.0.y);
-        let min_z = from_pos.0.z.min(to_pos.0.z);
-        let max_z = from_pos.0.z.max(to_pos.0.z);
+        // Vanilla FillBiomeCommand.quantize: corners snap to their biome cell.
+        let quantize = |coord: i32| (coord >> 2) << 2;
+        let min_x = quantize(from_pos.0.x.min(to_pos.0.x));
+        let max_x = quantize(from_pos.0.x.max(to_pos.0.x));
+        let min_y = quantize(from_pos.0.y.min(to_pos.0.y));
+        let max_y = quantize(from_pos.0.y.max(to_pos.0.y));
+        let min_z = quantize(from_pos.0.z.min(to_pos.0.z));
+        let max_z = quantize(from_pos.0.z.max(to_pos.0.z));
 
         let biome_min_x = min_x >> 2;
         let biome_max_x = max_x >> 2;
@@ -53,21 +58,25 @@ impl CommandExecutor for FillBiomeExecutor {
         let biome_min_z = min_z >> 2;
         let biome_max_z = max_z >> 2;
 
-        let volume = (biome_max_x - biome_min_x + 1) as i64
-            * (biome_max_y - biome_min_y + 1) as i64
-            * (biome_max_z - biome_min_z + 1) as i64;
-
-        if volume > MAX_BIOME_BLOCKS {
+        let volume = i64::from(max_x - min_x + 1)
+            * i64::from(max_y - min_y + 1)
+            * i64::from(max_z - min_z + 1);
+        let limit = world.level_info.load().game_rules.max_block_modifications;
+        if volume > limit {
             return Err(ERROR_TOOBIG.create_without_context_args_slice(&[
-                TextComponent::text(MAX_BIOME_BLOCKS.to_string()),
+                TextComponent::text(limit.to_string()),
                 TextComponent::text(volume.to_string()),
             ]));
         }
 
-        let target_biome = ResourceKeyArgument::get_biome(context, "biome")?;
+        let target_biome = ResourceArgument::get_resource::<Biome, CommandSource>(
+            context,
+            "biome",
+            BIOME_REGISTRY,
+        )?;
 
-        let replace_biome = if self.has_replace {
-            Some(ResourceKeyArgument::get_biome(context, "filter")?)
+        let filter = if self.has_replace {
+            Some(context.get_argument::<ResourceOrTag>("filter")?)
         } else {
             None
         };
@@ -90,7 +99,6 @@ impl CommandExecutor for FillBiomeExecutor {
         }
 
         let target_biome_id = target_biome.id;
-        let replace_biome_id = replace_biome.map(|b| b.id);
         let world = context.world().clone();
 
         let mut changed_count = 0;
@@ -105,7 +113,10 @@ impl CommandExecutor for FillBiomeExecutor {
                         chunk
                             .section
                             .get_noise_biome(section_index, rel_x, scale_y, rel_z)
-                        && replace_biome_id.is_none_or(|rep| current_id == rep)
+                        && filter.is_none_or(|filter| {
+                            Biome::from_id(current_id)
+                                .is_some_and(|biome| biome_matches(filter, biome))
+                        })
                     {
                         chunk
                             .section
@@ -152,11 +163,11 @@ pub fn register(dispatcher: &mut CommandDispatcher, registry: &PermissionRegistr
     let builder = command("fillbiome", DESCRIPTION).requires(PERMISSION).then(
         argument("from", BlockPosArgumentType).then(
             argument("to", BlockPosArgumentType).then(
-                argument("biome", ResourceKeyArgument(BIOME_REGISTRY))
+                argument("biome", BIOME_ARGUMENT.clone())
                     .executes(FillBiomeExecutor { has_replace: false })
                     .then(
                         literal("replace").then(
-                            argument("filter", ResourceKeyArgument(BIOME_REGISTRY))
+                            argument("filter", ResourceOrTagArgument(BIOME_REGISTRY.clone()))
                                 .executes(FillBiomeExecutor { has_replace: true }),
                         ),
                     ),

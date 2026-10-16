@@ -85,6 +85,11 @@ impl LeashKnotEntity {
 use crate::server::Server;
 
 impl EntityBase for LeashKnotEntity {
+    /// Vanilla `BlockAttachedEntity.isPickable`.
+    fn can_hit(&self) -> bool {
+        true
+    }
+
     fn get_entity(&self) -> &Entity {
         &self.entity
     }

@@ -834,12 +834,6 @@ pub fn write_item_stack_template(stack: &crate::item_stack::ItemStack) -> NbtTag
     if compound.get_int("count") == Some(1) {
         compound.child_tags.remove("count");
     }
-    if compound
-        .get_compound("components")
-        .is_some_and(|components| components.child_tags.is_empty())
-    {
-        compound.child_tags.remove("components");
-    }
     NbtTag::Compound(compound)
 }
 

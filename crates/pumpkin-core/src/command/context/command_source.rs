@@ -396,6 +396,11 @@ impl CommandSource {
                 }
             }
         }
+        if !matches!(self.output, CommandSender::Console)
+            && server.level_info.load().game_rules.log_admin_commands
+        {
+            Server::send_system_message(&text);
+        }
     }
 
     /// Sends feedback to this source.
