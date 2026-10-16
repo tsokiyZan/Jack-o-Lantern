@@ -119,7 +119,7 @@ impl FrogEntity {
 /// Vanilla `VariantUtils.selectVariantToSpawn` over the frog variants' spawn conditions:
 /// the warm and cold biome tags at priority one, temperate anywhere else.
 fn select_variant_to_spawn(world: &World, entity: &Entity) -> FrogVariant {
-    let biome = world.get_biome(&entity.block_pos.load()).registry_id;
+    let biome = world.get_zoomed_biome(&entity.block_pos.load()).registry_id;
     let biome = biome.strip_prefix("minecraft:").unwrap_or(biome);
     let warm = tag::WorldgenBiome::MINECRAFT_SPAWNS_WARM_VARIANT_FROGS
         .0

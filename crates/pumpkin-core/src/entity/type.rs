@@ -597,7 +597,7 @@ pub fn check_spawn_rules(
     }
     if id == EntityType::POLAR_BEAR.id {
         let below = pos.down();
-        let biome = world.get_biome(pos);
+        let biome = world.get_zoomed_biome(pos);
         if biome.has_tag(
             &pumpkin_data::tag::WorldgenBiome::MINECRAFT_POLAR_BEARS_SPAWN_ON_ALTERNATE_BLOCKS,
         ) {
@@ -629,7 +629,7 @@ pub fn check_spawn_rules(
         return mob::MobEntity::check_surface_ageable_water_creature_spawn_rules(world, pos);
     }
     if id == EntityType::TROPICAL_FISH.id {
-        let biome = world.get_biome(pos);
+        let biome = world.get_zoomed_biome(pos);
         let valid_water = world
             .get_fluid(&pos.down())
             .has_tag(&pumpkin_data::tag::Fluid::MINECRAFT_WATER)
@@ -685,7 +685,7 @@ pub fn check_spawn_rules(
         if !mob::MobEntity::is_dark_enough_to_spawn(world, pos, is_thundering) {
             return false;
         }
-        let biome = world.get_biome(pos);
+        let biome = world.get_zoomed_biome(pos);
         if biome.has_tag(&pumpkin_data::tag::WorldgenBiome::MINECRAFT_MORE_FREQUENT_DROWNED_SPAWNS)
         {
             return rand::random_range(0..15) == 0;

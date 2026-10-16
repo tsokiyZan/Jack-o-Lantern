@@ -133,7 +133,7 @@ impl FoxVariant {
     #[must_use]
     pub fn by_biome(world: &World, pos: &BlockPos) -> Self {
         if world
-            .get_biome(pos)
+            .get_zoomed_biome(pos)
             .has_tag(&tag::WorldgenBiome::MINECRAFT_SPAWNS_SNOW_FOXES)
         {
             Self::Snow

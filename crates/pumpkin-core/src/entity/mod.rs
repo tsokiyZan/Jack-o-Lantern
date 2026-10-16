@@ -1241,9 +1241,7 @@ impl Entity {
 
         let bounding_box_size = Self::type_dimensions(entity_type);
 
-        let current_biome = world
-            .level
-            .get_rough_biome(&BlockPos::new(floor_x, floor_y, floor_z));
+        let current_biome = world.get_zoomed_biome(&BlockPos::new(floor_x, floor_y, floor_z));
 
         Self {
             entity_id,
@@ -1359,7 +1357,7 @@ impl Entity {
     /// Called when the entity changes dimensions (e.g., through a nether portal).
     pub fn set_world(&self, world: Arc<World>) {
         let block_pos = self.block_pos.load();
-        let biome = world.level.get_rough_biome(&block_pos);
+        let biome = world.get_zoomed_biome(&block_pos);
         self.current_biome.store(Arc::new(biome));
         self.last_biome_update_pos.store(block_pos);
         self.world.store(world);
@@ -1603,7 +1601,7 @@ impl Entity {
                 self.block_pos.store(new_bp);
 
                 let world = self.world.load();
-                let biome = world.level.get_rough_biome(&new_bp);
+                let biome = world.get_zoomed_biome(&new_bp);
                 self.current_biome.store(Arc::new(biome));
                 self.last_biome_update_pos.store(new_bp);
 
