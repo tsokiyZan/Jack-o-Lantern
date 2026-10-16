@@ -256,6 +256,7 @@ pub mod resource_or_tag;
 pub mod slot;
 pub mod sound_category;
 pub mod structure;
+pub mod swing_animation;
 pub mod team_color;
 pub mod time;
 pub mod uuid;

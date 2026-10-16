@@ -1,6 +1,8 @@
 use pumpkin_util::text::TextComponent;
 
 use crate::command::CommandSource;
+use crate::command::errors::command_syntax_error::CommandSyntaxError;
+use crate::command::errors::error_types::CommandErrorType;
 
 /// Vanilla `CommandResponseTracker`, counting the elements a command changed to pick its feedback.
 pub struct CommandResponseTracker<T> {
@@ -28,7 +30,18 @@ impl<T> CommandResponseTracker<T> {
         }
     }
 
-    /// Vanilla `sendFeedback` with `ElementType.NON_ZERO` and no error for zero elements.
+    /// Vanilla `Messages.throwIfZero` for `ElementType.NON_ZERO`.
+    pub fn throw_if_zero(
+        &self,
+        on_zero: &'static CommandErrorType<0>,
+    ) -> Result<(), CommandSyntaxError> {
+        if self.non_zero_element_count == 0 {
+            return Err(on_zero.create_without_context());
+        }
+        Ok(())
+    }
+
+    /// Vanilla `sendFeedback` with `ElementType.NON_ZERO`.
     pub fn send_feedback(
         self,
         source: &CommandSource,
