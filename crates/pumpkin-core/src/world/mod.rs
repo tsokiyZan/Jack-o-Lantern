@@ -379,6 +379,19 @@ impl World {
         // TODO
         let generation_settings = NoiseSettings::from_dimension(&dimension);
         let level_time = LevelTime::from_level_data(&level_info.load(), &dimension);
+        // Vanilla `WorldBorder` saved data; the overworld's came from `level.dat` before 26.3.
+        let worldborder = Worldborder::from_saved(
+            &pumpkin_world::world_info::data_files::read_world_border(
+                &level.level_folder.dim_folder,
+            )
+            .unwrap_or_else(|| {
+                if dimension == Dimension::OVERWORLD {
+                    legacy_world_border(&level_info.load())
+                } else {
+                    pumpkin_world::world_info::data_files::WorldBorderData::default()
+                }
+            }),
+        );
         level.set_game_time(level_time.world_age);
 
         // Load portal POI from disk (PoiStorage::new automatically loads from disk if files exist)
@@ -409,14 +422,7 @@ impl World {
             players: ArcSwap::new(Arc::new(Vec::new())),
             entities: ArcSwap::new(Arc::new(Vec::new())),
             scoreboard: std::sync::Mutex::new(Scoreboard::default()),
-            worldborder: std::sync::Mutex::new(Worldborder::new(
-                0.0,
-                0.0,
-                5.999_996_8E7,
-                0,
-                5,
-                300,
-            )),
+            worldborder: std::sync::Mutex::new(worldborder),
             level_time: std::sync::Mutex::new(level_time),
             dimension,
             weather: std::sync::Mutex::new(Weather::new()),
@@ -7279,6 +7285,19 @@ impl World {
             let _ = portal_poi.save_all();
         }
 
+        let border = self
+            .worldborder
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .to_saved();
+        if let Err(err) = pumpkin_world::world_info::data_files::write_world_border(
+            &self.level.level_folder.dim_folder,
+            &border,
+            pumpkin_world::world_info::WORLD_VERSION,
+        ) {
+            warn!("Failed to save world_border.dat: {err}");
+        }
+
         {
             let custom_data = self
                 .custom_data
@@ -8021,5 +8040,22 @@ mod tests {
             GameRuleValue::Int(v) => assert_eq!(*v, 20),
             GameRuleValue::Bool(_) => panic!("expected int"),
         }
+    }
+}
+
+/// The overworld border `level.dat` held before 26.3 moved it to `world_border.dat`.
+const fn legacy_world_border(
+    level_data: &LevelData,
+) -> pumpkin_world::world_info::data_files::WorldBorderData {
+    pumpkin_world::world_info::data_files::WorldBorderData {
+        center_x: level_data.border_center_x,
+        center_z: level_data.border_center_z,
+        damage_per_block: level_data.border_damage_per_block,
+        safe_zone: level_data.border_safe_zone,
+        warning_blocks: level_data.border_warning_blocks as i32,
+        warning_time: level_data.border_warning_time as i32,
+        size: level_data.border_size,
+        lerp_time: level_data.border_size_lerp_time,
+        lerp_target: level_data.border_size_lerp_target,
     }
 }
