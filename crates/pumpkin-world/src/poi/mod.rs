@@ -185,12 +185,16 @@ impl PoiRegion {
             sec_comp.put_byte("Valid", sec_data.valid);
             let mut rec_list = Vec::new();
             for rec in &sec_data.records {
+                // Vanilla `PoiRecord.Packed.CODEC`.
                 let mut rec_comp = pumpkin_nbt::compound::NbtCompound::new();
-                rec_comp.put_int("x", rec.x);
-                rec_comp.put_int("y", rec.y);
-                rec_comp.put_int("z", rec.z);
+                rec_comp.put(
+                    "pos",
+                    pumpkin_nbt::tag::NbtTag::IntArray(vec![rec.x, rec.y, rec.z]),
+                );
                 rec_comp.put_string("type", rec.poi_type.clone());
-                rec_comp.put_int("free_tickets", rec.free_tickets);
+                if rec.free_tickets != 0 {
+                    rec_comp.put_int("free_tickets", rec.free_tickets);
+                }
                 rec_list.push(pumpkin_nbt::tag::NbtTag::Compound(rec_comp));
             }
             sec_comp.put_list("Records", rec_list);
@@ -229,10 +233,23 @@ impl PoiRegion {
                     {
                         for rec_t in rec_list {
                             if let pumpkin_nbt::tag::NbtTag::Compound(rc) = rec_t {
+                                // Earlier Pumpkin builds saved the position as `x`/`y`/`z`.
+                                let [x, y, z] = match rc.get("pos") {
+                                    Some(pumpkin_nbt::tag::NbtTag::IntArray(pos))
+                                        if pos.len() == 3 =>
+                                    {
+                                        [pos[0], pos[1], pos[2]]
+                                    }
+                                    _ => [
+                                        rc.get_int("x").unwrap_or(0),
+                                        rc.get_int("y").unwrap_or(0),
+                                        rc.get_int("z").unwrap_or(0),
+                                    ],
+                                };
                                 records.push(PoiEntry {
-                                    x: rc.get_int("x").unwrap_or(0),
-                                    y: rc.get_int("y").unwrap_or(0),
-                                    z: rc.get_int("z").unwrap_or(0),
+                                    x,
+                                    y,
+                                    z,
                                     poi_type: rc
                                         .get_string("type")
                                         .unwrap_or(POI_TYPE_NETHER_PORTAL)
