@@ -4,11 +4,10 @@ use pumpkin_data::effect::StatusEffect;
 use pumpkin_data::enchantment::LevelBasedValue;
 use pumpkin_data::potion::Effect;
 use pumpkin_util::math::vector3::Vector3;
-use pumpkin_util::random::{RandomGenerator, RandomImpl, get_seed, xoroshiro128::Xoroshiro};
 
 use super::EnchantmentEntityEffectExt;
-use crate::entity::Entity;
-use crate::entity::player::Player;
+use crate::enchantment::EnchantedItemInUse;
+use crate::entity::EntityBase;
 use crate::world::World;
 
 /// Enchantment entity effect that applies a status effect.
@@ -38,69 +37,54 @@ impl ApplyMobEffect {
             max_amplifier,
         }
     }
+}
 
-    pub fn apply(
-        &self,
-        world: &Arc<World>,
-        enchantment_level: i32,
-        _owner: Option<&Arc<Player>>,
-        entity: Option<&Entity>,
-    ) {
-        if self.to_apply.is_empty() {
-            return;
-        }
+/// Vanilla `Mth.randomBetween`.
+fn random_between(min: f32, max: f32) -> f32 {
+    rand::random::<f32>() * (max - min) + min
+}
 
-        let Some(entity) = entity else {
-            return;
-        };
-
-        let mut rng = RandomGenerator::Xoroshiro(Xoroshiro::from_seed(get_seed()));
-        let selected_idx = (rng.next_f32() * self.to_apply.len() as f32) as usize;
-        let selected = self.to_apply[selected_idx.min(self.to_apply.len() - 1)];
-
-        let min_dur = self.min_duration.calculate(enchantment_level);
-        let max_dur = self.max_duration.calculate(enchantment_level);
-        // Vanilla `Mth.randomBetween`, which always draws.
-        let dur_secs = rng.next_f32() * (max_dur - min_dur) + min_dur;
-        let ticks = (dur_secs * 20.0).round() as i32;
-
-        let min_amp = self.min_amplifier.calculate(enchantment_level);
-        let max_amp = self.max_amplifier.calculate(enchantment_level);
-        let amp_f = rng.next_f32() * (max_amp - min_amp) + min_amp;
-        let amplifier = (amp_f.round() as i32).max(0) as u8;
-
-        let effect = Effect {
-            effect_type: selected,
-            duration: ticks,
-            amplifier,
-            ambient: false,
-            show_particles: true,
-            show_icon: true,
-            blend: false,
-        };
-
-        let target_player = world.get_player_by_id(entity.entity_id);
-        if let Some(target_player) = target_player {
-            target_player.add_effect(effect);
-        } else if let Some(living) = world
-            .get_entity_by_id(entity.entity_id)
-            .as_deref()
-            .and_then(crate::entity::EntityBase::get_living_entity)
-        {
-            living.add_effect(effect);
-        }
-    }
+/// Java `Math.round(float)`.
+fn java_round(value: f32) -> i32 {
+    (value + 0.5).floor() as i32
 }
 
 impl EnchantmentEntityEffectExt for ApplyMobEffect {
     fn apply(
         &self,
-        world: &Arc<World>,
+        _world: &Arc<World>,
         enchantment_level: i32,
-        owner: Option<&Arc<Player>>,
-        entity: Option<&Entity>,
+        _item: &EnchantedItemInUse<'_>,
+        entity: &dyn EntityBase,
         _position: Vector3<f64>,
     ) {
-        self.apply(world, enchantment_level, owner, entity);
+        let Some(living) = entity.get_living_entity() else {
+            return;
+        };
+        // `HolderSet.getRandomElement`.
+        if self.to_apply.is_empty() {
+            return;
+        }
+        let selected = self.to_apply[rand::random_range(0..self.to_apply.len())];
+        let ticks = java_round(
+            random_between(
+                self.min_duration.calculate(enchantment_level),
+                self.max_duration.calculate(enchantment_level),
+            ) * 20.0,
+        );
+        let amplifier = java_round(random_between(
+            self.min_amplifier.calculate(enchantment_level),
+            self.max_amplifier.calculate(enchantment_level),
+        ))
+        .max(0);
+        living.add_effect(Effect {
+            effect_type: selected,
+            duration: ticks,
+            amplifier: amplifier as u8,
+            ambient: false,
+            show_particles: true,
+            show_icon: true,
+            blend: false,
+        });
     }
 }

@@ -165,10 +165,11 @@ impl super::EnchantmentEntityEffectExt for ReplaceDisk {
         &self,
         world: &Arc<World>,
         enchantment_level: i32,
-        _owner: Option<&Arc<crate::entity::player::Player>>,
-        entity: Option<&crate::entity::Entity>,
+        _item: &crate::enchantment::EnchantedItemInUse<'_>,
+        entity: &dyn crate::entity::EntityBase,
         position: Vector3<f64>,
     ) {
+        let entity = Some(entity.get_entity());
         self.apply(world, enchantment_level, entity, position);
     }
 }

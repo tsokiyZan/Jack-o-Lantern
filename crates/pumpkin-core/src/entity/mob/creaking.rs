@@ -33,6 +33,7 @@ use crate::entity::ai::control::jump_control::{JumpControl, JumpControlTrait};
 use crate::entity::ai::pathfinder::node::PathType;
 use crate::entity::ai::pathfinder::node_evaluator::MobData;
 use crate::entity::custom_sound::CustomSound;
+use crate::entity::damage_source::DamageSource;
 use crate::entity::player::Player;
 use crate::entity::projectile::is_projectile;
 use crate::entity::{
@@ -49,14 +50,6 @@ pub const CREAKING_GRAY: i32 = 6_250_335;
 pub const INVULNERABILITY_ANIMATION_DURATION: i32 = 8;
 pub const TWITCH_DEATH_DURATION: u8 = 45;
 const MAX_PLAYER_STUCK_COUNTER: i32 = 4;
-
-/// The parts of a vanilla `DamageSource` that the creaking's death reads: its type, the
-/// direct entity and the one responsible.
-pub struct DamageSource<'a> {
-    pub damage_type: DamageType,
-    pub direct: Option<&'a dyn EntityBase>,
-    pub causing: Option<&'a dyn EntityBase>,
-}
 
 pub struct CreakingEntity {
     pub mob_entity: MobEntity,

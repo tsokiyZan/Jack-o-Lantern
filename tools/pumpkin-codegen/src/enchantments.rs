@@ -338,8 +338,30 @@ fn parse_entity_effect(val: &serde_json::Value) -> TokenStream {
                 }
             }
             "minecraft:play_sound" => {
-                let sound = obj.get("sound").and_then(|s| s.as_str()).unwrap_or("");
-                quote! { EnchantmentEntityEffect::PlaySound { sound: #sound } }
+                let sound_names: Vec<&str> = match obj.get("sound") {
+                    Some(serde_json::Value::String(s)) => vec![s.as_str()],
+                    Some(serde_json::Value::Array(arr)) => arr
+                        .iter()
+                        .map(|s| s.as_str().expect("play_sound sound is a string"))
+                        .collect(),
+                    other => panic!("unsupported play_sound sound {other:?}"),
+                };
+                let sounds = sound_names.iter().map(|s| {
+                    let raw = s.strip_prefix("minecraft:").unwrap_or(s);
+                    let ident = format_ident!("{}", raw.to_pascal_case());
+                    quote! { crate::sound::Sound::#ident }
+                });
+                let volume =
+                    parse_float_provider(obj.get("volume").expect("play_sound without volume"));
+                let pitch =
+                    parse_float_provider(obj.get("pitch").expect("play_sound without pitch"));
+                quote! {
+                    EnchantmentEntityEffect::PlaySound {
+                        sounds: &[#(#sounds),*],
+                        volume: #volume,
+                        pitch: #pitch,
+                    }
+                }
             }
             "minecraft:replace_block" => {
                 let offset_x = obj
@@ -749,6 +771,193 @@ fn parse_value_effect(val: &serde_json::Value) -> TokenStream {
     }
 }
 
+/// Parses an effect's `requirements` (a vanilla `LootItemCondition`). Only the condition types the
+/// vanilla data uses on targeted effects are supported; anything else fails codegen instead of
+/// being silently dropped.
+fn parse_loot_item_condition(v: &serde_json::Value) -> TokenStream {
+    let cond_type = v.get("type").and_then(|t| t.as_str()).unwrap_or("");
+    match cond_type {
+        "minecraft:all_of" => {
+            let terms: Vec<TokenStream> = v
+                .get("terms")
+                .and_then(|t| t.as_array())
+                .expect("all_of without terms")
+                .iter()
+                .map(parse_loot_item_condition)
+                .collect();
+            quote! { LootItemCondition::AllOf(&[#(#terms),*]) }
+        }
+        "minecraft:random_chance" => {
+            let chance = v.get("chance").expect("random_chance without chance");
+            let chance = if let Some(f) = chance.as_f64() {
+                let f = f as f32;
+                quote! { ContextFloatProvider::Constant(#f) }
+            } else {
+                match chance.get("type").and_then(|t| t.as_str()) {
+                    Some("minecraft:constant") => {
+                        let f = chance
+                            .get("value")
+                            .and_then(serde_json::Value::as_f64)
+                            .expect("constant without value")
+                            as f32;
+                        quote! { ContextFloatProvider::Constant(#f) }
+                    }
+                    Some("minecraft:enchantment_level") => {
+                        let amount = parse_level_based_value(
+                            chance
+                                .get("amount")
+                                .expect("enchantment_level without amount"),
+                        );
+                        quote! { ContextFloatProvider::EnchantmentLevel(#amount) }
+                    }
+                    other => panic!("unsupported random_chance provider {other:?}"),
+                }
+            };
+            quote! { LootItemCondition::RandomChance { chance: #chance } }
+        }
+        "minecraft:entity_properties" => {
+            let entity = match v.get("entity").and_then(|e| e.as_str()) {
+                Some("this") => quote! { LootContextEntityTarget::This },
+                Some("attacker") => quote! { LootContextEntityTarget::Attacker },
+                Some("direct_attacker") => quote! { LootContextEntityTarget::DirectAttacker },
+                other => panic!("unsupported entity_properties entity {other:?}"),
+            };
+            let predicate = match v.get("predicate") {
+                Some(p) => {
+                    let p = parse_entity_predicate(p);
+                    quote! { Some(#p) }
+                }
+                None => quote! { None },
+            };
+            quote! { LootItemCondition::EntityProperties { entity: #entity, predicate: #predicate } }
+        }
+        "minecraft:damage_source_properties" => {
+            let predicate = match v.get("predicate") {
+                Some(p) => {
+                    let obj = p.as_object().expect("damage source predicate is an object");
+                    for key in obj.keys() {
+                        assert!(
+                            key == "is_direct",
+                            "unsupported damage source predicate field {key}"
+                        );
+                    }
+                    let is_direct = parse_optional_bool(p.get("is_direct"));
+                    quote! { Some(DamageSourcePredicate { is_direct: #is_direct }) }
+                }
+                None => quote! { None },
+            };
+            quote! { LootItemCondition::DamageSourceProperties { predicate: #predicate } }
+        }
+        "minecraft:weather_check" => {
+            assert!(
+                v.get("raining").is_none(),
+                "weather_check raining is not supported"
+            );
+            let thundering = parse_optional_bool(v.get("thundering"));
+            quote! { LootItemCondition::WeatherCheck { thundering: #thundering } }
+        }
+        other => panic!("unsupported enchantment requirement type {other}"),
+    }
+}
+
+fn parse_optional_bool(v: Option<&serde_json::Value>) -> TokenStream {
+    match v.and_then(serde_json::Value::as_bool) {
+        Some(b) => quote! { Some(#b) },
+        None => quote! { None },
+    }
+}
+
+fn parse_entity_predicate(v: &serde_json::Value) -> TokenStream {
+    let obj = v.as_object().expect("entity predicate is an object");
+    let mut entity_type = quote! { None };
+    let mut location = quote! { None };
+    let mut flags = quote! { None };
+    let mut movement = quote! { None };
+    for (key, value) in obj {
+        match key.as_str() {
+            "minecraft:entity_type" => {
+                let name = value.as_str().expect("entity_type is a string");
+                let t = if let Some(tag) = name.strip_prefix('#') {
+                    let ident = format_ident!("{}", tag.replace([':', '/'], "_").to_uppercase());
+                    quote! { EntityTypePredicate::Tag(&EntityTypeTag::#ident) }
+                } else {
+                    let raw = name.strip_prefix("minecraft:").unwrap_or(name);
+                    let ident = format_ident!("{}", raw.to_shouty_snake_case());
+                    quote! { EntityTypePredicate::Type(&crate::entity::EntityType::#ident) }
+                };
+                entity_type = quote! { Some(#t) };
+            }
+            "minecraft:location" => {
+                let loc = value.as_object().expect("location predicate is an object");
+                for k in loc.keys() {
+                    assert!(
+                        k == "can_see_sky",
+                        "unsupported location predicate field {k}"
+                    );
+                }
+                let can_see_sky = parse_optional_bool(loc.get("can_see_sky"));
+                location = quote! { Some(LocationPredicate { can_see_sky: #can_see_sky }) };
+            }
+            "minecraft:flags" => {
+                let f = value.as_object().expect("flags predicate is an object");
+                for k in f.keys() {
+                    assert!(k == "is_flying", "unsupported flags predicate field {k}");
+                }
+                let is_flying = parse_optional_bool(f.get("is_flying"));
+                flags = quote! { Some(EntityFlagsPredicate { is_flying: #is_flying }) };
+            }
+            "minecraft:movement" => {
+                let m = value.as_object().expect("movement predicate is an object");
+                for k in m.keys() {
+                    assert!(
+                        k == "fall_distance",
+                        "unsupported movement predicate field {k}"
+                    );
+                }
+                let bounds = m.get("fall_distance").map_or_else(
+                    || quote! { DoubleBounds { min: None, max: None } },
+                    parse_double_bounds,
+                );
+                movement = quote! { Some(MovementPredicate { fall_distance: #bounds }) };
+            }
+            other => panic!("unsupported entity predicate part {other}"),
+        }
+    }
+    quote! {
+        EntityPredicate {
+            entity_type: #entity_type,
+            location: #location,
+            flags: #flags,
+            movement: #movement,
+        }
+    }
+}
+
+fn parse_double_bounds(v: &serde_json::Value) -> TokenStream {
+    if let Some(exact) = v.as_f64() {
+        return quote! { DoubleBounds { min: Some(#exact), max: Some(#exact) } };
+    }
+    let min = match v.get("min").and_then(serde_json::Value::as_f64) {
+        Some(m) => quote! { Some(#m) },
+        None => quote! { None },
+    };
+    let max = match v.get("max").and_then(serde_json::Value::as_f64) {
+        Some(m) => quote! { Some(#m) },
+        None => quote! { None },
+    };
+    quote! { DoubleBounds { min: #min, max: #max } }
+}
+
+fn parse_requirements(item: &serde_json::Value) -> TokenStream {
+    match item.get("requirements") {
+        Some(r) => {
+            let r = parse_loot_item_condition(r);
+            quote! { Some(#r) }
+        }
+        None => quote! { None },
+    }
+}
+
 fn parse_conditional_entity_effects(val: Option<&serde_json::Value>) -> TokenStream {
     let effects: Vec<TokenStream> = val
         .and_then(|v| v.as_array())
@@ -789,11 +998,13 @@ fn parse_targeted_conditional_entity_effects(val: Option<&serde_json::Value>) ->
                         Some("victim") => quote! { Some(EnchantmentTarget::Victim) },
                         _ => quote! { None },
                     };
+                    let requirements = parse_requirements(item);
                     quote! {
                         TargetedConditionalEffect {
                             enchanted: #enchanted,
                             affected: #affected,
                             effect: #eff_tokens,
+                            requirements: #requirements,
                         }
                     }
                 })
@@ -843,11 +1054,13 @@ fn parse_targeted_conditional_value_effects(val: Option<&serde_json::Value>) -> 
                         Some("victim") => quote! { Some(EnchantmentTarget::Victim) },
                         _ => quote! { None },
                     };
+                    let requirements = parse_requirements(item);
                     quote! {
                         TargetedConditionalEffect {
                             enchanted: #enchanted,
                             affected: #affected,
                             effect: #eff_tokens,
+                            requirements: #requirements,
                         }
                     }
                 })
@@ -1306,11 +1519,97 @@ pub fn build() -> TokenStream {
             Victim,
         }
 
-        #[derive(Clone, Debug, PartialEq, Eq)]
+        #[derive(Clone, Debug, PartialEq)]
         pub struct TargetedConditionalEffect<T> {
             pub enchanted: Option<EnchantmentTarget>,
             pub affected: Option<EnchantmentTarget>,
             pub effect: T,
+            pub requirements: Option<LootItemCondition>,
+        }
+
+        /// The vanilla `LootItemCondition` types that enchantment effect requirements use.
+        #[derive(Clone, Debug, PartialEq)]
+        pub enum LootItemCondition {
+            AllOf(&'static [Self]),
+            RandomChance { chance: ContextFloatProvider },
+            EntityProperties {
+                entity: LootContextEntityTarget,
+                predicate: Option<EntityPredicate>,
+            },
+            DamageSourceProperties { predicate: Option<DamageSourcePredicate> },
+            WeatherCheck { thundering: Option<bool> },
+        }
+
+        #[derive(Clone, Debug, PartialEq)]
+        pub enum ContextFloatProvider {
+            Constant(f32),
+            EnchantmentLevel(LevelBasedValue),
+        }
+
+        /// Vanilla `LootContext.EntityTarget`.
+        #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+        pub enum LootContextEntityTarget {
+            This,
+            Attacker,
+            DirectAttacker,
+        }
+
+        #[derive(Clone, Debug, PartialEq)]
+        pub struct EntityPredicate {
+            pub entity_type: Option<EntityTypePredicate>,
+            pub location: Option<LocationPredicate>,
+            pub flags: Option<EntityFlagsPredicate>,
+            pub movement: Option<MovementPredicate>,
+        }
+
+        #[derive(Clone, Copy, Debug, PartialEq)]
+        pub enum EntityTypePredicate {
+            Type(&'static crate::entity::EntityType),
+            Tag(&'static Tag),
+        }
+
+        impl EntityTypePredicate {
+            #[must_use]
+            pub fn matches(&self, entity_type: &crate::entity::EntityType) -> bool {
+                match self {
+                    Self::Type(t) => t.id == entity_type.id,
+                    Self::Tag(tag) => entity_type.has_tag(tag),
+                }
+            }
+        }
+
+        #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+        pub struct LocationPredicate {
+            pub can_see_sky: Option<bool>,
+        }
+
+        #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+        pub struct EntityFlagsPredicate {
+            pub is_flying: Option<bool>,
+        }
+
+        #[derive(Clone, Copy, Debug, PartialEq)]
+        pub struct MovementPredicate {
+            pub fall_distance: DoubleBounds,
+        }
+
+        /// Vanilla `MinMaxBounds.Doubles`.
+        #[derive(Clone, Copy, Debug, PartialEq)]
+        pub struct DoubleBounds {
+            pub min: Option<f64>,
+            pub max: Option<f64>,
+        }
+
+        impl DoubleBounds {
+            #[must_use]
+            pub fn matches(&self, value: f64) -> bool {
+                self.min.is_none_or(|min| min <= value) && self.max.is_none_or(|max| value <= max)
+            }
+        }
+
+        #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+        pub struct DamageSourcePredicate {
+            pub is_direct: Option<bool>,
         }
 
         #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1350,7 +1649,9 @@ pub fn build() -> TokenStream {
                 amount: LevelBasedValue,
             },
             PlaySound {
-                sound: &'static str,
+                sounds: &'static [crate::sound::Sound],
+                volume: pumpkin_util::math::float_provider::FloatProvider,
+                pitch: pumpkin_util::math::float_provider::FloatProvider,
             },
             ReplaceBlock {
                 offset_x: i32,
@@ -1673,6 +1974,27 @@ pub fn build() -> TokenStream {
             Saddle,
         }
 
+        impl AttributeModifierSlot {
+            /// Vanilla `EquipmentSlotGroup.test`.
+            #[must_use]
+            pub fn test(&self, slot: &crate::data_component_impl::EquipmentSlot) -> bool {
+                use crate::data_component_impl::{EquipmentSlot, EquipmentType};
+                match self {
+                    Self::Any => true,
+                    Self::MainHand => *slot == EquipmentSlot::MAIN_HAND,
+                    Self::OffHand => *slot == EquipmentSlot::OFF_HAND,
+                    Self::Hand => slot.slot_type() == EquipmentType::Hand,
+                    Self::Feet => *slot == EquipmentSlot::FEET,
+                    Self::Legs => *slot == EquipmentSlot::LEGS,
+                    Self::Chest => *slot == EquipmentSlot::CHEST,
+                    Self::Head => *slot == EquipmentSlot::HEAD,
+                    Self::Armor => slot.is_armor_slot(),
+                    Self::Body => *slot == EquipmentSlot::BODY,
+                    Self::Saddle => *slot == EquipmentSlot::SADDLE,
+                }
+            }
+        }
+
         impl Enchantment {
             pub const ALL: &'static [&'static Self] = &[#all_variants];
 
@@ -1695,6 +2017,11 @@ pub fn build() -> TokenStream {
                 }
             }
 
+            /// Vanilla `Enchantment.matchingSlot`.
+            #[must_use]
+            pub fn matching_slot(&self, slot: &crate::data_component_impl::EquipmentSlot) -> bool {
+                self.slots.iter().any(|group| group.test(slot))
+            }
             pub fn can_enchant(&self, item: &'static Item) -> bool {
                 self.supported_items.1.contains(&item.id)
             }

@@ -43,10 +43,14 @@ impl EnchantmentEntityEffectExt for ApplyExhaustion {
         &self,
         world: &Arc<World>,
         enchantment_level: i32,
-        owner: Option<&Arc<Player>>,
-        entity: Option<&Entity>,
+        item: &crate::enchantment::EnchantedItemInUse<'_>,
+        entity: &dyn crate::entity::EntityBase,
         _position: Vector3<f64>,
     ) {
-        self.apply(world, enchantment_level, owner, entity);
+        let owner = item
+            .owner
+            .and_then(|owner| world.get_player_by_id(owner.get_entity().entity_id));
+        let entity = Some(entity.get_entity());
+        self.apply(world, enchantment_level, owner.as_ref(), entity);
     }
 }

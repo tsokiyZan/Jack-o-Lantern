@@ -34,6 +34,21 @@ pub enum ExplosionInteraction {
     Trigger,
 }
 
+impl ExplosionInteraction {
+    /// Parses the vanilla `Level.ExplosionInteraction` serialized name.
+    #[must_use]
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "none" => Some(Self::None),
+            "block" => Some(Self::Block),
+            "mob" => Some(Self::Mob),
+            "tnt" => Some(Self::Tnt),
+            "trigger" => Some(Self::Trigger),
+            _ => None,
+        }
+    }
+}
+
 /// Defines how an explosion interacts with blocks in the world.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BlockInteraction {

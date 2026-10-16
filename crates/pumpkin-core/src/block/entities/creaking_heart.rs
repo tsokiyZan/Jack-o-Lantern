@@ -27,8 +27,9 @@ use uuid::Uuid;
 use crate::block::blocks::creaking_heart::CreakingHeartBlock;
 use crate::block::blocks::sculk::sculk_vein::{has_face, set_face};
 use crate::entity::EntityBase;
+use crate::entity::damage_source::DamageSource;
 use crate::entity::mob::Mob;
-use crate::entity::mob::creaking::{CREAKING_GRAY, CREAKING_ORANGE, CreakingEntity, DamageSource};
+use crate::entity::mob::creaking::{CREAKING_GRAY, CREAKING_ORANGE, CreakingEntity};
 use crate::entity::spawn_util::{SpawnStrategy, try_spawn_mob};
 use crate::world::World;
 

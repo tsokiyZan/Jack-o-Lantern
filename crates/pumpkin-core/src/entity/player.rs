@@ -1,6 +1,8 @@
 pub mod advancement;
 pub mod statistics;
 
+use crate::enchantment::EnchantmentHelper;
+use crate::entity::damage_source::DamageSource;
 use crate::entity::movement_emission::MovementEmission;
 use core::f32;
 use std::collections::{HashMap, VecDeque};
@@ -1430,17 +1432,22 @@ impl Player {
             damage += (1.5 + smash_bonus_per_block) * f64::from(fall_distance);
         }
 
-        if !victim.damage_with_context(
-            victim.as_ref(),
-            damage as f32,
-            if is_mace_smash {
+        let damage_source = DamageSource {
+            damage_type: if is_mace_smash {
                 DamageType::MACE_SMASH
             } else {
                 DamageType::PLAYER_ATTACK
             },
+            direct: Some(self),
+            causing: Some(self),
+        };
+        if !victim.damage_with_context(
+            victim.as_ref(),
+            damage as f32,
+            damage_source.damage_type,
             None,
-            Some(self),
-            Some(self),
+            damage_source.direct,
+            damage_source.causing,
         ) {
             world.play_sound(
                 Sound::EntityPlayerAttackNodamage,
@@ -1454,37 +1461,18 @@ impl Player {
             self.trigger_advancement(crate::entity::player::advancement::trigger::AdvancementTrigger::DealtOverkillDamage);
         }
 
-        if let Some(enchantments) = item_stack.get_data_component::<EnchantmentsImpl>() {
-            for (enchantment, level) in enchantments.enchantment.iter() {
-                for post_effect in enchantment.get_post_attack_effects() {
-                    if post_effect.affected
-                        == Some(pumpkin_data::enchantment::EnchantmentTarget::Victim)
-                        && let pumpkin_data::enchantment::EnchantmentEntityEffect::Ignite {
-                            duration,
-                        } = &post_effect.effect
-                    {
-                        let duration_seconds = duration.calculate(*level);
-                        victim_entity.set_on_fire_for_ticks((duration_seconds * 20.0) as u32);
-                    }
-                }
-            }
-        }
+        // Vanilla `itemAttackInteraction`, ahead of the mace's `postHurtEnemy` fall reset that
+        // Wind Burst's requirement reads.
+        EnchantmentHelper::do_post_attack_effects_with_item_source(
+            &world,
+            victim.as_ref(),
+            &damage_source,
+            Some(&item_stack),
+        );
 
         if is_mace_smash {
             let fall_distance = self.living_entity.fall_distance.load();
             self.living_entity.fall_distance.store(0.0);
-            if let Some(enchantments) = item_stack.get_data_component::<EnchantmentsImpl>() {
-                for (enchantment, level) in enchantments.enchantment.iter() {
-                    if **enchantment == Enchantment::WIND_BURST {
-                        let boost_y = 0.5 + 0.25 * (*level as f64);
-                        let vel = self.living_entity.entity.velocity.load();
-                        self.living_entity
-                            .entity
-                            .velocity
-                            .store(Vector3::new(vel.x, boost_y, vel.z));
-                    }
-                }
-            }
             world.play_sound(
                 if fall_distance > 5.0 {
                     Sound::ItemMaceSmashGroundHeavy
@@ -1552,14 +1540,19 @@ impl Player {
                     for other_victim in victims {
                         if other_victim.get_entity().entity_id != victim_entity.entity_id
                             && other_victim.get_entity().entity_id != attacker_entity.entity_id
-                        {
-                            other_victim.damage_with_context(
+                            && other_victim.damage_with_context(
                                 other_victim.as_ref(),
                                 sweep_damage,
                                 DamageType::PLAYER_ATTACK,
                                 None,
                                 Some(self),
                                 Some(self),
+                            )
+                        {
+                            EnchantmentHelper::do_post_attack_effects(
+                                &world,
+                                other_victim.as_ref(),
+                                &damage_source,
                             );
                         }
                     }

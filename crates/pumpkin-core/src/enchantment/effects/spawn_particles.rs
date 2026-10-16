@@ -8,7 +8,6 @@ use pumpkin_util::random::{RandomGenerator, get_seed, xoroshiro128::Xoroshiro};
 
 use super::EnchantmentEntityEffectExt;
 use crate::entity::Entity;
-use crate::entity::player::Player;
 use crate::world::World;
 
 /// Enchantment entity effect that spawns particles.
@@ -101,10 +100,11 @@ impl EnchantmentEntityEffectExt for SpawnParticlesEffect {
         &self,
         world: &Arc<World>,
         _enchantment_level: i32,
-        _owner: Option<&Arc<Player>>,
-        entity: Option<&Entity>,
+        _item: &crate::enchantment::EnchantedItemInUse<'_>,
+        entity: &dyn crate::entity::EntityBase,
         position: Vector3<f64>,
     ) {
+        let entity = Some(entity.get_entity());
         self.apply(world, position, entity);
     }
 }
