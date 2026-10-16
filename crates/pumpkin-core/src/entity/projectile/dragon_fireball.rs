@@ -1,7 +1,5 @@
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 
-use crossbeam::atomic::AtomicCell;
 use pumpkin_data::effect::StatusEffect;
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::particle::Particle;
@@ -12,8 +10,8 @@ use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
 
 use crate::entity::area_effect_cloud::AreaEffectCloudEntity;
-use crate::entity::projectile::fireball::{AIR_INERTIA, INITIAL_ACCELERATION_POWER, WATER_INERTIA};
-use crate::entity::projectile::{ProjectileHit, ThrownItemEntity};
+use crate::entity::projectile::ProjectileHit;
+use crate::entity::projectile::hurting_projectile::{HurtingProjectile, HurtingProjectileTick};
 use crate::entity::{Entity, EntityBase};
 use crate::server::Server;
 
@@ -23,24 +21,14 @@ pub const SPLASH_RANGE: f64 = 4.0;
 /// Vanilla `DragonFireball`: the ender dragon's fireball, which leaves a cloud of dragon's
 /// breath where it lands.
 pub struct DragonFireballEntity {
-    pub thrown: ThrownItemEntity,
-    acceleration_power: AtomicCell<f64>,
+    pub hurting: HurtingProjectile,
 }
 
 impl DragonFireballEntity {
     #[must_use]
     pub const fn new(entity: Entity) -> Self {
         Self {
-            thrown: ThrownItemEntity {
-                entity,
-                owner_id: AtomicCell::new(None),
-                collides_with_projectiles: false,
-                has_hit: AtomicBool::new(false),
-                last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
-                gravity: 0.0,
-                left_owner: std::sync::atomic::AtomicBool::new(false),
-            },
-            acceleration_power: AtomicCell::new(INITIAL_ACCELERATION_POWER),
+            hurting: HurtingProjectile::new(entity),
         }
     }
 
@@ -48,55 +36,47 @@ impl DragonFireballEntity {
     /// `snapTo(x, y, z, 0, 0)`: `entity` is already at the start position.
     #[must_use]
     pub fn new_shot(entity: Entity, owner: &Entity, direction: Vector3<f64>) -> Self {
-        let fireball = Self::new(entity);
-        fireball.thrown.owner_id.store(Some(owner.entity_id));
-        // `assignDirectionalMovement`.
-        let entity = &fireball.thrown.entity;
-        entity
-            .velocity
-            .store(direction.normalize() * INITIAL_ACCELERATION_POWER);
-        entity.velocity_dirty.store(true, Ordering::Relaxed);
+        let start = entity.pos.load();
+        let fireball = Self {
+            hurting: HurtingProjectile::new_from_mob(entity, owner, direction),
+        };
+        let entity = fireball.get_entity();
+        entity.set_pos(start);
+        entity.set_rotation(0.0, 0.0);
         fireball
     }
 }
 
 impl EntityBase for DragonFireballEntity {
     fn get_owner_id(&self) -> Option<i32> {
-        self.thrown.owner_id.load()
+        self.hurting.get_owner_id()
     }
 
     fn set_owner_id(&self, owner: Option<i32>) {
-        self.thrown.owner_id.store(owner);
+        self.hurting.set_owner_id(owner);
     }
 
     fn write_custom_nbt(&self, nbt: &mut NbtCompound) {
-        nbt.put_double("acceleration_power", self.acceleration_power.load());
+        self.hurting.write_nbt(nbt);
     }
 
     fn read_custom_nbt(&self, nbt: &NbtCompound) {
-        self.acceleration_power.store(
-            nbt.get_double("acceleration_power")
-                .unwrap_or(INITIAL_ACCELERATION_POWER),
+        self.hurting.read_nbt(nbt);
+    }
+
+    fn tick(&self, caller: &dyn EntityBase, server: &Server) {
+        self.hurting.tick(
+            caller,
+            server,
+            &HurtingProjectileTick {
+                should_burn: false,
+                ..HurtingProjectileTick::default()
+            },
         );
     }
 
-    fn tick(&self, caller: &dyn EntityBase, _server: &Server) {
-        // `AbstractHurtingProjectile.applyInertia`, like `Fireball`.
-        let entity = self.get_entity();
-        let velocity = entity.velocity.load();
-        let inertia = if entity.touching_water.load(Ordering::Relaxed) {
-            WATER_INERTIA
-        } else {
-            AIR_INERTIA
-        };
-        entity
-            .velocity
-            .store((velocity + velocity.normalize() * self.acceleration_power.load()) * inertia);
-        self.thrown.process_tick(caller);
-    }
-
     fn get_entity(&self) -> &Entity {
-        self.thrown.get_entity()
+        self.hurting.get_entity()
     }
 
     fn get_living_entity(&self) -> Option<&crate::entity::living::LivingEntity> {
@@ -164,5 +144,6 @@ impl EntityBase for DragonFireballEntity {
             data,
         );
         world.spawn_entity(Arc::new(cloud));
+        entity.remove();
     }
 }

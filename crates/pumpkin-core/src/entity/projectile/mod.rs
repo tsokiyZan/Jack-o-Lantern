@@ -19,6 +19,7 @@ pub mod eye_of_ender;
 pub mod fireball;
 pub mod firework_rocket;
 pub mod fishing_bobber;
+pub mod hurting_projectile;
 pub mod lingering_potion;
 pub mod llama_spit;
 pub mod shulker_bullet;

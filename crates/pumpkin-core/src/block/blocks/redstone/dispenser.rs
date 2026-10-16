@@ -742,7 +742,7 @@ impl DispenserBlock {
         );
         let fireball = SmallFireballEntity::new(entity);
         fireball.fireball.set_item(item.clone());
-        fireball.fireball.thrown.set_velocity(
+        fireball.fireball.hurting.thrown.set_velocity(
             facing.x,
             facing.y,
             facing.z,

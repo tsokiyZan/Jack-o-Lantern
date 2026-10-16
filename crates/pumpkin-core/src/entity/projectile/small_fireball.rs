@@ -7,7 +7,7 @@ use crate::{
     block::blocks::fire::FireBlockBase,
     entity::{
         Entity, EntityBase,
-        projectile::{ProjectileHit, fireball::Fireball},
+        projectile::{ProjectileHit, fireball::Fireball, hurting_projectile::HurtingProjectile},
     },
     server::Server,
 };
@@ -22,7 +22,7 @@ impl SmallFireballEntity {
     #[must_use]
     pub fn new(entity: Entity) -> Self {
         Self {
-            fireball: Fireball::new(entity),
+            fireball: Fireball::new(HurtingProjectile::new(entity)),
         }
     }
 
@@ -30,7 +30,7 @@ impl SmallFireballEntity {
     #[must_use]
     pub fn new_directional(entity: Entity, direction: Vector3<f64>) -> Self {
         Self {
-            fireball: Fireball::new_directional(entity, direction),
+            fireball: Fireball::new(HurtingProjectile::new_directional(entity, direction)),
         }
     }
 
@@ -38,18 +38,18 @@ impl SmallFireballEntity {
     #[must_use]
     pub fn new_from_mob(entity: Entity, mob: &Entity, direction: Vector3<f64>) -> Self {
         Self {
-            fireball: Fireball::new_from_mob(entity, mob, direction),
+            fireball: Fireball::new(HurtingProjectile::new_from_mob(entity, mob, direction)),
         }
     }
 }
 
 impl EntityBase for SmallFireballEntity {
     fn get_owner_id(&self) -> Option<i32> {
-        self.fireball.thrown.owner_id.load()
+        self.fireball.hurting.get_owner_id()
     }
 
     fn set_owner_id(&self, owner: Option<i32>) {
-        self.fireball.thrown.owner_id.store(owner);
+        self.fireball.hurting.set_owner_id(owner);
     }
 
     fn write_custom_nbt(&self, nbt: &mut NbtCompound) {
@@ -123,5 +123,7 @@ impl EntityBase for SmallFireballEntity {
                 }
             }
         }
+        // Vanilla `SmallFireball.onHit`.
+        self.get_entity().remove();
     }
 }

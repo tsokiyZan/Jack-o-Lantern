@@ -7,38 +7,34 @@ use pumpkin_util::{Difficulty, math::vector3::Vector3};
 use crate::{
     entity::{
         Entity, EntityBase,
-        projectile::{ProjectileHit, ThrownItemEntity},
+        projectile::{
+            ProjectileHit,
+            hurting_projectile::{HurtingProjectile, HurtingProjectileTick},
+        },
     },
     server::Server,
     world::ExplosionInteraction,
 };
 
-const GRAVITY: f64 = 0.0;
+/// Vanilla `WitherSkull.getInertia` for a dangerous (blue) skull, a float.
+const DANGEROUS_INERTIA: f32 = 0.73;
 
+/// Vanilla `WitherSkull`.
 pub struct WitherSkullEntity {
-    pub thrown: ThrownItemEntity,
+    pub hurting: HurtingProjectile,
     pub dangerous: AtomicBool,
 }
 
 impl WitherSkullEntity {
     #[must_use]
     pub const fn new(entity: Entity) -> Self {
-        let thrown = ThrownItemEntity {
-            entity,
-            owner_id: crossbeam::atomic::AtomicCell::new(None),
-            collides_with_projectiles: false,
-            has_hit: AtomicBool::new(false),
-            last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
-            gravity: GRAVITY,
-            left_owner: std::sync::atomic::AtomicBool::new(false),
-        };
-
         Self {
-            thrown,
+            hurting: HurtingProjectile::new(entity),
             dangerous: AtomicBool::new(false),
         }
     }
 
+    /// Vanilla `WitherBoss.performRangedAttack`'s skull: `entity` is at the head.
     #[must_use]
     pub fn new_shot(
         entity: Entity,
@@ -46,21 +42,16 @@ impl WitherSkullEntity {
         dangerous: bool,
         direction: Vector3<f64>,
     ) -> Self {
-        let thrown = ThrownItemEntity::new(entity, shooter, GRAVITY);
-        let speed = 0.95;
-        let vel = direction.normalize().multiply(speed, speed, speed);
-        thrown.entity.velocity.store(vel);
-
-        let len = vel.horizontal_length();
-        thrown.entity.set_rotation(
-            vel.x.atan2(vel.z) as f32 * 57.295_776,
-            vel.y.atan2(len) as f32 * 57.295_776,
-        );
-
-        Self {
-            thrown,
-            dangerous: AtomicBool::new(dangerous),
+        let head = entity.pos.load();
+        let skull = Self {
+            hurting: HurtingProjectile::new_from_mob(entity, shooter, direction),
+            dangerous: AtomicBool::new(false),
+        };
+        if dangerous {
+            skull.set_dangerous(true);
         }
+        skull.get_entity().set_pos(head);
+        skull
     }
 
     #[must_use]
@@ -70,15 +61,19 @@ impl WitherSkullEntity {
 
     pub fn set_dangerous(&self, dangerous: bool) {
         self.dangerous.store(dangerous, Ordering::Relaxed);
-        self.thrown
-            .entity
+        self.hurting
+            .get_entity()
             .set_synced_data(tracked_data::wither_skull::DATA_DANGEROUS, dangerous);
     }
 }
 
 impl EntityBase for WitherSkullEntity {
     fn get_owner_id(&self) -> Option<i32> {
-        self.thrown.owner_id.load()
+        self.hurting.get_owner_id()
+    }
+
+    fn set_owner_id(&self, owner: Option<i32>) {
+        self.hurting.set_owner_id(owner);
     }
 
     /// Vanilla `WitherSkull.getBlockExplosionResistance`: a blue skull breaks what the wither
@@ -98,13 +93,16 @@ impl EntityBase for WitherSkullEntity {
     }
 
     fn write_custom_nbt(&self, nbt: &mut NbtCompound) {
+        self.hurting.write_nbt(nbt);
         nbt.put_bool("dangerous", self.is_dangerous());
     }
 
     fn read_custom_nbt(&self, nbt: &NbtCompound) {
-        if let Some(dangerous) = nbt.get_bool("dangerous") {
-            self.dangerous.store(dangerous, Ordering::Relaxed);
-        }
+        self.hurting.read_nbt(nbt);
+        self.dangerous.store(
+            nbt.get_bool("dangerous").unwrap_or(false),
+            Ordering::Relaxed,
+        );
     }
 
     fn init_data_tracker(&self) {
@@ -115,12 +113,25 @@ impl EntityBase for WitherSkullEntity {
         );
     }
 
-    fn tick(&self, caller: &dyn EntityBase, _server: &Server) {
-        self.thrown.process_tick(caller);
+    fn tick(&self, caller: &dyn EntityBase, server: &Server) {
+        let defaults = HurtingProjectileTick::default();
+        self.hurting.tick(
+            caller,
+            server,
+            &HurtingProjectileTick {
+                inertia: if self.is_dangerous() {
+                    DANGEROUS_INERTIA
+                } else {
+                    defaults.inertia
+                },
+                should_burn: false,
+                ..defaults
+            },
+        );
     }
 
     fn get_entity(&self) -> &Entity {
-        self.thrown.get_entity()
+        self.hurting.get_entity()
     }
 
     fn get_living_entity(&self) -> Option<&crate::entity::living::LivingEntity> {
@@ -155,8 +166,14 @@ impl EntityBase for WitherSkullEntity {
                         this.as_deref(),
                         Some(owner.as_ref()),
                     );
+                    // `isAlive`: a living target with no health left counts as dead.
+                    let alive = entity.get_living_entity().map_or_else(
+                        || entity.get_entity().is_alive(),
+                        crate::entity::living::LivingEntity::is_alive,
+                    );
+                    // TODO: vanilla `EnchantmentHelper.doPostAttackEffects` when the target lives.
                     if hurt
-                        && !entity.get_entity().is_alive()
+                        && !alive
                         && let Some(living_owner) = owner.get_living_entity()
                     {
                         living_owner.heal(5.0);
@@ -199,5 +216,6 @@ impl EntityBase for WitherSkullEntity {
             1.0,
             ExplosionInteraction::Mob,
         );
+        self.get_entity().remove();
     }
 }
