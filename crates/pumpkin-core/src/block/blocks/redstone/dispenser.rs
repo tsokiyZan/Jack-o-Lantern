@@ -39,7 +39,7 @@ use crate::item::items::bucket::{
     FilledBucketItem, empty_sulfur_cube_bucket, play_bucket_evaporation,
     should_evaporate_in_nether, try_pickup_fluid_at, try_place_filled_bucket,
 };
-use crate::item::items::honeycomb::try_wax_block;
+use crate::item::items::honeycomb::get_waxed;
 use crate::item::items::ignite::ignition::Ignition;
 use crate::item::items::minecart::MinecartItem;
 use crate::item::items::spawn_egg::prepare_egg_mob;
@@ -771,6 +771,7 @@ impl DispenserBlock {
             has_hit: AtomicBool::new(false),
             last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
             gravity: WIND_CHARGE_GRAVITY,
+            left_owner: std::sync::atomic::AtomicBool::new(false),
         };
         Self::launch_thrown(
             ctx,
@@ -924,16 +925,22 @@ impl DispenserBlock {
         }
     }
 
+    /// Vanilla's `HONEYCOMB` `OptionalDispenseItemBehavior`: anything it can't wax, it
+    /// dispenses like any other item.
     fn dispense_honeycomb(ctx: &DispenseContext<'_>, item: &mut ItemStack) {
         let front = Self::target_position(ctx);
-        let front_block = ctx.world.get_block(&front);
-
-        if try_wax_block(ctx.world, front, front_block) {
-            item.decrement(1);
-            Self::play_dispense_effects(ctx, WorldEvent::SoundDispenserDispense);
-        } else {
-            Self::play_dispense_effects(ctx, WorldEvent::SoundDispenserFail);
-        }
+        let Some(waxed_state) = get_waxed(ctx.world.get_block_state_id(&front)) else {
+            Self::drop_item(ctx, item);
+            return;
+        };
+        ctx.world
+            .set_block_state(&front, waxed_state, BlockFlags::NOTIFY_ALL);
+        ctx.world
+            .sync_world_event(WorldEvent::ParticlesWaxOn, front, 0);
+        ctx.world
+            .play_block_sound(Sound::ItemHoneycombWaxOn, SoundCategory::Blocks, front);
+        item.decrement(1);
+        Self::play_dispense_effects(ctx, WorldEvent::SoundDispenserDispense);
     }
 
     fn dispense_minecart(ctx: &DispenseContext<'_>, item: &mut ItemStack) -> bool {

@@ -38,6 +38,7 @@ impl DragonFireballEntity {
                 has_hit: AtomicBool::new(false),
                 last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
                 gravity: 0.0,
+                left_owner: std::sync::atomic::AtomicBool::new(false),
             },
             acceleration_power: AtomicCell::new(INITIAL_ACCELERATION_POWER),
         }

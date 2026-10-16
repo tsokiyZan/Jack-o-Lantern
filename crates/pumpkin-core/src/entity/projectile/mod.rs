@@ -111,6 +111,8 @@ pub struct ThrownItemEntity {
     /// Vanilla `Projectile.lastDeflectedBy`.
     pub last_deflected_by: crossbeam::atomic::AtomicCell<Option<i32>>,
     pub gravity: f64,
+    /// Vanilla `Projectile.leftOwner`: until then, the owner's stack of riders can't be hit.
+    pub left_owner: AtomicBool,
 }
 
 impl ThrownItemEntity {
@@ -125,6 +127,7 @@ impl ThrownItemEntity {
             has_hit: AtomicBool::new(false),
             last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
             gravity,
+            left_owner: AtomicBool::new(false),
         }
     }
 
@@ -205,8 +208,10 @@ impl ThrownItemEntity {
         let chunk_pos = entity.chunk_pos.load();
         world.broadcast_to_chunk(chunk_pos, &packet);
 
-        // Handle hit or continue
-        if let Some(h) = self.hit_result_on_move_vector(start_pos, delta) {
+        let hit = self.hit_result_on_move_vector(start_pos, delta);
+        // `Projectile.tick`, between the move and `hitTargetOrDeflectSelf`.
+        self.check_left_owner();
+        if let Some(h) = hit {
             if is_deflected(caller, &self.last_deflected_by, &h) {
                 return;
             }
@@ -320,6 +325,55 @@ impl ThrownItemEntity {
         self.entity.remove();
     }
 
+    /// Vanilla `Projectile.checkLeftOwner`.
+    pub(crate) fn check_left_owner(&self) {
+        if !self.left_owner.load(Ordering::Relaxed) {
+            self.left_owner
+                .store(self.is_outside_owner_collision_range(), Ordering::Relaxed);
+        }
+    }
+
+    /// Vanilla `Projectile.isOutsideOwnerCollisionRange`: no pickable entity of the owner's
+    /// stack touches this tick's movement, grown by a block.
+    fn is_outside_owner_collision_range(&self) -> bool {
+        let world = self.entity.world.load();
+        let Some(owner) = self
+            .owner_id
+            .load()
+            .and_then(|id| world.get_entity_by_id(id))
+        else {
+            return true;
+        };
+        let aabb = self
+            .entity
+            .bounding_box
+            .load()
+            .stretch(self.entity.velocity.load())
+            .expand(1.0, 1.0, 1.0);
+        let Some(root) = world.get_entity_by_id(owner.get_entity().root_vehicle_id()) else {
+            return true;
+        };
+        let mut stack = vec![root];
+        while let Some(entity) = stack.pop() {
+            if !entity.is_spectator()
+                && entity.can_hit()
+                && aabb.intersects(&entity.get_entity().bounding_box.load())
+            {
+                return false;
+            }
+            stack.extend(
+                entity
+                    .get_entity()
+                    .passengers
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .iter()
+                    .cloned(),
+            );
+        }
+        true
+    }
+
     /// Returns if collision should be skipped (e.g. owner or projectile vs projectile)
     fn should_skip_collision(&self, self_ent: &Entity, other: &Arc<dyn EntityBase>) -> bool {
         let other_ent = other.get_entity();
@@ -327,9 +381,13 @@ impl ThrownItemEntity {
             return true;
         }
 
-        // Skip owner for initial frames
-        if Some(other_ent.entity_id) == self.owner_id.load()
-            && self_ent.tick_count.load(Ordering::Relaxed) < 5
+        // Vanilla `Projectile.canHitEntity`: not the owner's stack until it has left it.
+        if !self.left_owner.load(Ordering::Relaxed)
+            && let Some(owner) = self
+                .owner_id
+                .load()
+                .and_then(|id| self_ent.world.load().get_entity_by_id(id))
+            && owner.get_entity().root_vehicle_id() == other_ent.root_vehicle_id()
         {
             return true;
         }

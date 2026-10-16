@@ -28,6 +28,7 @@ impl LlamaSpitEntity {
             has_hit: AtomicBool::new(false),
             last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
             gravity: LLAMA_SPIT_GRAVITY,
+            left_owner: std::sync::atomic::AtomicBool::new(false),
         };
 
         Self { thrown }
@@ -51,6 +52,7 @@ impl LlamaSpitEntity {
             has_hit: AtomicBool::new(false),
             last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
             gravity: LLAMA_SPIT_GRAVITY,
+            left_owner: std::sync::atomic::AtomicBool::new(false),
         };
 
         Self { thrown }

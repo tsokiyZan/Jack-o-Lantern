@@ -1,3 +1,4 @@
+use pumpkin_data::world::WorldEvent;
 use std::sync::RwLock;
 use std::sync::atomic::AtomicBool;
 
@@ -11,9 +12,8 @@ use crate::{
 use pumpkin_data::entity::EntityStatus;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_protocol::bedrock::server::actor_event::ActorEventID;
-use pumpkin_protocol::java::client::play::CWorldEvent;
 use pumpkin_util::math::position::BlockPos;
-use pumpkin_util::math::vector2::{Vector2, to_chunk_pos};
+
 use pumpkin_util::math::vector3::Vector3;
 use uuid::Uuid;
 
@@ -34,6 +34,7 @@ impl LingeringPotionEntity {
             has_hit: AtomicBool::new(false),
             last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
             gravity: GRAVITY,
+            left_owner: std::sync::atomic::AtomicBool::new(false),
         };
 
         Self {
@@ -172,17 +173,17 @@ impl EntityBase for LingeringPotionEntity {
             e.id == pumpkin_data::effect::StatusEffect::INSTANT_DAMAGE.id
                 || e.id == pumpkin_data::effect::StatusEffect::INSTANT_HEALTH.id
         });
-        let event_id = if has_instant { 2007 } else { 2002 };
+        let event = if has_instant {
+            WorldEvent::ParticlesInstantPotionSplash
+        } else {
+            WorldEvent::ParticlesSpellPotionSplash
+        };
         let block_pos = BlockPos(Vector3::new(
             hit_pos.x.floor() as i32,
             hit_pos.y.floor() as i32,
             hit_pos.z.floor() as i32,
         ));
-        let chunk_pos = to_chunk_pos(&Vector2::new(block_pos.0.x, block_pos.0.z));
-        world.broadcast_to_chunk(
-            chunk_pos,
-            &CWorldEvent::new(event_id, block_pos, color, false),
-        );
+        world.sync_world_event(event, block_pos, color);
 
         // Spawn and configure an `AreaEffectCloud` entity
         extinguish_fire_if_water_potion(&world, hit_pos, &stack);

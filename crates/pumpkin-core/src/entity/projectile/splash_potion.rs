@@ -1,3 +1,4 @@
+use pumpkin_data::world::WorldEvent;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, PoisonError, RwLock};
 
@@ -8,10 +9,9 @@ use crate::{
 use pumpkin_data::damage::DamageType;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::{Block, BlockId};
-use pumpkin_protocol::java::client::play::CWorldEvent;
+use pumpkin_util::math::boundingbox::BoundingBox;
+use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
-use pumpkin_util::math::{boundingbox::BoundingBox, vector2::Vector2};
-use pumpkin_util::math::{position::BlockPos, vector2::to_chunk_pos};
 use pumpkin_world::world::BlockFlags;
 
 const GRAVITY: f64 = 0.05;
@@ -31,6 +31,7 @@ impl SplashPotionEntity {
             has_hit: AtomicBool::new(false),
             last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
             gravity: GRAVITY,
+            left_owner: std::sync::atomic::AtomicBool::new(false),
         };
 
         Self {
@@ -297,7 +298,11 @@ impl EntityBase for SplashPotionEntity {
             e.id == pumpkin_data::effect::StatusEffect::INSTANT_DAMAGE.id
                 || e.id == pumpkin_data::effect::StatusEffect::INSTANT_HEALTH.id
         });
-        let event_id = if has_instant { 2007 } else { 2002 };
+        let event = if has_instant {
+            WorldEvent::ParticlesInstantPotionSplash
+        } else {
+            WorldEvent::ParticlesSpellPotionSplash
+        };
 
         // Convert hit_pos to BlockPos
         let block_pos = BlockPos(Vector3::new(
@@ -305,10 +310,7 @@ impl EntityBase for SplashPotionEntity {
             hit_pos.y.floor() as i32,
             hit_pos.z.floor() as i32,
         ));
-        world.broadcast_to_chunk(
-            to_chunk_pos(&Vector2::new(block_pos.0.x, block_pos.0.z)),
-            &CWorldEvent::new(event_id, block_pos, color, false),
-        );
+        world.sync_world_event(event, block_pos, color);
 
         // If no effects, just splash (like water bottles)
         if effects.is_empty() {

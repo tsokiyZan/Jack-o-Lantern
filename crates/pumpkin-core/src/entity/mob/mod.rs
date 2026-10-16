@@ -2556,7 +2556,7 @@ impl<T: Mob + Send + 'static> EntityBase for T {
     }
 
     fn can_hit(&self) -> bool {
-        true
+        !self.get_entity().is_removed()
     }
 
     fn damage_with_context(

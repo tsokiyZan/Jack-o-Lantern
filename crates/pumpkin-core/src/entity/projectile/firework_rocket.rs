@@ -37,6 +37,7 @@ impl FireworkRocketEntity {
                 has_hit: AtomicBool::new(false),
                 last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
                 gravity: GRAVITY,
+                left_owner: std::sync::atomic::AtomicBool::new(false),
             },
             life: 0.into(),
             life_time: (10 + random.next_bounded_i32(6) as u32 + random.next_bounded_i32(7) as u32)

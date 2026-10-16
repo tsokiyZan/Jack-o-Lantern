@@ -4510,14 +4510,30 @@ impl Player {
         source: Option<&dyn crate::entity::EntityBase>,
         cause: Option<&dyn crate::entity::EntityBase>,
     ) -> bool {
+        // Vanilla `Player.hurtServer`.
         if self
             .abilities
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .invulnerable
-            && damage_type != pumpkin_data::damage::DamageType::GENERIC_KILL
-            && damage_type != pumpkin_data::damage::DamageType::OUT_OF_WORLD
+            && !damage_type.has_tag(&tag::DamageType::MINECRAFT_BYPASSES_INVULNERABILITY)
         {
+            return false;
+        }
+        if self.living_entity.health.load() <= 0.0 {
+            return false;
+        }
+        // TODO: `removeEntitiesOnShoulder`; shoulder parrots aren't ported.
+        let mut amount = amount;
+        if scales_with_difficulty(damage_type, cause) {
+            match self.world().level_info.load().difficulty {
+                Difficulty::Peaceful => amount = 0.0,
+                Difficulty::Easy => amount = (amount / 2.0 + 1.0).min(amount),
+                Difficulty::Hard => amount = amount * 3.0 / 2.0,
+                Difficulty::Normal => {}
+            }
+        }
+        if amount == 0.0 {
             return false;
         }
         self.living_entity
@@ -7060,6 +7076,11 @@ impl EntityBase for Player {
         self.gamemode.load() == GameMode::Spectator
     }
 
+    /// Vanilla `Player.isPickable`.
+    fn can_hit(&self) -> bool {
+        !self.is_spectator() && !self.get_entity().is_removed()
+    }
+
     fn entity_sound_source(&self) -> SoundCategory {
         SoundCategory::Players
     }
@@ -8359,5 +8380,21 @@ mod tests {
             });
         }
         assert_eq!(counter.load(Ordering::SeqCst), 0);
+    }
+}
+
+/// Vanilla `DamageSource.scalesWithDifficulty`, with `cause` as the causing entity.
+fn scales_with_difficulty(
+    damage_type: pumpkin_data::damage::DamageType,
+    cause: Option<&dyn crate::entity::EntityBase>,
+) -> bool {
+    match damage_type.scaling {
+        pumpkin_data::damage::DamageScaling::Never => false,
+        pumpkin_data::damage::DamageScaling::WhenCausedByLivingNonPlayer => {
+            cause.is_some_and(|cause| {
+                cause.get_living_entity().is_some() && cause.get_player().is_none()
+            })
+        }
+        pumpkin_data::damage::DamageScaling::Always => true,
     }
 }

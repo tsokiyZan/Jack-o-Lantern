@@ -161,6 +161,7 @@ impl Behavior for Shoot {
             has_hit: AtomicBool::new(false),
             last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
             gravity: WIND_CHARGE_GRAVITY,
+            left_owner: std::sync::atomic::AtomicBool::new(false),
         };
         wind_charge.set_velocity(
             delta.x,

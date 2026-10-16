@@ -130,6 +130,17 @@ fn placed_chest_impl<E: BlockEntity + 'static>(
     }
 }
 
+/// Vanilla `ChestBlock.getConnectedDirection`, or `None` for a single chest.
+#[must_use]
+pub fn get_connected_direction(state_id: BlockStateId) -> Option<HorizontalFacing> {
+    let chest_props = ChestLikeProperties::from_state_id(state_id);
+    match chest_props.r#type {
+        ChestType::Single => None,
+        ChestType::Left => Some(chest_props.facing.rotate_clockwise()),
+        ChestType::Right => Some(chest_props.facing.rotate_counter_clockwise()),
+    }
+}
+
 /// Computes the comparator output for a chest, combining both halves for double chests.
 fn get_chest_comparator_output(args: &GetComparatorOutputArgs<'_>) -> Option<u8> {
     let state = args.world.get_block_state_id(args.position);

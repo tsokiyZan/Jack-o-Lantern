@@ -298,6 +298,7 @@ pub fn from_type(
                 has_hit: AtomicBool::new(false),
                 last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
                 gravity: WIND_CHARGE_GRAVITY,
+                left_owner: std::sync::atomic::AtomicBool::new(false),
             };
             Arc::new(WindChargeEntity::new_normal(thrown))
         }
@@ -309,6 +310,7 @@ pub fn from_type(
                 has_hit: AtomicBool::new(false),
                 last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
                 gravity: WIND_CHARGE_GRAVITY,
+                left_owner: std::sync::atomic::AtomicBool::new(false),
             };
             Arc::new(WindChargeEntity::new_breeze(thrown))
         }

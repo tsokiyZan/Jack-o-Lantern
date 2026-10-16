@@ -231,6 +231,11 @@ impl ArmorStandEntity {
 }
 
 impl EntityBase for ArmorStandEntity {
+    /// Vanilla `ArmorStand.isPickable`.
+    fn can_hit(&self) -> bool {
+        !self.get_entity().is_removed() && !self.is_marker()
+    }
+
     fn write_custom_nbt(&self, nbt: &mut NbtCompound) {
         let disabled_slots = self.disabled_slots.load(Ordering::Relaxed);
         // ...

@@ -501,8 +501,9 @@ pub trait EntityBase: Send + Sync + std::any::Any {
         false
     }
 
+    /// Vanilla `isPickable`: `false` for `Entity`, "not removed" for `LivingEntity`.
     fn can_hit(&self) -> bool {
-        false
+        self.get_living_entity().is_some() && !self.get_entity().is_removed()
     }
 
     fn is_flutterer(&self) -> bool {

@@ -1,3 +1,4 @@
+use crate::block::blocks::chests::get_connected_direction;
 use crate::block::registry::BlockActionResult;
 use crate::entity::player::Player;
 use crate::item::{ItemBehaviour, ItemMetadata};
@@ -41,11 +42,22 @@ impl ItemBehaviour for AxeItem {
         let current_state_id = world.get_block_state_id(&location);
 
         if let Some(result) = AXE.transform(block, current_state_id, face, &get_block) {
+            // Vanilla `BlockTransformer`: the player predicts its own sound and particles.
             if let Some(sound) = result.entry.sound {
-                world.play_sound(sound, SoundCategory::Blocks, &location.to_f64());
+                world.play_block_sound_expect(player, sound, SoundCategory::Blocks, location);
             }
             if let Some(particle) = result.entry.particle {
-                world.sync_world_event(particle, location, 0);
+                world.sync_world_event_from(player, particle, location, 0);
+                if block.has_tag(&tag::Block::MINECRAFT_COPPER_CHESTS)
+                    && let Some(direction) = get_connected_direction(current_state_id)
+                {
+                    world.sync_world_event_from(
+                        player,
+                        particle,
+                        location.offset(direction.to_offset()),
+                        0,
+                    );
+                }
             }
 
             if block.has_tag(&tag::Block::MINECRAFT_DOORS) {

@@ -190,6 +190,8 @@ use uuid::Uuid;
 use weather::Weather;
 
 const MAX_LIGHT_LEVEL: u8 = 15;
+/// The range vanilla `ServerLevel.levelEvent` passes to `PlayerList.broadcast`.
+const LEVEL_EVENT_RANGE: f64 = 64.0;
 
 fn bedrock_chest_block_actor(state_id: BlockStateId, position: BlockPos) -> Option<NbtCompound> {
     let (block, _) = BlockState::from_id_with_block(state_id);
@@ -5572,21 +5574,31 @@ impl World {
                 position: position.to_centered_f64().to_f32_lossy(),
                 data: VarInt(BlockState::to_be_network_id(broken_state_id) as i32),
             };
-            let chunk_pos = position.chunk_position();
-            if let Some(player) = cause {
-                // Java predicts its own break effect; Bedrock needs the server event.
-                if let ClientPlatform::Bedrock(client) = player.client.as_ref() {
-                    client.try_enqueue_client_packet(&be_packet);
-                }
-                self.broadcast_to_chunk_except_editioned(
-                    chunk_pos,
-                    &[player.get_entity().entity_uuid],
-                    &je_packet,
-                    &be_packet,
-                );
-            } else {
-                self.broadcast_to_chunk_editioned(chunk_pos, &je_packet, &be_packet);
+            // Vanilla `levelEvent(player, ...)`: Java predicts its own break effect; Bedrock
+            // needs the server event.
+            if let Some(player) = cause
+                && let ClientPlatform::Bedrock(client) = player.client.as_ref()
+            {
+                client.try_enqueue_client_packet(&be_packet);
             }
+            let players = self.players.load();
+            let mut java_recipients = Vec::new();
+            let mut bedrock_recipients = Vec::new();
+            for player in Self::level_event_recipients(
+                &players,
+                *position,
+                cause.map(|player| player.get_entity().entity_uuid),
+            ) {
+                match player.client.as_ref() {
+                    ClientPlatform::Java(_) => java_recipients.push(player),
+                    ClientPlatform::Bedrock(client) => bedrock_recipients.push(client),
+                }
+            }
+            Self::broadcast_java_grouped(
+                &je_packet,
+                Self::collect_java_recipients_by_version(java_recipients.into_iter()),
+            );
+            Self::broadcast_bedrock_grouped(&be_packet, bedrock_recipients.into_iter());
         }
 
         Some(broken_state_id)
@@ -6061,12 +6073,47 @@ impl World {
     }
     /* End ItemScatterer.java */
 
+    /// Vanilla `ServerLevel.levelEvent` without a source player.
     pub fn sync_world_event(&self, world_event: WorldEvent, position: BlockPos, data: i32) {
-        let chunk_pos = position.chunk_position();
-        self.broadcast_to_chunk(
-            chunk_pos,
+        let players = self.players.load();
+        let recipients = Self::level_event_recipients(&players, position, None);
+        Self::broadcast_java_grouped(
             &CWorldEvent::new(world_event as i32, position, data, false),
+            Self::collect_java_recipients_by_version(recipients),
         );
+    }
+
+    /// Vanilla `ServerLevel.levelEvent` from a player, who predicts the event and doesn't get it.
+    pub fn sync_world_event_from(
+        &self,
+        source: &Player,
+        world_event: WorldEvent,
+        position: BlockPos,
+        data: i32,
+    ) {
+        let players = self.players.load();
+        let recipients =
+            Self::level_event_recipients(&players, position, Some(source.get_entity().entity_uuid));
+        Self::broadcast_java_grouped(
+            &CWorldEvent::new(world_event as i32, position, data, false),
+            Self::collect_java_recipients_by_version(recipients),
+        );
+    }
+
+    /// Who vanilla `ServerLevel.levelEvent` reaches: through `PlayerList.broadcast`, the
+    /// players in this world within 64 blocks of the corner of `position`, except the source.
+    fn level_event_recipients(
+        players: &[Arc<Player>],
+        position: BlockPos,
+        except: Option<uuid::Uuid>,
+    ) -> impl Iterator<Item = &Arc<Player>> {
+        let corner = position.0.to_f64();
+        players.iter().filter(move |player| {
+            let entity = player.get_entity();
+            except != Some(entity.entity_uuid)
+                && (corner - entity.pos.load()).length_squared()
+                    < LEVEL_EVENT_RANGE * LEVEL_EVENT_RANGE
+        })
     }
 
     pub fn sync_global_world_event(&self, world_event: WorldEvent, position: BlockPos, data: i32) {

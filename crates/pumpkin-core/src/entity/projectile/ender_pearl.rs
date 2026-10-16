@@ -34,6 +34,7 @@ impl EnderPearlEntity {
             has_hit: AtomicBool::new(false),
             last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
             gravity: GRAVITY,
+            left_owner: std::sync::atomic::AtomicBool::new(false),
         };
 
         Self { thrown }

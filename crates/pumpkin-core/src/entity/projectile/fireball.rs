@@ -48,6 +48,7 @@ impl Fireball {
                 has_hit: AtomicBool::new(false),
                 last_deflected_by: AtomicCell::new(None),
                 gravity: 0.0,
+                left_owner: AtomicBool::new(false),
             },
             item_stack: RwLock::new(Self::get_default_item()),
             acceleration_power: AtomicCell::new(INITIAL_ACCELERATION_POWER),
@@ -191,7 +192,8 @@ impl Fireball {
         entity.set_pos(new_pos);
         // `applyEffectsFromBlocks`.
         Entity::check_block_collision(caller, server);
-        // `Projectile.tick`'s `super.tick()`.
+        // `Projectile.tick`.
+        self.thrown.check_left_owner();
         EntityBase::tick(entity, caller, server);
         // `shouldBurn`.
         caller.set_on_fire_for(1.0);
