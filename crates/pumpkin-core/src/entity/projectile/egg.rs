@@ -1,3 +1,5 @@
+use crate::entity::projectile::ProjectileHit;
+use pumpkin_data::damage::DamageType;
 use std::sync::RwLock;
 use std::sync::atomic::AtomicBool;
 
@@ -100,6 +102,24 @@ impl EntityBase for EggEntity {
 
         // Chicken spawn position offset slightly from hit position
         let spawn_pos = hit_pos.add(&normal.multiply(0.5, 0.5, 0.5));
+
+        // Vanilla `ThrownEgg.onHitEntity`: a 0 damage `thrown(this, owner)` hit, for the knockback.
+        if let ProjectileHit::Entity { ref entity, .. } = hit {
+            let this = world.get_entity_by_id(self.get_entity().entity_id);
+            let owner = self
+                .thrown
+                .owner_id
+                .load()
+                .and_then(|id| world.get_entity_by_id(id));
+            entity.damage_with_context(
+                entity.as_ref(),
+                0.0,
+                DamageType::THROWN,
+                None,
+                this.as_deref(),
+                owner.as_deref(),
+            );
+        }
 
         // Play egg break particles
         world.send_entity_status(

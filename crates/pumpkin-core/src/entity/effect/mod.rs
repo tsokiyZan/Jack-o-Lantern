@@ -80,21 +80,25 @@ pub fn get_mob_effect(effect: &'static StatusEffect) -> Option<&'static dyn MobE
     }
 }
 
+/// Vanilla `MobEffectInstance.CODEC`: optional fields are left out at their defaults, except
+/// `show_icon`, which is always written.
 impl NBTStorage for pumpkin_data::potion::Effect {
     fn write_nbt(&self, nbt: &mut NbtCompound) {
         nbt.put("id", self.effect_type.minecraft_name);
-        if self.amplifier > 0 {
-            nbt.put("amplifier", NbtTag::Int(i32::from(self.amplifier)));
+        if self.amplifier != 0 {
+            // `ExtraCodecs.UNSIGNED_BYTE`.
+            nbt.put("amplifier", NbtTag::Byte(self.amplifier as i8));
         }
-        nbt.put("duration", NbtTag::Int(self.duration));
+        if self.duration != 0 {
+            nbt.put("duration", NbtTag::Int(self.duration));
+        }
         if self.ambient {
             nbt.put("ambient", NbtTag::Byte(1));
         }
         if !self.show_particles {
             nbt.put("show_particles", NbtTag::Byte(0));
         }
-        let show_icon: i8 = i8::from(self.show_icon);
-        nbt.put("show_icon", NbtTag::Byte(show_icon));
+        nbt.put("show_icon", NbtTag::Byte(i8::from(self.show_icon)));
     }
 }
 
@@ -108,15 +112,15 @@ impl NBTStorageInit for pumpkin_data::potion::Effect {
             warn!("Unable to read effect. Unknown effect type: {effect_id}");
             return None;
         };
-        let Some(show_icon) = nbt.get_byte("show_icon") else {
-            warn!("Unable to read effect. Show icon is not present");
-            return None;
-        };
-        let amplifier = nbt.get_int("amplifier").unwrap_or(0) as u8;
-        let duration = nbt.get_int("duration").unwrap_or(0);
-        let ambient = nbt.get_byte("ambient").unwrap_or(0) == 1;
-        let show_particles = nbt.get_byte("show_particles").unwrap_or(1) == 1;
-        let show_icon = show_icon == 1;
+        // NBT numbers of any type decode, as through `NbtOps`.
+        let number = |name: &str| nbt.get(name).and_then(NbtTag::as_numeric_int);
+        let amplifier = number("amplifier").unwrap_or(0) as u8;
+        let duration = number("duration").unwrap_or(0);
+        let ambient = number("ambient").is_some_and(|v| v != 0);
+        let show_particles = number("show_particles").is_none_or(|v| v != 0);
+        // `Details`: a missing `show_icon` follows `show_particles`.
+        let show_icon = number("show_icon").map_or(show_particles, |v| v != 0);
+        // TODO: vanilla `hidden_effect` (a weaker effect kept under a stronger one).
         Some(Self {
             effect_type,
             duration,

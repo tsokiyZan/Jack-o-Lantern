@@ -73,11 +73,25 @@ impl EntityBase for SnowballEntity {
         );
 
         // Handle entity-specific damage
+        // Vanilla `Snowball.onHitEntity`: `thrown(this, owner)`, 3 to a blaze and 0 to the rest,
+        // which still knocks them back.
         if let ProjectileHit::Entity { ref entity, .. } = hit {
             let is_blaze = entity.get_entity().entity_type.id == EntityType::BLAZE.id;
-            let damage = if is_blaze { 3.0 } else { 0.0 }; // Only damage blazes
-
-            entity.damage(entity.as_ref(), damage, DamageType::THROWN);
+            let damage = if is_blaze { 3.0 } else { 0.0 };
+            let this = world.get_entity_by_id(self.get_entity().entity_id);
+            let owner = self
+                .thrown
+                .owner_id
+                .load()
+                .and_then(|id| world.get_entity_by_id(id));
+            entity.damage_with_context(
+                entity.as_ref(),
+                damage,
+                DamageType::THROWN,
+                None,
+                this.as_deref(),
+                owner.as_deref(),
+            );
         }
     }
 }

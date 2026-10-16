@@ -3823,7 +3823,8 @@ impl LivingEntity {
                 .is_none_or(super::mob::Mob::takes_knockback)
         {
             let (dx, dz) = self.default_knockback_direction(source, position);
-            self.knockback(caller, 0.4, dx, dz, cause, amount, false);
+            // `knockback(0.4F, ...)`: the float strength, widened.
+            self.knockback(caller, f64::from(0.4f32), dx, dz, cause, amount, false);
         }
 
         // Vanilla parity: actuallyHurt
