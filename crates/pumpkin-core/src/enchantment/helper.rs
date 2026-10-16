@@ -82,26 +82,9 @@ impl EnchantmentHelper {
         F: FnMut(&'static Enchantment, i32, &EnchantedItemInUse<'_>),
     {
         for slot in &EquipmentSlot::VALUES {
-            let stack = Self::get_item_by_slot(owner, living, slot);
+            let stack = living.get_item_by_slot(owner, slot);
             let item = EnchantedItemInUse::in_slot(&stack, slot.clone(), owner);
             Self::run_iteration_on_item_in_slot(&item, slot, &mut visitor);
-        }
-    }
-
-    /// Vanilla `LivingEntity.getItemBySlot`.
-    fn get_item_by_slot(
-        owner: &dyn EntityBase,
-        living: &LivingEntity,
-        slot: &EquipmentSlot,
-    ) -> ItemStack {
-        match slot {
-            EquipmentSlot::MainHand(_) => living.held_item(owner),
-            EquipmentSlot::OffHand(_) => living.off_hand_item(owner),
-            _ => living
-                .entity_equipment
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .get(slot),
         }
     }
 

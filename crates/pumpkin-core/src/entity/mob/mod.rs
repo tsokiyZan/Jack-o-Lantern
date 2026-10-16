@@ -1539,6 +1539,9 @@ pub trait Mob: EntityBase + Send + Sync {
         true
     }
 
+    /// Vanilla `hurtArmor`, which wears nothing unless a mob overrides it.
+    fn hurt_armor(&self, _damage_type: DamageType, _damage: f32) {}
+
     /// Vanilla `Entity.kill`, which some mobs override.
     fn mob_kill(&self, caller: &dyn EntityBase) {
         caller.damage(caller, f32::MAX, DamageType::GENERIC_KILL);
