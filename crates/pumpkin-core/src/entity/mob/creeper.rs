@@ -3,6 +3,7 @@ use std::sync::{
     atomic::{AtomicBool, AtomicI32, Ordering},
 };
 
+use crate::enchantment::HurtAndBreak;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::{
     entity::EntityType,
@@ -325,7 +326,7 @@ impl Mob for CreeperEntity {
         entity.set_synced_data(pumpkin_data::tracked_data::creeper::IS_IGNITED, true);
 
         if player.gamemode.load() != pumpkin_util::GameMode::Creative {
-            let _ = item_stack.damage_item(1);
+            let _ = item_stack.hurt_and_break(&entity.world.load(), 1);
         }
 
         true

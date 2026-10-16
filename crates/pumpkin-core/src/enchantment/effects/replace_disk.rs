@@ -16,6 +16,8 @@ pub struct ReplaceDisk {
     pub offset: Vector3<i32>,
     pub predicate: Option<ReplaceDiskPredicate>,
     pub block_state: &'static BlockState,
+    /// The properties `block_state` is set to; its block's default state when empty.
+    pub block_state_properties: &'static [(&'static str, &'static str)],
     pub trigger_game_event: Option<GameEvent>,
 }
 
@@ -39,18 +41,57 @@ impl ReplaceDiskPredicateExt for ReplaceDiskPredicate {
                     stripped == block.name
                 })
             }
+            // `FluidState.is(fluid)`: the source fluid for a source block, not its flowing family.
             Self::MatchingFluids { offset, fluids } => {
                 let test_pos = pos.offset(*offset);
-                let (_, fluid) = world.get_block_and_fluid(&test_pos);
+                let fluid = world.get_fluid_type(&test_pos);
                 fluids.iter().any(|f| {
                     let stripped = f.strip_prefix("minecraft:").unwrap_or(f);
                     stripped == fluid.name
                 })
             }
-            Self::Unobstructed => true,
+            // `UnobstructedPredicate`: no entity that blocks building is in the block.
+            Self::Unobstructed => {
+                let min = pos.to_f64();
+                let block_box = pumpkin_util::math::boundingbox::BoundingBox::new(
+                    min,
+                    Vector3::new(min.x + 1.0, min.y + 1.0, min.z + 1.0),
+                );
+                let blocked = |entity: &dyn crate::entity::EntityBase| {
+                    let base = entity.get_entity();
+                    !base.is_removed()
+                        && blocks_building(entity)
+                        && base.bounding_box.load().intersects(&block_box)
+                };
+                !world
+                    .get_entities_at_box(&block_box)
+                    .iter()
+                    .any(|entity| blocked(entity.as_ref()))
+                    && !world
+                        .get_players_at_box(&block_box)
+                        .iter()
+                        .any(|player| blocked(player.as_ref()))
+            }
             Self::AllOf(predicates) => predicates.iter().all(|p| p.test_world(world, pos)),
         }
     }
+}
+
+/// Vanilla `Entity.blocksBuilding`: living entities, boats, minecarts, falling blocks, primed
+/// TNT and end crystals.
+fn blocks_building(entity: &dyn crate::entity::EntityBase) -> bool {
+    let entity_type = entity.get_entity().entity_type;
+    let name = entity_type.resource_name;
+    entity.get_living_entity().is_some()
+        || name.ends_with("_boat")
+        || name.ends_with("_raft")
+        || name.contains("minecart")
+        || [
+            &pumpkin_data::entity::EntityType::FALLING_BLOCK,
+            &pumpkin_data::entity::EntityType::TNT,
+            &pumpkin_data::entity::EntityType::END_CRYSTAL,
+        ]
+        .contains(&entity_type)
 }
 
 impl ReplaceDisk {
@@ -69,6 +110,7 @@ impl ReplaceDisk {
             offset,
             predicate,
             block_state,
+            block_state_properties: &[],
             trigger_game_event,
         }
     }
@@ -87,8 +129,21 @@ impl ReplaceDisk {
             offset,
             predicate: None,
             block_state,
+            block_state_properties: &[],
             trigger_game_event,
         }
+    }
+
+    /// The state placed: `block_state`'s block with `block_state_properties`.
+    #[must_use]
+    pub fn resolved_state_id(&self) -> pumpkin_data::BlockStateId {
+        if self.block_state_properties.is_empty() {
+            return self.block_state.id;
+        }
+        let block = pumpkin_data::Block::from_state_id(self.block_state.id);
+        block
+            .from_properties(self.block_state_properties)
+            .to_state_id(block)
     }
 
     #[must_use]
@@ -145,9 +200,9 @@ impl ReplaceDisk {
                 continue;
             }
 
-            let new_state = self.block_state;
-            let old_state_id = world.set_block_state(&pos, new_state.id, BlockFlags::NOTIFY_ALL);
-            if old_state_id != new_state.id {
+            let new_state_id = self.resolved_state_id();
+            let old_state_id = world.set_block_state(&pos, new_state_id, BlockFlags::NOTIFY_ALL);
+            if old_state_id != new_state_id {
                 changed = true;
                 if let Some(event) = self.trigger_game_event {
                     world.emit_game_event(event.name(), pos.to_centered_f64());

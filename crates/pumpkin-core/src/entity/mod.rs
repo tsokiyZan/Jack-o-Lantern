@@ -772,6 +772,18 @@ pub trait EntityBase: Send + Sync + std::any::Any {
         self.get_entity().move_entity(caller, motion);
     }
 
+    /// Vanilla `Entity.getKnownMovement`: a player steering this entity knows its movement best.
+    fn get_known_movement(&self) -> Vector3<f64> {
+        let entity = self.get_entity();
+        if entity.is_alive()
+            && let Some(controller) = self.controlling_passenger()
+            && controller.get_player().is_some()
+        {
+            return controller.get_known_movement();
+        }
+        entity.velocity.load()
+    }
+
     /// Vanilla `Entity.checkFallDamage` and its overrides: adds the vertical move `ya` to the
     /// fall, and on landing hands the fall to the block below (`pos`, `state`).
     fn check_fall_damage(

@@ -148,7 +148,6 @@ impl BedrockClient {
 
             if pos_changed {
                 chunker::update_position(player);
-                player.check_location_enchantments(new_pos, on_ground);
                 player.progress_motion(new_pos - old_pos);
             }
         }

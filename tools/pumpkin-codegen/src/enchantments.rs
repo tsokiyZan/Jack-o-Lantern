@@ -472,10 +472,27 @@ fn parse_entity_effect(val: &serde_json::Value) -> TokenStream {
                     }
                     None => quote! { None },
                 };
-                let block_state_token = obj.get("block_state").map_or_else(
-                    || quote! { crate::block::Block::FROSTED_ICE.default_state },
-                    parse_block_state,
-                );
+                let block_state_value = obj
+                    .get("block_state")
+                    .expect("replace_disk has a block_state");
+                let block_state_token = parse_block_state(block_state_value);
+                // The state's properties, resolved at runtime: `blocks.json` lists states
+                // without their property values.
+                let properties: Vec<TokenStream> = block_state_value
+                    .get("properties")
+                    .or_else(|| block_state_value.get("Properties"))
+                    .and_then(|p| p.as_object())
+                    .map(|props| {
+                        props
+                            .iter()
+                            .map(|(k, v)| {
+                                let v =
+                                    v.as_str().expect("block state property values are strings");
+                                quote! { (#k, #v) }
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
                 let predicate_token = obj
                     .get("predicate")
                     .map_or_else(|| quote! { None }, parse_replace_disk_predicate);
@@ -488,6 +505,7 @@ fn parse_entity_effect(val: &serde_json::Value) -> TokenStream {
                         offset_z: #offset_z,
                         predicate: #predicate_token,
                         block_state: #block_state_token,
+                        block_state_properties: &[#(#properties),*],
                         trigger_game_event: #event_token,
                     }
                 }
@@ -729,6 +747,44 @@ fn parse_entity_effect(val: &serde_json::Value) -> TokenStream {
                     .map(|arr| arr.iter().map(parse_entity_effect).collect())
                     .unwrap_or_default();
                 quote! { EnchantmentEntityEffect::AllOf(&[#(#inner),*]) }
+            }
+            // A location-based effect only: `EnchantmentAttributeEffect`.
+            "minecraft:attribute" => {
+                let id = obj
+                    .get("id")
+                    .and_then(|v| v.as_str())
+                    .expect("attribute effect has an id");
+                let attribute = obj
+                    .get("attribute")
+                    .and_then(|v| v.as_str())
+                    .expect("attribute effect has an attribute");
+                let attribute_ident = format_ident!(
+                    "{}",
+                    attribute
+                        .strip_prefix("minecraft:")
+                        .unwrap_or(attribute)
+                        .to_uppercase()
+                );
+                let amount =
+                    parse_level_based_value(obj.get("amount").unwrap_or(&serde_json::Value::Null));
+                let operation = match obj.get("operation").and_then(|v| v.as_str()) {
+                    Some("add_value") => quote! { crate::data_component_impl::Operation::AddValue },
+                    Some("add_multiplied_base") => {
+                        quote! { crate::data_component_impl::Operation::AddMultipliedBase }
+                    }
+                    Some("add_multiplied_total") => {
+                        quote! { crate::data_component_impl::Operation::AddMultipliedTotal }
+                    }
+                    other => panic!("unknown attribute operation {other:?}"),
+                };
+                quote! {
+                    EnchantmentEntityEffect::Attribute {
+                        id: #id,
+                        attribute: &crate::attributes::Attributes::#attribute_ident,
+                        amount: #amount,
+                        operation: #operation,
+                    }
+                }
             }
             _ => quote! { EnchantmentEntityEffect::Other },
         }
@@ -1298,10 +1354,12 @@ fn parse_block_state(v: &serde_json::Value) -> TokenStream {
     } else {
         v
     };
+    // `BlockState.CODEC`: `Name` in older data, `id` in 26.x.
     let name = state_val
         .get("Name")
+        .or_else(|| state_val.get("id"))
         .and_then(|n| n.as_str())
-        .unwrap_or("minecraft:air");
+        .expect("a block state has a name");
     let name_stripped = name.strip_prefix("minecraft:").unwrap_or(name);
     let block_ident = format_ident!("{}", name_stripped.to_shouty_snake_case());
     quote! {
@@ -1554,6 +1612,7 @@ pub fn build() -> TokenStream {
             parse_conditional_entity_effects(effects_map.get("minecraft:location_changed"));
         let damage_immunity =
             parse_conditional_unit_effects(effects_map.get("minecraft:damage_immunity"));
+        let tick = parse_conditional_entity_effects(effects_map.get("minecraft:tick"));
         let prevent_armor_change = effects_map.contains_key("minecraft:prevent_armor_change");
         let prevent_equipment_drop = effects_map.contains_key("minecraft:prevent_equipment_drop");
 
@@ -1582,6 +1641,7 @@ pub fn build() -> TokenStream {
                 trident_spin_attack_strength: #trident_spin_attack_strength,
                 crossbow_charge_time: #crossbow_charge_time,
                 location_changed: #location_changed,
+                tick: #tick,
                 damage_immunity: #damage_immunity,
                 prevent_armor_change: #prevent_armor_change,
                 prevent_equipment_drop: #prevent_equipment_drop,
@@ -1970,6 +2030,8 @@ pub fn build() -> TokenStream {
                 offset_z: i32,
                 predicate: Option<ReplaceDiskPredicate>,
                 block_state: &'static crate::block_state::BlockState,
+                /// The properties `block_state` is set to; the default state when empty.
+                block_state_properties: &'static [(&'static str, &'static str)],
                 trigger_game_event: Option<crate::game_event::GameEvent>,
             },
             SummonEntity {
@@ -2016,6 +2078,13 @@ pub fn build() -> TokenStream {
                 small_particle: Option<crate::particle::Particle>,
                 large_particle: Option<crate::particle::Particle>,
                 sound: Option<crate::sound::Sound>,
+            },
+            /// `minecraft:attribute`, a location-based effect: a modifier while it is active.
+            Attribute {
+                id: &'static str,
+                attribute: &'static crate::attributes::Attributes,
+                amount: LevelBasedValue,
+                operation: crate::data_component_impl::Operation,
             },
             AllOf(&'static [EnchantmentEntityEffect]),
             Other,
@@ -2160,13 +2229,35 @@ pub fn build() -> TokenStream {
                     Self::Add(val) => current_value + val.calculate(level),
                     Self::Multiply(val) => current_value * val.calculate(level),
                     Self::Set(val) => val.calculate(level),
+                    // Vanilla `RemoveBinomial.process`: each point goes with the chance; a
+                    // large value draws the count from the normal approximation instead.
                     Self::RemoveBinomial(val) => {
-                        let prob = val.calculate(level);
-                        if rand::random::<f32>() < prob {
-                            0.0
+                        let chance = val.calculate(level);
+                        let to_remove = if current_value > 128.0
+                            && current_value * chance >= 20.0
+                            && current_value * (1.0 - chance) >= 20.0
+                        {
+                            let mean = f64::from(current_value * chance).floor();
+                            let std_dev =
+                                f64::from(current_value * chance * (1.0 - chance)).sqrt();
+                            // `nextGaussian`, by Box-Muller.
+                            let gaussian = (-2.0 * (1.0 - rand::random::<f64>()).ln()).sqrt()
+                                * (std::f64::consts::TAU * rand::random::<f64>()).cos();
+                            ((mean + gaussian * std_dev).round() as i64)
+                                .clamp(0, i64::from(current_value as i32))
+                                as i32
                         } else {
-                            current_value
-                        }
+                            let mut removed = 0;
+                            let mut i = 0;
+                            while (i as f32) < current_value {
+                                if rand::random::<f32>() < chance {
+                                    removed += 1;
+                                }
+                                i += 1;
+                            }
+                            removed
+                        };
+                        current_value - to_remove as f32
                     }
                     Self::Other => current_value,
                 }
@@ -2198,6 +2289,8 @@ pub fn build() -> TokenStream {
             pub trident_spin_attack_strength: Option<EnchantmentValueEffect>,
             pub crossbow_charge_time: Option<EnchantmentValueEffect>,
             pub location_changed: &'static [ConditionalEffect<EnchantmentEntityEffect>],
+            /// `minecraft:tick`: entity effects run every tick on the wearer.
+            pub tick: &'static [ConditionalEffect<EnchantmentEntityEffect>],
             /// `minecraft:damage_immunity`, whose effect carries no data.
             pub damage_immunity: &'static [ConditionalEffect<()>],
             pub prevent_armor_change: bool,

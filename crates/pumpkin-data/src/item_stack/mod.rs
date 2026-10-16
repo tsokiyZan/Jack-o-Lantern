@@ -368,20 +368,8 @@ impl ItemStack {
         repaired
     }
 
-    /// Core logic: apply Unbreaking chance with precomputed armor category and level.
-    /// Extracted for use in damage_item where these values are hoisted outside the loop.
-    /// Private to prevent incorrect usage; only call through damage_item.
-    fn should_apply_durability_damage_with(is_armor: bool, unbreaking_level: i32) -> bool {
-        if unbreaking_level <= 0 {
-            return true;
-        }
-
-        let mut damage = 1.0f32;
-        Enchantment::UNBREAKING.modify_durability_damage(unbreaking_level, is_armor, &mut damage);
-        damage > 0.0
-    }
-
-    /// Apply durability damage to this item and return the outcome.
+    /// Vanilla `ItemStack.applyDamage`: adds `amount` to the damage, breaking the item at its
+    /// maximum. Unbreaking is pumpkin-core's `hurt_and_break`, which comes first.
     /// Callers must check the return value to handle break broadcasts and item stack updates.
     /// TODO: Restore `#[must_use]` once all callsites (esp. tool/mob block-hit/damage sites)
     /// implement proper `DamageResult::Broken` handling instead of suppressing with `let _ =`.
@@ -397,23 +385,9 @@ impl ItemStack {
             return DamageResult::Untouched;
         }
 
-        // Hoist armor check and enchantment level outside loop to avoid repeated lookups.
-        let is_armor = self.is_armor();
-        let unbreaking_level = self.get_enchantment_level(&Enchantment::UNBREAKING);
-        let mut applied = 0;
-        // TODO: Short-circuit once applied >= (max_damage - current_damage) to avoid
-        // iterating the full amount for high-damage hits on high-durability items.
-        for _ in 0..amount {
-            if Self::should_apply_durability_damage_with(is_armor, unbreaking_level) {
-                applied += 1;
-            }
-        }
-
-        if applied <= 0 {
-            return DamageResult::Untouched;
-        }
-
-        let new_damage = self.get_damage().saturating_add(applied);
+        // Vanilla `applyDamage`: Unbreaking already thinned out `amount` in
+        // `processDurabilityChange`.
+        let new_damage = self.get_damage().saturating_add(amount);
         if new_damage >= max_damage {
             // Vanilla behavior: breaking consumes one item from the stack and resets
             // durability to 0. A single damage call never breaks more than one item,
@@ -1505,58 +1479,46 @@ mod tests {
         }
     }
 
-    // ── Unbreaking (statistical) ─────────────────────────────────────
+    // ── Unbreaking's binomial wear (statistical) ─────────────────────
 
-    /// Helper: iron sword with Unbreaking at `level`.
-    fn with_unbreaking(item: &'static Item, level: i32) -> ItemStack {
-        let mut s = ItemStack::new(1, item);
-        s.patch.push((
-            DataComponent::Enchantments,
-            Some(
-                EnchantmentsImpl {
-                    enchantment: std::borrow::Cow::Owned(vec![(&Enchantment::UNBREAKING, level)]),
-                }
-                .to_dyn(),
-            ),
-        ));
-        s
+    /// How much of `amount` wear Unbreaking III leaves, by its non-armour or armour effect.
+    fn unbreaking_iii(armor: bool, amount: f32) -> f32 {
+        let effects = Enchantment::UNBREAKING.effects.item_damage;
+        effects[usize::from(!armor)].effect.process(3, amount)
     }
 
-    /// Unbreaking III tool: 25% apply probability. 4 000 trials, expect ~1 000 hits (window 865–1135).
-    /// ±5σ confidence window ensures regressions are caught; CI-safe and statistically meaningful.
-    /// Note: uses thread-local rand::random().
-    /// Could be made fully deterministic by refactoring should_apply_durability_damage_with to accept RNG parameter.
+    /// Unbreaking III on a tool keeps a quarter of the wear: 4 000 single points, expect
+    /// ~1 000 kept (±5σ window 865–1135).
     #[test]
-    fn unbreaking_iii_tool_applies_roughly_25_percent_of_hits() {
-        let mut stack = with_unbreaking(&Item::NETHERITE_PICKAXE, 3);
-        let mut applied: u32 = 0;
-        for _ in 0..4_000 {
-            if stack.damage_item(1) != DamageResult::Untouched {
-                applied += 1;
-            }
-        }
+    fn unbreaking_iii_tool_keeps_roughly_25_percent_of_hits() {
+        let kept: f32 = (0..4_000).map(|_| unbreaking_iii(false, 1.0)).sum();
         assert!(
-            (865..=1_135).contains(&applied),
-            "Unbreaking III tool: expected ~1 000 applications in 4 000 trials, got {applied}"
+            (865.0..=1_135.0).contains(&kept),
+            "Unbreaking III tool: expected ~1 000 of 4 000 points kept, got {kept}"
         );
     }
 
-    /// Unbreaking III armor: 70% apply probability. 500 trials, expect ~350 hits (window 300–400).
-    /// See tool test notes on thread-local RNG; refactor would allow full determinism via seeded RNG parameter.
+    /// Unbreaking III on armour keeps 70%: 500 single points, expect ~350 (window 300–400).
     #[test]
-    fn unbreaking_iii_armor_applies_roughly_70_percent_of_hits() {
-        let mut stack = with_unbreaking(&Item::DIAMOND_CHESTPLATE, 3);
-        let mut applied: u32 = 0;
-        for _ in 0..500 {
-            if stack.damage_item(1) != DamageResult::Untouched {
-                applied += 1;
-            }
-        }
-        // ~350 expected with 70% probability, ±5σ confidence (300–400 window, ~99.7% non-flaky).
+    fn unbreaking_iii_armor_keeps_roughly_70_percent_of_hits() {
+        let kept: f32 = (0..500).map(|_| unbreaking_iii(true, 1.0)).sum();
         assert!(
-            (300..=400).contains(&applied),
-            "Unbreaking III armor: expected ~350 applications in 500 trials, got {applied}"
+            (300.0..=400.0).contains(&kept),
+            "Unbreaking III armour: expected ~350 of 500 points kept, got {kept}"
         );
+    }
+
+    /// A large wear is removed binomially, not all or nothing: Unbreaking III keeps about a
+    /// quarter of 1 000 points (σ ≈ 13.7; ±5σ window 181–319).
+    #[test]
+    fn unbreaking_iii_thins_large_wear_binomially() {
+        for _ in 0..20 {
+            let kept = unbreaking_iii(false, 1_000.0);
+            assert!(
+                (181.0..=319.0).contains(&kept),
+                "Unbreaking III tool: expected ~250 of 1 000 points kept, got {kept}"
+            );
+        }
     }
 
     // ── set_damage ───────────────────────────────────────────────────

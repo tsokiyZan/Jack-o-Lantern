@@ -1,4 +1,5 @@
 use crate::block::registry::BlockActionResult;
+use crate::enchantment::HurtAndBreak;
 use crate::entity::player::Player;
 use crate::item::ItemBehaviour;
 use crate::item::ItemMetadata;
@@ -68,7 +69,7 @@ impl ItemBehaviour for FlintAndSteelItem {
         );
 
         if ignited && player.gamemode.load() != pumpkin_util::GameMode::Creative {
-            let _ = item.damage_item(1);
+            let _ = item.hurt_and_break(&world, 1);
         }
 
         if ignited {

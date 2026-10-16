@@ -23,12 +23,17 @@ use crate::entity::{
 
 pub struct CaveSpiderEntity {
     pub mob_entity: MobEntity,
+    /// Vanilla `Spider.isClimbing`, the spider data flag.
+    pub is_climbing: std::sync::atomic::AtomicBool,
 }
 
 impl CaveSpiderEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
-        let cave_spider = Self { mob_entity };
+        let cave_spider = Self {
+            mob_entity,
+            is_climbing: std::sync::atomic::AtomicBool::new(false),
+        };
         let mob_arc = Arc::new(cave_spider);
         let mob_weak: Weak<dyn Mob> = {
             let mob_arc: Arc<dyn Mob> = mob_arc.clone();
@@ -82,6 +87,32 @@ impl CaveSpiderEntity {
 }
 
 impl Mob for CaveSpiderEntity {
+    /// Vanilla `Spider.tick`: a spider climbs while it walks into a wall.
+    fn mob_tick(&self, _caller: &dyn EntityBase) {
+        let entity = &self.mob_entity.living_entity.entity;
+        if !entity.is_alive() {
+            return;
+        }
+        let climbing = entity
+            .horizontal_collision
+            .load(std::sync::atomic::Ordering::Relaxed);
+        if self
+            .is_climbing
+            .swap(climbing, std::sync::atomic::Ordering::Relaxed)
+            != climbing
+        {
+            entity.set_synced_data(
+                pumpkin_data::tracked_data::spider::DATA_FLAGS_ID,
+                i8::from(climbing),
+            );
+        }
+    }
+
+    /// Vanilla `Spider.onClimbable`.
+    fn mob_on_climbable(&self) -> Option<bool> {
+        Some(self.is_climbing.load(std::sync::atomic::Ordering::Relaxed))
+    }
+
     fn finalize_spawn(
         &self,
         world: &Arc<crate::world::World>,

@@ -1,3 +1,4 @@
+use crate::enchantment::HurtAndBreak;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -150,7 +151,7 @@ impl Mob for BoggedSkeletonEntity {
             .load()
             .emit_game_event(GameEvent::Shear.name(), entity.pos.load());
         if player.gamemode.load() != GameMode::Creative {
-            let _ = item_stack.damage_item(1);
+            let _ = item_stack.hurt_and_break(&entity.world.load(), 1);
         }
         true
     }

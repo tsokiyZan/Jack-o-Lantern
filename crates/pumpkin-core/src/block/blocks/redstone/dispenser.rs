@@ -1,3 +1,4 @@
+use crate::enchantment::HurtAndBreak;
 use rand::{Rng, RngExt, rng};
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -918,7 +919,7 @@ impl DispenserBlock {
 
         if ignited {
             // `damage_item` already consumes the tool from the stack when it breaks.
-            let _ = item.damage_item(1);
+            let _ = item.hurt_and_break(ctx.world, 1);
             Self::play_dispense_effects(ctx, WorldEvent::SoundDispenserDispense);
         } else {
             Self::play_dispense_effects(ctx, WorldEvent::SoundDispenserFail);
@@ -998,7 +999,7 @@ impl DispenserBlock {
     fn dispense_shears(ctx: &DispenseContext<'_>, item: &mut ItemStack) {
         if Self::shear_beehive(ctx) || Self::shear_entity_in_front(ctx, item) {
             // `damage_item` already consumes the tool from the stack when it breaks.
-            let _ = item.damage_item(1);
+            let _ = item.hurt_and_break(ctx.world, 1);
             Self::play_dispense_effects(ctx, WorldEvent::SoundDispenserDispense);
         } else {
             Self::play_dispense_effects(ctx, WorldEvent::SoundDispenserFail);

@@ -171,7 +171,7 @@ fn default_vibration_data() -> NbtCompound {
 }
 
 /// Vanilla `EnchantmentHelper.has(stack, PREVENT_EQUIPMENT_DROP)`.
-fn prevents_equipment_drop(stack: &ItemStack) -> bool {
+pub(crate) fn prevents_equipment_drop(stack: &ItemStack) -> bool {
     stack
         .get_data_component::<EnchantmentsImpl>()
         .is_some_and(|enchantments| {
@@ -626,9 +626,8 @@ impl Mob for AllayEntity {
         false
     }
 
-    /// Vanilla `Allay.dropEquipment`, which `dropAllDeathLoot` runs after the equipment's
-    /// chance drops.
-    fn drop_custom_death_loot(&self) {
+    /// Vanilla `Allay.dropEquipment`.
+    fn drop_equipment(&self) {
         let entity = self.get_entity();
         for stack in self.inventory.remove_all_items() {
             entity.spawn_at_location(stack);

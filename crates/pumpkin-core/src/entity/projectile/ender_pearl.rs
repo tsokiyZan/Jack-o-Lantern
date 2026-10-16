@@ -130,7 +130,10 @@ impl EntityBase for EnderPearlEntity {
                 living.health.load() > 0.0 && owner.get_entity().pose.load() != EntityPose::Sleeping
             })
         {
-            let should_spawn_endermite = rand::random::<f32>() < ENDERMITE_SPAWN_CHANCE;
+            // Vanilla only spawns endermites behind, and hurts, a teleported player.
+            let is_player = owner.get_player().is_some();
+            let should_spawn_endermite =
+                is_player && rand::random::<f32>() < ENDERMITE_SPAWN_CHANCE;
             if world.should_spawn_monsters() && should_spawn_endermite {
                 let entity = Entity::new(
                     world.clone(),
@@ -162,12 +165,13 @@ impl EntityBase for EnderPearlEntity {
                 &teleport_pos,
             );
 
-            // Deal 5 damage to owner
-            owner.damage(
-                owner.as_ref(),
-                5.0,
-                pumpkin_data::damage::DamageType::ENDER_PEARL,
-            );
+            if is_player {
+                owner.damage(
+                    owner.as_ref(),
+                    5.0,
+                    pumpkin_data::damage::DamageType::ENDER_PEARL,
+                );
+            }
         }
 
         world.send_entity_status(entity, EntityStatus::Death, Some(ActorEventID::Death));

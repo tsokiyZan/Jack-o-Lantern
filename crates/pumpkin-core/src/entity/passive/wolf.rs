@@ -232,6 +232,64 @@ const BABY_DIMENSIONS: EntityDimensions =
     EntityDimensions::scalable(0.3, 0.425).with_eye_height(0.343_75);
 
 impl Mob for WolfEntity {
+    /// Vanilla `Wolf.actuallyHurt`: wolf armour takes the whole hit as durability, and cracks
+    /// audibly as it wears.
+    fn absorb_hurt(
+        &self,
+        caller: &dyn crate::entity::EntityBase,
+        damage_type: pumpkin_data::damage::DamageType,
+        damage: f32,
+    ) -> bool {
+        use pumpkin_data::data_component_impl::EquipmentSlot;
+        let living = &self.get_mob_entity().living_entity;
+        let armor = living
+            .entity_equipment
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get(&EquipmentSlot::BODY);
+        // `canArmorAbsorb`.
+        if armor.item != &pumpkin_data::item::Item::WOLF_ARMOR
+            || damage_type.has_tag(&pumpkin_data::tag::DamageType::MINECRAFT_BYPASSES_WOLF_ARMOR)
+        {
+            return false;
+        }
+        let crackiness_before = wolf_armor_crackiness(&armor);
+        living.hurt_and_break_in_slot(caller, &EquipmentSlot::BODY, damage.ceil() as i32);
+        let armor_after = living
+            .entity_equipment
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get(&EquipmentSlot::BODY);
+        if crackiness_before != wolf_armor_crackiness(&armor_after) {
+            caller.play_sound_at_self(pumpkin_data::sound::Sound::ItemWolfArmorCrack, 1.0, 1.0);
+            let scute = pumpkin_data::item_stack::ItemStack::new(
+                1,
+                &pumpkin_data::item::Item::ARMADILLO_SCUTE,
+            );
+            let mut data = Vec::new();
+            if pumpkin_protocol::codec::item_stack_seralizer::ItemStackSerializer(
+                std::borrow::Cow::Owned(scute),
+            )
+            .write_template0(
+                &mut data,
+                &pumpkin_util::version::JavaMinecraftVersion::V_26_1,
+            )
+            .is_ok()
+            {
+                let pos = living.entity.pos.load();
+                living.entity.world.load().spawn_particle_with_data(
+                    pumpkin_util::math::vector3::Vector3::new(pos.x, pos.y + 1.0, pos.z),
+                    pumpkin_util::math::vector3::Vector3::new(0.2, 0.1, 0.2),
+                    0.1,
+                    20,
+                    pumpkin_data::particle::Particle::Item,
+                    &data,
+                );
+            }
+        }
+        true
+    }
+
     /// Vanilla `Wolf.hurtArmor`.
     fn hurt_armor(&self, damage_type: pumpkin_data::damage::DamageType, damage: f32) {
         self.get_mob_entity().living_entity.do_hurt_equipment(
@@ -552,4 +610,20 @@ fn is_abstract_skeleton(entity_type: &EntityType) -> bool {
         &EntityType::PARCHED,
     ]
     .contains(&entity_type)
+}
+
+/// Vanilla `Crackiness.WOLF_ARMOR.byDamage`: 0 (none) to 3 (high) as the armour wears.
+fn wolf_armor_crackiness(armor: &pumpkin_data::item_stack::ItemStack) -> u8 {
+    if !armor.is_damageable() {
+        return 0;
+    }
+    let max_damage = armor.get_max_damage().unwrap_or(0);
+    let fraction = (max_damage - armor.get_damage()) as f32 / max_damage as f32;
+    if fraction < 0.32 {
+        3
+    } else if fraction < 0.69 {
+        2
+    } else {
+        u8::from(fraction < 0.95)
+    }
 }

@@ -175,8 +175,12 @@ impl Mob for SpiderEntity {
             return;
         }
 
-        let vel = entity.velocity.load();
-        let is_colliding_horizontally = vel.x.abs() < 1e-4 && vel.z.abs() < 1e-4;
-        self.set_climbing(is_colliding_horizontally);
+        // Vanilla `Spider.tick`: a spider climbs while it walks into a wall.
+        self.set_climbing(entity.horizontal_collision.load(Ordering::Relaxed));
+    }
+
+    /// Vanilla `Spider.onClimbable`.
+    fn mob_on_climbable(&self) -> Option<bool> {
+        Some(self.is_climbing())
     }
 }

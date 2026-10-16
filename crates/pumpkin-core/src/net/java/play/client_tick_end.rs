@@ -14,6 +14,7 @@ impl JavaClient {
                 .get_entity()
                 .movement
                 .store(Vector3::new(0.0, 0.0, 0.0));
+            player.known_movement.store(Vector3::default());
         }
     }
 }

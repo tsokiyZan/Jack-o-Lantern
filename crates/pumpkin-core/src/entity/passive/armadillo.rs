@@ -3,6 +3,7 @@ use std::sync::{
     atomic::{AtomicI32, AtomicU64, Ordering},
 };
 
+use crate::enchantment::HurtAndBreak;
 use pumpkin_data::damage::DamageType;
 use pumpkin_data::entity::EntityPose;
 use pumpkin_data::entity::EntityType;
@@ -546,7 +547,7 @@ impl Mob for ArmadilloEntity {
         if item_stack.item == &Item::BRUSH && self.brush_off_scute(item_stack) {
             // Vanilla `hurtAndBreak`: a player with infinite materials keeps the brush whole.
             if player.gamemode.load() != GameMode::Creative {
-                let _ = item_stack.damage_item(BRUSH_DURABILITY_COST);
+                let _ = item_stack.hurt_and_break(&player.world(), BRUSH_DURABILITY_COST);
             }
             return true;
         }

@@ -1,7 +1,6 @@
 #[allow(clippy::wildcard_imports)]
 use super::*;
 use crate::world::entity_tracker::encode_pos;
-use pumpkin_data::tag::Taggable;
 
 impl JavaClient {
     const fn clamp_horizontal(pos: f64) -> f64 {
@@ -82,14 +81,7 @@ impl JavaClient {
         let entity = player.get_entity();
         // `hasLandedInLiquid`.
         let landed_in_liquid = entity.velocity.load().y < 1.0E-5 && entity.is_in_liquid();
-        // `onClimbable`.
-        // TODO: open trapdoors over a ladder, which vanilla `LivingEntity.onClimbable` also allows.
-        let on_climbable = !player.is_spectator()
-            && entity
-                .world
-                .load()
-                .get_block(&entity.block_pos.load())
-                .has_tag(&pumpkin_data::tag::Block::MINECRAFT_CLIMBABLE);
+        let on_climbable = player.living_entity.on_climbable(player);
         if on_ground
             || landed_in_liquid
             || on_climbable
@@ -225,6 +217,7 @@ impl JavaClient {
 
                 // Vanilla `doCheckFallDamage` with the client's move, then a move upwards ends
                 // the fall.
+                player.known_movement.store(pos.sub(&last_pos));
                 entity.do_check_fall_damage(player.as_ref(), pos.sub(&last_pos), packet.collision & FLAG_ON_GROUND != 0);
                 if height_difference > 0.0 {
                     entity.reset_fall_distance();
@@ -239,7 +232,6 @@ impl JavaClient {
                 // Only update idle timeout if there's actual movement (vanilla threshold)
                 if delta.length_squared() > 1.0E-5 {
                     player.update_last_action_time();
-                    player.check_location_enchantments(pos, packet.collision & FLAG_ON_GROUND != 0);
                 }
                 player.progress_motion(delta);
             }
@@ -381,6 +373,7 @@ impl JavaClient {
                 world.send_to_tracking_players(entity, &CHeadRot::new(entity_id.into(), yaw as u8));
                 // Vanilla `doCheckFallDamage` with the client's move, then a move upwards ends
                 // the fall.
+                player.known_movement.store(pos.sub(&last_pos));
                 entity.do_check_fall_damage(player.as_ref(), pos.sub(&last_pos), (packet.collision & FLAG_ON_GROUND) != 0);
                 if height_difference > 0.0 {
                     entity.reset_fall_distance();
@@ -395,7 +388,6 @@ impl JavaClient {
                 // Only update idle timeout if there's actual movement (vanilla threshold)
                 if delta.length_squared() > 1.0E-5 {
                     player.update_last_action_time();
-                    player.check_location_enchantments(pos, (packet.collision & FLAG_ON_GROUND) != 0);
                 }
                 player.progress_motion(delta);
             }

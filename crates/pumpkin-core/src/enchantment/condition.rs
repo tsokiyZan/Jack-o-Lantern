@@ -215,7 +215,7 @@ fn entity_predicate_matches(
     }
     // `MovementPredicate`: `getKnownMovement` scaled to blocks per second.
     if let Some(movement) = &predicate.movement {
-        let velocity = base.velocity.load() * 20.0;
+        let velocity = entity.get_known_movement() * 20.0;
         let fall_distance = base.fall_distance.load();
         if !movement
             .horizontal_speed

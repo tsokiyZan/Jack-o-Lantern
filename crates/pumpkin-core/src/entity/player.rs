@@ -2,6 +2,7 @@ pub mod advancement;
 pub mod statistics;
 
 use crate::enchantment::EnchantmentHelper;
+use crate::enchantment::HurtAndBreak;
 use crate::entity::damage_source::DamageSource;
 use crate::entity::movement_emission::MovementEmission;
 use crate::item::items::mace::MaceItem;
@@ -487,6 +488,8 @@ pub struct Player {
     pub bedrock_spawned: AtomicBool,
     /// Whether the player is frozen in place (movement locked for dialogues/cutscenes).
     pub is_movement_locked: AtomicBool,
+    /// Vanilla `ServerPlayer.lastKnownClientMovement`: the client's last move.
+    pub known_movement: AtomicCell<Vector3<f64>>,
     /// Vanilla `ServerPlayer.startingToFallPosition`.
     pub starting_to_fall_position: AtomicCell<Option<Vector3<f64>>>,
     /// Vanilla `ServerPlayer.currentExplosionImpactPos`.
@@ -768,6 +771,7 @@ impl Player {
             previous_gamemode: AtomicCell::new(None),
             camera_target_id: AtomicCell::new(None),
             is_movement_locked: AtomicBool::new(false),
+            known_movement: AtomicCell::new(Vector3::default()),
             starting_to_fall_position: AtomicCell::new(None),
             current_explosion_impact_pos: AtomicCell::new(None),
             current_explosion_cause: AtomicCell::new(None),
@@ -1723,7 +1727,7 @@ impl Player {
 
         let mut stack = self.inventory.get_slot(slot_index);
         let original_item = stack.item;
-        let result = stack.damage_item(amount);
+        let result = stack.hurt_and_break(&self.world(), amount);
         let updated = (result != pumpkin_data::item_stack::DamageResult::Untouched)
             .then_some((result, stack.clone()));
 
@@ -1774,20 +1778,6 @@ impl Player {
         }
 
         false
-    }
-
-    /// Checks and triggers location-based enchantments (e.g. Frost Walker) on the player's equipped armor.
-    pub fn check_location_enchantments(&self, pos: Vector3<f64>, on_ground: bool) {
-        if on_ground {
-            let boots = self.inventory.get_slot(36);
-            if !boots.is_empty() {
-                crate::enchantment::EnchantmentHelper::on_location_changed(
-                    self.get_entity(),
-                    &boots,
-                    pos,
-                );
-            }
-        }
     }
 
     /// Convenience wrapper – damages the currently held (main-hand) item.
@@ -3324,7 +3314,7 @@ impl Player {
             (0.01, delta_pos.length())
         } else if entity.is_in_water() {
             (0.01, delta_pos.horizontal_length())
-        } else if self.living_entity.climbing.load(Ordering::Relaxed) {
+        } else if self.living_entity.on_climbable(self) {
             return;
         } else if entity.on_ground.load(Ordering::Relaxed) {
             let rate = if entity.is_sprinting() { 0.1 } else { 0.0 };
@@ -5120,6 +5110,7 @@ impl Player {
         if self.gamemode.load() == gamemode {
             return false;
         }
+        let was_spectator = self.gamemode.load() == GameMode::Spectator;
         let Some(server) = self.world().server.upgrade() else {
             return false;
         };
@@ -5168,6 +5159,12 @@ impl Player {
             }
             entity.on_ground.store(false, Ordering::Relaxed);
             self.living_entity.entity.reset_fall_distance();
+            crate::enchantment::EnchantmentHelper::stop_location_based_effects(&self.living_entity);
+        } else if was_spectator {
+            crate::enchantment::EnchantmentHelper::run_location_changed_effects(
+                self.as_ref(),
+                &self.living_entity,
+            );
         }
 
         if gamemode != GameMode::Spectator && self.camera_target_id.load().is_some() {
@@ -7098,6 +7095,26 @@ impl NBTStorage for EnderChestInventory {
 impl NBTStorageInit for EnderChestInventory {}
 
 impl EntityBase for Player {
+    /// Vanilla `ServerPlayer.getKnownMovement`: the client's last move, or the vehicle's when
+    /// someone else steers it.
+    fn get_known_movement(&self) -> Vector3<f64> {
+        let vehicle = self
+            .living_entity
+            .entity
+            .vehicle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        if let Some(vehicle) = vehicle
+            && vehicle
+                .controlling_passenger()
+                .is_none_or(|controller| controller.get_entity().entity_id != self.entity_id())
+        {
+            return vehicle.get_known_movement();
+        }
+        self.known_movement.load()
+    }
+
     fn check_fall_damage(
         &self,
         caller: &dyn EntityBase,

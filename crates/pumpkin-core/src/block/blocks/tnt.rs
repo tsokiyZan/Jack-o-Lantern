@@ -1,3 +1,4 @@
+use crate::enchantment::HurtAndBreak;
 use pumpkin_data::Block;
 use pumpkin_data::BlockStateId;
 use pumpkin_data::block_properties::TntLikeProperties;
@@ -137,7 +138,7 @@ impl BlockBehaviour for TNTBlock {
         if Self::prime(args.world, args.position, Some(&igniter)) {
             if args.player.gamemode.load() != GameMode::Creative {
                 if item_id == Item::FLINT_AND_STEEL.id {
-                    let _ = args.item_stack.damage_item(1);
+                    let _ = args.item_stack.hurt_and_break(args.world, 1);
                 } else {
                     args.item_stack.decrement(1);
                 }

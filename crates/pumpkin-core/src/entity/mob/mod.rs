@@ -1629,6 +1629,9 @@ pub trait Mob: EntityBase + Send + Sync {
     /// What a vanilla `dropCustomDeathLoot` override adds after the equipment drops.
     fn drop_custom_death_loot(&self) {}
 
+    /// A vanilla `dropEquipment` override: what drops on death whatever the `mob_drops` rule.
+    fn drop_equipment(&self) {}
+
     /// Vanilla `killedEntity`, run on the attacker as `victim` dies. `false` keeps the
     /// victim's loot, equipment and experience from dropping.
     fn killed_entity(&self, _victim: &dyn EntityBase) -> bool {
@@ -1761,6 +1764,21 @@ pub trait Mob: EntityBase + Send + Sync {
     /// Vanilla `Bucketable.loadFromBucketTag`: what a mob placed from a bucket reads back
     /// from the bucket's `bucket_entity_data`.
     fn load_from_bucket_tag(&self, _tag: &NbtCompound) {}
+
+    /// A vanilla `actuallyHurt` override that takes the hit instead of the mob: whether it did.
+    fn absorb_hurt(
+        &self,
+        _caller: &dyn EntityBase,
+        _damage_type: DamageType,
+        _damage: f32,
+    ) -> bool {
+        false
+    }
+
+    /// A vanilla `onClimbable` override: spiders climb walls.
+    fn mob_on_climbable(&self) -> Option<bool> {
+        None
+    }
 
     /// A vanilla `checkFallDamage` override. Flyers such as the phantom don't add up falls.
     fn mob_check_fall_damage(

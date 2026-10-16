@@ -287,6 +287,8 @@ pub enum EnchantmentEntityEffect {
         offset_z: i32,
         predicate: Option<ReplaceDiskPredicate>,
         block_state: &'static crate::block_state::BlockState,
+        #[doc = r" The properties `block_state` is set to; the default state when empty."]
+        block_state_properties: &'static [(&'static str, &'static str)],
         trigger_game_event: Option<crate::game_event::GameEvent>,
     },
     SummonEntity {
@@ -333,6 +335,13 @@ pub enum EnchantmentEntityEffect {
         small_particle: Option<crate::particle::Particle>,
         large_particle: Option<crate::particle::Particle>,
         sound: Option<crate::sound::Sound>,
+    },
+    #[doc = r" `minecraft:attribute`, a location-based effect: a modifier while it is active."]
+    Attribute {
+        id: &'static str,
+        attribute: &'static crate::attributes::Attributes,
+        amount: LevelBasedValue,
+        operation: crate::data_component_impl::Operation,
     },
     AllOf(&'static [EnchantmentEntityEffect]),
     Other,
@@ -461,12 +470,29 @@ impl EnchantmentValueEffect {
             Self::Multiply(val) => current_value * val.calculate(level),
             Self::Set(val) => val.calculate(level),
             Self::RemoveBinomial(val) => {
-                let prob = val.calculate(level);
-                if rand::random::<f32>() < prob {
-                    0.0
+                let chance = val.calculate(level);
+                let to_remove = if current_value > 128.0
+                    && current_value * chance >= 20.0
+                    && current_value * (1.0 - chance) >= 20.0
+                {
+                    let mean = f64::from(current_value * chance).floor();
+                    let std_dev = f64::from(current_value * chance * (1.0 - chance)).sqrt();
+                    let gaussian = (-2.0 * (1.0 - rand::random::<f64>()).ln()).sqrt()
+                        * (std::f64::consts::TAU * rand::random::<f64>()).cos();
+                    ((mean + gaussian * std_dev).round() as i64)
+                        .clamp(0, i64::from(current_value as i32)) as i32
                 } else {
-                    current_value
-                }
+                    let mut removed = 0;
+                    let mut i = 0;
+                    while (i as f32) < current_value {
+                        if rand::random::<f32>() < chance {
+                            removed += 1;
+                        }
+                        i += 1;
+                    }
+                    removed
+                };
+                current_value - to_remove as f32
             }
             Self::Other => current_value,
         }
@@ -497,6 +523,8 @@ pub struct EnchantmentEffects {
     pub trident_spin_attack_strength: Option<EnchantmentValueEffect>,
     pub crossbow_charge_time: Option<EnchantmentValueEffect>,
     pub location_changed: &'static [ConditionalEffect<EnchantmentEntityEffect>],
+    #[doc = r" `minecraft:tick`: entity effects run every tick on the wearer."]
+    pub tick: &'static [ConditionalEffect<EnchantmentEntityEffect>],
     #[doc = r" `minecraft:damage_immunity`, whose effect carries no data."]
     pub damage_immunity: &'static [ConditionalEffect<()>],
     pub prevent_armor_change: bool,
@@ -680,6 +708,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -785,6 +814,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -834,6 +864,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: true,
             prevent_equipment_drop: false,
@@ -903,6 +934,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -958,6 +990,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -1097,6 +1130,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -1152,6 +1186,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -1201,6 +1236,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -1250,6 +1286,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -1319,6 +1356,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -1383,6 +1421,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -1452,6 +1491,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -1506,6 +1546,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -1555,6 +1596,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -1632,7 +1674,8 @@ impl Enchantment {
                         },
                         ReplaceDiskPredicate::Unobstructed,
                     ])),
-                    block_state: crate::Block::AIR.default_state,
+                    block_state: crate::Block::FROSTED_ICE.default_state,
+                    block_state_properties: &[("age", "0")],
                     trigger_game_event: Some(crate::game_event::GameEvent::BlockPlace),
                 },
                 requirements: Some(LootItemCondition::AllOf(&[
@@ -1678,6 +1721,7 @@ impl Enchantment {
                     }),
                 ])),
             }],
+            tick: &[],
             damage_immunity: &[ConditionalEffect {
                 effect: (),
                 requirements: Some(LootItemCondition::DamageSourceProperties {
@@ -1764,6 +1808,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -1820,6 +1865,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -1875,6 +1921,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -1946,6 +1993,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -2001,6 +2049,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -2056,6 +2105,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -2105,6 +2155,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -2160,6 +2211,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -2212,6 +2264,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -2273,6 +2326,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -2328,6 +2382,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -2397,6 +2452,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -2466,6 +2522,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -2529,6 +2586,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -2598,6 +2656,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -2653,6 +2712,7 @@ impl Enchantment {
                 per_level_above_first: -0.25f32,
             })),
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -2702,6 +2762,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -2756,6 +2817,7 @@ impl Enchantment {
             )),
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -2811,6 +2873,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -2863,6 +2926,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -2932,6 +2996,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -2983,8 +3048,21 @@ impl Enchantment {
             location_changed: &[
                 ConditionalEffect {
                     effect: EnchantmentEntityEffect::AllOf(&[
-                        EnchantmentEntityEffect::Other,
-                        EnchantmentEntityEffect::Other,
+                        EnchantmentEntityEffect::Attribute {
+                            id: "minecraft:enchantment.soul_speed",
+                            attribute: &crate::attributes::Attributes::MOVEMENT_SPEED,
+                            amount: LevelBasedValue::Linear {
+                                base: 0.0405f32,
+                                per_level_above_first: 0.0105f32,
+                            },
+                            operation: crate::data_component_impl::Operation::AddValue,
+                        },
+                        EnchantmentEntityEffect::Attribute {
+                            id: "minecraft:enchantment.soul_speed",
+                            attribute: &crate::attributes::Attributes::MOVEMENT_EFFICIENCY,
+                            amount: LevelBasedValue::Constant(1f32),
+                            operation: crate::data_component_impl::Operation::AddValue,
+                        },
                     ]),
                     requirements: Some(LootItemCondition::AllOf(&[
                         LootItemCondition::Inverted(&LootItemCondition::EntityProperties {
@@ -3134,6 +3212,116 @@ impl Enchantment {
                     ])),
                 },
             ],
+            tick: &[
+                ConditionalEffect {
+                    effect: EnchantmentEntityEffect::SpawnParticles {
+                        particle: crate::particle::Particle::Soul,
+                        horizontal_position: PositionSource {
+                            source_type: PositionSourceType::InBoundingBox,
+                            offset: 0f32,
+                            scale: 1f32,
+                        },
+                        vertical_position: PositionSource {
+                            source_type: PositionSourceType::EntityPosition,
+                            offset: 0.1f32,
+                            scale: 1f32,
+                        },
+                        horizontal_velocity: VelocitySource {
+                            movement_scale: -0.2f32,
+                            base: pumpkin_util::math::float_provider::FloatProvider::Constant(0.0),
+                        },
+                        vertical_velocity: VelocitySource {
+                            movement_scale: 0f32,
+                            base: pumpkin_util::math::float_provider::FloatProvider::Constant(
+                                0.1f32,
+                            ),
+                        },
+                        speed: pumpkin_util::math::float_provider::FloatProvider::Constant(1f32),
+                    },
+                    requirements: Some(LootItemCondition::EntityProperties {
+                        entity: LootContextEntityTarget::This,
+                        predicate: Some(EntityPredicate {
+                            entity_type: None,
+                            location: None,
+                            flags: Some(EntityFlagsPredicate {
+                                is_on_ground: Some(true),
+                                is_flying: Some(false),
+                                is_fall_flying: None,
+                                is_in_water: None,
+                            }),
+                            movement: Some(MovementPredicate {
+                                fall_distance: DoubleBounds {
+                                    min: None,
+                                    max: None,
+                                },
+                                horizontal_speed: DoubleBounds {
+                                    min: Some(0.000009999999747378752f64),
+                                    max: None,
+                                },
+                            }),
+                            vehicle: None,
+                            player: None,
+                            movement_affected_by: Some(LocationPredicate {
+                                block: Some(BlockPredicate {
+                                    blocks: &BlockTag::MINECRAFT_SOUL_SPEED_BLOCKS,
+                                }),
+                                can_see_sky: None,
+                            }),
+                            periodic_tick: Some(5i32),
+                        }),
+                    }),
+                },
+                ConditionalEffect {
+                    effect: EnchantmentEntityEffect::PlaySound {
+                        sounds: &[crate::sound::Sound::ParticleSoulEscape],
+                        volume: pumpkin_util::math::float_provider::FloatProvider::Constant(0.6f32),
+                        pitch: pumpkin_util::math::float_provider::FloatProvider::Object(
+                            pumpkin_util::math::float_provider::NormalFloatProvider::Uniform(
+                                pumpkin_util::math::float_provider::UniformFloatProvider::new(
+                                    0.6f32, 1f32,
+                                ),
+                            ),
+                        ),
+                    },
+                    requirements: Some(LootItemCondition::AllOf(&[
+                        LootItemCondition::RandomChance {
+                            chance: ContextFloatProvider::Constant(0.35f32),
+                        },
+                        LootItemCondition::EntityProperties {
+                            entity: LootContextEntityTarget::This,
+                            predicate: Some(EntityPredicate {
+                                entity_type: None,
+                                location: None,
+                                flags: Some(EntityFlagsPredicate {
+                                    is_on_ground: Some(true),
+                                    is_flying: Some(false),
+                                    is_fall_flying: None,
+                                    is_in_water: None,
+                                }),
+                                movement: Some(MovementPredicate {
+                                    fall_distance: DoubleBounds {
+                                        min: None,
+                                        max: None,
+                                    },
+                                    horizontal_speed: DoubleBounds {
+                                        min: Some(0.000009999999747378752f64),
+                                        max: None,
+                                    },
+                                }),
+                                vehicle: None,
+                                player: None,
+                                movement_affected_by: Some(LocationPredicate {
+                                    block: Some(BlockPredicate {
+                                        blocks: &BlockTag::MINECRAFT_SOUL_SPEED_BLOCKS,
+                                    }),
+                                    can_see_sky: None,
+                                }),
+                                periodic_tick: Some(5i32),
+                            }),
+                        },
+                    ])),
+                },
+            ],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -3183,6 +3371,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -3232,6 +3421,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -3300,6 +3490,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -3386,6 +3577,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,
@@ -3435,6 +3627,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: true,
@@ -3535,6 +3728,7 @@ impl Enchantment {
             trident_spin_attack_strength: None,
             crossbow_charge_time: None,
             location_changed: &[],
+            tick: &[],
             damage_immunity: &[],
             prevent_armor_change: false,
             prevent_equipment_drop: false,

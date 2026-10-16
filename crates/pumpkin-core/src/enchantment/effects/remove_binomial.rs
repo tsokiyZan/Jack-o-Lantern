@@ -11,13 +11,10 @@ impl RemoveBinomial {
         Self { chance }
     }
 
+    /// Vanilla `RemoveBinomial.process`.
     #[must_use]
     pub fn process(&self, level: i32, current_value: f32) -> f32 {
-        let prob = self.chance.calculate(level);
-        if rand::random::<f32>() < prob {
-            0.0
-        } else {
-            current_value
-        }
+        pumpkin_data::enchantment::EnchantmentValueEffect::RemoveBinomial(self.chance.clone())
+            .process(level, current_value)
     }
 }
