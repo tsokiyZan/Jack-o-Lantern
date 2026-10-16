@@ -1,3 +1,4 @@
+use pumpkin_data::chat_type::ChatType;
 use pumpkin_data::world::{MSG_COMMAND_INCOMING, MSG_COMMAND_OUTGOING};
 use pumpkin_util::PermissionLvl;
 use pumpkin_util::permission::{Permission, PermissionDefault, PermissionRegistry};
@@ -10,6 +11,7 @@ use crate::command::context::command_context::CommandContext;
 use crate::command::node::dispatcher::CommandDispatcher;
 use crate::command::node::{CommandExecutor, CommandExecutorResult};
 use crate::entity::EntityBase;
+use crate::net::chat::decorate_chat;
 
 const NAMES: [&str; 3] = ["msg", "tell", "w"];
 const DESCRIPTION: &str = "Sends a private message to one or more players.";
@@ -37,17 +39,19 @@ impl CommandExecutor for MsgExecutor {
                     &msg_text,
                     MSG_COMMAND_INCOMING,
                     &player.get_display_name(),
-                    Some(&target.get_display_name()),
+                    None,
                 );
             }
         } else {
             for target in &targets {
-                target.send_message(
+                // Vanilla CommandSourceStack.sendChatMessage: a non-player source gets the decorated message.
+                context.source.send_message(decorate_chat(
+                    ChatType::MsgCommandOutgoing,
                     &msg_text,
-                    MSG_COMMAND_INCOMING,
                     sender_name,
                     Some(&target.get_display_name()),
-                );
+                ));
+                target.send_message(&msg_text, MSG_COMMAND_INCOMING, sender_name, None);
             }
         }
 

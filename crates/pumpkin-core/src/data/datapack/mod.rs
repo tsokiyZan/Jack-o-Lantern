@@ -22,9 +22,12 @@ use pumpkin_protocol::codec::recipe::DynamicRecipe;
 use pumpkin_util::loot_table::DynamicLootTable;
 
 use crate::command::context::command_source::CommandSource;
+use crate::command::node::dispatcher::CommandDispatcher;
 use crate::server::Server;
 use crate::server::recipe::RecipeManager;
 use crate::world::loot::LootTableHandle;
+use pumpkin_command::execution;
+use pumpkin_command::source::ResultValueTaker;
 
 use self::context_provider_loader::ContextProviderRegistry;
 use self::damage_type_loader::{DamageTypeDefinition, DamageTypeEntry, DamageTypeRegistry};
@@ -69,6 +72,19 @@ pub enum DatapackEnablePosition {
     Last,
     Before(String),
     After(String),
+}
+
+/// A function's id and its command lines.
+pub type ResolvedFunction = (String, Arc<[String]>);
+
+/// A `function` argument naming a function that isn't loaded.
+#[derive(Debug, PartialEq, Eq)]
+pub struct FunctionLookupError(pub String);
+
+impl std::fmt::Display for FunctionLookupError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Unknown function: {}", self.0)
+    }
 }
 
 pub struct DatapackManager {
@@ -731,65 +747,89 @@ impl DatapackManager {
         names
     }
 
+    /// Vanilla `FunctionArgument.getFunctions`: the function `name` names, or every function
+    /// of the tag `#name`. An unknown tag is empty, and tag entries without a loaded function
+    /// are skipped.
+    pub fn resolve_functions(
+        &self,
+        name: &str,
+    ) -> Result<Vec<ResolvedFunction>, FunctionLookupError> {
+        let tag_ids = name.strip_prefix('#').map(|tag_name| {
+            self.function_tags
+                .read()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .get(tag_name)
+                .cloned()
+                .unwrap_or_default()
+        });
+        let all_functions = self
+            .functions
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let Some(tag_ids) = tag_ids else {
+            return all_functions
+                .get(name)
+                .map(|lines| vec![(name.to_string(), Arc::clone(lines))])
+                .ok_or_else(|| FunctionLookupError(name.to_string()));
+        };
+        Ok(tag_ids
+            .into_iter()
+            .filter_map(|id| {
+                let lines = Arc::clone(all_functions.get(&id)?);
+                Some((id, lines))
+            })
+            .collect())
+    }
+
+    /// Vanilla `CallFunction.execute`: runs the function's commands as entries of a new frame
+    /// whose return value goes to `result_callback`, stopping once the frame is discarded.
+    /// Returns how many commands ran.
+    pub fn call_function(
+        server: &Arc<Server>,
+        lines: &[String],
+        source: &CommandSource,
+        result_callback: ResultValueTaker,
+        return_parent_frame: bool,
+    ) -> usize {
+        let dispatcher = server.command_dispatcher.load();
+        execution::run_in_new_frame(result_callback, return_parent_frame, |frame| {
+            let generation = frame.generation();
+            let mut executed = 0;
+            for line in lines {
+                if frame.generation() != generation {
+                    break;
+                }
+                if let Err(error) = dispatcher.execute_input_in_current_frame(line, source) {
+                    CommandDispatcher::send_error_to_source(source, error, line);
+                }
+                executed += 1;
+            }
+            executed
+        })
+    }
+
+    /// Vanilla `ServerFunctionManager.execute` for each function `name` resolves to: a
+    /// top-level call whose return value goes to the source's callbacks. Returns how many
+    /// commands ran.
     pub fn execute_function(
         &self,
         server: &Arc<Server>,
         source: &CommandSource,
         name: &str,
-    ) -> Result<usize, String> {
-        self.visit_function_lines(name, |line| {
-            server
-                .command_dispatcher
-                .load()
-                .handle_command(source, line);
-        })
-    }
-
-    fn visit_function_lines(
-        &self,
-        name: &str,
-        mut visit: impl FnMut(&str),
-    ) -> Result<usize, String> {
-        let (functions_to_run, is_tag) = if let Some(tag_name) = name.strip_prefix('#') {
-            let tags = self
-                .function_tags
-                .read()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            let Some(fns) = tags.get(tag_name) else {
-                return Err(format!("Unknown function tag: #{tag_name}"));
-            };
-            (fns.clone(), true)
-        } else {
-            (vec![name.to_string()], false)
-        };
-
-        let functions = {
-            let all_fns = self
-                .functions
-                .read()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            let mut functions = Vec::with_capacity(functions_to_run.len());
-            for fn_id in functions_to_run {
-                let Some(lines) = all_fns.get(&fn_id) else {
-                    if !is_tag {
-                        return Err(format!("Unknown function: {fn_id}"));
-                    }
-                    continue;
-                };
-                functions.push(Arc::clone(lines));
-            }
-            functions
-        };
-
-        let mut total_executed = 0;
-        for lines in functions {
-            for line in lines.iter() {
-                visit(line);
-                total_executed += 1;
-            }
+    ) -> Result<usize, FunctionLookupError> {
+        let mut executed = 0;
+        for (_, lines) in self.resolve_functions(name)? {
+            executed += execution::run_in_new_frame(ResultValueTaker::new(), false, |_| {
+                Self::call_function(
+                    server,
+                    &lines,
+                    source,
+                    source.command_result_taker.clone(),
+                    false,
+                )
+            });
         }
-
-        Ok(total_executed)
+        Ok(executed)
     }
 
     #[must_use]
@@ -1124,11 +1164,26 @@ impl DatapackManager {
         Ok(())
     }
 
+    /// Runs a function with the console as its source, for plugins. Returns how many commands ran.
     pub fn execute_function_from_console(
         server: &Arc<Server>,
         name: &str,
     ) -> Result<usize, String> {
         let source = crate::command::CommandSender::Console.into_source(server);
+        server
+            .datapack_manager
+            .execute_function(server, &source, name)
+            .map_err(|error| error.to_string())
+    }
+
+    /// Runs a function as the game loop does (vanilla `ServerFunctionManager.getGameLoopSender`).
+    pub fn execute_function_from_game_loop(
+        server: &Arc<Server>,
+        name: &str,
+    ) -> Result<usize, FunctionLookupError> {
+        let source = crate::command::CommandSender::Console
+            .into_source(server)
+            .with_silent();
         server
             .datapack_manager
             .execute_function(server, &source, name)
@@ -1672,10 +1727,10 @@ fn load_recipes_from_dir(
 }
 #[cfg(test)]
 mod tests {
-    use super::DatapackManager;
+    use super::{DatapackManager, FunctionLookupError};
 
     #[test]
-    fn function_dispatch_releases_the_functions_lock() {
+    fn function_resolution_releases_the_functions_lock() {
         let manager = DatapackManager::new();
         manager
             .functions
@@ -1686,24 +1741,22 @@ mod tests {
                 vec!["first command".to_string(), "second command".to_string()].into(),
             );
 
-        let mut visited = Vec::new();
-        let executed = manager
-            .visit_function_lines("test:reentrant", |line| {
-                let functions = manager
-                    .functions
-                    .try_write()
-                    .expect("function dispatch must not hold the functions read lock");
-                drop(functions);
-                visited.push(line.to_string());
-            })
-            .expect("execute function lines");
+        let functions = manager
+            .resolve_functions("test:reentrant")
+            .expect("resolve function");
+        drop(
+            manager
+                .functions
+                .try_write()
+                .expect("running a function must not hold the functions read lock"),
+        );
 
-        assert_eq!(executed, 2);
-        assert_eq!(visited, ["first command", "second command"]);
+        assert_eq!(functions.len(), 1);
+        assert_eq!(&*functions[0].1, ["first command", "second command"]);
     }
 
     #[test]
-    fn function_resolution_preserves_unknown_errors_and_skips_missing_tag_entries() {
+    fn function_resolution_reports_unknown_functions_and_skips_missing_tag_entries() {
         let manager = DatapackManager::new();
         manager
             .functions
@@ -1722,25 +1775,17 @@ mod tests {
                 vec!["test:missing".to_string(), "test:known".to_string()],
             );
 
-        let mut visited = Vec::new();
-        let executed = manager
-            .visit_function_lines("#test:mixed", |line| visited.push(line.to_string()))
-            .expect("execute function tag");
-        assert_eq!(executed, 1);
-        assert_eq!(visited, ["known command"]);
+        let functions = manager
+            .resolve_functions("#test:mixed")
+            .expect("resolve function tag");
+        assert_eq!(functions.len(), 1);
+        assert_eq!(functions[0].0, "test:known");
 
         assert_eq!(
-            manager
-                .visit_function_lines("test:missing", |_| {})
-                .expect_err("unknown function must fail"),
-            "Unknown function: test:missing"
+            manager.resolve_functions("test:missing"),
+            Err(FunctionLookupError("test:missing".to_string()))
         );
-        assert_eq!(
-            manager
-                .visit_function_lines("#test:missing", |_| {})
-                .expect_err("unknown function tag must fail"),
-            "Unknown function tag: #test:missing"
-        );
+        assert_eq!(manager.resolve_functions("#test:missing"), Ok(Vec::new()));
     }
 
     #[test]

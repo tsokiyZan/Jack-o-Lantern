@@ -27,8 +27,9 @@ fn create_copy_on_click_text(content: String) -> TextComponent {
                     [],
                 )))
                 .click_event(ClickEvent::CopyToClipboard {
-                    value: Cow::from(content),
+                    value: Cow::from(content.clone()),
                 })
+                .insertion(content)
                 .color_named(NamedColor::Green),
         )],
     )
@@ -36,7 +37,7 @@ fn create_copy_on_click_text(content: String) -> TextComponent {
 
 impl CommandExecutor for SeedCommandExecutor {
     fn execute(&self, context: &CommandContext) -> CommandExecutorResult {
-        let seed = context.world().level.seed.0;
+        let seed = context.world().level.seed.0.cast_signed();
         let seed_string = seed.to_string();
 
         context

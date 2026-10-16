@@ -163,7 +163,7 @@ fn biome_bonemeal_state(
     position: BlockPos,
 ) -> Option<(&'static BlockState, bool)> {
     let features: Vec<_> = world
-        .get_biome(&position)
+        .get_zoomed_biome(&position)
         .features
         .iter()
         .flat_map(|step| step.iter())

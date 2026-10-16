@@ -117,7 +117,7 @@ impl ScheduledFunctionQueue {
             }
         }
         for event in to_run {
-            let _ = crate::data::datapack::DatapackManager::execute_function_from_console(
+            let _ = crate::data::datapack::DatapackManager::execute_function_from_game_loop(
                 server,
                 &event.function_name,
             );

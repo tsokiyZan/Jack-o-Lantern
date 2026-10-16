@@ -439,7 +439,7 @@ impl NautilusEntity {
     /// Vanilla `ZombieNautilus.finalizeSpawn`'s `VariantUtils.selectVariantToSpawn`: the
     /// coral variant in its biomes, the temperate one anywhere else.
     fn select_variant_to_spawn(world: &World, pos: &BlockPos) -> ZombieNautilusVariant {
-        let biome = world.get_biome(pos).registry_id;
+        let biome = world.get_zoomed_biome(pos).registry_id;
         let biome = biome.strip_prefix("minecraft:").unwrap_or(biome);
         if tag::WorldgenBiome::MINECRAFT_SPAWNS_CORAL_VARIANT_ZOMBIE_NAUTILUS
             .0

@@ -329,7 +329,7 @@ impl Player {
 
                 if !self.has_advancement(Advancement::NETHER_EXPLORE_NETHER) {
                     let pos = self.position().to_block_pos();
-                    let biome = self.world().level.get_rough_biome(&pos);
+                    let biome = self.world().get_zoomed_biome(&pos);
                     let biome_resource = format!("minecraft:{}", biome.registry_id);
                     let nether_biomes = [
                         "minecraft:basalt_deltas",
@@ -348,7 +348,7 @@ impl Player {
 
                 if !self.has_advancement(Advancement::ADVENTURE_ADVENTURING_TIME) {
                     let pos = self.position().to_block_pos();
-                    let biome = self.world().level.get_rough_biome(&pos);
+                    let biome = self.world().get_zoomed_biome(&pos);
                     let biome_resource = format!("minecraft:{}", biome.registry_id);
                     let overworld_biomes = [
                         "minecraft:badlands",

@@ -57,7 +57,7 @@ pub struct ChickenEntity {
 impl ChickenEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let world = entity.world.load();
-        let biome = world.get_biome(&entity.block_pos.load());
+        let biome = world.get_zoomed_biome(&entity.block_pos.load());
         let variant = ChickenVariant::select_for_biome(biome.registry_id);
         let mob_entity = MobEntity::new(entity);
         set_animal_pathfinding_malus(&mob_entity);

@@ -148,7 +148,7 @@ impl ZombieVillagerEntity {
     fn finalize_villager_type(&self, world: &World, pos: &BlockPos) {
         if !self.get_villager_data_finalized() {
             let mut data = self.get_villager_data();
-            data.r#type = VarInt(villager_type_by_biome(world.get_biome(pos)) as i32);
+            data.r#type = VarInt(villager_type_by_biome(world.get_zoomed_biome(pos)) as i32);
             self.set_villager_data(data);
             self.set_villager_data_finalized(true);
         }

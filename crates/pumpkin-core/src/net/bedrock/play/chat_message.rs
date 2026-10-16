@@ -19,8 +19,6 @@ impl BedrockClient {
             PlayerChatEvent::new(player.clone(), packet.message.into_owned(), vec![], None);
 
             'after: {
-                info!("<chat> {}: {}", gameprofile.name, event.message);
-
                 let config = &server.advanced_config;
 
                 let message = match seasonal_events::modify_chat_message(&event.message, config) {
@@ -32,6 +30,11 @@ impl BedrockClient {
                     &config.chat.format,
                     &gameprofile.name,
                     &message,
+                );
+
+                Server::log_chat_message(
+                    &decorated_message,
+                    Some(crate::net::chat::NOT_SECURE_CHAT_TAG),
                 );
 
                 let entity = &player.get_entity();

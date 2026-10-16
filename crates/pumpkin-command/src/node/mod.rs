@@ -33,6 +33,12 @@ pub type CommandExecutorResult = Result<i32, CommandSyntaxError>;
 pub trait CommandExecutor<S: CommandSource = DummySource>: Sync + Send {
     /// Executes this executor for a command.
     fn execute(&self, context: &CommandContext<S>) -> CommandExecutorResult;
+
+    /// Whether this executor reports its own result to the source's callbacks and frames, like
+    /// vanilla `CustomCommandExecutor`, so the chain must not pass its result on.
+    fn reports_own_result(&self) -> bool {
+        false
+    }
 }
 
 impl<F, S: CommandSource> CommandExecutor<S> for F
@@ -63,6 +69,10 @@ pub enum RedirectModifier<S: CommandSource = DummySource> {
     /// Returns multiple [`CommandSource`]s from one context via
     /// custom behavior.
     Custom(Arc<RedirectModifierExecutor<S>>),
+
+    /// Vanilla `ReturnCommand.ReturnFromCommandCustomModifier`: discards the current frame and
+    /// runs the rest of the chain in return mode.
+    ReturnRun,
 }
 
 impl<S: CommandSource> RedirectModifier<S> {
@@ -70,7 +80,7 @@ impl<S: CommandSource> RedirectModifier<S> {
     /// given [`CommandContext`].
     pub fn sources(&self, command_context: &CommandContext<S>) -> RedirectModifierResult<S> {
         match self {
-            Self::KeepSource => Ok(vec![command_context.source.clone()]),
+            Self::KeepSource | Self::ReturnRun => Ok(vec![command_context.source.clone()]),
             Self::Custom(function) => function(command_context),
         }
     }

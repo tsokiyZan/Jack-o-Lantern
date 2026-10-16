@@ -39,6 +39,25 @@ impl ResultValueTaker {
             callback.call(return_value);
         }
     }
+
+    /// A taker that calls `callback` with each result.
+    pub fn from_fn(callback: impl Fn(ReturnValue) + Send + Sync + 'static) -> Self {
+        Self(vec![Arc::new(FnCallback(callback))])
+    }
+
+    /// Whether no callback takes the result (vanilla `CommandResultCallback.EMPTY`).
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
+struct FnCallback<F>(F);
+
+impl<F: Fn(ReturnValue) + Send + Sync> ReturnValueCallable for FnCallback<F> {
+    fn call(&self, value: ReturnValue) {
+        (self.0)(value);
+    }
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]

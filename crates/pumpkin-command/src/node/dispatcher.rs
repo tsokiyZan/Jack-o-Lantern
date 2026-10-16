@@ -5,11 +5,12 @@ use crate::errors::error_types::{
     DISPATCHER_EXPECTED_ARGUMENT_SEPARATOR, DISPATCHER_UNKNOWN_ARGUMENT,
     DISPATCHER_UNKNOWN_COMMAND, LiteralCommandErrorType,
 };
+use crate::execution;
 use crate::node::Redirection;
 use crate::node::attached::{CommandNodeId, NodeId};
 use crate::node::detached::CommandDetachedNode;
 use crate::node::tree::{NodeIdClassification, ROOT_NODE_ID, Tree};
-use crate::source::{CommandSource, DummySource, ReturnValue};
+use crate::source::{CommandSource, DummySource, ResultValueTaker, ReturnValue};
 use crate::string_reader::StringReader;
 use crate::suggestion::suggestions::{Suggestions, SuggestionsBuilder};
 use pumpkin_data::translation::java::COMMAND_CONTEXT_HERE;
@@ -360,6 +361,20 @@ impl<S: CommandSource> CommandDispatcher<S> {
         self.execute_reader(&mut reader, source)
     }
 
+    /// Executes the given command as an entry of the current frame, like a function line.
+    pub fn execute_input_in_current_frame(
+        &self,
+        input: &str,
+        source: &S,
+    ) -> Result<i32, CommandSyntaxError> {
+        let mut reader = StringReader::new(input);
+        if self.is_disabled(Self::command_name(input)) {
+            return Err(Self::unknown_command_error(&reader));
+        }
+        let parsed = self.parse(&mut reader, source);
+        self.execute_in_current_frame(parsed)
+    }
+
     /// Executes the given command in a [`StringReader`] with the provided source, returning a result of execution.
     ///
     /// # Note
@@ -373,8 +388,19 @@ impl<S: CommandSource> CommandDispatcher<S> {
         self.execute(parsed)
     }
 
-    /// Executes a given result that has already been parsed from an input.
+    /// Executes a given result that has already been parsed from an input, in a new top-level
+    /// frame (vanilla `Commands.performCommand`).
     pub fn execute(&self, parsed: ParsingResult<'_, S>) -> Result<i32, CommandSyntaxError> {
+        execution::run_in_new_frame(ResultValueTaker::new(), false, |_| {
+            self.execute_in_current_frame(parsed)
+        })
+    }
+
+    /// Executes a parsed command as an entry of the current frame, like a function line.
+    pub fn execute_in_current_frame(
+        &self,
+        parsed: ParsingResult<'_, S>,
+    ) -> Result<i32, CommandSyntaxError> {
         if parsed.reader.peek().is_some() {
             return if let Some(err) = parsed.errors.values().next() {
                 Err(err.clone())

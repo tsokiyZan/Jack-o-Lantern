@@ -2672,10 +2672,12 @@ impl World {
             return false;
         }
         self.can_see_sky(pos)
-            && self
-                .get_biome(pos)
-                .weather
-                .is_rain_at(pos.0.x, pos.0.y, pos.0.z, self.sea_level)
+            && self.get_zoomed_biome(pos).weather.is_rain_at(
+                pos.0.x,
+                pos.0.y,
+                pos.0.z,
+                self.sea_level,
+            )
     }
 
     pub fn set_raining(&self, raining: bool) {

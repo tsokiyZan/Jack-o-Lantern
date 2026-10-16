@@ -423,7 +423,7 @@ impl SpawnState {
         pos: &BlockPos,
         world: &Arc<World>,
     ) -> bool {
-        let biome = world.level.get_rough_biome(pos);
+        let biome = world.get_zoomed_biome(pos);
         biome
             .spawn_costs
             .get(entity_type.resource_name)
@@ -458,7 +458,7 @@ impl SpawnState {
         };
 
         let charge = charge.unwrap_or_else(|| {
-            let biome = world.level.get_rough_biome(pos);
+            let biome = world.get_zoomed_biome(pos);
             biome
                 .spawn_costs
                 .get(entity_type.resource_name)
@@ -901,7 +901,7 @@ pub fn can_spawn_mob_at(
     spawner_type: &'static str,
     pos: &BlockPos,
 ) -> bool {
-    let biome = world.level.get_rough_biome(pos);
+    let biome = world.get_zoomed_biome(pos);
     let spawners = match category.id {
         id if id == MobCategory::MONSTER.id => biome.spawners.monster,
         id if id == MobCategory::CREATURE.id => biome.spawners.creature,
@@ -930,7 +930,7 @@ pub fn get_random_spawn_mob_at(
     category: &'static MobCategory,
     block_pos: &BlockPos,
 ) -> Option<&'static Spawner> {
-    let biome = world.level.get_rough_biome(block_pos);
+    let biome = world.get_zoomed_biome(block_pos);
     if category == &MobCategory::WATER_AMBIENT
         && biome.has_tag(&MINECRAFT_REDUCE_WATER_AMBIENT_SPAWNS)
         && rng().random::<f32>() < 0.98f32

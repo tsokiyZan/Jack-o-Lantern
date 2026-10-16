@@ -5,6 +5,7 @@ pub mod argument_types;
 pub mod context;
 pub mod dispatcher;
 pub mod errors;
+pub mod execution;
 pub mod node;
 pub mod parser;
 pub mod snbt;

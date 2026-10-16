@@ -240,7 +240,12 @@ pub enum ArgumentType {
     LootTable,
     LootPredicate,
     LootModifier,
+    ContextFloatProvider,
+    ContextIntProvider,
+    SlotSource,
     Dialog,
+    Feature,
+    SwingAnimation,
     Uuid,
 }
 
