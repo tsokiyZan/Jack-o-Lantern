@@ -755,8 +755,12 @@ fn setup_stdin_console(server: &Arc<Server>) {
     });
     let server_clone = server.clone();
     server.spawn_task(async move {
+        // `stop` now runs in the tick, so this task has to wake up for the stop as well.
         while !SHOULD_STOP.load(Ordering::Relaxed)
-            && let Some(command) = rx.recv().await
+            && let Some(command) = select! {
+                command = rx.recv() => command,
+                () = STOP_INTERRUPT.cancelled() => None,
+            }
         {
             let mut event = ServerCommandEvent::new(command.clone());
             server_clone
@@ -764,10 +768,7 @@ fn setup_stdin_console(server: &Arc<Server>) {
                 .fire(&server_clone, &mut event)
                 .await;
             if !event.cancelled {
-                server_clone.command_dispatcher.load().handle_command(
-                    &command::CommandSender::Console.into_source(&server_clone),
-                    command.as_str(),
-                );
+                server_clone.handle_console_input(command);
             }
         }
     });
@@ -832,10 +833,7 @@ fn setup_console(mut rl: Editor<PumpkinCommandCompleter, FileHistory>, server: A
                 let mut event = ServerCommandEvent::new(line.clone());
                 server.plugin_manager.fire(&server, &mut event).await;
                 if !event.cancelled {
-                    server.command_dispatcher.load().handle_command(
-                        &command::CommandSender::Console.into_source(&server),
-                        &line,
-                    );
+                    server.handle_console_input(line);
                 }
                 let _ = tx_reply.send(1).await;
             } else {

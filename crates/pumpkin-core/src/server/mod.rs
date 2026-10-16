@@ -132,6 +132,8 @@ pub struct Server {
     pub white_list: AtomicBool,
     /// Manages the server's tick rate, freezing, and sprinting
     pub tick_rate_manager: Arc<ServerTickRateManager>,
+    /// Vanilla `DedicatedServer.consoleInput`: console commands wait for the tick.
+    console_input: std::sync::Mutex<Vec<String>>,
     /// Stores the duration of the last 100 ticks for performance analysis
     pub tick_times_nanos: std::sync::Mutex<[i64; 100]>,
     /// Aggregated tick times for efficient rolling average calculation
@@ -311,6 +313,7 @@ impl Server {
             advancement_manager,
             white_list,
             tick_rate_manager,
+            console_input: std::sync::Mutex::new(Vec::new()),
             tick_times_nanos: std::sync::Mutex::new([0; 100]),
             aggregated_tick_times_nanos: AtomicI64::new(0),
             tick_count: AtomicI32::new(0),
@@ -1173,8 +1176,34 @@ impl Server {
             self.sync_game_time();
             self.tick_players_and_network();
         }
+        // Vanilla `tickConnection`: console commands run between ticks, after the worlds.
+        self.handle_console_inputs();
         self.flush_pending_block_updates();
         Self::resume_player_flushes(&suspended);
+    }
+
+    /// Vanilla `DedicatedServer.handleConsoleInput`: queue a console command for the tick.
+    pub fn handle_console_input(&self, command: String) {
+        self.console_input
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .push(command);
+    }
+
+    /// Vanilla `DedicatedServer.handleConsoleInputs`: run the queued console commands in order.
+    fn handle_console_inputs(self: &Arc<Self>) {
+        let commands = std::mem::take(
+            &mut *self
+                .console_input
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+        );
+        for command in commands {
+            self.command_dispatcher.load().handle_command(
+                &crate::command::CommandSender::Console.into_source(self),
+                command.as_str(),
+            );
+        }
     }
 
     fn flush_pending_block_updates(&self) {
