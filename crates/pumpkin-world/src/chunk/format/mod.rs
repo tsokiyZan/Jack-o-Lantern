@@ -18,6 +18,7 @@ use crate::{
         format::anvil::{SingleChunkDataSerializer, WORLD_DATA_VERSION},
         io::{Dirtiable, file_manager::PathFromLevelFolder},
     },
+    data_fix,
     generation::section_coords,
     level::LevelFolder,
     tick::{SavedTick, scheduler::ChunkTickScheduler},
@@ -400,6 +401,7 @@ impl ChunkData {
         let block_ticks = read_saved_ticks::<&'static Block>(&root_tag, "block_ticks", position);
         let fluid_ticks = read_saved_ticks::<&'static Fluid>(&root_tag, "fluid_ticks", position);
 
+        let data_version = data_fix::data_version(&root_tag);
         let mut block_entities = FxHashMap::default();
         if let Some(list) = root_tag.get_list("block_entities") {
             for tag in list {
@@ -408,7 +410,9 @@ impl ChunkData {
                     && let Some(y) = nbt.get_int("y")
                     && let Some(z) = nbt.get_int("z")
                 {
-                    block_entities.insert(BlockPos::new(x, y, z), nbt.clone());
+                    let mut nbt = nbt.clone();
+                    data_fix::upgrade_block_entity(&mut nbt, data_version);
+                    block_entities.insert(BlockPos::new(x, y, z), nbt);
                 }
             }
         }
@@ -769,11 +773,16 @@ impl ChunkEntityData {
             )));
         }
 
+        let data_version = data_fix::data_version(&nbt.root_tag);
         let entities = match nbt.get("Entities") {
             Some(pumpkin_nbt::tag::NbtTag::List(list)) => list
                 .iter()
                 .filter_map(|t| match t {
-                    pumpkin_nbt::tag::NbtTag::Compound(c) => Some(c.clone()),
+                    pumpkin_nbt::tag::NbtTag::Compound(c) => {
+                        let mut c = c.clone();
+                        data_fix::upgrade_item_stacks(&mut c, data_version);
+                        Some(c)
+                    }
                     _ => None,
                 })
                 .collect(),
@@ -1017,6 +1026,34 @@ mod tests {
             terrain_chunk_status(WORLD_DATA_VERSION + 1, false),
             ChunkStatus::Terrain
         );
+    }
+
+    #[test]
+    fn block_entities_get_the_fixes_for_their_chunk_version() {
+        use crate::chunk::ChunkData;
+        use pumpkin_util::math::vector2::Vector2;
+
+        let sign_allows_op_features = |data_version: i32| {
+            let mut sign = NbtCompound::new();
+            sign.put_string("id", "minecraft:sign".to_string());
+            sign.put_int("x", 1);
+            sign.put_int("y", 2);
+            sign.put_int("z", 3);
+            let mut nbt = test_chunk(vec![test_section(-4, "minecraft:stone", true)]);
+            nbt.root_tag.put_int("DataVersion", data_version);
+            nbt.root_tag
+                .put_list("block_entities", vec![NbtTag::Compound(sign)]);
+            let chunk = ChunkData::from_bytes(&nbt.write(), Vector2::new(0, 0)).expect("parses");
+            let block_entities = chunk
+                .pending_block_entities
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            block_entities
+                .get(&BlockPos::new(1, 2, 3))
+                .and_then(|sign| sign.get_bool("allow_op_features"))
+        };
+        assert_eq!(sign_allows_op_features(4903), Some(true));
+        assert_eq!(sign_allows_op_features(5002), None);
     }
 
     #[test]
