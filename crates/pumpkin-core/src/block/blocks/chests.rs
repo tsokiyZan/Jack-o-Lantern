@@ -7,8 +7,9 @@ use pumpkin_data::BlockStateId;
 use pumpkin_data::block_properties::{ChestLikeProperties, ChestType, HorizontalFacing};
 use pumpkin_data::entity::{EntityPose, EntityType};
 use pumpkin_data::loot_table::get_loot_table;
+use pumpkin_data::sound::Sound;
 use pumpkin_data::tag::{self, Taggable};
-use pumpkin_data::{Block, BlockDirection, translation};
+use pumpkin_data::{Block, BlockDirection, BlockId, translation};
 use pumpkin_inventory::Inventory;
 use pumpkin_inventory::double::DoubleInventory;
 use pumpkin_inventory::generic_container_screen_handler::{create_generic_9x3, create_generic_9x6};
@@ -299,6 +300,29 @@ pub fn schedule_chest_recheck(world: &World, pos: &BlockPos) {
 
 /// Vanilla `ContainerOpenersCounter.CHECK_TICK_DELAY`.
 const CHECK_TICK_DELAY: i32 = 5;
+
+/// The chest's open and close sounds: vanilla `ChestBlock.getOpenChestSound` and
+/// `getCloseChestSound`, which copper chests set from `CopperChestBlock.getHingeSound`.
+#[must_use]
+pub const fn get_chest_sounds(block: &Block) -> (Sound, Sound) {
+    match block.id {
+        BlockId::COPPER_CHEST
+        | BlockId::EXPOSED_COPPER_CHEST
+        | BlockId::WAXED_COPPER_CHEST
+        | BlockId::WAXED_EXPOSED_COPPER_CHEST => {
+            (Sound::BlockCopperChestOpen, Sound::BlockCopperChestClose)
+        }
+        BlockId::WEATHERED_COPPER_CHEST | BlockId::WAXED_WEATHERED_COPPER_CHEST => (
+            Sound::BlockCopperChestWeatheredOpen,
+            Sound::BlockCopperChestWeatheredClose,
+        ),
+        BlockId::OXIDIZED_COPPER_CHEST | BlockId::WAXED_OXIDIZED_COPPER_CHEST => (
+            Sound::BlockCopperChestOxidizedOpen,
+            Sound::BlockCopperChestOxidizedClose,
+        ),
+        _ => (Sound::BlockChestOpen, Sound::BlockChestClose),
+    }
+}
 
 /// Returns a screen handler factory for opening a chest or double chest inventory.
 ///

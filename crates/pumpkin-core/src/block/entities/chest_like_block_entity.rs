@@ -254,16 +254,20 @@ macro_rules! impl_viewer_count_listener_for_chest {
                 world: &Arc<$crate::world::World>,
                 position: &pumpkin_util::math::position::BlockPos,
             ) {
-                self.play_sound(world, pumpkin_data::sound::Sound::BlockChestOpen);
+                let (open_sound, _) =
+                    $crate::block::blocks::chests::get_chest_sounds(world.get_block(position));
+                self.play_sound(world, open_sound);
                 $crate::block::blocks::chests::schedule_chest_recheck(world, position);
             }
 
             fn on_container_close(
                 &self,
                 world: &Arc<$crate::world::World>,
-                _position: &pumpkin_util::math::position::BlockPos,
+                position: &pumpkin_util::math::position::BlockPos,
             ) {
-                self.play_sound(world, pumpkin_data::sound::Sound::BlockChestClose);
+                let (_, close_sound) =
+                    $crate::block::blocks::chests::get_chest_sounds(world.get_block(position));
+                self.play_sound(world, close_sound);
             }
 
             fn on_viewer_count_update(
