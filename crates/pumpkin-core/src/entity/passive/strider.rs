@@ -4,11 +4,14 @@ use crate::entity::ai::pathfinder::node::PathComputationType;
 use crate::entity::ai::pathfinder::node::PathType;
 use crate::entity::ai::pathfinder::{GroundPathNavigation, Navigator};
 use crate::entity::attributes::{Modifier, ModifierOperation, send_attribute_updates_for_living};
-use crate::entity::mob::{first_passenger_player, is_player_holding, mob_controlling_passenger};
+use crate::entity::mob::{
+    first_passenger_player, is_player_holding, mob_controlling_passenger, read_legacy_saddle,
+};
 use crate::world::World;
 use pumpkin_data::Block;
 use pumpkin_data::BlockState;
 use pumpkin_data::attributes::Attributes;
+use pumpkin_data::data_component_impl::EquipmentSlot;
 use pumpkin_data::entity::EntityPose;
 use pumpkin_util::math::boundingbox::EntityDimensions;
 use pumpkin_util::math::position::BlockPos;
@@ -18,7 +21,7 @@ use std::sync::{Arc, Weak};
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
-use pumpkin_data::sound::{Sound, SoundCategory};
+use pumpkin_data::sound::Sound;
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_nbt::compound::NbtCompound;
 
@@ -45,7 +48,6 @@ pub struct StriderEntity {
     pub mob_entity: MobEntity,
     pub ageable_data: AgeableData,
     pub steering: ItemBasedSteering,
-    pub saddled: AtomicBool,
     pub suffocating: AtomicBool,
 }
 
@@ -68,7 +70,6 @@ impl StriderEntity {
             mob_entity,
             ageable_data: AgeableData::default(),
             steering: ItemBasedSteering::default(),
-            saddled: AtomicBool::new(false),
             suffocating: AtomicBool::new(false),
         };
         let mob_arc = Arc::new(strider);
@@ -236,16 +237,11 @@ impl Mob for StriderEntity {
 
     fn mob_write_nbt(&self, nbt: &mut NbtCompound) {
         self.write_ageable_nbt(nbt);
-        nbt.put_bool("Saddle", self.is_saddled());
     }
 
     fn mob_read_nbt(&self, nbt: &NbtCompound) {
         self.read_ageable_nbt(nbt);
-        if let Some(saddle) = nbt.get_bool("Saddle") {
-            self.set_saddled(saddle);
-        } else if let Some(saddle_byte) = nbt.get_byte("Saddle") {
-            self.set_saddled(saddle_byte == 1);
-        }
+        read_legacy_saddle(&self.mob_entity, nbt);
     }
 
     fn get_mob_entity(&self) -> &MobEntity {
@@ -267,16 +263,14 @@ impl Mob for StriderEntity {
         Some(self)
     }
 
-    fn is_saddled(&self) -> bool {
-        self.saddled.load(Ordering::Relaxed)
+    /// Vanilla `Strider.canUseSlot`.
+    fn can_use_slot(&self, slot: &EquipmentSlot) -> bool {
+        *slot != EquipmentSlot::SADDLE || (self.get_entity().is_alive() && !self.is_baby())
     }
 
-    fn can_be_saddled(&self) -> bool {
-        self.mob_entity.living_entity.entity.is_alive() && !self.is_baby()
-    }
-
-    fn set_saddled(&self, saddled: bool) {
-        self.saddled.store(saddled, Ordering::Relaxed);
+    /// Vanilla `Strider.getEquipSound`.
+    fn equip_sound(&self, slot: &EquipmentSlot) -> Option<Sound> {
+        (*slot == EquipmentSlot::SADDLE).then_some(Sound::EntityStriderSaddle)
     }
 
     fn mob_tick(&self, _caller: &dyn EntityBase) {
@@ -298,20 +292,13 @@ impl Mob for StriderEntity {
         );
     }
 
+    /// Vanilla `Strider.mobInteract`. A saddle goes on through the item's own use on the strider.
     fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
-        let item = item_stack.get_item();
-
-        if item == &Item::SADDLE && self.can_be_saddled() && !self.is_saddled() {
-            self.set_saddled(true);
-            item_stack.decrement_unless_creative(player.gamemode.load(), 1);
-            let entity = self.get_entity();
-            let world = entity.world.load();
-            let pos = entity.pos.load();
-            world.play_sound(Sound::EntityStriderSaddle, SoundCategory::Neutral, &pos);
-            return true;
-        }
-
-        if self.is_saddled() && !self.is_food(item_stack) {
+        if !self.is_food(item_stack)
+            && self.is_saddled()
+            && !self.is_vehicle()
+            && !player.get_entity().is_sneaking()
+        {
             let world = player.world();
             let ent = &self.mob_entity.living_entity.entity;
             if let Some(vehicle) = world.get_entity_by_id(ent.entity_id)

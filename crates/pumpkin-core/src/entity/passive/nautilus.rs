@@ -6,7 +6,7 @@ use std::sync::{
 };
 
 use pumpkin_data::damage::DamageType;
-use pumpkin_data::data_component_impl::{EquipmentSlot, EquippableImpl};
+use pumpkin_data::data_component_impl::EquipmentSlot;
 use pumpkin_data::effect::StatusEffect;
 use pumpkin_data::entity::{EntityPose, EntityStatus, EntityType};
 use pumpkin_data::game_event::GameEvent;
@@ -32,7 +32,6 @@ use crate::entity::ai::control::look_control::LookControl;
 use crate::entity::ai::control::smooth_swimming_move_control::SmoothSwimmingMoveControl;
 use crate::entity::ai::pathfinder::{Navigator, WaterBoundPathNavigation, node::PathType};
 use crate::entity::breath::BreathManager;
-use crate::entity::mob::equipment::is_equippable_in_slot;
 use crate::entity::mob::spawn::SpawnGroupData;
 use crate::entity::mob::{first_passenger_player, mob_controlling_passenger, mob_hurt_server};
 use crate::entity::r#type::from_type;
@@ -180,75 +179,6 @@ impl NautilusEntity {
             tracked_data::zombie_nautilus::DATA_VARIANT_ID,
             VarInt(i32::from(variant.id())),
         );
-    }
-
-    /// Vanilla `AbstractNautilus.canUseSlot`: the saddle and armor only go on a tame adult.
-    fn can_use_slot(&self, slot: &EquipmentSlot) -> bool {
-        if *slot == EquipmentSlot::SADDLE || *slot == EquipmentSlot::BODY {
-            self.get_entity().is_alive() && !self.is_baby() && self.is_tame()
-        } else {
-            true
-        }
-    }
-
-    /// Vanilla `LivingEntity.isEquippableInSlot` for an item that has the `equippable`
-    /// component.
-    fn is_equippable_in_slot(&self, stack: &ItemStack, slot: &EquipmentSlot) -> bool {
-        is_equippable_in_slot(self.get_entity().entity_type, stack, slot) && self.can_use_slot(slot)
-    }
-
-    /// Vanilla `Mob.hasValidEquippableItemForSlot`.
-    fn has_valid_equippable_item_for_slot(&self, slot: &EquipmentSlot) -> bool {
-        let stack = self.mob_entity.get_item_slot(slot);
-        !stack.is_empty() && self.is_equippable_in_slot(&stack, slot)
-    }
-
-    /// Vanilla `Equippable.equipOnTarget`, which `ItemStack.interactLivingEntity` runs for
-    /// items equipped on interaction (saddles and nautilus armor).
-    fn equip_on_target(&self, player: &Player, item_stack: &mut ItemStack) -> bool {
-        let Some(equippable) = item_stack.get_data_component::<EquippableImpl>() else {
-            return false;
-        };
-        if !equippable.equip_on_interact {
-            return false;
-        }
-        let slot = equippable.slot;
-        if !self.is_equippable_in_slot(item_stack, slot)
-            || !self.mob_entity.get_item_slot(slot).is_empty()
-            || !self.get_entity().is_alive()
-        {
-            return false;
-        }
-        let equipped = item_stack.split_unless_creative(player.gamemode.load(), 1);
-        self.mob_entity.set_item_slot(slot, equipped.clone());
-        self.on_equip_item(slot, &equipped);
-        self.mob_entity.set_guaranteed_drop(slot);
-        true
-    }
-
-    /// Vanilla `LivingEntity.onEquipItem` for a newly filled slot, which Pumpkin's
-    /// `set_item_slot` leaves out.
-    fn on_equip_item(&self, slot: &EquipmentSlot, stack: &ItemStack) {
-        let Some(equippable) = stack.get_data_component::<EquippableImpl>() else {
-            return;
-        };
-        let entity = self.get_entity();
-        let world = entity.world.load();
-        let pos = entity.pos.load();
-        if !entity.is_silent() && equippable.slot == slot {
-            // Vanilla `AbstractNautilus.getEquipSound`.
-            if *slot == EquipmentSlot::SADDLE {
-                let sound = if entity.is_under_water() {
-                    Sound::ItemNautilusSaddleUnderwaterEquip
-                } else {
-                    Sound::ItemNautilusSaddleEquip
-                };
-                world.play_sound_fine(sound, self.sound_source(), &pos, 1.0, 1.0);
-            } else {
-                world.play_sound_event(&equippable.equip_sound, self.sound_source(), &pos);
-            }
-        }
-        world.emit_game_event(GameEvent::Equip.name(), pos);
     }
 
     /// Vanilla `AbstractNautilus.getNautilusRestrictionRadius`.
@@ -675,9 +605,24 @@ impl Mob for NautilusEntity {
         entity.has_vehicle() || entity.is_leashed() || self.is_tame()
     }
 
-    /// Vanilla `Mob.isSaddled`.
-    fn is_saddled(&self) -> bool {
-        self.has_valid_equippable_item_for_slot(&EquipmentSlot::SADDLE)
+    /// Vanilla `AbstractNautilus.canUseSlot`: the saddle and armor only go on a tame adult.
+    fn can_use_slot(&self, slot: &EquipmentSlot) -> bool {
+        if *slot == EquipmentSlot::SADDLE || *slot == EquipmentSlot::BODY {
+            self.get_entity().is_alive() && !self.is_baby() && self.is_tame()
+        } else {
+            true
+        }
+    }
+
+    /// Vanilla `AbstractNautilus.getEquipSound`.
+    fn equip_sound(&self, slot: &EquipmentSlot) -> Option<Sound> {
+        (*slot == EquipmentSlot::SADDLE).then(|| {
+            if self.get_entity().is_under_water() {
+                Sound::ItemNautilusSaddleUnderwaterEquip
+            } else {
+                Sound::ItemNautilusSaddleEquip
+            }
+        })
     }
 
     /// Vanilla `AbstractNautilus.getControllingPassenger`.

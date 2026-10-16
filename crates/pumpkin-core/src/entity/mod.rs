@@ -539,6 +539,19 @@ pub trait EntityBase: Send + Sync + std::any::Any {
         None
     }
 
+    /// Vanilla `Entity.isClientAuthoritative`: a client moves this entity, because it is a
+    /// player or a player steers it.
+    fn is_client_authoritative(&self) -> bool {
+        self.controlling_passenger()
+            .is_some_and(|passenger| passenger.is_client_authoritative())
+    }
+
+    /// Vanilla `Entity.canSimulateMovement` on the server: a vehicle a player steers is only
+    /// moved by that player's client.
+    fn can_simulate_movement(&self) -> bool {
+        !self.is_client_authoritative()
+    }
+
     /// Vanilla `Entity.getMovementEmission`.
     fn movement_emission(&self) -> movement_emission::MovementEmission {
         movement_emission::MovementEmission::All

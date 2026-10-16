@@ -1,16 +1,19 @@
 use crate::entity::ai::util::goal_utils;
-use crate::entity::mob::{first_passenger_player, mob_controlling_passenger};
+use crate::entity::mob::{
+    first_passenger_player, is_player_holding, mob_controlling_passenger, read_legacy_saddle,
+};
 use crate::entity::passive::animal::horse_can_parent;
 use std::sync::{
     Arc, Weak,
     atomic::{AtomicBool, AtomicU8, Ordering},
 };
 
+use pumpkin_data::data_component_impl::EquipmentSlot;
 use pumpkin_data::entity::EntityPose;
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
-use pumpkin_data::sound::{Sound, SoundCategory};
+use pumpkin_data::sound::Sound;
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::math::boundingbox::EntityDimensions;
@@ -31,7 +34,6 @@ use crate::entity::{
 const TEMPT_ITEMS: &[&Item] = &[&Item::CACTUS];
 
 pub const FLAG_TAME: u8 = 2;
-pub const FLAG_SADDLE: u8 = 4;
 pub const FLAG_BRED: u8 = 8;
 pub const FLAG_EATING: u8 = 16;
 pub const FLAG_STANDING: u8 = 32;
@@ -99,15 +101,6 @@ impl CamelEntity {
             pumpkin_data::tracked_data::camel::DATA_ID_FLAGS,
             new_flags as i8,
         );
-    }
-
-    #[must_use]
-    pub fn is_saddled(&self) -> bool {
-        self.has_flag(FLAG_SADDLE)
-    }
-
-    pub fn set_saddled(&self, val: bool) {
-        self.set_flag(FLAG_SADDLE, val);
     }
 
     #[must_use]
@@ -189,14 +182,21 @@ impl Mob for CamelEntity {
 
     fn mob_write_nbt(&self, nbt: &mut NbtCompound) {
         self.write_ageable_nbt(nbt);
-        nbt.put_bool("Saddle", self.is_saddled());
     }
 
     fn mob_read_nbt(&self, nbt: &NbtCompound) {
         self.read_ageable_nbt(nbt);
-        if let Some(saddle) = nbt.get_bool("Saddle") {
-            self.set_saddled(saddle);
-        }
+        read_legacy_saddle(&self.mob_entity, nbt);
+    }
+
+    /// Vanilla `AbstractHorse.canUseSlot`; camels are always tame.
+    fn can_use_slot(&self, slot: &EquipmentSlot) -> bool {
+        *slot != EquipmentSlot::SADDLE || (self.get_entity().is_alive() && !self.is_baby())
+    }
+
+    /// Vanilla `Camel.getEquipSound`.
+    fn equip_sound(&self, slot: &EquipmentSlot) -> Option<Sound> {
+        (*slot == EquipmentSlot::SADDLE).then_some(Sound::EntityCamelSaddle)
     }
 
     fn get_mob_entity(&self) -> &MobEntity {
@@ -230,33 +230,44 @@ impl Mob for CamelEntity {
         entity.set_synced_data(pumpkin_data::tracked_data::camel::DASH, self.is_dashing());
     }
 
+    /// Vanilla `Camel.mobInteract`.
     fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
-        let item = item_stack.get_item();
-
-        if item == &Item::SADDLE && !self.is_saddled() && !self.is_baby() {
-            self.set_saddled(true);
-            item_stack.decrement_unless_creative(player.gamemode.load(), 1);
-            let entity = self.get_entity();
-            let world = entity.world.load();
-            world.play_sound(
-                Sound::EntityCamelSaddle,
-                SoundCategory::Neutral,
-                &entity.pos.load(),
-            );
+        if player.get_entity().is_sneaking() && !self.is_baby() {
+            self.open_custom_inventory_screen(player);
             return true;
         }
-
-        if self.is_saddled() && !self.is_baby() && !self.is_food(item_stack) {
-            let world = player.world();
-            let ent = &self.mob_entity.living_entity.entity;
-            if let Some(vehicle) = world.get_entity_by_id(ent.entity_id)
+        if self.equip_on_target(player, item_stack) {
+            return true;
+        }
+        // TODO: vanilla `Camel.handleEating`; Pumpkin feeds camels like other animals.
+        if self.is_food(item_stack) {
+            return self.animal_interact(player, item_stack, Sound::EntityCamelAmbient);
+        }
+        let entity = self.get_entity();
+        if entity
+            .passengers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .len()
+            < 2
+            && !self.is_baby()
+        {
+            // Vanilla `AbstractHorse.doPlayerRide`.
+            self.set_flag(FLAG_EATING, false);
+            self.set_flag(FLAG_STANDING, false);
+            player
+                .get_entity()
+                .set_rotation(entity.yaw.load(), entity.pitch.load());
+            let world = entity.world.load();
+            if let Some(vehicle) = world.get_entity_by_id(entity.entity_id)
                 && let Some(passenger) = world.get_player_by_id(player.entity_id())
             {
-                ent.add_passenger(vehicle, passenger as Arc<dyn EntityBase>);
-                return true;
+                entity.add_passenger(vehicle, passenger as Arc<dyn EntityBase>);
             }
+            return true;
         }
-
-        self.animal_interact(player, item_stack, Sound::EntityCamelAmbient)
+        self.is_baby()
+            && is_player_holding(player.as_ref(), &Item::GOLDEN_DANDELION)
+            && self.animal_interact(player, item_stack, Sound::EntityCamelAmbient)
     }
 }

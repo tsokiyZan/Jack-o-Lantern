@@ -2508,6 +2508,9 @@ impl LivingEntity {
         let slots_to_drop: Vec<EquipmentSlot> = {
             let mut slots: Vec<_> = self.equipment_slots.values().cloned().collect();
             slots.push(EquipmentSlot::MAIN_HAND);
+            // Vanilla `Mob.dropCustomDeathLoot` goes over every slot, a mount's too.
+            slots.push(EquipmentSlot::BODY);
+            slots.push(EquipmentSlot::SADDLE);
             slots
         };
 

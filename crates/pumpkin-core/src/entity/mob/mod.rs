@@ -25,7 +25,7 @@ use crate::world::brightness::DAYLIGHT_BRIGHTNESS;
 use crossbeam::atomic::AtomicCell;
 use pumpkin_data::attributes::Attributes;
 use pumpkin_data::damage::DamageType;
-use pumpkin_data::data_component_impl::EquipmentSlot;
+use pumpkin_data::data_component_impl::{EquipmentSlot, EquippableImpl};
 use pumpkin_data::entity::{EntityPose, EntityType};
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
@@ -1453,6 +1453,16 @@ pub trait Mob: EntityBase + Send + Sync {
         mob_controlling_passenger(self.get_mob_entity())
     }
 
+    /// Vanilla `Mob.isEffectiveAi`: the server runs this mob's AI unless it has none or a
+    /// player steers it.
+    fn is_effective_ai(&self) -> bool {
+        !self.get_mob_entity().is_no_ai() && !self.is_client_authoritative()
+    }
+
+    /// Vanilla `LivingEntity.tickRidden`, which the server's `travelRidden` runs every tick
+    /// `controller` steers this mob.
+    fn tick_ridden(&self, _controller: &Player) {}
+
     /// Vanilla `PlayerRideableJumping.canJump`, for mobs that implement it.
     fn can_jump(&self) -> bool {
         false
@@ -1465,15 +1475,65 @@ pub trait Mob: EntityBase + Send + Sync {
     /// Vanilla `PlayerRideableJumping.handleStopJump`.
     fn handle_stop_jump(&self) {}
 
+    /// Vanilla `HasCustomInventoryScreen.openCustomInventoryScreen`, for mobs that have one.
+    fn open_custom_inventory_screen(&self, _player: &Arc<Player>) {}
+
+    /// Vanilla `LivingEntity.canUseSlot`.
+    fn can_use_slot(&self, _slot: &EquipmentSlot) -> bool {
+        true
+    }
+
+    /// Vanilla `LivingEntity.isEquippableInSlot`.
+    fn is_equippable_in_slot(&self, stack: &ItemStack, slot: &EquipmentSlot) -> bool {
+        equipment::is_equippable_in_slot(self.get_entity().entity_type, stack, slot)
+            && self.can_use_slot(slot)
+    }
+
+    /// Vanilla `Mob.hasValidEquippableItemForSlot`.
+    fn has_valid_equippable_item_for_slot(&self, slot: &EquipmentSlot) -> bool {
+        let stack = self.get_mob_entity().get_item_slot(slot);
+        !stack.is_empty() && self.is_equippable_in_slot(&stack, slot)
+    }
+
+    /// Vanilla `Mob.isSaddled`.
     fn is_saddled(&self) -> bool {
-        false
+        self.has_valid_equippable_item_for_slot(&EquipmentSlot::SADDLE)
     }
 
-    fn can_be_saddled(&self) -> bool {
-        false
+    /// A vanilla `getEquipSound` override for `slot`; `None` plays the item's own sound.
+    fn equip_sound(&self, _slot: &EquipmentSlot) -> Option<Sound> {
+        None
     }
 
-    fn set_saddled(&self, _saddled: bool) {}
+    /// Vanilla `LivingEntity.setItemSlot`, with the equip sound and game event of its
+    /// `onEquipItem` that [`MobEntity::set_item_slot`] leaves out.
+    fn set_item_slot_and_notify(&self, slot: &EquipmentSlot, stack: ItemStack) {
+        let old = self.get_mob_entity().set_item_slot(slot, stack.clone());
+        equipment::notify_equip(self, slot, &old, &stack);
+        self.on_equip_item(slot);
+    }
+
+    /// Vanilla `Equippable.equipOnTarget`, which `ItemStack.interactLivingEntity` runs for
+    /// items equipped by using them on a mob (saddles, harnesses, nautilus armor).
+    fn equip_on_target(&self, player: &Player, item_stack: &mut ItemStack) -> bool {
+        let Some(equippable) = item_stack.get_data_component::<EquippableImpl>() else {
+            return false;
+        };
+        if !equippable.equip_on_interact {
+            return false;
+        }
+        let slot = equippable.slot;
+        if !self.is_equippable_in_slot(item_stack, slot)
+            || !self.get_mob_entity().get_item_slot(slot).is_empty()
+            || !self.get_entity().is_alive()
+        {
+            return false;
+        }
+        let equipped = item_stack.split_unless_creative(player.gamemode.load(), 1);
+        self.set_item_slot_and_notify(slot, equipped);
+        self.get_mob_entity().set_guaranteed_drop(slot);
+        true
+    }
 
     fn check_spawn_obstruction(&self, world: &World) -> bool {
         let bounding_box = self.get_entity().bounding_box.load();
@@ -2306,6 +2366,19 @@ pub fn first_passenger_player(mob: &MobEntity) -> Option<Arc<dyn EntityBase>> {
         .entity
         .get_first_passenger()
         .filter(|passenger| passenger.get_player().is_some())
+}
+
+/// Reads the `Saddle` tag Pumpkin wrote before saddles were equipment. Like vanilla's data
+/// fixer, it becomes a saddle in the saddle slot that always drops.
+pub fn read_legacy_saddle(mob: &MobEntity, nbt: &NbtCompound) {
+    if nbt.get_bool("Saddle").unwrap_or(false)
+        && mob.get_item_slot(&EquipmentSlot::SADDLE).is_empty()
+    {
+        mob.set_item_slot_and_drop_when_killed(
+            &EquipmentSlot::SADDLE,
+            ItemStack::new(1, &Item::SADDLE),
+        );
+    }
 }
 
 /// Vanilla `LivingEntity.isHolding(item)` for a player rider.

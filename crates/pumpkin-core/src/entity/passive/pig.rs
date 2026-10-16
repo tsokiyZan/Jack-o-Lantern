@@ -1,9 +1,12 @@
-use crate::entity::mob::{first_passenger_player, is_player_holding, mob_controlling_passenger};
+use crate::entity::mob::{
+    first_passenger_player, is_player_holding, mob_controlling_passenger, read_legacy_saddle,
+};
 use std::sync::{
     Arc, Weak,
-    atomic::{AtomicBool, AtomicU8, Ordering},
+    atomic::{AtomicU8, Ordering},
 };
 
+use pumpkin_data::data_component_impl::EquipmentSlot;
 use pumpkin_data::entity::EntityPose;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::pig_sound_variant::PigSoundVariant;
@@ -40,7 +43,6 @@ pub struct PigEntity {
     pub mob_entity: MobEntity,
     pub ageable_data: crate::entity::ageable::AgeableData,
     pub steering: ItemBasedSteering,
-    pub saddled: AtomicBool,
     pub variant: AtomicU8,
     pub sound_variant: AtomicU8,
 }
@@ -56,7 +58,6 @@ impl PigEntity {
             mob_entity,
             ageable_data: crate::entity::ageable::AgeableData::default(),
             steering: ItemBasedSteering::default(),
-            saddled: AtomicBool::new(false),
             variant: AtomicU8::new(variant.id()),
             sound_variant: AtomicU8::new(PigSoundVariant::Classic as u8),
         };
@@ -227,7 +228,6 @@ impl Mob for PigEntity {
     }
 
     fn mob_write_nbt(&self, nbt: &mut NbtCompound) {
-        nbt.put_bool("Saddle", self.is_saddled());
         let variant = PigVariant::from_id(self.variant.load(Ordering::Relaxed)).unwrap_or_default();
         nbt.put_string("variant", format!("minecraft:{}", variant.to_name()));
         let sound_variant = PigSoundVariant::from_id(self.sound_variant.load(Ordering::Relaxed))
@@ -239,9 +239,7 @@ impl Mob for PigEntity {
     }
 
     fn mob_read_nbt(&self, nbt: &NbtCompound) {
-        if let Some(saddle) = nbt.get_byte("Saddle") {
-            self.set_saddled(saddle == 1);
-        }
+        read_legacy_saddle(&self.mob_entity, nbt);
         if let Some(variant_str) = nbt.get_string("variant")
             && let Some(variant) = PigVariant::from_name(variant_str)
         {
@@ -274,37 +272,24 @@ impl Mob for PigEntity {
         Some(self)
     }
 
-    fn is_saddled(&self) -> bool {
-        self.saddled.load(Ordering::Relaxed)
+    /// Vanilla `Pig.canUseSlot`.
+    fn can_use_slot(&self, slot: &EquipmentSlot) -> bool {
+        *slot != EquipmentSlot::SADDLE || (self.get_entity().is_alive() && !self.is_baby())
     }
 
-    fn can_be_saddled(&self) -> bool {
-        self.mob_entity.living_entity.entity.is_alive() && !self.is_baby()
+    /// Vanilla `Pig.getEquipSound`.
+    fn equip_sound(&self, slot: &EquipmentSlot) -> Option<Sound> {
+        (*slot == EquipmentSlot::SADDLE).then_some(Sound::EntityPigSaddle)
     }
 
-    fn set_saddled(&self, saddled: bool) {
-        self.saddled.store(saddled, Ordering::Relaxed);
-    }
-
+    /// Vanilla `Pig.mobInteract`. A saddle the pig does not ride for goes on through the
+    /// item's own use on the pig.
     fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
-        if item_stack.get_item() == &pumpkin_data::item::Item::SADDLE
-            && self.can_be_saddled()
-            && !self.is_saddled()
+        if !self.is_food(item_stack)
+            && self.is_saddled()
+            && !self.is_vehicle()
+            && !player.get_entity().is_sneaking()
         {
-            self.set_saddled(true);
-            item_stack.decrement_unless_creative(player.gamemode.load(), 1);
-            let entity = self.get_entity();
-            let world = entity.world.load();
-            let pos = entity.pos.load();
-            world.play_sound(
-                Sound::EntityPigSaddle,
-                pumpkin_data::sound::SoundCategory::Neutral,
-                &pos,
-            );
-            return true;
-        }
-
-        if self.is_saddled() && !self.is_food(item_stack) {
             let world = player.world();
             if let Some(vehicle) = world.get_entity_by_id(self.get_entity().entity_id)
                 && let Some(passenger) = world.get_player_by_id(player.entity_id())

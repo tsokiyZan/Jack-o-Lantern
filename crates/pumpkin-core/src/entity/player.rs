@@ -7149,6 +7149,17 @@ impl EntityBase for Player {
         self.living_entity.get_gravity()
     }
 
+    /// Vanilla `Player.isClientAuthoritative`.
+    fn is_client_authoritative(&self) -> bool {
+        true
+    }
+
+    /// Vanilla `Player.getMoveSimulationType` (`AUTHORITATIVE_SIDE_AND_SERVER`): the server
+    /// runs its own copy of a player's movement too.
+    fn can_simulate_movement(&self) -> bool {
+        true
+    }
+
     fn get_name(&self) -> TextComponent {
         //TODO: team color
         TextComponent::text(self.gameprofile.name.clone())
