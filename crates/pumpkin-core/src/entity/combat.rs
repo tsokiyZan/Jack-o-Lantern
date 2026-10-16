@@ -23,7 +23,6 @@ pub enum AttackType {
     Sweeping,
     Strong,
     Weak,
-    MaceSmash,
 }
 
 impl AttackType {
@@ -34,12 +33,6 @@ impl AttackType {
         let on_ground = entity.on_ground.load(Ordering::Relaxed);
         let fall_distance = player.living_entity.fall_distance.load();
         let held_item = player.inventory().held_item();
-        let is_mace = held_item.item.id == pumpkin_data::item::Item::MACE.id;
-
-        if is_mace && !on_ground && fall_distance > 1.5 {
-            return Self::MaceSmash;
-        }
-
         let sword = held_item.is_sword();
         let is_bedrock = matches!(player.client.as_ref(), ClientPlatform::Bedrock(_));
 
@@ -144,9 +137,6 @@ pub fn player_attack_sound(pos: &Vector3<f64>, world: &World, attack_type: Attac
         }
         AttackType::Weak => {
             world.play_sound(Sound::EntityPlayerAttackWeak, SoundCategory::Players, pos);
-        }
-        AttackType::MaceSmash => {
-            world.play_sound(Sound::ItemMaceSmashAir, SoundCategory::Players, pos);
         }
     }
 }

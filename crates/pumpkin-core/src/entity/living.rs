@@ -133,6 +133,10 @@ pub struct LivingEntity {
     pub discard_friction: AtomicBool,
     /// The distance the entity has been falling.
     pub fall_distance: AtomicCell<f32>,
+    /// Vanilla `currentImpulseContextResetGraceTime`.
+    pub current_impulse_context_reset_grace_time: AtomicI32,
+    /// Vanilla `currentImpulseImpactPos`: while set, falls are measured from this height.
+    pub current_impulse_impact_pos: AtomicCell<Option<Vector3<f64>>>,
     pub active_effects: std::sync::Mutex<FxHashMap<&'static StatusEffect, Effect>>,
     pub entity_equipment: Arc<std::sync::Mutex<EntityEquipment>>,
     pub equipment_drop_chances: Arc<std::sync::Mutex<FxHashMap<EquipmentSlot, f32>>>,
@@ -329,6 +333,8 @@ impl LivingEntity {
             last_damage_taken: AtomicCell::new(0.0),
             absorption: AtomicCell::new(0.0),
             fall_distance: AtomicCell::new(0.0),
+            current_impulse_context_reset_grace_time: AtomicI32::new(0),
+            current_impulse_impact_pos: AtomicCell::new(None),
             death_time: AtomicU8::new(0),
             dead: AtomicBool::new(false),
             discard_friction: AtomicBool::new(false),
@@ -2247,6 +2253,22 @@ impl LivingEntity {
             );
         }
 
+        // Vanilla `LivingEntity.causeFallDamage`: after an ignored impulse only the drop below
+        // where it struck counts.
+        let fall_distance =
+            self.current_impulse_impact_pos
+                .load()
+                .map_or(fall_distance, |impact| {
+                    let effective =
+                        f64::from(fall_distance).min(impact.y - self.entity.pos.load().y);
+                    if effective <= 0.0 {
+                        self.reset_current_impulse_context();
+                    } else {
+                        self.try_reset_current_impulse_context();
+                    }
+                    effective as f32
+                });
+
         let safe_fall_distance = self.get_attribute_value(&Attributes::SAFE_FALL_DISTANCE) as f32;
         let unsafe_fall_distance = fall_distance + 1.0E-6 - safe_fall_distance;
 
@@ -2255,12 +2277,54 @@ impl LivingEntity {
             .get_mob()
             .map_or(damage, |mob| mob.calculate_fall_damage(damage));
         if damage > 0 {
+            self.reset_current_impulse_context();
             let check_damage = self.damage(caller, damage as f32, DamageType::FALL); // Fall
             if check_damage {
                 // Vanilla `getFallDamageSound(dmg)` picks by the damage, not the distance.
                 self.entity.play_sound(Self::get_fall_sound(damage));
             }
         }
+    }
+
+    /// Vanilla `LivingEntity.setIgnoreFallDamageFromCurrentImpulse`.
+    pub fn set_ignore_fall_damage_from_current_impulse(
+        &self,
+        ignore_fall_damage: bool,
+        new_impulse_impact_pos: Vector3<f64>,
+    ) {
+        if ignore_fall_damage {
+            self.apply_post_impulse_grace_time(40);
+            self.current_impulse_impact_pos
+                .store(Some(new_impulse_impact_pos));
+        } else {
+            self.current_impulse_context_reset_grace_time
+                .store(0, Relaxed);
+        }
+    }
+
+    /// Vanilla `LivingEntity.applyPostImpulseGraceTime`.
+    pub fn apply_post_impulse_grace_time(&self, ticks: i32) {
+        self.current_impulse_context_reset_grace_time
+            .fetch_max(ticks, Relaxed);
+    }
+
+    /// Vanilla `LivingEntity.isIgnoringFallDamageFromCurrentImpulse`.
+    pub fn is_ignoring_fall_damage_from_current_impulse(&self) -> bool {
+        self.current_impulse_impact_pos.load().is_some()
+    }
+
+    /// Vanilla `LivingEntity.tryResetCurrentImpulseContext`.
+    pub fn try_reset_current_impulse_context(&self) {
+        if self.current_impulse_context_reset_grace_time.load(Relaxed) == 0 {
+            self.reset_current_impulse_context();
+        }
+    }
+
+    /// Vanilla `LivingEntity.resetCurrentImpulseContext`.
+    pub fn reset_current_impulse_context(&self) {
+        self.current_impulse_context_reset_grace_time
+            .store(0, Relaxed);
+        self.current_impulse_impact_pos.store(None);
     }
 
     const fn get_fall_sound(damage: i32) -> Sound {
@@ -3242,6 +3306,20 @@ impl LivingEntity {
         // Persist current absorption amount
         nbt.put("AbsorptionAmount", NbtTag::Float(self.absorption.load()));
         nbt.put("FallDistance", NbtTag::Float(fall_distance));
+        nbt.put_int(
+            "current_impulse_context_reset_grace_time",
+            self.current_impulse_context_reset_grace_time.load(Relaxed),
+        );
+        if let Some(pos) = self.current_impulse_impact_pos.load() {
+            nbt.put(
+                "current_explosion_impact_pos",
+                NbtTag::List(vec![
+                    NbtTag::Double(pos.x),
+                    NbtTag::Double(pos.y),
+                    NbtTag::Double(pos.z),
+                ]),
+            );
+        }
         nbt.put_short("HurtTime", self.hurt_time.load(Relaxed) as i16);
         nbt.put_short("DeathTime", i16::from(self.death_time.load(Relaxed)));
         nbt.put_bool("FallFlying", self.entity.is_fall_flying());
@@ -3415,6 +3493,20 @@ impl LivingEntity {
         } else {
             self.fall_distance.store(fd);
         }
+        self.current_impulse_context_reset_grace_time.store(
+            nbt.get_int("current_impulse_context_reset_grace_time")
+                .unwrap_or(0),
+            Relaxed,
+        );
+        self.current_impulse_impact_pos.store(
+            nbt.get_list("current_explosion_impact_pos")
+                .and_then(|list| match list {
+                    [NbtTag::Double(x), NbtTag::Double(y), NbtTag::Double(z)] => {
+                        Some(Vector3::new(*x, *y, *z))
+                    }
+                    _ => None,
+                }),
+        );
         self.hurt_time
             .store(i32::from(nbt.get_short("HurtTime").unwrap_or(0)), Relaxed);
         if let Some(death_time) = nbt.get_short("DeathTime") {
@@ -4208,6 +4300,12 @@ impl EntityBase for LivingEntity {
             self.entity.tick_frozen(caller);
         }
 
+        // The end of vanilla `LivingEntity.tick`.
+        if self.current_impulse_context_reset_grace_time.load(Relaxed) > 0 {
+            self.current_impulse_context_reset_grace_time
+                .fetch_sub(1, Relaxed);
+        }
+
         // Fetch supporting blocks for players or other entities
         let supporting_pos = caller.get_player().map_or_else(
             || self.entity.get_supporting_block_pos(),
@@ -4614,6 +4712,7 @@ impl LivingEntity {
                     let destination = self.entity.pos.load();
                     if destination != center {
                         self.fall_distance.store(0.0);
+                        self.reset_current_impulse_context();
                         // Vanilla broadcasts entity event 46 (teleport particles) on success.
                         world.send_entity_status(&self.entity, EntityStatus::Teleport, None);
                         world.emit_game_event("teleport", center);

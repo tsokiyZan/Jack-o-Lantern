@@ -549,6 +549,10 @@ impl Explosion {
     }
 
     /// Vanilla `hurtEntities`.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "mirrors vanilla `ServerExplosion.hurtEntities`"
+    )]
     fn hurt_entities(&self, world: &Arc<World>) {
         if self.radius < 1.0e-5 {
             return;
@@ -650,6 +654,10 @@ impl Explosion {
                     .lock()
                     .unwrap_or_else(PoisonError::into_inner)
                     .insert(entity.entity_id, knockback);
+            }
+            // `onExplosionHit`, which only `ServerPlayer` overrides.
+            if let Some(player) = entity_base.get_player() {
+                player.on_explosion_hit(self.source.as_deref());
             }
         }
     }

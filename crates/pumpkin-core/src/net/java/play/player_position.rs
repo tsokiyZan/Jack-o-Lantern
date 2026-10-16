@@ -1,6 +1,7 @@
 #[allow(clippy::wildcard_imports)]
 use super::*;
 use crate::world::entity_tracker::encode_pos;
+use pumpkin_data::tag::Taggable;
 
 impl JavaClient {
     const fn clamp_horizontal(pos: f64) -> f64 {
@@ -72,6 +73,30 @@ impl JavaClient {
             Self::apply_move_speed_factor(player);
         }
         entity.check_supporting_block(caller, on_ground, Some(movement));
+    }
+
+    /// Vanilla `handleMovePlayer`: anything that ends a fall ends the current impulse too, once
+    /// its grace time is over.
+    fn try_reset_impulse_after_move(player: &Player, on_ground: bool) {
+        let entity = player.get_entity();
+        // `hasLandedInLiquid`.
+        let landed_in_liquid = entity.velocity.load().y < 1.0E-5 && entity.is_in_liquid();
+        // `onClimbable`.
+        // TODO: open trapdoors over a ladder, which vanilla `LivingEntity.onClimbable` also allows.
+        let on_climbable = !player.is_spectator()
+            && entity
+                .world
+                .load()
+                .get_block(&entity.block_pos.load())
+                .has_tag(&pumpkin_data::tag::Block::MINECRAFT_CLIMBABLE);
+        if on_ground
+            || landed_in_liquid
+            || on_climbable
+            || player.is_spectator()
+            || entity.is_fall_flying()
+        {
+            player.living_entity.try_reset_current_impulse_context();
+        }
     }
 
     /// The end of vanilla's server-side `player.move`, which every movement packet runs unless
@@ -209,6 +234,7 @@ impl JavaClient {
                         player.gamemode.load() == GameMode::Creative,
                     );
                 }
+                Self::try_reset_impulse_after_move(player, packet.collision & FLAG_ON_GROUND != 0);
                 chunker::update_position(player);
                 let delta = Vector3::new(
                     pos.x - last_pos.x,
@@ -370,6 +396,7 @@ impl JavaClient {
                         player.gamemode.load() == GameMode::Creative,
                     );
                 }
+                Self::try_reset_impulse_after_move(player, (packet.collision & FLAG_ON_GROUND) != 0);
                 chunker::update_position(player);
                 let delta = Vector3::new(
                     pos.x - last_pos.x,
