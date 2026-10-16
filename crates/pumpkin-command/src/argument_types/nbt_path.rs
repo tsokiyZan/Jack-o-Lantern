@@ -214,6 +214,87 @@ impl NbtPathNode {
         }
     }
 
+    /// Vanilla `Node.getOrCreateTag`: the children of `parent` this node selects, adding one made
+    /// by `child` (or the node's pattern) where vanilla does.
+    fn get_or_create_tag(
+        &self,
+        parent: &mut NbtTag,
+        child: &dyn Fn() -> NbtTag,
+        output: &mut Vec<*mut NbtTag>,
+    ) {
+        match self {
+            Self::AllElements => {
+                if let NbtTag::List(list) = parent {
+                    if list.is_empty() {
+                        list.push(child());
+                    }
+                    for elem in list.iter_mut() {
+                        output.push(elem as *mut NbtTag);
+                    }
+                }
+            }
+            Self::CompoundChild(name) => {
+                if let NbtTag::Compound(compound) = parent {
+                    if !compound.child_tags.contains_key(name.as_str()) {
+                        compound.child_tags.insert(name.clone().into(), child());
+                    }
+                    if let Some(tag) = compound.child_tags.get_mut(name.as_str()) {
+                        output.push(tag as *mut NbtTag);
+                    }
+                }
+            }
+            Self::IndexedElement(index) => {
+                if let NbtTag::List(list) = parent {
+                    let size = list.len() as i32;
+                    let actual_index = if *index < 0 { size + index } else { *index };
+                    if actual_index >= 0 && (actual_index as usize) < list.len() {
+                        output.push(&mut list[actual_index as usize] as *mut NbtTag);
+                    }
+                }
+            }
+            Self::MatchElement(pattern) => {
+                if let NbtTag::List(list) = parent {
+                    let pattern_tag = NbtTag::Compound(pattern.clone());
+                    let before = output.len();
+                    for elem in list.iter_mut() {
+                        if compare_nbt(&pattern_tag, elem) {
+                            output.push(elem as *mut NbtTag);
+                        }
+                    }
+                    if output.len() == before {
+                        list.push(pattern_tag);
+                        if let Some(last) = list.last_mut() {
+                            output.push(last as *mut NbtTag);
+                        }
+                    }
+                }
+            }
+            Self::MatchObject(name, pattern) => {
+                if let NbtTag::Compound(compound) = parent {
+                    let pattern_tag = NbtTag::Compound(pattern.clone());
+                    if compound.child_tags.contains_key(name.as_str()) {
+                        if let Some(tag) = compound.child_tags.get_mut(name.as_str())
+                            && compare_nbt(&pattern_tag, tag)
+                        {
+                            output.push(tag as *mut NbtTag);
+                        }
+                    } else {
+                        compound.child_tags.insert(name.clone().into(), pattern_tag);
+                        if let Some(tag) = compound.child_tags.get_mut(name.as_str()) {
+                            output.push(tag as *mut NbtTag);
+                        }
+                    }
+                }
+            }
+            Self::MatchRootObject(pattern) => {
+                let pattern_tag = NbtTag::Compound(pattern.clone());
+                if matches!(parent, NbtTag::Compound(_)) && compare_nbt(&pattern_tag, parent) {
+                    output.push(parent as *mut NbtTag);
+                }
+            }
+        }
+    }
+
     pub fn create_preferred_parent_tag(&self) -> NbtTag {
         match self {
             Self::AllElements | Self::IndexedElement(_) | Self::MatchElement(_) => {
@@ -464,79 +545,11 @@ impl NbtPath {
             for &parent_ptr in &current {
                 // SAFETY: We traverse disjoint paths in the NBT tree.
                 let parent = unsafe { &mut *parent_ptr };
-                match node {
-                    NbtPathNode::CompoundChild(name) => {
-                        if let NbtTag::Compound(compound) = parent {
-                            if !compound.child_tags.contains_key(name.as_str()) {
-                                compound.child_tags.insert(
-                                    name.clone().into(),
-                                    next_node.create_preferred_parent_tag(),
-                                );
-                            }
-                            if let Some(child) = compound.child_tags.get_mut(name.as_str()) {
-                                next.push(child as *mut NbtTag);
-                            }
-                        }
-                    }
-                    NbtPathNode::AllElements => {
-                        if let NbtTag::List(list) = parent {
-                            if list.is_empty() {
-                                list.push(next_node.create_preferred_parent_tag());
-                            }
-                            for elem in list.iter_mut() {
-                                next.push(elem as *mut NbtTag);
-                            }
-                        }
-                    }
-                    NbtPathNode::IndexedElement(index) => {
-                        if let NbtTag::List(list) = parent {
-                            let size = list.len() as i32;
-                            let actual_index = if *index < 0 { size + index } else { *index };
-                            if actual_index >= 0 && (actual_index as usize) < list.len() {
-                                next.push(&mut list[actual_index as usize] as *mut NbtTag);
-                            }
-                        }
-                    }
-                    NbtPathNode::MatchElement(pattern) => {
-                        if let NbtTag::List(list) = parent {
-                            let pattern_tag = NbtTag::Compound(pattern.clone());
-                            let mut found = false;
-                            for elem in list.iter_mut() {
-                                if compare_nbt(&pattern_tag, elem) {
-                                    next.push(elem as *mut NbtTag);
-                                    found = true;
-                                }
-                            }
-                            if !found {
-                                list.push(pattern_tag.clone());
-                                if let Some(last) = list.last_mut() {
-                                    next.push(last as *mut NbtTag);
-                                }
-                            }
-                        }
-                    }
-                    NbtPathNode::MatchObject(name, pattern) => {
-                        if let NbtTag::Compound(compound) = parent {
-                            let pattern_tag = NbtTag::Compound(pattern.clone());
-                            if !compound.child_tags.contains_key(name.as_str()) {
-                                compound
-                                    .child_tags
-                                    .insert(name.clone().into(), pattern_tag.clone());
-                            }
-                            if let Some(child) = compound.child_tags.get_mut(name.as_str()) {
-                                if compare_nbt(&pattern_tag, child) {
-                                    next.push(child as *mut NbtTag);
-                                }
-                            }
-                        }
-                    }
-                    NbtPathNode::MatchRootObject(pattern) => {
-                        let pattern_tag = NbtTag::Compound(pattern.clone());
-                        if compare_nbt(&pattern_tag, parent) {
-                            next.push(parent as *mut NbtTag);
-                        }
-                    }
-                }
+                node.get_or_create_tag(
+                    parent,
+                    &|| next_node.create_preferred_parent_tag(),
+                    &mut next,
+                );
             }
             if next.is_empty() {
                 return Err(self.create_not_found_exception(i));
@@ -544,6 +557,27 @@ impl NbtPath {
             current = next;
         }
         Ok(current)
+    }
+
+    /// Vanilla `NbtPath.getOrCreate`: the tags this path selects, creating missing ones on the way
+    /// and making a missing last one with `new_tag_value`.
+    pub fn get_or_create<'a>(
+        &self,
+        tag: &'a mut NbtTag,
+        new_tag_value: &dyn Fn() -> NbtTag,
+    ) -> Result<Vec<&'a mut NbtTag>, CommandSyntaxError> {
+        let parents = self.get_or_create_parents(tag)?;
+        let Some(last_node) = self.nodes.last() else {
+            return Ok(Vec::new());
+        };
+        let mut result = Vec::new();
+        for parent_ptr in parents {
+            // SAFETY: We traverse disjoint paths in the NBT tree.
+            let parent = unsafe { &mut *parent_ptr };
+            last_node.get_or_create_tag(parent, new_tag_value, &mut result);
+        }
+        // SAFETY: Each pointer is a distinct node of the tree `tag` borrows.
+        Ok(result.into_iter().map(|ptr| unsafe { &mut *ptr }).collect())
     }
 
     /// Sets the value at this path on the given root tag.
@@ -568,7 +602,8 @@ impl NbtPath {
         Ok(changed_count)
     }
 
-    /// Inserts elements at the given index into list targets matching this path.
+    /// Inserts elements at the given index into list targets matching this path, like vanilla
+    /// `NbtPath.insert`.
     pub fn insert(
         &self,
         index: i32,
@@ -580,61 +615,31 @@ impl NbtPath {
                 return Err(ERROR_DATA_TOO_DEEP.create_without_context());
             }
         }
-        let parents = self.get_or_create_parents(target)?;
-        let last_node = match self.nodes.last() {
-            Some(node) => node,
-            None => return Ok(0),
-        };
-
+        let targets = self.get_or_create(target, &|| NbtTag::List(Vec::new()))?;
         let mut modified_count = 0;
-        for &parent_ptr in &parents {
-            let parent = unsafe { &mut *parent_ptr };
-            let target_tags = match last_node {
-                NbtPathNode::CompoundChild(name) => {
-                    if let NbtTag::Compound(compound) = parent {
-                        if !compound.child_tags.contains_key(name.as_str()) {
-                            compound
-                                .child_tags
-                                .insert(name.clone().into(), NbtTag::List(Vec::new()));
-                        }
-                        compound.child_tags.get_mut(name.as_str())
-                    } else {
-                        None
-                    }
+        for target_tag in targets {
+            let size = match target_tag {
+                NbtTag::List(list) => list.len(),
+                NbtTag::ByteArray(array) => array.len(),
+                NbtTag::IntArray(array) => array.len(),
+                NbtTag::LongArray(array) => array.len(),
+                _ => {
+                    return Err(ERROR_EXPECTED_LIST
+                        .create_without_context(TextComponent::text(target_tag.to_string())));
                 }
-                NbtPathNode::MatchRootObject(_) => Some(parent),
-                _ => None,
-            };
-
-            if let Some(target_tag) = target_tags {
-                match target_tag {
-                    NbtTag::List(list) => {
-                        let mut modified = false;
-                        let size = list.len() as i32;
-                        let mut actual_index = if index < 0 { size + index + 1 } else { index };
-                        for source_tag in to_insert {
-                            if actual_index < 0 || (actual_index as usize) > list.len() {
-                                return Err(ERROR_INVALID_INDEX.create_without_context(
-                                    TextComponent::text(actual_index.to_string()),
-                                ));
-                            }
-                            list.insert(actual_index as usize, source_tag.clone());
-                            actual_index += 1;
-                            modified = true;
-                        }
-                        if modified {
-                            modified_count += 1;
-                        }
-                    }
-                    _ => {
-                        return Err(ERROR_EXPECTED_LIST.create_without_context(
-                            TextComponent::text(format!("{target_tag:?}")),
-                        ));
-                    }
+            } as i32;
+            let mut modified = false;
+            let mut actual_index = if index < 0 { size + index + 1 } else { index };
+            for source_tag in to_insert {
+                if add_tag(target_tag, actual_index, source_tag)? {
+                    actual_index += 1;
+                    modified = true;
                 }
             }
+            if modified {
+                modified_count += 1;
+            }
         }
-
         Ok(modified_count)
     }
 
@@ -655,6 +660,59 @@ impl NbtPath {
         }
         total_removed
     }
+}
+
+/// Vanilla `CollectionTag.addTag`: lists take any tag, arrays only numbers. An index outside the
+/// collection is vanilla's `IndexOutOfBoundsException`.
+fn add_tag(collection: &mut NbtTag, index: i32, tag: &NbtTag) -> Result<bool, CommandSyntaxError> {
+    let in_bounds = |len: usize| index >= 0 && index as usize <= len;
+    let out_of_bounds =
+        || ERROR_INVALID_INDEX.create_without_context(TextComponent::text(index.to_string()));
+    match collection {
+        NbtTag::List(list) => {
+            if !in_bounds(list.len()) {
+                return Err(out_of_bounds());
+            }
+            list.insert(index as usize, tag.clone());
+        }
+        NbtTag::ByteArray(array) => {
+            let Some(value) = tag.as_numeric_int() else {
+                return Ok(false);
+            };
+            if !in_bounds(array.len()) {
+                return Err(out_of_bounds());
+            }
+            let mut values = array.to_vec();
+            values.insert(index as usize, value as i8);
+            *array = values.into_boxed_slice();
+        }
+        NbtTag::IntArray(array) => {
+            let Some(value) = tag.as_numeric_int() else {
+                return Ok(false);
+            };
+            if !in_bounds(array.len()) {
+                return Err(out_of_bounds());
+            }
+            array.insert(index as usize, value);
+        }
+        NbtTag::LongArray(array) => {
+            let value = match *tag {
+                NbtTag::Float(value) => value as i64,
+                NbtTag::Double(value) => value.floor() as i64,
+                NbtTag::Long(value) => value,
+                _ => match tag.as_numeric_int() {
+                    Some(value) => i64::from(value),
+                    None => return Ok(false),
+                },
+            };
+            if !in_bounds(array.len()) {
+                return Err(out_of_bounds());
+            }
+            array.insert(index as usize, value);
+        }
+        _ => return Ok(false),
+    }
+    Ok(true)
 }
 
 impl std::fmt::Display for NbtPath {
