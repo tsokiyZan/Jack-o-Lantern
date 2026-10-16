@@ -6,6 +6,7 @@ use crate::data::player_server::ServerPlayerData;
 use crate::entity::NBTStorage;
 use crate::item::registry::ItemRegistry;
 use crate::net::authentication::fetch_mojang_public_keys;
+use crate::net::chat::{NOT_SECURE_CHAT_TAG, decorate_chat};
 use crate::net::{ClientPlatform, DisconnectReason, EncryptionError, GameProfile, PlayerConfig};
 use crate::plugin::PluginManager;
 use crate::plugin::loader::PluginLoader;
@@ -22,6 +23,7 @@ use arc_swap::ArcSwap;
 use connection_cache::{CachedBranding, CachedStatus};
 use key_store::KeyStore;
 use pumpkin_config::{AdvancedConfiguration, BasicConfiguration, TelemetryConfig};
+use pumpkin_data::chat_type::ChatType;
 use pumpkin_data::dimension::Dimension;
 use pumpkin_util::permission::PermissionManager;
 use pumpkin_util::text::color::NamedColor;
@@ -830,9 +832,26 @@ impl Server {
         let mut event = ServerBroadcastEvent::new(message.clone(), sender_name.clone());
         self.plugin_manager.fire_blocking(self, &mut event);
         if !event.cancelled {
+            // Command messages are never signed here, so vanilla tags them as not secure.
+            if let Some(chat_type) = ChatType::from_id(chat_type.into()) {
+                Self::log_chat_message(
+                    &decorate_chat(chat_type, &event.message, &event.sender, target_name),
+                    Some(NOT_SECURE_CHAT_TAG),
+                );
+            }
             for world in self.worlds.load().iter() {
                 world.broadcast_message(&event.message, &event.sender, chat_type, target_name);
             }
+        }
+    }
+
+    /// Vanilla `MinecraftServer.logChatMessage`, given the message already decorated with its chat type.
+    pub fn log_chat_message(decorated: &TextComponent, tag: Option<&str>) {
+        let decorated = decorated.clone().get_text();
+        if let Some(tag) = tag {
+            info!("[{tag}] {decorated}");
+        } else {
+            info!("{decorated}");
         }
     }
 

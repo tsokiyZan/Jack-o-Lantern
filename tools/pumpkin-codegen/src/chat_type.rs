@@ -16,6 +16,7 @@ struct ChatTypeJson {
 #[derive(Deserialize)]
 struct ChatFormatJson {
     translation_key: String,
+    parameters: Vec<String>,
 }
 
 pub fn build() -> TokenStream {
@@ -47,6 +48,8 @@ pub fn build() -> TokenStream {
     let mut to_name_arms = Vec::new();
     let mut asset_id_arms = Vec::new();
     let mut translation_key_arms = Vec::new();
+    let mut parameters_arms = Vec::new();
+    let mut from_id_arms = Vec::new();
     let mut all_variants = Vec::new();
 
     for (name, json) in &chat_types {
@@ -67,11 +70,31 @@ pub fn build() -> TokenStream {
         translation_key_arms.push(quote! {
             Self::#variant_ident => #translation_key
         });
+        let parameters = json
+            .chat
+            .parameters
+            .iter()
+            .map(|p| format_ident!("{}", p.to_pascal_case()));
+        parameters_arms.push(quote! {
+            Self::#variant_ident => &[#(ChatTypeParameter::#parameters),*]
+        });
+        let id = all_variants.len() as u32;
+        from_id_arms.push(quote! {
+            #id => Some(Self::#variant_ident)
+        });
         all_variants.push(quote! { Self::#variant_ident });
     }
 
     quote! {
         /* This file is generated. Do not edit manually. */
+
+        #[doc = "Vanilla `ChatTypeDecoration.Parameter`: what fills each argument of the translation."]
+        #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+        pub enum ChatTypeParameter {
+            Sender,
+            Target,
+            Content,
+        }
 
         #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
         #[repr(u32)]
@@ -85,6 +108,15 @@ pub fn build() -> TokenStream {
             pub fn from_name(name: &str) -> Option<Self> {
                 match name {
                     #(#from_name_arms,)*
+                    _ => None,
+                }
+            }
+
+            #[doc = "Returns the chat type with this numeric ID in the synced registry."]
+            #[must_use]
+            pub const fn from_id(id: u32) -> Option<Self> {
+                match id {
+                    #(#from_id_arms,)*
                     _ => None,
                 }
             }
@@ -116,6 +148,14 @@ pub fn build() -> TokenStream {
             pub const fn translation_key(&self) -> &'static str {
                 match self {
                     #(#translation_key_arms,)*
+                }
+            }
+
+            #[doc = "Returns the parameters of the chat decoration's translation, in order."]
+            #[must_use]
+            pub const fn chat_parameters(&self) -> &'static [ChatTypeParameter] {
+                match self {
+                    #(#parameters_arms,)*
                 }
             }
 

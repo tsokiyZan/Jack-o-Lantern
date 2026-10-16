@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use pumpkin_data::chat_type::{ChatType, ChatTypeParameter};
 use pumpkin_protocol::bedrock::server::text::SText;
 use pumpkin_protocol::codec::bit_set::BitSet;
 use pumpkin_protocol::codec::var_int::VarInt;
@@ -9,6 +10,29 @@ use pumpkin_util::text::TextComponent;
 use uuid::Uuid;
 
 use crate::entity::player::Player;
+
+/// Tag vanilla `PlayerList.broadcastChatMessage` logs unsigned or expired messages with.
+pub const NOT_SECURE_CHAT_TAG: &str = "Not Secure";
+
+/// Vanilla `ChatType.Bound.decorate`: the chat decoration's translation filled with its parameters.
+#[must_use]
+pub fn decorate_chat(
+    chat_type: ChatType,
+    content: &TextComponent,
+    sender_name: &TextComponent,
+    target_name: Option<&TextComponent>,
+) -> TextComponent {
+    let args: Vec<TextComponent> = chat_type
+        .chat_parameters()
+        .iter()
+        .map(|parameter| match parameter {
+            ChatTypeParameter::Sender => sender_name.clone(),
+            ChatTypeParameter::Target => target_name.cloned().unwrap_or_else(TextComponent::empty),
+            ChatTypeParameter::Content => content.clone(),
+        })
+        .collect();
+    TextComponent::translate(chat_type.translation_key(), args)
+}
 
 /// Mask specifying how a message should be filtered for a receiving client.
 #[derive(Clone, Debug, PartialEq, Eq)]

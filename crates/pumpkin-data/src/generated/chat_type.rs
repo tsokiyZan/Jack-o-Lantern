@@ -1,4 +1,11 @@
 /* This file is generated. Do not edit manually. */
+#[doc = "Vanilla `ChatTypeDecoration.Parameter`: what fills each argument of the translation."]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum ChatTypeParameter {
+    Sender,
+    Target,
+    Content,
+}
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(u32)]
 pub enum ChatType {
@@ -30,6 +37,20 @@ impl ChatType {
             "minecraft:team_msg_command_outgoing" | "team_msg_command_outgoing" => {
                 Some(Self::TeamMsgCommandOutgoing)
             }
+            _ => None,
+        }
+    }
+    #[doc = "Returns the chat type with this numeric ID in the synced registry."]
+    #[must_use]
+    pub const fn from_id(id: u32) -> Option<Self> {
+        match id {
+            0u32 => Some(Self::Chat),
+            1u32 => Some(Self::EmoteCommand),
+            2u32 => Some(Self::MsgCommandIncoming),
+            3u32 => Some(Self::MsgCommandOutgoing),
+            4u32 => Some(Self::SayCommand),
+            5u32 => Some(Self::TeamMsgCommandIncoming),
+            6u32 => Some(Self::TeamMsgCommandOutgoing),
             _ => None,
         }
     }
@@ -75,6 +96,27 @@ impl ChatType {
             Self::SayCommand => "chat.type.announcement",
             Self::TeamMsgCommandIncoming => "chat.type.team.text",
             Self::TeamMsgCommandOutgoing => "chat.type.team.sent",
+        }
+    }
+    #[doc = "Returns the parameters of the chat decoration's translation, in order."]
+    #[must_use]
+    pub const fn chat_parameters(&self) -> &'static [ChatTypeParameter] {
+        match self {
+            Self::Chat => &[ChatTypeParameter::Sender, ChatTypeParameter::Content],
+            Self::EmoteCommand => &[ChatTypeParameter::Sender, ChatTypeParameter::Content],
+            Self::MsgCommandIncoming => &[ChatTypeParameter::Sender, ChatTypeParameter::Content],
+            Self::MsgCommandOutgoing => &[ChatTypeParameter::Target, ChatTypeParameter::Content],
+            Self::SayCommand => &[ChatTypeParameter::Sender, ChatTypeParameter::Content],
+            Self::TeamMsgCommandIncoming => &[
+                ChatTypeParameter::Target,
+                ChatTypeParameter::Sender,
+                ChatTypeParameter::Content,
+            ],
+            Self::TeamMsgCommandOutgoing => &[
+                ChatTypeParameter::Target,
+                ChatTypeParameter::Sender,
+                ChatTypeParameter::Content,
+            ],
         }
     }
     #[doc = "Returns all vanilla chat types."]

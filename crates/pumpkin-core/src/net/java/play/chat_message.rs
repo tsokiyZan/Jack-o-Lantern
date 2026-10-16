@@ -50,8 +50,6 @@ impl JavaClient {
             );
 
             'after: {
-                info!("<chat> {}: {}", gameprofile.name, event.message);
-
                 let config = &server.advanced_config;
 
                 let message = match seasonal_events::modify_chat_message(&event.message, config) {
@@ -63,6 +61,13 @@ impl JavaClient {
                     &config.chat.format,
                     &gameprofile.name,
                     &message,
+                );
+
+                // Secure chat only gets here with a verified, unexpired signature.
+                Server::log_chat_message(
+                    &decorated_message,
+                    (!server.basic_config.allow_chat_reports)
+                        .then_some(crate::net::chat::NOT_SECURE_CHAT_TAG),
                 );
 
                 let entity = &player.get_entity();
