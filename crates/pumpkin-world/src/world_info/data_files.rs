@@ -74,12 +74,27 @@ impl WorldGenSettingsData {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Debug, Default)]
+/// Vanilla `ClockState`: one world clock in `world_clocks.dat`.
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub struct DimensionClock {
     pub total_ticks: i64,
+    pub partial_tick: f32,
+    pub rate: f32,
+    pub paused: bool,
 }
 
-#[derive(Clone, PartialEq, Eq, Debug, Default)]
+impl Default for DimensionClock {
+    fn default() -> Self {
+        Self {
+            total_ticks: 0,
+            partial_tick: 0.0,
+            rate: 1.0,
+            paused: false,
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Debug, Default)]
 pub struct WorldClocksData {
     pub clocks: std::collections::HashMap<String, DimensionClock>,
     pub data_version: i32,
@@ -527,10 +542,20 @@ fn world_clocks_from_nbt(root: &NbtCompound) -> WorldClocksData {
             continue;
         }
         if let NbtTag::Compound(dim_compound) = tag {
-            let total_ticks = dim_compound.get_long("total_ticks").unwrap_or(0);
-            result
-                .clocks
-                .insert(key.to_string(), DimensionClock { total_ticks });
+            // `ClockState.CODEC`.
+            let rate = dim_compound
+                .get_float("rate")
+                .filter(|rate| *rate > 0.0)
+                .unwrap_or(1.0);
+            result.clocks.insert(
+                key.to_string(),
+                DimensionClock {
+                    total_ticks: dim_compound.get_long("total_ticks").unwrap_or(0),
+                    partial_tick: dim_compound.get_float("partial_tick").unwrap_or(0.0),
+                    rate,
+                    paused: dim_compound.get_bool("paused").unwrap_or(false),
+                },
+            );
         }
     }
 
@@ -548,6 +573,16 @@ pub fn write_world_clocks(
     for (dim_name, clock) in &clocks.clocks {
         let mut dim_compound = NbtCompound::new();
         dim_compound.put_long("total_ticks", clock.total_ticks);
+        // `ClockState.CODEC` leaves out the optional fields at their defaults.
+        if clock.partial_tick != 0.0 {
+            dim_compound.put_float("partial_tick", clock.partial_tick);
+        }
+        if clock.rate != 1.0 {
+            dim_compound.put_float("rate", clock.rate);
+        }
+        if clock.paused {
+            dim_compound.put_bool("paused", true);
+        }
         inner.put_compound(dim_name, dim_compound);
     }
 

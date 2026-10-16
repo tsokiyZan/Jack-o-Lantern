@@ -16,9 +16,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::world_info::{
     DataPacks, MAXIMUM_SUPPORTED_LEVEL_VERSION, MINIMUM_SUPPORTED_LEVEL_VERSION,
-    MINIMUM_SUPPORTED_WORLD_DATA_VERSION, WORLD_VERSION, WorldVersion,
+    MINIMUM_SUPPORTED_WORLD_DATA_VERSION, OVERWORLD_CLOCK, WORLD_VERSION, WorldVersion,
     data_files::{
-        minecraft_data_dir, read_game_rules, read_wandering_trader, read_weather,
+        DimensionClock, minecraft_data_dir, read_game_rules, read_wandering_trader, read_weather,
         read_world_clocks, read_world_gen_settings, write_custom_boss_events_stub,
         write_game_rules, write_random_sequences_stub, write_scheduled_events_stub,
         write_scoreboard_stub, write_stopwatches_stub, write_wandering_trader, write_weather,
@@ -277,8 +277,16 @@ fn level_data_from_nbt(data: &NbtCompound, seed: i64) -> LevelData {
     if let Some(map_id) = data.get_int("map_id") {
         level_data.map_id = map_id;
     }
+    level_data.game_time = data.get_long("Time").unwrap_or(0);
+    // `DayTimeToClockFix`: before 26.1 the overworld clock was `DayTime`, defaulting to `Time`.
     if let Some(day_time) = data.get_long("DayTime") {
-        level_data.day_time = day_time;
+        level_data.world_clocks.insert(
+            OVERWORLD_CLOCK.to_string(),
+            DimensionClock {
+                total_ticks: day_time,
+                ..DimensionClock::default()
+            },
+        );
     }
     if let Some(clear_weather_time) = data.get_int("clearWeatherTime") {
         level_data.clear_weather_time = clear_weather_time;
@@ -317,6 +325,7 @@ fn level_data_to_nbt(info: &LevelData, data: &mut NbtCompound) {
     data.put_byte("Difficulty", info.difficulty as i8);
     data.put_bool("DifficultyLocked", info.difficulty_locked);
     data.put_long("LastPlayed", info.last_played);
+    data.put_long("Time", info.game_time);
     data.put_string("LevelName", info.level_name.clone());
 
     // 26.2 spawn
@@ -399,10 +408,7 @@ impl WorldInfoReader for AnvilLevelInfo {
             .join("world_clocks.dat")
             .exists()
         {
-            let clocks = read_world_clocks(level_folder);
-            if let Some(overworld) = clocks.clocks.get("minecraft:overworld") {
-                level_data.day_time = overworld.total_ticks;
-            }
+            level_data.world_clocks = read_world_clocks(level_folder).clocks;
         }
 
         // weather.dat
@@ -469,16 +475,14 @@ impl WorldInfoWriter for AnvilLevelInfo {
             error!("Failed to write world_gen_settings.dat: {e}");
         }
 
-        // world_clocks.dat – persist the overworld day_time; preserve other
+        // world_clocks.dat – the clocks this server keeps, over any others in the file.
         let mut clocks = read_world_clocks(level_folder);
         clocks.data_version = data_version;
-        clocks
-            .clocks
-            .entry("minecraft:overworld".to_string())
-            .and_modify(|c| c.total_ticks = info.day_time)
-            .or_insert(crate::world_info::data_files::DimensionClock {
-                total_ticks: info.day_time,
-            });
+        clocks.clocks.extend(
+            info.world_clocks
+                .iter()
+                .map(|(id, clock)| (id.clone(), *clock)),
+        );
 
         if let Err(e) = write_world_clocks(level_folder, &clocks) {
             error!("Failed to write world_clocks.dat: {e}");
@@ -546,6 +550,7 @@ mod test {
     };
     use pumpkin_util::{Difficulty, world_seed::Seed};
     use std::{
+        collections::HashMap,
         fs::{self, File},
         io::ErrorKind,
         path::Path,
@@ -557,9 +562,12 @@ mod test {
         CURRENT_MC_VERSION,
         world_info::{
             DataPacks, LevelData, MAXIMUM_SUPPORTED_LEVEL_VERSION, MINIMUM_SUPPORTED_LEVEL_VERSION,
-            MINIMUM_SUPPORTED_WORLD_DATA_VERSION, WORLD_VERSION, WorldGenSettings, WorldInfoError,
-            WorldVersion,
-            data_files::{minecraft_data_dir, read_world_gen_settings, write_world_gen_settings},
+            MINIMUM_SUPPORTED_WORLD_DATA_VERSION, OVERWORLD_CLOCK, WORLD_VERSION, WorldGenSettings,
+            WorldInfoError, WorldVersion,
+            data_files::{
+                DimensionClock, minecraft_data_dir, read_world_gen_settings,
+                write_world_gen_settings,
+            },
         },
     };
 
@@ -681,7 +689,7 @@ mod test {
         assert!(data.allow_commands);
         assert_eq!(data.border_size, 1024.0);
         assert_eq!(data.border_safe_zone, 5.0);
-        assert_eq!(data.day_time, 5000);
+        assert_eq!(data.world_clocks[OVERWORLD_CLOCK].total_ticks, 5000);
         assert_eq!(data.data_version, MINIMUM_SUPPORTED_WORLD_DATA_VERSION);
         assert_eq!(data.level_version, MINIMUM_SUPPORTED_LEVEL_VERSION);
         assert_eq!(data.world_version.name, "1.21.9");
@@ -813,7 +821,16 @@ mod test {
         original.spawn_yaw = 45.0;
         original.border_size = 2048.0;
         original.border_center_x = 8.0;
-        original.day_time = 12_345;
+        original.game_time = 54_321;
+        original.world_clocks.insert(
+            OVERWORLD_CLOCK.to_string(),
+            DimensionClock {
+                total_ticks: 12_345,
+                partial_tick: 0.5,
+                rate: 2.0,
+                paused: true,
+            },
+        );
         original.map_id = 3;
 
         AnvilLevelInfo
@@ -886,7 +903,8 @@ mod test {
                 enabled: vec!["vanilla".to_string()],
             },
             data_version: 4189,
-            day_time: 1727,
+            game_time: 0,
+            world_clocks: HashMap::new(),
             difficulty: Difficulty::Normal,
             difficulty_locked: false,
             game_rules: GameRuleRegistry {
@@ -1043,7 +1061,13 @@ mod test {
         let temp_dir = TempDir::new().unwrap();
         let mut level_data = LEVEL_DAT.data.clone();
         level_data.data_version = 4903;
-        level_data.day_time = 24000;
+        level_data.world_clocks.insert(
+            OVERWORLD_CLOCK.to_string(),
+            DimensionClock {
+                total_ticks: 24000,
+                ..DimensionClock::default()
+            },
+        );
         level_data.clear_weather_time = 100;
         level_data.world_gen_settings = WorldGenSettings::new(Seed(9999));
 

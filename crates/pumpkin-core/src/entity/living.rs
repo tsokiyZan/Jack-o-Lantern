@@ -2580,7 +2580,7 @@ impl LivingEntity {
                 killer_entity: killer.map(|c| c.get_entity().entity_type),
                 direct_killer_entity: source.map(|s| s.get_entity().entity_type),
                 position: Some(self.entity.pos.load()),
-                world_time: world.level_info.load().day_time as u64,
+                world_time: world.get_time_of_day() as u64,
                 damage_type: Some(damage_type),
                 tool,
                 is_raining: Some(is_raining),
@@ -4120,7 +4120,7 @@ impl LivingEntity {
         }
 
         if dmg_to_health > 0.0 || absorbed_damage > 0.0 {
-            let current_tick = world.level_info.load().day_time;
+            let current_tick = world.get_time_of_day();
             let fall_location = FallLocation::get_current_fall_location(self, &world);
             let fall_distance = self.fall_distance.load();
 

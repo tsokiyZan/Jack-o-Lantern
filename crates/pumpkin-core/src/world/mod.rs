@@ -378,6 +378,8 @@ impl World {
     ) -> Self {
         // TODO
         let generation_settings = NoiseSettings::from_dimension(&dimension);
+        let level_time = LevelTime::from_level_data(&level_info.load(), &dimension);
+        level.set_game_time(level_time.world_age);
 
         // Load portal POI from disk (PoiStorage::new automatically loads from disk if files exist)
         let portal_poi = portal::PortalPoiStorage::new(level.level_folder.poi_folder.clone());
@@ -415,7 +417,7 @@ impl World {
                 5,
                 300,
             )),
-            level_time: std::sync::Mutex::new(LevelTime::new()),
+            level_time: std::sync::Mutex::new(level_time),
             dimension,
             weather: std::sync::Mutex::new(Weather::new()),
             block_registry,

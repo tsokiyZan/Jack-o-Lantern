@@ -17,6 +17,9 @@ pub const MINIMUM_SUPPORTED_WORLD_DATA_VERSION: i32 = 4435; // 1.21.9
 /// the server saves, and the newest it reads.
 pub const WORLD_VERSION: i32 = 5023;
 
+/// Vanilla `WorldClocks.OVERWORLD`: the clock the overworld's day time follows.
+pub const OVERWORLD_CLOCK: &str = "minecraft:overworld";
+
 pub const MINIMUM_SUPPORTED_LEVEL_VERSION: i32 = 19132; // 1.21.9
 pub const MAXIMUM_SUPPORTED_LEVEL_VERSION: i32 = 19133; // 1.21.9
 
@@ -90,10 +93,14 @@ pub struct LevelData {
     #[serde(skip_serializing, default)]
     pub world_gen_settings: WorldGenSettings,
 
-    /// In-game time of day (overworld dimension clock).
-    /// Persisted to `data/minecraft/world_clocks.dat`.
+    /// Vanilla `PrimaryLevelData.gameTime`, saved as `Time`.
     #[serde(skip_serializing, default)]
-    pub day_time: i64,
+    pub game_time: i64,
+
+    /// Vanilla `ServerClockManager`'s clocks by id, which hold each dimension's day time.
+    /// Persisted to `data/minecraft/world_clocks.dat`.
+    #[serde(skip)]
+    pub world_clocks: HashMap<String, data_files::DimensionClock>,
 
     /// Remaining ticks of forced-clear weather.
     /// Persisted to `data/minecraft/weather.dat`.
@@ -556,7 +563,8 @@ impl LevelData {
             // fields now in data/minecraft/*.dat
             game_rules: GameRuleRegistry::default(),
             world_gen_settings: WorldGenSettings::new(seed),
-            day_time: 0,
+            game_time: 0,
+            world_clocks: HashMap::new(),
             clear_weather_time: -1,
         }
     }

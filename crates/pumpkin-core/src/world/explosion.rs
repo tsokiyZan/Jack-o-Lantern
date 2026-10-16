@@ -766,7 +766,7 @@ impl Explosion {
                     .then_some(self.radius),
                 position: Some(pos.to_centered_f64()),
                 this_entity: self.source.as_ref().map(|s| s.get_entity().entity_type),
-                world_time: world.level_info.load().day_time as u64,
+                world_time: world.get_time_of_day() as u64,
                 is_raining: Some(world.is_raining()),
                 is_thundering: Some(world.is_thundering()),
                 ..Default::default()
