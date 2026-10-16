@@ -1,7 +1,14 @@
+use std::sync::{Arc, Mutex};
+
 use crate::enchantment::effects::EnchantmentEntityEffectExt;
-use crate::entity::Entity;
+use crate::enchantment::enchanted_item_in_use::EnchantedItemInUse;
+use crate::enchantment::post_attack::do_post_attack;
+use crate::entity::EntityBase;
+use crate::entity::damage_source::DamageSource;
+use crate::entity::living::LivingEntity;
 use crate::entity::projectile::arrow::ArrowEntity;
-use pumpkin_data::data_component_impl::EnchantmentsImpl;
+use crate::world::World;
+use pumpkin_data::data_component_impl::{EnchantmentsImpl, EquipmentSlot};
 use pumpkin_data::enchantment::{Enchantment, EnchantmentEntityEffect, EnchantmentTarget};
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
@@ -25,18 +32,19 @@ impl EnchantmentHelper {
     /// Applies projectile-spawned enchantment effects (e.g. Flame ignites the projectile for 100s).
     pub fn on_projectile_spawned(
         weapon: &ItemStack,
-        projectile_entity: &Entity,
+        projectile: &dyn EntityBase,
         arrow: Option<&ArrowEntity>,
     ) {
-        let world = projectile_entity.world.load_full();
+        let world = projectile.get_entity().world.load_full();
+        let item = EnchantedItemInUse::ownerless(weapon);
         Self::run_iteration_on_item(weapon, |enchantment, level| {
             for conditional_effect in enchantment.effects.projectile_spawned {
                 conditional_effect.effect.apply(
                     &world,
                     level,
-                    None,
-                    Some(projectile_entity),
-                    projectile_entity.pos.load(),
+                    &item,
+                    projectile,
+                    projectile.get_entity().pos.load(),
                 );
                 if let EnchantmentEntityEffect::Ignite { .. } = &conditional_effect.effect
                     && let Some(arrow) = arrow
@@ -47,22 +55,160 @@ impl EnchantmentHelper {
         });
     }
 
-    /// Applies post-attack enchantment effects (e.g. Fire Aspect ignites victim).
-    pub fn on_post_attack(attacker: &Entity, victim: &Entity, weapon: &ItemStack) {
-        Self::run_iteration_on_item(weapon, |enchantment, level| {
-            for targeted_effect in enchantment.effects.post_attack {
-                let target = match targeted_effect.affected {
-                    Some(EnchantmentTarget::Attacker | EnchantmentTarget::DamagingEntity) => {
-                        attacker
-                    }
-                    Some(EnchantmentTarget::Victim) | None => victim,
-                };
-                let world = target.world.load_full();
-                targeted_effect
-                    .effect
-                    .apply(&world, level, None, Some(target), target.pos.load());
+    /// Vanilla `runIterationOnItem(ItemStack, EquipmentSlot, LivingEntity, EnchantmentInSlotVisitor)`.
+    fn run_iteration_on_item_in_slot<F>(
+        item: &EnchantedItemInUse<'_>,
+        slot: &EquipmentSlot,
+        mut visitor: F,
+    ) where
+        F: FnMut(&'static Enchantment, i32, &EnchantedItemInUse<'_>),
+    {
+        if item.item_stack.is_empty() {
+            return;
+        }
+        let Some(enchantments) = item.item_stack.get_data_component::<EnchantmentsImpl>() else {
+            return;
+        };
+        for (enchantment, level) in enchantments.enchantment.iter() {
+            if enchantment.matching_slot(slot) {
+                visitor(enchantment, *level, item);
             }
+        }
+    }
+
+    /// Vanilla `runIterationOnEquipment`.
+    fn run_iteration_on_equipment<F>(owner: &dyn EntityBase, living: &LivingEntity, mut visitor: F)
+    where
+        F: FnMut(&'static Enchantment, i32, &EnchantedItemInUse<'_>),
+    {
+        for slot in &EquipmentSlot::VALUES {
+            let stack = Self::get_item_by_slot(owner, living, slot);
+            let item = EnchantedItemInUse::in_slot(&stack, slot.clone(), owner);
+            Self::run_iteration_on_item_in_slot(&item, slot, &mut visitor);
+        }
+    }
+
+    /// Vanilla `LivingEntity.getItemBySlot`.
+    fn get_item_by_slot(
+        owner: &dyn EntityBase,
+        living: &LivingEntity,
+        slot: &EquipmentSlot,
+    ) -> ItemStack {
+        match slot {
+            EquipmentSlot::MainHand(_) => living.held_item(owner),
+            EquipmentSlot::OffHand(_) => living.off_hand_item(owner),
+            _ => living
+                .entity_equipment
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .get(slot),
+        }
+    }
+
+    /// Vanilla `EnchantmentHelper.doPostAttackEffects`: the victim's equipment, then the
+    /// attacker's weapon.
+    pub fn do_post_attack_effects(
+        world: &Arc<World>,
+        victim: &dyn EntityBase,
+        damage_source: &DamageSource<'_>,
+    ) {
+        // `LivingEntity.getWeaponItem`; Pumpkin doesn't track the riptide spin stack.
+        let weapon = damage_source.causing.and_then(|attacker| {
+            attacker
+                .get_living_entity()
+                .map(|living| living.held_item(attacker))
         });
+        Self::do_post_attack_effects_with_item_source(
+            world,
+            victim,
+            damage_source,
+            weapon.as_ref(),
+        );
+    }
+
+    /// Vanilla `EnchantmentHelper.doPostAttackEffectsWithItemSource`.
+    pub fn do_post_attack_effects_with_item_source(
+        world: &Arc<World>,
+        victim: &dyn EntityBase,
+        damage_source: &DamageSource<'_>,
+        source: Option<&ItemStack>,
+    ) {
+        Self::do_post_attack_effects_with_item_source_on_break(
+            world,
+            victim,
+            damage_source,
+            source.map(|stack| (stack, None)),
+            None,
+        );
+    }
+
+    /// Vanilla `EnchantmentHelper.doPostAttackEffectsWithItemSourceOnBreak`. `source` may name the
+    /// stack it was read from when that stack lives outside the attacker's equipment, such as a
+    /// thrown trident's item.
+    pub fn do_post_attack_effects_with_item_source_on_break(
+        world: &Arc<World>,
+        victim: &dyn EntityBase,
+        damage_source: &DamageSource<'_>,
+        source: Option<(&ItemStack, Option<&Mutex<ItemStack>>)>,
+        attackerless_on_break: Option<&dyn Fn()>,
+    ) {
+        if let Some(living_victim) = victim.get_living_entity() {
+            Self::run_iteration_on_equipment(victim, living_victim, |enchantment, level, item| {
+                do_post_attack(
+                    enchantment,
+                    world,
+                    level,
+                    item,
+                    EnchantmentTarget::Victim,
+                    victim,
+                    damage_source,
+                );
+            });
+        }
+
+        let Some((stack, detached_stack)) = source else {
+            return;
+        };
+        if let Some(attacker) = damage_source.causing
+            && attacker.get_living_entity().is_some()
+        {
+            let item = EnchantedItemInUse {
+                detached_stack,
+                ..EnchantedItemInUse::in_slot(stack, EquipmentSlot::MAIN_HAND, attacker)
+            };
+            Self::run_iteration_on_item_in_slot(
+                &item,
+                &EquipmentSlot::MAIN_HAND,
+                |enchantment, level, item| {
+                    do_post_attack(
+                        enchantment,
+                        world,
+                        level,
+                        item,
+                        EnchantmentTarget::Attacker,
+                        victim,
+                        damage_source,
+                    );
+                },
+            );
+        } else if let Some(on_break) = attackerless_on_break {
+            let item = EnchantedItemInUse {
+                detached_stack,
+                on_break: Some(on_break),
+                ..EnchantedItemInUse::ownerless(stack)
+            };
+            Self::run_iteration_on_item(stack, |enchantment, level| {
+                do_post_attack(
+                    enchantment,
+                    world,
+                    level,
+                    &item,
+                    EnchantmentTarget::Attacker,
+                    victim,
+                    damage_source,
+                );
+            });
+        }
     }
 
     /// Computes projectile spread angle using data-driven projectile spread effects.
@@ -296,16 +442,17 @@ impl EnchantmentHelper {
 
     /// Applies location-changed enchantment effects (e.g. Frost Walker replacing water with frosted ice).
     pub fn on_location_changed(
-        entity: &Entity,
+        entity: &dyn EntityBase,
         item: &ItemStack,
         position: pumpkin_util::math::vector3::Vector3<f64>,
     ) {
-        let world = entity.world.load_full();
+        let world = entity.get_entity().world.load_full();
+        let item_in_use = EnchantedItemInUse::in_slot(item, EquipmentSlot::FEET, entity);
         Self::run_iteration_on_item(item, |enchantment, level| {
             for conditional_effect in enchantment.effects.location_changed {
                 conditional_effect
                     .effect
-                    .apply(&world, level, None, Some(entity), position);
+                    .apply(&world, level, &item_in_use, entity, position);
             }
         });
     }
@@ -313,19 +460,16 @@ impl EnchantmentHelper {
     /// Applies hit-block enchantment effects.
     pub fn on_hit_block(
         weapon: &ItemStack,
-        projectile_entity: &Entity,
+        projectile: &dyn EntityBase,
         position: pumpkin_util::math::vector3::Vector3<f64>,
     ) {
-        let world = projectile_entity.world.load_full();
+        let world = projectile.get_entity().world.load_full();
+        let item = EnchantedItemInUse::ownerless(weapon);
         Self::run_iteration_on_item(weapon, |enchantment, level| {
             for conditional_effect in enchantment.effects.hit_block {
-                conditional_effect.effect.apply(
-                    &world,
-                    level,
-                    None,
-                    Some(projectile_entity),
-                    position,
-                );
+                conditional_effect
+                    .effect
+                    .apply(&world, level, &item, projectile, position);
             }
         });
     }

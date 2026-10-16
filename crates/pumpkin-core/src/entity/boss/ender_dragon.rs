@@ -19,7 +19,9 @@ use pumpkin_world::world::BlockFlags;
 use rand::RngExt;
 use uuid::Uuid;
 
+use crate::enchantment::EnchantmentHelper;
 use crate::entity::ai::target_predicate::TargetPredicate;
+use crate::entity::damage_source::DamageSource;
 use crate::entity::experience_orb::ExperienceOrbEntity;
 use crate::entity::living::can_be_seen_as_enemy;
 use crate::entity::mob::{Mob, MobEntity, mob_hurt_server};
@@ -683,15 +685,24 @@ impl EnderDragonEntity {
                     < target.tick_count.load(Relaxed) - 2
                 && do_teams_allow_damage(self, entity.as_ref())
             {
-                // TODO: vanilla `EnchantmentHelper.doPostAttackEffects` (the target's thorns);
-                // no Pumpkin mob melee runs it yet.
+                let damage_source = DamageSource {
+                    damage_type: DamageType::MOB_ATTACK,
+                    direct: Some(self),
+                    causing: Some(self),
+                };
                 entity.damage_with_context(
                     entity.as_ref(),
                     5.0,
-                    DamageType::MOB_ATTACK,
+                    damage_source.damage_type,
                     None,
-                    Some(self),
-                    Some(self),
+                    damage_source.direct,
+                    damage_source.causing,
+                );
+                // Unconditional in vanilla, even when the hit did no damage.
+                EnchantmentHelper::do_post_attack_effects(
+                    &self.get_entity().world.load_full(),
+                    entity.as_ref(),
+                    &damage_source,
                 );
             }
         }
@@ -702,13 +713,23 @@ impl EnderDragonEntity {
         for target in entities {
             if target.get_living_entity().is_some() && do_teams_allow_damage(self, target.as_ref())
             {
+                let damage_source = DamageSource {
+                    damage_type: DamageType::MOB_ATTACK,
+                    direct: Some(self),
+                    causing: Some(self),
+                };
                 target.damage_with_context(
                     target.as_ref(),
                     10.0,
-                    DamageType::MOB_ATTACK,
+                    damage_source.damage_type,
                     None,
-                    Some(self),
-                    Some(self),
+                    damage_source.direct,
+                    damage_source.causing,
+                );
+                EnchantmentHelper::do_post_attack_effects(
+                    &self.get_entity().world.load_full(),
+                    target.as_ref(),
+                    &damage_source,
                 );
             }
         }

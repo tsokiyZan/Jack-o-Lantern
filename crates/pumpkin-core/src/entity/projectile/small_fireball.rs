@@ -3,6 +3,8 @@ use std::sync::atomic::Ordering;
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::math::vector3::Vector3;
 
+use crate::enchantment::EnchantmentHelper;
+use crate::entity::damage_source::DamageSource;
 use crate::{
     block::blocks::fire::FireBlockBase,
     entity::{
@@ -92,15 +94,26 @@ impl EntityBase for SmallFireballEntity {
                 let remaining_fire_ticks = target.fire_ticks.load(Ordering::Relaxed);
                 entity.set_on_fire_for(5.0);
                 let this = world.get_entity_by_id(self.get_entity().entity_id);
-                // TODO: vanilla `EnchantmentHelper.doPostAttackEffects` (the target's thorns).
-                if !entity.damage_with_context(
+                let damage_source = DamageSource {
+                    damage_type: Fireball::damage_type(owner.as_deref()),
+                    direct: this.as_deref(),
+                    // `fireball`: an unowned fireball is its own cause.
+                    causing: owner.as_deref().or(this.as_deref()),
+                };
+                if entity.damage_with_context(
                     entity.as_ref(),
                     5.0,
-                    Fireball::damage_type(owner.as_deref()),
+                    damage_source.damage_type,
                     None,
-                    this.as_deref(),
-                    owner.as_deref(),
+                    damage_source.direct,
+                    damage_source.causing,
                 ) {
+                    EnchantmentHelper::do_post_attack_effects(
+                        &world,
+                        entity.as_ref(),
+                        &damage_source,
+                    );
+                } else {
                     target
                         .fire_ticks
                         .store(remaining_fire_ticks, Ordering::Relaxed);

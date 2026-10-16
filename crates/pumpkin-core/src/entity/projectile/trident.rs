@@ -1,6 +1,8 @@
 use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
+use crate::enchantment::EnchantmentHelper;
+use crate::entity::damage_source::DamageSource;
 use crate::{
     entity::{
         Entity, EntityBase, boss::ender_dragon::projectile_targets, living::LivingEntity,
@@ -385,14 +387,34 @@ impl EntityBase for TridentEntity {
                 let damage_val = damage as f32;
                 self.dealt_damage.store(true, Ordering::Relaxed);
                 let owner = self.owner_id.and_then(|id| world.get_entity_by_id(id));
-                target.damage_with_context(
+                // Vanilla `trident(this, owner)`, the trident standing in for a missing owner.
+                let damage_source = DamageSource {
+                    damage_type: DamageType::TRIDENT,
+                    direct: Some(self),
+                    causing: owner.as_deref().or(Some(self)),
+                };
+                if target.damage_with_context(
                     target.as_ref(),
                     damage_val,
-                    DamageType::TRIDENT,
+                    damage_source.damage_type,
                     Some(hit_pos),
-                    owner.as_deref(),
-                    None,
-                );
+                    damage_source.direct,
+                    damage_source.causing,
+                ) {
+                    let weapon = self
+                        .item_stack
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner)
+                        .clone();
+                    let kill = || self.kill(self);
+                    EnchantmentHelper::do_post_attack_effects_with_item_source_on_break(
+                        &world,
+                        target.as_ref(),
+                        &damage_source,
+                        Some((&weapon, Some(&self.item_stack))),
+                        Some(&kill),
+                    );
+                }
 
                 // Play hit sound
                 let sound_packet = CSoundEffect::new(

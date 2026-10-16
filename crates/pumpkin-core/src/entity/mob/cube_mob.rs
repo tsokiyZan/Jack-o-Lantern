@@ -22,11 +22,13 @@ use pumpkin_util::math::vector3::Vector3;
 use pumpkin_util::math::wrap_degrees_90;
 use rand::RngExt;
 
+use crate::enchantment::EnchantmentHelper;
 use crate::entity::ageable::{AgeableData, AgeableMob};
 use crate::entity::ai::control::look_control::LookControl;
 use crate::entity::ai::control::{Control, MoveControlTrait, rotlerp};
 use crate::entity::ai::goal::{Controls, Goal, active_target::ActiveTargetGoal, to_goal_ticks};
 use crate::entity::custom_sound::CustomSound;
+use crate::entity::damage_source::DamageSource;
 use crate::entity::living::LivingEntity;
 use crate::entity::mob::equipment::RegionalDifficulty;
 use crate::entity::mob::spawn::SpawnGroupData;
@@ -300,6 +302,11 @@ impl CubeMobEntity {
     /// Vanilla `dealDamage`.
     fn deal_damage(&self, target: &dyn EntityBase) {
         let entity = self.get_entity();
+        let damage_source = DamageSource {
+            damage_type: DamageType::MOB_ATTACK,
+            direct: Some(self),
+            causing: Some(self),
+        };
         if entity.is_alive()
             && do_teams_allow_damage(self, target)
             && self.mob_entity.is_in_attack_range(target)
@@ -307,10 +314,10 @@ impl CubeMobEntity {
             && target.damage_with_context(
                 target,
                 self.get_attack_damage(),
-                DamageType::MOB_ATTACK,
+                damage_source.damage_type,
                 None,
-                Some(self),
-                Some(self),
+                damage_source.direct,
+                damage_source.causing,
             )
         {
             let pitch = {
@@ -318,6 +325,11 @@ impl CubeMobEntity {
                 (rng.random::<f32>() - rng.random::<f32>()) * 0.2 + 1.0
             };
             self.play_sound(Sound::EntitySlimeAttack, 1.0, pitch);
+            EnchantmentHelper::do_post_attack_effects(
+                &entity.world.load_full(),
+                target,
+                &damage_source,
+            );
         }
     }
 

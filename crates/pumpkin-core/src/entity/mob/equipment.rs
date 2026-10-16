@@ -19,7 +19,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::LazyLock;
 
-use pumpkin_data::AttributeModifierSlot;
 use pumpkin_data::Enchantment;
 use pumpkin_data::attributes::Attributes;
 use pumpkin_data::data_component_impl::{
@@ -823,7 +822,7 @@ fn approximate_attribute_with(
     let mut multiplied_total = 1.0;
     if let Some(modifiers) = stack.get_data_component::<AttributeModifiersImpl>() {
         for modifier in modifiers.attribute_modifiers.iter() {
-            if modifier.r#type.id != attribute.id || !attribute_slot_matches(&modifier.slot, slot) {
+            if modifier.r#type.id != attribute.id || !modifier.slot.test(slot) {
                 continue;
             }
             match modifier.operation {
@@ -834,22 +833,6 @@ fn approximate_attribute_with(
         }
     }
     (base_value + add_value) * (1.0 + add_multiplied_base) * multiplied_total
-}
-
-fn attribute_slot_matches(group: &AttributeModifierSlot, slot: &EquipmentSlot) -> bool {
-    match group {
-        AttributeModifierSlot::Any => true,
-        AttributeModifierSlot::MainHand => *slot == EquipmentSlot::MAIN_HAND,
-        AttributeModifierSlot::OffHand => *slot == EquipmentSlot::OFF_HAND,
-        AttributeModifierSlot::Hand => slot.slot_type() == EquipmentType::Hand,
-        AttributeModifierSlot::Feet => *slot == EquipmentSlot::FEET,
-        AttributeModifierSlot::Legs => *slot == EquipmentSlot::LEGS,
-        AttributeModifierSlot::Chest => *slot == EquipmentSlot::CHEST,
-        AttributeModifierSlot::Head => *slot == EquipmentSlot::HEAD,
-        AttributeModifierSlot::Armor => slot.slot_type() == EquipmentType::HumanoidArmor,
-        AttributeModifierSlot::Body => *slot == EquipmentSlot::BODY,
-        AttributeModifierSlot::Saddle => *slot == EquipmentSlot::SADDLE,
-    }
 }
 
 #[must_use]

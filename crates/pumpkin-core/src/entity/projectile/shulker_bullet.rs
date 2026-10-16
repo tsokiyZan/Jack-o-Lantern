@@ -13,6 +13,8 @@ use pumpkin_util::math::vector3::Vector3;
 use rand::RngExt;
 use uuid::Uuid;
 
+use crate::enchantment::EnchantmentHelper;
+use crate::entity::damage_source::DamageSource;
 use crate::entity::mob::shulker::Axis;
 use crate::entity::{Entity, EntityBase};
 use crate::server::Server;
@@ -477,16 +479,30 @@ impl EntityBase for ShulkerBulletEntity {
                 break;
             }
 
-            // Deal 4 (MOB_PROJECTILE) damage
-            let owner_arc = world.get_entity_by_id(self.owner_id);
+            // Vanilla `mobProjectile(this, livingOwner)` for 4.
+            let owner_arc = world
+                .get_entity_by_id(self.owner_id)
+                .filter(|owner| owner.get_living_entity().is_some());
+            let damage_source = DamageSource {
+                damage_type: DamageType::MOB_PROJECTILE,
+                direct: Some(self.get_entity()),
+                causing: owner_arc.as_deref(),
+            };
             let damaged = hit_entity.damage_with_context(
                 hit_entity.as_ref(),
                 4.0,
-                DamageType::MOB_PROJECTILE,
+                damage_source.damage_type,
                 None,
-                owner_arc.as_deref(),
-                None,
+                damage_source.direct,
+                damage_source.causing,
             );
+            if damaged {
+                EnchantmentHelper::do_post_attack_effects(
+                    &world,
+                    hit_entity.as_ref(),
+                    &damage_source,
+                );
+            }
 
             if damaged && let Some(living) = hit_entity.get_living_entity() {
                 // Apply levitation for 200 ticks

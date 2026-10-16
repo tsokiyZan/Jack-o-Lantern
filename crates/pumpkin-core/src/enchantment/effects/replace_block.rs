@@ -5,8 +5,6 @@ use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
 
 use super::EnchantmentEntityEffectExt;
-use crate::entity::Entity;
-use crate::entity::player::Player;
 use crate::world::World;
 
 /// Enchantment entity effect that replaces a block at an offset position.
@@ -43,8 +41,8 @@ impl EnchantmentEntityEffectExt for ReplaceBlock {
         &self,
         world: &Arc<World>,
         _enchantment_level: i32,
-        _owner: Option<&Arc<Player>>,
-        _entity: Option<&Entity>,
+        _item: &crate::enchantment::EnchantedItemInUse<'_>,
+        _entity: &dyn crate::entity::EntityBase,
         position: Vector3<f64>,
     ) {
         let target = self.target_position(position);

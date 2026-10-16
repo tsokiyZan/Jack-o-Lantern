@@ -2,7 +2,9 @@ use std::any::Any;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
+use crate::enchantment::EnchantmentHelper;
 use crate::entity::combat;
+use crate::entity::damage_source::DamageSource;
 use crate::entity::mob::Mob;
 use crate::entity::player::Player;
 use crate::entity::{Entity, EntityBase};
@@ -182,14 +184,19 @@ impl SpearItem {
         } else {
             0.0
         };
+        let damage_source = DamageSource {
+            damage_type: DamageType::SPEAR,
+            direct: Some(player),
+            causing: Some(player),
+        };
         let was_hurt = effects.damage
             && target.damage_with_context(
                 target.as_ref(),
                 total_damage,
-                DamageType::SPEAR,
+                damage_source.damage_type,
                 None,
-                Some(player),
-                Some(player),
+                damage_source.direct,
+                damage_source.causing,
             );
 
         let config = &server.advanced_config.pvp;
@@ -231,8 +238,14 @@ impl SpearItem {
             player.get_entity().tick_count.load(Ordering::Relaxed),
             Ordering::Relaxed,
         );
+        // `itemAttackInteraction`.
         if was_hurt {
-            Self::apply_post_damage_effects(stack, target_entity);
+            EnchantmentHelper::do_post_attack_effects_with_item_source(
+                &player.world(),
+                target.as_ref(),
+                &damage_source,
+                Some(stack),
+            );
         }
         if target.get_living_entity().is_some()
             && let Some(weapon) = stack.get_data_component::<WeaponImpl>()
@@ -475,14 +488,19 @@ impl SpearItem {
         let post_enchantment_damage =
             base_damage + Self::enchantment_damage(stack, target_entity) as f32;
         let mut affected = effects.knockback;
+        let damage_source = DamageSource {
+            damage_type: DamageType::SPEAR,
+            direct: Some(mob),
+            causing: Some(mob),
+        };
         let dealt_damage = effects.damage
             && target.damage_with_context(
                 target.as_ref(),
                 post_enchantment_damage,
-                DamageType::SPEAR,
+                damage_source.damage_type,
                 None,
-                Some(mob),
-                Some(mob),
+                damage_source.direct,
+                damage_source.causing,
             );
         affected |= dealt_damage;
         if effects.knockback && target.get_living_entity().is_some() {
@@ -521,7 +539,11 @@ impl SpearItem {
         }
 
         if dealt_damage {
-            Self::apply_post_damage_effects(stack, target_entity);
+            EnchantmentHelper::do_post_attack_effects(
+                &attacker.world.load_full(),
+                target.as_ref(),
+                &damage_source,
+            );
         }
         if !affected {
             return false;
@@ -668,17 +690,6 @@ impl SpearItem {
                     .map(|(_, level)| u32::try_from(*level).unwrap_or(0))
             })
             .unwrap_or(0)
-    }
-
-    fn apply_post_damage_effects(stack: &ItemStack, target: &Entity) {
-        let Some(enchantments) = stack.get_data_component::<EnchantmentsImpl>() else {
-            return;
-        };
-        for (enchantment, level) in enchantments.enchantment.iter() {
-            if **enchantment == Enchantment::FIRE_ASPECT {
-                target.set_on_fire_for_ticks(u32::try_from(*level).unwrap_or(0) * 80);
-            }
-        }
     }
 
     fn targets_in_range(

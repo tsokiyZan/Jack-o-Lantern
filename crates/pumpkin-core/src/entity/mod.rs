@@ -77,6 +77,7 @@ pub mod boss;
 pub mod breath;
 pub mod bucketable;
 pub mod custom_sound;
+pub mod damage_source;
 pub mod decoration;
 pub mod effect;
 pub mod experience_orb;

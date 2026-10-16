@@ -4,6 +4,8 @@ use pumpkin_data::{damage::DamageType, effect::StatusEffect, potion::Effect, tra
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::{Difficulty, math::vector3::Vector3};
 
+use crate::enchantment::EnchantmentHelper;
+use crate::entity::damage_source::DamageSource;
 use crate::{
     entity::{
         Entity, EntityBase,
@@ -158,25 +160,34 @@ impl EntityBase for WitherSkullEntity {
             let was_hurt = owner.as_ref().map_or_else(
                 || entity.damage(entity.as_ref(), 5.0, DamageType::MAGIC),
                 |owner| {
+                    let damage_source = DamageSource {
+                        damage_type: DamageType::WITHER_SKULL,
+                        direct: this.as_deref(),
+                        causing: Some(owner.as_ref()),
+                    };
                     let hurt = entity.damage_with_context(
                         entity.as_ref(),
                         8.0,
-                        DamageType::WITHER_SKULL,
+                        damage_source.damage_type,
                         None,
-                        this.as_deref(),
-                        Some(owner.as_ref()),
+                        damage_source.direct,
+                        damage_source.causing,
                     );
                     // `isAlive`: a living target with no health left counts as dead.
                     let alive = entity.get_living_entity().map_or_else(
                         || entity.get_entity().is_alive(),
                         crate::entity::living::LivingEntity::is_alive,
                     );
-                    // TODO: vanilla `EnchantmentHelper.doPostAttackEffects` when the target lives.
-                    if hurt
-                        && !alive
-                        && let Some(living_owner) = owner.get_living_entity()
-                    {
-                        living_owner.heal(5.0);
+                    if hurt {
+                        if alive {
+                            EnchantmentHelper::do_post_attack_effects(
+                                &world,
+                                entity.as_ref(),
+                                &damage_source,
+                            );
+                        } else if let Some(living_owner) = owner.get_living_entity() {
+                            living_owner.heal(5.0);
+                        }
                     }
                     hurt
                 },

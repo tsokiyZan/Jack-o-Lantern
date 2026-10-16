@@ -8,9 +8,9 @@ use super::{
     ExplodeEffect, Ignite, PlaySound, ReplaceBlock, ReplaceDisk, RunFunction, SetBlockProperties,
     SpawnParticlesEffect, SummonEntityEffect,
 };
-use crate::entity::Entity;
-use crate::entity::player::Player;
-use crate::world::World;
+use crate::enchantment::EnchantedItemInUse;
+use crate::entity::EntityBase;
+use crate::world::{ExplosionInteraction, World};
 
 /// Extension trait for enchantment entity effects.
 pub trait EnchantmentEntityEffectExt {
@@ -19,8 +19,8 @@ pub trait EnchantmentEntityEffectExt {
         &self,
         world: &Arc<World>,
         enchantment_level: i32,
-        owner: Option<&Arc<Player>>,
-        entity: Option<&Entity>,
+        item: &EnchantedItemInUse<'_>,
+        entity: &dyn EntityBase,
         position: Vector3<f64>,
     );
 }
@@ -31,8 +31,8 @@ impl EnchantmentEntityEffectExt for EnchantmentEntityEffect {
         &self,
         world: &Arc<World>,
         enchantment_level: i32,
-        owner: Option<&Arc<Player>>,
-        entity: Option<&Entity>,
+        item: &EnchantedItemInUse<'_>,
+        entity: &dyn EntityBase,
         position: Vector3<f64>,
     ) {
         match self {
@@ -41,7 +41,7 @@ impl EnchantmentEntityEffectExt for EnchantmentEntityEffect {
                     &Ignite::new(duration.clone()),
                     world,
                     enchantment_level,
-                    owner,
+                    item,
                     entity,
                     position,
                 );
@@ -55,7 +55,7 @@ impl EnchantmentEntityEffectExt for EnchantmentEntityEffect {
                     &DamageEntity::new(min_damage.clone(), max_damage.clone(), *damage_type),
                     world,
                     enchantment_level,
-                    owner,
+                    item,
                     entity,
                     position,
                 );
@@ -65,17 +65,21 @@ impl EnchantmentEntityEffectExt for EnchantmentEntityEffect {
                     &ChangeItemDamage::new(amount.clone()),
                     world,
                     enchantment_level,
-                    owner,
+                    item,
                     entity,
                     position,
                 );
             }
-            Self::PlaySound { sound } => {
+            Self::PlaySound {
+                sounds,
+                volume,
+                pitch,
+            } => {
                 EnchantmentEntityEffectExt::apply(
-                    &PlaySound::new(sound),
+                    &PlaySound::new(sounds, volume.clone(), pitch.clone()),
                     world,
                     enchantment_level,
-                    owner,
+                    item,
                     entity,
                     position,
                 );
@@ -91,7 +95,7 @@ impl EnchantmentEntityEffectExt for EnchantmentEntityEffect {
                     &ReplaceBlock::new(offset, *trigger_game_event),
                     world,
                     enchantment_level,
-                    owner,
+                    item,
                     entity,
                     position,
                 );
@@ -112,7 +116,7 @@ impl EnchantmentEntityEffectExt for EnchantmentEntityEffect {
                     &SetBlockProperties::new(props, offset, *trigger_game_event),
                     world,
                     enchantment_level,
-                    owner,
+                    item,
                     entity,
                     position,
                 );
@@ -139,7 +143,7 @@ impl EnchantmentEntityEffectExt for EnchantmentEntityEffect {
                     },
                     world,
                     enchantment_level,
-                    owner,
+                    item,
                     entity,
                     position,
                 );
@@ -152,7 +156,7 @@ impl EnchantmentEntityEffectExt for EnchantmentEntityEffect {
                     &SummonEntityEffect::new(entity_types.to_vec(), *join_team),
                     world,
                     enchantment_level,
-                    owner,
+                    item,
                     entity,
                     position,
                 );
@@ -177,7 +181,7 @@ impl EnchantmentEntityEffectExt for EnchantmentEntityEffect {
                     &spawn_particles,
                     world,
                     enchantment_level,
-                    owner,
+                    item,
                     entity,
                     position,
                 );
@@ -187,7 +191,7 @@ impl EnchantmentEntityEffectExt for EnchantmentEntityEffect {
                     &RunFunction::new(*function),
                     world,
                     enchantment_level,
-                    owner,
+                    item,
                     entity,
                     position,
                 );
@@ -197,7 +201,7 @@ impl EnchantmentEntityEffectExt for EnchantmentEntityEffect {
                     &ApplyExhaustion::new(amount.clone()),
                     world,
                     enchantment_level,
-                    owner,
+                    item,
                     entity,
                     position,
                 );
@@ -211,7 +215,7 @@ impl EnchantmentEntityEffectExt for EnchantmentEntityEffect {
                     &ApplyEntityImpulse::new(*direction, *coordinate_scale, magnitude.clone()),
                     world,
                     enchantment_level,
-                    owner,
+                    item,
                     entity,
                     position,
                 );
@@ -233,36 +237,48 @@ impl EnchantmentEntityEffectExt for EnchantmentEntityEffect {
                     ),
                     world,
                     enchantment_level,
-                    owner,
+                    item,
                     entity,
                     position,
                 );
             }
             Self::Explode {
+                attribute_to_user,
+                damage_type,
+                knockback_multiplier,
+                immune_blocks,
                 offset_x,
                 offset_y,
                 offset_z,
                 radius,
                 create_fire,
-                ..
+                block_interaction,
+                small_particle,
+                large_particle,
+                sound,
             } => {
+                let Some(block_interaction) = ExplosionInteraction::from_name(block_interaction)
+                else {
+                    tracing::warn!("Unknown explode block_interaction {block_interaction}");
+                    return;
+                };
                 EnchantmentEntityEffectExt::apply(
                     &ExplodeEffect::new(
-                        false,
-                        None,
-                        None,
-                        None,
+                        *attribute_to_user,
+                        *damage_type,
+                        knockback_multiplier.clone(),
+                        *immune_blocks,
                         Vector3::new(*offset_x, *offset_y, *offset_z),
                         radius.clone(),
                         *create_fire,
-                        crate::world::ExplosionInteraction::None,
-                        None,
-                        None,
-                        None,
+                        block_interaction,
+                        *small_particle,
+                        *large_particle,
+                        *sound,
                     ),
                     world,
                     enchantment_level,
-                    owner,
+                    item,
                     entity,
                     position,
                 );
@@ -272,7 +288,7 @@ impl EnchantmentEntityEffectExt for EnchantmentEntityEffect {
                     &AllOf::new(effects),
                     world,
                     enchantment_level,
-                    owner,
+                    item,
                     entity,
                     position,
                 );

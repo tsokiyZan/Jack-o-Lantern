@@ -17,12 +17,12 @@ impl super::EnchantmentEntityEffectExt for AllOf<'_> {
         &self,
         world: &std::sync::Arc<crate::world::World>,
         enchantment_level: i32,
-        owner: Option<&std::sync::Arc<crate::entity::player::Player>>,
-        entity: Option<&crate::entity::Entity>,
+        item: &crate::enchantment::EnchantedItemInUse<'_>,
+        entity: &dyn crate::entity::EntityBase,
         position: pumpkin_util::math::vector3::Vector3<f64>,
     ) {
         for effect in self.effects {
-            effect.apply(world, enchantment_level, owner, entity, position);
+            effect.apply(world, enchantment_level, item, entity, position);
         }
     }
 }

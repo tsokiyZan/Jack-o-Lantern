@@ -14,8 +14,10 @@ use super::super::BrainTick;
 use super::super::memory::walk_target::WalkTarget;
 use super::super::memory::{MemoryModuleId, MemoryStatus, types};
 use super::timed::Behavior;
+use crate::enchantment::EnchantmentHelper;
 use crate::entity::ai::target_predicate::TargetPredicate;
 use crate::entity::combat::knockback_after_resistance;
+use crate::entity::damage_source::DamageSource;
 use crate::entity::living::LivingEntity;
 use crate::entity::mob::Mob;
 use crate::entity::mob::piglin_ai::sample;
@@ -165,15 +167,25 @@ impl Behavior for RamTarget {
             let living = &tick.mob.get_mob_entity().living_entity;
             let damage = living.get_attribute_value(&Attributes::ATTACK_DAMAGE) as f32;
             let attacker: &dyn EntityBase = tick.mob;
-            // TODO: vanilla `EnchantmentHelper.doPostAttackEffects` when the hit lands.
-            ram_target.damage_with_context(
+            let damage_source = DamageSource {
+                damage_type: DamageType::MOB_ATTACK_NO_AGGRO,
+                direct: Some(attacker),
+                causing: Some(attacker),
+            };
+            if ram_target.damage_with_context(
                 ram_target.as_ref(),
                 damage,
-                DamageType::MOB_ATTACK_NO_AGGRO,
+                damage_source.damage_type,
                 None,
-                Some(attacker),
-                Some(attacker),
-            );
+                damage_source.direct,
+                damage_source.causing,
+            ) {
+                EnchantmentHelper::do_post_attack_effects(
+                    tick.world,
+                    ram_target.as_ref(),
+                    &damage_source,
+                );
+            }
 
             let level_of = |effect: &'static StatusEffect| {
                 living

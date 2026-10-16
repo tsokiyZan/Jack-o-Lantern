@@ -9,6 +9,8 @@ use pumpkin_protocol::codec::item_stack_seralizer::ItemStackSerializer;
 use pumpkin_util::math::atomic_f32::AtomicF32;
 use pumpkin_util::math::vector3::Vector3;
 
+use crate::enchantment::EnchantmentHelper;
+use crate::entity::damage_source::DamageSource;
 use crate::{
     entity::{
         Entity, EntityBase,
@@ -215,15 +217,22 @@ impl EntityBase for FireballEntity {
             let owner = self
                 .get_owner_id()
                 .and_then(|id| world.get_entity_by_id(id));
-            // TODO: vanilla `EnchantmentHelper.doPostAttackEffects` (the target's thorns).
-            let _ = entity.damage_with_context(
+            let damage_source = DamageSource {
+                damage_type: Fireball::damage_type(owner.as_deref()),
+                direct: this.as_deref(),
+                // `fireball`: an unowned fireball is its own cause.
+                causing: owner.as_deref().or(this.as_deref()),
+            };
+            entity.damage_with_context(
                 entity.as_ref(),
                 6.0,
-                Fireball::damage_type(owner.as_deref()),
+                damage_source.damage_type,
                 None,
-                this.as_deref(),
-                owner.as_deref(),
+                damage_source.direct,
+                damage_source.causing,
             );
+            // Unconditional in vanilla, even when the hit did no damage.
+            EnchantmentHelper::do_post_attack_effects(&world, entity.as_ref(), &damage_source);
         }
 
         // Vanilla `LargeFireball.onHit`: at its own position, setting fire with mob griefing.

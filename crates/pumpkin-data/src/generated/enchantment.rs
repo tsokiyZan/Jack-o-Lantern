@@ -72,11 +72,91 @@ pub enum EnchantmentTarget {
     DamagingEntity,
     Victim,
 }
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct TargetedConditionalEffect<T> {
     pub enchanted: Option<EnchantmentTarget>,
     pub affected: Option<EnchantmentTarget>,
     pub effect: T,
+    pub requirements: Option<LootItemCondition>,
+}
+#[doc = r" The vanilla `LootItemCondition` types that enchantment effect requirements use."]
+#[derive(Clone, Debug, PartialEq)]
+pub enum LootItemCondition {
+    AllOf(&'static [Self]),
+    RandomChance {
+        chance: ContextFloatProvider,
+    },
+    EntityProperties {
+        entity: LootContextEntityTarget,
+        predicate: Option<EntityPredicate>,
+    },
+    DamageSourceProperties {
+        predicate: Option<DamageSourcePredicate>,
+    },
+    WeatherCheck {
+        thundering: Option<bool>,
+    },
+}
+#[derive(Clone, Debug, PartialEq)]
+pub enum ContextFloatProvider {
+    Constant(f32),
+    EnchantmentLevel(LevelBasedValue),
+}
+#[doc = r" Vanilla `LootContext.EntityTarget`."]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LootContextEntityTarget {
+    This,
+    Attacker,
+    DirectAttacker,
+}
+#[derive(Clone, Debug, PartialEq)]
+pub struct EntityPredicate {
+    pub entity_type: Option<EntityTypePredicate>,
+    pub location: Option<LocationPredicate>,
+    pub flags: Option<EntityFlagsPredicate>,
+    pub movement: Option<MovementPredicate>,
+}
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum EntityTypePredicate {
+    Type(&'static crate::entity::EntityType),
+    Tag(&'static Tag),
+}
+impl EntityTypePredicate {
+    #[must_use]
+    pub fn matches(&self, entity_type: &crate::entity::EntityType) -> bool {
+        match self {
+            Self::Type(t) => t.id == entity_type.id,
+            Self::Tag(tag) => entity_type.has_tag(tag),
+        }
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct LocationPredicate {
+    pub can_see_sky: Option<bool>,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct EntityFlagsPredicate {
+    pub is_flying: Option<bool>,
+}
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MovementPredicate {
+    pub fall_distance: DoubleBounds,
+}
+#[doc = r" Vanilla `MinMaxBounds.Doubles`."]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct DoubleBounds {
+    pub min: Option<f64>,
+    pub max: Option<f64>,
+}
+impl DoubleBounds {
+    #[must_use]
+    pub fn matches(&self, value: f64) -> bool {
+        self.min.is_none_or(|min| min <= value) && self.max.is_none_or(|max| value <= max)
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DamageSourcePredicate {
+    pub is_direct: Option<bool>,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ConditionalEffect<T> {
@@ -113,7 +193,9 @@ pub enum EnchantmentEntityEffect {
         amount: LevelBasedValue,
     },
     PlaySound {
-        sound: &'static str,
+        sounds: &'static [crate::sound::Sound],
+        volume: pumpkin_util::math::float_provider::FloatProvider,
+        pitch: pumpkin_util::math::float_provider::FloatProvider,
     },
     ReplaceBlock {
         offset_x: i32,
@@ -414,6 +496,26 @@ pub enum AttributeModifierSlot {
     Body,
     Saddle,
 }
+impl AttributeModifierSlot {
+    #[doc = r" Vanilla `EquipmentSlotGroup.test`."]
+    #[must_use]
+    pub fn test(&self, slot: &crate::data_component_impl::EquipmentSlot) -> bool {
+        use crate::data_component_impl::{EquipmentSlot, EquipmentType};
+        match self {
+            Self::Any => true,
+            Self::MainHand => *slot == EquipmentSlot::MAIN_HAND,
+            Self::OffHand => *slot == EquipmentSlot::OFF_HAND,
+            Self::Hand => slot.slot_type() == EquipmentType::Hand,
+            Self::Feet => *slot == EquipmentSlot::FEET,
+            Self::Legs => *slot == EquipmentSlot::LEGS,
+            Self::Chest => *slot == EquipmentSlot::CHEST,
+            Self::Head => *slot == EquipmentSlot::HEAD,
+            Self::Armor => slot.is_armor_slot(),
+            Self::Body => *slot == EquipmentSlot::BODY,
+            Self::Saddle => *slot == EquipmentSlot::SADDLE,
+        }
+    }
+}
 impl Enchantment {
     pub const ALL: &'static [&'static Self] = &[
         &Self::AQUA_AFFINITY,
@@ -546,6 +648,24 @@ impl Enchantment {
                     min_amplifier: LevelBasedValue::Constant(3f32),
                     max_amplifier: LevelBasedValue::Constant(3f32),
                 },
+                requirements: Some(LootItemCondition::AllOf(&[
+                    LootItemCondition::EntityProperties {
+                        entity: LootContextEntityTarget::This,
+                        predicate: Some(EntityPredicate {
+                            entity_type: Some(EntityTypePredicate::Tag(
+                                &EntityTypeTag::MINECRAFT_SENSITIVE_TO_BANE_OF_ARTHROPODS,
+                            )),
+                            location: None,
+                            flags: None,
+                            movement: None,
+                        }),
+                    },
+                    LootItemCondition::DamageSourceProperties {
+                        predicate: Some(DamageSourcePredicate {
+                            is_direct: Some(true),
+                        }),
+                    },
+                ])),
             }],
             projectile_count: &[],
             projectile_spread: &[],
@@ -762,9 +882,38 @@ impl Enchantment {
                         join_team: false,
                     },
                     EnchantmentEntityEffect::PlaySound {
-                        sound: "minecraft:item.trident.thunder",
+                        sounds: &[crate::sound::Sound::ItemTridentThunder],
+                        volume: pumpkin_util::math::float_provider::FloatProvider::Constant(5f32),
+                        pitch: pumpkin_util::math::float_provider::FloatProvider::Constant(1f32),
                     },
                 ]),
+                requirements: Some(LootItemCondition::AllOf(&[
+                    LootItemCondition::WeatherCheck {
+                        thundering: Some(true),
+                    },
+                    LootItemCondition::EntityProperties {
+                        entity: LootContextEntityTarget::This,
+                        predicate: Some(EntityPredicate {
+                            entity_type: None,
+                            location: Some(LocationPredicate {
+                                can_see_sky: Some(true),
+                            }),
+                            flags: None,
+                            movement: None,
+                        }),
+                    },
+                    LootItemCondition::EntityProperties {
+                        entity: LootContextEntityTarget::DirectAttacker,
+                        predicate: Some(EntityPredicate {
+                            entity_type: Some(EntityTypePredicate::Type(
+                                &crate::entity::EntityType::TRIDENT,
+                            )),
+                            location: None,
+                            flags: None,
+                            movement: None,
+                        }),
+                    },
+                ])),
             }],
             projectile_count: &[],
             projectile_spread: &[],
@@ -781,7 +930,9 @@ impl Enchantment {
                         join_team: false,
                     },
                     EnchantmentEntityEffect::PlaySound {
-                        sound: "minecraft:item.trident.thunder",
+                        sounds: &[crate::sound::Sound::ItemTridentThunder],
+                        volume: pumpkin_util::math::float_provider::FloatProvider::Constant(5f32),
+                        pitch: pumpkin_util::math::float_provider::FloatProvider::Constant(1f32),
                     },
                 ]),
             }],
@@ -1034,6 +1185,11 @@ impl Enchantment {
                         per_level_above_first: 4f32,
                     },
                 },
+                requirements: Some(LootItemCondition::DamageSourceProperties {
+                    predicate: Some(DamageSourcePredicate {
+                        is_direct: Some(true),
+                    }),
+                }),
             }],
             projectile_count: &[],
             projectile_spread: &[],
@@ -1488,6 +1644,17 @@ impl Enchantment {
                 effect: EnchantmentValueEffect::Add(LevelBasedValue::Linear {
                     base: 0.01f32,
                     per_level_above_first: 0.01f32,
+                }),
+                requirements: Some(LootItemCondition::EntityProperties {
+                    entity: LootContextEntityTarget::Attacker,
+                    predicate: Some(EntityPredicate {
+                        entity_type: Some(EntityTypePredicate::Type(
+                            &crate::entity::EntityType::PLAYER,
+                        )),
+                        location: None,
+                        flags: None,
+                        movement: None,
+                    }),
                 }),
             }],
             fishing_time_reduction: &[],
@@ -2586,6 +2753,12 @@ impl Enchantment {
                         amount: LevelBasedValue::Constant(2f32),
                     },
                 ]),
+                requirements: Some(LootItemCondition::RandomChance {
+                    chance: ContextFloatProvider::EnchantmentLevel(LevelBasedValue::Linear {
+                        base: 0.15f32,
+                        per_level_above_first: 0.15f32,
+                    }),
+                }),
             }],
             projectile_count: &[],
             projectile_spread: &[],
@@ -2779,6 +2952,22 @@ impl Enchantment {
                     large_particle: Some(crate::particle::Particle::GustEmitterLarge),
                     sound: Some(crate::sound::Sound::EntityWindChargeWindBurst),
                 },
+                requirements: Some(LootItemCondition::EntityProperties {
+                    entity: LootContextEntityTarget::DirectAttacker,
+                    predicate: Some(EntityPredicate {
+                        entity_type: None,
+                        location: None,
+                        flags: Some(EntityFlagsPredicate {
+                            is_flying: Some(false),
+                        }),
+                        movement: Some(MovementPredicate {
+                            fall_distance: DoubleBounds {
+                                min: Some(1.5f64),
+                                max: None,
+                            },
+                        }),
+                    }),
+                }),
             }],
             projectile_count: &[],
             projectile_spread: &[],
@@ -2904,6 +3093,11 @@ impl Enchantment {
             42u8 => Some(&Self::WIND_BURST),
             _ => None,
         }
+    }
+    #[doc = r" Vanilla `Enchantment.matchingSlot`."]
+    #[must_use]
+    pub fn matching_slot(&self, slot: &crate::data_component_impl::EquipmentSlot) -> bool {
+        self.slots.iter().any(|group| group.test(slot))
     }
     pub fn can_enchant(&self, item: &'static Item) -> bool {
         self.supported_items.1.contains(&item.id)

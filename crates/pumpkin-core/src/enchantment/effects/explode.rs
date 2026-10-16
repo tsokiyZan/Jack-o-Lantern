@@ -72,12 +72,12 @@ impl super::EnchantmentEntityEffectExt for ExplodeEffect {
         &self,
         world: &std::sync::Arc<crate::world::World>,
         enchantment_level: i32,
-        _owner: Option<&std::sync::Arc<crate::entity::player::Player>>,
-        entity: Option<&crate::entity::Entity>,
+        _item: &crate::enchantment::EnchantedItemInUse<'_>,
+        entity: &dyn crate::entity::EntityBase,
         position: Vector3<f64>,
     ) {
         let pos = position + self.offset;
-        let user = entity.and_then(|entity| world.get_entity_by_id(entity.entity_id));
+        let user = world.get_entity_by_id(entity.get_entity().entity_id);
         // `getDamageSource`: the type attributed to the user, or placed at the explosion.
         let damage_source = self.damage_type.map(|damage_type| {
             if self.attribute_to_user {

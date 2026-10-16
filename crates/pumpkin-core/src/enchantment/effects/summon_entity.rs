@@ -6,9 +6,10 @@ use pumpkin_util::math::vector3::Vector3;
 use rand::seq::IndexedRandom;
 use uuid::Uuid;
 
+use crate::enchantment::EnchantedItemInUse;
+use crate::entity::EntityBase;
 use crate::entity::lightning::LightningBoltEntity;
 use crate::entity::player::Player;
-use crate::entity::{Entity, EntityBase};
 use crate::world::World;
 
 /// Enchantment entity effect that summons an entity (such as lightning) at a given position.
@@ -39,7 +40,6 @@ impl SummonEntityEffect {
         world: &Arc<World>,
         position: Vector3<f64>,
         owner: Option<&Arc<Player>>,
-        _entity: Option<&Entity>,
     ) -> Option<Arc<dyn EntityBase>> {
         let block_pos = BlockPos::floored_v(position);
         if !world.is_in_build_limit(block_pos) {
@@ -66,10 +66,13 @@ impl super::EnchantmentEntityEffectExt for SummonEntityEffect {
         &self,
         world: &Arc<World>,
         _enchantment_level: i32,
-        owner: Option<&Arc<Player>>,
-        entity: Option<&Entity>,
+        item: &EnchantedItemInUse<'_>,
+        _entity: &dyn EntityBase,
         position: Vector3<f64>,
     ) {
-        let _ = self.apply(world, position, owner, entity);
+        let owner = item
+            .owner
+            .and_then(|owner| world.get_player_by_id(owner.get_entity().entity_id));
+        let _ = self.apply(world, position, owner.as_ref());
     }
 }

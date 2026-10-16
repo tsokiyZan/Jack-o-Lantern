@@ -18,8 +18,8 @@ use crate::block::{
     OnPlaceArgs, OnScheduledTickArgs, OnStateReplacedArgs, PlayerWillDestroyArgs,
 };
 use crate::entity::EntityBase;
+use crate::entity::damage_source::DamageSource;
 use crate::entity::experience_orb::ExperienceOrbEntity;
-use crate::entity::mob::creaking::DamageSource;
 use crate::entity::player::Player;
 use crate::plugin::api::events::block::block_exp::BlockExpEvent;
 use crate::world::World;
