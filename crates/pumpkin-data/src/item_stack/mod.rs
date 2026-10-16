@@ -851,7 +851,16 @@ impl ItemStack {
         // Try to get item by registry key
         let item = Item::from_registry_key(registry_key)?;
 
-        let count = compound.get_int("count")? as u8;
+        // `ExtraCodecs.optionalAlwaysPresentFieldOf(ExtraCodecs.intRange(1, 99), "count", 1)`:
+        // any numeric tag, read as `NumericTag.intValue`.
+        let count = match compound.get("count") {
+            Some(tag) => tag.as_numeric_int()?,
+            None => 1,
+        };
+        if !(1..=99).contains(&count) {
+            return None;
+        }
+        let count = count as u8;
 
         // Create the item stack
         let mut item_stack = Self::new(count, item);
