@@ -2348,11 +2348,12 @@ impl Entity {
 
     // Does not send movement. That must be done separately
     pub fn move_entity(&self, caller: &dyn EntityBase, mut motion: Vector3<f64>) {
-        if caller.get_player().is_some() {
-            return;
-        }
+        // A player only moves here in the server's own copy of its travel, which
+        // `Player::tick_server_travel` puts back where the client says the player is.
+        let is_player = caller.get_player().is_some();
 
-        if self.no_physics.load(Ordering::Relaxed) {
+        // `Player.tick` sets `noPhysics` for spectators.
+        if self.no_physics.load(Ordering::Relaxed) || caller.is_spectator() {
             self.move_pos(motion);
             self.horizontal_collision.store(false, Ordering::Relaxed);
             self.on_ground.store(false, Ordering::Relaxed);
@@ -2384,7 +2385,9 @@ impl Entity {
             Some(final_move),
         );
 
-        if let Some(living) = caller.get_living_entity()
+        // `checkFallDamage` only runs on the authoritative side, the client for a player.
+        if !is_player
+            && let Some(living) = caller.get_living_entity()
             && caller.get_mob().is_none_or(mob::Mob::checks_fall_damage)
         {
             let on_ground = self.on_ground.load(Ordering::SeqCst);
@@ -2393,8 +2396,16 @@ impl Entity {
 
         self.restitute_movement_after_collisions(caller, motion, final_move);
 
-        self.apply_movement_emission_and_play_sound(caller, final_move);
+        // A player's steps are played from its movement packets instead.
+        if !is_player {
+            self.apply_movement_emission_and_play_sound(caller, final_move);
+        }
 
+        self.apply_block_speed_factor(caller);
+    }
+
+    /// The end of vanilla `Entity.move`: the block's speed factor slows the horizontal velocity.
+    pub fn apply_block_speed_factor(&self, caller: &dyn EntityBase) {
         let block_speed_factor = f64::from(caller.get_block_speed_factor());
         let velocity = self.velocity.load();
         self.velocity.store(Vector3::new(

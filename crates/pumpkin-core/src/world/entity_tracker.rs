@@ -215,8 +215,8 @@ impl TrackedEntity {
 
     /// The velocity half of `sendChanges` for a player, whose moves are broadcast from the
     /// movement packets instead: `needsSync` goes to trackers only (a player's `trackDelta` is
-    /// off), and `syncVelocity` to the player as well.
-    fn send_player_velocity(&self, world: &World) {
+    /// off), and `syncVelocity` to the player as well. The player's own tick calls it.
+    pub(crate) fn send_player_velocity(&self, world: &World) {
         let entity = self.entity.get_entity();
         if entity.velocity_dirty.swap(false, Ordering::SeqCst) {
             self.send_motion(entity, world);
@@ -1015,11 +1015,8 @@ impl EntityTracker {
             let tracked = entry.value();
             if tracked.entity.get_player().is_none() {
                 tracked.send_changes(world);
-            } else {
-                tracked.send_player_velocity(world);
-                if tracked.entity.get_entity().synched_data.is_dirty() {
-                    tracked.entity.get_entity().send_dirty_entity_data();
-                }
+            } else if tracked.entity.get_entity().synched_data.is_dirty() {
+                tracked.entity.get_entity().send_dirty_entity_data();
             }
         }
     }

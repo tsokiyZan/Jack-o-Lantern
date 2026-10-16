@@ -11,5 +11,6 @@ impl JavaClient {
             .entity
             .on_ground
             .store(ground.on_ground, Ordering::Relaxed);
+        Self::apply_move_speed_factor(player);
     }
 }

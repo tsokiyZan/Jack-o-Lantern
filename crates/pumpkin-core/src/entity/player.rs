@@ -2755,6 +2755,15 @@ impl Player {
     pub fn tick<'a>(&'a self, server: &'a Server) {
         self.process_inbound_packets();
 
+        // Vanilla's tracker sends a player's velocity after its packets and before `doTick`,
+        // so `markHurt` from a fall sends the velocity left by the last `travel`.
+        {
+            let world = self.world();
+            if let Some(tracked) = world.entity_tracker.get_tracked_entity(self.entity_id()) {
+                tracked.send_player_velocity(&world);
+            }
+        }
+
         if self.is_spectator() {
             self.living_entity
                 .entity
@@ -3114,7 +3123,9 @@ impl Player {
         }
     }
 
+    /// Vanilla `ServerPlayer.jumpFromGround`.
     pub fn jump(&self) {
+        self.living_entity.jump();
         self.stats
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -3123,6 +3134,83 @@ impl Player {
             self.add_exhaustion(0.2);
         } else {
             self.add_exhaustion(0.05);
+        }
+    }
+
+    /// The movement in vanilla `ServerPlayer.doTick`, which runs `LivingEntity.aiStep` on the
+    /// server's own copy of the player with no input. `tickPlayer` then snaps the player back to
+    /// where its client put it, so only the velocity is kept: what `markHurt` and knockback read.
+    pub fn tick_server_travel(&self) {
+        let living = &self.living_entity;
+        let entity = &living.entity;
+        if living.dead.load(Ordering::Relaxed) || living.health.load() <= 0.0 {
+            return;
+        }
+        // `Entity.rideTick`.
+        if entity.has_vehicle() {
+            entity.velocity.store(Vector3::default());
+        }
+        entity.check_zero_velo();
+
+        // Vanilla also keeps the collision state of this move; here it stays the client's.
+        let pos = entity.pos.load();
+        let on_ground = entity.on_ground.load(Ordering::Relaxed);
+        let horizontal_collision = entity.horizontal_collision.load(Ordering::Relaxed);
+        let supporting_block_pos = entity.supporting_block_pos.load();
+        let on_ground_no_blocks = entity.on_ground_no_blocks.load(Ordering::Relaxed);
+
+        self.travel();
+
+        entity.set_pos(pos);
+        entity.on_ground.store(on_ground, Ordering::Relaxed);
+        entity
+            .horizontal_collision
+            .store(horizontal_collision, Ordering::Relaxed);
+        entity.supporting_block_pos.store(supporting_block_pos);
+        entity
+            .on_ground_no_blocks
+            .store(on_ground_no_blocks, Ordering::Relaxed);
+    }
+
+    /// Vanilla `Player.travel`. A server player's `jumping` is never set.
+    fn travel(&self) {
+        let living = &self.living_entity;
+        let entity = &living.entity;
+        if entity.has_vehicle() {
+            living.travel(self);
+            return;
+        }
+        if self.is_swimming() {
+            let look_angle_y =
+                Entity::calculate_view_vector(entity.pitch.load(), entity.yaw.load()).y;
+            let multiplier = if look_angle_y < -0.2 { 0.085 } else { 0.06 };
+            let pos = entity.pos.load();
+            if look_angle_y <= 0.0
+                || self
+                    .world()
+                    .get_fluid(&BlockPos::floored(pos.x, pos.y + 1.0 - 0.1, pos.z))
+                    .id
+                    != pumpkin_data::fluid::Fluid::EMPTY.id
+            {
+                let movement = entity.velocity.load();
+                entity.velocity.store(movement.add_raw(
+                    0.0,
+                    (look_angle_y - movement.y) * multiplier,
+                    0.0,
+                ));
+            }
+        }
+        if self.is_flying() {
+            let original_movement_y = entity.velocity.load().y;
+            living.travel(self);
+            let movement = entity.velocity.load();
+            entity.velocity.store(Vector3::new(
+                movement.x,
+                original_movement_y * 0.6,
+                movement.z,
+            ));
+        } else {
+            living.travel(self);
         }
     }
 
@@ -7055,6 +7143,10 @@ impl EntityBase for Player {
 
     fn is_pushable(&self) -> bool {
         self.gamemode.load() != GameMode::Spectator && self.gamemode.load() != GameMode::Creative
+    }
+
+    fn get_gravity(&self) -> f64 {
+        self.living_entity.get_gravity()
     }
 
     fn get_name(&self) -> TextComponent {

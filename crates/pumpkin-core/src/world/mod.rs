@@ -1784,6 +1784,13 @@ impl World {
             dragon_fight::DragonFight::tick(fight_mutex, self);
         }
 
+        // Vanilla ticks a player's movement (`ServerPlayer.doTick`) from its connection, after
+        // the level, so the travel sees this tick's hits and knockback before they are sent.
+        players.par_iter().for_each(|player| {
+            let _guard = player_handle.enter();
+            player.tick_server_travel();
+        });
+
         let total_elapsed = start.elapsed();
         if total_elapsed.as_millis() > 50 {
             debug!(

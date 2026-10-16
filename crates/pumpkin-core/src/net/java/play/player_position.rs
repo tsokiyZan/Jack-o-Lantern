@@ -50,9 +50,10 @@ impl JavaClient {
     }
 
     /// The parts of vanilla's server-side `player.move` Pumpkin runs: step sounds and `step`
-    /// events (`applyMovementEmissionAndPlaySound`), then `setOnGroundWithMovement`'s
-    /// supporting block. Inside `move` the supporting block only updates when the player moved
-    /// vertically, so flat walking steps on the block from the previous packet.
+    /// events (`applyMovementEmissionAndPlaySound`) and the block speed factor, then
+    /// `setOnGroundWithMovement`'s supporting block. Inside `move` the supporting block only
+    /// updates when the player moved vertically, so flat walking steps on the block from the
+    /// previous packet.
     fn apply_player_move(
         player: &Arc<Player>,
         last_pos: Vector3<f64>,
@@ -68,8 +69,28 @@ impl JavaClient {
                 entity.check_supporting_block(caller, on_ground, Some(movement));
             }
             entity.apply_movement_emission_and_play_sound(caller, movement);
+            Self::apply_move_speed_factor(player);
         }
         entity.check_supporting_block(caller, on_ground, Some(movement));
+    }
+
+    /// The end of vanilla's server-side `player.move`, which every movement packet runs unless
+    /// the player waits on a teleport, rides, sleeps or is a spectator (`noPhysics`).
+    pub(super) fn apply_move_speed_factor(player: &Player) {
+        let entity = player.get_entity();
+        if !player.has_client_loaded()
+            || entity.has_vehicle()
+            || player.is_sleeping()
+            || player.is_spectator()
+            || player
+                .awaiting_teleport
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .is_some()
+        {
+            return;
+        }
+        entity.apply_block_speed_factor(player);
     }
 
     #[expect(clippy::too_many_lines)]
@@ -130,7 +151,6 @@ impl JavaClient {
                 let pos = event.to;
                 let entity = &player.get_entity();
                 let last_pos = entity.pos.load();
-                player.get_entity().set_pos(pos);
 
                 let distance = last_pos.squared_distance_to_vec(&pos).sqrt();
                 let cm = (distance * 100.0) as i32;
@@ -140,9 +160,11 @@ impl JavaClient {
                 }
 
                 let height_difference = pos.y - last_pos.y;
+                // Vanilla jumps before `player.move`, from where the player was.
                 if entity.on_ground.load(Ordering::Relaxed) && packet.collision & FLAG_ON_GROUND == 0 && height_difference > 0.0 {
                     player.jump();
                 }
+                entity.set_pos(pos);
 
                 let new_on_ground = packet.collision & FLAG_ON_GROUND != 0;
                 entity.on_ground.store(new_on_ground, Ordering::Relaxed);
@@ -272,7 +294,6 @@ impl JavaClient {
                 let pos = event.to;
                 let entity = &player.get_entity();
                 let last_pos = entity.pos.load();
-                player.get_entity().set_pos(pos);
 
                 let distance = last_pos.squared_distance_to_vec(&pos).sqrt();
                 let cm = (distance * 100.0) as i32;
@@ -286,8 +307,10 @@ impl JavaClient {
                     && (packet.collision & FLAG_ON_GROUND) == 0
                     && height_difference > 0.0
                 {
+                    // Vanilla jumps before `player.move`, from where the player was.
                     player.jump();
                 }
+                entity.set_pos(pos);
                 entity
                     .on_ground
                     .store((packet.collision & FLAG_ON_GROUND) != 0, Ordering::Relaxed);

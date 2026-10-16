@@ -44,5 +44,6 @@ impl JavaClient {
 
         let je_packet = CHeadRot::new(entity_id.into(), yaw as u8);
         world.send_to_tracking_players(entity, &je_packet);
+        Self::apply_move_speed_factor(player);
     }
 }

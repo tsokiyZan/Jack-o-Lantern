@@ -1712,31 +1712,6 @@ impl LivingEntity {
             .store(self.entity.velocity.load() * drag);
     }
 
-    /// Decays player velocity like vanilla `travelInAir` friction.
-    fn apply_travel_friction(&self) {
-        let mut velo = self.entity.velocity.load();
-        if velo.x == 0.0 && velo.z == 0.0 {
-            return;
-        }
-
-        let friction = if self.entity.on_ground.load(Relaxed) {
-            f64::from(
-                self.entity
-                    .get_block_with_y_offset(0.500_001)
-                    .1
-                    .slipperiness,
-            ) * 0.91
-        } else {
-            0.91
-        };
-
-        velo.x *= friction;
-
-        velo.z *= friction;
-
-        self.entity.velocity.store(velo);
-    }
-
     /// Vanilla `LivingEntity.computeModifiedFriction`.
     fn compute_modified_friction(friction: f32, modifier: f32) -> f32 {
         (1.0 - (1.0 - friction) * modifier).clamp(0.0, 1.0)
@@ -1751,7 +1726,7 @@ impl LivingEntity {
     }
 
     /// Vanilla `LivingEntity.travelInAir`, in vanilla's float maths.
-    fn travel_in_air(&self, caller: &dyn EntityBase) {
+    pub(crate) fn travel_in_air(&self, caller: &dyn EntityBase) {
         let on_ground = self.entity.on_ground.load(Relaxed);
         let block_friction = if on_ground {
             Self::compute_modified_friction(
@@ -1835,7 +1810,73 @@ impl LivingEntity {
         self.entity.velocity.store(velo);
     }
 
-    fn travel_in_fluid(&self, caller: &dyn EntityBase, water: bool) {
+    /// Vanilla `LivingEntity.travel`, used for players. Mobs travel from `tick_movement`,
+    /// which adds their own hooks.
+    pub(crate) fn travel(&self, caller: &dyn EntityBase) {
+        let touching_water = self.entity.touching_water.load(SeqCst);
+        // `shouldTravelInFluid`: a flying player is not affected by fluids.
+        if (touching_water || self.entity.touching_lava.load(SeqCst))
+            && caller.get_player().is_none_or(|player| !player.is_flying())
+        {
+            self.travel_in_fluid(caller, touching_water);
+        } else if self.entity.is_fall_flying() {
+            self.travel_fall_flying(caller);
+        } else {
+            self.travel_in_air(caller);
+        }
+    }
+
+    /// Vanilla `LivingEntity.travelFallFlying`.
+    pub(crate) fn travel_fall_flying(&self, caller: &dyn EntityBase) {
+        // TODO: the `onClimbable` branch once climbing is tracked, and
+        // `LivingEntity.handleFallFlyingCollisions` (flying into a wall).
+        let movement = self.update_fall_flying_movement(caller, self.entity.velocity.load());
+        self.entity.velocity.store(movement);
+        self.make_move(caller);
+    }
+
+    /// Vanilla `LivingEntity.updateFallFlyingMovement`.
+    fn update_fall_flying_movement(
+        &self,
+        caller: &dyn EntityBase,
+        mut movement: Vector3<f64>,
+    ) -> Vector3<f64> {
+        let x_rot = self.entity.pitch.load();
+        let look = Entity::calculate_view_vector(x_rot, self.entity.yaw.load());
+        let lean_angle = x_rot * (std::f64::consts::PI / 180.0) as f32;
+        let look_hor_length = look.horizontal_length();
+        let move_hor_length = movement.horizontal_length();
+        let gravity = self.get_effective_gravity(caller);
+        let lean_cos = f64::from(lean_angle).cos();
+        let lift_force = lean_cos * lean_cos;
+        movement.y += gravity * (-1.0 + lift_force * 0.75);
+        if movement.y < 0.0 && look_hor_length > 0.0 {
+            let convert = movement.y * -0.1 * lift_force;
+            movement = movement.add_raw(
+                look.x * convert / look_hor_length,
+                convert,
+                look.z * convert / look_hor_length,
+            );
+        }
+        if lean_angle < 0.0 && look_hor_length > 0.0 {
+            let convert = move_hor_length * f64::from(-pumpkin_util::math::sin(lean_angle)) * 0.04;
+            movement = movement.add_raw(
+                -look.x * convert / look_hor_length,
+                convert * 3.2,
+                -look.z * convert / look_hor_length,
+            );
+        }
+        if look_hor_length > 0.0 {
+            movement = movement.add_raw(
+                (look.x / look_hor_length * move_hor_length - movement.x) * 0.1,
+                0.0,
+                (look.z / look_hor_length * move_hor_length - movement.z) * 0.1,
+            );
+        }
+        movement.multiply(f64::from(0.99f32), f64::from(0.98f32), f64::from(0.99f32))
+    }
+
+    pub(crate) fn travel_in_fluid(&self, caller: &dyn EntityBase, water: bool) {
         let movement_input = self.movement_input.load();
 
         let falling = self.entity.velocity.load().y <= 0.0;
@@ -4112,10 +4153,7 @@ impl EntityBase for LivingEntity {
             // Vanilla-like order: freeze logic runs after movement/collisions.
             self.entity.tick_frozen(caller);
         } else if is_alive {
-            // Client-authoritative players skip `travel`, so decay pushed velocity like
-            // vanilla to prevent it accumulating and launching the player.
-            self.apply_travel_friction();
-
+            // A player travels in `Player::tick_server_travel`, after the other entities.
             let suffocating = self.entity.tick_block_collisions(caller);
             if suffocating {
                 caller.damage(caller, 1.0, DamageType::IN_WALL);
