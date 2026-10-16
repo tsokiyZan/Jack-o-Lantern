@@ -5425,14 +5425,16 @@ impl Player {
 
     pub fn tick_maps(&self, server: &Server) {
         use pumpkin_data::data_component_impl::MapIdImpl;
-        use pumpkin_data::item::Item;
 
         for hand in Hand::all() {
             let stack = self.inventory().get_stack_in_hand(hand);
 
-            if stack.item.id == Item::FILLED_MAP.id
-                && let Some(map_id_comp) = stack.get_data_component::<MapIdImpl>()
-            {
+            // Vanilla `MapItem.inventoryTick`; every map item has a default `map_decorations`.
+            let is_map_item =
+                stack.item.components.iter().any(|(id, _)| {
+                    *id == pumpkin_data::data_component::DataComponent::MapDecorations
+                });
+            if is_map_item && let Some(map_id_comp) = stack.get_data_component::<MapIdImpl>() {
                 let map_id = map_id_comp.id;
                 if let Some(map_data_arc) = server.map_manager.get_map(map_id)
                     && let Ok(mut map_data) = map_data_arc.try_lock()
@@ -5471,18 +5473,34 @@ impl Player {
                             direction: icon_direction,
                             display_name: None,
                         }];
-                        icons.extend(map_data.decorations.iter().map(|decoration| {
-                            MapIcon {
-                                icon_type: VarInt(decoration.icon_type),
-                                x: decoration.x,
-                                z: decoration.z,
-                                direction: decoration.direction,
-                                display_name: decoration
-                                    .display_name
-                                    .as_ref()
-                                    .map(|name| TextComponent::text(name.clone())),
-                            }
-                        }));
+                        // `tickCarriedBy`: the decorations the item itself carries.
+                        let game_time = self.world().get_world_age();
+                        let item_decorations: Vec<_> = stack
+                            .get_data_component::<pumpkin_data::data_component_impl::MapDecorationsImpl>()
+                            .map(|decorations| {
+                                decorations
+                                    .decorations
+                                    .iter()
+                                    .filter_map(|(_, entry)| {
+                                        map_data.item_decoration(entry, game_time)
+                                    })
+                                    .collect()
+                            })
+                            .unwrap_or_default();
+                        icons.extend(map_data.decorations.iter().chain(&item_decorations).map(
+                            |decoration| {
+                                MapIcon {
+                                    icon_type: VarInt(decoration.icon_type),
+                                    x: decoration.x,
+                                    z: decoration.z,
+                                    direction: decoration.direction,
+                                    display_name: decoration
+                                        .display_name
+                                        .as_ref()
+                                        .map(|name| TextComponent::text(name.clone())),
+                                }
+                            },
+                        ));
 
                         let data = map_data.dirty.then(|| MapPatch {
                             columns: 128,
