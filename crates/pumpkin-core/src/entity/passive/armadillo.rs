@@ -300,7 +300,7 @@ impl ArmadilloEntity {
         entity
             .world
             .load()
-            .emit_game_event(event.name(), entity.pos.load());
+            .game_event_from(Some(self), event, entity.pos.load());
     }
 }
 

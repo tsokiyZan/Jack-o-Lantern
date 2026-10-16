@@ -315,9 +315,10 @@ impl SnifferEntity {
     fn emit_digging_particles(&self) -> &Self {
         let entity = self.get_entity();
         if entity.tick_count.load(Ordering::Relaxed) % DIGGING_EVENT_INTERVAL == 0 {
-            entity.world.load().emit_game_event(
-                GameEvent::EntityAction.name(),
+            entity.world.load().game_event(
+                GameEvent::EntityAction,
                 self.get_head_block().to_centered_f64(),
+                crate::world::game_event::GameEventContext::of_entity(self),
             );
         }
         self

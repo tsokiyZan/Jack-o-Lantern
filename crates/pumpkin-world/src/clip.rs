@@ -449,16 +449,15 @@ fn check_block(
     }
 }
 
-/// Traces a ray segment through the block grid from `context.from` to `context.to`,
-/// testing voxel shapes and fluid shapes according to `context`.
-/// Matches vanilla `BlockGetter.clip(ClipContext)`.
-pub fn clip(accessor: &(impl BlockAccessor + ?Sized), context: &ClipContext) -> BlockHitResult {
-    let from = context.from;
-    let to = context.to;
-
+/// Vanilla `BlockGetter.traverseBlocks`: visits every block the segment from `from` to `to`
+/// passes through, in order, until `visit` returns a result. `None` is vanilla's miss.
+pub fn traverse_blocks<T>(
+    from: Vector3<f64>,
+    to: Vector3<f64>,
+    mut visit: impl FnMut(&BlockPos) -> Option<T>,
+) -> Option<T> {
     if from == to {
-        let block_pos = BlockPos::floored(to.x, to.y, to.z);
-        return BlockHitResult::miss(to, BlockDirection::Up, block_pos);
+        return None;
     }
 
     let adjust = -1.0e-7f64;
@@ -467,8 +466,8 @@ pub fn clip(accessor: &(impl BlockAccessor + ?Sized), context: &ClipContext) -> 
 
     let mut block = BlockPos::floored(d_from.x, d_from.y, d_from.z);
 
-    if let Some(hit) = check_block(accessor, &block, from, to, context) {
-        return hit;
+    if let Some(hit) = visit(&block) {
+        return Some(hit);
     }
 
     let difference = d_to.sub(&d_from);
@@ -530,15 +529,49 @@ pub fn clip(accessor: &(impl BlockAccessor + ?Sized), context: &ClipContext) -> 
             next.z += delta.z;
         }
 
-        if let Some(hit) = check_block(accessor, &block, from, to, context) {
-            return hit;
+        if let Some(hit) = visit(&block) {
+            return Some(hit);
         }
     }
 
-    let miss_vec = from.sub(&to);
-    let miss_dir = BlockDirection::get_nearest(miss_vec.x, miss_vec.y, miss_vec.z);
-    let end_block = BlockPos::floored(to.x, to.y, to.z);
-    BlockHitResult::miss(to, miss_dir, end_block)
+    None
+}
+
+/// Traces a ray segment through the block grid from `context.from` to `context.to`,
+/// testing voxel shapes and fluid shapes according to `context`.
+/// Matches vanilla `BlockGetter.clip(ClipContext)`.
+pub fn clip(accessor: &(impl BlockAccessor + ?Sized), context: &ClipContext) -> BlockHitResult {
+    let from = context.from;
+    let to = context.to;
+
+    if from == to {
+        let block_pos = BlockPos::floored(to.x, to.y, to.z);
+        return BlockHitResult::miss(to, BlockDirection::Up, block_pos);
+    }
+
+    traverse_blocks(from, to, |block| {
+        check_block(accessor, block, from, to, context)
+    })
+    .unwrap_or_else(|| {
+        let miss_vec = from.sub(&to);
+        let miss_dir = BlockDirection::get_nearest(miss_vec.x, miss_vec.y, miss_vec.z);
+        let end_block = BlockPos::floored(to.x, to.y, to.z);
+        BlockHitResult::miss(to, miss_dir, end_block)
+    })
+}
+
+/// Vanilla `BlockGetter.isBlockInLine(ClipBlockStateContext)`: whether a block on the segment
+/// from `from` to `to` matches `is_target_block` (a `BLOCK` hit rather than a miss).
+pub fn is_block_in_line(
+    accessor: &(impl BlockAccessor + ?Sized),
+    from: Vector3<f64>,
+    to: Vector3<f64>,
+    is_target_block: impl Fn(&BlockState) -> bool,
+) -> bool {
+    traverse_blocks(from, to, |pos| {
+        is_target_block(accessor.get_block_state(pos)).then_some(())
+    })
+    .is_some()
 }
 
 #[cfg(test)]

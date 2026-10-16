@@ -5,6 +5,7 @@ use crate::{
     server::Server,
     world::{
         World,
+        game_event::DynamicGameEventListener,
         portal::{NetherPortal, PortalProcessor, PortalType, SourcePortalInfo},
     },
 };
@@ -51,7 +52,7 @@ use pumpkin_util::math::vector3::Axis;
 use pumpkin_util::math::{
     boundingbox::{BoundingBox, EntityDimensions},
     get_section_cord, pack_degrees,
-    position::BlockPos,
+    position::{BlockPos, chunk_section_from_pos},
     vector2::Vector2,
     vector3::Vector3,
     wrap_degrees,
@@ -512,6 +513,11 @@ pub trait EntityBase: Send + Sync + std::any::Any {
     /// Vanilla `Entity.isSteppingCarefully`: sneaking, so blocks stepped on stay calm.
     fn is_stepping_carefully(&self) -> bool {
         self.get_entity().is_sneaking()
+    }
+
+    /// Vanilla `Entity.dampensVibrations`.
+    fn dampens_vibrations(&self) -> bool {
+        false
     }
 
     /// Vanilla `Entity.getSoundSource`.
@@ -1197,6 +1203,9 @@ pub struct Entity {
     pub last_sent_velocity: AtomicCell<Vector3<f64>>,
     /// Persistent custom data container for plugins
     pub custom_data: std::sync::Mutex<NbtCompound>,
+    /// The listeners vanilla's `updateDynamicGameEventListener` overrides hand out (the
+    /// allay's and the warden's), set once by the entity's constructor.
+    pub dynamic_game_event_listeners: std::sync::OnceLock<Box<[DynamicGameEventListener]>>,
 }
 
 impl Entity {
@@ -1333,6 +1342,14 @@ impl Entity {
             last_sent_pos: AtomicCell::new(position),
             last_sent_velocity: AtomicCell::new(Vector3::default()),
             custom_data: std::sync::Mutex::new(NbtCompound::new()),
+            dynamic_game_event_listeners: std::sync::OnceLock::new(),
+        }
+    }
+
+    /// Vanilla `Entity.updateDynamicGameEventListener`.
+    pub fn update_dynamic_game_event_listener(&self, action: impl Fn(&DynamicGameEventListener)) {
+        if let Some(listeners) = self.dynamic_game_event_listeners.get() {
+            listeners.iter().for_each(action);
         }
     }
 
@@ -1600,6 +1617,13 @@ impl Entity {
                 let new_block_pos = Vector3::new(floor_x, floor_y, floor_z);
                 let new_bp = BlockPos(new_block_pos);
                 self.block_pos.store(new_bp);
+                // Vanilla `EntityInLevelCallback.onMove`'s `onSectionChange`.
+                if chunk_section_from_pos(&block_pos) != chunk_section_from_pos(&new_bp) {
+                    let world = self.world.load();
+                    self.update_dynamic_game_event_listener(|listener| {
+                        listener.on_section_change(&world);
+                    });
+                }
 
                 let world = self.world.load();
                 let biome = world.level.get_rough_biome(&new_bp);

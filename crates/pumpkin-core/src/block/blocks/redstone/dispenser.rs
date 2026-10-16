@@ -377,7 +377,7 @@ impl DispenserBlock {
             // Empty buckets pick up the fluid in front of the dispenser
             Self::dispense_empty_bucket(ctx, dispenser, item);
         } else if item.item.id == Item::SULFUR_CUBE_BUCKET.id {
-            empty_sulfur_cube_bucket(ctx.world, item, Self::target_position(ctx));
+            empty_sulfur_cube_bucket(ctx.world, item, Self::target_position(ctx), None);
             *item = ItemStack::new(1, &Item::BUCKET);
             Self::play_dispense_effects(ctx, WorldEvent::SoundDispenserDispense);
         } else if FilledBucketItem::ids().contains(&item.item.id) {
@@ -611,7 +611,7 @@ impl DispenserBlock {
         ctx.world
             .play_sound(Sound::EntityTntPrimed, SoundCategory::Blocks, &spawn_pos);
         ctx.world
-            .emit_game_event(GameEvent::EntityPlace.name(), target.to_centered_f64());
+            .game_event_from(None, GameEvent::EntityPlace, target.to_centered_f64());
 
         Self::play_dispense_effects(ctx, WorldEvent::SoundDispenserDispense);
     }

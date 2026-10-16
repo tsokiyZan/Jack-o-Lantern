@@ -4455,7 +4455,7 @@ impl LivingEntity {
         } else {
             GameEvent::Eat
         };
-        world.emit_game_event(event.name(), pos);
+        world.game_event_from(Some(caller), event, pos);
         stack.decrement(1);
         stack
     }
@@ -4535,7 +4535,11 @@ impl LivingEntity {
                         self.fall_distance.store(0.0);
                         // Vanilla broadcasts entity event 46 (teleport particles) on success.
                         world.send_entity_status(&self.entity, EntityStatus::Teleport, None);
-                        world.emit_game_event("teleport", center);
+                        world.game_event(
+                            pumpkin_data::game_event::GameEvent::Teleport,
+                            center,
+                            crate::world::game_event::GameEventContext::of_entity(caller),
+                        );
                         world.play_sound(
                             Sound::ItemChorusFruitTeleport,
                             SoundCategory::Players,

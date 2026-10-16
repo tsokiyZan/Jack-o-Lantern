@@ -41,7 +41,11 @@ impl CaveVinesBlock {
 
     /// Vanilla `CaveVines.use`: picks the glow berries off a vine, returning whether it had
     /// any.
-    pub fn use_berries(world: &Arc<World>, pos: &BlockPos) -> bool {
+    pub fn use_berries(
+        world: &Arc<World>,
+        pos: &BlockPos,
+        source_entity: Option<&dyn crate::entity::EntityBase>,
+    ) -> bool {
         let (block, state) = world.get_block_and_state_id(pos);
         if !Self::has_glow_berries(block, state) {
             return false;
@@ -66,7 +70,14 @@ impl CaveVinesBlock {
             props.to_state_id(block)
         };
         world.set_block_state(pos, new_state, BlockFlags::NOTIFY_LISTENERS);
-        world.emit_game_event(GameEvent::BlockChange.name(), pos.to_centered_f64());
+        world.game_event(
+            GameEvent::BlockChange,
+            pos.to_centered_f64(),
+            crate::world::game_event::GameEventContext::of(
+                source_entity,
+                Some(pumpkin_data::BlockState::from_id(new_state)),
+            ),
+        );
         true
     }
 
@@ -113,7 +124,7 @@ impl BlockBehaviour for CaveVinesBlock {
     }
 
     fn normal_use(&self, args: NormalUseArgs<'_>) -> BlockActionResult {
-        if Self::use_berries(args.world, args.position) {
+        if Self::use_berries(args.world, args.position, Some(args.player.as_ref())) {
             BlockActionResult::SuccessServer
         } else {
             BlockActionResult::Pass

@@ -3,18 +3,32 @@ use crate::entity::player::Player;
 #[derive(Debug, Clone)]
 pub enum AdvancementTrigger {
     InventoryChanged,
-    PlayerKilledEntity { entity_type_resource: String },
-    EnterBlock { block_id: String },
-    PlacedBlock { block_id: String },
-    ConsumeItem { item_id: String },
+    PlayerKilledEntity {
+        entity_type_resource: String,
+    },
+    EnterBlock {
+        block_id: String,
+    },
+    PlacedBlock {
+        block_id: String,
+    },
+    ConsumeItem {
+        item_id: String,
+    },
     SleptInBed,
-    FishedItem { item_id: String },
-    EnterDimension { dimension: String },
+    FishedItem {
+        item_id: String,
+    },
+    EnterDimension {
+        dimension: String,
+    },
     PlayerKilled,
     DeflectedDamage,
     LaunchedEyeOfEnder,
     GlowedSign,
-    BredAnimal { parent_type: String },
+    BredAnimal {
+        parent_type: String,
+    },
     DealtOverkillDamage,
     SniperDuel,
     TwoBirdsOneArrow,
@@ -22,6 +36,8 @@ pub enum AdvancementTrigger {
     Bullseye,
     CuredZombieVillager,
     TradedWithVillager,
+    /// Vanilla `CriteriaTriggers.AVOID_VIBRATION`.
+    AvoidVibration,
 }
 
 impl Player {
@@ -621,6 +637,14 @@ impl Player {
                     self.trigger_advancement_criterion(
                         Advancement::ADVENTURE_TRADE_AT_WORLD_HEIGHT,
                         "trade_at_world_height",
+                    );
+                }
+            }
+            AdvancementTrigger::AvoidVibration => {
+                if !self.has_advancement(Advancement::ADVENTURE_AVOID_VIBRATION) {
+                    self.trigger_advancement_criterion(
+                        Advancement::ADVENTURE_AVOID_VIBRATION,
+                        "avoid_vibration",
                     );
                 }
             }

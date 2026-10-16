@@ -25,6 +25,7 @@ pub mod bee_poi;
 pub mod brightness;
 pub mod chunker;
 pub mod explosion;
+pub mod game_event;
 pub mod generation_cache;
 pub mod loot;
 pub mod map;
@@ -296,6 +297,8 @@ pub struct World {
     /// active chunks instead of scanning every loaded block entity each tick.
     pub block_entities: DashMap<Vector2<i32>, FxHashMap<BlockPos, Arc<dyn BlockEntity>>>,
     pending_block_entity_migrations: crossbeam::queue::SegQueue<Vector2<i32>>,
+    /// Vanilla `LevelChunk.gameEventListenerRegistrySections` of every loaded chunk.
+    pub game_event_listeners: game_event::GameEventListenerRegistries,
     /// Persistent custom data for the world (matching Bukkit's `PersistentDataHolder`)
     pub custom_data: std::sync::Mutex<NbtCompound>,
     /// Persistent custom data for block entities at specific positions
@@ -431,6 +434,7 @@ impl World {
             forced_chunks: std::sync::Mutex::new(FxHashSet::default()),
             server,
             block_entities: DashMap::new(),
+            game_event_listeners: game_event::GameEventListenerRegistries::default(),
             pending_block_entity_migrations: crossbeam::queue::SegQueue::new(),
             custom_data: std::sync::Mutex::new(custom_data),
             custom_block_entity_data: DashMap::new(),
@@ -5063,6 +5067,9 @@ impl World {
         let _base_entity = entity.get_entity();
         self.entity_tracker.add_entity(&entity, self);
         self.spawn_state.load().add_entity(self, entity.as_ref());
+        entity
+            .get_entity()
+            .update_dynamic_game_event_listener(|listener| listener.add(self));
 
         self.entities.rcu(|current_entities| {
             let mut new_entities = (**current_entities).clone();
@@ -5162,6 +5169,7 @@ impl World {
         // serialized at once (which would double it on the next reload).
         self.spawn_state.load().add_entity(self, entity.as_ref());
         self.entity_tracker.add_entity(&entity, self);
+        base_entity.update_dynamic_game_event_listener(|listener| listener.add(self));
 
         self.entities.rcu(|current_entities| {
             let mut new_entities = (**current_entities).clone();
@@ -5184,6 +5192,7 @@ impl World {
 
         self.spawn_state.load().remove_entity(self, entity);
         self.entity_tracker.remove_entity(entity, self);
+        base_entity.update_dynamic_game_event_listener(|listener| listener.remove(self));
         self.entities.rcu(|current_entities| {
             let mut new_entities = (**current_entities).clone();
             new_entities.retain(|e| e.get_entity().entity_uuid != base_entity.entity_uuid);
@@ -5221,6 +5230,9 @@ impl World {
             .await;
 
         for entity in entities_to_remove {
+            entity
+                .get_entity()
+                .update_dynamic_game_event_listener(|listener| listener.remove(self));
             self.entity_tracker.remove_entity(entity.as_ref(), self);
             self.spawn_state.load().remove_entity(self, entity.as_ref());
         }
@@ -5228,6 +5240,7 @@ impl World {
         for chunk_pos in &chunks_set {
             self.save_block_entities(*chunk_pos);
             self.block_entities.remove(chunk_pos);
+            self.game_event_listeners.remove_chunk(*chunk_pos);
         }
     }
 
@@ -6508,11 +6521,46 @@ impl World {
                 .insert(*block_pos, custom_data.clone());
         }
         let entity = block_entity_from_nbt(&nbt)?;
-        self.block_entities
+        let previous = self
+            .block_entities
             .entry(chunk_pos)
             .or_default()
             .insert(*block_pos, entity.clone());
+        self.replace_game_event_listener(
+            previous.as_ref(),
+            *block_pos,
+            entity.clone().get_listener(),
+        );
         Some(entity)
+    }
+
+    /// Vanilla `LevelChunk.addGameEventListener` for the listener of the block entity added at
+    /// `pos`, after `removeGameEventListener` for the block entity it replaced.
+    fn replace_game_event_listener(
+        &self,
+        previous: Option<&Arc<dyn BlockEntity>>,
+        pos: BlockPos,
+        added_listener: Option<Arc<dyn game_event::GameEventListener>>,
+    ) {
+        if let Some(previous) = previous {
+            self.remove_game_event_listener(previous);
+        }
+        if let Some(listener) = added_listener {
+            self.game_event_listeners.register(
+                pumpkin_util::math::position::chunk_section_from_pos(&pos),
+                listener,
+            );
+        }
+    }
+
+    /// Vanilla `LevelChunk.removeGameEventListener`.
+    fn remove_game_event_listener(&self, block_entity: &Arc<dyn BlockEntity>) {
+        if let Some(listener) = block_entity.clone().get_listener() {
+            self.game_event_listeners.unregister(
+                pumpkin_util::math::position::chunk_section_from_pos(&block_entity.get_position()),
+                &listener,
+            );
+        }
     }
 
     fn bedrock_block_entity_data(
@@ -6591,10 +6639,13 @@ impl World {
             );
         }
 
-        self.block_entities
+        let added_listener = block_entity.clone().get_listener();
+        let previous = self
+            .block_entities
             .entry(chunk_pos)
             .or_default()
             .insert(block_pos, block_entity);
+        self.replace_game_event_listener(previous.as_ref(), block_pos, added_listener);
 
         if let Some(nbt) = block_entity_nbt {
             let mut full_nbt = nbt;
@@ -6646,13 +6697,14 @@ impl World {
                 removed
             })
             .unwrap_or(false);
-        let removed =
-            self.block_entities
-                .get_mut(&chunk_pos)
-                .is_some_and(|mut chunk_block_entities| {
-                    chunk_block_entities.remove(block_pos).is_some()
-                });
-        if removed || removed_pending {
+        let removed = self
+            .block_entities
+            .get_mut(&chunk_pos)
+            .and_then(|mut chunk_block_entities| chunk_block_entities.remove(block_pos));
+        if let Some(removed) = &removed {
+            self.remove_game_event_listener(removed);
+        }
+        if removed.is_some() || removed_pending {
             self.custom_block_entity_data.remove(block_pos);
             // Drop the chunk's map once its last block entity is gone.
             self.block_entities
@@ -7176,14 +7228,44 @@ impl World {
         Self::broadcast_bedrock_grouped(be_packet, bedrock_recipients.into_iter());
     }
 
-    pub fn emit_game_event(&self, event_key: impl Into<String>, position: Vector3<f64>) {
-        let mut event = crate::plugin::api::events::world::generic_game::GenericGameEvent::new(
-            event_key.into(),
-            position,
-        );
+    /// Vanilla `ServerLevel.gameEvent(Holder<GameEvent>, Vec3, GameEvent.Context)`. Plugins
+    /// see it first as a [`GenericGameEvent`] and can cancel it before any listener hears it.
+    ///
+    /// [`GenericGameEvent`]: crate::plugin::api::events::world::generic_game::GenericGameEvent
+    pub fn game_event(
+        &self,
+        event: pumpkin_data::game_event::GameEvent,
+        position: Vector3<f64>,
+        context: game_event::GameEventContext<'_>,
+    ) {
+        let mut plugin_event =
+            crate::plugin::api::events::world::generic_game::GenericGameEvent::new(
+                event.name().to_string(),
+                position,
+            );
         if let Some(server) = self.server.upgrade() {
-            server.plugin_manager.fire_blocking(&server, &mut event);
+            server
+                .plugin_manager
+                .fire_blocking(&server, &mut plugin_event);
         }
+        if plugin_event.cancelled {
+            return;
+        }
+        game_event::post(self, event, position, &context);
+    }
+
+    /// Vanilla `LevelAccessor.gameEvent(Entity, Holder<GameEvent>, Vec3)`.
+    pub fn game_event_from(
+        &self,
+        source_entity: Option<&dyn EntityBase>,
+        event: pumpkin_data::game_event::GameEvent,
+        position: Vector3<f64>,
+    ) {
+        self.game_event(
+            event,
+            position,
+            game_event::GameEventContext::of(source_entity, None),
+        );
     }
 
     pub async fn unload(self: &Arc<Self>) {

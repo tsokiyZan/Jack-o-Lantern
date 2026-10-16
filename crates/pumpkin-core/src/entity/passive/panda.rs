@@ -576,7 +576,7 @@ impl PandaEntity {
                 entity
                     .world
                     .load()
-                    .emit_game_event(GameEvent::Eat.name(), entity.pos.load());
+                    .game_event_from(Some(self), GameEvent::Eat, entity.pos.load());
                 self.sit(false);
             }
             self.eat(false);

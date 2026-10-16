@@ -248,7 +248,7 @@ impl NautilusEntity {
                 world.play_sound_event(&equippable.equip_sound, self.sound_source(), &pos);
             }
         }
-        world.emit_game_event(GameEvent::Equip.name(), pos);
+        world.game_event_from(Some(self), GameEvent::Equip, pos);
     }
 
     /// Vanilla `AbstractNautilus.getNautilusRestrictionRadius`.
@@ -705,7 +705,7 @@ impl Mob for NautilusEntity {
         entity
             .world
             .load()
-            .emit_game_event(GameEvent::EntityAction.name(), entity.pos.load());
+            .game_event_from(Some(self), GameEvent::EntityAction, entity.pos.load());
         self.set_dashing(true);
     }
 

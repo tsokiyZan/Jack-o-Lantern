@@ -777,7 +777,7 @@ impl Explosion {
 
     /// Vanilla `ServerExplosion.explode`; returns the exploded block count.
     pub fn explode(&self, world: &Arc<World>) -> usize {
-        world.emit_game_event(GameEvent::Explode.name(), self.center);
+        world.game_event_from(self.source.as_deref(), GameEvent::Explode, self.center);
         let mut to_blow = self.calculate_exploded_positions(world);
         self.hurt_entities(world);
         if self.interacts_with_blocks() {
