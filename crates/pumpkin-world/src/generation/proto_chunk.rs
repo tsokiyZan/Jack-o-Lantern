@@ -1047,8 +1047,8 @@ impl ProtoChunk {
     #[must_use]
     pub(crate) fn get_terrain_gen_biome_pos(&self, x: i32, y: i32, z: i32) -> Vector3<i32> {
         biome::get_biome_blend(
-            self.bottom_y(),
-            self.height(),
+            self.bottom_y().into(),
+            self.height().into(),
             self.biome_mixer_seed,
             x,
             y,

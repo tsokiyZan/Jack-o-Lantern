@@ -5802,6 +5802,20 @@ impl World {
         }
     }
 
+    /// Vanilla `Level.getBiome`: `BiomeManager` moves the block onto one of the eight
+    /// surrounding noise biome cells, picked with the hashed world seed.
+    pub fn get_zoomed_biome(&self, position: &BlockPos) -> &'static Biome {
+        let cell = pumpkin_world::generation::get_biome_blend(
+            self.dimension.min_y,
+            self.dimension.height,
+            biome::hash_seed(self.level.seed.0),
+            position.0.x,
+            position.0.y,
+            position.0.z,
+        );
+        self.get_biome(&BlockPos::new(cell.x << 2, cell.y << 2, cell.z << 2))
+    }
+
     /// Vanilla `LevelAccessor.scheduleTick` for a block.
     pub fn schedule_block_tick(
         &self,
