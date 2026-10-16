@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use pumpkin_data::translation;
 use pumpkin_nbt::compound::NbtCompound;
+use pumpkin_nbt::java_fmt::float_to_string;
 use pumpkin_nbt::tag::NbtTag;
 use pumpkin_util::PermissionLvl;
 use pumpkin_util::identifier::Identifier;
@@ -15,7 +16,7 @@ use crate::command::argument_builder::{ArgumentBuilder, argument, command, liter
 use crate::command::argument_types::FromStringReader;
 use crate::command::argument_types::argument_type::{ArgumentType, JavaClientArgumentType};
 use crate::command::argument_types::coordinates::block_pos::BlockPosArgumentType;
-use crate::command::argument_types::core::double::DoubleArgumentType;
+use crate::command::argument_types::core::float::FloatArgumentType;
 use crate::command::argument_types::entity::EntityArgumentType;
 use crate::command::context::command_context::CommandContext;
 use crate::command::context::command_source::CommandSource;
@@ -25,18 +26,15 @@ use crate::command::node::dispatcher::CommandDispatcher;
 use crate::command::node::{CommandExecutor, CommandExecutorResult};
 use crate::command::snbt::SnbtParser;
 use crate::command::string_reader::StringReader;
-use crate::command::suggestion::provider::{SuggestionProvider, SuggestionProviderResult};
-use crate::command::suggestion::suggestions::SuggestionsBuilder;
 use crate::data::datapack::DatapackManager;
 use crate::entity::EntityBase;
 
 const DESCRIPTION: &str = "Evaluates number providers.";
 const PERMISSION: &str = "minecraft:command.compute";
 
-const ARG_POS: &str = "pos";
-const ARG_TARGET: &str = "target";
-const ARG_INT_PROVIDER: &str = "int_provider";
-const ARG_FLOAT_PROVIDER: &str = "float_provider";
+const ARG_POS: &str = "computePos";
+const ARG_TARGET: &str = "computeTarget";
+const ARG_PROVIDER: &str = "provider";
 const ARG_SCALE: &str = "scale";
 
 const MAX_PROVIDER_DEPTH: usize = 64;
@@ -44,6 +42,22 @@ const MAX_PROVIDER_DEPTH: usize = 64;
 const ERROR_DIV_BY_ZERO: LiteralCommandErrorType = LiteralCommandErrorType::new("Division by zero");
 const ERROR_POW_ZERO_ZERO: LiteralCommandErrorType =
     LiteralCommandErrorType::new("0^0 is undefined");
+const ERROR_FAILED_TO_PARSE: CommandErrorType<1> = CommandErrorType::new(
+    translation::java::ARGUMENT_RESOURCE_OR_ID_FAILED_TO_PARSE,
+    translation::java::ARGUMENT_RESOURCE_OR_ID_FAILED_TO_PARSE,
+);
+const ERROR_NO_SUCH_ELEMENT: CommandErrorType<2> = CommandErrorType::new(
+    translation::java::ARGUMENT_RESOURCE_OR_ID_NO_SUCH_ELEMENT,
+    translation::java::ARGUMENT_RESOURCE_OR_ID_NO_SUCH_ELEMENT,
+);
+const INVALID_NAMED_VALUE: CommandErrorType<2> = CommandErrorType::new(
+    translation::java::COMMAND_COMPUTE_RESULT_NAMED_INVALID,
+    translation::java::COMMAND_COMPUTE_RESULT_NAMED_INVALID,
+);
+const INVALID_UNNAMED_VALUE: CommandErrorType<1> = CommandErrorType::new(
+    translation::java::COMMAND_COMPUTE_RESULT_UNNAMED_INVALID,
+    translation::java::COMMAND_COMPUTE_RESULT_UNNAMED_INVALID,
+);
 const ERROR_EVALUATION_FAILED: LiteralCommandErrorType =
     LiteralCommandErrorType::new("Failed to evaluate number provider");
 
@@ -67,47 +81,82 @@ pub enum ProviderArg {
     Id(Identifier),
 }
 
-pub struct ProviderArgumentType;
+/// Vanilla `ResourceOrIdArgument.floatProvider` and `intProvider`.
+#[derive(Clone, Copy)]
+pub enum ProviderArgumentType {
+    Float,
+    Int,
+}
 
 impl ArgumentType<CommandSource> for ProviderArgumentType {
     type Item = ProviderArg;
 
+    /// Vanilla `ResourceOrIdArgument`'s grammar: an identifier if one can be read, otherwise an
+    /// inline SNBT value.
     fn parse(&self, reader: &mut StringReader) -> Result<Self::Item, CommandSyntaxError> {
         reader.skip_whitespace();
-        if reader.peek() == Some('{') {
-            let tag = SnbtParser::parse_for_commands(reader)?;
-            if let NbtTag::Compound(compound) = tag {
-                return Ok(ProviderArg::Nbt(compound));
-            }
-        }
-
         let start = reader.cursor();
-        if let Ok(num) = reader.read_double() {
-            let is_word = reader
-                .peek()
-                .is_some_and(|c| c.is_ascii_alphabetic() || c == '_' || c == ':');
-            if !is_word {
-                return Ok(ProviderArg::Number(num));
+        if reader.peek().is_some_and(Identifier::is_valid_char) {
+            if let Ok(id) = Identifier::from_reader(reader) {
+                return Ok(ProviderArg::Id(id));
+            }
+            reader.set_cursor(start);
+        }
+        let tag = SnbtParser::parse_for_commands(reader)?;
+        if let NbtTag::Compound(compound) = tag {
+            return Ok(ProviderArg::Nbt(compound));
+        }
+        // The inline form of a constant, read with Codec.INT or Codec.FLOAT.
+        let number = match self {
+            Self::Float => tag.as_numeric_float().map(f64::from),
+            Self::Int => tag.as_numeric_int().map(f64::from),
+        };
+        number.map(ProviderArg::Number).ok_or_else(|| {
+            ERROR_FAILED_TO_PARSE.create(reader, TextComponent::text(tag.to_string()))
+        })
+    }
+
+    /// Vanilla `ReferenceResult.parse`: an identifier must name a registered provider.
+    fn parse_with_source(
+        &self,
+        reader: &mut StringReader,
+        source: &CommandSource,
+    ) -> Result<Self::Item, CommandSyntaxError> {
+        let provider = self.parse(reader)?;
+        if let ProviderArg::Id(id) = &provider
+            && let Some(server) = source.server.as_ref()
+        {
+            let key = id.to_string();
+            let (found, registry) = match self {
+                Self::Float => (
+                    server.datapack_manager.get_context_float_provider(&key),
+                    "minecraft:context_float_provider",
+                ),
+                Self::Int => (
+                    server.datapack_manager.get_context_int_provider(&key),
+                    "minecraft:context_int_provider",
+                ),
+            };
+            if found.is_none() {
+                return Err(ERROR_NO_SUCH_ELEMENT.create(
+                    reader,
+                    TextComponent::text(key),
+                    TextComponent::text(registry),
+                ));
             }
         }
-        reader.set_cursor(start);
-
-        let id = Identifier::from_reader(reader)?;
-        Ok(ProviderArg::Id(id))
+        Ok(provider)
     }
 
     fn client_side_parser(&self) -> JavaClientArgumentType {
-        JavaClientArgumentType::NbtTag
+        match self {
+            Self::Float => JavaClientArgumentType::ContextFloatProvider,
+            Self::Int => JavaClientArgumentType::ContextIntProvider,
+        }
     }
 
     fn examples(&self) -> Vec<String> {
-        vec![
-            "5".to_string(),
-            "3.14".to_string(),
-            "minecraft:constant".to_string(),
-            "{type:\"constant\",value:5}".to_string(),
-            "{type:\"add\",left:1,right:2}".to_string(),
-        ]
+        crate::examples!("foo", "foo:bar", "012", "{}", "true")
     }
 }
 
@@ -995,7 +1044,7 @@ struct ComputeIntegerExecutor {
 
 impl CommandExecutor for ComputeIntegerExecutor {
     fn execute(&self, context: &CommandContext) -> CommandExecutorResult {
-        let provider = ProviderArgumentType::get(context, ARG_INT_PROVIDER)?;
+        let provider = ProviderArgumentType::get(context, ARG_PROVIDER)?;
         let ctx = build_context(context, self.target_type)?;
 
         let (value, name) = evaluate_int(provider, &ctx)?;
@@ -1033,141 +1082,93 @@ struct ComputeFloatExecutor {
 }
 
 impl CommandExecutor for ComputeFloatExecutor {
+    /// Vanilla `ComputeCommand.computeAsFloat`.
     fn execute(&self, context: &CommandContext) -> CommandExecutorResult {
-        let provider = ProviderArgumentType::get(context, ARG_FLOAT_PROVIDER)?;
+        let provider = ProviderArgumentType::get(context, ARG_PROVIDER)?;
         let scale = if self.has_scale {
-            DoubleArgumentType::get(context, ARG_SCALE)?
+            FloatArgumentType::get(context, ARG_SCALE)?
         } else {
             1.0
         };
 
         let ctx = build_context(context, self.target_type)?;
         let (raw_value, name) = evaluate_float(provider, &ctx)?;
-
-        if raw_value.is_nan() || raw_value.is_infinite() {
-            let msg = name.as_deref().map_or_else(
-                || {
-                    TextComponent::translate_cross(
-                        translation::java::COMMAND_COMPUTE_RESULT_UNNAMED_INVALID,
-                        translation::java::COMMAND_COMPUTE_RESULT_UNNAMED_INVALID,
-                        [TextComponent::text(raw_value.to_string())],
-                    )
-                },
-                |name| {
-                    TextComponent::translate_cross(
-                        translation::java::COMMAND_COMPUTE_RESULT_NAMED_INVALID,
-                        translation::java::COMMAND_COMPUTE_RESULT_NAMED_INVALID,
-                        [
-                            TextComponent::text(name.to_string()),
-                            TextComponent::text(raw_value.to_string()),
-                        ],
-                    )
-                },
-            );
-            context.source.send_feedback(msg, false);
-            return Err(ERROR_EVALUATION_FAILED.create_without_context());
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "vanilla float providers compute in float"
+        )]
+        let original = raw_value as f32;
+        if !original.is_finite() {
+            return Err(invalid_value(name, float_to_string(original)));
         }
 
-        let scaled = raw_value * scale;
-        #[allow(clippy::cast_possible_truncation)]
-        let rounded = scaled.floor() as i32;
-        let is_exact = scaled == f64::from(rounded);
-
-        let msg = match (name, is_exact) {
-            (Some(name), true) => TextComponent::translate_cross(
+        let result = (original * scale).floor() as i32;
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "vanilla compares the int result with the float value"
+        )]
+        let exact = result as f32 == original;
+        let result_arg = TextComponent::text(result.to_string());
+        let original_arg = TextComponent::text(float_to_string(original));
+        let msg = match (name, exact) {
+            (Some(name), true) => translatable(
                 translation::java::COMMAND_COMPUTE_RESULT_NAMED_EXACT,
-                translation::java::COMMAND_COMPUTE_RESULT_NAMED_EXACT,
-                [
-                    TextComponent::text(name),
-                    TextComponent::text(scaled.to_string()),
-                ],
+                [TextComponent::text(name), result_arg],
             ),
-            (Some(name), false) => TextComponent::translate_cross(
+            (Some(name), false) => translatable(
                 translation::java::COMMAND_COMPUTE_RESULT_NAMED_ROUNDED,
-                translation::java::COMMAND_COMPUTE_RESULT_NAMED_ROUNDED,
-                [
-                    TextComponent::text(name),
-                    TextComponent::text(scaled.to_string()),
-                    TextComponent::text(rounded.to_string()),
-                ],
+                [TextComponent::text(name), original_arg, result_arg],
             ),
-            (None, true) => TextComponent::translate_cross(
+            (None, true) => translatable(
                 translation::java::COMMAND_COMPUTE_RESULT_UNNAMED_EXACT,
-                translation::java::COMMAND_COMPUTE_RESULT_UNNAMED_EXACT,
-                [TextComponent::text(scaled.to_string())],
+                [result_arg],
             ),
-            (None, false) => TextComponent::translate_cross(
+            (None, false) => translatable(
                 translation::java::COMMAND_COMPUTE_RESULT_UNNAMED_ROUNDED,
-                translation::java::COMMAND_COMPUTE_RESULT_UNNAMED_ROUNDED,
-                [
-                    TextComponent::text(scaled.to_string()),
-                    TextComponent::text(rounded.to_string()),
-                ],
+                [original_arg, result_arg],
             ),
         };
 
         context.source.send_feedback(msg, false);
-        Ok(rounded)
+        Ok(result)
     }
 }
 
-struct ContextIntProviderSuggestionProvider;
+fn translatable(key: &'static str, args: impl Into<Vec<TextComponent>>) -> TextComponent {
+    TextComponent::translate_cross(key, key, args)
+}
 
-impl SuggestionProvider for ContextIntProviderSuggestionProvider {
-    fn suggest(
-        &self,
-        context: &CommandContext,
-        mut builder: SuggestionsBuilder,
-    ) -> SuggestionProviderResult {
-        if let Some(server) = context.source.server.as_ref() {
-            for name in server.datapack_manager.get_context_int_provider_names() {
-                builder = builder.suggest(name);
-            }
-        }
-        builder.build()
+/// Vanilla `ComputeCommand.throwInvalidValue`.
+fn invalid_value(name: Option<String>, value: String) -> CommandSyntaxError {
+    match name {
+        Some(name) => INVALID_NAMED_VALUE
+            .create_without_context(TextComponent::text(name), TextComponent::text(value)),
+        None => INVALID_UNNAMED_VALUE.create_without_context(TextComponent::text(value)),
     }
 }
 
-struct ContextFloatProviderSuggestionProvider;
-
-impl SuggestionProvider for ContextFloatProviderSuggestionProvider {
-    fn suggest(
-        &self,
-        context: &CommandContext,
-        mut builder: SuggestionsBuilder,
-    ) -> SuggestionProviderResult {
-        if let Some(server) = context.source.server.as_ref() {
-            for name in server.datapack_manager.get_context_float_provider_names() {
-                builder = builder.suggest(name);
-            }
-        }
-        builder.build()
-    }
-}
-
+/// The `float` and `integer` nodes `ComputeCommand` adds under each `LootContextSources` node.
 fn add_provider_nodes<B: ArgumentBuilder>(builder: B, target_type: TargetType) -> B {
     builder
         .then(
-            literal("integer").then(
-                argument(ARG_INT_PROVIDER, ProviderArgumentType)
-                    .suggests(ContextIntProviderSuggestionProvider)
-                    .executes(ComputeIntegerExecutor { target_type }),
-            ),
-        )
-        .then(
             literal("float").then(
-                argument(ARG_FLOAT_PROVIDER, ProviderArgumentType)
-                    .suggests(ContextFloatProviderSuggestionProvider)
+                argument(ARG_PROVIDER, ProviderArgumentType::Float)
                     .executes(ComputeFloatExecutor {
                         target_type,
                         has_scale: false,
                     })
-                    .then(argument(ARG_SCALE, DoubleArgumentType::any()).executes(
+                    .then(argument(ARG_SCALE, FloatArgumentType::any()).executes(
                         ComputeFloatExecutor {
                             target_type,
                             has_scale: true,
                         },
                     )),
+            ),
+        )
+        .then(
+            literal("integer").then(
+                argument(ARG_PROVIDER, ProviderArgumentType::Int)
+                    .executes(ComputeIntegerExecutor { target_type }),
             ),
         )
 }
