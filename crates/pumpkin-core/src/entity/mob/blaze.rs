@@ -1,9 +1,12 @@
 use crate::entity::ai::pathfinder::node::PathType;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 use std::sync::{Arc, Weak};
 
+use crossbeam::atomic::AtomicCell;
 use pumpkin_data::entity::EntityType;
 use pumpkin_util::math::vector3::Vector3;
+
+use crate::entity::ai::util::RandomExt;
 
 use crate::entity::{
     Entity, EntityBase,
@@ -18,6 +21,8 @@ use crate::entity::{
 pub struct BlazeEntity {
     pub entity: Arc<MobEntity>,
     pub is_charged: AtomicBool,
+    allowed_height_offset: AtomicCell<f32>,
+    next_height_offset_change_tick: AtomicI32,
 }
 
 impl BlazeEntity {
@@ -31,6 +36,8 @@ impl BlazeEntity {
         let blaze = Self {
             entity,
             is_charged: AtomicBool::new(false),
+            allowed_height_offset: AtomicCell::new(0.5),
+            next_height_offset_change_tick: AtomicI32::new(0),
         };
         let mob_arc = Arc::new(blaze);
         let mob_weak: Weak<dyn Mob> = {
@@ -98,18 +105,46 @@ impl Mob for BlazeEntity {
         &self.entity
     }
 
-    fn mob_tick(&self, _caller: &dyn EntityBase) {
+    /// Vanilla `Blaze.aiStep` before `super.aiStep()`: falling slows to 0.6 per tick.
+    fn ai_step(&self, _caller: &dyn EntityBase) {
         let base_entity = &self.entity.living_entity.entity;
-        if !base_entity.is_alive() {
-            return;
-        }
-
-        let on_ground = base_entity.on_ground.load(Ordering::Relaxed);
         let vel = base_entity.velocity.load();
-        if !on_ground && vel.y < 0.0 {
+        if !base_entity.on_ground.load(Ordering::Relaxed) && vel.y < 0.0 {
             base_entity
                 .velocity
                 .store(Vector3::new(vel.x, vel.y * 0.6, vel.z));
+        }
+    }
+
+    /// Vanilla `Blaze.customServerAiStep`: rise towards a target above the allowed height offset.
+    fn custom_server_ai_step(&self, _caller: &dyn EntityBase) {
+        if self
+            .next_height_offset_change_tick
+            .fetch_sub(1, Ordering::Relaxed)
+            - 1
+            <= 0
+        {
+            self.next_height_offset_change_tick
+                .store(100, Ordering::Relaxed);
+            self.allowed_height_offset
+                .store(self.get_random().triangle(0.5, 6.891) as f32);
+        }
+
+        let Some(target) = self.entity.get_target() else {
+            return;
+        };
+        let base_entity = &self.entity.living_entity.entity;
+        if target.get_entity().get_eye_y()
+            > base_entity.get_eye_y() + f64::from(self.allowed_height_offset.load())
+            && self.can_attack(target.as_ref())
+        {
+            let vel = base_entity.velocity.load();
+            let up = (f64::from(0.3f32) - vel.y) * f64::from(0.3f32);
+            base_entity
+                .velocity
+                .store(Vector3::new(vel.x, vel.y + up, vel.z));
+            // `needsSync`.
+            base_entity.velocity_dirty.store(true, Ordering::SeqCst);
         }
     }
 
