@@ -68,7 +68,7 @@ mod say;
 mod schedule;
 mod scoreboard;
 mod seed;
-mod setblock;
+pub(crate) mod setblock;
 mod setidletimeout;
 mod setworldspawn;
 mod spawnpoint;

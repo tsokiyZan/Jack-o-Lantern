@@ -74,12 +74,27 @@ impl WorldGenSettingsData {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Debug, Default)]
+/// Vanilla `ClockState`: one world clock in `world_clocks.dat`.
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub struct DimensionClock {
     pub total_ticks: i64,
+    pub partial_tick: f32,
+    pub rate: f32,
+    pub paused: bool,
 }
 
-#[derive(Clone, PartialEq, Eq, Debug, Default)]
+impl Default for DimensionClock {
+    fn default() -> Self {
+        Self {
+            total_ticks: 0,
+            partial_tick: 0.0,
+            rate: 1.0,
+            paused: false,
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Debug, Default)]
 pub struct WorldClocksData {
     pub clocks: std::collections::HashMap<String, DimensionClock>,
     pub data_version: i32,
@@ -527,10 +542,20 @@ fn world_clocks_from_nbt(root: &NbtCompound) -> WorldClocksData {
             continue;
         }
         if let NbtTag::Compound(dim_compound) = tag {
-            let total_ticks = dim_compound.get_long("total_ticks").unwrap_or(0);
-            result
-                .clocks
-                .insert(key.to_string(), DimensionClock { total_ticks });
+            // `ClockState.CODEC`.
+            let rate = dim_compound
+                .get_float("rate")
+                .filter(|rate| *rate > 0.0)
+                .unwrap_or(1.0);
+            result.clocks.insert(
+                key.to_string(),
+                DimensionClock {
+                    total_ticks: dim_compound.get_long("total_ticks").unwrap_or(0),
+                    partial_tick: dim_compound.get_float("partial_tick").unwrap_or(0.0),
+                    rate,
+                    paused: dim_compound.get_bool("paused").unwrap_or(false),
+                },
+            );
         }
     }
 
@@ -548,6 +573,16 @@ pub fn write_world_clocks(
     for (dim_name, clock) in &clocks.clocks {
         let mut dim_compound = NbtCompound::new();
         dim_compound.put_long("total_ticks", clock.total_ticks);
+        // `ClockState.CODEC` leaves out the optional fields at their defaults.
+        if clock.partial_tick != 0.0 {
+            dim_compound.put_float("partial_tick", clock.partial_tick);
+        }
+        if clock.rate != 1.0 {
+            dim_compound.put_float("rate", clock.rate);
+        }
+        if clock.paused {
+            dim_compound.put_bool("paused", true);
+        }
         inner.put_compound(dim_name, dim_compound);
     }
 
@@ -712,5 +747,110 @@ pub fn write_stopwatches_stub(
 
     let file = File::create(&path)?;
     pumpkin_nbt::nbt_compress::write_gzip_compound_tag(root, file)
+        .map_err(|e| WorldInfoError::SerializationError(e.to_string()))
+}
+
+/// Vanilla `WorldBorder.Settings`, saved per dimension as `data/minecraft/world_border.dat`.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct WorldBorderData {
+    pub center_x: f64,
+    pub center_z: f64,
+    pub damage_per_block: f64,
+    pub safe_zone: f64,
+    pub warning_blocks: i32,
+    pub warning_time: i32,
+    pub size: f64,
+    pub lerp_time: i64,
+    pub lerp_target: f64,
+}
+
+impl Default for WorldBorderData {
+    /// Vanilla `WorldBorder.Settings.DEFAULT`.
+    fn default() -> Self {
+        Self {
+            center_x: 0.0,
+            center_z: 0.0,
+            damage_per_block: 0.2,
+            safe_zone: 5.0,
+            warning_blocks: 5,
+            warning_time: 300,
+            size: f64::from(5.999_997E7f32),
+            lerp_time: 0,
+            lerp_target: 0.0,
+        }
+    }
+}
+
+/// Reads a dimension's `world_border.dat`; `None` when it has none or it doesn't parse.
+#[must_use]
+pub fn read_world_border(dim_folder: &Path) -> Option<WorldBorderData> {
+    let path = minecraft_data_dir(dim_folder).join("world_border.dat");
+    let root = read_gzip_compound_tag(File::open(path).ok()?).ok()?;
+    let data = root.get_compound("data")?;
+    Some(WorldBorderData {
+        center_x: data.get_double("center_x")?,
+        center_z: data.get_double("center_z")?,
+        damage_per_block: data.get_double("damage_per_block")?,
+        safe_zone: data.get_double("safe_zone")?,
+        warning_blocks: data.get_int("warning_blocks")?,
+        warning_time: data.get_int("warning_time")?,
+        size: data.get_double("size")?,
+        lerp_time: data.get_long("lerp_time")?,
+        lerp_target: data.get_double("lerp_target")?,
+    })
+}
+
+pub fn write_world_border(
+    dim_folder: &Path,
+    border: &WorldBorderData,
+    data_version: i32,
+) -> Result<(), WorldInfoError> {
+    let dir = ensure_minecraft_data_dir(dim_folder)?;
+    let file = File::create(dir.join("world_border.dat"))?;
+    let mut data = NbtCompound::new();
+    data.put_double("center_x", border.center_x);
+    data.put_double("center_z", border.center_z);
+    data.put_double("damage_per_block", border.damage_per_block);
+    data.put_double("safe_zone", border.safe_zone);
+    data.put_int("warning_blocks", border.warning_blocks);
+    data.put_int("warning_time", border.warning_time);
+    data.put_double("size", border.size);
+    data.put_long("lerp_time", border.lerp_time);
+    data.put_double("lerp_target", border.lerp_target);
+    let mut root = NbtCompound::new();
+    root.put_int("DataVersion", data_version);
+    root.put_compound("data", data);
+    pumpkin_nbt::nbt_compress::write_gzip_compound_tag(root, BufWriter::new(file))
+        .map_err(|e| WorldInfoError::SerializationError(e.to_string()))
+}
+
+/// Vanilla `MapIndex` (`data/minecraft/maps/last_id.dat`): the last map id handed out, -1
+/// before any.
+#[must_use]
+pub fn read_last_map_id(level_folder: &Path) -> Option<i32> {
+    let path = minecraft_data_dir(level_folder)
+        .join("maps")
+        .join("last_id.dat");
+    let root = read_gzip_compound_tag(File::open(path).ok()?).ok()?;
+    Some(root.get_compound("data")?.get_int("map").unwrap_or(-1))
+}
+
+pub fn write_last_map_id(
+    level_folder: &Path,
+    last_map_id: i32,
+    data_version: i32,
+) -> Result<(), WorldInfoError> {
+    let dir = ensure_minecraft_data_dir(level_folder)?.join("maps");
+    fs::create_dir_all(&dir)?;
+    let file = File::create(dir.join("last_id.dat"))?;
+    let mut data = NbtCompound::new();
+    // `optionalFieldOf("map", -1)`.
+    if last_map_id != -1 {
+        data.put_int("map", last_map_id);
+    }
+    let mut root = NbtCompound::new();
+    root.put_int("DataVersion", data_version);
+    root.put_compound("data", data);
+    pumpkin_nbt::nbt_compress::write_gzip_compound_tag(root, BufWriter::new(file))
         .map_err(|e| WorldInfoError::SerializationError(e.to_string()))
 }

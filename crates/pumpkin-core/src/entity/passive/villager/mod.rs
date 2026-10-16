@@ -608,7 +608,9 @@ impl VillagerEntity {
 
     fn create_explorer_map(&self, destination: &str, given: &ItemStack) -> Option<ItemStack> {
         use pumpkin_data::data_component::DataComponent;
-        use pumpkin_data::data_component_impl::{DataComponentImpl, ItemNameImpl, MapIdImpl};
+        use pumpkin_data::data_component_impl::{
+            DataComponentImpl, ItemNameImpl, MapDecorationEntry, MapDecorationsImpl, MapIdImpl,
+        };
         use pumpkin_data::structures::StructureSet;
         use pumpkin_world::generation::generator::structure_finder::find_nearest_structure_start;
 
@@ -625,23 +627,14 @@ impl VillagerEntity {
         )?;
         let server = world.server.upgrade()?;
         let map_id = server.next_map_id();
-        let map = server.map_manager.create_map(
+        // `MapItem.applyNewSavedData`; the target marker lives on the item.
+        let _map = server.map_manager.create_map(
             map_id,
             world.dimension.clone(),
             target.0.x,
             target.0.z,
             2,
         );
-        map.lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .decorations
-            .push(crate::world::map::MapDecoration {
-                icon_type,
-                x: 0,
-                z: 0,
-                direction: 8,
-                display_name: None,
-            });
 
         // 26.3 trades hand out a dedicated map item that already carries its own
         // name; older data trades a plain filled map that has to be named here.
@@ -659,6 +652,24 @@ impl VillagerEntity {
             DataComponent::MapId,
             Some(MapIdImpl { id: map_id }.to_dyn()),
         ));
+        // Vanilla `MapItemSavedData.addTargetDecoration(stack, target, "+", decoration)`.
+        let decoration =
+            pumpkin_data::map_decoration::MapDecorationType::from_id(icon_type as u32)?;
+        let mut decorations = stack
+            .get_data_component::<MapDecorationsImpl>()
+            .cloned()
+            .unwrap_or_default();
+        decorations.decorations.retain(|(key, _)| key != "+");
+        decorations.decorations.push((
+            "+".to_string(),
+            MapDecorationEntry {
+                r#type: format!("minecraft:{}", decoration.name),
+                x: f64::from(target.0.x),
+                z: f64::from(target.0.z),
+                rotation: 180.0,
+            },
+        ));
+        stack.set_data_component(decorations);
         Some(stack)
     }
 

@@ -138,12 +138,8 @@ impl EntityBase for WindChargeEntity {
             .has_tag(&pumpkin_data::tag::EntityType::MINECRAFT_REDIRECTABLE_PROJECTILE)
     }
 
-    fn get_owner_id(&self) -> Option<i32> {
-        self.thrown_item_entity.owner_id.load()
-    }
-
-    fn set_owner_id(&self, owner: Option<i32>) {
-        self.thrown_item_entity.owner_id.store(owner);
+    fn get_projectile(&self) -> Option<&crate::entity::projectile::Projectile> {
+        Some(&self.thrown_item_entity.projectile)
     }
 
     fn tick(&self, caller: &dyn EntityBase, _server: &Server) {
@@ -177,9 +173,8 @@ impl EntityBase for WindChargeEntity {
                 let world = self.get_entity().world.load();
                 let owner = self
                     .thrown_item_entity
-                    .owner_id
-                    .load()
-                    .and_then(|id| world.get_entity_by_id(id))
+                    .projectile
+                    .get_owner(&self.thrown_item_entity.entity)
                     .filter(|owner| owner.get_living_entity().is_some());
                 if let Some(owner_living) = owner.as_ref().and_then(|o| o.get_living_entity()) {
                     // `setLastHurtMob`.

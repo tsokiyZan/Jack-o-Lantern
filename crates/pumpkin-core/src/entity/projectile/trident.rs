@@ -25,7 +25,7 @@ use super::{ProjectileHit, calculate_ray_intersection};
 
 pub struct TridentEntity {
     pub entity: Entity,
-    pub owner_id: Option<i32>,
+    pub projectile: super::Projectile,
     pub item_stack: Arc<Mutex<ItemStack>>,
     pub pickup: ArrowPickup,
     pub in_ground: AtomicBool,
@@ -47,10 +47,11 @@ impl TridentEntity {
     const GRAVITY: f64 = 0.05;
     const DESPAWN_TIME: u32 = 1200;
 
-    pub fn new(entity: Entity, owner_id: Option<i32>) -> Self {
+    /// A trident without an owner.
+    pub fn new(entity: Entity) -> Self {
         Self {
             entity,
-            owner_id,
+            projectile: super::Projectile::new(),
             item_stack: Arc::new(Mutex::new(ItemStack::new(1, &Item::TRIDENT))),
             pickup: ArrowPickup::Disallowed,
             in_ground: AtomicBool::new(false),
@@ -79,7 +80,7 @@ impl TridentEntity {
 
         Self {
             entity,
-            owner_id: Some(shooter.entity_id),
+            projectile: super::Projectile::owned_by(shooter),
             item_stack: Arc::new(Mutex::new(item_stack)),
             pickup,
             in_ground: AtomicBool::new(false),
@@ -153,10 +154,8 @@ impl TridentEntity {
             return true;
         }
 
-        // Skip owner for initial frames (5 ticks)
-        if Some(other_ent.entity_id) == self.owner_id
-            && self_ent.tick_count.load(Ordering::Relaxed) < 5
-        {
+        // Vanilla `Projectile.canHitEntity`: not the owner's stack until it has left it.
+        if !self.projectile.can_hit_owner_stack(self_ent, other_ent) {
             return true;
         }
 
@@ -184,10 +183,11 @@ impl EntityBase for TridentEntity {
         )
     }
 
-    fn get_owner_id(&self) -> Option<i32> {
-        self.owner_id
+    fn get_projectile(&self) -> Option<&super::Projectile> {
+        Some(&self.projectile)
     }
 
+    #[expect(clippy::too_many_lines)]
     fn tick(&self, caller: &dyn EntityBase, _server: &Server) {
         let entity = self.get_entity();
         let world = entity.world.load();
@@ -232,6 +232,8 @@ impl EntityBase for TridentEntity {
             velocity.x.atan2(velocity.z) as f32 * 57.295_776,
             velocity.y.atan2(len) as f32 * 57.295_776,
         );
+        // Vanilla `AbstractArrow.tick`'s `checkLeftOwner`, with `Projectile.tick`'s shoot event.
+        self.projectile.tick(entity);
 
         // Move trident
         let new_pos = start_pos.add(&velocity);
@@ -374,7 +376,7 @@ impl EntityBase for TridentEntity {
                 hit_pos,
                 ..
             } => {
-                let owner = self.owner_id.and_then(|id| world.get_entity_by_id(id));
+                let owner = self.projectile.get_owner(&self.entity);
                 // Vanilla `trident(this, owner)`, the trident standing in for a missing owner.
                 let damage_source = DamageSource {
                     damage_type: DamageType::TRIDENT,

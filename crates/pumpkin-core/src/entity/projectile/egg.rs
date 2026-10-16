@@ -1,7 +1,6 @@
 use crate::entity::projectile::ProjectileHit;
 use pumpkin_data::damage::DamageType;
 use std::sync::RwLock;
-use std::sync::atomic::AtomicBool;
 
 use crate::plugin::player::egg_throw::PlayerEggThrowEvent;
 use crate::{
@@ -28,15 +27,7 @@ impl EggEntity {
     pub fn new(entity: Entity) -> Self {
         // Default velocity slightly upward for thrown egg
         entity.set_velocity(Vector3::new(0.0, 0.1, 0.0));
-        let thrown = ThrownItemEntity {
-            entity,
-            owner_id: crossbeam::atomic::AtomicCell::new(None),
-            collides_with_projectiles: false,
-            has_hit: AtomicBool::new(false),
-            last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
-            gravity: GRAVITY,
-            left_owner: std::sync::atomic::AtomicBool::new(false),
-        };
+        let thrown = ThrownItemEntity::unowned(entity, GRAVITY);
 
         Self {
             thrown,
@@ -66,8 +57,8 @@ impl EggEntity {
 }
 
 impl EntityBase for EggEntity {
-    fn get_owner_id(&self) -> Option<i32> {
-        self.thrown.owner_id.load()
+    fn get_projectile(&self) -> Option<&crate::entity::projectile::Projectile> {
+        Some(&self.thrown.projectile)
     }
 
     fn init_data_tracker(&self) {
@@ -106,11 +97,7 @@ impl EntityBase for EggEntity {
         // Vanilla `ThrownEgg.onHitEntity`: a 0 damage `thrown(this, owner)` hit, for the knockback.
         if let ProjectileHit::Entity { ref entity, .. } = hit {
             let this = world.get_entity_by_id(self.get_entity().entity_id);
-            let owner = self
-                .thrown
-                .owner_id
-                .load()
-                .and_then(|id| world.get_entity_by_id(id));
+            let owner = self.thrown.projectile.get_owner(&self.thrown.entity);
             entity.damage_with_context(
                 entity.as_ref(),
                 0.0,
@@ -137,7 +124,7 @@ impl EntityBase for EggEntity {
         let mut hatching = to_spawn > 0;
         let mut hatching_type: &'static EntityType = &EntityType::CHICKEN;
 
-        let owner_id = self.thrown.owner_id.load();
+        let owner_id = self.thrown.projectile.get_owner_id(&self.thrown.entity);
         let entity_uuid = self.get_entity().entity_uuid;
         let variant_name = {
             let stack = self

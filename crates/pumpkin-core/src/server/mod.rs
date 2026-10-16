@@ -536,7 +536,39 @@ impl Server {
         Ok(())
     }
 
+    /// Copies the worlds' game time and default clocks into the level data, as vanilla's
+    /// `ServerLevelData` and `ServerClockManager` hold them when they are saved.
+    fn store_level_time(&self) {
+        let worlds = self.worlds.load();
+        let times: Vec<_> = worlds
+            .iter()
+            .map(|world| {
+                let time = world
+                    .level_time
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .clone();
+                (world.dimension.clone(), time)
+            })
+            .collect();
+        self.level_info.rcu(|level_info| {
+            let mut level_info = (**level_info).clone();
+            for (dimension, time) in &times {
+                if *dimension == Dimension::OVERWORLD {
+                    level_info.game_time = time.world_age;
+                }
+                if let Some(clock) = dimension.default_clock {
+                    level_info
+                        .world_clocks
+                        .insert(clock.to_string(), time.clock_state());
+                }
+            }
+            level_info
+        });
+    }
+
     pub fn save_world_info(&self) -> Result<(), WorldInfoError> {
+        self.store_level_time();
         let level_data = self.level_info.load();
         self.world_info_writer
             .write_world_info(&level_data, &self.basic_config.get_world_path())
@@ -777,6 +809,7 @@ impl Server {
         for world in self.worlds.load().iter() {
             world.shutdown().await;
         }
+        self.store_level_time();
         let level_data = self.level_info.load();
         // then lets save the world info
 

@@ -57,7 +57,7 @@ impl ArrowPickup {
 
 pub struct ArrowEntity {
     pub entity: Entity,
-    pub owner_id: Option<i32>,
+    pub projectile: super::Projectile,
     pub item_stack: RwLock<ItemStack>,
     pub base_damage: AtomicU64,
     pub pickup: ArrowPickup,
@@ -84,20 +84,16 @@ impl ArrowEntity {
     const GRAVITY: f64 = 0.05;
     const DESPAWN_TIME: u32 = 1200;
 
-    pub fn new(entity: Entity, owner_id: Option<i32>) -> Self {
+    pub fn new(entity: Entity) -> Self {
         let item_stack = ItemStack::new(1, Self::default_item(entity.entity_type));
-        Self::new_with_item(entity, owner_id, &item_stack, ArrowPickup::Disallowed)
+        Self::new_with_item(entity, &item_stack, ArrowPickup::Disallowed)
     }
 
-    pub fn new_with_item(
-        entity: Entity,
-        owner_id: Option<i32>,
-        item_stack: &ItemStack,
-        pickup: ArrowPickup,
-    ) -> Self {
+    /// An arrow without an owner.
+    pub fn new_with_item(entity: Entity, item_stack: &ItemStack, pickup: ArrowPickup) -> Self {
         Self {
             entity,
-            owner_id,
+            projectile: super::Projectile::new(),
             item_stack: RwLock::new(item_stack.copy_with_count(1)),
             base_damage: AtomicU64::new(Self::ARROW_BASE_DAMAGE.to_bits()),
             pickup,
@@ -139,7 +135,7 @@ impl ArrowEntity {
 
         Self {
             entity,
-            owner_id: Some(shooter.entity_id),
+            projectile: super::Projectile::owned_by(shooter),
             item_stack: RwLock::new(item_stack.copy_with_count(1)),
             base_damage: AtomicU64::new(Self::ARROW_BASE_DAMAGE.to_bits()),
             pickup,
@@ -488,8 +484,8 @@ impl EntityBase for ArrowEntity {
         Self::get_weapon_item(self)
     }
 
-    fn get_owner_id(&self) -> Option<i32> {
-        self.owner_id
+    fn get_projectile(&self) -> Option<&super::Projectile> {
+        Some(&self.projectile)
     }
 
     fn write_custom_nbt(&self, nbt: &mut pumpkin_nbt::compound::NbtCompound) {
@@ -731,6 +727,9 @@ impl EntityBase for ArrowEntity {
             velocity.x.atan2(velocity.z) as f32 * 57.295_776,
             velocity.y.atan2(len) as f32 * 57.295_776,
         );
+        // Vanilla `checkLeftOwner` before the move; `Projectile.tick`'s shoot event comes at
+        // the end of the flying tick there, here with it.
+        self.projectile.tick(entity);
 
         // Move arrow
         let new_pos = start_pos.add(&velocity);
@@ -941,7 +940,10 @@ impl EntityBase for ArrowEntity {
                 }
 
                 if block == &pumpkin_data::Block::TARGET
-                    && let Some(player) = self.owner_id.and_then(|id| world.get_player_by_id(id))
+                    && let Some(player) = self
+                        .projectile
+                        .get_owner(&self.entity)
+                        .and_then(|owner| world.get_player_by_id(owner.get_entity().entity_id))
                 {
                     player.trigger_advancement(
                         crate::entity::player::advancement::trigger::AdvancementTrigger::Bullseye,
@@ -994,7 +996,7 @@ impl EntityBase for ArrowEntity {
                     .unwrap_or_else(std::sync::PoisonError::into_inner)
                     .push(target_entity_id);
 
-                let owner_entity = self.owner_id.and_then(|id| world.get_entity_by_id(id));
+                let owner_entity = self.projectile.get_owner(&self.entity);
                 // Vanilla `damageSources().arrow(this, owner)`: the arrow hits, its owner (or the
                 // arrow itself when it has none) is responsible.
                 let damage_source = DamageSource {
@@ -1182,10 +1184,8 @@ impl ArrowEntity {
             return true;
         }
 
-        // Skip owner for initial frames (5 ticks)
-        if Some(other_ent.entity_id) == self.owner_id
-            && self_ent.tick_count.load(Ordering::Relaxed) < 5
-        {
+        // Vanilla `Projectile.canHitEntity`: not the owner's stack until it has left it.
+        if !self.projectile.can_hit_owner_stack(self_ent, other_ent) {
             return true;
         }
 

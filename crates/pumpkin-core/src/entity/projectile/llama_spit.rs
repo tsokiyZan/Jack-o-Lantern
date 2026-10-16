@@ -1,4 +1,4 @@
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::Ordering;
 
 use pumpkin_data::damage::DamageType;
 use pumpkin_util::math::vector3::Vector3;
@@ -23,15 +23,7 @@ pub struct LlamaSpitEntity {
 impl LlamaSpitEntity {
     #[must_use]
     pub const fn new(entity: Entity) -> Self {
-        let thrown = ThrownItemEntity {
-            entity,
-            owner_id: crossbeam::atomic::AtomicCell::new(None),
-            collides_with_projectiles: false,
-            has_hit: AtomicBool::new(false),
-            last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
-            gravity: LLAMA_SPIT_GRAVITY,
-            left_owner: std::sync::atomic::AtomicBool::new(false),
-        };
+        let thrown = ThrownItemEntity::unowned(entity, LLAMA_SPIT_GRAVITY);
 
         Self { thrown }
     }
@@ -47,23 +39,16 @@ impl LlamaSpitEntity {
         let z = owner_pos.z + offset * body_yaw_rad.cos();
         entity.pos.store(Vector3::new(x, y, z));
 
-        let thrown = ThrownItemEntity {
-            entity,
-            owner_id: crossbeam::atomic::AtomicCell::new(Some(shooter.entity_id)),
-            collides_with_projectiles: false,
-            has_hit: AtomicBool::new(false),
-            last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
-            gravity: LLAMA_SPIT_GRAVITY,
-            left_owner: std::sync::atomic::AtomicBool::new(false),
-        };
+        let thrown = ThrownItemEntity::unowned(entity, LLAMA_SPIT_GRAVITY);
+        thrown.projectile.set_owner(Some(shooter));
 
         Self { thrown }
     }
 }
 
 impl EntityBase for LlamaSpitEntity {
-    fn get_owner_id(&self) -> Option<i32> {
-        self.thrown.owner_id.load()
+    fn get_projectile(&self) -> Option<&crate::entity::projectile::Projectile> {
+        Some(&self.thrown.projectile)
     }
 
     fn tick(&self, caller: &dyn EntityBase, _server: &Server) {
@@ -94,10 +79,11 @@ impl EntityBase for LlamaSpitEntity {
         } = hit
         {
             let world = self.get_entity().world.load();
-            let owner_id = self.thrown.owner_id.load();
             // Vanilla `LlamaSpit.onHitEntity` only hurts for a living owner.
-            let Some(owner) = owner_id
-                .and_then(|id| world.get_entity_by_id(id))
+            let Some(owner) = self
+                .thrown
+                .projectile
+                .get_owner(&self.thrown.entity)
                 .filter(|owner| owner.get_living_entity().is_some())
             else {
                 return;

@@ -53,6 +53,9 @@ impl MobEntity {
     /// Vanilla `Mob.finalizeSpawn`: random follow range bonus and left-handedness.
     pub fn finalize_spawn_base(&self) {
         let mut rng = rand::rng();
+        // `getAttribute(FOLLOW_RANGE)`.
+        self.living_entity
+            .get_attribute_instance(&Attributes::FOLLOW_RANGE);
         let follow_range_changed = {
             let mut attributes = self
                 .living_entity

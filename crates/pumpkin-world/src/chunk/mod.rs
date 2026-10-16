@@ -82,6 +82,11 @@ pub struct ChunkData {
     pub dirty: AtomicBool,
     pub inhabited_time: AtomicU64,
     pub custom_data: std::sync::Mutex<NbtCompound>,
+    /// Vanilla `LastUpdate`: the game time the chunk was last saved at.
+    pub last_update: std::sync::atomic::AtomicI64,
+    /// Saved fields Pumpkin doesn't model yet (structure starts, post-processing, upgrade and
+    /// blending data, a proto chunk's entities), kept so a save loses none of them.
+    pub unmodelled_nbt: NbtCompound,
 }
 
 pub struct ChunkEntityData {
@@ -645,6 +650,8 @@ impl ChunkData {
             dirty: std::sync::atomic::AtomicBool::new(false),
             inhabited_time: std::sync::atomic::AtomicU64::new(0),
             custom_data: std::sync::Mutex::new(NbtCompound::new()),
+            last_update: std::sync::atomic::AtomicI64::new(0),
+            unmodelled_nbt: NbtCompound::new(),
         }
     }
 

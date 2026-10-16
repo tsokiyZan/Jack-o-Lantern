@@ -1,7 +1,6 @@
 use rand::{Rng, RngExt, rng};
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::sync::atomic::AtomicBool;
 use uuid::Uuid;
 
 use crate::block::blocks::carved_pumpkin::find_golem_pattern;
@@ -490,8 +489,7 @@ impl DispenserBlock {
             Self::projectile_spawn_position(ctx),
             ArrowEntity::entity_type_for_item(projectile.item),
         );
-        let arrow =
-            ArrowEntity::new_with_item(arrow_entity, None, &projectile, ArrowPickup::Allowed);
+        let arrow = ArrowEntity::new_with_item(arrow_entity, &projectile, ArrowPickup::Allowed);
         arrow.apply_on_projectile_spawned(&projectile);
 
         arrow.set_velocity(
@@ -764,15 +762,7 @@ impl DispenserBlock {
             Self::projectile_spawn_position(ctx),
             &EntityType::WIND_CHARGE,
         );
-        let thrown = ThrownItemEntity {
-            entity,
-            owner_id: crossbeam::atomic::AtomicCell::new(None),
-            collides_with_projectiles: false,
-            has_hit: AtomicBool::new(false),
-            last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
-            gravity: WIND_CHARGE_GRAVITY,
-            left_owner: std::sync::atomic::AtomicBool::new(false),
-        };
+        let thrown = ThrownItemEntity::unowned(entity, WIND_CHARGE_GRAVITY);
         Self::launch_thrown(
             ctx,
             &thrown,

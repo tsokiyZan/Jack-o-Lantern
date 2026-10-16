@@ -18,8 +18,8 @@ pub struct Worldborder {
     pub portal_teleport_boundary: i32,
     pub warning_blocks: i32,
     pub warning_time: i32,
-    pub damage_per_block: f32,
-    pub buffer: f32,
+    pub damage_per_block: f64,
+    pub buffer: f64,
 }
 
 impl Worldborder {
@@ -43,6 +43,47 @@ impl Worldborder {
             warning_time,
             damage_per_block: 0.0,
             buffer: 0.0,
+        }
+    }
+
+    /// From vanilla `WorldBorder.Settings` as saved; a border mid-move resumes its move.
+    #[must_use]
+    pub const fn from_saved(
+        saved: &pumpkin_world::world_info::data_files::WorldBorderData,
+    ) -> Self {
+        let moving = saved.lerp_time > 0;
+        Self {
+            center_x: saved.center_x,
+            center_z: saved.center_z,
+            old_diameter: saved.size,
+            new_diameter: if moving {
+                saved.lerp_target
+            } else {
+                saved.size
+            },
+            speed: if moving { saved.lerp_time } else { 0 },
+            portal_teleport_boundary: 29_999_984,
+            warning_blocks: saved.warning_blocks,
+            warning_time: saved.warning_time,
+            damage_per_block: saved.damage_per_block,
+            buffer: saved.safe_zone,
+        }
+    }
+
+    /// Vanilla `WorldBorder.Settings(worldBorder)`. Pumpkin doesn't move a border over time,
+    /// so it is saved at its target size.
+    #[must_use]
+    pub const fn to_saved(&self) -> pumpkin_world::world_info::data_files::WorldBorderData {
+        pumpkin_world::world_info::data_files::WorldBorderData {
+            center_x: self.center_x,
+            center_z: self.center_z,
+            damage_per_block: self.damage_per_block,
+            safe_zone: self.buffer,
+            warning_blocks: self.warning_blocks,
+            warning_time: self.warning_time,
+            size: self.new_diameter,
+            lerp_time: 0,
+            lerp_target: self.new_diameter,
         }
     }
 
@@ -102,11 +143,11 @@ impl Worldborder {
         world.broadcast_packet_all(&CSetBorderWarningDistance::new(self.warning_blocks.into()));
     }
 
-    pub const fn set_damage_buffer(&mut self, buffer: f32) {
+    pub const fn set_damage_buffer(&mut self, buffer: f64) {
         self.buffer = buffer;
     }
 
-    pub const fn set_damage_per_block(&mut self, damage: f32) {
+    pub const fn set_damage_per_block(&mut self, damage: f64) {
         self.damage_per_block = damage;
     }
 

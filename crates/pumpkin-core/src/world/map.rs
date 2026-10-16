@@ -70,6 +70,51 @@ impl MapData {
         }
     }
 
+    /// Vanilla `MapItemSavedData.addDecoration` for a decoration the map item carries in its
+    /// `map_decorations` (`tickCarriedBy`): where it lands on this map, if it does.
+    #[must_use]
+    pub fn item_decoration(
+        &self,
+        entry: &pumpkin_data::data_component_impl::MapDecorationEntry,
+        game_time: i64,
+    ) -> Option<MapDecoration> {
+        let decoration_type = pumpkin_data::map_decoration::MapDecorationType::from_name(
+            entry
+                .r#type
+                .strip_prefix("minecraft:")
+                .unwrap_or(&entry.r#type),
+        )?;
+        let scaling = (1 << self.scale) as f32;
+        let x_delta = (entry.x - f64::from(self.center_x)) as f32 / scaling;
+        let z_delta = (entry.z - f64::from(self.center_z)) as f32 / scaling;
+        // `calculateDecorationLocationAndType`, for a type other than the player.
+        if !is_inside_map(x_delta, z_delta) {
+            return None;
+        }
+        Some(MapDecoration {
+            icon_type: decoration_type.id as i32,
+            x: clamp_map_coordinate(x_delta),
+            z: clamp_map_coordinate(z_delta),
+            direction: self.calculate_rotation(f64::from(entry.rotation), game_time),
+            display_name: None,
+        })
+    }
+
+    /// Vanilla `MapItemSavedData.calculateRotation`.
+    fn calculate_rotation(&self, y_rot: f64, game_time: i64) -> i8 {
+        if self.dimension == Dimension::THE_NETHER {
+            let s = (game_time / 10) as i32;
+            return ((s.wrapping_mul(s).wrapping_mul(34_187_121) + s.wrapping_mul(121)) >> 15 & 15)
+                as i8;
+        }
+        let adjusted = if y_rot < 0.0 {
+            y_rot - 8.0
+        } else {
+            y_rot + 8.0
+        };
+        (adjusted * 16.0 / 360.0) as i8
+    }
+
     pub fn set_color(&mut self, x: usize, z: usize, color: u8) {
         if x < 128 && z < 128 {
             let idx = z * 128 + x;
@@ -138,4 +183,20 @@ pub struct MapDecoration {
     pub z: i8,
     pub direction: i8,
     pub display_name: Option<String>,
+}
+
+/// Vanilla `MapItemSavedData.isInsideMap`.
+fn is_inside_map(x_delta: f32, z_delta: f32) -> bool {
+    (-63.0..=63.0).contains(&x_delta) && (-63.0..=63.0).contains(&z_delta)
+}
+
+/// Vanilla `MapItemSavedData.clampMapCoordinate`.
+fn clamp_map_coordinate(delta: f32) -> i8 {
+    if delta <= -63.0 {
+        -128
+    } else if delta >= 63.0 {
+        127
+    } else {
+        (f64::from(delta * 2.0) + 0.5) as i8
+    }
 }

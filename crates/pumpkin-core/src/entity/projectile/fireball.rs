@@ -178,12 +178,8 @@ impl EntityBase for FireballEntity {
             .has_tag(&pumpkin_data::tag::EntityType::MINECRAFT_REDIRECTABLE_PROJECTILE)
     }
 
-    fn get_owner_id(&self) -> Option<i32> {
-        self.fireball.hurting.get_owner_id()
-    }
-
-    fn set_owner_id(&self, owner: Option<i32>) {
-        self.fireball.hurting.set_owner_id(owner);
+    fn get_projectile(&self) -> Option<&crate::entity::projectile::Projectile> {
+        Some(&self.fireball.hurting.thrown.projectile)
     }
 
     fn write_custom_nbt(&self, nbt: &mut NbtCompound) {
@@ -222,9 +218,7 @@ impl EntityBase for FireballEntity {
         let this = world.get_entity_by_id(self.get_entity().entity_id);
         // Vanilla `LargeFireball.onHitEntity`: `fireball(this, owner)` for 6.
         if let ProjectileHit::Entity { ref entity, .. } = hit {
-            let owner = self
-                .get_owner_id()
-                .and_then(|id| world.get_entity_by_id(id));
+            let owner = self.fireball.hurting.get_owner();
             let damage_source = DamageSource {
                 damage_type: Fireball::damage_type(owner.as_deref()),
                 direct: this.as_deref(),

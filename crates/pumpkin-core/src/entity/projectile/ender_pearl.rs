@@ -1,5 +1,3 @@
-use std::sync::atomic::AtomicBool;
-
 use crate::entity::projectile::ProjectileHit;
 use crate::{
     entity::{
@@ -27,15 +25,7 @@ impl EnderPearlEntity {
     pub fn new(entity: Entity) -> Self {
         entity.set_velocity(Vector3::new(0.0, 0.1, 0.0));
 
-        let thrown = ThrownItemEntity {
-            entity,
-            owner_id: crossbeam::atomic::AtomicCell::new(None),
-            collides_with_projectiles: false,
-            has_hit: AtomicBool::new(false),
-            last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
-            gravity: GRAVITY,
-            left_owner: std::sync::atomic::AtomicBool::new(false),
-        };
+        let thrown = ThrownItemEntity::unowned(entity, GRAVITY);
 
         Self { thrown }
     }
@@ -48,8 +38,8 @@ impl EnderPearlEntity {
 }
 
 impl EntityBase for EnderPearlEntity {
-    fn get_owner_id(&self) -> Option<i32> {
-        self.thrown.owner_id.load()
+    fn get_projectile(&self) -> Option<&crate::entity::projectile::Projectile> {
+        Some(&self.thrown.projectile)
     }
 
     fn tick(&self, caller: &dyn EntityBase, _server: &Server) {
@@ -71,11 +61,7 @@ impl EntityBase for EnderPearlEntity {
         let entity = self.get_entity();
         let world = entity.world.load();
 
-        let attacker = self
-            .thrown
-            .owner_id
-            .load()
-            .and_then(|id| world.get_entity_by_id(id));
+        let attacker = self.thrown.projectile.get_owner(&self.thrown.entity);
 
         // Spawn portal particles at hit position
         let hit_pos = hit.hit_pos();
@@ -100,7 +86,7 @@ impl EntityBase for EnderPearlEntity {
             );
         }
 
-        let owner_id = self.thrown.owner_id.load();
+        let owner = attacker.clone();
         let teleport_pos = entity.last_pos.load();
 
         if let (
@@ -123,8 +109,7 @@ impl EntityBase for EnderPearlEntity {
             );
         }
 
-        if let Some(owner_id) = owner_id
-            && let Some(owner) = world.get_entity_by_id(owner_id)
+        if let Some(owner) = owner
             && owner.get_entity().is_alive()
             && owner.get_living_entity().is_none_or(|living| {
                 living.health.load() > 0.0 && owner.get_entity().pose.load() != EntityPose::Sleeping

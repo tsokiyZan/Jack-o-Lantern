@@ -1,6 +1,6 @@
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 
-use crate::entity::projectile::{ProjectileHit, is_projectile};
+use crate::entity::projectile::{Projectile, ProjectileHit, is_projectile};
 use crate::{
     entity::{Entity, EntityBase, living::LivingEntity, player::Player},
     server::Server,
@@ -12,7 +12,8 @@ use pumpkin_util::math::vector3::Vector3;
 
 pub struct FishingBobberEntity {
     pub entity: Entity,
-    pub owner_id: i32,
+    /// Vanilla `FishingHook` saves none of it (`addAdditionalSaveData` is empty).
+    pub projectile: Projectile,
     pub hooked_entity_id: AtomicI32,
     pub in_ground: AtomicBool,
     pub has_hit: AtomicBool,
@@ -32,7 +33,7 @@ impl FishingBobberEntity {
 
         Self {
             entity,
-            owner_id: owner.living_entity.entity.entity_id,
+            projectile: Projectile::owned_by(&owner.living_entity.entity),
             hooked_entity_id: AtomicI32::new(0),
             in_ground: AtomicBool::new(false),
             has_hit: AtomicBool::new(false),
@@ -93,6 +94,8 @@ impl FishingBobberEntity {
     pub fn process_tick(&self, caller: &dyn EntityBase) {
         let entity = self.get_entity();
         let world = entity.world.load();
+        // `super.tick()`, first in vanilla `FishingHook.tick`.
+        self.projectile.tick(entity);
 
         if self.in_ground.load(Ordering::Relaxed) {
             return;
@@ -188,8 +191,9 @@ impl FishingBobberEntity {
         entity.set_pos(new_pos);
 
         let candidates = world.get_entities_at_box(&search_box);
+        let owner_id = self.projectile.get_owner_id(entity);
         for cand in candidates {
-            if cand.get_entity().entity_id == self.owner_id
+            if Some(cand.get_entity().entity_id) == owner_id
                 || cand.get_entity().entity_id == entity.entity_id
             {
                 continue;
@@ -215,7 +219,7 @@ impl FishingBobberEntity {
 
 impl EntityBase for FishingBobberEntity {
     fn get_owner_id(&self) -> Option<i32> {
-        Some(self.owner_id)
+        self.projectile.get_owner_id(&self.entity)
     }
 
     fn get_entity(&self) -> &Entity {

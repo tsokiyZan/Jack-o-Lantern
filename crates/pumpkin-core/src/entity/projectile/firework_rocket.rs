@@ -10,7 +10,7 @@ use pumpkin_util::{
     math::vector3::Vector3,
     random::{RandomGenerator, RandomImpl, get_seed, xoroshiro128::Xoroshiro},
 };
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU32, Ordering};
 
 const GRAVITY: f64 = 0.0;
 
@@ -30,15 +30,7 @@ impl FireworkRocketEntity {
             random.next_triangular(0.0, 0.002_297),
         ));
         Self {
-            entity: ThrownItemEntity {
-                entity,
-                owner_id: crossbeam::atomic::AtomicCell::new(None),
-                collides_with_projectiles: false,
-                has_hit: AtomicBool::new(false),
-                last_deflected_by: crossbeam::atomic::AtomicCell::new(None),
-                gravity: GRAVITY,
-                left_owner: std::sync::atomic::AtomicBool::new(false),
-            },
+            entity: ThrownItemEntity::unowned(entity, GRAVITY),
             life: 0.into(),
             life_time: (10 + random.next_bounded_i32(6) as u32 + random.next_bounded_i32(7) as u32)
                 .into(),
@@ -94,8 +86,8 @@ impl FireworkRocketEntity {
 }
 
 impl EntityBase for FireworkRocketEntity {
-    fn get_owner_id(&self) -> Option<i32> {
-        self.entity.owner_id.load()
+    fn get_projectile(&self) -> Option<&crate::entity::projectile::Projectile> {
+        Some(&self.entity.projectile)
     }
 
     fn tick(&self, caller: &dyn EntityBase, _server: &Server) {
@@ -105,7 +97,7 @@ impl EntityBase for FireworkRocketEntity {
         let world = entity.world.load();
         let mut velocity = entity.velocity.load();
 
-        if let Some(shooter_id) = self.entity.owner_id.load() {
+        if let Some(shooter_id) = self.entity.projectile.get_owner_id(&self.entity.entity) {
             if let Some(shooter) = world.get_entity_by_id(shooter_id) {
                 let shooter = shooter.get_entity();
 

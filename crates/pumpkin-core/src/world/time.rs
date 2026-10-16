@@ -101,6 +101,37 @@ impl LevelTime {
         }
     }
 
+    /// The game time and the dimension's default clock as the level data saved them.
+    #[must_use]
+    pub fn from_level_data(
+        level_data: &pumpkin_world::world_info::LevelData,
+        dimension: &pumpkin_data::dimension::Dimension,
+    ) -> Self {
+        let mut time = Self::new();
+        time.world_age = level_data.game_time;
+        if let Some(clock) = dimension
+            .default_clock
+            .and_then(|clock| level_data.world_clocks.get(clock))
+        {
+            time.time_of_day = clock.total_ticks;
+            time.partial_tick = clock.partial_tick;
+            time.rate = clock.rate;
+            time.paused = clock.paused;
+        }
+        time
+    }
+
+    /// The default clock's state as vanilla `ClockState` saves it.
+    #[must_use]
+    pub const fn clock_state(&self) -> pumpkin_world::world_info::data_files::DimensionClock {
+        pumpkin_world::world_info::data_files::DimensionClock {
+            total_ticks: self.time_of_day,
+            partial_tick: self.partial_tick,
+            rate: self.rate,
+            paused: self.paused,
+        }
+    }
+
     pub const fn load_from(&mut self, time_of_day: i64, world_age: i64) {
         self.time_of_day = time_of_day;
         self.world_age = world_age;

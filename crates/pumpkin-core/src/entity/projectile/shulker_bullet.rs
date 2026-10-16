@@ -15,6 +15,7 @@ use uuid::Uuid;
 
 use crate::enchantment::EnchantmentHelper;
 use crate::entity::damage_source::DamageSource;
+use crate::entity::entity_reference::EntityReference;
 use crate::entity::mob::shulker::Axis;
 use crate::entity::{Entity, EntityBase};
 use crate::server::Server;
@@ -32,9 +33,9 @@ const SPEED: f64 = 0.15;
 
 pub struct ShulkerBulletEntity {
     pub entity: Entity,
-    pub owner_id: i32,
-    /// Entity id of the final target; -1 = no target, 0+ = valid target
-    target_id: AtomicI32,
+    pub projectile: crate::entity::projectile::Projectile,
+    /// Vanilla `ShulkerBullet.finalTarget`.
+    final_target: EntityReference,
     /// Current movement direction (direction ordinal, or `DIR_NONE`)
     current_dir: AtomicU8,
     /// How many ticks remain on the current axis segment
@@ -74,10 +75,14 @@ impl ShulkerBulletEntity {
             &EntityType::SHULKER_BULLET,
         );
 
+        let final_target = EntityReference::none();
+        if let Some(target) = world.get_entity_by_id(target_id) {
+            final_target.set(Some(target.get_entity()));
+        }
         let bullet = Self {
             entity,
-            owner_id: owner.entity_id,
-            target_id: AtomicI32::new(target_id),
+            projectile: crate::entity::projectile::Projectile::owned_by(owner),
+            final_target,
             current_dir: AtomicU8::new(DIR_UP),
             flight_steps: AtomicI32::new(0),
             target_delta_x: AtomicCell::new(0.0),
@@ -259,8 +264,8 @@ impl ShulkerBulletEntity {
     pub const fn orphan(entity: Entity) -> Self {
         Self {
             entity,
-            owner_id: 0,
-            target_id: AtomicI32::new(-1),
+            projectile: crate::entity::projectile::Projectile::new(),
+            final_target: EntityReference::none(),
             current_dir: AtomicU8::new(DIR_NONE),
             flight_steps: AtomicI32::new(0),
             target_delta_x: AtomicCell::new(0.0),
@@ -278,8 +283,42 @@ impl EntityBase for ShulkerBulletEntity {
         true
     }
 
-    fn get_owner_id(&self) -> Option<i32> {
-        Some(self.owner_id)
+    fn get_projectile(&self) -> Option<&crate::entity::projectile::Projectile> {
+        Some(&self.projectile)
+    }
+
+    /// Vanilla `ShulkerBullet.addAdditionalSaveData`, after `Projectile`'s.
+    fn write_custom_nbt(&self, nbt: &mut pumpkin_nbt::compound::NbtCompound) {
+        if let Some(target) = self.final_target.uuid() {
+            nbt.put_uuid("Target", target);
+        }
+        let dir = self.current_dir.load(Ordering::Relaxed);
+        if dir != DIR_NONE {
+            nbt.put_int("Dir", i32::from(dir));
+        }
+        nbt.put_int("Steps", self.flight_steps.load(Ordering::Relaxed));
+        nbt.put_double("TXD", self.target_delta_x.load());
+        nbt.put_double("TYD", self.target_delta_y.load());
+        nbt.put_double("TZD", self.target_delta_z.load());
+    }
+
+    /// Vanilla `ShulkerBullet.readAdditionalSaveData`.
+    fn read_custom_nbt(&self, nbt: &pumpkin_nbt::compound::NbtCompound) {
+        self.flight_steps
+            .store(nbt.get_int("Steps").unwrap_or(0), Ordering::Relaxed);
+        self.target_delta_x
+            .store(nbt.get_double("TXD").unwrap_or(0.0));
+        self.target_delta_y
+            .store(nbt.get_double("TYD").unwrap_or(0.0));
+        self.target_delta_z
+            .store(nbt.get_double("TZD").unwrap_or(0.0));
+        let dir = nbt
+            .get_int("Dir")
+            .and_then(|dir| u8::try_from(dir).ok())
+            .filter(|dir| *dir <= DIR_EAST)
+            .unwrap_or(DIR_NONE);
+        self.current_dir.store(dir, Ordering::Relaxed);
+        self.final_target.set_uuid(nbt.get_uuid("Target"));
     }
 
     fn get_entity(&self) -> &Entity {
@@ -332,6 +371,8 @@ impl EntityBase for ShulkerBulletEntity {
         if self.has_hit.load(Ordering::Relaxed) {
             return;
         }
+        // `super.tick()`, first in vanilla `ShulkerBullet.tick`.
+        self.projectile.tick(&self.entity);
 
         // Discard bullet after 150 ticks if it never hits anything
         let age = self.age.fetch_add(1, Ordering::Relaxed) + 1;
@@ -362,28 +403,24 @@ impl EntityBase for ShulkerBulletEntity {
         let entity = &self.entity;
         let world = entity.world.load();
 
-        let target_id = self.target_id.load(Ordering::Relaxed);
-        let target_opt = if target_id >= 0 {
-            world.get_entity_by_id(target_id)
-        } else {
-            None
-        };
+        let has_target = self.final_target.uuid().is_some();
+        let target_opt = self.final_target.get(&world);
 
         // Apply gravity only if target is null, dead, or a spectator.
         let target_alive = target_opt
             .as_ref()
             .is_some_and(|t| t.get_entity().is_alive());
 
-        if !target_alive && target_id >= 0 {
+        if !target_alive && has_target {
             // Target ID is set but entity was not found (dead/left the world).
             // Only permanently clear the target when we're sure it's gone.
             if let Some(t) = &target_opt {
                 if !t.get_entity().is_alive() {
-                    self.target_id.store(-1, Ordering::Relaxed);
+                    self.final_target.set(None);
                 }
             } else {
                 // Not found -> clear target
-                self.target_id.store(-1, Ordering::Relaxed);
+                self.final_target.set(None);
             }
         }
 
@@ -465,7 +502,7 @@ impl EntityBase for ShulkerBulletEntity {
                 continue;
             }
             // Never hit the owner shulker
-            if he.entity_id == self.owner_id {
+            if self.projectile.owned_by_entity(he) {
                 continue;
             }
             // Must be alive
@@ -485,8 +522,9 @@ impl EntityBase for ShulkerBulletEntity {
             }
 
             // Vanilla `mobProjectile(this, livingOwner)` for 4.
-            let owner_arc = world
-                .get_entity_by_id(self.owner_id)
+            let owner_arc = self
+                .projectile
+                .get_owner(&self.entity)
                 .filter(|owner| owner.get_living_entity().is_some());
             let damage_source = DamageSource {
                 damage_type: DamageType::MOB_PROJECTILE,

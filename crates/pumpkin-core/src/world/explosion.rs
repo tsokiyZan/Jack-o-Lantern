@@ -640,12 +640,14 @@ impl Explosion {
                 .entity_type
                 .has_tag(&tag::EntityType::MINECRAFT_REDIRECTABLE_PROJECTILE)
             {
-                entity_base.set_owner_id(
-                    self.damage_source
-                        .causing
-                        .as_ref()
-                        .map(|causing| causing.get_entity().entity_id),
-                );
+                if let Some(projectile) = entity_base.get_projectile() {
+                    projectile.set_owner(
+                        self.damage_source
+                            .causing
+                            .as_ref()
+                            .map(|causing| causing.get_entity()),
+                    );
+                }
             } else if let Some(player) = entity_base.get_player()
                 && !player.is_spectator()
                 && !(player.is_creative() && player.is_flying())
@@ -764,7 +766,7 @@ impl Explosion {
                     .then_some(self.radius),
                 position: Some(pos.to_centered_f64()),
                 this_entity: self.source.as_ref().map(|s| s.get_entity().entity_type),
-                world_time: world.level_info.load().day_time as u64,
+                world_time: world.get_time_of_day() as u64,
                 is_raining: Some(world.is_raining()),
                 is_thundering: Some(world.is_thundering()),
                 ..Default::default()

@@ -98,6 +98,9 @@ const PROJECTILE_TYPES: [&EntityType; 19] = [
     &EntityType::FISHING_BOBBER,
 ];
 
+/// Vanilla `LivingEntity.SPEED_MODIFIER_POWDER_SNOW_ID`.
+const SPEED_MODIFIER_POWDER_SNOW_ID: &str = "minecraft:powder_snow";
+
 pub struct LivingEntity {
     /// The underlying entity object, providing basic entity information and functionality.
     pub entity: Entity,
@@ -313,17 +316,14 @@ impl LivingEntity {
         };
         let mut max_health: f32 = 20.0; // Overridden by attribute base below
         Self {
-            // Populate local attribute instances from the default registry and get initial vars
+            // Vanilla `AttributeMap`: instances are made from the type's supplier on first use.
             attributes: {
-                let mut m = FxHashMap::default();
-
                 for (attr, base) in entity.entity_type.attributes {
                     if attr.id == Attributes::MAX_HEALTH.id {
                         max_health = *base as f32;
                     }
-                    m.insert(attr.id, AttributeInstance::new(*base));
                 }
-                std::sync::RwLock::new(m)
+                std::sync::RwLock::new(FxHashMap::default())
             },
             health: AtomicCell::new(max_health), // Initial health value from attributes
             entity,
@@ -525,9 +525,17 @@ impl LivingEntity {
                 (Attributes::ATTACK_SPEED, speed_modifiers),
                 (Attributes::ATTACK_DAMAGE, damage_modifiers),
             ] {
-                let instance = attributes
-                    .entry(attribute.id)
-                    .or_insert_with(|| AttributeInstance::new(attribute.default_value));
+                // Vanilla only removes modifiers from an instance that exists, and makes one to
+                // add them to.
+                if modifiers.is_empty() && !attributes.contains_key(&attribute.id) {
+                    continue;
+                }
+                let instance = attributes.entry(attribute.id).or_insert_with(|| {
+                    AttributeInstance::new(
+                        self.supplier_base_value(&attribute)
+                            .unwrap_or(attribute.default_value),
+                    )
+                });
                 if instance.modifiers == modifiers {
                     continue;
                 }
@@ -895,24 +903,15 @@ impl LivingEntity {
             .unwrap_or_else(std::sync::PoisonError::into_inner);
 
         let inst = map.entry(attribute.id).or_insert_with(|| {
-            let base = self
-                .entity
-                .entity_type
-                .attributes
-                .iter()
-                .find(|a| a.0.id == attribute.id)
-                .map_or_else(
-                    || {
-                        tracing::debug!(
-                            "Entity type {} has no base value for attribute {}; falling back to default {}",
-                            self.entity.entity_type.resource_name,
-                            attribute.name,
-                            attribute.default_value,
-                        );
-                        attribute.default_value
-                    },
-                    |a| a.1,
+            let base = self.supplier_base_value(attribute).unwrap_or_else(|| {
+                tracing::debug!(
+                    "Entity type {} has no base value for attribute {}; falling back to default {}",
+                    self.entity.entity_type.resource_name,
+                    attribute.name,
+                    attribute.default_value,
                 );
+                attribute.default_value
+            });
             AttributeInstance::new(base)
         });
 
@@ -920,15 +919,122 @@ impl LivingEntity {
         inst.dirty.store(true, Ordering::Relaxed);
     }
 
-    /// Returns the computed value for `attribute` using the local instance, falling back
-    /// to `attribute.default_value` if no local instance exists.
+    /// Vanilla `AttributeMap.getValue`: the instance's value, or the type's base value for an
+    /// attribute nothing has touched yet (falling back to `attribute.default_value`). Doesn't
+    /// make an instance.
     pub fn get_attribute_value(&self, attribute: &Attributes) -> f64 {
         let map = self
             .attributes
             .read()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        map.get(&attribute.id)
-            .map_or(attribute.default_value, AttributeInstance::value)
+        map.get(&attribute.id).map_or_else(
+            || {
+                self.supplier_base_value(attribute)
+                    .unwrap_or(attribute.default_value)
+            },
+            AttributeInstance::value,
+        )
+    }
+
+    /// Vanilla `AttributeSupplier.getBaseValue`: the entity type's base for `attribute`, if the
+    /// type has it.
+    fn supplier_base_value(&self, attribute: &Attributes) -> Option<f64> {
+        self.entity
+            .entity_type
+            .attributes
+            .iter()
+            .find(|a| a.0.id == attribute.id)
+            .map(|a| a.1)
+    }
+
+    /// Vanilla `LivingEntity.removeFrost` then `tryAddFrost`, from `aiStep`: the powder snow
+    /// slowdown follows how frozen the entity is.
+    fn update_frost(&self) {
+        // `removeFrost`: `getAttribute(MOVEMENT_SPEED)` makes the instance every tick.
+        if !self.get_attribute_instance(&Attributes::MOVEMENT_SPEED) {
+            return;
+        }
+        let mut changed = false;
+        {
+            let mut map = self
+                .attributes
+                .write()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            if let Some(speed) = map.get_mut(&Attributes::MOVEMENT_SPEED.id)
+                && speed.get_modifier(SPEED_MODIFIER_POWDER_SNOW_ID).is_some()
+            {
+                speed.remove_modifier(SPEED_MODIFIER_POWDER_SNOW_ID);
+                speed.dirty.store(true, Ordering::Relaxed);
+                changed = true;
+            }
+        }
+        // `tryAddFrost`.
+        let ticks_frozen = self.entity.frozen_ticks.load(Ordering::Relaxed);
+        if !self.entity.get_block_state_on_legacy().is_air() && ticks_frozen > 0 {
+            // `getPercentFrozen`.
+            let percent_frozen =
+                ticks_frozen.min(Entity::MAX_FROZEN_TICKS) as f32 / Entity::MAX_FROZEN_TICKS as f32;
+            let slow_amount = -0.05f32 * percent_frozen;
+            self.update_attribute(&Attributes::MOVEMENT_SPEED, |speed| {
+                speed.add_or_replace_modifier(Modifier {
+                    id: SPEED_MODIFIER_POWDER_SNOW_ID.to_string(),
+                    amount: f64::from(slow_amount),
+                    operation: ModifierOperation::Add,
+                });
+            });
+            changed = true;
+        }
+        if changed {
+            crate::entity::attributes::send_attribute_updates_for_living(
+                self,
+                vec![Attributes::MOVEMENT_SPEED],
+            );
+        }
+    }
+
+    /// Vanilla `AttributeMap.hasAttribute`: an instance, or a base value from the type.
+    pub fn has_attribute(&self, attribute: &Attributes) -> bool {
+        self.attributes
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .contains_key(&attribute.id)
+            || self.supplier_base_value(attribute).is_some()
+    }
+
+    /// Vanilla `AttributeMap.resetBaseValue`: back to the type's base value, without making an
+    /// instance. False when the type has no such attribute.
+    pub fn reset_attribute_base(&self, attribute: &Attributes) -> bool {
+        let Some(base) = self.supplier_base_value(attribute) else {
+            return false;
+        };
+        if let Some(instance) = self
+            .attributes
+            .write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get_mut(&attribute.id)
+        {
+            instance.base_value = base;
+            instance.dirty.store(true, Ordering::Relaxed);
+        }
+        true
+    }
+
+    /// Vanilla `AttributeMap.getInstance`: makes the instance from the type's supplier on first
+    /// use, which also puts it in the saved `attributes`. False when the type has no such
+    /// attribute.
+    pub fn get_attribute_instance(&self, attribute: &Attributes) -> bool {
+        let mut map = self
+            .attributes
+            .write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if map.contains_key(&attribute.id) {
+            return true;
+        }
+        let Some(base) = self.supplier_base_value(attribute) else {
+            return false;
+        };
+        map.insert(attribute.id, AttributeInstance::new(base));
+        true
     }
 
     /// Vanilla `LivingEntity.getSpeed`, which `Player.getSpeed` replaces with the
@@ -960,12 +1066,8 @@ impl LivingEntity {
         }
 
         // Fall back to registry base value if no local instance exists
-        self.entity
-            .entity_type
-            .attributes
-            .iter()
-            .find(|a| a.0.id == attribute.id)
-            .map_or(attribute.default_value, |a| a.1)
+        self.supplier_base_value(attribute)
+            .unwrap_or(attribute.default_value)
     }
 
     /// Update or insert the base value for an attribute on this entity.
@@ -2478,7 +2580,7 @@ impl LivingEntity {
                 killer_entity: killer.map(|c| c.get_entity().entity_type),
                 direct_killer_entity: source.map(|s| s.get_entity().entity_type),
                 position: Some(self.entity.pos.load()),
-                world_time: world.level_info.load().day_time as u64,
+                world_time: world.get_time_of_day() as u64,
                 damage_type: Some(damage_type),
                 tool,
                 is_raining: Some(is_raining),
@@ -4018,7 +4120,7 @@ impl LivingEntity {
         }
 
         if dmg_to_health > 0.0 || absorbed_damage > 0.0 {
-            let current_tick = world.level_info.load().day_time;
+            let current_tick = world.get_time_of_day();
             let fall_location = FallLocation::get_current_fall_location(self, &world);
             let fall_distance = self.fall_distance.load();
 
@@ -4296,6 +4398,7 @@ impl EntityBase for LivingEntity {
             }
             // Vanilla-like order: freeze logic runs after movement/collisions.
             self.entity.tick_frozen(caller);
+            self.update_frost();
         } else if is_alive {
             // A player travels in `Player::tick_server_travel`, after the other entities.
             let suffocating = self.entity.tick_block_collisions(caller);
@@ -4307,6 +4410,7 @@ impl EntityBase for LivingEntity {
             self.push_entities(caller);
 
             self.entity.tick_frozen(caller);
+            self.update_frost();
         }
 
         // The end of vanilla `LivingEntity.tick`.
