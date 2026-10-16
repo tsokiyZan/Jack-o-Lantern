@@ -2368,6 +2368,27 @@ pub fn first_passenger_player(mob: &MobEntity) -> Option<Arc<dyn EntityBase>> {
         .filter(|passenger| passenger.get_player().is_some())
 }
 
+/// The rotation vanilla's `tickRidden` overrides end with: `setRot(y_rot, x_rot)`, then
+/// `yRotO = yBodyRot = yHeadRot = getYRot()`.
+pub fn set_ridden_rotation(entity: &Entity, y_rot: f32, x_rot: f32) {
+    let y_rot = y_rot % 360.0;
+    entity.yaw.store(y_rot);
+    entity.set_pitch(x_rot % 360.0);
+    entity.body_yaw.store(y_rot);
+    entity.head_yaw.store(y_rot);
+}
+
+/// Vanilla `AbstractHorse.tickRidden` on the server, which camels share: the horse faces
+/// where its rider looks. The rider's jump it runs is the steering client's.
+pub fn horse_tick_ridden(entity: &Entity, controller: &Player) {
+    let controller_entity = controller.get_entity();
+    set_ridden_rotation(
+        entity,
+        controller_entity.yaw.load(),
+        controller_entity.pitch.load() * 0.5,
+    );
+}
+
 /// Reads the `Saddle` tag Pumpkin wrote before saddles were equipment. Like vanilla's data
 /// fixer, it becomes a saddle in the saddle slot that always drops.
 pub fn read_legacy_saddle(mob: &MobEntity, nbt: &NbtCompound) {

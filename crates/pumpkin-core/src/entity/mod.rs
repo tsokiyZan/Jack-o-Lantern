@@ -2398,8 +2398,9 @@ impl Entity {
             Some(final_move),
         );
 
-        // `checkFallDamage` only runs on the authoritative side, the client for a player.
-        if !is_player
+        // `checkFallDamage` only runs on the authoritative side, the client for a player or a
+        // vehicle a player steers.
+        if !caller.is_client_authoritative()
             && let Some(living) = caller.get_living_entity()
             && caller.get_mob().is_none_or(mob::Mob::checks_fall_damage)
         {
@@ -2407,7 +2408,9 @@ impl Entity {
             living.fall(caller, final_move.y, on_ground, false);
         }
 
-        self.restitute_movement_after_collisions(caller, motion, final_move);
+        if caller.can_simulate_movement() {
+            self.restitute_movement_after_collisions(caller, motion, final_move);
+        }
 
         // A player's steps are played from its movement packets instead.
         if !is_player {
@@ -4138,6 +4141,16 @@ impl Entity {
     /// the start of this entity's last tick (vanilla's `lastKnownSpeed`).
     pub fn has_moved_horizontally_recently(&self) -> bool {
         self.movement.load().horizontal_length() > f64::from(1.0E-5f32)
+    }
+
+    /// Vanilla `getRootVehicle` for an entity that rides: the bottom of its stack.
+    #[must_use]
+    pub fn root_vehicle(&self) -> Option<Arc<dyn EntityBase>> {
+        let mut root = self.get_vehicle()?;
+        while let Some(vehicle) = root.get_entity().get_vehicle() {
+            root = vehicle;
+        }
+        Some(root)
     }
 
     /// The id of vanilla's `getRootVehicle`: the bottom of the stack this entity rides in.

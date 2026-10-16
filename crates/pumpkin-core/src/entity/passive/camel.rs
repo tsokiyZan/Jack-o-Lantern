@@ -1,6 +1,7 @@
 use crate::entity::ai::util::goal_utils;
 use crate::entity::mob::{
-    first_passenger_player, is_player_holding, mob_controlling_passenger, read_legacy_saddle,
+    first_passenger_player, horse_tick_ridden, is_player_holding, mob_controlling_passenger,
+    read_legacy_saddle,
 };
 use crate::entity::passive::animal::horse_can_parent;
 use std::sync::{
@@ -197,6 +198,10 @@ impl Mob for CamelEntity {
     /// Vanilla `Camel.getEquipSound`.
     fn equip_sound(&self, slot: &EquipmentSlot) -> Option<Sound> {
         (*slot == EquipmentSlot::SADDLE).then_some(Sound::EntityCamelSaddle)
+    }
+
+    fn tick_ridden(&self, controller: &Player) {
+        horse_tick_ridden(self.get_entity(), controller);
     }
 
     fn get_mob_entity(&self) -> &MobEntity {

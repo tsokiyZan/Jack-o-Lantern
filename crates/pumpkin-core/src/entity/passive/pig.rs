@@ -1,5 +1,6 @@
 use crate::entity::mob::{
     first_passenger_player, is_player_holding, mob_controlling_passenger, read_legacy_saddle,
+    set_ridden_rotation,
 };
 use std::sync::{
     Arc, Weak,
@@ -253,6 +254,17 @@ impl Mob for PigEntity {
         }
     }
 
+    /// Vanilla `Pig.tickRidden`.
+    fn tick_ridden(&self, controller: &Player) {
+        let controller_entity = controller.get_entity();
+        set_ridden_rotation(
+            self.get_entity(),
+            controller_entity.yaw.load(),
+            controller_entity.pitch.load() * 0.5,
+        );
+        self.steering.tick_boost();
+    }
+
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
     }
@@ -311,7 +323,11 @@ impl Mob for PigEntity {
 
 impl ItemSteerable for PigEntity {
     fn boost(&self) -> bool {
-        self.steering.boost()
+        self.steering.boost(
+            &mut self.get_random(),
+            self.get_entity(),
+            pumpkin_data::tracked_data::pig::DATA_BOOST_TIME,
+        )
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

@@ -7,14 +7,14 @@ use crate::entity::mob::equipment::is_equippable_in_slot;
 use crate::entity::mob::ghast::{
     GhastMoveControl, RAD_TO_DEG, RandomFloatAroundGoal, face_movement_direction,
 };
-use crate::entity::mob::{first_passenger_player, mob_controlling_passenger};
+use crate::entity::mob::{first_passenger_player, mob_controlling_passenger, set_ridden_rotation};
 use crate::entity::passive::happy_ghast_ai;
 use pumpkin_data::attributes::Attributes;
 use pumpkin_data::data_component_impl::EquipmentSlot;
 use pumpkin_util::math::boundingbox::BoundingBox;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
-use pumpkin_util::math::{atan2, wrap_degrees_90};
+use pumpkin_util::math::{atan2, wrap_degrees, wrap_degrees_90};
 use std::sync::{
     Arc,
     atomic::{AtomicBool, AtomicI32, Ordering},
@@ -385,6 +385,15 @@ impl Mob for HappyGhastEntity {
         if let Some(timeout) = nbt.get_int("still_timeout") {
             self.set_server_still_timeout(timeout);
         }
+    }
+
+    /// Vanilla `HappyGhast.tickRidden`: turns part of the way to where the rider looks.
+    fn tick_ridden(&self, controller: &Player) {
+        let entity = self.get_entity();
+        let controller_entity = controller.get_entity();
+        let y_rot = entity.yaw.load();
+        let y_rot = y_rot + wrap_degrees(controller_entity.yaw.load() - y_rot) * 0.08;
+        set_ridden_rotation(entity, y_rot, controller_entity.pitch.load() * 0.5);
     }
 
     fn get_mob_entity(&self) -> &MobEntity {

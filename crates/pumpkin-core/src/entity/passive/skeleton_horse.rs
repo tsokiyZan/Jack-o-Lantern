@@ -1,4 +1,4 @@
-use crate::entity::mob::{first_passenger_player, mob_controlling_passenger};
+use crate::entity::mob::{first_passenger_player, horse_tick_ridden, mob_controlling_passenger};
 use crate::entity::passive::abstract_horse::add_abstract_horse_goals;
 use crate::entity::passive::abstract_horse::{AbstractHorse, abstract_horse_mob_interact};
 use std::sync::{
@@ -389,6 +389,10 @@ impl Mob for SkeletonHorseEntity {
     /// Vanilla `AbstractHorse.getEquipSound`.
     fn equip_sound(&self, slot: &EquipmentSlot) -> Option<Sound> {
         (*slot == EquipmentSlot::SADDLE).then_some(Sound::EntityHorseSaddle)
+    }
+
+    fn tick_ridden(&self, controller: &Player) {
+        horse_tick_ridden(self.get_entity(), controller);
     }
 
     fn get_mob_entity(&self) -> &MobEntity {

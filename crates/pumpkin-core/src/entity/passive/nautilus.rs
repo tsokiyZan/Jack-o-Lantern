@@ -33,7 +33,9 @@ use crate::entity::ai::control::smooth_swimming_move_control::SmoothSwimmingMove
 use crate::entity::ai::pathfinder::{Navigator, WaterBoundPathNavigation, node::PathType};
 use crate::entity::breath::BreathManager;
 use crate::entity::mob::spawn::SpawnGroupData;
-use crate::entity::mob::{first_passenger_player, mob_controlling_passenger, mob_hurt_server};
+use crate::entity::mob::{
+    first_passenger_player, mob_controlling_passenger, mob_hurt_server, set_ridden_rotation,
+};
 use crate::entity::r#type::from_type;
 use crate::entity::{
     Entity, EntityBase,
@@ -49,6 +51,7 @@ use crate::entity::{
     player::Player,
 };
 use crate::world::World;
+use pumpkin_util::math::wrap_degrees;
 
 /// Vanilla `AbstractNautilus.SMALL_RESTRICTION_RADIUS`.
 const SMALL_RESTRICTION_RADIUS: i32 = 16;
@@ -499,6 +502,15 @@ impl CustomSound for NautilusEntity {
 }
 
 impl Mob for NautilusEntity {
+    /// Vanilla `AbstractNautilus.tickRidden`: turns part of the way to where the rider looks.
+    fn tick_ridden(&self, controller: &Player) {
+        let entity = self.get_entity();
+        let controller_entity = controller.get_entity();
+        let y_rot = entity.yaw.load();
+        let y_rot = y_rot + wrap_degrees(controller_entity.yaw.load() - y_rot) * 0.5;
+        set_ridden_rotation(entity, y_rot, controller_entity.pitch.load() * 0.5);
+    }
+
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
     }
@@ -626,9 +638,6 @@ impl Mob for NautilusEntity {
     }
 
     /// Vanilla `AbstractNautilus.getControllingPassenger`.
-    // TODO: vanilla `LivingEntity.travelRidden` and `AbstractNautilus.tickRidden`; Pumpkin
-    // takes a player-steered vehicle's movement from `SMoveVehicle` and keeps running its
-    // AI, where vanilla stops the AI and travel while the client steers.
     fn get_controlling_passenger(&self) -> Option<Arc<dyn EntityBase>> {
         if self.is_saddled()
             && let Some(player) = first_passenger_player(&self.mob_entity)
