@@ -1150,6 +1150,11 @@ impl MobEntity {
 }
 
 pub trait Mob: EntityBase + Send + Sync {
+    /// Vanilla `isPickable` for a mob: `LivingEntity`'s "not removed" unless overridden.
+    fn is_pickable(&self) -> bool {
+        !self.get_entity().is_removed()
+    }
+
     /// Vanilla `LivingEntity.getAgeScale`: babies are half size unless a mob says
     /// otherwise.
     fn age_scale(&self) -> f32 {
@@ -2578,7 +2583,7 @@ impl<T: Mob + Send + 'static> EntityBase for T {
     }
 
     fn can_hit(&self) -> bool {
-        !self.get_entity().is_removed()
+        self.is_pickable()
     }
 
     fn damage_with_context(

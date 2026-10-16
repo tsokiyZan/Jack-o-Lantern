@@ -519,6 +519,14 @@ pub trait EntityBase: Send + Sync + std::any::Any {
         self.get_living_entity().is_some() && !self.get_entity().is_removed()
     }
 
+    /// Vanilla `canBeHitByProjectile`: alive and pickable.
+    fn can_be_hit_by_projectile(&self) -> bool {
+        let alive = self
+            .get_living_entity()
+            .map_or_else(|| self.get_entity().is_alive(), LivingEntity::is_alive);
+        alive && self.can_hit()
+    }
+
     fn is_flutterer(&self) -> bool {
         false
     }

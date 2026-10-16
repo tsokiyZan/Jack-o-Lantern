@@ -273,6 +273,11 @@ impl ShulkerBulletEntity {
 }
 
 impl EntityBase for ShulkerBulletEntity {
+    /// Vanilla `isPickable`.
+    fn can_hit(&self) -> bool {
+        true
+    }
+
     fn get_owner_id(&self) -> Option<i32> {
         Some(self.owner_id)
     }

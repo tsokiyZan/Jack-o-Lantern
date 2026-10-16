@@ -143,6 +143,11 @@ impl InteractionEntity {
 }
 
 impl EntityBase for InteractionEntity {
+    /// Vanilla `Interaction.canBeHitByProjectile`.
+    fn can_be_hit_by_projectile(&self) -> bool {
+        false
+    }
+
     fn write_custom_nbt(&self, nbt: &mut NbtCompound) {
         nbt.put_float(
             "width",

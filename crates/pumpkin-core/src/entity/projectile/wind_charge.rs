@@ -1,5 +1,6 @@
 use pumpkin_data::damage::DamageType;
 use pumpkin_data::tag;
+use pumpkin_data::tag::Taggable;
 use pumpkin_util::math::vector3::Vector3;
 use std::sync::LazyLock;
 use std::{
@@ -130,6 +131,13 @@ impl WindChargeEntity {
 }
 
 impl EntityBase for WindChargeEntity {
+    /// Vanilla `Projectile.isPickable`: only redirectable projectiles.
+    fn can_hit(&self) -> bool {
+        self.get_entity()
+            .entity_type
+            .has_tag(&pumpkin_data::tag::EntityType::MINECRAFT_REDIRECTABLE_PROJECTILE)
+    }
+
     fn get_owner_id(&self) -> Option<i32> {
         self.thrown_item_entity.owner_id.load()
     }

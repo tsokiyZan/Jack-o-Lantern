@@ -940,6 +940,11 @@ impl EnderDragonEntity {
 }
 
 impl Mob for EnderDragonEntity {
+    /// Vanilla `EnderDragon.isPickable`: only its parts are.
+    fn is_pickable(&self) -> bool {
+        false
+    }
+
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
     }

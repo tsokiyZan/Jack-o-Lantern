@@ -66,6 +66,11 @@ impl EndCrystalEntity {
 }
 
 impl EntityBase for EndCrystalEntity {
+    /// Vanilla `isPickable`.
+    fn can_hit(&self) -> bool {
+        true
+    }
+
     fn get_entity(&self) -> &Entity {
         &self.entity
     }
