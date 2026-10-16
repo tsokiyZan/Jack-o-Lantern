@@ -391,8 +391,11 @@ impl<S: CommandSource> CommandDispatcher<S> {
     /// Executes a given result that has already been parsed from an input, in a new top-level
     /// frame (vanilla `Commands.performCommand`).
     pub fn execute(&self, parsed: ParsingResult<'_, S>) -> Result<i32, CommandSyntaxError> {
-        execution::run_in_new_frame(ResultValueTaker::new(), false, |_| {
-            self.execute_in_current_frame(parsed)
+        let (command_limit, fork_limit) = parsed.context.source.command_limits();
+        execution::execute_in_context(command_limit, fork_limit, || {
+            execution::run_in_new_frame(ResultValueTaker::new(), false, |_| {
+                self.execute_in_current_frame(parsed)
+            })
         })
     }
 

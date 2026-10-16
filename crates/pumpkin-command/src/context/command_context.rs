@@ -1,6 +1,6 @@
 use crate::context::string_range::StringRange;
 use crate::errors::command_syntax_error::CommandSyntaxError;
-use crate::errors::error_types::DISPATCHER_PARSE_EXCEPTION;
+use crate::errors::error_types::{DISPATCHER_PARSE_EXCEPTION, ERROR_FORK_LIMIT_REACHED};
 use crate::execution::{self, ChainModifiers, Frame};
 use crate::node::attached::NodeId;
 use crate::node::dispatcher::{CommandDispatcher, ResultConsumer};
@@ -308,14 +308,24 @@ impl<'a, S: CommandSource> ContextChain<'a, S> {
     ///
     /// Mirrors vanilla `BuildContexts.execute`: modifiers run stage by stage over every source,
     /// then the command runs once per source until the current frame is discarded.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "mirrors vanilla BuildContexts.execute"
+    )]
     pub fn execute_all(
         &self,
         source: &Arc<S>,
         result_consumer: &dyn ResultConsumer<S>,
     ) -> Result<i32, CommandSyntaxError> {
+        if execution::quota_exhausted() {
+            return Ok(0);
+        }
         let frame = execution::current_frame();
         let mut modifiers = ChainModifiers::default();
         let mut current_sources: Vec<Arc<S>> = vec![source.clone()];
+        let fork_limit = execution::fork_limit()
+            .and_then(|limit| usize::try_from(limit).ok())
+            .unwrap_or(usize::MAX);
 
         for modifier in &self.modifiers {
             if modifier.forks {
@@ -329,9 +339,24 @@ impl<'a, S: CommandSource> ContextChain<'a, S> {
                 continue;
             }
 
+            // Vanilla's chain has no modifier for a plain redirect, so it costs nothing.
+            if matches!(modifier.modifier, RedirectModifier::KeepSource) {
+                continue;
+            }
+            execution::increment_cost();
             let mut next_sources = Vec::new();
             for source in current_sources {
                 let mut to_add = Self::run_modifier(modifier, &source, modifiers.is_forked())?;
+                if next_sources.len() + to_add.len() >= fork_limit {
+                    // Vanilla BuildContexts: the original source handles the error.
+                    let error = ERROR_FORK_LIMIT_REACHED
+                        .create_without_context(TextComponent::text(fork_limit.to_string()));
+                    return if modifiers.is_forked() {
+                        Ok(0)
+                    } else {
+                        Err(error)
+                    };
+                }
                 next_sources.append(&mut to_add);
             }
             current_sources = next_sources;
@@ -390,6 +415,10 @@ impl<'a, S: CommandSource> ContextChain<'a, S> {
                 inner: result_consumer,
                 frame,
             };
+            if execution::quota_exhausted() {
+                return Ok(0);
+            }
+            execution::increment_cost();
             return Self::run_executable(
                 &executable,
                 &current_sources[0],
@@ -400,9 +429,11 @@ impl<'a, S: CommandSource> ContextChain<'a, S> {
 
         let mut result = 0;
         for execution_source in current_sources {
-            if discarded() {
+            // Each source's command is its own ExecuteCommand entry in vanilla's queue.
+            if discarded() || execution::quota_exhausted() {
                 break;
             }
+            execution::increment_cost();
             result += Self::run_executable(
                 &executable,
                 &execution_source,

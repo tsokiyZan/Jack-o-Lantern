@@ -88,6 +88,80 @@ pub fn run_in_new_frame<R>(
     body(&frame)
 }
 
+/// Vanilla `ExecutionContext`'s command quota and fork limit.
+struct Limits {
+    command_limit: i32,
+    fork_limit: i32,
+    quota: i32,
+    stopped: bool,
+}
+
+thread_local! {
+    static LIMITS: RefCell<Option<Limits>> = const { RefCell::new(None) };
+}
+
+struct LimitsGuard;
+
+impl Drop for LimitsGuard {
+    fn drop(&mut self) {
+        LIMITS.set(None);
+    }
+}
+
+/// Runs `body` like vanilla `Commands.executeCommandInContext`: with a new command quota and
+/// fork limit, unless a command execution already holds them on this thread.
+pub fn execute_in_context<R>(command_limit: i32, fork_limit: i32, body: impl FnOnce() -> R) -> R {
+    if LIMITS.with_borrow(Option::is_some) {
+        return body();
+    }
+    let command_limit = command_limit.max(1);
+    LIMITS.set(Some(Limits {
+        command_limit,
+        fork_limit,
+        quota: command_limit,
+        stopped: false,
+    }));
+    let _guard = LimitsGuard;
+    let result = body();
+    // Vanilla runCommandQueue checks the quota before looking for the next entry, so using it
+    // up exactly is reported even when nothing was left to run.
+    let _ = quota_exhausted();
+    result
+}
+
+/// Vanilla `ExecutionContext.incrementCost`.
+pub fn increment_cost() {
+    LIMITS.with_borrow_mut(|limits| {
+        if let Some(limits) = limits {
+            limits.quota -= 1;
+        }
+    });
+}
+
+/// Whether vanilla `runCommandQueue` stops before its next entry because the command quota ran
+/// out. Once it has, nothing else in the execution runs.
+#[must_use]
+pub fn quota_exhausted() -> bool {
+    LIMITS.with_borrow_mut(|limits| match limits {
+        Some(limits) if limits.stopped => true,
+        Some(limits) if limits.quota <= 0 => {
+            limits.stopped = true;
+            tracing::info!(
+                "Command execution stopped due to limit (executed {} commands)",
+                limits.command_limit
+            );
+            true
+        }
+        _ => false,
+    })
+}
+
+/// Vanilla `ExecutionContext.forkLimit`.
+#[must_use]
+pub fn fork_limit() -> Option<i32> {
+    LIMITS.with_borrow(|limits| limits.as_ref().map(|limits| limits.fork_limit))
+}
+
 /// Vanilla `ChainModifiers`.
 #[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
 pub struct ChainModifiers {

@@ -481,6 +481,23 @@ impl pumpkin_command::source::CommandSource for CommandSource {
         self.command_result_taker.call(result);
     }
 
+    fn command_limits(&self) -> (i32, i32) {
+        self.server.as_ref().map_or(
+            (
+                pumpkin_command::source::DEFAULT_COMMAND_LIMIT,
+                pumpkin_command::source::DEFAULT_COMMAND_LIMIT,
+            ),
+            |server| {
+                let game_rules = &server.level_info.load().game_rules;
+                let clamp = |value: i64| i32::try_from(value).unwrap_or(i32::MAX);
+                (
+                    clamp(game_rules.max_command_sequence_length),
+                    clamp(game_rules.max_command_forks),
+                )
+            },
+        )
+    }
+
     fn has_permission(&self, permission: &str) -> bool {
         self.has_permission(permission)
     }

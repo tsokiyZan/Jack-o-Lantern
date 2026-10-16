@@ -791,11 +791,15 @@ impl DatapackManager {
         return_parent_frame: bool,
     ) -> usize {
         let dispatcher = server.command_dispatcher.load();
+        if execution::quota_exhausted() {
+            return 0;
+        }
+        execution::increment_cost();
         execution::run_in_new_frame(result_callback, return_parent_frame, |frame| {
             let generation = frame.generation();
             let mut executed = 0;
             for line in lines {
-                if frame.generation() != generation {
+                if frame.generation() != generation || execution::quota_exhausted() {
                     break;
                 }
                 if let Err(error) = dispatcher.execute_input_in_current_frame(line, source) {
@@ -822,14 +826,18 @@ impl DatapackManager {
             let Ok(lines) = Self::instantiate(server, &function, None, source) else {
                 continue;
             };
-            executed += execution::run_in_new_frame(ResultValueTaker::new(), false, |_| {
-                Self::call_function(
-                    server,
-                    &lines,
-                    source,
-                    source.command_result_taker.clone(),
-                    false,
-                )
+            let (command_limit, fork_limit) =
+                pumpkin_command::source::CommandSource::command_limits(source);
+            executed += execution::execute_in_context(command_limit, fork_limit, || {
+                execution::run_in_new_frame(ResultValueTaker::new(), false, |_| {
+                    Self::call_function(
+                        server,
+                        &lines,
+                        source,
+                        source.command_result_taker.clone(),
+                        false,
+                    )
+                })
             });
         }
         Ok(executed)
