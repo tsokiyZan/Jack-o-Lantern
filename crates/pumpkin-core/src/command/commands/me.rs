@@ -1,10 +1,9 @@
 use pumpkin_data::world::EMOTE_COMMAND;
 use pumpkin_util::PermissionLvl;
 use pumpkin_util::permission::{Permission, PermissionDefault, PermissionRegistry};
-use pumpkin_util::text::TextComponent;
 
 use crate::command::argument_builder::{ArgumentBuilder, argument, command};
-use crate::command::argument_types::core::string::StringArgumentType;
+use crate::command::argument_types::message::MessageArgumentType;
 use crate::command::context::command_context::CommandContext;
 use crate::command::node::dispatcher::CommandDispatcher;
 use crate::command::node::{CommandExecutor, CommandExecutorResult};
@@ -16,16 +15,11 @@ struct MeExecutor;
 
 impl CommandExecutor for MeExecutor {
     fn execute(&self, context: &CommandContext) -> CommandExecutorResult {
-        let msg = StringArgumentType::get(context, "action")?;
+        let msg = MessageArgumentType::get_message(context, "action")?;
         let sender = &context.source;
         let server = sender.server();
 
-        server.broadcast_message(
-            &TextComponent::text(msg.to_string()),
-            &context.source.display_name,
-            EMOTE_COMMAND,
-            None,
-        );
+        server.broadcast_message(&msg, &context.source.display_name, EMOTE_COMMAND, None);
 
         Ok(1)
     }
@@ -41,6 +35,6 @@ pub fn register(dispatcher: &mut CommandDispatcher, registry: &PermissionRegistr
     dispatcher.register(
         command("me", DESCRIPTION)
             .requires(PERMISSION)
-            .then(argument("action", StringArgumentType::GreedyPhrase).executes(MeExecutor)),
+            .then(argument("action", MessageArgumentType).executes(MeExecutor)),
     );
 }

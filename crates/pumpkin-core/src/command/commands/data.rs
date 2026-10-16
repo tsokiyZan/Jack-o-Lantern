@@ -20,7 +20,7 @@ use pumpkin_util::PermissionLvl;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::permission::{Permission, PermissionDefault, PermissionRegistry};
 use pumpkin_util::text::TextComponent;
-use pumpkin_util::text::color::NamedColor;
+use pumpkin_util::text::nbt::to_pretty_component;
 
 use crate::command::argument_builder::{ArgumentBuilder, argument, command, literal};
 use crate::command::argument_types::coordinates::block_pos::BlockPosArgumentType;
@@ -37,6 +37,8 @@ use crate::command::errors::command_syntax_error::CommandSyntaxError;
 use crate::command::errors::error_types::CommandErrorType;
 use crate::command::node::dispatcher::CommandDispatcher;
 use crate::command::node::{CommandExecutor, CommandExecutorResult};
+use crate::command::suggestion::provider::{SuggestionProvider, SuggestionProviderResult};
+use crate::command::suggestion::suggestions::SuggestionsBuilder;
 use crate::entity::EntityBase;
 use crate::server::Server;
 use crate::world::World;
@@ -89,120 +91,6 @@ pub const ERROR_ENTITY_INVALID: CommandErrorType<0> = CommandErrorType::new(
     translation::java::COMMANDS_DATA_ENTITY_INVALID,
 );
 
-#[must_use]
-pub fn snbt_colorful_display(tag: &NbtTag, _depth: usize) -> TextComponent {
-    let folded = TextComponent::text("<...>").color_named(NamedColor::Gray);
-    match tag {
-        NbtTag::End => TextComponent::text(""),
-        NbtTag::Byte(value) => TextComponent::text(format!("{value}"))
-            .color_named(NamedColor::Gold)
-            .add_child(TextComponent::text("b").color_named(NamedColor::Red)),
-        NbtTag::Short(value) => TextComponent::text(format!("{value}"))
-            .color_named(NamedColor::Gold)
-            .add_child(TextComponent::text("s").color_named(NamedColor::Red)),
-        NbtTag::Int(value) => TextComponent::text(format!("{value}")).color_named(NamedColor::Gold),
-        NbtTag::Long(value) => TextComponent::text(format!("{value}"))
-            .color_named(NamedColor::Gold)
-            .add_child(TextComponent::text("L").color_named(NamedColor::Red)),
-        NbtTag::Float(value) => TextComponent::text(format!("{value}"))
-            .color_named(NamedColor::Gold)
-            .add_child(TextComponent::text("f").color_named(NamedColor::Red)),
-        NbtTag::Double(value) => TextComponent::text(format!("{value}"))
-            .color_named(NamedColor::Gold)
-            .add_child(TextComponent::text("d").color_named(NamedColor::Red)),
-        NbtTag::ByteArray(value) => {
-            let mut content = TextComponent::text("[")
-                .add_child(TextComponent::text("B").color_named(NamedColor::Red))
-                .add_child(TextComponent::text("; "));
-
-            for (index, byte) in value.iter().take(128).enumerate() {
-                content = content
-                    .add_child(TextComponent::text(format!("{byte}")))
-                    .add_child(TextComponent::text("b").color_named(NamedColor::Red));
-                if index < value.len() - 1 {
-                    content = content.add_child(TextComponent::text(", "));
-                }
-            }
-
-            if value.len() > 128 {
-                content = content.add_child(folded);
-            }
-
-            content.add_child(TextComponent::text("]"))
-        }
-        NbtTag::String(value) => {
-            let escaped = value.replace('"', "\\\"");
-            TextComponent::text(format!("\"{escaped}\"")).color_named(NamedColor::Green)
-        }
-        NbtTag::List(value) => {
-            let mut content = TextComponent::text("[");
-            for (index, tag) in value.iter().take(128).enumerate() {
-                content = content.add_child(snbt_colorful_display(tag, 0));
-                if index < value.len() - 1 {
-                    content = content.add_child(TextComponent::text(", "));
-                }
-            }
-            if value.len() > 128 {
-                content = content.add_child(folded);
-            }
-            content.add_child(TextComponent::text("]"))
-        }
-        NbtTag::Compound(value) => {
-            let mut content = TextComponent::text("{");
-            let mut keys: Vec<&Box<str>> = value.child_tags.keys().collect();
-            keys.sort();
-            for (index, key) in keys.into_iter().take(128).enumerate() {
-                let tag = &value.child_tags[key];
-                content = content
-                    .add_child(
-                        TextComponent::text(format!("{key}: ")).color_named(NamedColor::Aqua),
-                    )
-                    .add_child(snbt_colorful_display(tag, 0));
-                if index < value.child_tags.len() - 1 {
-                    content = content.add_child(TextComponent::text(", "));
-                }
-            }
-            if value.child_tags.len() > 128 {
-                content = content.add_child(folded);
-            }
-            content.add_child(TextComponent::text("}"))
-        }
-        NbtTag::IntArray(value) => {
-            let mut content = TextComponent::text("[")
-                .add_child(TextComponent::text("I").color_named(NamedColor::Red))
-                .add_child(TextComponent::text("; "));
-            for (index, int) in value.iter().take(128).enumerate() {
-                content = content
-                    .add_child(TextComponent::text(format!("{int}")).color_named(NamedColor::Gold));
-                if index < value.len() - 1 {
-                    content = content.add_child(TextComponent::text(", "));
-                }
-            }
-            if value.len() > 128 {
-                content = content.add_child(folded);
-            }
-            content.add_child(TextComponent::text("]"))
-        }
-        NbtTag::LongArray(value) => {
-            let mut content = TextComponent::text("[")
-                .add_child(TextComponent::text("L").color_named(NamedColor::Red))
-                .add_child(TextComponent::text("; "));
-            for (index, long) in value.iter().take(128).enumerate() {
-                content = content
-                    .add_child(TextComponent::text(format!("{long}")).color_named(NamedColor::Gold))
-                    .add_child(TextComponent::text("L").color_named(NamedColor::Red));
-                if index < value.len() - 1 {
-                    content = content.add_child(TextComponent::text(", "));
-                }
-            }
-            if value.len() > 128 {
-                content = content.add_child(folded);
-            }
-            content.add_child(TextComponent::text("]"))
-        }
-    }
-}
-
 // ---------------- DATA ACCESSOR ABSTRACTION ----------------
 
 pub trait DataAccessor: Send + Sync {
@@ -249,10 +137,7 @@ impl DataAccessor for EntityDataAccessor {
         TextComponent::translate_cross(
             translation::java::COMMANDS_DATA_ENTITY_QUERY,
             translation::java::COMMANDS_DATA_ENTITY_QUERY,
-            [
-                self.entity.get_display_name(),
-                snbt_colorful_display(data, 0),
-            ],
+            [self.entity.get_display_name(), to_pretty_component(data)],
         )
     }
 
@@ -312,10 +197,11 @@ impl DataAccessor for BlockDataAccessor {
         TextComponent::translate_cross(
             translation::java::COMMANDS_DATA_BLOCK_MODIFIED,
             translation::java::COMMANDS_DATA_BLOCK_MODIFIED,
-            [TextComponent::text(format!(
-                "{}, {}, {}",
-                self.pos.0.x, self.pos.0.y, self.pos.0.z
-            ))],
+            [
+                TextComponent::text(self.pos.0.x.to_string()),
+                TextComponent::text(self.pos.0.y.to_string()),
+                TextComponent::text(self.pos.0.z.to_string()),
+            ],
         )
     }
 
@@ -324,11 +210,10 @@ impl DataAccessor for BlockDataAccessor {
             translation::java::COMMANDS_DATA_BLOCK_QUERY,
             translation::java::COMMANDS_DATA_BLOCK_QUERY,
             [
-                TextComponent::text(format!(
-                    "{}, {}, {}",
-                    self.pos.0.x, self.pos.0.y, self.pos.0.z
-                )),
-                snbt_colorful_display(data, 0),
+                TextComponent::text(self.pos.0.x.to_string()),
+                TextComponent::text(self.pos.0.y.to_string()),
+                TextComponent::text(self.pos.0.z.to_string()),
+                to_pretty_component(data),
             ],
         )
     }
@@ -395,7 +280,7 @@ impl DataAccessor for StorageDataAccessor {
             translation::java::COMMANDS_DATA_STORAGE_QUERY,
             [
                 TextComponent::text(self.id.clone()),
-                snbt_colorful_display(data, 0),
+                to_pretty_component(data),
             ],
         )
     }
@@ -429,44 +314,35 @@ pub fn get_single_tag(
     }
 }
 
+/// Vanilla `DataCommands.getAsText`: a string's value, or a number's `Tag.toString`.
 fn get_as_text(tag: &NbtTag) -> Result<String, CommandSyntaxError> {
     match tag {
         NbtTag::String(s) => Ok(s.to_string()),
-        NbtTag::Byte(b) => Ok(b.to_string()),
-        NbtTag::Short(s) => Ok(s.to_string()),
-        NbtTag::Int(i) => Ok(i.to_string()),
-        NbtTag::Long(l) => Ok(l.to_string()),
-        NbtTag::Float(f) => Ok(f.to_string()),
-        NbtTag::Double(d) => Ok(d.to_string()),
-        _ => {
-            Err(ERROR_EXPECTED_VALUE
-                .create_without_context(TextComponent::text(format!("{tag:?}"))))
-        }
+        NbtTag::Byte(_)
+        | NbtTag::Short(_)
+        | NbtTag::Int(_)
+        | NbtTag::Long(_)
+        | NbtTag::Float(_)
+        | NbtTag::Double(_) => Ok(tag.to_string()),
+        _ => Err(ERROR_EXPECTED_VALUE.create_without_context(TextComponent::text(tag.to_string()))),
     }
 }
 
+/// Vanilla `DataCommands.substring`, counting UTF-16 code units like Java strings.
 fn substring(input: &str, start: i32, end: Option<i32>) -> Result<String, CommandSyntaxError> {
-    let len = input.chars().count() as i32;
-    let abs_start = if start >= 0 { start } else { len + start };
-    let abs_end = match end {
-        Some(e) => {
-            if e >= 0 {
-                e
-            } else {
-                len + e
-            }
-        }
-        None => len,
-    };
-    if abs_start >= 0 && abs_end <= len && abs_start <= abs_end {
-        let chars: Vec<char> = input.chars().collect();
-        Ok(chars[(abs_start as usize)..(abs_end as usize)]
-            .iter()
-            .collect())
+    let units: Vec<u16> = input.encode_utf16().collect();
+    let length = units.len() as i32;
+    let offset = |index: i32| if index >= 0 { index } else { length + index };
+    let start = offset(start);
+    let end = end.map_or(length, offset);
+    if start >= 0 && end <= length && start <= end {
+        Ok(String::from_utf16_lossy(
+            &units[start as usize..end as usize],
+        ))
     } else {
         Err(ERROR_INVALID_SUBSTRING.create_without_context(
             TextComponent::text(start.to_string()),
-            TextComponent::text(end.unwrap_or(len).to_string()),
+            TextComponent::text(end.to_string()),
         ))
     }
 }
@@ -486,20 +362,17 @@ impl TargetKind {
     ) -> Result<Box<dyn DataAccessor>, CommandSyntaxError> {
         match self {
             Self::Entity => {
-                let entity = EntityArgumentType::get_entity(context, &format!("{prefix}_target"))?;
+                let entity = EntityArgumentType::get_entity(context, prefix)?;
                 Ok(Box::new(EntityDataAccessor::new(entity)))
             }
             Self::Block => {
-                let pos =
-                    BlockPosArgumentType::get_block_pos(context, &format!("{prefix}_target"))?;
+                let pos = BlockPosArgumentType::get_block_pos(context, prefix)?;
                 let world = context.world().clone();
                 let accessor = BlockDataAccessor::new(pos, world)?;
                 Ok(Box::new(accessor))
             }
             Self::Storage => {
-                let id = context.get_argument::<pumpkin_util::identifier::Identifier>(&format!(
-                    "{prefix}_target"
-                ))?;
+                let id = context.get_argument::<pumpkin_util::identifier::Identifier>(prefix)?;
                 let server = context.server().clone();
                 Ok(Box::new(StorageDataAccessor::new(id.to_string(), server)))
             }
@@ -518,11 +391,10 @@ fn execute_get(
     let accessor = target_kind.access(context, "target")?;
     if !has_path {
         let data = accessor.get_data()?;
-        let result = data.child_tags.len() as i32;
         context
             .source
             .send_feedback(accessor.get_print_success(&NbtTag::Compound(data)), false);
-        return Ok(result);
+        return Ok(1);
     }
 
     let path = context.get_argument::<NbtPath>("path")?;
@@ -560,7 +432,7 @@ fn execute_get(
         NbtTag::ByteArray(arr) => arr.len() as i32,
         NbtTag::IntArray(arr) => arr.len() as i32,
         NbtTag::LongArray(arr) => arr.len() as i32,
-        NbtTag::String(s) => s.len() as i32,
+        NbtTag::String(s) => s.encode_utf16().count() as i32,
         NbtTag::List(list) => list.len() as i32,
         NbtTag::Compound(compound) => compound.child_tags.len() as i32,
         NbtTag::End => {
@@ -582,9 +454,7 @@ fn execute_merge(context: &CommandContext, target_kind: TargetKind) -> CommandEx
     }
     let old = accessor.get_data()?;
     let mut updated = old.clone();
-    for (k, v) in nbt.child_tags {
-        updated.child_tags.insert(k, v);
-    }
+    updated.merge(&nbt);
     if old == updated {
         return Err(ERROR_MERGE_UNCHANGED.create_without_context());
     }
@@ -714,22 +584,32 @@ fn execute_modify(
             target_path.set(&mut root, last_tag)?
         }
         ModifyMode::Merge => {
-            let mut combined = NbtCompound::new();
+            let mut combined_sources = NbtCompound::new();
             for tag in &source_tags {
                 if is_too_deep(tag, 0) {
                     return Err(ERROR_DATA_TOO_DEEP.create_without_context());
                 }
-                if let NbtTag::Compound(c) = tag {
-                    for (k, v) in &c.child_tags {
-                        combined.child_tags.insert(k.clone(), v.clone());
-                    }
-                } else {
+                let NbtTag::Compound(tag) = tag else {
                     return Err(ERROR_EXPECTED_OBJECT
-                        .create_without_context(TextComponent::text(format!("{tag:?}"))));
+                        .create_without_context(TextComponent::text(tag.to_string())));
+                };
+                combined_sources.merge(tag);
+            }
+            let targets =
+                target_path.get_or_create(&mut root, &|| NbtTag::Compound(NbtCompound::new()))?;
+            let mut changed_count = 0;
+            for target_tag in targets {
+                let NbtTag::Compound(target_object) = target_tag else {
+                    return Err(ERROR_EXPECTED_OBJECT
+                        .create_without_context(TextComponent::text(target_tag.to_string())));
+                };
+                let original_target = target_object.clone();
+                target_object.merge(&combined_sources);
+                if original_target != *target_object {
+                    changed_count += 1;
                 }
             }
-
-            target_path.set(&mut root, NbtTag::Compound(combined))?
+            changed_count
         }
     };
 
@@ -809,14 +689,38 @@ impl CommandExecutor for ModifyExecutor {
 
 // ---------------- REGISTRATION ----------------
 
-fn make_target_arg(
+/// Vanilla `DataCommands.SUGGEST_STORAGE`.
+struct StorageSuggestionProvider;
+
+impl SuggestionProvider for StorageSuggestionProvider {
+    fn suggest(
+        &self,
+        context: &CommandContext,
+        mut builder: SuggestionsBuilder,
+    ) -> SuggestionProviderResult {
+        let storage = context
+            .server()
+            .command_storage
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        for id in storage.keys() {
+            builder = builder.suggest(id.clone());
+        }
+        builder.build()
+    }
+}
+
+/// The argument a `DataCommands` data provider wraps a command in.
+pub fn make_target_arg(
     kind: TargetKind,
     name: &'static str,
 ) -> crate::command::argument_builder::RequiredArgumentBuilder {
     match kind {
         TargetKind::Entity => argument(name, EntityArgumentType::Entity),
         TargetKind::Block => argument(name, BlockPosArgumentType),
-        TargetKind::Storage => argument(name, IdentifierArgumentType),
+        TargetKind::Storage => {
+            argument(name, IdentifierArgumentType).suggests(StorageSuggestionProvider)
+        }
     }
 }
 
@@ -845,7 +749,7 @@ pub fn register(dispatcher: &mut CommandDispatcher, registry: &PermissionRegistr
     for &(target_kind, name) in &all_target_kinds {
         // data merge <target> <nbt>
         merge_node = merge_node.then(literal(name).then(
-            make_target_arg(target_kind, "target_target").then(
+            make_target_arg(target_kind, "target").then(
                 argument("nbt", NbtCompoundArgumentType).executes(MergeExecutor { target_kind }),
             ),
         ));
@@ -853,7 +757,7 @@ pub fn register(dispatcher: &mut CommandDispatcher, registry: &PermissionRegistr
         // data get <target> [<path>] [<scale>]
         get_node = get_node.then(
             literal(name).then(
-                make_target_arg(target_kind, "target_target")
+                make_target_arg(target_kind, "target")
                     .executes(GetExecutor {
                         target_kind,
                         has_path: false,
@@ -879,7 +783,7 @@ pub fn register(dispatcher: &mut CommandDispatcher, registry: &PermissionRegistr
 
         // data remove <target> <path>
         remove_node = remove_node.then(literal(name).then(
-            make_target_arg(target_kind, "target_target").then(
+            make_target_arg(target_kind, "target").then(
                 argument("path", NbtPathArgumentType).executes(RemoveExecutor { target_kind }),
             ),
         ));
@@ -906,6 +810,89 @@ pub fn register(dispatcher: &mut CommandDispatcher, registry: &PermissionRegistr
                 literal(mod_name)
             };
 
+            // from & string sources; each verb literal is built once (see the note above)
+            let mut from_node = literal("from");
+            let mut string_node = literal("string");
+            for &(source_kind, source_name) in &all_target_kinds {
+                // from <source> [<sourcePath>]
+                from_node = from_node.then(
+                    literal(source_name).then(
+                        make_target_arg(source_kind, "source")
+                            .executes(ModifyExecutor {
+                                target_kind,
+                                modify_mode: mod_mode,
+                                source_kind: Some(source_kind),
+                                source_mode: SourceMode::From { has_path: false },
+                            })
+                            .then(argument("sourcePath", NbtPathArgumentType).executes(
+                                ModifyExecutor {
+                                    target_kind,
+                                    modify_mode: mod_mode,
+                                    source_kind: Some(source_kind),
+                                    source_mode: SourceMode::From { has_path: true },
+                                },
+                            )),
+                    ),
+                );
+
+                // string <source> [<sourcePath>] [<start>] [<end>]
+                string_node = string_node.then(
+                    literal(source_name).then(
+                        make_target_arg(source_kind, "source")
+                            .executes(ModifyExecutor {
+                                target_kind,
+                                modify_mode: mod_mode,
+                                source_kind: Some(source_kind),
+                                source_mode: SourceMode::String {
+                                    has_path: false,
+                                    has_start: false,
+                                    has_end: false,
+                                },
+                            })
+                            .then(
+                                argument("sourcePath", NbtPathArgumentType)
+                                    .executes(ModifyExecutor {
+                                        target_kind,
+                                        modify_mode: mod_mode,
+                                        source_kind: Some(source_kind),
+                                        source_mode: SourceMode::String {
+                                            has_path: true,
+                                            has_start: false,
+                                            has_end: false,
+                                        },
+                                    })
+                                    .then(
+                                        argument("start", IntegerArgumentType::any())
+                                            .executes(ModifyExecutor {
+                                                target_kind,
+                                                modify_mode: mod_mode,
+                                                source_kind: Some(source_kind),
+                                                source_mode: SourceMode::String {
+                                                    has_path: true,
+                                                    has_start: true,
+                                                    has_end: false,
+                                                },
+                                            })
+                                            .then(
+                                                argument("end", IntegerArgumentType::any())
+                                                    .executes(ModifyExecutor {
+                                                        target_kind,
+                                                        modify_mode: mod_mode,
+                                                        source_kind: Some(source_kind),
+                                                        source_mode: SourceMode::String {
+                                                            has_path: true,
+                                                            has_start: true,
+                                                            has_end: true,
+                                                        },
+                                                    }),
+                                            ),
+                                    ),
+                            ),
+                    ),
+                );
+            }
+            mod_node = mod_node.then(from_node).then(string_node);
+
             // value <value>
             mod_node = mod_node.then(literal("value").then(
                 argument("value", NbtTagArgumentType).executes(ModifyExecutor {
@@ -916,96 +903,11 @@ pub fn register(dispatcher: &mut CommandDispatcher, registry: &PermissionRegistr
                 }),
             ));
 
-            // from & string sources
-            for &(source_kind, source_name) in &all_target_kinds {
-                // from <source> [<sourcePath>]
-                mod_node = mod_node.then(
-                    literal("from").then(
-                        literal(source_name).then(
-                            make_target_arg(source_kind, "source_target")
-                                .executes(ModifyExecutor {
-                                    target_kind,
-                                    modify_mode: mod_mode,
-                                    source_kind: Some(source_kind),
-                                    source_mode: SourceMode::From { has_path: false },
-                                })
-                                .then(argument("sourcePath", NbtPathArgumentType).executes(
-                                    ModifyExecutor {
-                                        target_kind,
-                                        modify_mode: mod_mode,
-                                        source_kind: Some(source_kind),
-                                        source_mode: SourceMode::From { has_path: true },
-                                    },
-                                )),
-                        ),
-                    ),
-                );
-
-                // string <source> [<sourcePath>] [<start>] [<end>]
-                mod_node = mod_node.then(
-                    literal("string").then(
-                        literal(source_name).then(
-                            make_target_arg(source_kind, "source_target")
-                                .executes(ModifyExecutor {
-                                    target_kind,
-                                    modify_mode: mod_mode,
-                                    source_kind: Some(source_kind),
-                                    source_mode: SourceMode::String {
-                                        has_path: false,
-                                        has_start: false,
-                                        has_end: false,
-                                    },
-                                })
-                                .then(
-                                    argument("sourcePath", NbtPathArgumentType)
-                                        .executes(ModifyExecutor {
-                                            target_kind,
-                                            modify_mode: mod_mode,
-                                            source_kind: Some(source_kind),
-                                            source_mode: SourceMode::String {
-                                                has_path: true,
-                                                has_start: false,
-                                                has_end: false,
-                                            },
-                                        })
-                                        .then(
-                                            argument("start", IntegerArgumentType::any())
-                                                .executes(ModifyExecutor {
-                                                    target_kind,
-                                                    modify_mode: mod_mode,
-                                                    source_kind: Some(source_kind),
-                                                    source_mode: SourceMode::String {
-                                                        has_path: true,
-                                                        has_start: true,
-                                                        has_end: false,
-                                                    },
-                                                })
-                                                .then(
-                                                    argument("end", IntegerArgumentType::any())
-                                                        .executes(ModifyExecutor {
-                                                            target_kind,
-                                                            modify_mode: mod_mode,
-                                                            source_kind: Some(source_kind),
-                                                            source_mode: SourceMode::String {
-                                                                has_path: true,
-                                                                has_start: true,
-                                                                has_end: true,
-                                                            },
-                                                        }),
-                                                ),
-                                        ),
-                                ),
-                        ),
-                    ),
-                );
-            }
-
             target_path_arg = target_path_arg.then(mod_node);
         }
 
         modify_node = modify_node.then(
-            literal(target_name)
-                .then(make_target_arg(target_kind, "target_target").then(target_path_arg)),
+            literal(target_name).then(make_target_arg(target_kind, "target").then(target_path_arg)),
         );
     }
     data_cmd = data_cmd.then(modify_node);

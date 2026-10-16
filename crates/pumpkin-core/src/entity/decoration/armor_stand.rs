@@ -40,13 +40,21 @@ impl Default for PackedRotation {
 
 impl From<PackedRotation> for NbtTag {
     fn from(val: PackedRotation) -> Self {
+        // ArmorStandPose.CODEC: each part is an optionalFieldOf left out at its default.
+        let default = PackedRotation::default();
         let mut compound = NbtCompound::new();
-        compound.put("Head", val.head);
-        compound.put("Body", val.body);
-        compound.put("LeftArm", val.left_arm);
-        compound.put("RightArm", val.right_arm);
-        compound.put("LeftLeg", val.left_leg);
-        compound.put("RightLeg", val.right_leg);
+        for (key, value, default) in [
+            ("Head", val.head, default.head),
+            ("Body", val.body, default.body),
+            ("LeftArm", val.left_arm, default.left_arm),
+            ("RightArm", val.right_arm, default.right_arm),
+            ("LeftLeg", val.left_leg, default.left_leg),
+            ("RightLeg", val.right_leg, default.right_leg),
+        ] {
+            if value != default {
+                compound.put(key, value);
+            }
+        }
         Self::Compound(compound)
     }
 }

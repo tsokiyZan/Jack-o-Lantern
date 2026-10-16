@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::errors::error_types::{CommandErrorType, LITERAL_INCORRECT};
 use crate::parser::Parser;
 use crate::snbt::markers::{
@@ -686,10 +684,8 @@ impl SnbtParser<'_, '_> {
         }
     }
 
-    fn map_entries(&mut self) -> HashMap<String, NbtTag> {
-        self.repeated_with_trailing_comma(Self::map_entry, HashMap::new(), |map, element| {
-            map.insert(element.0, element.1);
-        })
+    fn map_entries(&mut self) -> Vec<(String, NbtTag)> {
+        self.repeated_with_trailing_comma_vec(Self::map_entry)
     }
 
     fn map_literal(&mut self) -> Option<NbtTag> {

@@ -1,14 +1,14 @@
 //! Storage and convenience methods for NBT compound tags.
 
-use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use uuid::Uuid;
 
 use crate::deserializer::NbtReadHelper;
+use crate::java_fmt::{double_to_string, float_to_string};
+use crate::java_hash_map::JavaHashMap;
 use crate::serializer::NbtWriteHelper;
-use crate::tag::NbtTag;
+use crate::tag::{NbtTag, double_value_of, float_value_of, quote_and_escape};
 use crate::{END_ID, Error, Nbt};
-use std::collections::hash_map::IntoIter;
 use std::io::ErrorKind;
 
 #[macro_export]
@@ -31,13 +31,11 @@ macro_rules! nbt_compound_tag {
 
 /// Represents a Compound NBT tag, effectively a hash map.
 ///
-/// Internally, this uses a `HashMap<String, NbtTag>`, which does not preserve insertion order,
-/// just like Minecraft: Java Edition, but it does mean lookups are O(1).
-///
+/// Its tags iterate in the order of the Java `HashMap` behind vanilla's `CompoundTag`.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct NbtCompound {
     /// Tags in the compound, indexed by their names.
-    pub child_tags: HashMap<Box<str>, NbtTag>,
+    pub child_tags: JavaHashMap<NbtTag>,
 }
 
 impl NbtCompound {
@@ -45,7 +43,7 @@ impl NbtCompound {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            child_tags: HashMap::new(),
+            child_tags: JavaHashMap::new(),
         }
     }
 
@@ -367,7 +365,7 @@ impl FromIterator<(Box<str>, NbtTag)> for NbtCompound {
 
 impl IntoIterator for NbtCompound {
     type Item = (Box<str>, NbtTag);
-    type IntoIter = IntoIter<Box<str>, NbtTag>;
+    type IntoIter = <JavaHashMap<NbtTag> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
         self.child_tags.into_iter()
@@ -401,47 +399,67 @@ impl From<NbtCompound> for NbtTag {
     }
 }
 
-/// SNBT display implementation for `NbtCompound`
+/// Vanilla `CompoundTag.toString`, which prints through `StringTagVisitor`.
 impl Display for NbtCompound {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.write_str("{")?;
-        for (i, (key, value)) in self.child_tags.iter().enumerate() {
-            if i > 0 {
-                f.write_str(", ")?;
+        let mut entries: Vec<_> = self.child_tags.iter().collect();
+        entries.sort_by(|(a, _), (b, _)| a.encode_utf16().cmp(b.encode_utf16()));
+        for (i, (key, value)) in entries.into_iter().enumerate() {
+            if i != 0 {
+                f.write_str(",")?;
             }
-            write!(f, "{key}: {value}")?;
+            write_key(f, key)?;
+            write!(f, ":{value}")?;
         }
         f.write_str("}")
     }
 }
 
+/// `StringTagVisitor.handleKeyEscape`.
+fn write_key(f: &mut Formatter<'_>, key: &str) -> std::fmt::Result {
+    let mut chars = key.chars();
+    let unquoted = chars
+        .next()
+        .is_some_and(|c| c.is_ascii_alphabetic() || c == '.' || c == '_')
+        && chars.all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '+' | '-'))
+        && !key.eq_ignore_ascii_case("true")
+        && !key.eq_ignore_ascii_case("false");
+    if unquoted {
+        f.write_str(key)
+    } else {
+        f.write_str(&quote_and_escape(key))
+    }
+}
+
+/// Vanilla `Tag.toString`, which prints through `StringTagVisitor`.
 impl Display for NbtTag {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::End => Ok(()),
+            Self::End => f.write_str("END"),
             Self::Byte(v) => write!(f, "{v}b"),
             Self::Short(v) => write!(f, "{v}s"),
             Self::Int(v) => write!(f, "{v}"),
             Self::Long(v) => write!(f, "{v}L"),
-            Self::Float(v) => write!(f, "{v}f"),
-            Self::Double(v) => write!(f, "{v}d"),
-            Self::String(v) => write!(f, "\"{v}\""), // TODO: Proper escaping needed for robust SNBT
+            Self::Float(v) => write!(f, "{}f", float_to_string(float_value_of(*v))),
+            Self::Double(v) => write!(f, "{}d", double_to_string(double_value_of(*v))),
+            Self::String(v) => f.write_str(&quote_and_escape(v)),
             Self::Compound(v) => write!(f, "{v}"),
             Self::ByteArray(v) => {
                 f.write_str("[B;")?;
                 for (i, byte) in v.iter().enumerate() {
-                    if i > 0 {
+                    if i != 0 {
                         f.write_str(",")?;
                     }
-                    write!(f, " {byte}b")?;
+                    write!(f, "{byte}B")?;
                 }
                 f.write_str("]")
             }
             Self::List(v) => {
                 f.write_str("[")?;
                 for (i, tag) in v.iter().enumerate() {
-                    if i > 0 {
-                        f.write_str(", ")?;
+                    if i != 0 {
+                        f.write_str(",")?;
                     }
                     write!(f, "{tag}")?;
                 }
@@ -450,20 +468,20 @@ impl Display for NbtTag {
             Self::IntArray(v) => {
                 f.write_str("[I;")?;
                 for (i, int) in v.iter().enumerate() {
-                    if i > 0 {
+                    if i != 0 {
                         f.write_str(",")?;
                     }
-                    write!(f, " {int}")?;
+                    write!(f, "{int}")?;
                 }
                 f.write_str("]")
             }
             Self::LongArray(v) => {
                 f.write_str("[L;")?;
                 for (i, long) in v.iter().enumerate() {
-                    if i > 0 {
+                    if i != 0 {
                         f.write_str(",")?;
                     }
-                    write!(f, " {long}L")?;
+                    write!(f, "{long}L")?;
                 }
                 f.write_str("]")
             }

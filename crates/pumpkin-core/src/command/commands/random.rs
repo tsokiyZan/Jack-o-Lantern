@@ -94,9 +94,7 @@ impl CommandExecutor for RandomExecutor {
                     TextComponent::text(max.to_string()),
                 ],
             );
-            for player in context.server().get_all_players() {
-                player.send_system_message(&msg);
-            }
+            context.server().broadcast_system_message(&msg, false);
             if context.source.player_or_none().is_none() {
                 context.source.send_message(msg);
             }

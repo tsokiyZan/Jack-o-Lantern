@@ -391,9 +391,29 @@ impl<S: CommandSource> CommandDispatcher<S> {
     /// Executes a given result that has already been parsed from an input, in a new top-level
     /// frame (vanilla `Commands.performCommand`).
     pub fn execute(&self, parsed: ParsingResult<'_, S>) -> Result<i32, CommandSyntaxError> {
-        execution::run_in_new_frame(ResultValueTaker::new(), false, |_| {
-            self.execute_in_current_frame(parsed)
+        let (command_limit, fork_limit) = parsed.context.source.command_limits();
+        execution::execute_in_context(command_limit, fork_limit, || {
+            execution::run_in_new_frame(ResultValueTaker::new(), false, |_| {
+                self.execute_in_current_frame(parsed)
+            })
         })
+    }
+
+    /// Vanilla `Commands.validateParseResults`: input left over after parsing is an error.
+    pub fn validate_parse_results(parsed: &ParsingResult<'_, S>) -> Result<(), CommandSyntaxError> {
+        if parsed.reader.peek().is_none() {
+            return Ok(());
+        }
+        Err(parsed.errors.values().next().map_or_else(
+            || {
+                if parsed.context.range.is_empty() {
+                    Self::unknown_command_error(&parsed.reader)
+                } else {
+                    DISPATCHER_UNKNOWN_ARGUMENT.create(&parsed.reader)
+                }
+            },
+            Clone::clone,
+        ))
     }
 
     /// Executes a parsed command as an entry of the current frame, like a function line.
@@ -401,15 +421,7 @@ impl<S: CommandSource> CommandDispatcher<S> {
         &self,
         parsed: ParsingResult<'_, S>,
     ) -> Result<i32, CommandSyntaxError> {
-        if parsed.reader.peek().is_some() {
-            return if let Some(err) = parsed.errors.values().next() {
-                Err(err.clone())
-            } else if parsed.context.range.is_empty() {
-                Err(Self::unknown_command_error(&parsed.reader))
-            } else {
-                Err(DISPATCHER_UNKNOWN_ARGUMENT.create(&parsed.reader))
-            };
-        }
+        Self::validate_parse_results(&parsed)?;
 
         let command = parsed.reader.string();
         let original_context = parsed.context.build(command);

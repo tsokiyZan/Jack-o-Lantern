@@ -1262,21 +1262,24 @@ impl Hash for KineticWeaponImpl {
     }
 }
 
+/// Vanilla `SwingAnimationType`, whose ids are its ordinals.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
 pub enum SwingAnimationType {
+    None = 0,
     #[default]
-    Whack = 0,
-    Stab = 1,
-    None = 2,
+    Whack = 1,
+    Stab = 2,
 }
 
 impl SwingAnimationType {
+    pub const VALUES: [Self; 3] = [Self::None, Self::Whack, Self::Stab];
+
     #[must_use]
     pub fn from_id(id: i32) -> Option<Self> {
         match id {
-            0 => Some(Self::Whack),
-            1 => Some(Self::Stab),
-            2 => Some(Self::None),
+            0 => Some(Self::None),
+            1 => Some(Self::Whack),
+            2 => Some(Self::Stab),
             _ => None,
         }
     }

@@ -1,6 +1,7 @@
 use crate::ClientPacket;
 use crate::VarInt;
 use crate::ser::NetworkWriteExt;
+use pumpkin_data::data_component_impl::SwingAnimationImpl;
 use pumpkin_data::packet::clientbound::play::{ANIMATE, SWING_ANIMATION};
 use pumpkin_macros::java_packet;
 use pumpkin_util::version::JavaMinecraftVersion;
@@ -58,14 +59,26 @@ impl ClientPacket for CEntityAnimation {
 pub struct CSwingArm {
     pub entity_id: VarInt,
     pub off_hand: bool,
+    pub animation: SwingAnimationImpl,
 }
 
 impl CSwingArm {
+    /// A swing with the default animation, whacking for 6 ticks.
     #[must_use]
     pub const fn new(entity_id: VarInt, off_hand: bool) -> Self {
+        Self::with_animation(entity_id, off_hand, SwingAnimationImpl::DEFAULT)
+    }
+
+    #[must_use]
+    pub const fn with_animation(
+        entity_id: VarInt,
+        off_hand: bool,
+        animation: SwingAnimationImpl,
+    ) -> Self {
         Self {
             entity_id,
             off_hand,
+            animation,
         }
     }
 }
@@ -89,9 +102,8 @@ impl ClientPacket for CSwingArm {
         write.write_var_int(&self.entity_id)?;
         if *version >= JavaMinecraftVersion::V_26_3 {
             write.write_var_int(&VarInt(i32::from(self.off_hand)))?;
-            // The swing animation of the held item, whacking for 6 ticks is the default one
-            write.write_var_int(&VarInt(1))?;
-            write.write_var_int(&VarInt(6))?;
+            write.write_var_int(&VarInt(self.animation.animation_type.to_id()))?;
+            write.write_var_int(&VarInt(self.animation.duration))?;
         } else if self.off_hand {
             write.write_u8(Animation::SwingOffhand as u8)?;
         } else {

@@ -85,6 +85,9 @@ impl ReturnValue {
 }
 
 /// Abstract command source trait for command dispatch and execution.
+/// The default of vanilla's `max_command_sequence_length` and `max_command_forks` game rules.
+pub const DEFAULT_COMMAND_LIMIT: i32 = 65536;
+
 pub trait CommandSource: Clone + Send + Sync + 'static {
     /// Sends a feedback message to the command sender.
     fn send_message(&self, message: TextComponent);
@@ -96,6 +99,12 @@ pub trait CommandSource: Clone + Send + Sync + 'static {
 
     /// Invokes callbacks for the command's return value.
     fn call_result(&self, _result: ReturnValue) {}
+
+    /// The command quota and fork limit a new command execution by this source gets (vanilla's
+    /// `max_command_sequence_length` and `max_command_forks` game rules).
+    fn command_limits(&self) -> (i32, i32) {
+        (DEFAULT_COMMAND_LIMIT, DEFAULT_COMMAND_LIMIT)
+    }
 
     /// Checks if this command source has the specified permission.
     fn has_permission(&self, _permission: &str) -> bool {
@@ -172,6 +181,10 @@ impl CommandSource for () {
 impl<S: CommandSource> CommandSource for Arc<S> {
     fn send_message(&self, message: TextComponent) {
         (**self).send_message(message);
+    }
+
+    fn command_limits(&self) -> (i32, i32) {
+        (**self).command_limits()
     }
 
     fn send_error(&self, error: TextComponent) {

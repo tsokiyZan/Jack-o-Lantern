@@ -8,6 +8,7 @@ use pumpkin_util::text::TextComponent;
 
 use crate::command::argument_builder::{ArgumentBuilder, argument, command};
 use crate::command::argument_types::core::string::StringArgumentType;
+use crate::command::argument_types::message::MessageArgumentType;
 use crate::command::context::command_context::CommandContext;
 use crate::command::errors::error_types::CommandErrorType;
 use crate::command::node::dispatcher::CommandDispatcher;
@@ -121,7 +122,7 @@ impl CommandExecutor for BanIpExecutor {
     fn execute(&self, context: &CommandContext) -> CommandExecutorResult {
         let target = StringArgumentType::get(context, "target")?;
         let reason = if self.has_reason {
-            Some(StringArgumentType::get(context, "reason")?.to_string())
+            Some(MessageArgumentType::get_message(context, "reason")?.get_text())
         } else {
             None
         };
@@ -141,7 +142,7 @@ pub fn register(dispatcher: &mut CommandDispatcher, registry: &PermissionRegistr
         argument("target", StringArgumentType::SingleWord)
             .executes(BanIpExecutor { has_reason: false })
             .then(
-                argument("reason", StringArgumentType::GreedyPhrase)
+                argument("reason", MessageArgumentType)
                     .executes(BanIpExecutor { has_reason: true }),
             ),
     );

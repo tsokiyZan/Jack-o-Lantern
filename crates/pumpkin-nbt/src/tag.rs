@@ -1,5 +1,7 @@
 //! The in-memory representation of individual NBT tags.
 
+use std::fmt::Write;
+
 use compound::NbtCompound;
 use deserializer::NbtReadHelper;
 use serializer::NbtWriteHelper;
@@ -8,6 +10,55 @@ use crate::{
     BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID, DOUBLE_ID, END_ID, Error, FLOAT_ID, INT_ARRAY_ID, INT_ID,
     LIST_ID, LONG_ARRAY_ID, LONG_ID, SHORT_ID, STRING_ID, compound, deserializer, serializer,
 };
+
+/// The value vanilla's `FloatTag.valueOf` stores, which turns -0.0 into 0.0. Every float tag
+/// vanilla creates goes through it.
+#[must_use]
+pub fn float_value_of(value: f32) -> f32 {
+    if value == 0.0 { 0.0 } else { value }
+}
+
+/// The value vanilla's `DoubleTag.valueOf` stores, which turns -0.0 into 0.0. Every double tag
+/// vanilla creates goes through it.
+#[must_use]
+pub fn double_value_of(value: f64) -> f64 {
+    if value == 0.0 { 0.0 } else { value }
+}
+
+/// Vanilla `StringTag.quoteAndEscape`: quotes with `'` when the first quote character in the
+/// string is `"` and with `"` otherwise, escaping backslashes, that quote and control characters.
+#[must_use]
+pub fn quote_and_escape(input: &str) -> String {
+    let mut result = String::with_capacity(input.len() + 2);
+    let mut quote = None;
+    for c in input.chars() {
+        match c {
+            '\\' => result.push_str("\\\\"),
+            '"' | '\'' => {
+                let q = *quote.get_or_insert(if c == '"' { '\'' } else { '"' });
+                if q == c {
+                    result.push('\\');
+                }
+                result.push(c);
+            }
+            '\u{8}' => result.push_str("\\b"),
+            '\t' => result.push_str("\\t"),
+            '\n' => result.push_str("\\n"),
+            '\u{c}' => result.push_str("\\f"),
+            '\r' => result.push_str("\\r"),
+            c if c < ' ' => {
+                let _ = write!(result, "\\x{:02X}", c as u32);
+            }
+            c => result.push(c),
+        }
+    }
+    let quote = quote.unwrap_or('"');
+    let mut quoted = String::with_capacity(result.len() + 2);
+    quoted.push(quote);
+    quoted.push_str(&result);
+    quoted.push(quote);
+    quoted
+}
 
 /// A value represented by one of the tag types defined by the NBT format.
 #[derive(Clone, Debug, PartialEq)]
@@ -42,6 +93,26 @@ pub enum NbtTag {
 }
 
 impl NbtTag {
+    /// Vanilla `TagType.getName` of this tag's type.
+    #[must_use]
+    pub const fn get_type_name(&self) -> &'static str {
+        match self {
+            Self::End => "END",
+            Self::Byte(_) => "BYTE",
+            Self::Short(_) => "SHORT",
+            Self::Int(_) => "INT",
+            Self::Long(_) => "LONG",
+            Self::Float(_) => "FLOAT",
+            Self::Double(_) => "DOUBLE",
+            Self::ByteArray(_) => "BYTE[]",
+            Self::String(_) => "STRING",
+            Self::List(_) => "LIST",
+            Self::Compound(_) => "COMPOUND",
+            Self::IntArray(_) => "INT[]",
+            Self::LongArray(_) => "LONG[]",
+        }
+    }
+
     /// Returns the numeric id associated with the data type.
     #[must_use]
     pub const fn get_type_id(&self) -> u8 {
@@ -132,8 +203,8 @@ impl NbtTag {
             Self::Short(short) => w.write_i16(short)?,
             Self::Int(int) => w.write_i32(int)?,
             Self::Long(long) => w.write_i64(long)?,
-            Self::Float(float) => w.write_f32(float)?,
-            Self::Double(double) => w.write_f64(double)?,
+            Self::Float(float) => w.write_f32(float_value_of(float))?,
+            Self::Double(double) => w.write_f64(double_value_of(double))?,
             Self::ByteArray(byte_array) => {
                 let len = byte_array.len();
                 if len > i32::MAX as usize {

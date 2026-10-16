@@ -1,3 +1,4 @@
+use pumpkin_util::fastutil::OpenHashKeys;
 use rustc_hash::FxHashMap;
 
 use pumpkin_data::scoreboard::ScoreboardDisplaySlot;
@@ -112,18 +113,52 @@ impl ScoreboardTarget for NoTarget {
     fn send_je<J: ClientPacket + Sync>(&self, _je_packet: &J) {}
 }
 
-#[derive(Clone, Debug, Default)]
+/// `Scoreboard.playerScores`' initial size and load factor.
+const PLAYER_SCORES_EXPECTED: usize = 16;
+const PLAYER_SCORES_LOAD_FACTOR: f32 = 0.5;
+
+#[derive(Clone, Debug)]
 pub struct Scoreboard {
     objectives: FxHashMap<String, ScoreboardObjective>,
     display_slots: FxHashMap<ScoreboardDisplaySlot, String>,
     scores: FxHashMap<String, FxHashMap<String, ScoreboardScore>>,
     teams: FxHashMap<String, Team>,
+    /// The holders vanilla keeps in `Scoreboard.playerScores`, in that map's order. A holder
+    /// stays tracked after its objectives are removed, until its scores are reset.
+    tracked_players: OpenHashKeys,
+    /// The names in vanilla's `Scoreboard.teamsByName`, in that map's order.
+    team_names: OpenHashKeys,
+}
+
+impl Default for Scoreboard {
+    fn default() -> Self {
+        Self {
+            objectives: FxHashMap::default(),
+            display_slots: FxHashMap::default(),
+            scores: FxHashMap::default(),
+            teams: FxHashMap::default(),
+            tracked_players: OpenHashKeys::new(PLAYER_SCORES_EXPECTED, PLAYER_SCORES_LOAD_FACTOR),
+            team_names: OpenHashKeys::default(),
+        }
+    }
 }
 
 impl Scoreboard {
     #[must_use]
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Vanilla `Scoreboard.getTrackedPlayers`.
+    pub fn get_tracked_players(&self) -> impl Iterator<Item = &str> {
+        self.tracked_players.iter()
+    }
+
+    /// Vanilla `Scoreboard.getPlayerTeams`, in the order iterating it gives.
+    pub fn get_player_teams(&self) -> impl Iterator<Item = &Team> {
+        self.team_names
+            .iter_rev()
+            .filter_map(|name| self.teams.get(name))
     }
 
     #[must_use]
@@ -380,6 +415,7 @@ impl Scoreboard {
 
         target.send_editioned(&je_packet, &be_packet);
 
+        self.tracked_players.insert(&score.entity_name);
         self.scores
             .entry(score.objective_name.clone())
             .or_default()
@@ -447,6 +483,14 @@ impl Scoreboard {
         if let Some(objective_scores) = self.scores.get_mut(objective_name) {
             objective_scores.remove(entity_name);
         }
+        // `resetSinglePlayerScore` stops tracking a holder left without scores.
+        if !self
+            .scores
+            .values()
+            .any(|objective_scores| objective_scores.contains_key(entity_name))
+        {
+            self.tracked_players.remove(entity_name);
+        }
     }
 
     pub fn reset_scores_for_entity(&mut self, target: &impl ScoreboardTarget, entity_name: &str) {
@@ -476,6 +520,7 @@ impl Scoreboard {
         for obj_scores in self.scores.values_mut() {
             obj_scores.remove(entity_name);
         }
+        self.tracked_players.remove(entity_name);
     }
 
     pub fn add_team(&mut self, target: &impl ScoreboardTarget, team: Team) {
@@ -484,23 +529,14 @@ impl Scoreboard {
             return;
         }
 
-        let parameters = TeamParameters {
-            display_name: &team.display_name,
-            options: team.options,
-            nametag_visibility: team.nametag_visibility.to_str(),
-            collision_rule: team.collision_rule.to_str(),
-            color: team.color as i32,
-            player_prefix: &team.player_prefix,
-            player_suffix: &team.player_suffix,
-        };
-
         target.send_je(&CSetPlayerTeam {
             team_name: team.name.clone(),
             method: TeamMethod::Create,
-            parameters: Some(parameters),
+            parameters: Some(team.parameters()),
             players: team.players.clone().into(),
         });
 
+        self.team_names.insert(&team.name);
         self.teams.insert(team.name.clone(), team);
     }
 
@@ -514,20 +550,10 @@ impl Scoreboard {
             return;
         }
 
-        let parameters = TeamParameters {
-            display_name: &team.display_name,
-            options: team.options,
-            nametag_visibility: team.nametag_visibility.to_str(),
-            collision_rule: team.collision_rule.to_str(),
-            color: team.color as i32,
-            player_prefix: &team.player_prefix,
-            player_suffix: &team.player_suffix,
-        };
-
         target.send_je(&CSetPlayerTeam {
             team_name: team.name.clone(),
             method: TeamMethod::Update,
-            parameters: Some(parameters),
+            parameters: Some(team.parameters()),
             players: Box::new([]),
         });
 
@@ -547,26 +573,27 @@ impl Scoreboard {
             players: Box::new([]),
         });
 
+        self.team_names.remove(name);
         self.teams.remove(name);
     }
 
+    /// Vanilla `Scoreboard.addPlayerToTeam`: the player leaves its current team first. Returns
+    /// whether it was added.
     pub fn add_player_to_team(
         &mut self,
         target: &impl ScoreboardTarget,
         team_name: &str,
         player: String,
-    ) {
-        let Some(team) = self.teams.get_mut(team_name) else {
+    ) -> bool {
+        if !self.teams.contains_key(team_name) {
             warn!(
                 "Tried to add player to Team which does not exist, {}",
                 team_name
             );
-            return;
-        };
-
-        if team.players.contains(&player) {
-            return;
+            return false;
         }
+
+        self.remove_player_from_any_team(target, &player);
 
         target.send_je(&CSetPlayerTeam {
             team_name: team_name.to_string(),
@@ -575,7 +602,23 @@ impl Scoreboard {
             players: vec![player.clone()].into(),
         });
 
-        team.players.push(player);
+        if let Some(team) = self.teams.get_mut(team_name) {
+            team.players.push(player);
+        }
+        true
+    }
+
+    /// Vanilla `Scoreboard.removePlayerFromTeam(String)`: returns whether the player had a team.
+    pub fn remove_player_from_any_team(
+        &mut self,
+        target: &impl ScoreboardTarget,
+        player: &str,
+    ) -> bool {
+        let Some(team_name) = self.get_entity_team(player).map(|team| team.name.clone()) else {
+            return false;
+        };
+        self.remove_player_from_team(target, &team_name, player);
+        true
     }
 
     pub fn remove_player_from_team(
@@ -695,19 +738,10 @@ impl Scoreboard {
         }
 
         for team in self.teams.values() {
-            let parameters = TeamParameters {
-                display_name: &team.display_name,
-                options: team.options,
-                nametag_visibility: team.nametag_visibility.to_str(),
-                collision_rule: team.collision_rule.to_str(),
-                color: team.color as i32,
-                player_prefix: &team.player_prefix,
-                player_suffix: &team.player_suffix,
-            };
             let je_packet = CSetPlayerTeam {
                 team_name: team.name.clone(),
                 method: TeamMethod::Create,
-                parameters: Some(parameters),
+                parameters: Some(team.parameters()),
                 players: team.players.clone().into(),
             };
             player.try_send_client_packet(&je_packet);
@@ -793,6 +827,13 @@ pub enum NameTagVisibility {
 }
 
 impl NameTagVisibility {
+    /// Vanilla `getDisplayName`.
+    #[must_use]
+    pub fn display_name(self) -> TextComponent {
+        let key = format!("team.visibility.{}", self.to_str());
+        TextComponent::translate_cross(key.clone(), key, [])
+    }
+
     #[must_use]
     pub const fn to_str(&self) -> &'static str {
         match self {
@@ -813,6 +854,13 @@ pub enum CollisionRule {
 }
 
 impl CollisionRule {
+    /// Vanilla `getDisplayName`.
+    #[must_use]
+    pub fn display_name(self) -> TextComponent {
+        let key = format!("team.collision.{}", self.to_str());
+        TextComponent::translate_cross(key.clone(), key, [])
+    }
+
     #[must_use]
     pub const fn to_str(&self) -> &'static str {
         match self {
@@ -830,11 +878,65 @@ pub struct Team {
     pub display_name: TextComponent,
     pub options: i8,
     pub nametag_visibility: NameTagVisibility,
+    pub death_message_visibility: NameTagVisibility,
     pub collision_rule: CollisionRule,
-    pub color: NamedColor,
+    pub color: Option<NamedColor>,
     pub player_prefix: TextComponent,
     pub player_suffix: TextComponent,
     pub players: Vec<String>,
+}
+
+impl Team {
+    pub const BIT_FRIENDLY_FIRE: i8 = 1;
+    pub const BIT_SEE_INVISIBLES: i8 = 2;
+
+    /// Vanilla `new PlayerTeam(scoreboard, name)`.
+    #[must_use]
+    pub fn new(name: String) -> Self {
+        Self {
+            display_name: TextComponent::text(name.clone()),
+            name,
+            options: Self::BIT_FRIENDLY_FIRE | Self::BIT_SEE_INVISIBLES,
+            nametag_visibility: NameTagVisibility::Always,
+            death_message_visibility: NameTagVisibility::Always,
+            collision_rule: CollisionRule::Always,
+            color: None,
+            player_prefix: TextComponent::empty(),
+            player_suffix: TextComponent::empty(),
+            players: Vec::new(),
+        }
+    }
+
+    /// Vanilla `PlayerTeam.getFormattedDisplayName`.
+    #[must_use]
+    pub fn formatted_display_name(&self) -> TextComponent {
+        let name = self
+            .display_name
+            .clone()
+            .insertion(self.name.clone())
+            .hover_event(pumpkin_util::text::hover::HoverEvent::show_text(
+                TextComponent::text(self.name.clone()),
+            ))
+            .wrap_in_square_brackets();
+        match self.color {
+            Some(color) => name.color_named(color),
+            None => name,
+        }
+    }
+
+    /// Vanilla `ClientboundSetPlayerTeamPacket.Parameters(PlayerTeam)`.
+    #[must_use]
+    pub fn parameters(&self) -> TeamParameters<'_> {
+        TeamParameters {
+            display_name: &self.display_name,
+            options: self.options,
+            nametag_visibility: self.nametag_visibility.to_str(),
+            collision_rule: self.collision_rule.to_str(),
+            color: self.color.map_or(-1, |color| color as i32),
+            player_prefix: &self.player_prefix,
+            player_suffix: &self.player_suffix,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -1210,6 +1312,7 @@ impl ScoreboardBuilder {
 
     #[must_use]
     pub fn team(mut self, team: Team) -> Self {
+        self.scoreboard.team_names.insert(&team.name);
         self.scoreboard.teams.insert(team.name.clone(), team);
         self
     }

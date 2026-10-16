@@ -3,9 +3,18 @@ use crate::command::{
     argument_types::argument_type::{ArgumentType, JavaClientArgumentType},
     context::command_context::CommandContext,
     errors::command_syntax_error::CommandSyntaxError,
+    errors::error_types::CommandErrorType,
     string_reader::StringReader,
     suggestion::suggestions::{Suggestions, SuggestionsBuilder},
 };
+use crate::world::scoreboard::{Scoreboard, Team};
+use pumpkin_data::translation;
+use pumpkin_util::text::TextComponent;
+
+const ERROR_TEAM_NOT_FOUND: CommandErrorType<1> = CommandErrorType::new(
+    translation::java::TEAM_NOTFOUND,
+    translation::java::TEAM_NOTFOUND,
+);
 
 /// Represents an argument type parsing a team name.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -48,5 +57,17 @@ impl TeamArgumentType {
     /// Returns a [`CommandContext`]'s parsed `String` argument as a string slice.
     pub fn get<'a>(context: &'a CommandContext, name: &str) -> Result<&'a str, CommandSyntaxError> {
         Ok(context.get_argument::<String>(name)?.as_str())
+    }
+
+    /// Vanilla `TeamArgument.getTeam`.
+    pub fn get_team<'a>(
+        context: &CommandContext,
+        name: &str,
+        scoreboard: &'a Scoreboard,
+    ) -> Result<&'a Team, CommandSyntaxError> {
+        let team_name = Self::get(context, name)?;
+        scoreboard.get_team(team_name).ok_or_else(|| {
+            ERROR_TEAM_NOT_FOUND.create_without_context(TextComponent::text(team_name.to_string()))
+        })
     }
 }

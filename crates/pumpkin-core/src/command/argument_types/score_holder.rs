@@ -10,12 +10,13 @@ use crate::command::{
     errors::command_syntax_error::CommandSyntaxError,
     errors::error_types::CommandErrorType,
     string_reader::StringReader,
+    suggestion::provider::{SuggestionProvider, SuggestionProviderResult},
     suggestion::suggestions::{Suggestions, SuggestionsBuilder},
 };
 use crate::entity::EntityBase;
 use pumpkin_data::translation;
 use pumpkin_util::text::TextComponent;
-use rustc_hash::FxHashSet;
+use pumpkin_util::text::hover::HoverEvent;
 use uuid::Uuid;
 
 const NO_WILDCARD_RESULTS: CommandErrorType<0> = CommandErrorType::new(
@@ -45,10 +46,15 @@ impl ResolvedScoreHolder {
         }
     }
 
-    fn entity(entity: &dyn EntityBase) -> Self {
+    /// Vanilla `ScoreHolder.getFeedbackDisplayName` of an entity: its display name, hovering its
+    /// scoreboard name.
+    pub fn entity(entity: &dyn EntityBase) -> Self {
+        let name = entity.get_scoreboard_name();
         Self {
-            name: entity.get_scoreboard_name(),
-            display_name: entity.get_display_name(),
+            display_name: entity
+                .get_display_name()
+                .hover_event(HoverEvent::show_text(TextComponent::text(name.clone()))),
+            name,
         }
     }
 
@@ -81,6 +87,20 @@ impl ResolvedScoreHolder {
             }
         }
         vec![Self::named(name.to_string())]
+    }
+}
+
+/// Vanilla `ScoreHolderArgument.SUGGEST_SCORE_HOLDERS`, which commands attach to their score
+/// holder arguments so the client asks the server.
+pub struct ScoreHolderSuggestionProvider;
+
+impl SuggestionProvider for ScoreHolderSuggestionProvider {
+    fn suggest(
+        &self,
+        context: &CommandContext,
+        builder: SuggestionsBuilder,
+    ) -> SuggestionProviderResult {
+        ScoreHolderArgumentType::Multiple.list_suggestions(context, builder)
     }
 }
 
@@ -168,7 +188,7 @@ impl ScoreHolderArgumentType {
         }
     }
 
-    /// Resolves holders without losing entity display names used in feedback.
+    /// Vanilla `ScoreHolderArgument.getNamesWithDefaultWildcard`: `*` is every tracked holder.
     pub fn get_score_holders(
         context: &CommandContext,
         name: &str,
@@ -188,19 +208,14 @@ impl ScoreHolderArgumentType {
                     .scoreboard
                     .lock()
                     .unwrap_or_else(std::sync::PoisonError::into_inner);
-                let mut names: Vec<String> = Vec::new();
-                let mut seen = FxHashSet::default();
-                for objective_scores in scoreboard.get_scores().values() {
-                    for holder in objective_scores.keys() {
-                        if seen.insert(holder) {
-                            names.push(holder.clone());
-                        }
-                    }
-                }
-                if names.is_empty() {
+                let holders: Vec<ResolvedScoreHolder> = scoreboard
+                    .get_tracked_players()
+                    .map(|name| ResolvedScoreHolder::named(name.to_string()))
+                    .collect();
+                if holders.is_empty() {
                     return Err(NO_WILDCARD_RESULTS.create_without_context());
                 }
-                names.into_iter().map(ResolvedScoreHolder::named).collect()
+                holders
             }
         };
         if holders.is_empty() {

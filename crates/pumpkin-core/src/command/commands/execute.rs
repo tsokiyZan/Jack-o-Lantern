@@ -36,6 +36,7 @@ use crate::command::argument_types::resource::{ENTITY_TYPE_ARGUMENT, ResourceArg
 use crate::command::argument_types::resource_key::{BIOME_REGISTRY, ResourceKeyArgument};
 use crate::command::argument_types::resource_or_tag::{ResourceOrTag, ResourceOrTagArgument};
 use crate::command::argument_types::score_holder::ScoreHolderArgumentType;
+use crate::command::argument_types::score_holder::ScoreHolderSuggestionProvider;
 use crate::command::commands::bossbar::{BossbarIdArgumentType, handle_bossbar_error};
 use crate::command::commands::data::{
     BlockDataAccessor, DataAccessor, EntityDataAccessor, StorageDataAccessor, TargetKind,
@@ -52,6 +53,7 @@ use crate::command::node::dispatcher::CommandDispatcher;
 use crate::command::node::tree::Tree;
 use crate::command::node::{CommandExecutor, CommandExecutorResult, RedirectModifier, Redirection};
 use crate::data::datapack::DatapackManager;
+use crate::data::datapack::function_loader::FunctionInstantiationError;
 use crate::entity::EntityBase;
 use crate::entity::r#type::from_type;
 use crate::world::World;
@@ -85,6 +87,10 @@ static ERROR_INVALID_DIMENSION: CommandErrorType<1> =
 
 const MAX_TEST_AREA: i64 = 32768;
 
+const ERROR_FUNCTION_CONDITION_INSTANTATION_FAILURE: CommandErrorType<2> = CommandErrorType::new(
+    translation::java::COMMANDS_EXECUTE_FUNCTION_INSTANTIATIONFAILURE,
+    translation::java::COMMANDS_EXECUTE_FUNCTION_INSTANTIATIONFAILURE,
+);
 const ERROR_AREA_TOO_LARGE: CommandErrorType<2> = CommandErrorType::new(
     translation::java::COMMANDS_EXECUTE_BLOCKS_TOOBIG,
     translation::java::COMMANDS_EXECUTE_BLOCKS_TOOBIG,
@@ -767,14 +773,18 @@ fn wrap_stores(parent: LiteralArgumentBuilder, store_result: bool) -> LiteralArg
 
     parent
         .then(
-            literal("score").then(argument("targets", ScoreHolderArgumentType::Multiple).then(
-                argument("objective", ObjectiveArgumentType).redirect_with_modifier(
-                    Redirection::Root,
-                    RedirectModifier::Custom(Arc::new(move |context: &CommandContext| {
-                        store_score(context, store_result)
-                    })),
-                ),
-            )),
+            literal("score").then(
+                argument("targets", ScoreHolderArgumentType::Multiple)
+                    .suggests(ScoreHolderSuggestionProvider)
+                    .then(
+                        argument("objective", ObjectiveArgumentType).redirect_with_modifier(
+                            Redirection::Root,
+                            RedirectModifier::Custom(Arc::new(move |context: &CommandContext| {
+                                store_score(context, store_result)
+                            })),
+                        ),
+                    ),
+            ),
         )
         .then(
             literal("bossbar").then(
@@ -815,6 +825,21 @@ fn execute_if_function(
             .clone()
             .with_command_result_taker(ResultValueTaker::new()),
     );
+    // Instantiation stops at the first function that fails; the ones before it still run.
+    let mut instantiated = Vec::with_capacity(functions.len());
+    for (id, function) in &functions {
+        match DatapackManager::instantiate(server, function, None, &function_source) {
+            Ok(lines) => instantiated.push(lines),
+            Err(FunctionInstantiationError(reason)) => {
+                if !context.chain_modifiers.is_forked() {
+                    let error = ERROR_FUNCTION_CONDITION_INSTANTATION_FAILURE
+                        .create_without_context(TextComponent::text(id.clone()), reason);
+                    context.source.send_error(error.message);
+                }
+                break;
+            }
+        }
+    }
     let passed = Arc::new(AtomicBool::new(false));
     let callback = {
         let passed = passed.clone();
@@ -827,7 +852,7 @@ fn execute_if_function(
     // Vanilla IsolatedCall, then FallthroughTask if no function returned.
     execution::run_in_new_frame(callback, false, |frame| {
         let generation = frame.generation();
-        for (_, lines) in &functions {
+        for lines in &instantiated {
             if frame.generation() != generation {
                 return;
             }
@@ -1130,13 +1155,15 @@ fn check_regions_in(
 /// Vanilla `ExecuteCommand.addConditionals`.
 fn add_conditionals(parent: LiteralArgumentBuilder, expected: bool) -> LiteralArgumentBuilder {
     let score_comparison = |operator: &'static str, predicate: CommandPredicate| {
-        literal(operator).then(argument("source", ScoreHolderArgumentType::Single).then(
-            add_conditional(
-                argument("sourceObjective", ObjectiveArgumentType),
-                expected,
-                predicate,
-            ),
-        ))
+        literal(operator).then(
+            argument("source", ScoreHolderArgumentType::Single)
+                .suggests(ScoreHolderSuggestionProvider)
+                .then(add_conditional(
+                    argument("sourceObjective", ObjectiveArgumentType),
+                    expected,
+                    predicate,
+                )),
+        )
     };
     let data_source = |source: RequiredArgumentBuilder, condition: CommandNumericPredicate| {
         source.then(add_numeric_conditional(
@@ -1173,19 +1200,21 @@ fn add_conditionals(parent: LiteralArgumentBuilder, expected: bool) -> LiteralAr
         )))
         .then(
             literal("score").then(
-                argument("target", ScoreHolderArgumentType::Single).then(
-                    argument("targetObjective", ObjectiveArgumentType)
-                        .then(score_comparison("=", |c| check_score(c, |a, b| a == b)))
-                        .then(score_comparison("<", |c| check_score(c, |a, b| a < b)))
-                        .then(score_comparison("<=", |c| check_score(c, |a, b| a <= b)))
-                        .then(score_comparison(">", |c| check_score(c, |a, b| a > b)))
-                        .then(score_comparison(">=", |c| check_score(c, |a, b| a >= b)))
-                        .then(literal("matches").then(add_conditional(
-                            argument("range", IntRangeArgumentType),
-                            expected,
-                            check_score_range,
-                        ))),
-                ),
+                argument("target", ScoreHolderArgumentType::Single)
+                    .suggests(ScoreHolderSuggestionProvider)
+                    .then(
+                        argument("targetObjective", ObjectiveArgumentType)
+                            .then(score_comparison("=", |c| check_score(c, |a, b| a == b)))
+                            .then(score_comparison("<", |c| check_score(c, |a, b| a < b)))
+                            .then(score_comparison("<=", |c| check_score(c, |a, b| a <= b)))
+                            .then(score_comparison(">", |c| check_score(c, |a, b| a > b)))
+                            .then(score_comparison(">=", |c| check_score(c, |a, b| a >= b)))
+                            .then(literal("matches").then(add_conditional(
+                                argument("range", IntRangeArgumentType),
+                                expected,
+                                check_score_range,
+                            ))),
+                    ),
             ),
         )
         .then(

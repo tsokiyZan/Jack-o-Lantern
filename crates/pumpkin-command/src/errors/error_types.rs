@@ -96,6 +96,11 @@ pub const LONG_TOO_HIGH: CommandErrorType<2> = CommandErrorType::new(
     translation::java::ARGUMENT_LONG_BIG,
 );
 
+/// Vanilla `BuildContexts.ERROR_FORK_LIMIT_REACHED`.
+pub const ERROR_FORK_LIMIT_REACHED: CommandErrorType<1> = CommandErrorType::new(
+    translation::java::COMMAND_FORKLIMIT,
+    translation::java::COMMAND_FORKLIMIT,
+);
 pub const DISPATCHER_UNKNOWN_COMMAND: CommandErrorType<1> = CommandErrorType::new(
     translation::java::COMMAND_UNKNOWN_COMMAND,
     translation::bedrock::COMMANDS_GENERIC_UNKNOWN,

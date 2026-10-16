@@ -1,8 +1,7 @@
 use pumpkin_data::world::SAY_COMMAND;
-use pumpkin_util::text::TextComponent;
 
 use crate::command::argument_builder::{ArgumentBuilder, argument, command};
-use crate::command::argument_types::core::string::StringArgumentType;
+use crate::command::argument_types::message::MessageArgumentType;
 use crate::command::context::command_context::CommandContext;
 use crate::command::node::dispatcher::CommandDispatcher;
 use crate::command::node::{CommandExecutor, CommandExecutorResult};
@@ -19,14 +18,11 @@ struct Executor;
 
 impl CommandExecutor for Executor {
     fn execute(&self, context: &CommandContext) -> CommandExecutorResult {
-        let msg = context.get_argument::<String>(ARG_MESSAGE)?;
+        let msg = MessageArgumentType::get_message(context, ARG_MESSAGE)?;
 
-        context.server().broadcast_message(
-            &TextComponent::text(msg.clone()),
-            &context.source.display_name,
-            SAY_COMMAND,
-            None,
-        );
+        context
+            .server()
+            .broadcast_message(&msg, &context.source.display_name, SAY_COMMAND, None);
 
         Ok(1)
     }
@@ -41,6 +37,6 @@ pub fn register(dispatcher: &mut CommandDispatcher, registry: &PermissionRegistr
     dispatcher.register(
         command(NAME, DESCRIPTION)
             .requires(PERMISSION)
-            .then(argument(ARG_MESSAGE, StringArgumentType::GreedyPhrase).executes(Executor)),
+            .then(argument(ARG_MESSAGE, MessageArgumentType).executes(Executor)),
     );
 }

@@ -31,6 +31,7 @@ use pumpkin_command::source::ResultValueTaker;
 
 use self::context_provider_loader::ContextProviderRegistry;
 use self::damage_type_loader::{DamageTypeDefinition, DamageTypeEntry, DamageTypeRegistry};
+use self::function_loader::{CommandFunction, FunctionInstantiationError, TagEntry};
 use self::test_loader::{
     TestInstance, TestInstanceRegistry, load_test_instances_from_dir, to_registry_entry,
 };
@@ -74,8 +75,8 @@ pub enum DatapackEnablePosition {
     After(String),
 }
 
-/// A function's id and its command lines.
-pub type ResolvedFunction = (String, Arc<[String]>);
+/// A function's id and the function.
+pub type ResolvedFunction = (String, Arc<CommandFunction>);
 
 /// A `function` argument naming a function that isn't loaded.
 #[derive(Debug, PartialEq, Eq)]
@@ -89,7 +90,7 @@ impl std::fmt::Display for FunctionLookupError {
 
 pub struct DatapackManager {
     loaded_packs: RwLock<Vec<LoadedDatapack>>,
-    functions: RwLock<HashMap<String, Arc<[String]>>>,
+    functions: RwLock<HashMap<String, Arc<CommandFunction>>>,
     function_tags: RwLock<HashMap<String, Vec<String>>>,
     test_instances: RwLock<TestInstanceRegistry>,
     context_int_providers: RwLock<ContextProviderRegistry>,
@@ -98,15 +99,6 @@ pub struct DatapackManager {
     loot_tables: RwLock<HashMap<String, Arc<DynamicLootTable>>>,
     dynamic_registries: RwLock<HashMap<String, HashMap<String, RegistryEntryData>>>,
     trade_registry: RwLock<TradeRegistry>,
-}
-
-fn share_function_bodies(
-    functions: HashMap<String, Vec<String>>,
-) -> HashMap<String, Arc<[String]>> {
-    functions
-        .into_iter()
-        .map(|(name, lines)| (name, lines.into()))
-        .collect()
 }
 
 impl Default for DatapackManager {
@@ -143,7 +135,7 @@ impl DatapackManager {
         let mut loaded_packs_vec = Vec::new();
         let mut all_recipes: Vec<DynamicRecipe> = Vec::new();
         let mut all_functions: HashMap<String, Vec<String>> = HashMap::new();
-        let mut all_function_tags: HashMap<String, Vec<String>> = HashMap::new();
+        let mut all_function_tags: HashMap<String, Vec<TagEntry>> = HashMap::new();
         let mut all_test_instances: TestInstanceRegistry = HashMap::new();
         let mut all_context_int_providers: ContextProviderRegistry = HashMap::new();
         let mut all_context_float_providers: ContextProviderRegistry = HashMap::new();
@@ -197,7 +189,9 @@ impl DatapackManager {
             .loaded_packs
             .write()
             .unwrap_or_else(std::sync::PoisonError::into_inner) = loaded_packs_vec;
-        let all_functions = share_function_bodies(all_functions);
+        let all_functions = function_loader::compile_functions(all_functions);
+        let all_function_tags =
+            function_loader::build_function_tags(&all_function_tags, &all_functions);
         *self
             .functions
             .write()
@@ -241,15 +235,6 @@ impl DatapackManager {
             .read()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone()
-    }
-
-    pub fn get_functions(&self) -> HashMap<String, Vec<String>> {
-        self.functions
-            .read()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .iter()
-            .map(|(name, lines)| (name.clone(), lines.to_vec()))
-            .collect()
     }
 
     pub fn get_test_instance(&self, name: &str) -> Option<TestInstance> {
@@ -748,8 +733,7 @@ impl DatapackManager {
     }
 
     /// Vanilla `FunctionArgument.getFunctions`: the function `name` names, or every function
-    /// of the tag `#name`. An unknown tag is empty, and tag entries without a loaded function
-    /// are skipped.
+    /// of the tag `#name`. An unknown tag is empty.
     pub fn resolve_functions(
         &self,
         name: &str,
@@ -769,16 +753,31 @@ impl DatapackManager {
         let Some(tag_ids) = tag_ids else {
             return all_functions
                 .get(name)
-                .map(|lines| vec![(name.to_string(), Arc::clone(lines))])
+                .map(|function| vec![(name.to_string(), Arc::clone(function))])
                 .ok_or_else(|| FunctionLookupError(name.to_string()));
         };
         Ok(tag_ids
             .into_iter()
             .filter_map(|id| {
-                let lines = Arc::clone(all_functions.get(&id)?);
-                Some((id, lines))
+                let function = Arc::clone(all_functions.get(&id)?);
+                Some((id, function))
             })
             .collect())
+    }
+
+    /// Vanilla `CommandFunction.instantiate`, checking the filled-in macro lines with the
+    /// command dispatcher.
+    pub fn instantiate(
+        server: &Server,
+        function: &CommandFunction,
+        arguments: Option<&NbtCompound>,
+        source: &CommandSource,
+    ) -> Result<Arc<[String]>, FunctionInstantiationError> {
+        let dispatcher = server.command_dispatcher.load();
+        function.instantiate(arguments, |command| {
+            let parsed = dispatcher.parse_input(command, source);
+            CommandDispatcher::validate_parse_results(&parsed).map_err(|error| error.get_message())
+        })
     }
 
     /// Vanilla `CallFunction.execute`: runs the function's commands as entries of a new frame
@@ -792,11 +791,15 @@ impl DatapackManager {
         return_parent_frame: bool,
     ) -> usize {
         let dispatcher = server.command_dispatcher.load();
+        if execution::quota_exhausted() {
+            return 0;
+        }
+        execution::increment_cost();
         execution::run_in_new_frame(result_callback, return_parent_frame, |frame| {
             let generation = frame.generation();
             let mut executed = 0;
             for line in lines {
-                if frame.generation() != generation {
+                if frame.generation() != generation || execution::quota_exhausted() {
                     break;
                 }
                 if let Err(error) = dispatcher.execute_input_in_current_frame(line, source) {
@@ -818,15 +821,23 @@ impl DatapackManager {
         name: &str,
     ) -> Result<usize, FunctionLookupError> {
         let mut executed = 0;
-        for (_, lines) in self.resolve_functions(name)? {
-            executed += execution::run_in_new_frame(ResultValueTaker::new(), false, |_| {
-                Self::call_function(
-                    server,
-                    &lines,
-                    source,
-                    source.command_result_taker.clone(),
-                    false,
-                )
+        for (_, function) in self.resolve_functions(name)? {
+            // A macro function can't run without arguments; vanilla skips it silently.
+            let Ok(lines) = Self::instantiate(server, &function, None, source) else {
+                continue;
+            };
+            let (command_limit, fork_limit) =
+                pumpkin_command::source::CommandSource::command_limits(source);
+            executed += execution::execute_in_context(command_limit, fork_limit, || {
+                execution::run_in_new_frame(ResultValueTaker::new(), false, |_| {
+                    Self::call_function(
+                        server,
+                        &lines,
+                        source,
+                        source.command_result_taker.clone(),
+                        false,
+                    )
+                })
             });
         }
         Ok(executed)
@@ -1279,7 +1290,7 @@ fn build_damage_type_registry(
 struct PackContentAccumulators<'a> {
     recipes: &'a mut Vec<DynamicRecipe>,
     functions: &'a mut HashMap<String, Vec<String>>,
-    function_tags: &'a mut HashMap<String, Vec<String>>,
+    function_tags: &'a mut HashMap<String, Vec<TagEntry>>,
     test_instances: &'a mut TestInstanceRegistry,
     damage_types: &'a mut HashMap<String, DamageTypeDefinition>,
     context_int_providers: &'a mut ContextProviderRegistry,
@@ -1728,6 +1739,13 @@ fn load_recipes_from_dir(
 #[cfg(test)]
 mod tests {
     use super::{DatapackManager, FunctionLookupError};
+    use crate::data::datapack::function_loader::CommandFunction;
+    use std::sync::Arc;
+
+    fn function(id: &str, lines: &[&str]) -> Arc<CommandFunction> {
+        let lines: Vec<String> = lines.iter().map(ToString::to_string).collect();
+        Arc::new(CommandFunction::from_lines(id, &lines).expect("valid function"))
+    }
 
     #[test]
     fn function_resolution_releases_the_functions_lock() {
@@ -1738,7 +1756,7 @@ mod tests {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .insert(
                 "test:reentrant".to_string(),
-                vec!["first command".to_string(), "second command".to_string()].into(),
+                function("test:reentrant", &["first command", "second command"]),
             );
 
         let functions = manager
@@ -1752,7 +1770,10 @@ mod tests {
         );
 
         assert_eq!(functions.len(), 1);
-        assert_eq!(&*functions[0].1, ["first command", "second command"]);
+        let Ok(commands) = functions[0].1.instantiate(None, |_| Ok(())) else {
+            panic!("a plain function instantiates");
+        };
+        assert_eq!(&*commands, ["first command", "second command"]);
     }
 
     #[test]
@@ -1764,7 +1785,7 @@ mod tests {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .insert(
                 "test:known".to_string(),
-                vec!["known command".to_string()].into(),
+                function("test:known", &["known command"]),
             );
         manager
             .function_tags
@@ -1782,10 +1803,14 @@ mod tests {
         assert_eq!(functions[0].0, "test:known");
 
         assert_eq!(
-            manager.resolve_functions("test:missing"),
-            Err(FunctionLookupError("test:missing".to_string()))
+            manager.resolve_functions("test:missing").err(),
+            Some(FunctionLookupError("test:missing".to_string()))
         );
-        assert_eq!(manager.resolve_functions("#test:missing"), Ok(Vec::new()));
+        assert!(
+            manager
+                .resolve_functions("#test:missing")
+                .is_ok_and(|functions| functions.is_empty())
+        );
     }
 
     #[test]
