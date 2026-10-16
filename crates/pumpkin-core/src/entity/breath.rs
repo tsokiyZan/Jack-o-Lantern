@@ -78,6 +78,8 @@ impl BreathManager {
     /// Vanilla `LivingEntity.decreaseAirSupply`: Respiration (the oxygen bonus
     /// attribute) gives a chance to keep the air this tick.
     fn decrease_air_supply(living: &LivingEntity, current: i32) -> i32 {
+        // `getAttribute(OXYGEN_BONUS)` makes the instance.
+        living.get_attribute_instance(&Attributes::OXYGEN_BONUS);
         let oxygen_bonus = living.get_attribute_value(&Attributes::OXYGEN_BONUS);
         if oxygen_bonus > 0.0 && rand::rng().random::<f64>() >= 1.0 / (oxygen_bonus + 1.0) {
             current

@@ -72,12 +72,8 @@ impl CommandExecutor for GetExecutor {
             1.0
         };
 
-        let has_attr = living
-            .attributes
-            .read()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .contains_key(&attribute.id);
-        if !has_attr {
+        // Vanilla `getEntityWithAttribute`: `hasAttribute`, without making an instance.
+        if !living.has_attribute(&attribute) {
             return Err(NO_ATTRIBUTE_ERROR.create_without_context(
                 target.get_name(),
                 TextComponent::translate(attribute_translation_key(&attribute), []),
@@ -136,12 +132,8 @@ impl CommandExecutor for BaseSetExecutor {
         let attribute = AttributeArgumentType::get(context, ARG_ATTRIBUTE)?;
         let value = DoubleArgumentType::get(context, ARG_VALUE)?;
 
-        let has_attr = living
-            .attributes
-            .read()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .contains_key(&attribute.id);
-        if !has_attr {
+        // Vanilla `getAttributeInstance`: `getInstance` makes it.
+        if !living.get_attribute_instance(&attribute) {
             return Err(NO_ATTRIBUTE_ERROR.create_without_context(
                 target.get_name(),
                 TextComponent::translate(attribute_translation_key(&attribute), []),
@@ -182,20 +174,15 @@ impl CommandExecutor for BaseResetExecutor {
 
         let attribute = AttributeArgumentType::get(context, ARG_ATTRIBUTE)?;
 
-        let has_attr = living
-            .attributes
-            .read()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .contains_key(&attribute.id);
-        if !has_attr {
+        // Vanilla `AttributeMap.resetBaseValue`.
+        if !living.reset_attribute_base(&attribute) {
             return Err(NO_ATTRIBUTE_ERROR.create_without_context(
                 target.get_name(),
                 TextComponent::translate(attribute_translation_key(&attribute), []),
             ));
         }
 
-        let default_val = attribute.default_value;
-        living.set_attribute_base(&attribute, default_val);
+        let default_val = living.get_attribute_base(&attribute);
         crate::entity::attributes::send_attribute_updates_for_living(
             living,
             vec![attribute.clone()],
@@ -236,6 +223,8 @@ impl CommandExecutor for ModifierAddExecutor {
 
         let modifier_id = uuid.to_string();
 
+        // Vanilla `getAttributeInstance`: `getInstance` makes it.
+        living.get_attribute_instance(&attribute);
         let res = {
             let mut map = living
                 .attributes
@@ -302,6 +291,8 @@ impl CommandExecutor for ModifierRemoveExecutor {
 
         let modifier_id = uuid.to_string();
 
+        // Vanilla `getAttributeInstance`: `getInstance` makes it.
+        living.get_attribute_instance(&attribute);
         let res = {
             let mut map = living
                 .attributes
@@ -368,22 +359,22 @@ impl CommandExecutor for ModifierGetExecutor {
 
         let modifier_id = uuid.to_string();
 
+        // Vanilla `getEntityWithAttribute`.
+        if !living.has_attribute(&attribute) {
+            return Err(NO_ATTRIBUTE_ERROR.create_without_context(
+                target.get_name(),
+                TextComponent::translate(attribute_translation_key(&attribute), []),
+            ));
+        }
         let val = {
             let map = living
                 .attributes
                 .read()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
-            let inst = map.get(&attribute.id).ok_or_else(|| {
-                NO_ATTRIBUTE_ERROR.create_without_context(
-                    target.get_name(),
-                    TextComponent::translate(attribute_translation_key(&attribute), []),
-                )
-            })?;
-
-            let modifier = inst
-                .modifiers
-                .iter()
-                .find(|m| m.id == modifier_id)
+            // `hasModifier` finds none on an attribute without an instance.
+            let modifier = map
+                .get(&attribute.id)
+                .and_then(|inst| inst.modifiers.iter().find(|m| m.id == modifier_id))
                 .ok_or_else(|| {
                     NO_MODIFIER_ERROR.create_without_context(
                         TextComponent::translate(attribute_translation_key(&attribute), []),
