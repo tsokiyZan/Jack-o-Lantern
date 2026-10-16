@@ -1,13 +1,17 @@
 use std::ops::BitOr;
 
 use pumpkin_data::entity::EntityStatus;
+use pumpkin_data::item::Item;
+use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::tag::{self, Taggable};
 use rand::RngExt;
 
 use super::{Controls, Goal};
 use crate::entity::mob::Mob;
+use crate::entity::passive::copper_golem::CopperGolemEntity;
 
 pub const OFFER_TICKS: i32 = 400;
+const OFFER_ITEM: &Item = &Item::POPPY;
 
 pub struct OfferFlowerGoal {
     pub target_entity_id: Option<i32>,
@@ -120,15 +124,26 @@ impl Goal for OfferFlowerGoal {
             && let Some(target_id) = self.target_entity_id
         {
             let world = mob.get_entity().world.load();
-            if let Some(target) = world.get_entity_by_id(target_id) {
+            if let Some(target) = world.get_entity_by_id(target_id)
+                && let Some(target_mob) = target.get_mob()
+            {
                 let target_entity = target.get_entity();
                 let bb = mob.get_entity().bounding_box.load().expand(6.0, 2.0, 6.0);
+                let target_mob_entity = target_mob.get_mob_entity();
                 if target_entity
                     .entity_type
                     .has_tag(&tag::EntityType::MINECRAFT_ACCEPTS_IRON_GOLEM_GIFT)
+                    && target_mob_entity
+                        .get_item_slot(&CopperGolemEntity::EQUIPMENT_SLOT_ANTENNA)
+                        .is_empty()
                     && bb.intersects(&target_entity.bounding_box.load())
                 {
-                    // TODO: hand the poppy over once mobs can hold equipment gifts.
+                    target_mob_entity.set_item_slot(
+                        &CopperGolemEntity::EQUIPMENT_SLOT_ANTENNA,
+                        ItemStack::new(1, OFFER_ITEM),
+                    );
+                    target_mob_entity
+                        .set_guaranteed_drop(&CopperGolemEntity::EQUIPMENT_SLOT_ANTENNA);
                 }
             }
         }
