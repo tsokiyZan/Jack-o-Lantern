@@ -16,6 +16,7 @@ use crate::{math::vector3::Axis, random::RandomImpl};
 
 pub mod biome;
 pub mod difficulty;
+pub mod fastutil;
 pub mod gamemode;
 pub mod loot_table;
 pub mod math;

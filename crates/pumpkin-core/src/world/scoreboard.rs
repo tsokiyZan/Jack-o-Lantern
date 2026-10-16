@@ -1,3 +1,4 @@
+use pumpkin_util::fastutil::OpenHashKeys;
 use rustc_hash::FxHashMap;
 
 use pumpkin_data::scoreboard::ScoreboardDisplaySlot;
@@ -112,18 +113,42 @@ impl ScoreboardTarget for NoTarget {
     fn send_je<J: ClientPacket + Sync>(&self, _je_packet: &J) {}
 }
 
-#[derive(Clone, Debug, Default)]
+/// `Scoreboard.playerScores`' initial size and load factor.
+const PLAYER_SCORES_EXPECTED: usize = 16;
+const PLAYER_SCORES_LOAD_FACTOR: f32 = 0.5;
+
+#[derive(Clone, Debug)]
 pub struct Scoreboard {
     objectives: FxHashMap<String, ScoreboardObjective>,
     display_slots: FxHashMap<ScoreboardDisplaySlot, String>,
     scores: FxHashMap<String, FxHashMap<String, ScoreboardScore>>,
     teams: FxHashMap<String, Team>,
+    /// The holders vanilla keeps in `Scoreboard.playerScores`, in that map's order. A holder
+    /// stays tracked after its objectives are removed, until its scores are reset.
+    tracked_players: OpenHashKeys,
+}
+
+impl Default for Scoreboard {
+    fn default() -> Self {
+        Self {
+            objectives: FxHashMap::default(),
+            display_slots: FxHashMap::default(),
+            scores: FxHashMap::default(),
+            teams: FxHashMap::default(),
+            tracked_players: OpenHashKeys::new(PLAYER_SCORES_EXPECTED, PLAYER_SCORES_LOAD_FACTOR),
+        }
+    }
 }
 
 impl Scoreboard {
     #[must_use]
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Vanilla `Scoreboard.getTrackedPlayers`.
+    pub fn get_tracked_players(&self) -> impl Iterator<Item = &str> {
+        self.tracked_players.iter()
     }
 
     #[must_use]
@@ -380,6 +405,7 @@ impl Scoreboard {
 
         target.send_editioned(&je_packet, &be_packet);
 
+        self.tracked_players.insert(&score.entity_name);
         self.scores
             .entry(score.objective_name.clone())
             .or_default()
@@ -447,6 +473,14 @@ impl Scoreboard {
         if let Some(objective_scores) = self.scores.get_mut(objective_name) {
             objective_scores.remove(entity_name);
         }
+        // `resetSinglePlayerScore` stops tracking a holder left without scores.
+        if !self
+            .scores
+            .values()
+            .any(|objective_scores| objective_scores.contains_key(entity_name))
+        {
+            self.tracked_players.remove(entity_name);
+        }
     }
 
     pub fn reset_scores_for_entity(&mut self, target: &impl ScoreboardTarget, entity_name: &str) {
@@ -476,6 +510,7 @@ impl Scoreboard {
         for obj_scores in self.scores.values_mut() {
             obj_scores.remove(entity_name);
         }
+        self.tracked_players.remove(entity_name);
     }
 
     pub fn add_team(&mut self, target: &impl ScoreboardTarget, team: Team) {
