@@ -2,6 +2,9 @@ use pumpkin_util::text::TextComponent;
 
 use crate::errors::error_types::AnyCommandErrorType;
 
+/// Brigadier `CommandSyntaxException.CONTEXT_AMOUNT`.
+const CONTEXT_AMOUNT: usize = 10;
+
 /// A struct detailing the context of a syntax error, including where it happened.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommandSyntaxErrorContext {
@@ -37,6 +40,25 @@ pub struct CommandSyntaxError {
 }
 
 impl CommandSyntaxError {
+    /// Brigadier `CommandSyntaxException.getMessage`: the message, then where in the input it
+    /// happened.
+    #[must_use]
+    pub fn get_message(&self) -> String {
+        let mut message = self.message.clone().get_java_text();
+        if let Some(context) = &self.context {
+            let cursor = context.input.len().min(context.cursor);
+            message.push_str(" at position ");
+            message.push_str(&context.cursor.to_string());
+            message.push_str(": ");
+            if cursor > CONTEXT_AMOUNT {
+                message.push_str("...");
+            }
+            message.push_str(&context.input[cursor.saturating_sub(CONTEXT_AMOUNT)..cursor]);
+            message.push_str("<--[HERE]");
+        }
+        message
+    }
+
     /// Constructs a new [`CommandSyntaxError`] without any context of the error,
     /// and only the error message itself.
     ///

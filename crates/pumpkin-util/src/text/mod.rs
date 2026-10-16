@@ -1527,6 +1527,29 @@ impl TextComponent {
         self.0.get_text(Locale::EnUs)
     }
 
+    /// Extracts the raw text content for English (US) with the Java Edition translations, like
+    /// vanilla `Component.getString`.
+    #[must_use]
+    pub fn get_java_text(self) -> String {
+        fn java_only(mut base: TextComponentBase) -> TextComponentBase {
+            if let TextContent::Translate {
+                bedrock_translate,
+                with,
+                ..
+            } = base.content.as_mut()
+            {
+                *bedrock_translate = None;
+                *with = std::mem::take(with).into_iter().map(java_only).collect();
+            }
+            base.extra = std::mem::take(&mut base.extra)
+                .into_iter()
+                .map(java_only)
+                .collect();
+            base
+        }
+        java_only(self.0).get_text(Locale::EnUs)
+    }
+
     /// Creates a chat message with formatting placeholders replaced.
     ///
     /// Replaces:

@@ -4,8 +4,11 @@ use pumpkin_util::permission::{Permission, PermissionDefault, PermissionRegistry
 use pumpkin_util::text::TextComponent;
 
 use crate::command::CommandSource;
-use crate::command::argument_builder::{ArgumentBuilder, argument, command};
+use crate::command::argument_builder::{ArgumentBuilder, argument, command, literal};
 use crate::command::argument_types::function::FunctionArgumentType;
+use crate::command::argument_types::nbt::NbtCompoundArgumentType;
+use crate::command::argument_types::nbt_path::{NbtPath, NbtPathArgumentType};
+use crate::command::commands::data::{DataAccessor, TargetKind, get_single_tag, make_target_arg};
 use crate::command::context::command_context::CommandContext;
 use crate::command::errors::command_syntax_error::CommandSyntaxError;
 use crate::command::errors::error_types::CommandErrorType;
@@ -13,14 +16,22 @@ use crate::command::node::dispatcher::CommandDispatcher;
 use crate::command::node::{CommandExecutor, CommandExecutorResult};
 use crate::command::suggestion::provider::{SuggestionProvider, SuggestionProviderResult};
 use crate::command::suggestion::suggestions::SuggestionsBuilder;
+use crate::data::datapack::function_loader::FunctionInstantiationError;
 use crate::data::datapack::{DatapackManager, FunctionLookupError, ResolvedFunction};
 use crate::server::Server;
 use pumpkin_command::execution::{self, ChainModifiers};
 use pumpkin_command::source::{ResultValueTaker, ReturnValue};
+use pumpkin_nbt::compound::NbtCompound;
+use pumpkin_nbt::tag::NbtTag;
 use std::sync::{Arc, Mutex};
 
 const DESCRIPTION: &str = "Runs commands found in the corresponding function files.";
 const PERMISSION: &str = "minecraft:command.function";
+
+const ARG_NAME: &str = "name";
+const ARG_ARGUMENTS: &str = "arguments";
+const ARG_SOURCE: &str = "source";
+const ARG_PATH: &str = "path";
 
 static ERROR_UNKNOWN_FUNCTION: CommandErrorType<1> = CommandErrorType::new(
     translation::java::ARGUMENTS_FUNCTION_UNKNOWN,
@@ -29,6 +40,14 @@ static ERROR_UNKNOWN_FUNCTION: CommandErrorType<1> = CommandErrorType::new(
 static ERROR_NO_FUNCTIONS: CommandErrorType<1> = CommandErrorType::new(
     translation::java::COMMANDS_FUNCTION_SCHEDULED_NO_FUNCTIONS,
     translation::java::COMMANDS_FUNCTION_SCHEDULED_NO_FUNCTIONS,
+);
+static ERROR_ARGUMENT_NOT_COMPOUND: CommandErrorType<1> = CommandErrorType::new(
+    translation::java::COMMANDS_FUNCTION_ERROR_ARGUMENT_NOT_COMPOUND,
+    translation::java::COMMANDS_FUNCTION_ERROR_ARGUMENT_NOT_COMPOUND,
+);
+static ERROR_FUNCTION_INSTANTATION_FAILURE: CommandErrorType<2> = CommandErrorType::new(
+    translation::java::COMMANDS_FUNCTION_INSTANTIATIONFAILURE,
+    translation::java::COMMANDS_FUNCTION_INSTANTIATIONFAILURE,
 );
 
 pub struct FunctionSuggestionProvider;
@@ -95,10 +114,35 @@ fn decorate_output_if_needed(
     })
 }
 
+/// A function's id and the commands vanilla's `InstantiatedFunction` holds.
+type InstantiatedFunction = (String, Arc<[String]>);
+
+/// Vanilla `FunctionCommand.instantiateAndQueueFunctions`' instantiation for every function, done
+/// before any of them runs. Stops at the first function that fails, with the ones before it.
+fn instantiate_functions(
+    server: &Server,
+    functions: Vec<ResolvedFunction>,
+    arguments: Option<&NbtCompound>,
+    function_source: &CommandSource,
+) -> (Vec<InstantiatedFunction>, Option<CommandSyntaxError>) {
+    let mut instantiated = Vec::with_capacity(functions.len());
+    for (id, function) in functions {
+        match DatapackManager::instantiate(server, &function, arguments, function_source) {
+            Ok(lines) => instantiated.push((id, lines)),
+            Err(FunctionInstantiationError(reason)) => {
+                let error = ERROR_FUNCTION_INSTANTATION_FAILURE
+                    .create_without_context(TextComponent::text(id), reason);
+                return (instantiated, Some(error));
+            }
+        }
+    }
+    (instantiated, None)
+}
+
 /// Vanilla `FunctionCommand.queueFunctions`.
 fn queue_functions(
     server: &Arc<Server>,
-    functions: &[ResolvedFunction],
+    functions: &[InstantiatedFunction],
     original_source: &Arc<CommandSource>,
     function_source: &CommandSource,
     modifiers: ChainModifiers,
@@ -162,12 +206,62 @@ fn queue_functions(
     }
 }
 
+/// Where a `/function` call takes its macro arguments from.
+#[derive(Clone, Copy)]
+enum ArgumentsSource {
+    None,
+    /// The `arguments` compound.
+    Compound,
+    /// `with <block|entity|storage> <source> [<path>]`.
+    With {
+        kind: TargetKind,
+        has_path: bool,
+    },
+}
+
+/// Vanilla `FunctionCommand.getArgumentTag`.
+fn get_argument_tag(
+    path: &NbtPath,
+    accessor: &dyn DataAccessor,
+) -> Result<NbtCompound, CommandSyntaxError> {
+    match get_single_tag(path, accessor)? {
+        NbtTag::Compound(compound) => Ok(compound),
+        tag => Err(ERROR_ARGUMENT_NOT_COMPOUND
+            .create_without_context(TextComponent::text(tag.get_type_name()))),
+    }
+}
+
 /// Vanilla `FunctionCommand.FunctionCustomExecutor.runGuarded`.
-struct FunctionExecutor;
+struct FunctionExecutor(ArgumentsSource);
+
+impl FunctionExecutor {
+    fn arguments(
+        &self,
+        context: &CommandContext,
+    ) -> Result<Option<NbtCompound>, CommandSyntaxError> {
+        Ok(match self.0 {
+            ArgumentsSource::None => None,
+            ArgumentsSource::Compound => {
+                Some(NbtCompoundArgumentType::get(context, ARG_ARGUMENTS)?.clone())
+            }
+            ArgumentsSource::With { kind, has_path } => {
+                let accessor = kind.access(context, ARG_SOURCE)?;
+                Some(if has_path {
+                    get_argument_tag(
+                        NbtPathArgumentType::get(context, ARG_PATH)?,
+                        accessor.as_ref(),
+                    )?
+                } else {
+                    accessor.get_data()?
+                })
+            }
+        })
+    }
+}
 
 impl CommandExecutor for FunctionExecutor {
     fn execute(&self, context: &CommandContext) -> CommandExecutorResult {
-        let name = FunctionArgumentType::get(context, "name")?;
+        let name = FunctionArgumentType::get(context, ARG_NAME)?;
         let functions = get_functions(context, name)?;
         if functions.is_empty() {
             return Err(
@@ -177,6 +271,7 @@ impl CommandExecutor for FunctionExecutor {
             );
         }
 
+        let arguments = self.arguments(context)?;
         let function_source = modify_sender_for_execution(&context.source);
         let feedback = if let [(id, _)] = functions.as_slice() {
             TextComponent::translate_cross(
@@ -205,6 +300,24 @@ impl CommandExecutor for FunctionExecutor {
             // What this source queued was discarded by an earlier source's function.
             return Ok(0);
         }
+        let function_count = functions.len();
+        let (functions, failure) = instantiate_functions(
+            context.server(),
+            functions,
+            arguments.as_ref(),
+            &function_source,
+        );
+        if let Some(error) = &failure {
+            // Vanilla throws out of runGuarded once a function fails to instantiate; the
+            // functions queued before it still run, after the error is reported.
+            if !context.chain_modifiers.is_forked() {
+                context.source.send_error(error.message.clone());
+            }
+            context
+                .source
+                .command_result_taker
+                .call(ReturnValue::Failure);
+        }
         queue_functions(
             context.server(),
             &functions,
@@ -212,7 +325,11 @@ impl CommandExecutor for FunctionExecutor {
             &function_source,
             context.chain_modifiers,
         );
-        Ok(functions.len() as i32)
+        Ok(if failure.is_some() {
+            0
+        } else {
+            function_count as i32
+        })
     }
 
     fn reports_own_result(&self) -> bool {
@@ -227,11 +344,41 @@ pub fn register(dispatcher: &mut CommandDispatcher, registry: &PermissionRegistr
         PermissionDefault::Op(PermissionLvl::Two),
     ));
 
+    let mut with = literal("with");
+    for (name, kind) in [
+        ("block", TargetKind::Block),
+        ("entity", TargetKind::Entity),
+        ("storage", TargetKind::Storage),
+    ] {
+        with = with.then(
+            literal(name).then(
+                make_target_arg(kind, ARG_SOURCE)
+                    .executes(FunctionExecutor(ArgumentsSource::With {
+                        kind,
+                        has_path: false,
+                    }))
+                    .then(
+                        argument(ARG_PATH, NbtPathArgumentType).executes(FunctionExecutor(
+                            ArgumentsSource::With {
+                                kind,
+                                has_path: true,
+                            },
+                        )),
+                    ),
+            ),
+        );
+    }
+
     dispatcher.register(
         command("function", DESCRIPTION).requires(PERMISSION).then(
-            argument("name", FunctionArgumentType)
+            argument(ARG_NAME, FunctionArgumentType)
                 .suggests(FunctionSuggestionProvider)
-                .executes(FunctionExecutor),
+                .executes(FunctionExecutor(ArgumentsSource::None))
+                .then(
+                    argument(ARG_ARGUMENTS, NbtCompoundArgumentType)
+                        .executes(FunctionExecutor(ArgumentsSource::Compound)),
+                )
+                .then(with),
         ),
     );
 }

@@ -396,20 +396,29 @@ impl<S: CommandSource> CommandDispatcher<S> {
         })
     }
 
+    /// Vanilla `Commands.validateParseResults`: input left over after parsing is an error.
+    pub fn validate_parse_results(parsed: &ParsingResult<'_, S>) -> Result<(), CommandSyntaxError> {
+        if parsed.reader.peek().is_none() {
+            return Ok(());
+        }
+        Err(parsed.errors.values().next().map_or_else(
+            || {
+                if parsed.context.range.is_empty() {
+                    Self::unknown_command_error(&parsed.reader)
+                } else {
+                    DISPATCHER_UNKNOWN_ARGUMENT.create(&parsed.reader)
+                }
+            },
+            Clone::clone,
+        ))
+    }
+
     /// Executes a parsed command as an entry of the current frame, like a function line.
     pub fn execute_in_current_frame(
         &self,
         parsed: ParsingResult<'_, S>,
     ) -> Result<i32, CommandSyntaxError> {
-        if parsed.reader.peek().is_some() {
-            return if let Some(err) = parsed.errors.values().next() {
-                Err(err.clone())
-            } else if parsed.context.range.is_empty() {
-                Err(Self::unknown_command_error(&parsed.reader))
-            } else {
-                Err(DISPATCHER_UNKNOWN_ARGUMENT.create(&parsed.reader))
-            };
-        }
+        Self::validate_parse_results(&parsed)?;
 
         let command = parsed.reader.string();
         let original_context = parsed.context.build(command);

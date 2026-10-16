@@ -37,6 +37,8 @@ use crate::command::errors::command_syntax_error::CommandSyntaxError;
 use crate::command::errors::error_types::CommandErrorType;
 use crate::command::node::dispatcher::CommandDispatcher;
 use crate::command::node::{CommandExecutor, CommandExecutorResult};
+use crate::command::suggestion::provider::{SuggestionProvider, SuggestionProviderResult};
+use crate::command::suggestion::suggestions::SuggestionsBuilder;
 use crate::entity::EntityBase;
 use crate::server::Server;
 use crate::world::World;
@@ -687,14 +689,38 @@ impl CommandExecutor for ModifyExecutor {
 
 // ---------------- REGISTRATION ----------------
 
-fn make_target_arg(
+/// Vanilla `DataCommands.SUGGEST_STORAGE`.
+struct StorageSuggestionProvider;
+
+impl SuggestionProvider for StorageSuggestionProvider {
+    fn suggest(
+        &self,
+        context: &CommandContext,
+        mut builder: SuggestionsBuilder,
+    ) -> SuggestionProviderResult {
+        let storage = context
+            .server()
+            .command_storage
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        for id in storage.keys() {
+            builder = builder.suggest(id.clone());
+        }
+        builder.build()
+    }
+}
+
+/// The argument a `DataCommands` data provider wraps a command in.
+pub fn make_target_arg(
     kind: TargetKind,
     name: &'static str,
 ) -> crate::command::argument_builder::RequiredArgumentBuilder {
     match kind {
         TargetKind::Entity => argument(name, EntityArgumentType::Entity),
         TargetKind::Block => argument(name, BlockPosArgumentType),
-        TargetKind::Storage => argument(name, IdentifierArgumentType),
+        TargetKind::Storage => {
+            argument(name, IdentifierArgumentType).suggests(StorageSuggestionProvider)
+        }
     }
 }
 
