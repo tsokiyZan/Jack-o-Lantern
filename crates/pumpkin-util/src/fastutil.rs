@@ -7,6 +7,8 @@ use crate::math::java_string_hash;
 const INT_PHI: i32 = 0x9E37_79B9u32.cast_signed();
 /// `Hash.DEFAULT_INITIAL_SIZE`.
 const DEFAULT_INITIAL_SIZE: usize = 16;
+/// `Hash.DEFAULT_LOAD_FACTOR`.
+const DEFAULT_LOAD_FACTOR: f32 = 0.75;
 
 /// `HashCommon.mix`.
 const fn mix(x: i32) -> i32 {
@@ -36,6 +38,13 @@ pub struct OpenHashKeys {
     size: usize,
     min_n: usize,
     load_factor: f32,
+}
+
+impl Default for OpenHashKeys {
+    /// `new Object2ObjectOpenHashMap()`.
+    fn default() -> Self {
+        Self::new(DEFAULT_INITIAL_SIZE, DEFAULT_LOAD_FACTOR)
+    }
 }
 
 impl OpenHashKeys {
@@ -100,8 +109,15 @@ impl OpenHashKeys {
         }
     }
 
+    /// The keys in the order of the map's spliterator and streams.
     pub fn iter(&self) -> impl Iterator<Item = &str> {
         self.table.iter().flatten().map(AsRef::as_ref)
+    }
+
+    /// The keys in the order of the map's iterators (and so of for-each loops), which walk the
+    /// table from the last slot.
+    pub fn iter_rev(&self) -> impl Iterator<Item = &str> {
+        self.table.iter().rev().flatten().map(AsRef::as_ref)
     }
 
     const fn mask(&self) -> usize {

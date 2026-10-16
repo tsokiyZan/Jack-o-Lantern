@@ -31,6 +31,7 @@ pub mod client_suggestions;
 pub mod commands;
 pub mod context;
 pub mod node;
+pub mod response_tracker;
 
 pub mod dispatcher {
     pub use pumpkin_command::dispatcher::*;

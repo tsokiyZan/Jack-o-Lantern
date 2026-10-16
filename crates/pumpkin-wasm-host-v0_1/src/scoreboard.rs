@@ -761,6 +761,7 @@ fn map_team_settings(
                 pumpkin_core::world::scoreboard::NameTagVisibility::HideForOwnTeam
             }
         },
+        death_message_visibility: pumpkin_core::world::scoreboard::NameTagVisibility::Always,
         collision_rule: match settings.collision_rule {
             CollisionRule::Always => pumpkin_core::world::scoreboard::CollisionRule::Always,
             CollisionRule::Never => pumpkin_core::world::scoreboard::CollisionRule::Never,
@@ -771,7 +772,7 @@ fn map_team_settings(
                 pumpkin_core::world::scoreboard::CollisionRule::PushOwnTeam
             }
         },
-        color: map_named_color(settings.color),
+        color: Some(map_named_color(settings.color)),
         player_prefix,
         player_suffix,
         players: Vec::new(),
@@ -848,7 +849,11 @@ fn map_team_to_settings(
         pumpkin_core::world::scoreboard::CollisionRule::PushOwnTeam => CollisionRule::PushOwnTeam,
     };
 
-    let color = map_named_color_rev(team.color);
+    // The WIT team settings have no "no color", so a colorless team reads as white.
+    let color = map_named_color_rev(
+        team.color
+            .unwrap_or(pumpkin_util::text::color::NamedColor::White),
+    );
 
     Ok(TeamSettings {
         display_name,

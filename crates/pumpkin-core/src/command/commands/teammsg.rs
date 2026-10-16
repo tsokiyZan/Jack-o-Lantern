@@ -44,7 +44,7 @@ impl CommandExecutor for TeamMsgCommandExecutor {
             return Err(NO_TEAM_ERROR.create_without_context());
         };
 
-        let team_display_name = team.display_name.clone().color_named(team.color);
+        let team_display_name = team.formatted_display_name();
 
         let online_players = world.players.load();
         let mut recipients = 0;
