@@ -20,6 +20,7 @@ pub mod click;
 pub mod color;
 pub mod hover;
 pub mod legacy;
+pub mod nbt;
 pub mod style;
 
 /// Represents a Minecraft chat component.

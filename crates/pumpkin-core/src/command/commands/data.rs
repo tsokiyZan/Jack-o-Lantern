@@ -20,7 +20,7 @@ use pumpkin_util::PermissionLvl;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::permission::{Permission, PermissionDefault, PermissionRegistry};
 use pumpkin_util::text::TextComponent;
-use pumpkin_util::text::color::NamedColor;
+use pumpkin_util::text::nbt::to_pretty_component;
 
 use crate::command::argument_builder::{ArgumentBuilder, argument, command, literal};
 use crate::command::argument_types::coordinates::block_pos::BlockPosArgumentType;
@@ -89,120 +89,6 @@ pub const ERROR_ENTITY_INVALID: CommandErrorType<0> = CommandErrorType::new(
     translation::java::COMMANDS_DATA_ENTITY_INVALID,
 );
 
-#[must_use]
-pub fn snbt_colorful_display(tag: &NbtTag, _depth: usize) -> TextComponent {
-    let folded = TextComponent::text("<...>").color_named(NamedColor::Gray);
-    match tag {
-        NbtTag::End => TextComponent::text(""),
-        NbtTag::Byte(value) => TextComponent::text(format!("{value}"))
-            .color_named(NamedColor::Gold)
-            .add_child(TextComponent::text("b").color_named(NamedColor::Red)),
-        NbtTag::Short(value) => TextComponent::text(format!("{value}"))
-            .color_named(NamedColor::Gold)
-            .add_child(TextComponent::text("s").color_named(NamedColor::Red)),
-        NbtTag::Int(value) => TextComponent::text(format!("{value}")).color_named(NamedColor::Gold),
-        NbtTag::Long(value) => TextComponent::text(format!("{value}"))
-            .color_named(NamedColor::Gold)
-            .add_child(TextComponent::text("L").color_named(NamedColor::Red)),
-        NbtTag::Float(value) => TextComponent::text(format!("{value}"))
-            .color_named(NamedColor::Gold)
-            .add_child(TextComponent::text("f").color_named(NamedColor::Red)),
-        NbtTag::Double(value) => TextComponent::text(format!("{value}"))
-            .color_named(NamedColor::Gold)
-            .add_child(TextComponent::text("d").color_named(NamedColor::Red)),
-        NbtTag::ByteArray(value) => {
-            let mut content = TextComponent::text("[")
-                .add_child(TextComponent::text("B").color_named(NamedColor::Red))
-                .add_child(TextComponent::text("; "));
-
-            for (index, byte) in value.iter().take(128).enumerate() {
-                content = content
-                    .add_child(TextComponent::text(format!("{byte}")))
-                    .add_child(TextComponent::text("b").color_named(NamedColor::Red));
-                if index < value.len() - 1 {
-                    content = content.add_child(TextComponent::text(", "));
-                }
-            }
-
-            if value.len() > 128 {
-                content = content.add_child(folded);
-            }
-
-            content.add_child(TextComponent::text("]"))
-        }
-        NbtTag::String(value) => {
-            let escaped = value.replace('"', "\\\"");
-            TextComponent::text(format!("\"{escaped}\"")).color_named(NamedColor::Green)
-        }
-        NbtTag::List(value) => {
-            let mut content = TextComponent::text("[");
-            for (index, tag) in value.iter().take(128).enumerate() {
-                content = content.add_child(snbt_colorful_display(tag, 0));
-                if index < value.len() - 1 {
-                    content = content.add_child(TextComponent::text(", "));
-                }
-            }
-            if value.len() > 128 {
-                content = content.add_child(folded);
-            }
-            content.add_child(TextComponent::text("]"))
-        }
-        NbtTag::Compound(value) => {
-            let mut content = TextComponent::text("{");
-            let mut keys: Vec<&Box<str>> = value.child_tags.keys().collect();
-            keys.sort();
-            for (index, key) in keys.into_iter().take(128).enumerate() {
-                let tag = &value.child_tags[key];
-                content = content
-                    .add_child(
-                        TextComponent::text(format!("{key}: ")).color_named(NamedColor::Aqua),
-                    )
-                    .add_child(snbt_colorful_display(tag, 0));
-                if index < value.child_tags.len() - 1 {
-                    content = content.add_child(TextComponent::text(", "));
-                }
-            }
-            if value.child_tags.len() > 128 {
-                content = content.add_child(folded);
-            }
-            content.add_child(TextComponent::text("}"))
-        }
-        NbtTag::IntArray(value) => {
-            let mut content = TextComponent::text("[")
-                .add_child(TextComponent::text("I").color_named(NamedColor::Red))
-                .add_child(TextComponent::text("; "));
-            for (index, int) in value.iter().take(128).enumerate() {
-                content = content
-                    .add_child(TextComponent::text(format!("{int}")).color_named(NamedColor::Gold));
-                if index < value.len() - 1 {
-                    content = content.add_child(TextComponent::text(", "));
-                }
-            }
-            if value.len() > 128 {
-                content = content.add_child(folded);
-            }
-            content.add_child(TextComponent::text("]"))
-        }
-        NbtTag::LongArray(value) => {
-            let mut content = TextComponent::text("[")
-                .add_child(TextComponent::text("L").color_named(NamedColor::Red))
-                .add_child(TextComponent::text("; "));
-            for (index, long) in value.iter().take(128).enumerate() {
-                content = content
-                    .add_child(TextComponent::text(format!("{long}")).color_named(NamedColor::Gold))
-                    .add_child(TextComponent::text("L").color_named(NamedColor::Red));
-                if index < value.len() - 1 {
-                    content = content.add_child(TextComponent::text(", "));
-                }
-            }
-            if value.len() > 128 {
-                content = content.add_child(folded);
-            }
-            content.add_child(TextComponent::text("]"))
-        }
-    }
-}
-
 // ---------------- DATA ACCESSOR ABSTRACTION ----------------
 
 pub trait DataAccessor: Send + Sync {
@@ -249,10 +135,7 @@ impl DataAccessor for EntityDataAccessor {
         TextComponent::translate_cross(
             translation::java::COMMANDS_DATA_ENTITY_QUERY,
             translation::java::COMMANDS_DATA_ENTITY_QUERY,
-            [
-                self.entity.get_display_name(),
-                snbt_colorful_display(data, 0),
-            ],
+            [self.entity.get_display_name(), to_pretty_component(data)],
         )
     }
 
@@ -328,7 +211,7 @@ impl DataAccessor for BlockDataAccessor {
                     "{}, {}, {}",
                     self.pos.0.x, self.pos.0.y, self.pos.0.z
                 )),
-                snbt_colorful_display(data, 0),
+                to_pretty_component(data),
             ],
         )
     }
@@ -395,7 +278,7 @@ impl DataAccessor for StorageDataAccessor {
             translation::java::COMMANDS_DATA_STORAGE_QUERY,
             [
                 TextComponent::text(self.id.clone()),
-                snbt_colorful_display(data, 0),
+                to_pretty_component(data),
             ],
         )
     }

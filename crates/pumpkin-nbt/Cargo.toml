@@ -8,6 +8,7 @@ license.workspace = true
 [dependencies]
 pumpkin-codecs.workspace = true
 thiserror.workspace = true
+indexmap.workspace = true
 bytes.workspace = true
 uuid.workspace = true
 

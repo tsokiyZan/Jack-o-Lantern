@@ -3323,6 +3323,7 @@ dependencies = [
  "cesu8",
  "criterion",
  "flate2",
+ "indexmap",
  "pumpkin-codecs",
  "tempfile",
  "thiserror 2.0.21",

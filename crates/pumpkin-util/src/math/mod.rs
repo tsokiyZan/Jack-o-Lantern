@@ -1012,16 +1012,7 @@ fn java_array_hash(data: &[u8]) -> i32 {
     hash
 }
 
-#[must_use]
-pub fn java_string_hash(string: &str) -> i32 {
-    let mut result = 0i32;
-    for char_encoding in string.encode_utf16() {
-        result = 31i32
-            .wrapping_mul(result)
-            .wrapping_add(char_encoding as i32);
-    }
-    result
-}
+pub use pumpkin_nbt::java_hash_map::java_string_hash;
 
 macro_rules! vector_codec_impl {
     ($vector:ty, $number:literal, $($components:ident),+ ) => {

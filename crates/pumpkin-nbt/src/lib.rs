@@ -22,6 +22,10 @@ use thiserror::Error;
 pub mod compound;
 /// Low-level NBT deserialization support.
 pub mod deserializer;
+/// Java's number-to-string formatting.
+pub mod java_fmt;
+/// A map with Java `HashMap` iteration order.
+pub mod java_hash_map;
 /// Reading and writing gzip-compressed NBT.
 pub mod nbt_compress;
 /// Integration with Pumpkin's dynamic codec operations.
