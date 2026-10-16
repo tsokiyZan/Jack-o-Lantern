@@ -836,7 +836,7 @@ impl EntityBase for ArrowEntity {
                     if self.has_hit.swap(true, Ordering::SeqCst) {
                         return;
                     }
-                    caller.on_hit(h);
+                    super::on_hit(caller, h);
                 }
                 ProjectileHit::Entity { .. } => {
                     if super::is_deflected(caller, &self.last_deflected_by, &h) {
@@ -851,7 +851,7 @@ impl EntityBase for ArrowEntity {
                     if pierced_len >= pierce as usize && self.has_hit.swap(true, Ordering::SeqCst) {
                         return;
                     }
-                    caller.on_hit(h);
+                    super::on_hit(caller, h);
                 }
             }
         }

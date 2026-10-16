@@ -35,6 +35,7 @@ use crate::entity::combat::{CombatRules, CombatTracker, FallLocation, knockback_
 use crate::entity::mob::equipment::DEFAULT_EQUIPMENT_DROP_CHANCE;
 use crate::entity::player::statistics::{CustomStatistic, StatisticCategory};
 use crate::server::Server;
+use crate::world::game_event::GameEventContext;
 use crate::world::loot::LootContextParameters;
 use crossbeam::atomic::AtomicCell;
 use pumpkin_data::AttributeModifierSlot;
@@ -2131,27 +2132,37 @@ impl LivingEntity {
             if fall_distance > 0.0 {
                 self.on_changed_block(caller, self.entity.block_pos.load());
             }
-            // Vanilla runs `fallOn` for fall-damage-immune entities too: the block still
-            // reacts and `causeFallDamage` overrides still run, only the damage is zero.
-            if fall_distance <= 0.0
-                || dont_damage
-                || self.should_prevent_fall_damage()
-                || self.should_prevent_fall_damage_in_area()
-            {
+            if fall_distance <= 0.0 {
                 return;
             }
             let world = self.entity.world.load();
-            let block = world.get_block(&self.entity.get_pos_with_y_offset(0.2).0);
-            let pumpkin_block = world.block_registry.get_pumpkin_block(block.id);
-            if let Some(pumpkin_block) = pumpkin_block {
-                pumpkin_block.on_landed_upon(OnLandedUponArgs {
-                    world: &world,
-                    fall_distance,
-                    entity: caller,
-                });
-            } else {
-                self.handle_fall_damage(caller, fall_distance, 1.0);
+            let on_pos = self.entity.get_pos_with_y_offset(0.2).0;
+            // Vanilla runs `fallOn` for fall-damage-immune entities too: the block still
+            // reacts and `causeFallDamage` overrides still run, only the damage is zero.
+            if !dont_damage
+                && !self.should_prevent_fall_damage()
+                && !self.should_prevent_fall_damage_in_area()
+            {
+                let block = world.get_block(&on_pos);
+                let pumpkin_block = world.block_registry.get_pumpkin_block(block.id);
+                if let Some(pumpkin_block) = pumpkin_block {
+                    pumpkin_block.on_landed_upon(OnLandedUponArgs {
+                        world: &world,
+                        fall_distance,
+                        entity: caller,
+                    });
+                } else {
+                    self.handle_fall_damage(caller, fall_distance, 1.0);
+                }
             }
+            // Vanilla `Entity.checkFallDamage`, after `fallOn`.
+            let supporting_state =
+                world.get_block_state(&self.entity.get_supporting_block_pos().unwrap_or(on_pos));
+            world.game_event(
+                GameEvent::HitGround,
+                self.entity.pos.load(),
+                GameEventContext::of(Some(caller), Some(supporting_state)),
+            );
         } else if height_difference < 0.0 {
             let new_fall_distance = if !self.should_prevent_fall_damage()
                 && !self.should_prevent_fall_damage_in_area()
@@ -2411,6 +2422,11 @@ impl LivingEntity {
             };
 
             if perished {
+                world.game_event_from(
+                    Some(&*dyn_self),
+                    pumpkin_data::game_event::GameEvent::EntityDie,
+                    self.entity.pos.load(),
+                );
                 if let Some(mob) = dyn_self.get_mob() {
                     mob.before_drop_all_death_loot();
                 }
@@ -3828,6 +3844,11 @@ impl LivingEntity {
             }
 
             self.set_health(new_health);
+            world.game_event_from(
+                Some(caller),
+                pumpkin_data::game_event::GameEvent::EntityDamage,
+                self.entity.pos.load(),
+            );
 
             if let Some(attacker_player) = cause.or(source).and_then(|c| c.get_player()) {
                 attacker_player.increment_stat(

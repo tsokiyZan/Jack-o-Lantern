@@ -1,8 +1,10 @@
 use super::{
     Entity, EntityBase, living::LivingEntity, projectile_deflection::ProjectileDeflectionType,
 };
+use crate::world::game_event::GameEventContext;
 use pumpkin_data::BlockDirection;
 use pumpkin_data::entity::EntityType;
+use pumpkin_data::game_event::GameEvent;
 use pumpkin_protocol::java::client::play::CEntityVelocity;
 use pumpkin_util::math::boundingbox::BoundingBox;
 use pumpkin_util::math::{position::BlockPos, vector3::Vector3};
@@ -297,7 +299,7 @@ impl ThrownItemEntity {
             }
 
             // Just trigger hit effects and remove
-            caller.on_hit(h);
+            on_hit(caller, h);
             entity.remove();
         }
     }
@@ -384,6 +386,26 @@ fn calculate_ray_intersection(
     }
 
     (t_min <= t_max && (0.0..=1.0).contains(&t_min)).then_some(t_min)
+}
+
+/// Vanilla `Projectile.onHit`: the projectile's own hit handling, then `projectile_land` at
+/// the entity's hit location or the hit block.
+pub fn on_hit(projectile: &dyn EntityBase, hit: ProjectileHit) {
+    let hit_block = match &hit {
+        ProjectileHit::Block { pos, .. } => Some(*pos),
+        ProjectileHit::Entity { .. } => None,
+    };
+    let hit_pos = hit.hit_pos();
+    projectile.on_hit(hit);
+    let world = projectile.get_entity().world.load();
+    let (position, affected_state) = hit_block.map_or((hit_pos, None), |pos| {
+        (pos.to_centered_f64(), Some(world.get_block_state(&pos)))
+    });
+    world.game_event(
+        GameEvent::ProjectileLand,
+        position,
+        GameEventContext::of(Some(projectile), affected_state),
+    );
 }
 
 /// Get the face of the block that was hit

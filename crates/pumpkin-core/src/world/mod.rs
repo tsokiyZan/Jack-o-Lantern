@@ -5554,6 +5554,12 @@ impl World {
                 position,
                 player,
             );
+            // The end of vanilla `Block.playerWillDestroy`, which its overrides call.
+            self.game_event(
+                pumpkin_data::game_event::GameEvent::BlockDestroy,
+                position.to_centered_f64(),
+                game_event::GameEventContext::of(Some(player.as_ref()), Some(broken_block_state)),
+            );
         }
 
         if !flags.contains(BlockFlags::SKIP_DROPS) {
@@ -5581,6 +5587,14 @@ impl World {
         };
 
         let broken_state_id = self.set_block_state(position, new_state_id, flags);
+        // Vanilla `Level.destroyBlock`; a player's break posted it in `playerWillDestroy`.
+        if cause.is_none() && broken_state_id != new_state_id {
+            self.game_event(
+                pumpkin_data::game_event::GameEvent::BlockDestroy,
+                position.to_centered_f64(),
+                game_event::GameEventContext::of_state(broken_block_state),
+            );
+        }
         let broken_block = Block::from_state_id(broken_state_id);
         if !broken_block.is_air()
             && broken_state_id != new_state_id

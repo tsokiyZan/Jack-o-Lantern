@@ -828,6 +828,14 @@ impl BlockRegistry {
                 block_id: format!("minecraft:{}", placed_block.name),
             },
         );
+        world.game_event(
+            pumpkin_data::game_event::GameEvent::BlockPlace,
+            final_block_pos.to_centered_f64(),
+            crate::world::game_event::GameEventContext::of(
+                Some(player.as_ref()),
+                Some(world.get_block_state(&final_block_pos)),
+            ),
+        );
 
         Ok(Some((final_block_pos, new_state)))
     }

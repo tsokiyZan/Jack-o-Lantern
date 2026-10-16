@@ -43,7 +43,9 @@ fn get_sound(block: &Block, on: bool) -> Sound {
 /// Presses the button, unless it is already pressed. Returns whether it was
 /// pressed, so callers can tell the two cases apart the way vanilla's
 /// `ButtonBlock::useWithoutItem` does.
-fn click_button(world: &Arc<World>, block_pos: &BlockPos) -> bool {
+use crate::entity::EntityBase;
+
+fn click_button(world: &Arc<World>, block_pos: &BlockPos, player: &dyn EntityBase) -> bool {
     let (block, state) = world.get_block_and_state_id(block_pos);
 
     let mut button_props = ButtonLikeProperties::from_state_id(state);
@@ -65,6 +67,11 @@ fn click_button(world: &Arc<World>, block_pos: &BlockPos) -> bool {
     world.schedule_block_tick(block, *block_pos, delay, TickPriority::Normal);
     ButtonBlock::update_neighbors(world, block_pos, button_props);
     world.play_block_sound(get_sound(block, true), SoundCategory::Blocks, *block_pos);
+    world.game_event_from(
+        Some(player),
+        pumpkin_data::game_event::GameEvent::BlockActivate,
+        block_pos.to_centered_f64(),
+    );
 
     true
 }
@@ -74,7 +81,7 @@ pub struct ButtonBlock;
 
 impl BlockBehaviour for ButtonBlock {
     fn normal_use(&self, args: NormalUseArgs<'_>) -> BlockActionResult {
-        if click_button(args.world, args.position) {
+        if click_button(args.world, args.position, args.player.as_ref()) {
             BlockActionResult::Success
         } else {
             BlockActionResult::Consume
@@ -96,6 +103,12 @@ impl BlockBehaviour for ButtonBlock {
                 get_sound(args.block, false),
                 SoundCategory::Blocks,
                 *args.position,
+            );
+            // Vanilla `ButtonBlock.checkPressed` with no arrow in the button.
+            args.world.game_event_from(
+                None,
+                pumpkin_data::game_event::GameEvent::BlockDeactivate,
+                args.position.to_centered_f64(),
             );
         }
     }

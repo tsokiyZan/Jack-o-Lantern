@@ -244,8 +244,8 @@ impl Entity {
         caller.play_sound_at_self(caller.swim_sound(), volume, swim_pitch());
     }
 
-    /// Vanilla `Entity.doWaterSplashEffect`: the sound half. Pumpkin doesn't spawn the
-    /// bubble and splash particles yet.
+    /// Vanilla `Entity.doWaterSplashEffect` without the bubble and splash particles, which
+    /// Pumpkin doesn't spawn yet.
     pub fn do_water_splash_effect(&self, caller: &dyn EntityBase) {
         if caller.is_spectator() {
             // Vanilla `Player.doWaterSplashEffect`.
@@ -258,6 +258,9 @@ impl Entity {
             caller.swim_high_speed_splash_sound()
         };
         caller.play_sound_at_self(sound, speed, swim_pitch());
+        self.world
+            .load()
+            .game_event_from(Some(caller), GameEvent::Splash, self.pos.load());
     }
 
     /// The speed term shared by `waterSwimSound` and `doWaterSplashEffect`: the controlling

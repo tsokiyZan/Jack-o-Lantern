@@ -827,6 +827,8 @@ impl DispenserBlock {
             Self::drop_item(ctx, item);
             return;
         };
+        ctx.world
+            .game_event_from(None, GameEvent::FluidPickup, front.to_centered_f64());
 
         Self::consume_with_remainder(ctx, dispenser, item, ItemStack::new(1, filled));
         Self::play_dispense_effects(ctx, WorldEvent::SoundDispenserDispense);
@@ -861,12 +863,18 @@ impl DispenserBlock {
             play_bucket_evaporation(ctx.world, &front.to_f64());
             true
         } else {
-            try_place_filled_bucket(
+            let placed = try_place_filled_bucket(
                 ctx.world,
                 item.item,
                 *ctx.position,
                 ctx.facing.to_block_direction(),
-            )
+            );
+            if placed {
+                // Vanilla `BucketItem.playEmptySound`, with no user.
+                ctx.world
+                    .game_event_from(None, GameEvent::FluidPlace, front.to_centered_f64());
+            }
+            placed
         };
 
         if emptied {
