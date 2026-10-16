@@ -187,11 +187,12 @@ impl ThrownItemEntity {
             velocity.y -= self.get_gravity();
         }
 
-        let inertia = if entity.touching_water.load(Ordering::Relaxed) {
-            0.8
+        // Vanilla `ThrowableProjectile.applyInertia`: float inertia, widened.
+        let inertia = f64::from(if entity.touching_water.load(Ordering::Relaxed) {
+            0.8f32
         } else {
-            0.99
-        };
+            0.99f32
+        });
         velocity = velocity.multiply(inertia, inertia, inertia);
 
         // Store velocity
