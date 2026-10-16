@@ -14,7 +14,7 @@ use crate::{
         palette::has_random_ticking_fluid,
     },
     generation::get_world_gen_with_all_settings,
-    tick::{OrderedTick, ScheduledTick, TickPriority},
+    tick::{ScheduledTick, TickPriority, level_ticks::LevelTicks},
     world::WorldPortalExt,
 };
 use arc_swap::ArcSwap;
@@ -31,7 +31,7 @@ use std::sync::{Arc, Mutex, Weak};
 use std::time::Duration;
 use std::{
     path::PathBuf,
-    sync::atomic::{AtomicBool, AtomicU64, Ordering},
+    sync::atomic::{AtomicBool, AtomicI64, Ordering},
     thread,
 };
 use tokio::time::timeout;
@@ -81,15 +81,18 @@ pub struct Level {
     pub level_folder: Arc<LevelFolder>,
     pub lighting_config: LightingEngineConfig,
 
-    /// Counts the number of ticks that have been scheduled for this world
-    schedule_tick_counts: AtomicU64,
+    /// Vanilla `Level.subTickCount`.
+    sub_tick_count: AtomicI64,
+    /// Vanilla `getGameTime()`, mirrored from the world's clock each tick.
+    game_time: Arc<AtomicI64>,
+    block_ticks: LevelTicks<&'static Block>,
+    fluid_ticks: LevelTicks<&'static Fluid>,
 
     // Chunks that are paired with chunk watchers. When a chunk is no longer watched, it is removed
     // from the loaded chunks map and sent to the underlying ChunkIO
     pub loaded_chunks: Arc<DashMap<Vector2<i32>, SyncChunk>>,
     pub(crate) loaded_chunk_changes: Arc<SegQueue<LoadedChunkChange>>,
     loaded_entity_chunks: Arc<DashMap<Vector2<i32>, SyncEntityChunk>>,
-    pub chunks_with_scheduled_ticks: Arc<dashmap::DashSet<Vector2<i32>>>,
     pub chunk_loading: Mutex<ChunkLoading>,
 
     chunk_watchers: Arc<DashMap<Vector2<i32>, usize>>,
@@ -125,10 +128,11 @@ pub struct Level {
 }
 
 pub struct TickData {
-    pub block_ticks: Vec<OrderedTick<&'static Block>>,
-    pub fluid_ticks: Vec<OrderedTick<&'static Fluid>>,
     pub random_ticks: Vec<RandomTickSample>,
 }
+
+/// Vanilla `ServerLevel.MAX_SCHEDULED_TICKS_PER_TICK`.
+pub const MAX_SCHEDULED_TICKS_PER_TICK: usize = 65536;
 
 #[derive(Clone, Copy)]
 pub struct RandomTickSample {
@@ -268,6 +272,7 @@ impl Level {
         let thread_tracker = Mutex::new(Vec::new());
         let listener = Arc::new(ChunkListener::new());
 
+        let game_time = Arc::new(AtomicI64::new(0));
         let level_ref = Arc::new(Self {
             seed,
             world_portal: ArcSwap::new(Arc::new(None)),
@@ -277,11 +282,13 @@ impl Level {
             light_engine: DynamicLightEngine::new(dim_min_y, dim_min_y + dim_height),
             chunk_saver,
             entity_saver,
-            schedule_tick_counts: AtomicU64::new(0),
+            sub_tick_count: AtomicI64::new(0),
+            block_ticks: LevelTicks::new(|chunk| &chunk.block_ticks, game_time.clone()),
+            fluid_ticks: LevelTicks::new(|chunk| &chunk.fluid_ticks, game_time.clone()),
+            game_time,
             loaded_chunks: Arc::new(DashMap::new()),
             loaded_chunk_changes: Arc::new(SegQueue::new()),
             loaded_entity_chunks: Arc::new(DashMap::new()),
-            chunks_with_scheduled_ticks: Arc::new(dashmap::DashSet::new()),
             chunk_loading: Mutex::new(ChunkLoading::new(level_channel.clone())),
             chunk_watchers: Arc::new(DashMap::new()),
             tasks: TaskTracker::new(),
@@ -524,12 +531,9 @@ impl Level {
         let samples_per_section = random_tick_speed.max(0);
 
         let mut ticks = TickData {
-            block_ticks: Vec::new(),
-            fluid_ticks: Vec::new(),
             random_ticks: Vec::with_capacity(active_chunks.len() * 3),
         };
 
-        // 1. Process active chunks (random ticks, block entities)
         for pos in active_chunks {
             if let Some(chunk) = self.loaded_chunks.get(pos) {
                 let chunk = chunk.value();
@@ -577,41 +581,6 @@ impl Level {
                 }
             }
         }
-
-        // 2. Process chunks with scheduled ticks
-        // We collect keys first to avoid holding DashSet shard lock while accessing loaded_chunks (deadlock risk)
-        let scheduled_chunk_pos: Vec<_> = self
-            .chunks_with_scheduled_ticks
-            .iter()
-            .map(|p| *p)
-            .collect();
-        for pos in scheduled_chunk_pos {
-            // Vanilla `LevelTicks` only drains chunks that pass its tick check
-            // (`ServerLevel.isPositionTickingWithEntitiesLoaded`). A chunk at the edge
-            // keeps its ticks until it is ticking again, instead of handing them out
-            // while it may unload before they run, which loses them for good.
-            if !active_chunks.contains(&pos) {
-                if !self.loaded_chunks.contains_key(&pos) {
-                    self.chunks_with_scheduled_ticks.remove(&pos);
-                }
-                continue;
-            }
-            if let Some(chunk) = self.loaded_chunks.get(&pos) {
-                let chunk = chunk.value();
-                ticks.block_ticks.append(&mut chunk.block_ticks.step_tick());
-                ticks.fluid_ticks.append(&mut chunk.fluid_ticks.step_tick());
-
-                // Remove from set if it no longer has ticks
-                if !chunk.block_ticks.has_ticks() && !chunk.fluid_ticks.has_ticks() {
-                    self.chunks_with_scheduled_ticks.remove(&pos);
-                }
-            } else {
-                self.chunks_with_scheduled_ticks.remove(&pos); // Chunk unloaded
-            }
-        }
-
-        ticks.block_ticks.sort_unstable();
-        ticks.fluid_ticks.sort_unstable();
 
         ticks
     }
@@ -958,132 +927,210 @@ impl Level {
         self.loaded_entity_chunks.try_get(&coordinates).try_unwrap()
     }
 
+    /// Vanilla `getGameTime()`, which scheduled ticks are measured against.
+    pub fn game_time(&self) -> i64 {
+        self.game_time.load(Ordering::Relaxed)
+    }
+
+    /// Mirrors the world's game time after vanilla `ServerLevel.tickTime`.
+    pub fn set_game_time(&self, game_time: i64) {
+        self.game_time.store(game_time, Ordering::Relaxed);
+    }
+
+    /// Vanilla `LevelAccessor.createTick`.
+    fn create_tick<T>(
+        &self,
+        pos: BlockPos,
+        value: T,
+        tick_delay: i32,
+        priority: TickPriority,
+    ) -> ScheduledTick<T> {
+        ScheduledTick {
+            value,
+            position: pos,
+            trigger_tick: self.game_time() + i64::from(tick_delay),
+            priority,
+            sub_tick_order: self.sub_tick_count.fetch_add(1, Ordering::Relaxed),
+        }
+    }
+
+    /// Vanilla `LevelAccessor.scheduleTick` for a block. Ticks for unloaded chunks are dropped.
     pub fn schedule_block_tick(
         &self,
-        block: &Block,
+        block: &'static Block,
         block_pos: BlockPos,
-        delay: u8,
+        delay: i32,
         priority: TickPriority,
     ) {
-        let tick_order = self.schedule_tick_counts.fetch_add(1, Ordering::Relaxed);
-        let scheduled_tick = ScheduledTick {
-            delay,
-            position: block_pos,
-            priority,
-            // SAFETY: `block` is a valid reference that outlives this function call for scheduling.
-            value: unsafe { &*std::ptr::from_ref::<Block>(block) },
-        };
-
-        let chunk_pos = block_pos.chunk_position();
-        if self
-            .read_chunk_sync(&chunk_pos, |chunk| {
-                chunk.block_ticks.schedule_tick(&scheduled_tick, tick_order);
-            })
-            .is_some()
-        {
-            self.chunks_with_scheduled_ticks.insert(chunk_pos);
-        }
+        let tick = self.create_tick(block_pos, block, delay, priority);
+        self.read_chunk_sync(&block_pos.chunk_position(), |chunk| {
+            self.block_ticks.schedule(chunk, tick);
+        });
     }
 
+    /// Vanilla `LevelAccessor.scheduleTick` for a fluid. Ticks for unloaded chunks are dropped.
     pub fn schedule_fluid_tick(
         &self,
-        fluid: &Fluid,
+        fluid: &'static Fluid,
         block_pos: BlockPos,
-        delay: u8,
+        delay: i32,
         priority: TickPriority,
     ) {
-        let tick_order = self.schedule_tick_counts.fetch_add(1, Ordering::Relaxed);
-        let scheduled_tick = ScheduledTick {
-            delay,
-            position: block_pos,
-            priority,
-            // SAFETY: `fluid` is a valid reference that outlives this function call for scheduling.
-            value: unsafe { &*std::ptr::from_ref::<Fluid>(fluid) },
-        };
-
-        let chunk_pos = block_pos.chunk_position();
-        if self
-            .read_chunk_sync(&chunk_pos, |chunk| {
-                chunk.fluid_ticks.schedule_tick(&scheduled_tick, tick_order);
-            })
-            .is_some()
-        {
-            self.chunks_with_scheduled_ticks.insert(chunk_pos);
-        }
-    }
-
-    /// Registers a freshly loaded chunk's saved block and fluid ticks so the tick
-    /// loop runs them; otherwise they wait until something schedules a new tick
-    /// in the same chunk.
-    pub fn resume_scheduled_ticks(&self, chunk_pos: Vector2<i32>) {
-        let has_ticks = self
-            .read_chunk_sync(&chunk_pos, |chunk| {
-                chunk.block_ticks.has_ticks() || chunk.fluid_ticks.has_ticks()
-            })
-            .unwrap_or(false);
-        if has_ticks {
-            self.chunks_with_scheduled_ticks.insert(chunk_pos);
-        }
-    }
-
-    pub fn is_block_tick_scheduled(&self, block_pos: &BlockPos, block: &Block) -> bool {
+        let tick = self.create_tick(block_pos, fluid, delay, priority);
         self.read_chunk_sync(&block_pos.chunk_position(), |chunk| {
-            chunk.block_ticks.is_scheduled(*block_pos, block)
+            self.fluid_ticks.schedule(chunk, tick);
+        });
+    }
+
+    /// Vanilla `ServerLevel.startTickingChunk`: the chunk's saved ticks start counting from now.
+    pub fn start_ticking_chunk(&self, chunk_pos: Vector2<i32>) {
+        let game_time = self.game_time();
+        self.read_chunk_sync(&chunk_pos, |chunk| {
+            self.block_ticks.start_ticking(chunk, game_time);
+            self.fluid_ticks.start_ticking(chunk, game_time);
+        });
+    }
+
+    fn get_loaded_chunk(&self, pos: Vector2<i32>) -> Option<SyncChunk> {
+        self.loaded_chunks
+            .get(&pos)
+            .map(|chunk| chunk.value().clone())
+    }
+
+    /// Vanilla `blockTicks.tick(getGameTime(), 65536, this::tickBlock)`. Only chunks in
+    /// `ticking_chunks` run their ticks; the rest wait.
+    pub fn tick_block_ticks(
+        &self,
+        ticking_chunks: &FxHashSet<Vector2<i32>>,
+        output: impl FnMut(BlockPos, &'static Block),
+    ) {
+        self.block_ticks.tick(
+            self.game_time(),
+            MAX_SCHEDULED_TICKS_PER_TICK,
+            |pos| ticking_chunks.contains(pos),
+            |pos| self.get_loaded_chunk(*pos),
+            output,
+        );
+    }
+
+    /// Vanilla `fluidTicks.tick(getGameTime(), 65536, this::tickFluid)`.
+    pub fn tick_fluid_ticks(
+        &self,
+        ticking_chunks: &FxHashSet<Vector2<i32>>,
+        output: impl FnMut(BlockPos, &'static Fluid),
+    ) {
+        self.fluid_ticks.tick(
+            self.game_time(),
+            MAX_SCHEDULED_TICKS_PER_TICK,
+            |pos| ticking_chunks.contains(pos),
+            |pos| self.get_loaded_chunk(*pos),
+            output,
+        );
+    }
+
+    /// Vanilla `LevelTicks.hasScheduledTick` for blocks.
+    pub fn is_block_tick_scheduled(&self, block_pos: &BlockPos, block: &'static Block) -> bool {
+        self.read_chunk_sync(&block_pos.chunk_position(), |chunk| {
+            chunk.block_ticks.has_scheduled_tick(*block_pos, block)
         })
         .unwrap_or(false)
     }
 
-    pub fn is_fluid_tick_scheduled(&self, block_pos: &BlockPos, fluid: &Fluid) -> bool {
+    /// Vanilla `LevelTicks.hasScheduledTick` for fluids.
+    pub fn is_fluid_tick_scheduled(&self, block_pos: &BlockPos, fluid: &'static Fluid) -> bool {
         self.read_chunk_sync(&block_pos.chunk_position(), |chunk| {
-            chunk.fluid_ticks.is_scheduled(*block_pos, fluid)
+            chunk.fluid_ticks.has_scheduled_tick(*block_pos, fluid)
         })
         .unwrap_or(false)
+    }
+
+    /// Vanilla `getBlockTicks().willTickThisTick`.
+    pub fn will_block_tick_this_tick(&self, block_pos: &BlockPos, block: &'static Block) -> bool {
+        self.block_ticks.will_tick_this_tick(*block_pos, block)
+    }
+
+    /// Vanilla `getBlockTicks().clearArea` for the half-open box `[min, max)`.
+    pub fn clear_block_ticks_in_area(&self, min: &BlockPos, max: &BlockPos) {
+        if max.0.x <= min.0.x || max.0.y <= min.0.y || max.0.z <= min.0.z {
+            return;
+        }
+        let min_chunk = min.chunk_position();
+        let max_chunk = BlockPos::new(max.0.x - 1, max.0.y - 1, max.0.z - 1).chunk_position();
+        let chunks = (min_chunk.x..=max_chunk.x)
+            .flat_map(|x| (min_chunk.y..=max_chunk.y).map(move |z| Vector2::new(x, z)))
+            .filter_map(|pos| self.get_loaded_chunk(pos));
+        self.block_ticks.clear_area(chunks, |pos| {
+            pos.0.x >= min.0.x
+                && pos.0.x < max.0.x
+                && pos.0.y >= min.0.y
+                && pos.0.y < max.0.y
+                && pos.0.z >= min.0.z
+                && pos.0.z < max.0.z
+        });
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tick::{SavedTick, scheduler::ChunkTickScheduler};
     use pumpkin_config::world::LevelConfig;
     use tempfile::TempDir;
 
-    /// Ticks saved with a chunk must run once the chunk is loaded again. In vanilla,
-    /// `ChunkStatusTasks` calls `LevelChunk.registerTickContainerInLevel`, which hands the
-    /// chunk's block and fluid ticks to `LevelTicks.addContainer`, so a loaded chunk's
-    /// saved ticks are always visible to the tick loop.
-    #[tokio::test]
-    async fn saved_ticks_run_after_chunk_load() {
-        const DELAY: u8 = 3;
-        let temp_dir = TempDir::new().unwrap();
-        let level = Level::from_root_folder(
+    fn test_level(temp_dir: &TempDir) -> Arc<Level> {
+        Level::from_root_folder(
             &LevelConfig::default(),
             temp_dir.path().to_path_buf(),
             0,
             Dimension::OVERWORLD,
-        );
+        )
+    }
+
+    /// Advances the game time like `ServerLevel.tickTime` and runs the block ticks due.
+    fn run_block_ticks(
+        level: &Level,
+        ticking: &FxHashSet<Vector2<i32>>,
+    ) -> Vec<(BlockPos, &'static Block)> {
+        level.set_game_time(level.game_time() + 1);
+        let mut ran = Vec::new();
+        level.tick_block_ticks(ticking, |pos, block| ran.push((pos, block)));
+        ran
+    }
+
+    fn chunk_with_saved_tick(pos: BlockPos, delay: i32) -> ChunkData {
+        let chunk_pos = pos.chunk_position();
+        let mut chunk = ChunkData::empty(chunk_pos.x, chunk_pos.y);
+        chunk.block_ticks = ChunkTickScheduler::from_saved(vec![SavedTick {
+            value: &Block::FIRE,
+            position: pos,
+            delay,
+            priority: TickPriority::Normal,
+        }]);
+        chunk
+    }
+
+    /// Saved ticks are relative and start counting when the chunk starts ticking
+    /// (`ServerLevel.startTickingChunk`), including delays far past one byte.
+    #[tokio::test]
+    async fn saved_ticks_run_after_chunk_starts_ticking() {
+        const DELAY: i32 = 300;
+        let temp_dir = TempDir::new().unwrap();
+        let level = test_level(&temp_dir);
+        level.set_game_time(1000);
         let pos = BlockPos::new(1, 70, 1);
         let chunk_pos = pos.chunk_position();
-
-        // The chunk as read back from disk: one fire tick still pending, and
-        // nothing else in the level has scheduled a tick in it.
-        let mut chunk = ChunkData::empty(chunk_pos.x, chunk_pos.y);
-        chunk.block_ticks = std::iter::once(ScheduledTick {
-            delay: DELAY,
-            priority: TickPriority::Normal,
-            position: pos,
-            value: &Block::FIRE,
-        })
-        .collect();
-        level.loaded_chunks.insert(chunk_pos, Arc::new(chunk));
-        level.resume_scheduled_ticks(chunk_pos);
+        level
+            .loaded_chunks
+            .insert(chunk_pos, Arc::new(chunk_with_saved_tick(pos, DELAY)));
+        level.start_ticking_chunk(chunk_pos);
 
         let ticking = FxHashSet::from_iter([chunk_pos]);
-        let ran: Vec<_> = (0..=DELAY)
-            .flat_map(|_| level.get_tick_data(&ticking, 0).block_ticks)
-            .collect();
-        assert_eq!(ran.len(), 1, "the saved tick should run exactly once");
-        assert_eq!(ran[0].position, pos);
-        assert_eq!(ran[0].value, &Block::FIRE);
+        for _ in 1..DELAY {
+            assert!(run_block_ticks(&level, &ticking).is_empty());
+        }
+        assert!(level.is_block_tick_scheduled(&pos, &Block::FIRE));
+        assert_eq!(run_block_ticks(&level, &ticking), vec![(pos, &Block::FIRE)]);
+        assert!(!level.is_block_tick_scheduled(&pos, &Block::FIRE));
     }
 
     /// Vanilla `LevelTicks.sortContainersToTick` skips chunks that fail its tick check,
@@ -1091,40 +1138,74 @@ mod tests {
     #[tokio::test]
     async fn ticks_wait_while_their_chunk_is_not_ticking() {
         let temp_dir = TempDir::new().unwrap();
-        let level = Level::from_root_folder(
-            &LevelConfig::default(),
-            temp_dir.path().to_path_buf(),
-            0,
-            Dimension::OVERWORLD,
-        );
+        let level = test_level(&temp_dir);
         let pos = BlockPos::new(1, 70, 1);
         let chunk_pos = pos.chunk_position();
-        let mut chunk = ChunkData::empty(chunk_pos.x, chunk_pos.y);
-        chunk.block_ticks = std::iter::once(ScheduledTick {
-            delay: 1,
-            priority: TickPriority::Normal,
-            position: pos,
-            value: &Block::FIRE,
-        })
-        .collect();
-        level.loaded_chunks.insert(chunk_pos, Arc::new(chunk));
-        level.resume_scheduled_ticks(chunk_pos);
+        level
+            .loaded_chunks
+            .insert(chunk_pos, Arc::new(chunk_with_saved_tick(pos, 1)));
+        level.start_ticking_chunk(chunk_pos);
 
         for _ in 0..10 {
-            assert!(
-                level
-                    .get_tick_data(&FxHashSet::default(), 0)
-                    .block_ticks
-                    .is_empty()
-            );
+            assert!(run_block_ticks(&level, &FxHashSet::default()).is_empty());
         }
         assert!(level.is_block_tick_scheduled(&pos, &Block::FIRE));
 
         let ticking = FxHashSet::from_iter([chunk_pos]);
-        let ran = (0..2)
-            .flat_map(|_| level.get_tick_data(&ticking, 0).block_ticks)
-            .count();
-        assert_eq!(ran, 1, "the tick should run once its chunk ticks");
+        assert_eq!(run_block_ticks(&level, &ticking).len(), 1);
+    }
+
+    /// Vanilla `ScheduledTick.DRAIN_ORDER`: by trigger tick, then priority, then the order the
+    /// ticks were scheduled in, across chunks. A delay of 0 or 1 both run on the next tick.
+    #[tokio::test]
+    async fn ticks_run_in_vanilla_drain_order() {
+        let temp_dir = TempDir::new().unwrap();
+        let level = test_level(&temp_dir);
+        let a = BlockPos::new(1, 70, 1);
+        let b = BlockPos::new(17, 70, 1);
+        let c = BlockPos::new(2, 70, 1);
+        let d = BlockPos::new(18, 70, 1);
+        for pos in [a, b] {
+            let chunk_pos = pos.chunk_position();
+            let chunk = ChunkData::empty(chunk_pos.x, chunk_pos.y);
+            level.loaded_chunks.insert(chunk_pos, Arc::new(chunk));
+        }
+        level.schedule_block_tick(&Block::FIRE, a, 1, TickPriority::Normal);
+        level.schedule_block_tick(&Block::FIRE, b, 0, TickPriority::Normal);
+        level.schedule_block_tick(&Block::FIRE, c, 1, TickPriority::High);
+        level.schedule_block_tick(&Block::FIRE, d, 2, TickPriority::ExtremelyHigh);
+        level.schedule_block_tick(&Block::FIRE, a, 1, TickPriority::ExtremelyHigh);
+
+        let ticking = FxHashSet::from_iter([a.chunk_position(), b.chunk_position()]);
+        let order: Vec<_> = run_block_ticks(&level, &ticking)
+            .into_iter()
+            .map(|(pos, _)| pos)
+            .collect();
+        assert_eq!(order, vec![c, a, b]);
+        let order: Vec<_> = run_block_ticks(&level, &ticking)
+            .into_iter()
+            .map(|(pos, _)| pos)
+            .collect();
+        assert_eq!(order, vec![d]);
+    }
+
+    /// Vanilla `LevelChunkTicks.pack` saves `t` relative to the game time at save.
+    #[tokio::test]
+    async fn scheduled_ticks_save_relative_to_game_time() {
+        let temp_dir = TempDir::new().unwrap();
+        let level = test_level(&temp_dir);
+        level.set_game_time(5000);
+        let pos = BlockPos::new(1, 70, 1);
+        let chunk_pos = pos.chunk_position();
+        let chunk = Arc::new(ChunkData::empty(chunk_pos.x, chunk_pos.y));
+        level.loaded_chunks.insert(chunk_pos, chunk.clone());
+        level.schedule_block_tick(&Block::FIRE, pos, 24000, TickPriority::Low);
+        level.set_game_time(5100);
+
+        let saved = chunk.block_ticks.to_saved_ticks();
+        assert_eq!(saved.len(), 1);
+        assert_eq!(saved[0].delay, 23900);
+        assert_eq!(saved[0].priority, TickPriority::Low);
     }
 
     #[tokio::test]

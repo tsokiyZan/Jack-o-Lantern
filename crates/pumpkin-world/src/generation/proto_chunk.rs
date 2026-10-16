@@ -65,7 +65,7 @@ use pumpkin_data::tag::get_tag_ids;
 use pumpkin_nbt::compound::NbtCompound;
 
 use crate::generation::structure::template::BlockPlacer;
-use crate::tick::{ScheduledTick, TickPriority};
+use crate::tick::{SavedTick, TickPriority};
 
 pub trait GenerationCache: HeightLimitView + BlockAccessor {
     fn get_center_chunk_mut(&mut self) -> &mut ProtoChunk;
@@ -161,7 +161,7 @@ pub struct ProtoChunk {
     pub blending_data: Option<crate::generation::blender::blending_data::BlendingData>,
     pub pending_block_entities: Vec<NbtCompound>,
     pending_structure_entities: Vec<NbtCompound>,
-    pub fluid_ticks: Vec<ScheduledTick<&'static Fluid>>,
+    pub fluid_ticks: Vec<SavedTick<&'static Fluid>>,
 }
 
 pub struct TerrainCache {
@@ -463,11 +463,12 @@ impl ProtoChunk {
     }
 
     pub fn schedule_fluid_tick(&mut self, x: i32, y: i32, z: i32, fluid: &'static Fluid) {
-        self.fluid_ticks.push(ScheduledTick {
+        // Vanilla `ProtoChunkTicks.schedule` saves every tick with delay 0.
+        self.fluid_ticks.push(SavedTick {
+            value: fluid,
+            position: BlockPos::new(x, y, z),
             delay: 0,
             priority: TickPriority::Normal,
-            position: BlockPos::new(x, y, z),
-            value: fluid,
         });
     }
 

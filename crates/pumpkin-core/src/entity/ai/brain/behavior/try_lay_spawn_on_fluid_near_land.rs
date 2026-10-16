@@ -50,7 +50,7 @@ pub fn try_lay_spawn_on_fluid_near_land(spawn_block: &'static Block) -> OneShot 
                         BlockFlags::NOTIFY_ALL,
                     );
                     tick.world
-                        .emit_game_event(GameEvent::BlockPlace.name(), spawn_pos.to_f64());
+                        .emit_game_event(GameEvent::BlockPlace.name(), spawn_pos.to_centered_f64());
                     tick.world.play_sound_fine(
                         Sound::EntityFrogLaySpawn,
                         SoundCategory::Blocks,

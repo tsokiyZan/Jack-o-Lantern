@@ -58,13 +58,7 @@ impl SnifferEggBlock {
         let progression_tick_delay = hatch_time / HATCH_STAGES;
         world.emit_game_event(GameEvent::BlockPlace.name(), pos.to_centered_f64());
         let delay = progression_tick_delay + rand::rng().random_range(0..RANDOM_HATCH_OFFSET_TICKS);
-        // TODO: the block tick scheduler holds at most 255 ticks, far short of this delay.
-        world.schedule_block_tick(
-            block,
-            *pos,
-            u8::try_from(delay).unwrap_or(u8::MAX),
-            TickPriority::Normal,
-        );
+        world.schedule_block_tick(block, *pos, delay, TickPriority::Normal);
     }
 }
 

@@ -209,8 +209,6 @@ fn init_lay_spawn_activity() -> ActivityData {
                     &tag::Fluid::MINECRAFT_FROG_TRIES_TO_FIND_LAND_NEAR,
                 )),
             ),
-            // TODO: FrogspawnBlock, whose 3600 to 12000 tick hatch delay does not fit
-            // pumpkin-world's u8 scheduled tick delay; laid frogspawn never hatches.
             (
                 3,
                 Box::new(behavior::try_lay_spawn_on_fluid_near_land(

@@ -213,7 +213,7 @@ impl BlockBehaviour for FireBlock {
         args.world.schedule_block_tick(
             args.block,
             *args.position,
-            Self::get_fire_tick_delay() as u8,
+            Self::get_fire_tick_delay(),
             TickPriority::Normal,
         );
     }
@@ -260,7 +260,7 @@ impl BlockBehaviour for FireBlock {
         world.schedule_block_tick(
             block,
             *pos,
-            Self::get_fire_tick_delay() as u8,
+            Self::get_fire_tick_delay(),
             TickPriority::Normal,
         );
 
