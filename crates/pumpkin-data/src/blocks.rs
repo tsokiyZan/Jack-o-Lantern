@@ -2,6 +2,7 @@ use crate::{
     BlockState, BlockStateId,
     tag::{RegistryKey, Tag, Taggable},
 };
+use pumpkin_nbt::{compound::NbtCompound, tag::NbtTag};
 use pumpkin_util::{
     loot_table::LootTable,
     math::{experience::Experience, position::BlockPos, vector3::Vector3},
@@ -300,6 +301,56 @@ impl Block {
         } else {
             BlockState::from_id(id)
         }
+    }
+
+    /// Vanilla `BlockState.CODEC`: a default state is the bare block id, any other state is
+    /// `{id, properties}` with every property.
+    #[must_use]
+    pub fn state_to_nbt(state_id: BlockStateId) -> NbtTag {
+        let block = Self::from_state_id(state_id);
+        let id = format!("minecraft:{}", block.name);
+        if state_id == block.default_state.id {
+            return NbtTag::String(id.into());
+        }
+        let mut nbt = NbtCompound::new();
+        nbt.put_string("id", id);
+        if let Some(props) = block.properties(state_id) {
+            let mut props_nbt = NbtCompound::new();
+            for (key, value) in props.to_props() {
+                props_nbt.put_string(key, value.to_string());
+            }
+            nbt.put_compound("properties", props_nbt);
+        }
+        NbtTag::Compound(nbt)
+    }
+
+    /// Reads [`Self::state_to_nbt`]'s format, and the `Name`/`Properties` field names saves
+    /// used before 26.3's `BlockStateFieldNamesFix`. Unknown blocks are `None`; missing or
+    /// unknown property values fall back to the block's defaults.
+    #[must_use]
+    pub fn state_from_nbt(tag: &NbtTag) -> Option<BlockStateId> {
+        let nbt = match tag {
+            NbtTag::String(id) => return Some(Self::from_name(id)?.default_state.id),
+            NbtTag::Compound(nbt) => nbt,
+            _ => return None,
+        };
+        let block = Self::from_name(nbt.get_string("id").or_else(|| nbt.get_string("Name"))?)?;
+        let Some(props_nbt) = nbt
+            .get_compound("properties")
+            .or_else(|| nbt.get_compound("Properties"))
+            .filter(|_| block.properties(block.default_state.id).is_some())
+        else {
+            return Some(block.default_state.id);
+        };
+        let props: Vec<(&str, &str)> = props_nbt
+            .child_tags
+            .iter()
+            .filter_map(|(key, value)| match value {
+                NbtTag::String(value) => Some((key.as_ref(), value.as_ref())),
+                _ => None,
+            })
+            .collect();
+        Some(block.from_properties(&props).to_state_id(block))
     }
 }
 
