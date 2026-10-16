@@ -400,6 +400,13 @@ impl World {
             NbtCompound::new()
         };
 
+        // Every dimension reads the overworld's saved clocks, like vanilla's `DerivedLevelData`.
+        let mut level_time = LevelTime::new();
+        let info = level_info.load();
+        level_time.load_from(info.day_time, info.time);
+        drop(info);
+        level.set_game_time(level_time.world_age);
+
         Self {
             uuid: Uuid::new_v4(),
             level,
@@ -415,7 +422,7 @@ impl World {
                 5,
                 300,
             )),
-            level_time: std::sync::Mutex::new(LevelTime::new()),
+            level_time: std::sync::Mutex::new(level_time),
             dimension,
             weather: std::sync::Mutex::new(Weather::new()),
             block_registry,

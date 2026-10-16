@@ -534,9 +534,24 @@ impl Server {
     }
 
     pub fn save_world_info(&self) -> Result<(), WorldInfoError> {
-        let level_data = self.level_info.load();
-        self.world_info_writer
-            .write_world_info(&level_data, &self.basic_config.get_world_path())
+        self.world_info_writer.write_world_info(
+            &self.level_data_to_save(),
+            &self.basic_config.get_world_path(),
+        )
+    }
+
+    /// The level data with the overworld's game and day time, which vanilla keeps in
+    /// `PrimaryLevelData` and its world clock as they tick.
+    fn level_data_to_save(&self) -> LevelData {
+        let mut level_data = (**self.level_info.load()).clone();
+        let overworld = self.get_world_from_dimension(&Dimension::OVERWORLD);
+        let level_time = overworld
+            .level_time
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        level_data.time = level_time.world_age;
+        level_data.day_time = level_time.time_of_day;
+        level_data
     }
 
     pub fn reload_datapacks(&self, server: &Arc<Self>) {
@@ -774,7 +789,7 @@ impl Server {
         for world in self.worlds.load().iter() {
             world.shutdown().await;
         }
-        let level_data = self.level_info.load();
+        let level_data = self.level_data_to_save();
         // then lets save the world info
 
         if let Err(err) = self

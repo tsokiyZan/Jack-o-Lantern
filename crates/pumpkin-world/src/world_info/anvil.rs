@@ -280,6 +280,9 @@ fn level_data_from_nbt(data: &NbtCompound, seed: i64) -> LevelData {
     if let Some(day_time) = data.get_long("DayTime") {
         level_data.day_time = day_time;
     }
+    if let Some(time) = data.get_long("Time") {
+        level_data.time = time;
+    }
     if let Some(clear_weather_time) = data.get_int("clearWeatherTime") {
         level_data.clear_weather_time = clear_weather_time;
     }
@@ -318,6 +321,7 @@ fn level_data_to_nbt(info: &LevelData, data: &mut NbtCompound) {
     data.put_bool("DifficultyLocked", info.difficulty_locked);
     data.put_long("LastPlayed", info.last_played);
     data.put_string("LevelName", info.level_name.clone());
+    data.put_long("Time", info.time);
 
     // 26.2 spawn
     let mut spawn_comp = NbtCompound::new();
@@ -935,6 +939,7 @@ mod test {
                 series: "main".to_string(),
             },
             map_id: 0,
+            time: 0,
         },
     });
 

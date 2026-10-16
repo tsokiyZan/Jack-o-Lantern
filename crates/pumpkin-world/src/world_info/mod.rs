@@ -79,6 +79,9 @@ pub struct LevelData {
     pub level_version: i32,
     #[serde(rename = "map_id", default)]
     pub map_id: i32,
+    /// The game time, `PrimaryLevelData.gameTime`.
+    #[serde(default)]
+    pub time: i64,
 
     // These are NOT serialized to level.dat, but are still deserialized from it if present.
     // They are loaded and saved by AnvilLevelInfo via the data_files module.
@@ -553,6 +556,7 @@ impl LevelData {
             world_version: WorldVersion::default(),
             level_version: MAXIMUM_SUPPORTED_LEVEL_VERSION,
             map_id: 0,
+            time: 0,
             // fields now in data/minecraft/*.dat
             game_rules: GameRuleRegistry::default(),
             world_gen_settings: WorldGenSettings::new(seed),
