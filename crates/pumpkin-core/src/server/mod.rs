@@ -1225,12 +1225,17 @@ impl Server {
         );
 
         self.plugin_manager.tick_loaders(self);
-        self.scheduled_functions.tick(
-            self,
-            self.tick_count.load(std::sync::atomic::Ordering::Relaxed) as u64,
-        );
 
         self.sync_game_time();
+
+        // Vanilla ticks scheduled functions in the overworld's `tickTime`, with the game time it
+        // has just advanced to; the overworld ticks first, so they still run before any world.
+        let game_time = self
+            .get_world_from_dimension(&Dimension::OVERWORLD)
+            .level
+            .game_time()
+            + 1;
+        self.scheduled_functions.tick(self, game_time as u64);
 
         let worlds = self.worlds.load();
         let handle = self.runtime.clone();

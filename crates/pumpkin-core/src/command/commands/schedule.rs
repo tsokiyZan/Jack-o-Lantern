@@ -1,5 +1,4 @@
-use std::sync::atomic::Ordering;
-
+use pumpkin_data::dimension::Dimension;
 use pumpkin_data::translation;
 use pumpkin_util::PermissionLvl;
 use pumpkin_util::permission::{Permission, PermissionDefault, PermissionRegistry};
@@ -66,14 +65,18 @@ fn execute_schedule(context: &CommandContext, replace: bool) -> Result<i32, Comm
     }
 
     let server = context.server();
-    let current_tick = server.tick_count.load(Ordering::Relaxed) as u64;
-    let tick_time = current_tick + (time as u64);
+    // `source.getLevel().getGameTime()`: every dimension shares the overworld's game time.
+    let game_time = server
+        .get_world_from_dimension(&Dimension::OVERWORLD)
+        .level
+        .game_time();
+    let tick_time = game_time + i64::from(time);
     let is_tag = function_name.starts_with('#');
     let callback_id = function_name.trim_start_matches('#').to_string();
 
     server.scheduled_functions.schedule(
         function_name.clone(),
-        tick_time,
+        tick_time as u64,
         function_name,
         is_tag,
         replace,
@@ -107,7 +110,7 @@ fn execute_schedule(context: &CommandContext, replace: bool) -> Result<i32, Comm
         );
     }
 
-    Ok((tick_time % (i32::MAX as u64)) as i32)
+    Ok(tick_time.rem_euclid(i64::from(i32::MAX)) as i32)
 }
 
 struct ScheduleExecutor {
