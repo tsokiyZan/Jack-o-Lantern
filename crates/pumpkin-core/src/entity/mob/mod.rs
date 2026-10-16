@@ -987,10 +987,6 @@ impl MobEntity {
             return false;
         }
 
-        let attack_damage: f32 =
-            self.living_entity
-                .get_attribute_value(&Attributes::ATTACK_DAMAGE) as f32;
-
         let damage_source = DamageSource {
             damage_type: caller
                 .get_mob()
@@ -998,6 +994,16 @@ impl MobEntity {
             direct: Some(caller),
             causing: Some(caller),
         };
+        // Vanilla `Mob.doHurtTarget`: the weapon's enchantments against this target.
+        let world = self.living_entity.entity.world.load_full();
+        let attack_damage = EnchantmentHelper::modify_damage(
+            &world,
+            &self.living_entity.held_item(caller),
+            target,
+            &damage_source,
+            self.living_entity
+                .get_attribute_value(&Attributes::ATTACK_DAMAGE) as f32,
+        );
         let damaged = target.damage_with_context(
             target,
             attack_damage,
@@ -1008,11 +1014,7 @@ impl MobEntity {
         );
 
         if damaged {
-            EnchantmentHelper::do_post_attack_effects(
-                &self.living_entity.entity.world.load_full(),
-                target,
-                &damage_source,
-            );
+            EnchantmentHelper::do_post_attack_effects(&world, target, &damage_source);
             self.living_entity
                 .last_attacking_id
                 .store(target.get_entity().entity_id, Relaxed);
@@ -1538,6 +1540,9 @@ pub trait Mob: EntityBase + Send + Sync {
     fn takes_knockback(&self) -> bool {
         true
     }
+
+    /// Vanilla `hurtArmor`, which wears nothing unless a mob overrides it.
+    fn hurt_armor(&self, _damage_type: DamageType, _damage: f32) {}
 
     /// Vanilla `Entity.kill`, which some mobs override.
     fn mob_kill(&self, caller: &dyn EntityBase) {
@@ -2456,6 +2461,12 @@ pub fn mob_hurt_server<M: Mob + ?Sized>(
 }
 
 impl<T: Mob + Send + 'static> EntityBase for T {
+    /// Vanilla `LivingEntity.getWeaponItem`; Pumpkin doesn't track the riptide spin stack.
+    fn get_weapon_item(&self) -> Option<ItemStack> {
+        self.get_living_entity()
+            .map(|living| living.held_item(self))
+    }
+
     fn get_mob(&self) -> Option<&dyn Mob> {
         Some(self)
     }

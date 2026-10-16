@@ -232,6 +232,16 @@ const BABY_DIMENSIONS: EntityDimensions =
     EntityDimensions::scalable(0.3, 0.425).with_eye_height(0.343_75);
 
 impl Mob for WolfEntity {
+    /// Vanilla `Wolf.hurtArmor`.
+    fn hurt_armor(&self, damage_type: pumpkin_data::damage::DamageType, damage: f32) {
+        self.get_mob_entity().living_entity.do_hurt_equipment(
+            self,
+            damage_type,
+            damage,
+            &[pumpkin_data::data_component_impl::EquipmentSlot::BODY],
+        );
+    }
+
     /// Vanilla `Wolf.playStepSound`.
     fn play_step_sound(
         &self,

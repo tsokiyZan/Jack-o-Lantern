@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use std::sync::atomic::Ordering;
 
 use crate::enchantment::EnchantmentHelper;
 use crate::entity::projectile::arrow::{ArrowEntity, ArrowPickup};
@@ -48,15 +47,6 @@ impl ProjectileWeaponItem {
         let arrow =
             ArrowEntity::new_shot_with_weapon(arrow_entity, shooter, projectile, weapon, pickup);
 
-        // Apply data-driven weapon enchantment modifications
-        arrow.set_base_damage(EnchantmentHelper::modify_damage(
-            weapon,
-            arrow.get_base_damage(),
-        ));
-        arrow.punch_level.store(
-            EnchantmentHelper::modify_knockback(weapon, 0.0) as u8,
-            Ordering::Relaxed,
-        );
         arrow.set_pierce_level(EnchantmentHelper::process_projectile_piercing(weapon, 0));
 
         // Data-driven PROJECTILE_SPAWNED effects (e.g. Flame enchantment -> Ignite effect)
@@ -71,7 +61,12 @@ impl ProjectileWeaponItem {
 
     /// Draws ammo for projectile weapon matching vanilla `ProjectileWeaponItem::draw`.
     #[must_use]
-    pub fn draw(weapon: &ItemStack, projectile: &ItemStack, is_creative: bool) -> Vec<ItemStack> {
+    pub fn draw(
+        world: &World,
+        weapon: &ItemStack,
+        projectile: &ItemStack,
+        is_creative: bool,
+    ) -> Vec<ItemStack> {
         if projectile.item_count == 0 {
             return Vec::new();
         }
@@ -82,6 +77,7 @@ impl ProjectileWeaponItem {
 
         for i in 0..num_projectiles {
             let drawn_stack = Self::use_ammo(
+                world,
                 weapon,
                 if i == 0 { projectile } else { &projectile_copy },
                 is_creative,
@@ -98,6 +94,7 @@ impl ProjectileWeaponItem {
     /// Handles ammo usage logic matching vanilla `ProjectileWeaponItem::useAmmo`.
     #[must_use]
     pub fn use_ammo(
+        world: &World,
         weapon: &ItemStack,
         projectile: &ItemStack,
         is_creative: bool,
@@ -106,7 +103,7 @@ impl ProjectileWeaponItem {
         let ammo_to_use = if force_infinite || is_creative {
             0
         } else {
-            EnchantmentHelper::process_ammo_use(weapon, projectile, 1)
+            EnchantmentHelper::process_ammo_use(world, weapon, projectile, 1)
         };
 
         if ammo_to_use > projectile.item_count as i32 {

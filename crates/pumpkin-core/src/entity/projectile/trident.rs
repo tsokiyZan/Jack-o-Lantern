@@ -41,7 +41,7 @@ pub struct TridentEntity {
 }
 
 impl TridentEntity {
-    const BASE_DAMAGE: f64 = 8.0;
+    const BASE_DAMAGE: f32 = 8.0;
     const AIR_INERTIA: f64 = 0.99;
     const WATER_INERTIA: f64 = 0.9;
     const GRAVITY: f64 = 0.05;
@@ -174,6 +174,16 @@ impl TridentEntity {
 }
 
 impl EntityBase for TridentEntity {
+    /// Vanilla `ThrownTrident.getWeaponItem`: its own item.
+    fn get_weapon_item(&self) -> Option<ItemStack> {
+        Some(
+            self.item_stack
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .clone(),
+        )
+    }
+
     fn get_owner_id(&self) -> Option<i32> {
         self.owner_id
     }
@@ -364,28 +374,6 @@ impl EntityBase for TridentEntity {
                 hit_pos,
                 ..
             } => {
-                let mut damage = Self::BASE_DAMAGE;
-
-                // Apply Impaling enchantment extra damage
-                if let Some(enchantments) = self
-                    .item_stack
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .get_data_component::<pumpkin_data::data_component_impl::EnchantmentsImpl>()
-                {
-                    for (enchantment, level) in enchantments.enchantment.iter() {
-                        if **enchantment == pumpkin_data::Enchantment::IMPALING {
-                            let in_water =
-                                target.get_entity().touching_water.load(Ordering::Relaxed);
-                            if in_water {
-                                damage += 1.25 * f64::from(*level);
-                            }
-                        }
-                    }
-                }
-
-                let damage_val = damage as f32;
-                self.dealt_damage.store(true, Ordering::Relaxed);
                 let owner = self.owner_id.and_then(|id| world.get_entity_by_id(id));
                 // Vanilla `trident(this, owner)`, the trident standing in for a missing owner.
                 let damage_source = DamageSource {
@@ -393,6 +381,20 @@ impl EntityBase for TridentEntity {
                     direct: Some(self),
                     causing: owner.as_deref().or(Some(self)),
                 };
+                // The trident's enchantments (Impaling) against this target.
+                let weapon = self
+                    .item_stack
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .clone();
+                let damage_val = EnchantmentHelper::modify_damage(
+                    &world,
+                    &weapon,
+                    target.as_ref(),
+                    &damage_source,
+                    Self::BASE_DAMAGE,
+                );
+                self.dealt_damage.store(true, Ordering::Relaxed);
                 if target.damage_with_context(
                     target.as_ref(),
                     damage_val,
@@ -401,11 +403,6 @@ impl EntityBase for TridentEntity {
                     damage_source.direct,
                     damage_source.causing,
                 ) {
-                    let weapon = self
-                        .item_stack
-                        .lock()
-                        .unwrap_or_else(std::sync::PoisonError::into_inner)
-                        .clone();
                     let kill = || self.kill(self);
                     EnchantmentHelper::do_post_attack_effects_with_item_source_on_break(
                         &world,

@@ -246,6 +246,16 @@ impl Animal for HorseEntity {
 const BABY_DIMENSIONS: EntityDimensions = Entity::type_dimensions(&EntityType::HORSE).scale(0.7);
 
 impl Mob for HorseEntity {
+    /// Vanilla `Horse.hurtArmor`.
+    fn hurt_armor(&self, damage_type: pumpkin_data::damage::DamageType, damage: f32) {
+        self.get_mob_entity().living_entity.do_hurt_equipment(
+            self,
+            damage_type,
+            damage,
+            &[pumpkin_data::data_component_impl::EquipmentSlot::BODY],
+        );
+    }
+
     fn as_abstract_horse(&self) -> Option<&dyn AbstractHorse> {
         Some(self)
     }

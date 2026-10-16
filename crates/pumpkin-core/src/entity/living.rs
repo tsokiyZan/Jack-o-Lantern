@@ -5,7 +5,6 @@ use pumpkin_data::tag::{self, Taggable};
 use pumpkin_data::tracked_data;
 use pumpkin_inventory::build_equipment_slots;
 use pumpkin_inventory::player::player_inventory::PlayerInventory;
-use pumpkin_inventory::screen_handler::InventoryPlayer;
 use pumpkin_protocol::bedrock::client::take_item_actor::CTakeItemActor;
 use pumpkin_protocol::bedrock::server::actor_event::{ActorEventID, SActorEvent};
 use pumpkin_protocol::codec::var_ulong::VarULong;
@@ -26,25 +25,28 @@ use super::breath::BreathManager;
 use super::experience_orb::ExperienceOrbEntity;
 use super::{Entity, EntityBase, NBTStorageInit};
 use crate::block::OnLandedUponArgs;
+use crate::enchantment::EnchantmentHelper;
 use crate::entity::NBTStorage;
 use crate::entity::ageable::AgeableMob;
 use crate::entity::attributes::AttributeInstance;
 use crate::entity::attributes::Modifier;
 use crate::entity::attributes::ModifierOperation;
 use crate::entity::combat::{CombatRules, CombatTracker, FallLocation, knockback_after_resistance};
+use crate::entity::damage_source::DamageSource;
 use crate::entity::mob::equipment::DEFAULT_EQUIPMENT_DROP_CHANCE;
 use crate::entity::player::statistics::{CustomStatistic, StatisticCategory};
 use crate::server::Server;
 use crate::world::loot::LootContextParameters;
 use crossbeam::atomic::AtomicCell;
 use pumpkin_data::AttributeModifierSlot;
+use pumpkin_data::Block;
 use pumpkin_data::attributes::Attributes;
 use pumpkin_data::data_component_impl::IdOr;
 use pumpkin_data::data_component_impl::Operation;
 use pumpkin_data::data_component_impl::food::{ConsumableImpl, ConsumeAnimation, ConsumeEffect};
 use pumpkin_data::data_component_impl::{
-    AttributeModifiersImpl, BlocksAttacksImpl, DeathProtectionImpl, EnchantmentsImpl,
-    EquipmentSlot, EquippableImpl, FoodImpl, IDSet, MobVisibilityImpl,
+    AttributeModifiersImpl, BlocksAttacksImpl, DeathProtectionImpl, EquipmentSlot, EquippableImpl,
+    FoodImpl, IDSet, MobVisibilityImpl,
 };
 use pumpkin_data::effect::StatusEffect;
 use pumpkin_data::entity::{EntityPose, EntityStatus, EntityType};
@@ -53,15 +55,12 @@ use pumpkin_data::game_event::GameEvent;
 use pumpkin_data::game_rules::{GameRule, GameRuleValue};
 use pumpkin_data::item_stack::{DamageResult, ItemStack};
 use pumpkin_data::sound::SoundCategory;
-use pumpkin_data::{Block, Enchantment};
 use pumpkin_data::{damage::DamageType, sound::Sound};
 use pumpkin_inventory::entity_equipment::EntityEquipment;
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_nbt::tag::NbtTag;
 use pumpkin_protocol::codec::var_int::VarInt;
-use pumpkin_protocol::java::client::play::{
-    CHurtAnimation, CSetPlayerInventory, CTakeItemEntity, CUpdateMobEffect,
-};
+use pumpkin_protocol::java::client::play::{CHurtAnimation, CTakeItemEntity, CUpdateMobEffect};
 use pumpkin_protocol::{
     codec::item_stack_seralizer::ItemStackSerializer,
     java::client::play::{CSetEquipment, MetadataSerializer},
@@ -136,6 +135,10 @@ pub struct LivingEntity {
     pub discard_friction: AtomicBool,
     /// The distance the entity has been falling.
     pub fall_distance: AtomicCell<f32>,
+    /// Vanilla `currentImpulseContextResetGraceTime`.
+    pub current_impulse_context_reset_grace_time: AtomicI32,
+    /// Vanilla `currentImpulseImpactPos`: while set, falls are measured from this height.
+    pub current_impulse_impact_pos: AtomicCell<Option<Vector3<f64>>>,
     pub active_effects: std::sync::Mutex<FxHashMap<&'static StatusEffect, Effect>>,
     pub entity_equipment: Arc<std::sync::Mutex<EntityEquipment>>,
     pub equipment_drop_chances: Arc<std::sync::Mutex<FxHashMap<EquipmentSlot, f32>>>,
@@ -332,6 +335,8 @@ impl LivingEntity {
             last_damage_taken: AtomicCell::new(0.0),
             absorption: AtomicCell::new(0.0),
             fall_distance: AtomicCell::new(0.0),
+            current_impulse_context_reset_grace_time: AtomicI32::new(0),
+            current_impulse_impact_pos: AtomicCell::new(None),
             death_time: AtomicU8::new(0),
             dead: AtomicBool::new(false),
             discard_friction: AtomicBool::new(false),
@@ -2250,6 +2255,22 @@ impl LivingEntity {
             );
         }
 
+        // Vanilla `LivingEntity.causeFallDamage`: after an ignored impulse only the drop below
+        // where it struck counts.
+        let fall_distance =
+            self.current_impulse_impact_pos
+                .load()
+                .map_or(fall_distance, |impact| {
+                    let effective =
+                        f64::from(fall_distance).min(impact.y - self.entity.pos.load().y);
+                    if effective <= 0.0 {
+                        self.reset_current_impulse_context();
+                    } else {
+                        self.try_reset_current_impulse_context();
+                    }
+                    effective as f32
+                });
+
         let safe_fall_distance = self.get_attribute_value(&Attributes::SAFE_FALL_DISTANCE) as f32;
         let unsafe_fall_distance = fall_distance + 1.0E-6 - safe_fall_distance;
 
@@ -2258,12 +2279,54 @@ impl LivingEntity {
             .get_mob()
             .map_or(damage, |mob| mob.calculate_fall_damage(damage));
         if damage > 0 {
+            self.reset_current_impulse_context();
             let check_damage = self.damage(caller, damage as f32, DamageType::FALL); // Fall
             if check_damage {
                 // Vanilla `getFallDamageSound(dmg)` picks by the damage, not the distance.
                 self.entity.play_sound(Self::get_fall_sound(damage));
             }
         }
+    }
+
+    /// Vanilla `LivingEntity.setIgnoreFallDamageFromCurrentImpulse`.
+    pub fn set_ignore_fall_damage_from_current_impulse(
+        &self,
+        ignore_fall_damage: bool,
+        new_impulse_impact_pos: Vector3<f64>,
+    ) {
+        if ignore_fall_damage {
+            self.apply_post_impulse_grace_time(40);
+            self.current_impulse_impact_pos
+                .store(Some(new_impulse_impact_pos));
+        } else {
+            self.current_impulse_context_reset_grace_time
+                .store(0, Relaxed);
+        }
+    }
+
+    /// Vanilla `LivingEntity.applyPostImpulseGraceTime`.
+    pub fn apply_post_impulse_grace_time(&self, ticks: i32) {
+        self.current_impulse_context_reset_grace_time
+            .fetch_max(ticks, Relaxed);
+    }
+
+    /// Vanilla `LivingEntity.isIgnoringFallDamageFromCurrentImpulse`.
+    pub fn is_ignoring_fall_damage_from_current_impulse(&self) -> bool {
+        self.current_impulse_impact_pos.load().is_some()
+    }
+
+    /// Vanilla `LivingEntity.tryResetCurrentImpulseContext`.
+    pub fn try_reset_current_impulse_context(&self) {
+        if self.current_impulse_context_reset_grace_time.load(Relaxed) == 0 {
+            self.reset_current_impulse_context();
+        }
+    }
+
+    /// Vanilla `LivingEntity.resetCurrentImpulseContext`.
+    pub fn reset_current_impulse_context(&self) {
+        self.current_impulse_context_reset_grace_time
+            .store(0, Relaxed);
+        self.current_impulse_impact_pos.store(None);
     }
 
     const fn get_fall_sound(damage: i32) -> Sound {
@@ -2390,27 +2453,18 @@ impl LivingEntity {
                 .and_then(EntityBase::get_mob)
                 .is_none_or(|mob| mob.killed_entity(&*dyn_self));
             world.send_entity_status(&self.entity, EntityStatus::Death, Some(ActorEventID::Death));
-            let looting_level;
-            let tool = if let Some(cause_ent) = cause {
-                if let Some(player) = cause_ent
-                    .cast_any()
-                    .downcast_ref::<crate::entity::player::Player>()
-                {
-                    let hand_stack = player
+            let tool = cause
+                .and_then(|cause_ent| {
+                    cause_ent
+                        .cast_any()
+                        .downcast_ref::<crate::entity::player::Player>()
+                })
+                .map(|player| {
+                    player
                         .inventory()
-                        .get_stack_in_hand(pumpkin_util::Hand::Right);
-                    looting_level = hand_stack
-                        .get_enchantment_level(&Enchantment::LOOTING)
-                        .max(0) as u32;
-                    (!hand_stack.is_empty()).then(|| hand_stack.clone())
-                } else {
-                    looting_level = 0;
-                    None
-                }
-            } else {
-                looting_level = 0;
-                None
-            };
+                        .get_stack_in_hand(pumpkin_util::Hand::Right)
+                })
+                .filter(|hand_stack| !hand_stack.is_empty());
 
             let is_raining = world.is_raining();
             let is_thundering = world.is_thundering();
@@ -2471,7 +2525,11 @@ impl LivingEntity {
             self.entity.pose.store(EntityPose::Dying);
 
             if perished {
-                self.drop_equipment(looting_level);
+                self.drop_equipment(&DamageSource {
+                    damage_type,
+                    direct: source,
+                    causing: cause,
+                });
                 if let Some(mob) = dyn_self.get_mob() {
                     mob.drop_custom_death_loot();
                 }
@@ -2499,7 +2557,8 @@ impl LivingEntity {
         }
     }
 
-    fn drop_equipment(&self, looting_level: u32) {
+    fn drop_equipment(&self, killing_blow: &DamageSource<'_>) {
+        let world = self.entity.world.load();
         let drop_chances = self
             .equipment_drop_chances
             .lock()
@@ -2518,10 +2577,19 @@ impl LivingEntity {
                 .unwrap_or(DEFAULT_EQUIPMENT_DROP_CHANCE);
             // A chance above 1.0 marks a guaranteed, undamaged drop.
             let preserved = chance > 1.0;
-            // Vanilla approximation: EnchantmentHelper.processEquipmentDropChance
-            // adds lootingLevel * 0.01 to the per-slot equipment drop chance.
-            chance += looting_level as f32 * 0.01;
-            chance = chance.min(1.0);
+            // Vanilla `Mob.dropCustomDeathLoot` hands the killer to
+            // `processEquipmentDropChance` (Looting adds 0.01 per level).
+            if let Some(killer) = killing_blow.causing
+                && let Some(killer_living) = killer.get_living_entity()
+            {
+                chance = EnchantmentHelper::process_equipment_drop_chance(
+                    &world,
+                    killer,
+                    killer_living,
+                    killing_blow,
+                    chance,
+                );
+            }
             if !preserved && rand::random::<f32>() >= chance {
                 continue;
             }
@@ -2861,74 +2929,112 @@ impl LivingEntity {
         false
     }
 
-    #[allow(dead_code)]
-    fn damage_armor_items(&self, caller: &dyn EntityBase, damage_amount: f32) {
-        // Formula: armor loses floor(incoming_damage / 4) durability, minimum 1.
-        let armor_damage = (damage_amount / 4.0).floor().max(1.0) as i32;
-        let mut equipment_updates = Vec::new();
+    /// Vanilla `LivingEntity.hurtArmor`, empty for most entities: players wear all four armour
+    /// pieces and `Mob::hurt_armor` covers the mobs that override it.
+    fn hurt_armor(&self, caller: &dyn EntityBase, damage_type: DamageType, damage: f32) {
+        if caller.get_player().is_some() {
+            // `Player.hurtArmor`.
+            self.do_hurt_equipment(
+                caller,
+                damage_type,
+                damage,
+                &[
+                    EquipmentSlot::FEET,
+                    EquipmentSlot::LEGS,
+                    EquipmentSlot::CHEST,
+                    EquipmentSlot::HEAD,
+                ],
+            );
+        } else if let Some(mob) = caller.get_mob() {
+            mob.hurt_armor(damage_type, damage);
+        }
+    }
 
-        // TODO: Falling anvil/stalactite should only damage the helmet slot.
-        // TODO: Implement DAMAGE_RESISTANT component checks (e.g. netherite vs fire).
+    /// Vanilla `LivingEntity.hurtHelmet`, which only `Player` overrides.
+    fn hurt_helmet(&self, caller: &dyn EntityBase, damage_type: DamageType, damage: f32) {
+        if caller.get_player().is_some() {
+            self.do_hurt_equipment(caller, damage_type, damage, &[EquipmentSlot::HEAD]);
+        }
+    }
 
-        let armor_slots: Vec<(usize, ItemStack, EquipmentSlot)> = {
-            let equipment_lock = self
+    /// Vanilla `LivingEntity.doHurtEquipment`.
+    pub fn do_hurt_equipment(
+        &self,
+        caller: &dyn EntityBase,
+        damage_type: DamageType,
+        damage: f32,
+        slots: &[EquipmentSlot],
+    ) {
+        if damage <= 0.0 {
+            return;
+        }
+        let durability_damage = (damage / 4.0).max(1.0) as i32;
+        for slot in slots {
+            let stack = self.get_item_by_slot(caller, slot);
+            if stack
+                .get_data_component::<EquippableImpl>()
+                .is_some_and(|equippable| equippable.damage_on_hurt)
+                && stack.is_damageable()
+                && !stack.is_unbreakable()
+                && stack.can_be_hurt_by(&damage_type)
+            {
+                self.hurt_and_break_in_slot(caller, slot, durability_damage);
+            }
+        }
+    }
+
+    /// Vanilla `ItemStack.hurtAndBreak(int, LivingEntity, EquipmentSlot)` on the stack worn in
+    /// `slot`.
+    pub fn hurt_and_break_in_slot(
+        &self,
+        caller: &dyn EntityBase,
+        slot: &EquipmentSlot,
+        amount: i32,
+    ) {
+        if let Some(player) = caller.get_player() {
+            player.damage_item_in_slot(slot, amount);
+            return;
+        }
+        let (result, stack) = {
+            let mut equipment = self
                 .entity_equipment
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
-            self.equipment_slots
-                .iter()
-                .filter(|(_, slot)| slot.is_armor_slot())
-                .filter_map(|(index, slot)| {
-                    equipment_lock
-                        .equipment
-                        .get(slot)
-                        .cloned()
-                        .map(|stack| (*index, stack, slot.clone()))
-                })
-                .collect()
+            let mut stack = equipment.get(slot);
+            let result = stack.damage_item(amount);
+            if result != DamageResult::Untouched {
+                equipment.put(slot, stack.clone());
+            }
+            (result, stack)
         };
-
-        for (slot_index, mut stack, slot) in armor_slots {
-            if stack.is_empty() {
-                continue;
-            }
-
-            let takes_damage = stack
-                .get_data_component::<EquippableImpl>()
-                .is_none_or(|equippable| equippable.damage_on_hurt);
-
-            if takes_damage {
-                let item_id = stack.item.id;
-                let slot_result = stack.damage_item(armor_damage);
-                if slot_result != pumpkin_data::item_stack::DamageResult::Untouched {
-                    if slot_result == pumpkin_data::item_stack::DamageResult::Broken {
-                        if let Some(player) = caller.get_player() {
-                            player.increment_stat(
-                                pumpkin_data::statistic::StatisticCategory::Broken,
-                                item_id as i32,
-                                1,
-                            );
-                        }
-                        let world = self.entity.world.load();
-                        world.send_entity_status(
-                            &self.entity,
-                            super::equipment_break_status(&slot),
-                            None,
-                        );
-                    }
-                    equipment_updates.push((slot.clone(), stack.clone()));
-                    if let Some(player) = caller.get_player() {
-                        player.enqueue_slot_set_packet(&CSetPlayerInventory::new(
-                            (slot_index as i32).into(),
-                            &ItemStackSerializer::from(stack),
-                        ));
-                    }
-                }
-            }
+        if result == DamageResult::Untouched {
+            return;
         }
+        self.send_equipment_changes(&[(slot.clone(), stack)]);
+        if result == DamageResult::Broken {
+            self.on_equipped_item_broken(slot);
+        }
+    }
 
-        if !equipment_updates.is_empty() {
-            self.send_equipment_changes(&equipment_updates);
+    /// Vanilla `LivingEntity.onEquippedItemBroken`.
+    pub fn on_equipped_item_broken(&self, slot: &EquipmentSlot) {
+        self.entity.world.load().send_entity_status(
+            &self.entity,
+            super::equipment_break_status(slot),
+            None,
+        );
+    }
+
+    /// Vanilla `LivingEntity.getItemBySlot`; a player's main hand is its selected hotbar slot.
+    pub fn get_item_by_slot(&self, caller: &dyn EntityBase, slot: &EquipmentSlot) -> ItemStack {
+        match slot {
+            EquipmentSlot::MainHand(_) => self.held_item(caller),
+            EquipmentSlot::OffHand(_) => self.off_hand_item(caller),
+            _ => self
+                .entity_equipment
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .get(slot),
         }
     }
 
@@ -3207,6 +3313,20 @@ impl LivingEntity {
         // Persist current absorption amount
         nbt.put("AbsorptionAmount", NbtTag::Float(self.absorption.load()));
         nbt.put("FallDistance", NbtTag::Float(fall_distance));
+        nbt.put_int(
+            "current_impulse_context_reset_grace_time",
+            self.current_impulse_context_reset_grace_time.load(Relaxed),
+        );
+        if let Some(pos) = self.current_impulse_impact_pos.load() {
+            nbt.put(
+                "current_explosion_impact_pos",
+                NbtTag::List(vec![
+                    NbtTag::Double(pos.x),
+                    NbtTag::Double(pos.y),
+                    NbtTag::Double(pos.z),
+                ]),
+            );
+        }
         nbt.put_short("HurtTime", self.hurt_time.load(Relaxed) as i16);
         nbt.put_short("DeathTime", i16::from(self.death_time.load(Relaxed)));
         nbt.put_bool("FallFlying", self.entity.is_fall_flying());
@@ -3380,6 +3500,20 @@ impl LivingEntity {
         } else {
             self.fall_distance.store(fd);
         }
+        self.current_impulse_context_reset_grace_time.store(
+            nbt.get_int("current_impulse_context_reset_grace_time")
+                .unwrap_or(0),
+            Relaxed,
+        );
+        self.current_impulse_impact_pos.store(
+            nbt.get_list("current_explosion_impact_pos")
+                .and_then(|list| match list {
+                    [NbtTag::Double(x), NbtTag::Double(y), NbtTag::Double(z)] => {
+                        Some(Vector3::new(*x, *y, *z))
+                    }
+                    _ => None,
+                }),
+        );
         self.hurt_time
             .store(i32::from(nbt.get_short("HurtTime").unwrap_or(0)), Relaxed);
         if let Some(death_time) = nbt.get_short("DeathTime") {
@@ -3416,44 +3550,37 @@ impl LivingEntity {
         // todo more...
     }
 
-    /// Calculates damage after armor reduction, mirroring vanilla `LivingEntity.getDamageAfterArmorAbsorb`.
+    /// Vanilla `LivingEntity.getDamageAfterArmorAbsorb`.
     pub fn get_damage_after_armor_absorb(
         &self,
+        caller: &dyn EntityBase,
         damage: f32,
-        damage_type: &DamageType,
-        attacker: Option<&dyn EntityBase>,
+        damage_source: &DamageSource<'_>,
     ) -> f32 {
-        if damage_type.has_tag(&tag::DamageType::MINECRAFT_BYPASSES_ARMOR) {
+        if damage_source
+            .damage_type
+            .has_tag(&tag::DamageType::MINECRAFT_BYPASSES_ARMOR)
+        {
             return damage;
         }
+        self.hurt_armor(caller, damage_source.damage_type, damage);
 
         // Vanilla `getArmorValue` (the floored ARMOR attribute, worn armor included through
         // its attribute modifiers) and the ARMOR_TOUGHNESS attribute.
         let armor = self.get_attribute_value(&Attributes::ARMOR).floor() as f32;
         let toughness = self.get_attribute_value(&Attributes::ARMOR_TOUGHNESS) as f32;
-
-        let breach_level = attacker
-            .and_then(|att| {
-                let player = att.get_player()?;
-                let hand_stack = player
-                    .inventory()
-                    .get_stack_in_hand(pumpkin_util::Hand::Right);
-                let level = hand_stack.get_enchantment_level(&Enchantment::BREACH);
-                (level > 0).then_some(level as u32)
-            })
-            .unwrap_or(0);
-
-        CombatRules::get_damage_after_absorb(damage, armor, toughness, breach_level)
+        CombatRules::get_damage_after_absorb(caller, damage, damage_source, armor, toughness)
     }
 
     /// Calculates damage after magic/resistance/enchantment reduction, mirroring vanilla `LivingEntity.getDamageAfterMagicAbsorb`.
     pub fn get_damage_after_magic_absorb(
         &self,
         mut damage: f32,
-        damage_type: &DamageType,
         caller: &dyn EntityBase,
-        cause: Option<&dyn EntityBase>,
+        damage_source: &DamageSource<'_>,
     ) -> f32 {
+        let damage_type = &damage_source.damage_type;
+        let cause = damage_source.causing;
         if damage_type.has_tag(&tag::DamageType::MINECRAFT_BYPASSES_EFFECTS) {
             return damage;
         }
@@ -3494,28 +3621,12 @@ impl LivingEntity {
             return damage;
         }
 
-        let mut epf = 0.0f32;
-        {
-            let equipment_lock = self
-                .entity_equipment
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            for slot in [
-                EquipmentSlot::HEAD,
-                EquipmentSlot::CHEST,
-                EquipmentSlot::LEGS,
-                EquipmentSlot::FEET,
-            ] {
-                if let Some(stack) = equipment_lock.equipment.get(&slot)
-                    && !stack.is_empty()
-                    && let Some(enchantments) = stack.get_data_component::<EnchantmentsImpl>()
-                {
-                    for (enchantment, level) in enchantments.enchantment.iter() {
-                        enchantment.modify_damage_protection_against(*level, damage_type, &mut epf);
-                    }
-                }
-            }
-        }
+        let epf = EnchantmentHelper::get_damage_protection(
+            &self.entity.world.load(),
+            caller,
+            self,
+            damage_source,
+        );
 
         if epf > 0.0 {
             damage = CombatRules::get_damage_after_magic_absorb(damage, epf);
@@ -3536,8 +3647,19 @@ impl LivingEntity {
     ) -> bool {
         let mut amount = amount;
 
-        // Check invulnerability before applying damage
-        if self.entity.is_invulnerable_to(&damage_type, cause) {
+        // Vanilla `LivingEntity.isInvulnerableTo`: the base check, then enchantment immunities.
+        if self.entity.is_invulnerable_to(&damage_type, cause)
+            || EnchantmentHelper::is_immune_to_damage(
+                &self.entity.world.load(),
+                caller,
+                self,
+                &DamageSource {
+                    damage_type,
+                    direct: source,
+                    causing: cause,
+                },
+            )
+        {
             return false;
         }
 
@@ -3733,42 +3855,49 @@ impl LivingEntity {
             }
         }
 
-        // Vanilla parity: 1. Armor absorb
-        let damage_after_armor =
-            self.get_damage_after_armor_absorb(amount, &damage_type, cause.or(source));
+        // Vanilla `hurtServer`: falling blocks wear the helmet and lose a quarter.
+        if damage_type.has_tag(&tag::DamageType::MINECRAFT_DAMAGES_HELMET)
+            && !self
+                .get_item_by_slot(caller, &EquipmentSlot::HEAD)
+                .is_empty()
+        {
+            self.hurt_helmet(caller, damage_type, amount);
+            amount *= 0.75;
+        }
+        if amount.is_nan() || amount.is_infinite() {
+            amount = f32::MAX;
+        }
 
-        let effective_amount = self.get_damage_after_magic_absorb(
-            damage_after_armor,
-            &damage_type,
-            caller,
-            cause.or(source),
-        );
-
-        // These damage types bypass the hurt cooldown and death protection
-        let bypasses_cooldown_protection =
-            damage_type == DamageType::GENERIC_KILL || damage_type == DamageType::OUT_OF_WORLD;
-
-        // Apply hurt cooldown logic
+        // The cooldown compares the raw damage; only the part above the last hit reaches
+        // `actuallyHurt`.
         let last_damage = self.last_damage_taken.load();
-        let (damage_amount, play_sound, took_full_damage) =
-            if self.hurt_cooldown.load(Relaxed) > 10 && !bypasses_cooldown_protection {
-                if effective_amount <= last_damage {
-                    return false;
-                }
-                (effective_amount - last_damage, false, false)
-            } else {
-                self.hurt_cooldown.store(20, Relaxed);
-                self.hurt_time.store(HURT_DURATION, Relaxed);
-                (
-                    effective_amount,
-                    self.health.load() > effective_amount,
-                    true,
-                )
-            };
+        let (hurt_amount, took_full_damage) = if self.hurt_cooldown.load(Relaxed) > 10
+            && !damage_type.has_tag(&tag::DamageType::MINECRAFT_BYPASSES_COOLDOWN)
+        {
+            if amount <= last_damage {
+                return false;
+            }
+            (amount - last_damage, false)
+        } else {
+            self.hurt_cooldown.store(20, Relaxed);
+            self.hurt_time.store(HURT_DURATION, Relaxed);
+            (amount, true)
+        };
 
-        // Finalize state
+        // Vanilla `actuallyHurt`: armour (which wears it), then effects and enchantments.
+        let damage_source = DamageSource {
+            damage_type,
+            direct: source,
+            causing: cause,
+        };
+        let damage_after_armor =
+            self.get_damage_after_armor_absorb(caller, hurt_amount, &damage_source);
+        let effective_amount =
+            self.get_damage_after_magic_absorb(damage_after_armor, caller, &damage_source);
+        let play_sound = took_full_damage && self.health.load() > effective_amount;
+
         self.last_damage_taken.store(amount);
-        let damage_amount = damage_amount.max(0.0);
+        let damage_amount = effective_amount.max(0.0);
 
         // Record the source once the hit is confirmed.
         *self
@@ -4085,6 +4214,12 @@ impl LivingEntity {
 }
 
 impl EntityBase for LivingEntity {
+    /// Vanilla `LivingEntity.getWeaponItem`; Pumpkin doesn't track the riptide spin stack.
+    fn get_weapon_item(&self) -> Option<ItemStack> {
+        self.get_living_entity()
+            .map(|living| living.held_item(self))
+    }
+
     fn damage_with_context(
         &self,
         caller: &dyn EntityBase,
@@ -4164,6 +4299,12 @@ impl EntityBase for LivingEntity {
             self.push_entities(caller);
 
             self.entity.tick_frozen(caller);
+        }
+
+        // The end of vanilla `LivingEntity.tick`.
+        if self.current_impulse_context_reset_grace_time.load(Relaxed) > 0 {
+            self.current_impulse_context_reset_grace_time
+                .fetch_sub(1, Relaxed);
         }
 
         // Fetch supporting blocks for players or other entities
@@ -4572,6 +4713,7 @@ impl LivingEntity {
                     let destination = self.entity.pos.load();
                     if destination != center {
                         self.fall_distance.store(0.0);
+                        self.reset_current_impulse_context();
                         // Vanilla broadcasts entity event 46 (teleport particles) on success.
                         world.send_entity_status(&self.entity, EntityStatus::Teleport, None);
                         world.emit_game_event("teleport", center);

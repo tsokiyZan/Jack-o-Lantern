@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
-use pumpkin_data::data_component_impl::{DamageImpl, EquipmentSlot};
+use pumpkin_data::data_component_impl::DamageImpl;
 use pumpkin_data::enchantment::LevelBasedValue;
 use pumpkin_data::item_stack::DamageResult;
 use pumpkin_util::math::vector3::Vector3;
 
 use super::EnchantmentEntityEffectExt;
 use crate::enchantment::EnchantedItemInUse;
-use crate::entity::{EntityBase, equipment_break_status};
+use crate::entity::EntityBase;
 use crate::world::World;
 
 /// Enchantment entity effect that alters item damage.
@@ -53,52 +53,17 @@ impl EnchantmentEntityEffectExt for ChangeItemDamage {
             if result == DamageResult::Broken {
                 if let Some(on_break) = item.on_break {
                     on_break();
-                } else if let (Some(owner), Some(slot)) = (item.owner, &item.in_slot) {
-                    on_equipped_item_broken(owner, slot);
+                } else if let (Some(living), Some(slot)) = (
+                    item.owner.and_then(EntityBase::get_living_entity),
+                    &item.in_slot,
+                ) {
+                    living.on_equipped_item_broken(slot);
                 }
             }
-        } else if let (Some(owner), Some(slot)) = (item.owner, &item.in_slot) {
-            hurt_and_break_in_slot(owner, slot, change);
+        } else if let (Some(owner), Some(slot)) = (item.owner, &item.in_slot)
+            && let Some(living) = owner.get_living_entity()
+        {
+            living.hurt_and_break_in_slot(owner, slot, change);
         }
     }
-}
-
-/// Vanilla `ItemStack.hurtAndBreak(int, LivingEntity, EquipmentSlot)` on the stack the owner wears
-/// in `slot`.
-fn hurt_and_break_in_slot(owner: &dyn EntityBase, slot: &EquipmentSlot, amount: i32) {
-    if let Some(player) = owner.get_player() {
-        player.damage_item_in_slot(slot, amount);
-        return;
-    }
-    let Some(living) = owner.get_living_entity() else {
-        return;
-    };
-    let (result, stack) = {
-        let mut equipment = living
-            .entity_equipment
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let mut stack = equipment.get(slot);
-        let result = stack.damage_item(amount);
-        if result != DamageResult::Untouched {
-            equipment.put(slot, stack.clone());
-        }
-        (result, stack)
-    };
-    if result == DamageResult::Untouched {
-        return;
-    }
-    living.send_equipment_changes(&[(slot.clone(), stack)]);
-    if result == DamageResult::Broken {
-        on_equipped_item_broken(owner, slot);
-    }
-}
-
-/// Vanilla `LivingEntity.onEquippedItemBroken`.
-fn on_equipped_item_broken(owner: &dyn EntityBase, slot: &EquipmentSlot) {
-    let entity = owner.get_entity();
-    entity
-        .world
-        .load()
-        .send_entity_status(entity, equipment_break_status(slot), None);
 }

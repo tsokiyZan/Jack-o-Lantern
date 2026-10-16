@@ -320,6 +320,13 @@ impl ItemStack {
             .is_some_and(|data| data.enchantment.iter().any(|(enc, _)| enc.has_tag(tag)))
     }
 
+    /// Vanilla `ItemStack.canBeHurtBy`: the `damage_resistant` tag blocks matching damage.
+    #[must_use]
+    pub fn can_be_hurt_by(&self, damage_type: &crate::damage::DamageType) -> bool {
+        self.get_data_component::<crate::data_component_impl::DamageResistantImpl>()
+            .is_none_or(|res| damage_type.is_tagged_with(res.res_type.as_str()) != Some(true))
+    }
+
     #[must_use]
     pub fn is_unbreakable(&self) -> bool {
         self.get_data_component::<UnbreakableImpl>().is_some()

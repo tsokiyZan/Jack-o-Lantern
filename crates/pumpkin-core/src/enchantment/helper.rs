@@ -1,5 +1,6 @@
 use std::sync::{Arc, Mutex};
 
+use crate::enchantment::condition::{EnchantmentLootContext, LootItemConditionExt};
 use crate::enchantment::effects::EnchantmentEntityEffectExt;
 use crate::enchantment::enchanted_item_in_use::EnchantedItemInUse;
 use crate::enchantment::post_attack::do_post_attack;
@@ -9,8 +10,10 @@ use crate::entity::living::LivingEntity;
 use crate::entity::projectile::arrow::ArrowEntity;
 use crate::world::World;
 use pumpkin_data::data_component_impl::{EnchantmentsImpl, EquipmentSlot};
-use pumpkin_data::enchantment::{Enchantment, EnchantmentEntityEffect, EnchantmentTarget};
-use pumpkin_data::item::Item;
+use pumpkin_data::enchantment::{
+    ConditionalEffect, Enchantment, EnchantmentEntityEffect, EnchantmentTarget,
+    EnchantmentValueEffect,
+};
 use pumpkin_data::item_stack::ItemStack;
 
 /// Data-driven helper for enchantment effects matching vanilla `EnchantmentHelper`.
@@ -37,15 +40,17 @@ impl EnchantmentHelper {
     ) {
         let world = projectile.get_entity().world.load_full();
         let item = EnchantedItemInUse::ownerless(weapon);
+        let position = projectile.get_entity().pos.load();
         Self::run_iteration_on_item(weapon, |enchantment, level| {
+            // `Enchantment.onProjectileSpawned`, with `entityContext`.
+            let context = EnchantmentLootContext::entity(&world, level, projectile, position);
             for conditional_effect in enchantment.effects.projectile_spawned {
-                conditional_effect.effect.apply(
-                    &world,
-                    level,
-                    &item,
-                    projectile,
-                    projectile.get_entity().pos.load(),
-                );
+                if !matches(conditional_effect, &context) {
+                    continue;
+                }
+                conditional_effect
+                    .effect
+                    .apply(&world, level, &item, projectile, position);
                 if let EnchantmentEntityEffect::Ignite { .. } = &conditional_effect.effect
                     && let Some(arrow) = arrow
                 {
@@ -82,26 +87,9 @@ impl EnchantmentHelper {
         F: FnMut(&'static Enchantment, i32, &EnchantedItemInUse<'_>),
     {
         for slot in &EquipmentSlot::VALUES {
-            let stack = Self::get_item_by_slot(owner, living, slot);
+            let stack = living.get_item_by_slot(owner, slot);
             let item = EnchantedItemInUse::in_slot(&stack, slot.clone(), owner);
             Self::run_iteration_on_item_in_slot(&item, slot, &mut visitor);
-        }
-    }
-
-    /// Vanilla `LivingEntity.getItemBySlot`.
-    fn get_item_by_slot(
-        owner: &dyn EntityBase,
-        living: &LivingEntity,
-        slot: &EquipmentSlot,
-    ) -> ItemStack {
-        match slot {
-            EquipmentSlot::MainHand(_) => living.held_item(owner),
-            EquipmentSlot::OffHand(_) => living.off_hand_item(owner),
-            _ => living
-                .entity_equipment
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .get(slot),
         }
     }
 
@@ -112,12 +100,10 @@ impl EnchantmentHelper {
         victim: &dyn EntityBase,
         damage_source: &DamageSource<'_>,
     ) {
-        // `LivingEntity.getWeaponItem`; Pumpkin doesn't track the riptide spin stack.
-        let weapon = damage_source.causing.and_then(|attacker| {
-            attacker
-                .get_living_entity()
-                .map(|living| living.held_item(attacker))
-        });
+        let weapon = damage_source
+            .causing
+            .filter(|attacker| attacker.get_living_entity().is_some())
+            .and_then(EntityBase::get_weapon_item);
         Self::do_post_attack_effects_with_item_source(
             world,
             victim,
@@ -247,66 +233,178 @@ impl EnchantmentHelper {
         piercing as u8
     }
 
-    /// Computes ammo use using data-driven ammo use effects (e.g. Infinity).
+    /// Vanilla `EnchantmentHelper.processAmmoUse`: the requirements see the ammo, not the weapon.
     #[must_use]
-    pub fn process_ammo_use(weapon: &ItemStack, projectile: &ItemStack, base_ammo: i32) -> i32 {
-        let mut ammo = base_ammo as f32;
-        if projectile.item.id == Item::ARROW.id
-            && let Some(enchantments) = weapon.get_data_component::<EnchantmentsImpl>()
+    pub fn process_ammo_use(
+        world: &World,
+        weapon: &ItemStack,
+        ammo: &ItemStack,
+        amount: i32,
+    ) -> i32 {
+        let mut value = amount as f32;
+        Self::run_iteration_on_item(weapon, |enchantment, level| {
+            let context = EnchantmentLootContext::item(world, level, ammo);
+            apply_value_effects(enchantment.effects.ammo_use, &context, level, &mut value);
+        });
+        value as i32
+    }
+
+    /// Vanilla `EnchantmentHelper.modifyDamage`.
+    #[must_use]
+    pub fn modify_damage(
+        world: &World,
+        item: &ItemStack,
+        victim: &dyn EntityBase,
+        damage_source: &DamageSource<'_>,
+        damage: f32,
+    ) -> f32 {
+        Self::modify_damage_filtered_value(world, item, victim, damage_source, damage, |e| {
+            e.effects.damage
+        })
+    }
+
+    /// Vanilla `EnchantmentHelper.modifyFallBasedDamage`.
+    #[must_use]
+    pub fn modify_fall_based_damage(
+        world: &World,
+        item: &ItemStack,
+        victim: &dyn EntityBase,
+        damage_source: &DamageSource<'_>,
+        damage: f32,
+    ) -> f32 {
+        Self::modify_damage_filtered_value(world, item, victim, damage_source, damage, |e| {
+            e.effects.smash_damage_per_fallen_block
+        })
+    }
+
+    /// Vanilla `EnchantmentHelper.modifyKnockback`.
+    #[must_use]
+    pub fn modify_knockback(
+        world: &World,
+        item: &ItemStack,
+        victim: &dyn EntityBase,
+        damage_source: &DamageSource<'_>,
+        knockback: f32,
+    ) -> f32 {
+        Self::modify_damage_filtered_value(world, item, victim, damage_source, knockback, |e| {
+            e.effects.knockback
+        })
+    }
+
+    /// Vanilla `EnchantmentHelper.modifyArmorEffectiveness`.
+    #[must_use]
+    pub fn modify_armor_effectiveness(
+        world: &World,
+        item: &ItemStack,
+        victim: &dyn EntityBase,
+        damage_source: &DamageSource<'_>,
+        armor_fraction: f32,
+    ) -> f32 {
+        Self::modify_damage_filtered_value(
+            world,
+            item,
+            victim,
+            damage_source,
+            armor_fraction,
+            |e| e.effects.armor_effectiveness,
+        )
+    }
+
+    /// Vanilla `Enchantment.modifyDamageFilteredValue` over every enchantment on `item`.
+    fn modify_damage_filtered_value(
+        world: &World,
+        item: &ItemStack,
+        victim: &dyn EntityBase,
+        damage_source: &DamageSource<'_>,
+        value: f32,
+        component: impl Fn(&Enchantment) -> &'static [ConditionalEffect<EnchantmentValueEffect>],
+    ) -> f32 {
+        let mut value = value;
+        Self::run_iteration_on_item(item, |enchantment, level| {
+            let context = EnchantmentLootContext::damage(world, level, victim, damage_source);
+            apply_value_effects(component(enchantment), &context, level, &mut value);
+        });
+        value
+    }
+
+    /// Vanilla `EnchantmentHelper.processEquipmentDropChance`. Vanilla passes the killer as
+    /// `entity`, so both passes read the killer's equipment.
+    #[must_use]
+    pub fn process_equipment_drop_chance(
+        world: &World,
+        entity: &dyn EntityBase,
+        living: &LivingEntity,
+        killing_blow: &DamageSource<'_>,
+        chance: f32,
+    ) -> f32 {
+        let mut modified_chance = chance;
+        let mut apply = |owner: &dyn EntityBase,
+                         owner_living: &LivingEntity,
+                         enchanted: EnchantmentTarget| {
+            Self::run_iteration_on_equipment(owner, owner_living, |enchantment, level, _item| {
+                let context = EnchantmentLootContext::damage(world, level, entity, killing_blow);
+                for effect in enchantment.effects.equipment_drops {
+                    if effect.enchanted == Some(enchanted)
+                        && effect.affected == Some(EnchantmentTarget::Victim)
+                        && effect
+                            .requirements
+                            .as_ref()
+                            .is_none_or(|requirements| requirements.test(&context))
+                    {
+                        modified_chance = effect.effect.process(level, modified_chance);
+                    }
+                }
+            });
+        };
+        apply(entity, living, EnchantmentTarget::Victim);
+        if let Some(attacker) = killing_blow.causing
+            && let Some(attacker_living) = attacker.get_living_entity()
         {
-            for (enchantment, level) in enchantments.enchantment.iter() {
-                enchantment.modify_ammo_count(*level, &mut ammo);
-            }
+            apply(attacker, attacker_living, EnchantmentTarget::Attacker);
         }
-        ammo as i32
+        modified_chance
     }
 
-    /// Modifies damage using data-driven damage effects (e.g. Power / Sharpness).
+    /// Vanilla `EnchantmentHelper.isImmuneToDamage` (Frost Walker against hot floors).
     #[must_use]
-    pub fn modify_damage(weapon: &ItemStack, base_damage: f64) -> f64 {
-        let mut damage = base_damage;
-        if let Some(enchantments) = weapon.get_data_component::<EnchantmentsImpl>() {
-            for (enchantment, level) in enchantments.enchantment.iter() {
-                enchantment.modify_damage(*level, &mut damage);
-            }
-        }
-        damage
+    pub fn is_immune_to_damage(
+        world: &World,
+        victim: &dyn EntityBase,
+        living: &LivingEntity,
+        damage_source: &DamageSource<'_>,
+    ) -> bool {
+        let mut immune = false;
+        Self::run_iteration_on_equipment(victim, living, |enchantment, level, _item| {
+            let context = EnchantmentLootContext::damage(world, level, victim, damage_source);
+            immune = immune
+                || enchantment
+                    .effects
+                    .damage_immunity
+                    .iter()
+                    .any(|effect| matches(effect, &context));
+        });
+        immune
     }
 
-    /// Modifies smash / fall-based damage using data-driven effects (e.g. Density).
+    /// Vanilla `EnchantmentHelper.getDamageProtection`, over all of the victim's equipment.
     #[must_use]
-    pub fn modify_fall_based_damage(weapon: &ItemStack, base_damage: f64) -> f64 {
-        let mut damage = base_damage;
-        if let Some(enchantments) = weapon.get_data_component::<EnchantmentsImpl>() {
-            for (enchantment, level) in enchantments.enchantment.iter() {
-                enchantment.modify_fall_based_damage(*level, &mut damage);
-            }
-        }
-        damage
-    }
-
-    /// Modifies knockback using data-driven knockback effects (e.g. Punch / Knockback).
-    #[must_use]
-    pub fn modify_knockback(weapon: &ItemStack, base_knockback: f32) -> f32 {
-        let mut knockback = base_knockback;
-        if let Some(enchantments) = weapon.get_data_component::<EnchantmentsImpl>() {
-            for (enchantment, level) in enchantments.enchantment.iter() {
-                enchantment.modify_knockback(*level, &mut knockback);
-            }
-        }
-        knockback
-    }
-
-    /// Modifies armor effectiveness using data-driven effects (e.g. Breach).
-    #[must_use]
-    pub fn modify_armor_effectiveness(weapon: &ItemStack, base_effectiveness: f32) -> f32 {
-        let mut effectiveness = base_effectiveness;
-        if let Some(enchantments) = weapon.get_data_component::<EnchantmentsImpl>() {
-            for (enchantment, level) in enchantments.enchantment.iter() {
-                enchantment.modify_armor_effectiveness(*level, &mut effectiveness);
-            }
-        }
-        effectiveness
+    pub fn get_damage_protection(
+        world: &World,
+        victim: &dyn EntityBase,
+        living: &LivingEntity,
+        damage_source: &DamageSource<'_>,
+    ) -> f32 {
+        let mut protection = 0.0;
+        Self::run_iteration_on_equipment(victim, living, |enchantment, level, _item| {
+            let context = EnchantmentLootContext::damage(world, level, victim, damage_source);
+            apply_value_effects(
+                enchantment.effects.damage_protection,
+                &context,
+                level,
+                &mut protection,
+            );
+        });
+        protection
     }
 
     /// Modifies crossbow charge time using data-driven charge time effects (e.g. Quick Charge).
@@ -323,18 +421,17 @@ impl EnchantmentHelper {
         (charge_time as i32).max(0)
     }
 
-    /// Modifies durability change using data-driven item damage effects (e.g. Unbreaking).
+    /// Vanilla `EnchantmentHelper.processDurabilityChange`.
+    // TODO: `ItemStack::damage_item` in pumpkin-data still applies Unbreaking itself, with the
+    // armour check its requirements make.
     #[must_use]
-    pub fn modify_durability_change(item: &ItemStack, base_change: f32) -> f32 {
-        let mut change = base_change;
-        if let Some(enchantments) = item.get_data_component::<EnchantmentsImpl>() {
-            for (enchantment, level) in enchantments.enchantment.iter() {
-                for effect in enchantment.effects.item_damage {
-                    change = effect.effect.process(*level, change);
-                }
-            }
-        }
-        change
+    pub fn process_durability_change(world: &World, item: &ItemStack, amount: i32) -> i32 {
+        let mut value = amount as f32;
+        Self::run_iteration_on_item(item, |enchantment, level| {
+            let context = EnchantmentLootContext::item(world, level, item);
+            apply_value_effects(enchantment.effects.item_damage, &context, level, &mut value);
+        });
+        value as i32
     }
 
     /// Modifies block experience using data-driven block experience effects (e.g. Fortune).
@@ -421,26 +518,10 @@ impl EnchantmentHelper {
         luck
     }
 
-    /// Modifies damage protection across equipped armor items.
-    #[must_use]
-    pub fn modify_damage_protection<'a>(
-        armor_items: impl IntoIterator<Item = &'a ItemStack>,
-        base_protection: f32,
-    ) -> f32 {
-        let mut protection = base_protection;
-        for item in armor_items {
-            if let Some(enchantments) = item.get_data_component::<EnchantmentsImpl>() {
-                for (enchantment, level) in enchantments.enchantment.iter() {
-                    for effect in enchantment.effects.damage_protection {
-                        protection = effect.effect.process(*level, protection);
-                    }
-                }
-            }
-        }
-        protection
-    }
-
     /// Applies location-changed enchantment effects (e.g. Frost Walker replacing water with frosted ice).
+    // TODO: vanilla `Enchantment.runLocationChangedEffects` tracks which location-based effects
+    // are active per slot and deactivates them; Pumpkin runs them as plain entity effects and
+    // always reports them inactive to `enchantment_active_check`.
     pub fn on_location_changed(
         entity: &dyn EntityBase,
         item: &ItemStack,
@@ -449,15 +530,18 @@ impl EnchantmentHelper {
         let world = entity.get_entity().world.load_full();
         let item_in_use = EnchantedItemInUse::in_slot(item, EquipmentSlot::FEET, entity);
         Self::run_iteration_on_item(item, |enchantment, level| {
+            let context = EnchantmentLootContext::location(&world, level, entity, false);
             for conditional_effect in enchantment.effects.location_changed {
-                conditional_effect
-                    .effect
-                    .apply(&world, level, &item_in_use, entity, position);
+                if matches(conditional_effect, &context) {
+                    conditional_effect
+                        .effect
+                        .apply(&world, level, &item_in_use, entity, position);
+                }
             }
         });
     }
 
-    /// Applies hit-block enchantment effects.
+    /// Vanilla `EnchantmentHelper.onHitBlock`.
     pub fn on_hit_block(
         weapon: &ItemStack,
         projectile: &dyn EntityBase,
@@ -466,11 +550,36 @@ impl EnchantmentHelper {
         let world = projectile.get_entity().world.load_full();
         let item = EnchantedItemInUse::ownerless(weapon);
         Self::run_iteration_on_item(weapon, |enchantment, level| {
+            let context = EnchantmentLootContext::entity(&world, level, projectile, position);
             for conditional_effect in enchantment.effects.hit_block {
-                conditional_effect
-                    .effect
-                    .apply(&world, level, &item, projectile, position);
+                if matches(conditional_effect, &context) {
+                    conditional_effect
+                        .effect
+                        .apply(&world, level, &item, projectile, position);
+                }
             }
         });
+    }
+}
+
+/// Vanilla `ConditionalEffect.matches`.
+fn matches<T>(effect: &ConditionalEffect<T>, context: &EnchantmentLootContext<'_>) -> bool {
+    effect
+        .requirements
+        .as_ref()
+        .is_none_or(|requirements| requirements.test(context))
+}
+
+/// Vanilla `Enchantment.applyEffects` for value effects.
+fn apply_value_effects(
+    effects: &[ConditionalEffect<EnchantmentValueEffect>],
+    context: &EnchantmentLootContext<'_>,
+    level: i32,
+    value: &mut f32,
+) {
+    for effect in effects {
+        if matches(effect, context) {
+            *value = effect.effect.process(level, *value);
+        }
     }
 }

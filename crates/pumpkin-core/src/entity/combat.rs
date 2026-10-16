@@ -1,6 +1,8 @@
 use std::sync::atomic::Ordering;
 
+use crate::enchantment::EnchantmentHelper;
 use crate::entity::EntityBase;
+use crate::entity::damage_source::DamageSource;
 use pumpkin_data::tag::Taggable;
 use pumpkin_data::{
     attributes::Attributes,
@@ -23,7 +25,6 @@ pub enum AttackType {
     Sweeping,
     Strong,
     Weak,
-    MaceSmash,
 }
 
 impl AttackType {
@@ -34,12 +35,6 @@ impl AttackType {
         let on_ground = entity.on_ground.load(Ordering::Relaxed);
         let fall_distance = player.living_entity.fall_distance.load();
         let held_item = player.inventory().held_item();
-        let is_mace = held_item.item.id == pumpkin_data::item::Item::MACE.id;
-
-        if is_mace && !on_ground && fall_distance > 1.5 {
-            return Self::MaceSmash;
-        }
-
         let sword = held_item.is_sword();
         let is_bedrock = matches!(player.client.as_ref(), ClientPlatform::Bedrock(_));
 
@@ -145,9 +140,6 @@ pub fn player_attack_sound(pos: &Vector3<f64>, world: &World, attack_type: Attac
         AttackType::Weak => {
             world.play_sound(Sound::EntityPlayerAttackWeak, SoundCategory::Players, pos);
         }
-        AttackType::MaceSmash => {
-            world.play_sound(Sound::ItemMaceSmashAir, SoundCategory::Players, pos);
-        }
     }
 }
 
@@ -163,25 +155,31 @@ impl CombatRules {
     /// Calculates damage after armor reduction, mirroring vanilla `CombatRules.getDamageAfterAbsorb`.
     #[must_use]
     pub fn get_damage_after_absorb(
+        victim: &dyn EntityBase,
         damage: f32,
+        damage_source: &DamageSource<'_>,
         total_armor: f32,
         armor_toughness: f32,
-        breach_level: u32,
     ) -> f32 {
         let toughness = Self::BASE_ARMOR_TOUGHNESS + armor_toughness / 4.0;
         let real_armor = (total_armor - damage / toughness)
             .clamp(total_armor * Self::MIN_ARMOR_RATIO, Self::MAX_ARMOR);
-        let mut armor_fraction = real_armor / Self::ARMOR_PROTECTION_DIVIDER;
-
-        if breach_level > 0 {
-            let mut effectiveness = 1.0f32;
-            pumpkin_data::Enchantment::BREACH
-                .modify_armor_effectiveness(breach_level as i32, &mut effectiveness);
-            armor_fraction = (armor_fraction * effectiveness.clamp(0.0, 1.0)).clamp(0.0, 1.0);
-        }
-
-        let damage_multiplier = 1.0 - armor_fraction;
-        damage * damage_multiplier
+        let armor_fraction = real_armor / Self::ARMOR_PROTECTION_DIVIDER;
+        // Breach and the like, from the weapon the direct attacker holds.
+        let modified_armor_fraction =
+            damage_source
+                .get_weapon_item()
+                .map_or(armor_fraction, |weapon| {
+                    EnchantmentHelper::modify_armor_effectiveness(
+                        &victim.get_entity().world.load(),
+                        &weapon,
+                        victim,
+                        damage_source,
+                        armor_fraction,
+                    )
+                    .clamp(0.0, 1.0)
+                });
+        damage * (1.0 - modified_armor_fraction)
     }
 
     /// Calculates damage after magic/enchantment armor reduction, mirroring vanilla `CombatRules.getDamageAfterMagicAbsorb`.
