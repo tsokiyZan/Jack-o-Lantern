@@ -10,6 +10,7 @@ use crate::command::{
     errors::command_syntax_error::CommandSyntaxError,
     errors::error_types::CommandErrorType,
     string_reader::StringReader,
+    suggestion::provider::{SuggestionProvider, SuggestionProviderResult},
     suggestion::suggestions::{Suggestions, SuggestionsBuilder},
 };
 use crate::entity::EntityBase;
@@ -86,6 +87,20 @@ impl ResolvedScoreHolder {
             }
         }
         vec![Self::named(name.to_string())]
+    }
+}
+
+/// Vanilla `ScoreHolderArgument.SUGGEST_SCORE_HOLDERS`, which commands attach to their score
+/// holder arguments so the client asks the server.
+pub struct ScoreHolderSuggestionProvider;
+
+impl SuggestionProvider for ScoreHolderSuggestionProvider {
+    fn suggest(
+        &self,
+        context: &CommandContext,
+        builder: SuggestionsBuilder,
+    ) -> SuggestionProviderResult {
+        ScoreHolderArgumentType::Multiple.list_suggestions(context, builder)
     }
 }
 

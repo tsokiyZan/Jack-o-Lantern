@@ -3,6 +3,7 @@ use crate::command::argument_types::core::integer::IntegerArgumentType;
 use crate::command::argument_types::core::string::StringArgumentType;
 use crate::command::argument_types::objective::ObjectiveArgumentType;
 use crate::command::argument_types::operation::{OperationArgumentType, ScoreboardOperation};
+use crate::command::argument_types::score_holder::ScoreHolderSuggestionProvider;
 use crate::command::argument_types::score_holder::{ResolvedScoreHolder, ScoreHolderArgumentType};
 use crate::command::context::command_context::CommandContext;
 use crate::command::errors::command_syntax_error::CommandSyntaxError;
@@ -743,50 +744,60 @@ pub fn register(dispatcher: &mut CommandDispatcher, registry: &PermissionRegistr
                     .then(
                         literal("list").executes(PlayersListExecutor).then(
                             argument(ARG_TARGET, ScoreHolderArgumentType::Single)
+                                .suggests(ScoreHolderSuggestionProvider)
                                 .executes(PlayersListEntityExecutor),
                         ),
                     )
                     .then(
                         literal("set").then(
-                            argument(ARG_TARGETS, ScoreHolderArgumentType::Multiple).then(
-                                argument(ARG_OBJECTIVE, ObjectiveArgumentType).then(
-                                    argument(ARG_SCORE, IntegerArgumentType::any())
-                                        .executes(PlayersSetExecutor),
+                            argument(ARG_TARGETS, ScoreHolderArgumentType::Multiple)
+                                .suggests(ScoreHolderSuggestionProvider)
+                                .then(
+                                    argument(ARG_OBJECTIVE, ObjectiveArgumentType).then(
+                                        argument(ARG_SCORE, IntegerArgumentType::any())
+                                            .executes(PlayersSetExecutor),
+                                    ),
                                 ),
-                            ),
                         ),
                     )
                     .then(
                         literal("get").then(
-                            argument(ARG_TARGETS, ScoreHolderArgumentType::Single).then(
-                                argument(ARG_OBJECTIVE, ObjectiveArgumentType)
-                                    .executes(PlayersGetExecutor),
-                            ),
+                            argument(ARG_TARGETS, ScoreHolderArgumentType::Single)
+                                .suggests(ScoreHolderSuggestionProvider)
+                                .then(
+                                    argument(ARG_OBJECTIVE, ObjectiveArgumentType)
+                                        .executes(PlayersGetExecutor),
+                                ),
                         ),
                     )
                     .then(
                         literal("add").then(
-                            argument(ARG_TARGETS, ScoreHolderArgumentType::Multiple).then(
-                                argument(ARG_OBJECTIVE, ObjectiveArgumentType).then(
-                                    argument(ARG_SCORE, IntegerArgumentType::with_min(0))
-                                        .executes(PlayersAddRemoveExecutor { remove: false }),
+                            argument(ARG_TARGETS, ScoreHolderArgumentType::Multiple)
+                                .suggests(ScoreHolderSuggestionProvider)
+                                .then(
+                                    argument(ARG_OBJECTIVE, ObjectiveArgumentType).then(
+                                        argument(ARG_SCORE, IntegerArgumentType::with_min(0))
+                                            .executes(PlayersAddRemoveExecutor { remove: false }),
+                                    ),
                                 ),
-                            ),
                         ),
                     )
                     .then(
                         literal("remove").then(
-                            argument(ARG_TARGETS, ScoreHolderArgumentType::Multiple).then(
-                                argument(ARG_OBJECTIVE, ObjectiveArgumentType).then(
-                                    argument(ARG_SCORE, IntegerArgumentType::with_min(0))
-                                        .executes(PlayersAddRemoveExecutor { remove: true }),
+                            argument(ARG_TARGETS, ScoreHolderArgumentType::Multiple)
+                                .suggests(ScoreHolderSuggestionProvider)
+                                .then(
+                                    argument(ARG_OBJECTIVE, ObjectiveArgumentType).then(
+                                        argument(ARG_SCORE, IntegerArgumentType::with_min(0))
+                                            .executes(PlayersAddRemoveExecutor { remove: true }),
+                                    ),
                                 ),
-                            ),
                         ),
                     )
                     .then(
                         literal("reset").then(
                             argument(ARG_TARGETS, ScoreHolderArgumentType::Multiple)
+                                .suggests(ScoreHolderSuggestionProvider)
                                 .executes(PlayersResetExecutor {
                                     has_objective: false,
                                 })
@@ -799,28 +810,36 @@ pub fn register(dispatcher: &mut CommandDispatcher, registry: &PermissionRegistr
                     )
                     .then(
                         literal("operation").then(
-                            argument(ARG_TARGETS, ScoreHolderArgumentType::Multiple).then(
-                                argument(ARG_OBJECTIVE, ObjectiveArgumentType).then(
-                                    argument(ARG_OPERATION, OperationArgumentType).then(
-                                        argument(
-                                            ARG_SOURCE_TARGETS,
-                                            ScoreHolderArgumentType::Multiple,
-                                        )
-                                        .then(
-                                            argument(ARG_SOURCE_OBJECTIVE, ObjectiveArgumentType)
+                            argument(ARG_TARGETS, ScoreHolderArgumentType::Multiple)
+                                .suggests(ScoreHolderSuggestionProvider)
+                                .then(
+                                    argument(ARG_OBJECTIVE, ObjectiveArgumentType).then(
+                                        argument(ARG_OPERATION, OperationArgumentType).then(
+                                            argument(
+                                                ARG_SOURCE_TARGETS,
+                                                ScoreHolderArgumentType::Multiple,
+                                            )
+                                            .suggests(ScoreHolderSuggestionProvider)
+                                            .then(
+                                                argument(
+                                                    ARG_SOURCE_OBJECTIVE,
+                                                    ObjectiveArgumentType,
+                                                )
                                                 .executes(PlayersOperationExecutor),
+                                            ),
                                         ),
                                     ),
                                 ),
-                            ),
                         ),
                     )
                     .then(
                         literal("enable").then(
-                            argument(ARG_TARGETS, ScoreHolderArgumentType::Multiple).then(
-                                argument(ARG_OBJECTIVE, ObjectiveArgumentType)
-                                    .executes(PlayersEnableExecutor),
-                            ),
+                            argument(ARG_TARGETS, ScoreHolderArgumentType::Multiple)
+                                .suggests(ScoreHolderSuggestionProvider)
+                                .then(
+                                    argument(ARG_OBJECTIVE, ObjectiveArgumentType)
+                                        .executes(PlayersEnableExecutor),
+                                ),
                         ),
                     ),
             ),

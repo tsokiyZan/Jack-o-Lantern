@@ -6,6 +6,7 @@ use crate::command::argument_builder::{
 use crate::command::argument_types::component::ComponentArgumentType;
 use crate::command::argument_types::core::bool::BoolArgumentType;
 use crate::command::argument_types::core::string::StringArgumentType;
+use crate::command::argument_types::score_holder::ScoreHolderSuggestionProvider;
 use crate::command::argument_types::score_holder::{ResolvedScoreHolder, ScoreHolderArgumentType};
 use crate::command::argument_types::team::TeamArgumentType;
 use crate::command::argument_types::team_color::TeamColorArgumentType;
@@ -584,14 +585,18 @@ fn join_branch() -> LiteralArgumentBuilder {
             .executes(JoinTeamExecutor { has_members: false })
             .then(
                 argument(ARG_MEMBERS, ScoreHolderArgumentType::Multiple)
+                    .suggests(ScoreHolderSuggestionProvider)
                     .executes(JoinTeamExecutor { has_members: true }),
             ),
     )
 }
 
 fn leave_branch() -> LiteralArgumentBuilder {
-    literal("leave")
-        .then(argument(ARG_MEMBERS, ScoreHolderArgumentType::Multiple).executes(LeaveTeamExecutor))
+    literal("leave").then(
+        argument(ARG_MEMBERS, ScoreHolderArgumentType::Multiple)
+            .suggests(ScoreHolderSuggestionProvider)
+            .executes(LeaveTeamExecutor),
+    )
 }
 
 fn visibility_branch<E: CommandExecutor + 'static>(
