@@ -60,6 +60,12 @@ const RAIL_HEIGHT_OFFSET: f64 = 0.0625;
 pub struct MinecartEntity {
     pub vehicle: VehicleEntity,
     kind: MinecartKind,
+    /// Vanilla `AbstractMinecart.DATA_ID_CUSTOM_DISPLAY_BLOCK`.
+    custom_display_state: crossbeam::atomic::AtomicCell<Option<pumpkin_data::BlockStateId>>,
+    /// Vanilla `AbstractMinecart.DATA_ID_DISPLAY_OFFSET`.
+    display_offset: std::sync::atomic::AtomicI32,
+    /// Vanilla `AbstractMinecart.flipped`.
+    flipped: std::sync::atomic::AtomicBool,
 }
 
 enum MinecartKind {
@@ -85,10 +91,43 @@ impl MinecartEntity {
             id if id == EntityType::TNT_MINECART.id => MinecartKind::Tnt(TntMinecart::new()),
             _ => MinecartKind::Other,
         };
+        let display_offset = Self::default_display_offset(&kind);
         Self {
             vehicle: VehicleEntity::new(entity),
             kind,
+            custom_display_state: crossbeam::atomic::AtomicCell::new(None),
+            display_offset: std::sync::atomic::AtomicI32::new(display_offset),
+            flipped: std::sync::atomic::AtomicBool::new(false),
         }
+    }
+
+    /// Vanilla `getDefaultDisplayOffset`: 8 for a chest minecart, 1 for a hopper one, else 6.
+    const fn default_display_offset(kind: &MinecartKind) -> i32 {
+        match kind {
+            MinecartKind::Chest(_) => 8,
+            MinecartKind::Hopper(_) => 1,
+            _ => 6,
+        }
+    }
+
+    /// Vanilla `AbstractMinecart.setCustomDisplayBlockState`.
+    fn set_custom_display_state(&self, state: Option<pumpkin_data::BlockStateId>) {
+        self.custom_display_state.store(state);
+        self.vehicle.entity.set_synced_data(
+            pumpkin_data::tracked_data::abstract_minecart::DATA_ID_CUSTOM_DISPLAY_BLOCK,
+            pumpkin_protocol::codec::var_int::VarInt(
+                state.map_or(0, |state| i32::from(state.as_u16())),
+            ),
+        );
+    }
+
+    /// Vanilla `AbstractMinecart.setDisplayOffset`.
+    fn set_display_offset(&self, offset: i32) {
+        self.display_offset.store(offset, Ordering::Relaxed);
+        self.vehicle.entity.set_synced_data(
+            pumpkin_data::tracked_data::abstract_minecart::DATA_ID_DISPLAY_OFFSET,
+            pumpkin_protocol::codec::var_int::VarInt(offset),
+        );
     }
 
     const fn container(&self) -> Option<&Arc<MinecartInventory>> {
@@ -138,6 +177,20 @@ impl EntityBase for MinecartEntity {
     }
 
     fn write_custom_nbt(&self, nbt: &mut NbtCompound) {
+        // Vanilla `AbstractMinecart.addAdditionalSaveData`.
+        if let Some(state) = self.custom_display_state.load() {
+            nbt.put("DisplayState", Block::state_to_nbt(state));
+        }
+        let display_offset = self.display_offset.load(Ordering::Relaxed);
+        if display_offset != Self::default_display_offset(&self.kind) {
+            nbt.put_int("DisplayOffset", display_offset);
+        }
+        nbt.put_bool("FlippedRotation", self.flipped.load(Ordering::Relaxed));
+        // `Entity.firstTick`, under this name: true until the first `baseTick`.
+        nbt.put_bool(
+            "HasTicked",
+            self.vehicle.entity.tick_count.load(Ordering::Relaxed) == 0,
+        );
         match &self.kind {
             MinecartKind::Chest(minecart) => minecart.write_nbt(nbt),
             MinecartKind::Furnace(minecart) => minecart.write_nbt(nbt),
@@ -148,6 +201,16 @@ impl EntityBase for MinecartEntity {
     }
 
     fn read_custom_nbt(&self, nbt: &NbtCompound) {
+        // Vanilla `AbstractMinecart.readAdditionalSaveData`.
+        self.set_custom_display_state(nbt.get("DisplayState").and_then(Block::state_from_nbt));
+        self.set_display_offset(
+            nbt.get_int("DisplayOffset")
+                .unwrap_or_else(|| Self::default_display_offset(&self.kind)),
+        );
+        self.flipped.store(
+            nbt.get_bool("FlippedRotation").unwrap_or(false),
+            Ordering::Relaxed,
+        );
         match &self.kind {
             MinecartKind::Chest(minecart) => minecart.read_nbt(nbt),
             MinecartKind::Furnace(minecart) => minecart.read_nbt(nbt),
