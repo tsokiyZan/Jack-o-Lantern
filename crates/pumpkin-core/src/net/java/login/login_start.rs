@@ -66,7 +66,9 @@ impl PendingConnection {
             let id = if server.advanced_config.networking.java.online_mode {
                 login_start.uuid
             } else {
-                offline_uuid(&login_start.name).unwrap_or_else(|_| uuid::Uuid::nil())
+                let uuid = offline_uuid(&login_start.name);
+                crate::data::migrate_legacy_offline_uuid(server, &login_start.name, uuid);
+                uuid
             };
 
             let profile = GameProfile {

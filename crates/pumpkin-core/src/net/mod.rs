@@ -71,8 +71,20 @@ where
     Ok(ArcSwap::new(Arc::new(v)))
 }
 
-pub fn offline_uuid(username: &str) -> Result<Uuid, uuid::Error> {
-    Uuid::from_slice(&Sha256::digest(username)[..16])
+/// Vanilla `UUIDUtil.createOfflinePlayerUUID`: the name-based (version 3) UUID of
+/// `"OfflinePlayer:" + name`.
+#[must_use]
+pub fn offline_uuid(username: &str) -> Uuid {
+    uuid::Builder::from_md5_bytes(md5::compute(format!("OfflinePlayer:{username}")).0).into_uuid()
+}
+
+/// The offline UUID Pumpkin used before it matched vanilla, kept to migrate saved data.
+#[must_use]
+pub fn legacy_offline_uuid(username: &str) -> Uuid {
+    let digest = Sha256::digest(username);
+    let mut bytes = [0; 16];
+    bytes.copy_from_slice(&digest[..16]);
+    Uuid::from_bytes(bytes)
 }
 
 /// Represents a player's configuration settings.
@@ -594,7 +606,16 @@ pub enum DisconnectReason {
 
 #[cfg(test)]
 mod tests {
-    use crate::net::is_valid_player_name;
+    use crate::net::{is_valid_player_name, offline_uuid};
+
+    #[test]
+    fn offline_uuid_matches_vanilla() {
+        // From a vanilla 26.3 server's ops.json in offline mode.
+        assert_eq!(
+            offline_uuid("TreeBot").to_string(),
+            "d94e727f-402a-35d5-a360-9b4797d2e572"
+        );
+    }
 
     /// Test case for a standard, valid English name at max length.
     #[test]
