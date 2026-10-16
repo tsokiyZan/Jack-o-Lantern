@@ -159,6 +159,7 @@ impl<S: crate::source::CommandSource> ArgumentType<S> for ResourceOrTagArgument 
     type Item = ResourceOrTag;
 
     fn parse(&self, reader: &mut StringReader) -> Result<Self::Item, CommandSyntaxError> {
+        let start = reader.cursor();
         let value = ResourceOrTag::from_string_reader(reader)?;
 
         match &value {
@@ -167,7 +168,8 @@ impl<S: crate::source::CommandSource> ArgumentType<S> for ResourceOrTagArgument 
                     && !(id.is_vanilla()
                         && pumpkin_data::biome::Biome::from_name(id.path()).is_some())
                 {
-                    return Err(ERROR_UNKNOWN_RESOURCE.create_without_context(
+                    return Err(ERROR_UNKNOWN_RESOURCE.create(
+                        reader,
                         TextComponent::text(id.to_string()),
                         TextComponent::text(self.0.to_string()),
                     ));
@@ -185,10 +187,13 @@ impl<S: crate::source::CommandSource> ArgumentType<S> for ResourceOrTagArgument 
                 if let Some(key) = registry_key
                     && tag::get_tag_values(key, &id.to_string()).is_none()
                 {
-                    return Err(ERROR_UNKNOWN_TAG.create_without_context(
+                    let error = ERROR_UNKNOWN_TAG.create(
+                        reader,
                         TextComponent::text(id.to_string()),
                         TextComponent::text(self.0.to_string()),
-                    ));
+                    );
+                    reader.set_cursor(start);
+                    return Err(error);
                 }
             }
         }

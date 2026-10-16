@@ -275,7 +275,7 @@ pub fn register(dispatcher: &mut CommandDispatcher, registry: &PermissionRegistr
 
 /// Vanilla `BlockPredicateArgument`'s test on a `BlockInWorld`: the state, then the block
 /// entity's saved data when the predicate names any.
-fn matches_filter(
+pub fn matches_filter(
     world: &Arc<World>,
     filter: &BlockPredicate,
     pos: &BlockPos,

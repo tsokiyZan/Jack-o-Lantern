@@ -3,9 +3,10 @@ use pumpkin_util::math::{square_f64, vector3::Vector3};
 use super::biome_coords;
 
 // This blends biome boundaries, returning which biome to populate the surface on based on the seed
+#[must_use]
 pub fn get_biome_blend(
-    bottom_y: i8,
-    height: u16,
+    bottom_y: i32,
+    height: i32,
     seed: i64,
     x: i32,
     y: i32,
@@ -100,9 +101,8 @@ pub fn get_biome_blend(
     };
 
     // Java's `getBiomeForNoiseGen`
-    let bottom_y = bottom_y as i32;
     let biome_bottom = biome_coords::from_block(bottom_y);
-    let biome_top = biome_bottom + biome_coords::from_block(height as i32) - 1;
+    let biome_top = biome_bottom + biome_coords::from_block(height) - 1;
     let biome_y = biome_y.clamp(biome_bottom, biome_top);
 
     Vector3::new(biome_x, biome_y, biome_z)
@@ -196,7 +196,7 @@ mod test {
 
         let seed = hash_seed((-777i64) as u64);
         for (i, (x, y, z, result_x, result_y, result_z)) in data.into_iter().enumerate() {
-            let result = get_biome_blend(i8::MIN, u16::MAX, seed, x, y, z);
+            let result = get_biome_blend(i8::MIN.into(), u16::MAX.into(), seed, x, y, z);
             let expected = Vector3::new(result_x, result_y, result_z);
             assert_eq!(
                 result, expected,
