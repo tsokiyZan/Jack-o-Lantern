@@ -3,7 +3,9 @@ use pumpkin_data::tag::Taggable;
 use pumpkin_data::{Block, tag};
 use pumpkin_macros::pumpkin_block;
 
-use crate::block::{BlockBehaviour, BrokenArgs, CanPlaceAtArgs, GetStateForNeighborUpdateArgs};
+use crate::block::{
+    BlockBehaviour, BrokenArgs, CanPlaceAtArgs, GetStateForNeighborUpdateArgs, PlacedArgs,
+};
 
 use super::FireBlockBase;
 use crate::block::OnEntityCollisionArgs;
@@ -19,6 +21,13 @@ impl SoulFireBlock {
 }
 
 impl BlockBehaviour for SoulFireBlock {
+    /// Vanilla `BaseFireBlock.onPlace`; soul fire schedules no ticks.
+    fn placed(&self, args: PlacedArgs<'_>) {
+        FireBlockBase::on_place(&args, || {
+            Self::is_soul_base(args.world.get_block(&args.position.down()))
+        });
+    }
+
     fn on_entity_collision(&self, args: OnEntityCollisionArgs<'_>) {
         FireBlockBase::apply_fire_collision(&args, true);
     }
