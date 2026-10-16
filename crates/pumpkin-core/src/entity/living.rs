@@ -2649,9 +2649,7 @@ impl LivingEntity {
             }
 
             if show_death_messages && let Some(server) = world.server.upgrade() {
-                for player in server.get_all_players() {
-                    player.send_system_message(&final_death_message);
-                }
+                server.broadcast_system_message(&final_death_message, false);
             }
         } else if self.entity.custom_name.load().is_some() {
             let death_message = Self::get_death_message(dyn_self, damage_type, source, cause);

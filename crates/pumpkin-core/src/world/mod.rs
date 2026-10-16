@@ -18,7 +18,7 @@ use std::{
     collections::{BTreeMap, HashMap},
     sync::atomic::Ordering,
 };
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, error, trace, warn};
 
 mod active_chunks;
 pub mod bee_poi;
@@ -3313,7 +3313,7 @@ impl World {
         let msg_comp = TextComponent::translate_cross(
             translation::java::MULTIPLAYER_PLAYER_JOINED,
             translation::bedrock::MULTIPLAYER_PLAYER_JOINED,
-            [TextComponent::text(player.gameprofile.name.clone())],
+            [player.get_display_name()],
         )
         .color_named(NamedColor::Yellow);
 
@@ -3321,8 +3321,16 @@ impl World {
         server.plugin_manager.fire(server, &mut event).await;
 
         if !event.cancelled {
-            self.broadcast_system_message(&event.join_message, false);
-            info!("{}", event.join_message.to_pretty_console());
+            // Vanilla broadcasts before adding the player to the player list, so the joining
+            // player doesn't get its own message.
+            server.broadcast_system_message_with(
+                &event.join_message,
+                |other| {
+                    (other.gameprofile.id != player.gameprofile.id)
+                        .then(|| event.join_message.clone())
+                },
+                false,
+            );
         }
     }
 
@@ -3874,7 +3882,7 @@ impl World {
         let msg_comp = TextComponent::translate_cross(
             translation::java::MULTIPLAYER_PLAYER_JOINED,
             translation::bedrock::MULTIPLAYER_PLAYER_JOINED,
-            [TextComponent::text(player.gameprofile.name.clone())],
+            [player.get_display_name()],
         )
         .color_named(NamedColor::Yellow);
         let mut event = PlayerJoinEvent::new(player.clone(), msg_comp);
@@ -3882,9 +3890,16 @@ impl World {
         server.plugin_manager.fire(server, &mut event).await;
 
         if !event.cancelled {
-            self.broadcast_system_message(&event.join_message, false);
-            // TODO: Switch to structured logging, e.g. info!(player = %name, "connected")
-            info!("{}", event.join_message.to_pretty_console());
+            // Vanilla broadcasts before adding the player to the player list, so the joining
+            // player doesn't get its own message.
+            server.broadcast_system_message_with(
+                &event.join_message,
+                |other| {
+                    (other.gameprofile.id != player.gameprofile.id)
+                        .then(|| event.join_message.clone())
+                },
+                false,
+            );
         }
     }
 
@@ -5068,7 +5083,7 @@ impl World {
                 let msg_comp = TextComponent::translate_cross(
                     translation::java::MULTIPLAYER_PLAYER_LEFT,
                     translation::bedrock::MULTIPLAYER_PLAYER_LEFT,
-                    [TextComponent::text(player.gameprofile.name.clone())],
+                    [player.get_display_name()],
                 )
                 .color_named(NamedColor::Yellow);
                 let mut event = PlayerLeaveEvent::new(player.clone(), msg_comp);
@@ -5077,10 +5092,7 @@ impl World {
                     server.plugin_manager.fire(&server, &mut event).await;
 
                     if !event.cancelled {
-                        for player in self.players.load().iter() {
-                            player.send_system_message(&event.leave_message);
-                        }
-                        info!("{}", event.leave_message.to_pretty_console());
+                        server.broadcast_system_message(&event.leave_message, false);
                     }
                 }
             }

@@ -865,6 +865,27 @@ impl Server {
         info!("System chat: {}", message.clone().get_text());
     }
 
+    /// Vanilla `PlayerList.broadcastSystemMessage`: logs the message and sends it to every player.
+    pub fn broadcast_system_message(&self, message: &TextComponent, overlay: bool) {
+        self.broadcast_system_message_with(message, |_| Some(message.clone()), overlay);
+    }
+
+    /// Vanilla `PlayerList.broadcastSystemMessage` with a per-player message; players it gives no
+    /// message for are skipped.
+    pub fn broadcast_system_message_with(
+        &self,
+        message: &TextComponent,
+        player_messages: impl Fn(&Player) -> Option<TextComponent>,
+        overlay: bool,
+    ) {
+        Self::send_system_message(message);
+        for player in self.get_all_players() {
+            if let Some(player_message) = player_messages(&player) {
+                player.send_system_message_raw(&player_message, overlay);
+            }
+        }
+    }
+
     /// Vanilla `MinecraftServer.logChatMessage`, given the message already decorated with its chat type.
     pub fn log_chat_message(decorated: &TextComponent, tag: Option<&str>) {
         let decorated = decorated.clone().get_text();
