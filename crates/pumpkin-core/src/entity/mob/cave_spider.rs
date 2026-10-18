@@ -113,12 +113,14 @@ impl Mob for CaveSpiderEntity {
         Some(self.is_climbing.load(std::sync::atomic::Ordering::Relaxed))
     }
 
+    /// Vanilla `CaveSpider.finalizeSpawn` calls neither `Spider`'s nor `Mob`'s: no jockey, no
+    /// effect, no follow range bonus, no left-handed roll.
     fn finalize_spawn(
         &self,
-        world: &Arc<crate::world::World>,
+        _world: &Arc<crate::world::World>,
         group_data: Option<super::spawn::SpawnGroupData>,
     ) -> Option<super::spawn::SpawnGroupData> {
-        super::spider::finalize_spider_spawn(&self.mob_entity, world, group_data)
+        group_data
     }
 
     fn get_mob_entity(&self) -> &MobEntity {
