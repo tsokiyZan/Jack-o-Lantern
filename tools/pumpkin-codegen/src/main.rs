@@ -80,6 +80,7 @@ mod placed_feature;
 mod potion;
 mod potion_brewing;
 mod processor_list;
+mod recipe_sync;
 mod recipes;
 mod registry;
 mod scoreboard_slot;
@@ -189,6 +190,7 @@ pub fn main() {
             "flower_pot_transformations.rs",
         ),
         (recipes::build, "recipes.rs"),
+        (recipe_sync::build, "recipe_sync.rs"),
         (enchantments::build, "enchantment.rs"),
         (data_component::build, "data_component.rs"),
         (attributes::build, "attributes.rs"),

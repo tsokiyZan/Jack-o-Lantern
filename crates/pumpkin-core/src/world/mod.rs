@@ -3814,6 +3814,15 @@ impl World {
             player.get_inventory().get_selected_slot() as i8,
         ));
 
+        // Vanilla `PlayerList.placeNewPlayer`: the furnace, smithing and brewing inputs and the
+        // stonecutter recipes the client needs (JEI also starts on this packet).
+        let recipes = server.recipe_manager.update_recipes_payload();
+        client
+            .enqueue_client_packet(&pumpkin_protocol::java::client::play::CUpdateRecipes::new(
+                &recipes,
+            ))
+            .await;
+
         if client.version.load() >= JavaMinecraftVersion::V_1_20_2 {
             // Start waiting for level chunks. Sets the "Loading Terrain" screen (Added in 1.20.2)
             debug!("Sending waiting chunks to {}", player.gameprofile.name);

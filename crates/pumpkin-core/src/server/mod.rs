@@ -585,9 +585,15 @@ impl Server {
             "#minecraft:load",
         );
 
+        // Vanilla `PlayerList.reloadResources`: the synchronized recipe data, then the recipe
+        // book.
+        let recipes = self.recipe_manager.update_recipes_payload();
         let dynamic_recipes = self.recipe_manager.get_dynamic_recipes_internal();
         for player in self.get_all_players() {
             if let crate::net::ClientPlatform::Java(java_client) = player.client.as_ref() {
+                java_client.try_send_packet(
+                    &pumpkin_protocol::java::client::play::CUpdateRecipes::new(&recipes),
+                );
                 let add_packet = pumpkin_protocol::java::client::play::CRecipeBookAdd::new(
                     true,
                     &dynamic_recipes,

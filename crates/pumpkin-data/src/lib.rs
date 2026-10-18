@@ -95,6 +95,11 @@ pub use advancement::*;
 #[path = "generated/recipes.rs"]
 pub mod recipes;
 
+#[cfg(feature = "recipes")]
+#[rustfmt::skip]
+#[path = "generated/recipe_sync.rs"]
+pub mod recipe_sync;
+
 #[cfg(feature = "data_component")]
 #[rustfmt::skip]
 #[path = "generated/data_component.rs"]
