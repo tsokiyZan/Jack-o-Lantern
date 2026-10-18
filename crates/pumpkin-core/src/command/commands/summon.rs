@@ -14,10 +14,15 @@ use crate::command::context::command_context::CommandContext;
 use crate::command::errors::error_types::CommandErrorType;
 use crate::command::node::dispatcher::CommandDispatcher;
 use crate::command::node::{CommandExecutor, CommandExecutorResult};
+use crate::entity::EntityBase;
 use crate::entity::mob::spawn::finalize_spawn;
 use crate::entity::r#type::from_type;
 use crate::world::World;
+use pumpkin_data::entity::EntityType;
 use pumpkin_nbt::compound::NbtCompound;
+use pumpkin_nbt::tag::NbtTag;
+use pumpkin_util::math::vector3::Vector3;
+use std::sync::Arc;
 
 const DESCRIPTION: &str = "Spawns an entity at position.";
 const PERMISSION: &str = "minecraft:command.summon";
@@ -66,23 +71,21 @@ impl CommandExecutor for SummonExecutor {
             None
         };
 
-        let uuid = nbt
-            .and_then(|nbt| nbt.get_uuid("UUID"))
-            .unwrap_or_else(Uuid::new_v4);
-
-        let entity = from_type(entity_type, pos, world, uuid);
+        let empty = NbtCompound::new();
         // Vanilla `SummonCommand.createEntity` always loads the entity from a tag (an empty one
         // without the NBT argument), so unset fields take their load defaults, e.g.
         // `CanPickUpLoot` false.
-        entity.read_nbt_non_mut(nbt.unwrap_or(&NbtCompound::new()));
-        entity.get_entity().set_pos(pos);
+        let mut loaded = Vec::new();
+        let entity =
+            load_entity_recursive(entity_type, nbt.unwrap_or(&empty), pos, world, &mut loaded);
 
-        if world
-            .entities
-            .load()
-            .iter()
-            .any(|e| e.get_entity().entity_uuid == entity.get_entity().entity_uuid)
-        {
+        // Vanilla `tryAddFreshEntityWithPassengers`: no entity in the stack may reuse a loaded UUID.
+        let entities = world.entities.load();
+        if loaded.iter().any(|(e, _)| {
+            entities
+                .iter()
+                .any(|w| w.get_entity().entity_uuid == e.get_entity().entity_uuid)
+        }) {
             return Err(ERROR_DUPLICATE_UUID.create_without_context());
         }
 
@@ -91,7 +94,14 @@ impl CommandExecutor for SummonExecutor {
         if !self.has_nbt {
             finalize_spawn(&entity, world, None);
         }
-        world.spawn_entity(entity);
+        // Vanilla `addFreshEntityWithPassengers`: the entity, then its passengers, each one riding
+        // the vehicle it was loaded under.
+        for (e, vehicle) in loaded {
+            world.spawn_entity(e.clone());
+            if let Some(vehicle) = vehicle {
+                vehicle.get_entity().add_passenger(vehicle.clone(), e);
+            }
+        }
 
         context.source.send_feedback(
             TextComponent::translate_cross(
@@ -104,6 +114,42 @@ impl CommandExecutor for SummonExecutor {
 
         Ok(1)
     }
+}
+
+/// A loaded entity and the vehicle it rides.
+type Loaded = (Arc<dyn EntityBase>, Option<Arc<dyn EntityBase>>);
+
+/// Vanilla `EntityType.loadEntityRecursive` with `SummonCommand`'s post-load step (every entity is
+/// snapped to the summon position): the entity and, depth first, the `Passengers` it carries.
+/// `loaded` gets each entity with the vehicle it rides, vehicles first.
+fn load_entity_recursive(
+    entity_type: &'static EntityType,
+    nbt: &NbtCompound,
+    pos: Vector3<f64>,
+    world: &Arc<World>,
+    loaded: &mut Vec<Loaded>,
+) -> Arc<dyn EntityBase> {
+    let uuid = nbt.get_uuid("UUID").unwrap_or_else(Uuid::new_v4);
+    let entity = from_type(entity_type, pos, world, uuid);
+    entity.read_nbt_non_mut(nbt);
+    entity.get_entity().set_pos(pos);
+    let index = loaded.len();
+    loaded.push((entity.clone(), None));
+    for passenger in nbt.get_list("Passengers").unwrap_or_default() {
+        // `loadStaticEntity`: a passenger without a known `id` is skipped.
+        let NbtTag::Compound(passenger) = passenger else {
+            continue;
+        };
+        let Some(passenger_type) = passenger.get_string("id").and_then(EntityType::from_name)
+        else {
+            continue;
+        };
+        let start = loaded.len();
+        load_entity_recursive(passenger_type, passenger, pos, world, loaded);
+        // `startRiding(entity, true, false)`.
+        loaded[start].1 = Some(loaded[index].0.clone());
+    }
+    entity
 }
 
 pub fn register(dispatcher: &mut CommandDispatcher, registry: &PermissionRegistry) {
