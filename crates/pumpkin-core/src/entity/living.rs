@@ -4346,8 +4346,13 @@ impl EntityBase for LivingEntity {
             self.hurt_time.fetch_sub(1, Relaxed);
         }
         let own_tick_death = caller.get_mob().is_some_and(|mob| mob.tick_death(caller));
-        let in_death_animation = self.health.load() <= 0.0 && self.death_time.load(Relaxed) < 20;
         let is_player = self.entity.entity_type == &EntityType::PLAYER;
+        // Vanilla `baseTick` ends with `tickDeath`, so a corpse removed on its 20th tick
+        // never reaches `aiStep` (`if (!this.isRemoved()) this.aiStep()`).
+        if self.health.load() <= 0.0 && !own_tick_death && !is_player {
+            self.tick_death(caller);
+        }
+        let in_death_animation = self.health.load() <= 0.0 && !self.entity.removed.load(Relaxed);
         if (is_alive || in_death_animation) && !is_player {
             self.tick_movement(caller);
             if let Some(mob) = caller.get_mob() {
@@ -4578,46 +4583,23 @@ impl EntityBase for LivingEntity {
             }
         }
 
-        if self.health.load() <= 0.0 && !own_tick_death {
+        if self.health.load() <= 0.0 && !own_tick_death && is_player {
             let time = self
                 .death_time
                 .fetch_update(Relaxed, Relaxed, |time| Some(time.saturating_add(1)))
                 .unwrap_or_else(|time| time)
                 .saturating_add(1);
-            if self.entity.entity_type == &EntityType::PLAYER {
-                // Bedrock keeps a dead remote player actor in its death pose.
-                // Remove Java players after the animation so respawn can
-                // recreate a live, interactable actor with the same identity.
-                if time == 10 {
-                    self.entity
-                        .world
-                        .load()
-                        .despawn_dead_java_player_for_bedrock(&self.entity);
-                }
-                // Players remain part of the world until their client requests a
-                // respawn. Removing one here breaks reconnecting while dead.
-                return;
-            }
-            // Vanilla `LivingEntity.tickDeath` sends the POOF (60) particle event
-            // once the death animation finished; the death event (3) was already
-            // broadcast in `on_death`. Sending it again here would restart the
-            // client-side death animation.
-            if time >= 20 && !self.entity.removed.swap(true, Ordering::Relaxed) {
-                if let Some(mob) = caller.get_mob() {
-                    mob.remove_killed();
-                }
-                // `LivingEntity.remove(KILLED)`.
-                self.trigger_on_death_mob_effects();
-                self.active_effects
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .clear();
+            // Bedrock keeps a dead remote player actor in its death pose.
+            // Remove Java players after the animation so respawn can
+            // recreate a live, interactable actor with the same identity.
+            if time == 10 {
                 self.entity
                     .world
                     .load()
-                    .send_entity_status(&self.entity, EntityStatus::Poof, None);
-                self.entity.remove();
+                    .despawn_dead_java_player_for_bedrock(&self.entity);
             }
+            // Players remain part of the world until their client requests a
+            // respawn. Removing one here breaks reconnecting while dead.
         }
     }
 
@@ -4647,6 +4629,34 @@ pub const SPEED_MODIFIER_SPRINTING_ID: &str = "minecraft:sprinting";
 pub const SPEED_MODIFIER_SPRINTING_AMOUNT: f64 = 0.300_000_011_920_928_96;
 
 impl LivingEntity {
+    /// Vanilla `LivingEntity.tickDeath` for anything but a player: the death animation runs
+    /// 20 ticks, then the corpse goes with the POOF (60) particle event. The death event (3)
+    /// was already broadcast in `on_death`; sending it again would restart the client-side
+    /// animation.
+    fn tick_death(&self, caller: &dyn EntityBase) {
+        let time = self
+            .death_time
+            .fetch_update(Relaxed, Relaxed, |time| Some(time.saturating_add(1)))
+            .unwrap_or_else(|time| time)
+            .saturating_add(1);
+        if time >= 20 && !self.entity.removed.swap(true, Ordering::Relaxed) {
+            if let Some(mob) = caller.get_mob() {
+                mob.remove_killed();
+            }
+            // `LivingEntity.remove(KILLED)`.
+            self.trigger_on_death_mob_effects();
+            self.active_effects
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .clear();
+            self.entity
+                .world
+                .load()
+                .send_entity_status(&self.entity, EntityStatus::Poof, None);
+            self.entity.remove();
+        }
+    }
+
     pub fn set_sprinting(&self, is_sprinting: bool) {
         self.entity.set_sprinting(is_sprinting);
         self.update_attribute(&Attributes::MOVEMENT_SPEED, |speed| {
