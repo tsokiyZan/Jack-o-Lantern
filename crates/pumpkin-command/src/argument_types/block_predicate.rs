@@ -69,7 +69,7 @@ impl BlockPredicate {
                 let Some(actual) = block.properties(state) else {
                     return false;
                 };
-                let actual = actual.to_props();
+                let actual = super::block::property_pairs(actual.to_props());
                 properties.iter().all(|(name, value)| {
                     actual.iter().any(|(key, set)| key == name && set == value)
                 })

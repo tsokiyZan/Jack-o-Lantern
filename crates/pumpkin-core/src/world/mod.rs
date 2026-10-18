@@ -483,10 +483,10 @@ impl World {
         if let Some(server) = self.server.upgrade() {
             server.spawn_task(async move {
                 if !unforced.is_empty() {
-                    world.level.mark_chunks_as_not_watched(&unforced).await;
+                    world.level.mark_chunks_as_not_watched(&unforced);
                 }
                 if !forced.is_empty() {
-                    world.level.mark_chunks_as_newly_watched(&forced).await;
+                    world.level.mark_chunks_as_newly_watched(&forced);
                     world.load_entity_chunks(None, forced);
                 }
             });

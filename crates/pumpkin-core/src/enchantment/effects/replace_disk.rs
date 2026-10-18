@@ -141,9 +141,17 @@ impl ReplaceDisk {
             return self.block_state.id;
         }
         let block = pumpkin_data::Block::from_state_id(self.block_state.id);
-        block
-            .from_properties(self.block_state_properties)
-            .to_state_id(block)
+        let properties: Vec<pumpkin_data::Property> = self
+            .block_state_properties
+            .iter()
+            .filter_map(|(key, value)| {
+                pumpkin_data::Property::from_key_value_str(
+                    pumpkin_data::PropertyKey::from_str(key)?,
+                    value,
+                )
+            })
+            .collect();
+        block.from_properties(&properties).to_state_id(block)
     }
 
     #[must_use]

@@ -43,6 +43,8 @@ pub struct Block {
     pub flammable: Option<Flammable>,
     /// Defines the amount of XP dropped when the block is mined (e.g., Coal or Diamond).
     pub experience: Option<Experience>,
+    /// Loot table identifier, `None` when the block has no loot table.
+    pub loot_table: Option<&'static str>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -183,15 +185,18 @@ impl Block {
         self.properties(id).is_some_and(|properties| {
             properties
                 .to_props()
-                .into_iter()
-                .any(|(key, value)| key == "waterlogged" && value == "true")
+                .contains(&crate::Property::Waterlogged(true))
         })
     }
 
     #[must_use]
     pub fn is_waterloggable(&self) -> bool {
-        self.properties(self.default_state.id)
-            .is_some_and(|props| props.to_props().iter().any(|p| p.0 == "waterlogged"))
+        self.properties(self.default_state.id).is_some_and(|props| {
+            props
+                .to_props()
+                .iter()
+                .any(|p| p.key() == crate::PropertyKey::Waterlogged)
+        })
     }
 
     /// Returns a new [`BlockStateId`] for the given [`BlockStateId`] with the
@@ -202,13 +207,15 @@ impl Block {
     pub fn set_waterlogged(&self, id: BlockStateId, value: bool) -> Option<BlockStateId> {
         self.properties(id).and_then(|props| {
             let mut props = props.to_props();
-            let waterlogged = &mut props.iter_mut().find(|p| p.0 == "waterlogged")?.1;
-            let new_waterlogged = value.to_string();
-            if new_waterlogged.as_str() == *waterlogged {
+            let waterlogged = props.iter_mut().find_map(|p| match p {
+                crate::Property::Waterlogged(w) => Some(w),
+                _ => None,
+            })?;
+            if value == *waterlogged {
                 return None;
             }
 
-            *waterlogged = &new_waterlogged;
+            *waterlogged = value;
             Some(self.from_properties(&props).to_state_id(self))
         })
     }
@@ -216,7 +223,7 @@ impl Block {
     #[must_use]
     pub fn state_from_properties(
         &'static self,
-        properties: &[(&str, &str)],
+        properties: &[crate::Property],
     ) -> Option<&'static BlockState> {
         self.states.iter().find(|state| {
             let Some(state_properties) = self.properties(state.id) else {
@@ -225,10 +232,10 @@ impl Block {
             let state_properties = state_properties.to_props();
 
             state_properties.len() == properties.len()
-                && properties.iter().all(|(name, value)| {
-                    state_properties.iter().any(|(state_name, state_value)| {
-                        *state_name == *name && *state_value == *value
-                    })
+                && properties.iter().all(|prop| {
+                    state_properties
+                        .iter()
+                        .any(|state_prop| state_prop.matches_property(*prop))
                 })
         })
     }
@@ -262,11 +269,7 @@ impl Block {
                 crate::block_rotation::Rotation::None,
                 mirror,
             );
-            let transformed_refs: Vec<(&str, &str)> = transformed
-                .iter()
-                .map(|(k, v)| (k.as_str(), v.as_str()))
-                .collect();
-            let new_props = self.from_properties(&transformed_refs);
+            let new_props = self.from_properties(&transformed);
             let new_state_id = new_props.to_state_id(self);
             BlockState::from_id(new_state_id)
         } else {
@@ -291,11 +294,7 @@ impl Block {
                 rotation,
                 crate::block_rotation::Mirror::None,
             );
-            let transformed_refs: Vec<(&str, &str)> = transformed
-                .iter()
-                .map(|(k, v)| (k.as_str(), v.as_str()))
-                .collect();
-            let new_props = self.from_properties(&transformed_refs);
+            let new_props = self.from_properties(&transformed);
             let new_state_id = new_props.to_state_id(self);
             BlockState::from_id(new_state_id)
         } else {
@@ -316,8 +315,8 @@ impl Block {
         nbt.put_string("id", id);
         if let Some(props) = block.properties(state_id) {
             let mut props_nbt = NbtCompound::new();
-            for (key, value) in props.to_props() {
-                props_nbt.put_string(key, value.to_string());
+            for prop in props.to_props() {
+                props_nbt.put_string(prop.key().to_str(), prop.value_str().to_string());
             }
             nbt.put_compound("properties", props_nbt);
         }
@@ -342,11 +341,14 @@ impl Block {
         else {
             return Some(block.default_state.id);
         };
-        let props: Vec<(&str, &str)> = props_nbt
+        // Unknown keys and values are skipped, like any other property the block doesn't have.
+        let props: Vec<crate::Property> = props_nbt
             .child_tags
             .iter()
             .filter_map(|(key, value)| match value {
-                NbtTag::String(value) => Some((key.as_ref(), value.as_ref())),
+                NbtTag::String(value) => {
+                    crate::Property::from_key_value_str(crate::PropertyKey::from_str(key)?, value)
+                }
                 _ => None,
             })
             .collect();

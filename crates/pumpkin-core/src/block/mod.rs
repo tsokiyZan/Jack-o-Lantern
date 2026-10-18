@@ -533,8 +533,7 @@ pub fn block_loot_stacks(
     pos: &BlockPos,
     params: &LootContextParameters,
 ) -> Vec<ItemStack> {
-    let key = format!("minecraft:blocks/{}", block.name);
-    let Some(loot_table) = world.get_loot_table(&key) else {
+    let Some(loot_table) = block.loot_table.and_then(|key| world.get_loot_table(key)) else {
         return Vec::new();
     };
     let seed: i64 = rand::random();

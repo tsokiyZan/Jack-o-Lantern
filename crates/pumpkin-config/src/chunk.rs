@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 /// Configuration for chunk storage format.
 ///
-/// Supports multiple chunk formats, currently `Anvil` and `Linear`.
+/// Supports `Anvil` (`.mca`), `Linear` (`.linear`), and `Pump` (`.pump`).
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(tag = "type")]
 pub enum ChunkConfig {
@@ -19,6 +19,7 @@ pub enum ChunkConfig {
     Pump,
 }
 
+/// Vanilla's region format, so worlds stay readable by vanilla.
 impl Default for ChunkConfig {
     fn default() -> Self {
         Self::Anvil(AnvilChunkConfig::default())
@@ -31,8 +32,6 @@ impl Default for ChunkConfig {
 pub struct AnvilChunkConfig {
     /// Compression settings for chunk data.
     pub compression: ChunkCompression,
-    /// Whether chunks should be written in place.
-    pub write_in_place: bool,
 }
 
 /// Compression settings for chunk data.

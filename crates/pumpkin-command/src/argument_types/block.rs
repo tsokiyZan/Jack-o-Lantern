@@ -7,7 +7,7 @@ use crate::{
     string_reader::StringReader,
     suggestion::suggestions::{Suggestions, SuggestionsBuilder},
 };
-use pumpkin_data::{Block, BlockStateId, translation};
+use pumpkin_data::{Block, BlockStateId, Property, PropertyKey, translation};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::text::TextComponent;
 
@@ -75,9 +75,8 @@ impl BlockInput {
         else {
             return state;
         };
-        let input = input.to_props();
-        let merged: Vec<(&str, &str)> = current
-            .to_props()
+        let input = property_pairs(input.to_props());
+        let merged: Vec<(&str, &str)> = property_pairs(current.to_props())
             .into_iter()
             .map(|(key, value)| {
                 if self.properties.contains(&key)
@@ -89,8 +88,25 @@ impl BlockInput {
                 }
             })
             .collect();
-        block.from_properties(&merged).to_state_id(block)
+        state_from_pairs(block, &merged)
     }
+}
+
+/// A state's properties as vanilla's `name=value` strings, in the block's order.
+pub(crate) fn property_pairs(properties: Vec<Property>) -> Vec<(&'static str, &'static str)> {
+    properties
+        .into_iter()
+        .map(|property| (property.key().to_str(), property.value_str()))
+        .collect()
+}
+
+/// The block's state with these `name=value` properties.
+fn state_from_pairs(block: &'static Block, pairs: &[(&str, &str)]) -> BlockStateId {
+    let properties: Vec<Property> = pairs
+        .iter()
+        .filter_map(|(key, value)| Property::from_key_value_str(PropertyKey::from_str(key)?, value))
+        .collect();
+    block.from_properties(&properties).to_state_id(block)
 }
 
 /// Whether `state` has the same value as `expected` for each of `properties`.
@@ -107,8 +123,8 @@ pub(crate) fn properties_match(
     else {
         return false;
     };
-    let expected = expected.to_props();
-    let actual = actual.to_props();
+    let expected = property_pairs(expected.to_props());
+    let actual = property_pairs(actual.to_props());
     properties.iter().all(|name| {
         expected.iter().find(|(key, _)| key == name) == actual.iter().find(|(key, _)| key == name)
     })
@@ -158,7 +174,7 @@ pub(crate) fn read_properties(
         let key = reader.read_string()?;
         let current = block
             .properties(state)
-            .map(|properties| properties.to_props())
+            .map(|properties| property_pairs(properties.to_props()))
             .unwrap_or_default();
         let Some(&(name, _)) = current.iter().find(|(name, _)| *name == key) else {
             reader.set_cursor(key_start);
@@ -200,7 +216,7 @@ pub(crate) fn read_properties(
         let candidate = block.states.iter().find(|candidate| {
             block
                 .properties(candidate.id)
-                .is_some_and(|properties| properties.to_props() == requested)
+                .is_some_and(|properties| property_pairs(properties.to_props()) == requested)
         });
         let Some(candidate) = candidate.map(|candidate| candidate.id) else {
             reader.set_cursor(value_start);
