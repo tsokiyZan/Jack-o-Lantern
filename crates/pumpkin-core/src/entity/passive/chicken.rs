@@ -166,10 +166,19 @@ impl Animal for ChickenEntity {
 }
 
 /// Vanilla `Chicken.BABY_DIMENSIONS`.
-const BABY_DIMENSIONS: EntityDimensions =
-    EntityDimensions::scalable(0.3, 0.4).with_eye_height(0.281_25);
+const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::CHICKEN_BABY_DIMENSIONS;
 
 impl Mob for ChickenEntity {
+    /// Vanilla `Chicken.positionRider`: a living passenger's body turns with the chicken.
+    fn mob_after_position_rider(&self, passenger: &dyn EntityBase) {
+        if passenger.get_living_entity().is_some() {
+            passenger
+                .get_entity()
+                .body_yaw
+                .store(self.get_entity().body_yaw.load());
+        }
+    }
+
     /// Vanilla `Chicken.playStepSound`.
     fn play_step_sound(
         &self,

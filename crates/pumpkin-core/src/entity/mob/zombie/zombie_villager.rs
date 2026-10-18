@@ -396,7 +396,7 @@ fn read_villager_data(nbt: &NbtCompound, mut data: VillagerData) -> VillagerData
 
 /// Vanilla `ZombieVillager.BABY_DIMENSIONS`.
 const BABY_DIMENSIONS: EntityDimensions =
-    EntityDimensions::scalable(0.49, 0.98).with_eye_height(0.67);
+    pumpkin_data::entity_dimensions::ZOMBIE_VILLAGER_BABY_DIMENSIONS;
 
 impl Mob for ZombieVillagerEntity {
     crate::impl_zombie_mob!(mob_entity);

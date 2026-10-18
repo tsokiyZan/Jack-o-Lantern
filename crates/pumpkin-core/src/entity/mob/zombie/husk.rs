@@ -36,8 +36,7 @@ impl HuskEntity {
 }
 
 /// Vanilla `Husk.BABY_DIMENSIONS`.
-const BABY_DIMENSIONS: EntityDimensions =
-    EntityDimensions::scalable(0.49, 0.98).with_eye_height(0.825);
+const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::HUSK_BABY_DIMENSIONS;
 
 impl Mob for HuskEntity {
     crate::impl_zombie_mob!(entity);

@@ -900,9 +900,7 @@ impl Animal for PandaEntity {
 }
 
 /// Vanilla `Panda.BABY_DIMENSIONS`.
-const BABY_DIMENSIONS: EntityDimensions = Entity::type_dimensions(&EntityType::PANDA)
-    .scale(0.5)
-    .with_eye_height(0.281_25);
+const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::PANDA_BABY_DIMENSIONS;
 
 /// Vanilla `Panda.finalizeSpawn`'s baby chance for the rest of a group.
 const BABY_SPAWN_CHANCE: f32 = 0.2;

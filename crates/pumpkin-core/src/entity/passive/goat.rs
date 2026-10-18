@@ -40,8 +40,7 @@ use crate::world::World;
 /// Vanilla `Goat.LONG_JUMPING_DIMENSION_SCALE_FACTOR`.
 const LONG_JUMPING_DIMENSION_SCALE_FACTOR: f32 = 0.7;
 /// Vanilla `Goat.BABY_DIMENSIONS`.
-const BABY_DIMENSIONS: EntityDimensions =
-    EntityDimensions::scalable(0.45, 0.65).with_eye_height(0.593_75);
+const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::GOAT_BABY_DIMENSIONS;
 /// Vanilla `Goat.BABY_SCALE`.
 const BABY_SCALE: f32 = 0.55;
 /// Vanilla `Goat.ADULT_ATTACK_DAMAGE` and `BABY_ATTACK_DAMAGE`.

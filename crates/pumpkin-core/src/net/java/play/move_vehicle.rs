@@ -114,11 +114,11 @@ impl JavaClient {
         steered.last_good = target;
         drop(steered);
 
-        // Pumpkin keeps the rider where its vehicle is, in place of `positionRider`.
-        let last_pos = entity.pos.load();
-        entity.set_pos(target);
+        // The rider follows in its vehicle's tick (`positionRider`); the chunks follow the
+        // player now, and the riding stats come from the vehicle's move
+        // (`checkMovementStatistics`).
         chunker::update_position(player);
-        let distance = last_pos.squared_distance_to_vec(&target).sqrt();
+        let distance = client_movement.length();
         let cm = (distance * 100.0).round() as i32;
         if cm > 0 {
             let stat = player.get_movement_statistic();

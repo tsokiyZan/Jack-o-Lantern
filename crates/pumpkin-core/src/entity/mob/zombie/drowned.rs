@@ -201,10 +201,14 @@ fn ok_target(target: &LivingEntity, world: &World) -> bool {
 const NAUTILUS_SHELL_CHANCE: f32 = 0.03;
 
 /// Vanilla `Drowned.BABY_DIMENSIONS`.
-const BABY_DIMENSIONS: EntityDimensions =
-    EntityDimensions::scalable(0.49, 0.98).with_eye_height(0.775);
+const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::DROWNED_BABY_DIMENSIONS;
 
 impl Mob for DrownedEntity {
+    /// Vanilla `rideTick`.
+    fn mob_after_ride_tick(&self) {
+        crate::entity::mob::turn_body_with_controlled_vehicle(self);
+    }
+
     crate::impl_zombie_mob!(entity);
 
     /// Vanilla `Drowned.finalizeSpawn`.

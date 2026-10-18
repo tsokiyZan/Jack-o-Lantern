@@ -7,6 +7,33 @@ use quote::{ToTokens, format_ident, quote};
 use serde::Deserialize;
 use syn::LitInt;
 
+/// One entry of `entity_attachments.json` (`tools/vanilla-dump/EntityAttachments.java`).
+#[derive(Deserialize)]
+pub struct DimensionsDump {
+    pub width: f32,
+    pub height: f32,
+    pub eye_height: f32,
+    pub passenger: Vec<[f64; 3]>,
+    pub vehicle: Vec<[f64; 3]>,
+}
+
+#[derive(Deserialize)]
+pub struct AttachmentsDump {
+    pub types: BTreeMap<String, DimensionsDump>,
+    pub statics: BTreeMap<String, DimensionsDump>,
+}
+
+pub fn read_attachments() -> AttachmentsDump {
+    serde_json::from_str(&fs::read_to_string("../../assets/entity_attachments.json").unwrap())
+        .expect("Failed to parse entity_attachments.json")
+}
+
+/// A `&[[f64; 3]]` literal.
+pub fn points_tokens(points: &[[f64; 3]]) -> TokenStream {
+    let points = points.iter().map(|[x, y, z]| quote! { [#x, #y, #z] });
+    quote! { &[#(#points),*] }
+}
+
 /// Raw deserialization shape for a single entity type entry from `entities.json`.
 #[derive(Deserialize)]
 pub struct EntityType {
@@ -87,13 +114,20 @@ pub enum MobCategory {
 }
 
 /// Pairs a raw entity name string with its deserialized [`EntityType`] data for token generation.
-pub struct NamedEntityType<'a>(&'a str, &'a EntityType);
+pub struct NamedEntityType<'a>(&'a str, &'a EntityType, &'a DimensionsDump);
 
 impl ToTokens for NamedEntityType<'_> {
     /// Emits an `EntityType { … }` struct literal token stream for the wrapped entity.
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let name = self.0;
         let entity = self.1;
+        let dump = self.2;
+        assert!(
+            dump.width == entity.dimension[0] && dump.height == entity.dimension[1],
+            "entity_attachments.json is from another version than entities.json ({name})"
+        );
+        let passenger_attachments = points_tokens(&dump.passenger);
+        let vehicle_attachments = points_tokens(&dump.vehicle);
         let id = LitInt::new(&entity.id.to_string(), proc_macro2::Span::call_site());
 
         let attribute_tokens = entity
@@ -216,6 +250,8 @@ impl ToTokens for NamedEntityType<'_> {
                 track_deltas: #track_deltas,
                 dimension: [#dimension0, #dimension1], // Correctly construct the array
                 eye_height: #eye_height,
+                passenger_attachments: #passenger_attachments,
+                vehicle_attachments: #vehicle_attachments,
                 spawn_dimensions_scale: #spawn_dimensions_scale,
                 spawn_restriction: #spawn_restriction,
                 resource_name: #name,
@@ -231,6 +267,8 @@ pub fn build() -> TokenStream {
         serde_json::from_str(&fs::read_to_string("../../assets/entities.json").unwrap())
             .expect("Failed to parse entities.json");
 
+    let attachments = read_attachments();
+
     let mut consts = TokenStream::new();
     let mut type_from_raw_id_arms = TokenStream::new();
     let mut type_from_name = TokenStream::new();
@@ -241,7 +279,11 @@ pub fn build() -> TokenStream {
         let id_lit = LitInt::new(&id.to_string(), proc_macro2::Span::call_site());
         let upper_name = format_ident!("{}", name.to_uppercase());
 
-        let entity_tokens = NamedEntityType(name, entity).to_token_stream();
+        let dump = attachments
+            .types
+            .get(name)
+            .unwrap_or_else(|| panic!("{name} missing from entity_attachments.json"));
+        let entity_tokens = NamedEntityType(name, entity, dump).to_token_stream();
 
         consts.extend(quote! {
             pub const #upper_name: EntityType = #entity_tokens;
@@ -291,6 +333,10 @@ pub fn build() -> TokenStream {
             pub track_deltas: bool,
             pub dimension: [f32; 2],
             pub eye_height: f32,
+            /// The built `PASSENGER` points of vanilla's type dimensions.
+            pub passenger_attachments: &'static [[f64; 3]],
+            /// The built `VEHICLE` points of vanilla's type dimensions.
+            pub vehicle_attachments: &'static [[f64; 3]],
             pub spawn_dimensions_scale: f32,
             pub spawn_restriction: SpawnRestriction,
             pub resource_name: &'static str,

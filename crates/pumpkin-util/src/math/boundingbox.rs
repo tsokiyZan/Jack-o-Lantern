@@ -497,6 +497,113 @@ impl BoundingBox {
     }
 }
 
+/// One kind of vanilla `EntityAttachments` point list.
+#[derive(Clone, Copy, Debug)]
+pub enum AttachmentPoints {
+    /// Points given explicitly (or already built), as vanilla's doubles.
+    Points(&'static [[f64; 3]]),
+    /// `EntityAttachment.Fallback.AT_HEIGHT`: one point at the height it was built with.
+    AtHeight(f32),
+    /// `EntityAttachment.Fallback.AT_FEET`: one point at the origin.
+    AtFeet,
+}
+
+impl AttachmentPoints {
+    const fn len(self) -> usize {
+        match self {
+            Self::Points(points) => points.len(),
+            Self::AtHeight(_) | Self::AtFeet => 1,
+        }
+    }
+
+    fn point(self, index: usize) -> Vector3<f64> {
+        match self {
+            Self::Points(points) => {
+                let [x, y, z] = points[index];
+                Vector3::new(x, y, z)
+            }
+            Self::AtHeight(height) => Vector3::new(0.0, f64::from(height), 0.0),
+            Self::AtFeet => Vector3::new(0.0, 0.0, 0.0),
+        }
+    }
+}
+
+/// The riding points of vanilla `EntityAttachments`: `PASSENGER` and `VEHICLE`.
+#[derive(Clone, Copy, Debug)]
+pub struct EntityAttachments {
+    pub passenger: AttachmentPoints,
+    pub vehicle: AttachmentPoints,
+    /// The `scale` calls made on these attachments, in order: vanilla multiplies every point
+    /// by each one in turn.
+    scales: [[f32; 3]; 4],
+    scale_count: u8,
+}
+
+impl EntityAttachments {
+    /// Vanilla `EntityAttachments.createDefault`: the fallback points for this size.
+    #[must_use]
+    pub const fn create_default(height: f32) -> Self {
+        Self::new(AttachmentPoints::AtHeight(height), AttachmentPoints::AtFeet)
+    }
+
+    #[must_use]
+    pub const fn new(passenger: AttachmentPoints, vehicle: AttachmentPoints) -> Self {
+        Self {
+            passenger,
+            vehicle,
+            scales: [[1.0; 3]; 4],
+            scale_count: 0,
+        }
+    }
+
+    /// Vanilla `EntityAttachments.scale`.
+    #[must_use]
+    pub const fn scale(mut self, x: f32, y: f32, z: f32) -> Self {
+        let count = self.scale_count as usize;
+        if count < self.scales.len() {
+            self.scales[count] = [x, y, z];
+            self.scale_count += 1;
+        } else {
+            // Deeper than any vanilla size chain: fold into the last step.
+            let [lx, ly, lz] = self.scales[count - 1];
+            self.scales[count - 1] = [lx * x, ly * y, lz * z];
+        }
+        self
+    }
+
+    fn transform(&self, points: AttachmentPoints, index: usize, rot_y: f32) -> Vector3<f64> {
+        let mut point = points.point(index);
+        for [x, y, z] in &self.scales[..self.scale_count as usize] {
+            point = Vector3::new(
+                point.x * f64::from(*x),
+                point.y * f64::from(*y),
+                point.z * f64::from(*z),
+            );
+        }
+        // `transformPoint`.
+        point.y_rot(-rot_y * (std::f32::consts::PI / 180.0))
+    }
+
+    /// Vanilla `getClamped(PASSENGER, index, rotY)`.
+    #[must_use]
+    pub fn passenger_clamped(&self, index: usize, rot_y: f32) -> Vector3<f64> {
+        let index = index.min(self.passenger.len() - 1);
+        self.transform(self.passenger, index, rot_y)
+    }
+
+    /// Vanilla `getNullable(PASSENGER, index, rotY)`.
+    #[must_use]
+    pub fn passenger(&self, index: usize, rot_y: f32) -> Option<Vector3<f64>> {
+        (index < self.passenger.len()).then(|| self.transform(self.passenger, index, rot_y))
+    }
+
+    /// Vanilla `get(VEHICLE, 0, rotY)`.
+    #[must_use]
+    pub fn vehicle(&self, rot_y: f32) -> Vector3<f64> {
+        self.transform(self.vehicle, 0, rot_y)
+    }
+}
+
 /// Represents the dimensions of an entity.
 #[derive(Clone, Copy, Debug)]
 pub struct EntityDimensions {
@@ -506,6 +613,8 @@ pub struct EntityDimensions {
     pub height: f32,
     /// Eye height relative to the bottom of the entity.
     pub eye_height: f32,
+    /// Where passengers sit on it and where it sits on a vehicle.
+    pub attachments: EntityAttachments,
 }
 
 impl EntityDimensions {
@@ -521,6 +630,20 @@ impl EntityDimensions {
             width,
             height,
             eye_height,
+            attachments: EntityAttachments::create_default(height),
+        }
+    }
+
+    /// Vanilla `EntityDimensions.withAttachments`, with the points already built.
+    #[must_use]
+    pub const fn with_attachments(
+        self,
+        passenger: AttachmentPoints,
+        vehicle: AttachmentPoints,
+    ) -> Self {
+        Self {
+            attachments: EntityAttachments::new(passenger, vehicle),
+            ..self
         }
     }
 
@@ -553,6 +676,9 @@ impl EntityDimensions {
             width: self.width * width_factor,
             height: self.height * height_factor,
             eye_height: self.eye_height * height_factor,
+            attachments: self
+                .attachments
+                .scale(width_factor, height_factor, width_factor),
         }
     }
 }

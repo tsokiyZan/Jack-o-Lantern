@@ -376,9 +376,8 @@ impl CustomSound for ArmadilloEntity {
 }
 
 /// Vanilla `Armadillo.BABY_DIMENSIONS`.
-const BABY_DIMENSIONS: EntityDimensions = Entity::type_dimensions(&EntityType::ARMADILLO)
-    .scale(BABY_SCALE)
-    .with_eye_height(0.218_75);
+const BABY_DIMENSIONS: EntityDimensions =
+    pumpkin_data::entity_dimensions::ARMADILLO_BABY_DIMENSIONS;
 
 impl Mob for ArmadilloEntity {
     /// Vanilla `Armadillo.getAmbientSound`.

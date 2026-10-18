@@ -134,8 +134,7 @@ impl Animal for CowEntity {
 }
 
 /// Vanilla `Cow.BABY_DIMENSIONS`.
-const BABY_DIMENSIONS: EntityDimensions =
-    EntityDimensions::scalable(0.45, 0.7).with_eye_height(0.69);
+const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::COW_BABY_DIMENSIONS;
 
 impl Mob for CowEntity {
     /// Vanilla `AbstractCow.playStepSound`.

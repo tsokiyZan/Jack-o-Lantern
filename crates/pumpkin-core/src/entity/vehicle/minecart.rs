@@ -150,6 +150,24 @@ impl MinecartEntity {
 }
 
 impl EntityBase for MinecartEntity {
+    /// Vanilla `AbstractMinecart.getPassengerAttachmentPoint`: villagers and wandering
+    /// traders sit lower, at the cart's origin.
+    fn passenger_attachment_point(
+        &self,
+        passenger: &dyn EntityBase,
+        dimensions: pumpkin_util::math::boundingbox::EntityDimensions,
+        _scale: f32,
+    ) -> pumpkin_util::math::vector3::Vector3<f64> {
+        let kind = passenger.get_entity().entity_type;
+        if kind == &pumpkin_data::entity::EntityType::VILLAGER
+            || kind == &pumpkin_data::entity::EntityType::WANDERING_TRADER
+        {
+            return pumpkin_util::math::vector3::Vector3::new(0.0, 0.0, 0.0);
+        }
+        self.get_entity()
+            .default_passenger_attachment_point(passenger, &dimensions.attachments)
+    }
+
     /// Vanilla `MinecartTNT.causeFallDamage`: a TNT minecart that falls three blocks or more
     /// explodes.
     // TODO: the `ignitionSource` that lit the minecart.

@@ -148,8 +148,7 @@ impl Animal for PigEntity {
 }
 
 /// Vanilla `Pig.BABY_DIMENSIONS`.
-const BABY_DIMENSIONS: EntityDimensions =
-    EntityDimensions::scalable(0.45, 0.45).with_eye_height(0.406_25);
+const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::PIG_BABY_DIMENSIONS;
 
 impl Mob for PigEntity {
     /// Vanilla `Pig.playStepSound`.

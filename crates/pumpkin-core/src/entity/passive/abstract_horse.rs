@@ -33,6 +33,8 @@ pub trait AbstractHorse: Mob {
     fn set_horse_owner(&self, owner: Uuid);
     fn horse_temper(&self) -> &AtomicI32;
     fn stand_counter(&self) -> &AtomicI32;
+    /// Vanilla `standAnim` and `standAnimO`, in that order.
+    fn stand_anim(&self) -> &crossbeam::atomic::AtomicCell<[f32; 2]>;
     /// Vanilla `AbstractHorse.inventory`.
     fn horse_inventory(&self) -> &MountInventory;
 
@@ -237,7 +239,7 @@ pub trait AbstractHorse: Mob {
             .send_entity_status(entity, EntityStatus::TamingSucceeded, None);
     }
 
-    /// The standing countdown from vanilla `AbstractHorse.tick`.
+    /// The standing countdown and the rearing animation from vanilla `AbstractHorse.tick`.
     fn tick_standing(&self) {
         let counter = self.stand_counter().load(Relaxed);
         if counter > 0 {
@@ -245,6 +247,52 @@ pub trait AbstractHorse: Mob {
             if counter - 1 <= 0 {
                 self.clear_standing();
             }
+        }
+
+        let [mut stand_anim, _] = self.stand_anim().load();
+        let stand_anim_o = stand_anim;
+        if self.is_standing() {
+            stand_anim += (1.0 - stand_anim) * 0.4 + 0.05;
+            if stand_anim > 1.0 {
+                stand_anim = 1.0;
+            }
+        } else {
+            stand_anim += (0.8 * stand_anim * stand_anim * stand_anim - stand_anim) * 0.6 - 0.05;
+            if stand_anim < 0.0 {
+                stand_anim = 0.0;
+            }
+        }
+        self.stand_anim().store([stand_anim, stand_anim_o]);
+    }
+
+    /// Vanilla `AbstractHorse.getPassengerAttachmentPoint`: the default point, moved with the
+    /// rearing animation.
+    fn horse_passenger_attachment_point(
+        &self,
+        passenger: &dyn EntityBase,
+        dimensions: pumpkin_util::math::boundingbox::EntityDimensions,
+        scale: f32,
+    ) -> pumpkin_util::math::vector3::Vector3<f64> {
+        let entity = self.get_entity();
+        let stand_anim_o = f64::from(self.stand_anim().load()[1]);
+        let scale = f64::from(scale);
+        entity.default_passenger_attachment_point(passenger, &dimensions.attachments)
+            + pumpkin_util::math::vector3::Vector3::new(
+                0.0,
+                0.15 * stand_anim_o * scale,
+                -0.7 * stand_anim_o * scale,
+            )
+            .y_rot(-entity.yaw.load() * (std::f32::consts::PI / 180.0))
+    }
+
+    /// Vanilla `AbstractHorse.positionRider` (and `Chicken`'s) after placing the passenger:
+    /// a living passenger's body turns with the vehicle.
+    fn turn_rider_body(&self, passenger: &dyn EntityBase) {
+        if passenger.get_living_entity().is_some() {
+            passenger
+                .get_entity()
+                .body_yaw
+                .store(self.get_entity().body_yaw.load());
         }
     }
 }

@@ -116,6 +116,8 @@ pub struct HorseEntity {
     pub owner: AtomicCell<Option<Uuid>>,
     /// Vanilla `AbstractHorse.standCounter`.
     pub stand_counter: AtomicI32,
+    /// Vanilla `AbstractHorse.standAnim` and `standAnimO`.
+    pub stand_anim: crossbeam::atomic::AtomicCell<[f32; 2]>,
     pub inventory: MountInventory,
 }
 
@@ -137,6 +139,7 @@ impl HorseEntity {
             gallop_sound_counter: AtomicI32::new(0),
             owner: AtomicCell::new(None),
             stand_counter: AtomicI32::new(0),
+            stand_anim: crossbeam::atomic::AtomicCell::new([0.0; 2]),
             inventory: MountInventory::default(),
         };
         let mob_arc = Arc::new(horse);
@@ -237,9 +240,22 @@ impl Animal for HorseEntity {
 }
 
 /// Vanilla `Horse.BABY_DIMENSIONS`.
-const BABY_DIMENSIONS: EntityDimensions = Entity::type_dimensions(&EntityType::HORSE).scale(0.7);
+const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::HORSE_BABY_DIMENSIONS;
 
 impl Mob for HorseEntity {
+    fn mob_passenger_attachment_point(
+        &self,
+        passenger: &dyn EntityBase,
+        dimensions: pumpkin_util::math::boundingbox::EntityDimensions,
+        scale: f32,
+    ) -> pumpkin_util::math::vector3::Vector3<f64> {
+        self.horse_passenger_attachment_point(passenger, dimensions, scale)
+    }
+
+    fn mob_after_position_rider(&self, passenger: &dyn EntityBase) {
+        self.turn_rider_body(passenger);
+    }
+
     /// Vanilla `Horse.hurtArmor`.
     fn hurt_armor(&self, damage_type: pumpkin_data::damage::DamageType, damage: f32) {
         self.get_mob_entity().living_entity.do_hurt_equipment(
@@ -412,6 +428,10 @@ impl AbstractHorse for HorseEntity {
 
     fn stand_counter(&self) -> &AtomicI32 {
         &self.stand_counter
+    }
+
+    fn stand_anim(&self) -> &crossbeam::atomic::AtomicCell<[f32; 2]> {
+        &self.stand_anim
     }
 
     fn horse_inventory(&self) -> &MountInventory {

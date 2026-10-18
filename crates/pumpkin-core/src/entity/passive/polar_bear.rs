@@ -246,7 +246,7 @@ impl NeutralMob for PolarBearEntity {
 
 /// Vanilla `PolarBear.BABY_DIMENSIONS`.
 const BABY_DIMENSIONS: EntityDimensions =
-    EntityDimensions::scalable(0.7, 0.7).with_eye_height(0.343_75);
+    pumpkin_data::entity_dimensions::POLAR_BEAR_BABY_DIMENSIONS;
 
 impl Mob for PolarBearEntity {
     /// Vanilla `PolarBear.getAmbientSound`.

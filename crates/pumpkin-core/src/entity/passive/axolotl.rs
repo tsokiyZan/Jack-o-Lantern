@@ -215,8 +215,7 @@ impl Animal for AxolotlEntity {
 }
 
 /// Vanilla `Axolotl.BABY_DIMENSIONS`.
-const BABY_DIMENSIONS: EntityDimensions =
-    EntityDimensions::scalable(0.375, 0.21).with_eye_height(0.093_75);
+const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::AXOLOTL_BABY_DIMENSIONS;
 
 impl Mob for AxolotlEntity {
     /// Vanilla `Axolotl.getAmbientSound`.

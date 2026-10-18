@@ -46,11 +46,7 @@ impl ItemBehaviour for LeadItem {
             f64::from(location.0.z) + 0.5,
         );
 
-        let search_dim = EntityDimensions {
-            width: 32.0,
-            height: 32.0,
-            eye_height: 16.0,
-        };
+        let search_dim = EntityDimensions::new(32.0, 32.0, 16.0);
 
         let search_box = BoundingBox::new_from_pos(center.x, center.y, center.z, &search_dim);
 

@@ -48,7 +48,6 @@ pub mod wither;
 const WEAPON_GOAL_PRIORITY: u8 = 4;
 
 /// Vanilla `AbstractSkeleton`, shared by every skeleton type.
-// TODO: AbstractSkeleton.rideTick (body turns with a PathfinderMob vehicle) needs a rideTick hook.
 pub struct SkeletonEntityBase {
     pub mob_entity: MobEntity,
     /// Vanilla `bowGoal` and `meleeGoal`, kept here while out of the goal selector so their
@@ -340,6 +339,11 @@ fn is_abstract_piglin(target: &LivingEntity, _world: &World) -> bool {
 }
 
 impl Mob for SkeletonEntityBase {
+    /// Vanilla `rideTick`.
+    fn mob_after_ride_tick(&self) {
+        crate::entity::mob::turn_body_with_controlled_vehicle(self);
+    }
+
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
     }

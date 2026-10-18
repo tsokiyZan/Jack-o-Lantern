@@ -28,8 +28,7 @@ use crate::entity::{Entity, EntityBase};
 use crate::world::World;
 
 /// Vanilla `Zoglin.BABY_DIMENSIONS`.
-const BABY_DIMENSIONS: EntityDimensions =
-    EntityDimensions::scalable(0.75, 0.85).with_eye_height(0.625);
+const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::ZOGLIN_BABY_DIMENSIONS;
 const BABY_ATTACK_DAMAGE: f64 = 0.5;
 const ATTACK_INTERVAL: i32 = 40;
 const BABY_ATTACK_INTERVAL: i32 = 15;

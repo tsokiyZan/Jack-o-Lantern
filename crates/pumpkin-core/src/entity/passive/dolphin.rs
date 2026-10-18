@@ -231,9 +231,7 @@ impl AgeableMob for DolphinEntity {
 }
 
 /// Vanilla `Dolphin.BABY_DIMENSIONS`.
-const BABY_DIMENSIONS: EntityDimensions = Entity::type_dimensions(&EntityType::DOLPHIN)
-    .scale(0.65)
-    .with_eye_height(0.093_75);
+const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::DOLPHIN_BABY_DIMENSIONS;
 
 impl Mob for DolphinEntity {
     /// Vanilla `Dolphin.getDefaultDimensions`.

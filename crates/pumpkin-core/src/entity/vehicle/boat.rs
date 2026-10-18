@@ -52,6 +52,94 @@ impl BoatEntity {
 }
 
 impl EntityBase for BoatEntity {
+    /// Vanilla `AbstractBoat.getPassengerAttachmentPoint`: two riders sit fore and aft (an
+    /// animal a little further forward), at the boat's or raft's ride height.
+    fn passenger_attachment_point(
+        &self,
+        passenger: &dyn EntityBase,
+        dimensions: pumpkin_util::math::boundingbox::EntityDimensions,
+        _scale: f32,
+    ) -> pumpkin_util::math::vector3::Vector3<f64> {
+        let entity = self.get_entity();
+        let name = entity.entity_type.resource_name;
+        let raft = name.ends_with("_raft");
+        // `AbstractChestBoat.getSinglePassengerXOffset`.
+        let mut offset = if name.contains("chest") { 0.15f32 } else { 0.0 };
+        let passengers = entity
+            .passengers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        if passengers.len() > 1 {
+            let id = passenger.get_entity().entity_id;
+            let index = passengers
+                .iter()
+                .position(|p| p.get_entity().entity_id == id);
+            offset = if index == Some(0) { 0.2 } else { -0.6 };
+            if passenger.get_mob().is_some_and(|m| m.as_animal().is_some()) {
+                offset += 0.2;
+            }
+        }
+        // `rideHeight`: `Raft`/`ChestRaft` and `Boat`/`ChestBoat`.
+        let ride_height = if raft {
+            dimensions.height * 0.888_888_9
+        } else {
+            dimensions.height / 3.0
+        };
+        pumpkin_util::math::vector3::Vector3::new(0.0, f64::from(ride_height), f64::from(offset))
+            .y_rot(-entity.yaw.load() * (std::f32::consts::PI / 180.0))
+    }
+
+    /// Vanilla `AbstractBoat.positionRider`. Pumpkin's boats don't turn on their own
+    /// (`deltaRotation` stays 0), so only `clampRotation` is left.
+    fn position_rider(&self, caller: &dyn EntityBase, passenger: &dyn EntityBase) {
+        use pumpkin_data::tag::Taggable;
+        crate::entity::set_rider_position(caller, passenger);
+        let passenger_entity = passenger.get_entity();
+        if passenger_entity
+            .entity_type
+            .has_tag(&pumpkin_data::tag::EntityType::MINECRAFT_CAN_TURN_IN_BOATS)
+        {
+            return;
+        }
+        // `clampRotation` with `calculatePassengerBodyYRot`.
+        let entity = self.get_entity();
+        let max_passengers = if entity.entity_type.resource_name.contains("chest") {
+            1
+        } else {
+            2
+        };
+        let passenger_count = entity
+            .passengers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .len();
+        let yaw = entity.yaw.load();
+        let body_yaw = if passenger.get_mob().is_some_and(|m| m.as_animal().is_some())
+            && passenger_count == max_passengers
+        {
+            yaw + if passenger_entity.entity_id % 2 == 0 {
+                90.0
+            } else {
+                270.0
+            }
+        } else {
+            yaw
+        };
+        passenger_entity.body_yaw.store(body_yaw);
+        if let Some(mob) = passenger.get_mob() {
+            passenger_entity.yaw.store(body_yaw);
+            mob.clamp_head_rotation_to_body();
+        } else {
+            let passenger_yaw = passenger_entity.yaw.load();
+            let delta = pumpkin_util::math::wrap_degrees(passenger_yaw - body_yaw);
+            let target_delta = delta.clamp(-105.0, 105.0);
+            passenger_entity
+                .yaw
+                .store(passenger_yaw + target_delta - delta);
+        }
+    }
+
     /// Vanilla `AbstractBoat.checkFallDamage`: a boat's fall ends on the ground without
     /// landing on anything, and doesn't add up over water.
     fn check_fall_damage(

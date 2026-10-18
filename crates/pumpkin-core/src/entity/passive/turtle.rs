@@ -203,7 +203,7 @@ impl Animal for TurtleEntity {
 }
 
 /// Vanilla `Turtle.BABY_DIMENSIONS`.
-const BABY_DIMENSIONS: EntityDimensions = Entity::type_dimensions(&EntityType::TURTLE).scale(0.3);
+const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::TURTLE_BABY_DIMENSIONS;
 
 impl Mob for TurtleEntity {
     /// Vanilla `Turtle.getWalkTargetValue`.

@@ -784,9 +784,7 @@ impl Animal for FoxEntity {
 }
 
 /// Vanilla `Fox.BABY_DIMENSIONS`.
-const BABY_DIMENSIONS: EntityDimensions = Entity::type_dimensions(&EntityType::FOX)
-    .scale(0.6)
-    .with_eye_height(0.343_75);
+const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::FOX_BABY_DIMENSIONS;
 
 impl Mob for FoxEntity {
     /// Vanilla `Fox.getAmbientSound`: a fox alone at night sometimes screeches.

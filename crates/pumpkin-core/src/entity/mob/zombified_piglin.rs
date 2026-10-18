@@ -141,7 +141,7 @@ crate::impl_neutral_mob!(ZombifiedPiglinEntity, neutral_data);
 
 /// Vanilla `ZombifiedPiglin.BABY_DIMENSIONS`.
 const BABY_DIMENSIONS: EntityDimensions =
-    EntityDimensions::scalable(0.49, 0.98).with_eye_height(0.78);
+    pumpkin_data::entity_dimensions::ZOMBIFIED_PIGLIN_BABY_DIMENSIONS;
 
 impl Mob for ZombifiedPiglinEntity {
     crate::impl_zombie_mob!(zombie);

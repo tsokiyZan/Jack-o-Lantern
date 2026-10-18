@@ -165,9 +165,57 @@ impl Animal for CamelEntity {
 
 /// Vanilla `Camel.BABY_DIMENSIONS`.
 const BABY_DIMENSIONS: EntityDimensions =
-    EntityDimensions::scalable(0.95, 1.4).with_eye_height(1.38);
+    pumpkin_data::entity_dimensions::CAMEL_BABY_STANDING_DIMENSIONS;
 
 impl Mob for CamelEntity {
+    /// Vanilla `Camel.getPassengerAttachmentPoint`. Pumpkin's camel never sits, so the body
+    /// anchor is always the standing one of `getBodyAnchorAnimationYOffset`.
+    fn mob_passenger_attachment_point(
+        &self,
+        passenger: &dyn EntityBase,
+        dimensions: EntityDimensions,
+        scale: f32,
+    ) -> pumpkin_util::math::vector3::Vector3<f64> {
+        let entity = self.get_entity();
+        let passengers = entity
+            .passengers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        let index = passengers
+            .iter()
+            .position(|p| p.get_entity().entity_id == passenger.get_entity().entity_id)
+            .unwrap_or(0);
+        let driver = index == 0;
+        let mut offset = 0.5f32;
+        let age_sit_y_offset = if entity.is_baby() { 0.093_75 } else { 0.375 };
+        let height = if entity.is_removed() {
+            0.01
+        } else {
+            (f64::from(dimensions.height) - age_sit_y_offset) as f32
+        };
+        if passengers.len() > 1 {
+            if !driver {
+                offset = -0.7;
+            }
+            if passenger.get_mob().is_some_and(|m| m.as_animal().is_some()) {
+                offset += 0.2;
+            }
+        }
+        pumpkin_util::math::vector3::Vector3::new(0.0, f64::from(height), f64::from(offset * scale))
+            .y_rot(-entity.yaw.load() * (std::f32::consts::PI / 180.0))
+    }
+
+    /// Vanilla `AbstractHorse.positionRider`, which the camel inherits.
+    fn mob_after_position_rider(&self, passenger: &dyn EntityBase) {
+        if passenger.get_living_entity().is_some() {
+            passenger
+                .get_entity()
+                .body_yaw
+                .store(self.get_entity().body_yaw.load());
+        }
+    }
+
     /// Vanilla `Camel.playStepSound`.
     fn play_step_sound(
         &self,

@@ -1896,8 +1896,7 @@ impl VillagerEntity {
 }
 
 /// Vanilla `Villager.BABY_DIMENSIONS`.
-const BABY_DIMENSIONS: EntityDimensions =
-    EntityDimensions::scalable(0.49, 0.98).with_eye_height(0.63);
+const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::VILLAGER_BABY_DIMENSIONS;
 
 impl Mob for VillagerEntity {
     /// Vanilla `Villager.getAmbientSound`.

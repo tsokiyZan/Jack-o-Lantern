@@ -171,8 +171,7 @@ impl Animal for StriderEntity {
 }
 
 /// Vanilla `Strider.BABY_DIMENSIONS`.
-const BABY_DIMENSIONS: EntityDimensions =
-    EntityDimensions::scalable(0.45, 0.85).with_eye_height(0.4375);
+const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::STRIDER_BABY_DIMENSIONS;
 
 impl Mob for StriderEntity {
     /// Vanilla `Strider.checkFallDamage`: lava ends a fall.

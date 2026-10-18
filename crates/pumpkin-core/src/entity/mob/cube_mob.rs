@@ -389,6 +389,21 @@ impl AgeableMob for CubeMobEntity {
 }
 
 impl Mob for CubeMobEntity {
+    /// Vanilla `AbstractCubeMob.getPassengerAttachmentPoint`: on top, sunk in by its size.
+    fn mob_passenger_attachment_point(
+        &self,
+        _passenger: &dyn EntityBase,
+        dimensions: EntityDimensions,
+        scale: f32,
+    ) -> pumpkin_util::math::vector3::Vector3<f64> {
+        pumpkin_util::math::vector3::Vector3::new(
+            0.0,
+            f64::from(dimensions.height)
+                - 0.015_625 * f64::from(self.get_size()) * f64::from(scale),
+            0.0,
+        )
+    }
+
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
     }

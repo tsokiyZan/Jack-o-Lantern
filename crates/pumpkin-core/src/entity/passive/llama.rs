@@ -99,6 +99,8 @@ pub struct LlamaEntity {
     pub owner: AtomicCell<Option<Uuid>>,
     /// Vanilla `AbstractHorse.standCounter`.
     pub stand_counter: AtomicI32,
+    /// Vanilla `AbstractHorse.standAnim` and `standAnimO`.
+    pub stand_anim: crossbeam::atomic::AtomicCell<[f32; 2]>,
     pub inventory: MountInventory,
     pub caravan: CaravanData,
     /// Vanilla `Llama.didSpit`: ends the retaliation after a spit.
@@ -126,6 +128,7 @@ impl LlamaEntity {
             temper: AtomicI32::new(0),
             owner: AtomicCell::new(None),
             stand_counter: AtomicI32::new(0),
+            stand_anim: crossbeam::atomic::AtomicCell::new([0.0; 2]),
             inventory: MountInventory::default(),
             did_spit: AtomicBool::new(false),
             caravan: CaravanData::default(),
@@ -321,9 +324,13 @@ impl Animal for LlamaEntity {
 }
 
 /// Vanilla `Llama.BABY_DIMENSIONS`.
-const BABY_DIMENSIONS: EntityDimensions = Entity::type_dimensions(&EntityType::LLAMA).scale(0.5);
+const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::LLAMA_BABY_DIMENSIONS;
 
 impl Mob for LlamaEntity {
+    fn mob_after_position_rider(&self, passenger: &dyn EntityBase) {
+        self.turn_rider_body(passenger);
+    }
+
     fn as_abstract_horse(&self) -> Option<&dyn AbstractHorse> {
         Some(self)
     }
@@ -500,6 +507,10 @@ impl AbstractHorse for LlamaEntity {
 
     fn stand_counter(&self) -> &AtomicI32 {
         &self.stand_counter
+    }
+
+    fn stand_anim(&self) -> &crossbeam::atomic::AtomicCell<[f32; 2]> {
+        &self.stand_anim
     }
 
     fn horse_inventory(&self) -> &MountInventory {

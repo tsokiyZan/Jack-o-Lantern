@@ -3,7 +3,7 @@ use std::sync::{
     atomic::{AtomicI32, Ordering},
 };
 
-use pumpkin_data::entity::{EntityPose, EntityStatus, EntityType};
+use pumpkin_data::entity::{EntityPose, EntityStatus};
 use pumpkin_data::game_event::GameEvent;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
@@ -38,8 +38,6 @@ use super::sniffer_ai;
 const SNIFFER_BABY_START_AGE: i32 = -48000;
 /// Vanilla `Sniffer.DIGGING_DROP_SEED_OFFSET_TICKS`.
 const DIGGING_DROP_SEED_OFFSET_TICKS: i32 = 120;
-/// Vanilla `Sniffer.DIGGING_BB_HEIGHT_OFFSET`.
-const DIGGING_BB_HEIGHT_OFFSET: f32 = 0.4;
 /// Vanilla `Sniffer.getMaxHeadYRot`.
 const MAX_HEAD_Y_ROT: f32 = 50.0;
 /// Vanilla `BuiltInLootTables.SNIFFER_DIGGING`.
@@ -413,11 +411,8 @@ impl Animal for SnifferEntity {
 }
 
 /// Vanilla `Sniffer.DIGGING_DIMENSIONS`.
-const DIGGING_DIMENSIONS: EntityDimensions = EntityDimensions::scalable(
-    EntityType::SNIFFER.dimension[0],
-    EntityType::SNIFFER.dimension[1] - DIGGING_BB_HEIGHT_OFFSET,
-)
-.with_eye_height(0.81);
+const DIGGING_DIMENSIONS: EntityDimensions =
+    pumpkin_data::entity_dimensions::SNIFFER_DIGGING_DIMENSIONS;
 
 impl Mob for SnifferEntity {
     /// Vanilla `Sniffer.getAmbientSound`.

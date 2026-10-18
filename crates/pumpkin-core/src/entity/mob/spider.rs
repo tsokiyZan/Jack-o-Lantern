@@ -163,6 +163,26 @@ pub fn finalize_spider_spawn(
 }
 
 impl Mob for SpiderEntity {
+    /// Vanilla `getVehicleAttachmentPoint`: low on a vehicle no wider than itself.
+    fn mob_vehicle_attachment_point(
+        &self,
+        vehicle: &dyn EntityBase,
+    ) -> pumpkin_util::math::vector3::Vector3<f64> {
+        let entity = self.get_entity();
+        if vehicle.get_entity().entity_dimension.load().width
+            <= entity.entity_dimension.load().width
+        {
+            let scale = self.get_mob_entity().living_entity.get_scale();
+            pumpkin_util::math::vector3::Vector3::new(0.0, 0.3125 * f64::from(scale), 0.0)
+        } else {
+            entity
+                .entity_dimension
+                .load()
+                .attachments
+                .vehicle(entity.yaw.load())
+        }
+    }
+
     fn finalize_spawn(
         &self,
         world: &Arc<World>,

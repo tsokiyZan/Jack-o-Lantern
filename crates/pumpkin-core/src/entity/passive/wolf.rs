@@ -228,8 +228,7 @@ impl NeutralMob for WolfEntity {
 }
 
 /// Vanilla `Wolf.BABY_DIMENSIONS`.
-const BABY_DIMENSIONS: EntityDimensions =
-    EntityDimensions::scalable(0.3, 0.425).with_eye_height(0.343_75);
+const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::WOLF_BABY_DIMENSIONS;
 
 impl Mob for WolfEntity {
     /// Vanilla `Wolf.actuallyHurt`: wolf armour takes the whole hit as durability, and cracks

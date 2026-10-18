@@ -150,7 +150,7 @@ impl Animal for MooshroomEntity {
 
 /// Vanilla `MushroomCow.BABY_DIMENSIONS`.
 const BABY_DIMENSIONS: EntityDimensions =
-    EntityDimensions::scalable(0.45, 0.7).with_eye_height(0.69);
+    pumpkin_data::entity_dimensions::MUSHROOM_COW_BABY_DIMENSIONS;
 
 impl Mob for MooshroomEntity {
     /// Vanilla `MushroomCow.getWalkTargetValue`.

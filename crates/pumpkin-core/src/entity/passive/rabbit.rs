@@ -390,8 +390,7 @@ impl Animal for RabbitEntity {
 }
 
 /// Vanilla `Rabbit.BABY_DIMENSIONS`.
-const BABY_DIMENSIONS: EntityDimensions =
-    EntityDimensions::scalable(0.24, 0.4).with_eye_height(0.39);
+const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::RABBIT_BABY_DIMENSIONS;
 
 impl Mob for RabbitEntity {
     /// Vanilla `Rabbit.getDefaultDimensions`.

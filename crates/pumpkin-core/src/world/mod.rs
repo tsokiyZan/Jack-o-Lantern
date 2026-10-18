@@ -321,6 +321,9 @@ impl PartialEq for World {
 
 impl Eq for World {}
 
+/// A player as the entity tick sees it for collisions: position, inflated box and chunk.
+type PlayerCollisionEntry<'a> = (&'a Arc<Player>, Vector3<f64>, BoundingBox, Vector2<i32>);
+
 impl World {
     const TAB_LIST_ADD_FLAGS: u8 = PlayerInfoFlags::ADD_PLAYER.bits()
         | PlayerInfoFlags::UPDATE_LISTED.bits()
@@ -1721,6 +1724,13 @@ impl World {
             player.get_entity().tick_count.fetch_add(1, Relaxed);
             player.tick(server);
         });
+        // A player's passengers tick with it, as with any other vehicle.
+        for player in players.iter() {
+            if player.get_entity().has_passengers() {
+                let vehicle: Arc<dyn EntityBase> = player.clone();
+                Self::tick_passengers(&vehicle, server.as_ref(), &players_cache);
+            }
+        }
         let player_elapsed = t_players.elapsed();
 
         let entities_to_tick = self.entities.load();
@@ -1758,25 +1768,28 @@ impl World {
                 let _guard = entity_handle.enter();
 
                 for (entity, entity_chunk) in batch {
+                    // Vanilla `ServerLevel.tick`: a passenger ticks with its vehicle, unless the
+                    // vehicle is gone or no longer carries it.
+                    let vehicle = entity
+                        .get_entity()
+                        .vehicle
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner)
+                        .clone();
+                    if let Some(vehicle) = vehicle {
+                        let vehicle = vehicle.get_entity();
+                        let id = entity.get_entity().entity_id;
+                        if !vehicle.is_removed() && vehicle.has_passenger(id) {
+                            continue;
+                        }
+                        vehicle.remove_passenger(id);
+                    }
+
+                    // `tickNonPassenger`.
                     entity.get_entity().tick_count.fetch_add(1, Relaxed);
                     entity.tick(entity.as_ref(), server_ref);
-
-                    let entity_inner = entity.get_entity();
-                    let entity_pos = entity_inner.pos.load();
-                    let entity_bb = entity_inner.bounding_box.load();
-
-                    for (player, player_pos, player_bb, player_chunk) in &players_cache {
-                        if (player_chunk.x - entity_chunk.x).abs() <= 1
-                            && (player_chunk.y - entity_chunk.y).abs() <= 1
-                            && (player_pos.x - entity_pos.x).abs() < 5.0
-                            && (player_pos.y - entity_pos.y).abs() < 5.0
-                            && (player_pos.z - entity_pos.z).abs() < 5.0
-                            && player_bb.intersects(&entity_bb)
-                        {
-                            entity.on_player_collision(player);
-                            break;
-                        }
-                    }
+                    Self::touch_players(entity.as_ref(), *entity_chunk, &players_cache);
+                    Self::tick_passengers(entity, server_ref, &players_cache);
                 }
             });
         let entity_elapsed = t_entities.elapsed();
@@ -5128,6 +5141,102 @@ impl World {
             }
         }
         removed_player
+    }
+
+    /// The players `entity` touches after its tick.
+    fn touch_players(
+        entity: &dyn EntityBase,
+        entity_chunk: Vector2<i32>,
+        players: &[PlayerCollisionEntry<'_>],
+    ) {
+        let entity_inner = entity.get_entity();
+        let entity_pos = entity_inner.pos.load();
+        let entity_bb = entity_inner.bounding_box.load();
+        for (player, player_pos, player_bb, player_chunk) in players {
+            if (player_chunk.x - entity_chunk.x).abs() <= 1
+                && (player_chunk.y - entity_chunk.y).abs() <= 1
+                && (player_pos.x - entity_pos.x).abs() < 5.0
+                && (player_pos.y - entity_pos.y).abs() < 5.0
+                && (player_pos.z - entity_pos.z).abs() < 5.0
+                && player_bb.intersects(&entity_bb)
+            {
+                entity.on_player_collision(player);
+                break;
+            }
+        }
+    }
+
+    /// The passenger loop of vanilla `ServerLevel.tickNonPassenger`.
+    fn tick_passengers(
+        vehicle: &Arc<dyn EntityBase>,
+        server: &Server,
+        players: &[PlayerCollisionEntry<'_>],
+    ) {
+        let passengers = vehicle
+            .get_entity()
+            .passengers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        for passenger in &passengers {
+            Self::tick_passenger(vehicle, passenger, server, players);
+        }
+    }
+
+    /// Vanilla `ServerLevel.tickPassenger` with `Entity.rideTick` and `LivingEntity.rideTick`.
+    /// A player has already ticked with the players, so it is only positioned.
+    fn tick_passenger(
+        vehicle: &Arc<dyn EntityBase>,
+        passenger: &Arc<dyn EntityBase>,
+        server: &Server,
+        players: &[PlayerCollisionEntry<'_>],
+    ) {
+        let entity = passenger.get_entity();
+        let vehicle_id = vehicle.get_entity().entity_id;
+        let rides_vehicle = |entity: &crate::entity::Entity| {
+            entity
+                .vehicle
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .as_ref()
+                .is_some_and(|v| v.get_entity().entity_id == vehicle_id)
+        };
+        if entity.is_removed() || !rides_vehicle(entity) {
+            // `stopRiding`.
+            let own_vehicle = entity
+                .vehicle
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .clone();
+            if let Some(own_vehicle) = own_vehicle {
+                own_vehicle.get_entity().remove_passenger(entity.entity_id);
+            }
+            return;
+        }
+        // `commonTick` and `rideTick`.
+        if passenger.get_player().is_none() {
+            entity.tick_count.fetch_add(1, Relaxed);
+            entity.velocity.store(Vector3::default());
+            passenger.tick(passenger.as_ref(), server);
+        }
+        if rides_vehicle(entity) && vehicle.get_entity().has_passenger(entity.entity_id) {
+            vehicle.position_rider(vehicle.as_ref(), passenger.as_ref());
+        }
+        if passenger.get_living_entity().is_some() {
+            entity.reset_fall_distance();
+        }
+        if let Some(mob) = passenger.get_mob() {
+            mob.mob_after_ride_tick();
+        }
+        if passenger.get_player().is_none() {
+            let pos = entity.pos.load();
+            let chunk = Vector2::new(
+                get_section_cord(pos.x.floor() as i32),
+                get_section_cord(pos.z.floor() as i32),
+            );
+            Self::touch_players(passenger.as_ref(), chunk, players);
+        }
+        Self::tick_passengers(passenger, server, players);
     }
 
     #[expect(clippy::needless_pass_by_value)]

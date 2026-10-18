@@ -49,7 +49,7 @@ use pumpkin_protocol::{
 };
 use pumpkin_util::math::vector3::Axis;
 use pumpkin_util::math::{
-    boundingbox::{BoundingBox, EntityDimensions},
+    boundingbox::{AttachmentPoints, BoundingBox, EntityAttachments, EntityDimensions},
     get_section_cord, pack_degrees,
     position::BlockPos,
     vector2::Vector2,
@@ -570,6 +570,33 @@ pub trait EntityBase: Send + Sync + std::any::Any {
     /// Vanilla `Entity.getControllingPassenger`.
     fn controlling_passenger(&self) -> Option<Arc<dyn EntityBase>> {
         None
+    }
+
+    /// Vanilla `Entity.getVehicleAttachmentPoint`: the point of this entity that sits on
+    /// `vehicle`'s passenger point.
+    fn vehicle_attachment_point(&self, _vehicle: &dyn EntityBase) -> Vector3<f64> {
+        let entity = self.get_entity();
+        entity
+            .entity_dimension
+            .load()
+            .attachments
+            .vehicle(entity.yaw.load())
+    }
+
+    /// Vanilla `Entity.getPassengerAttachmentPoint`.
+    fn passenger_attachment_point(
+        &self,
+        passenger: &dyn EntityBase,
+        dimensions: EntityDimensions,
+        _scale: f32,
+    ) -> Vector3<f64> {
+        self.get_entity()
+            .default_passenger_attachment_point(passenger, &dimensions.attachments)
+    }
+
+    /// Vanilla `Entity.positionRider(passenger, Entity::setPos)`; `caller` is this entity.
+    fn position_rider(&self, caller: &dyn EntityBase, passenger: &dyn EntityBase) {
+        set_rider_position(caller, passenger);
     }
 
     /// Vanilla `Entity.isClientAuthoritative`: a client moves this entity, because it is a
@@ -1527,14 +1554,37 @@ impl Entity {
         metadata
     }
 
+    /// Vanilla `Entity.getDefaultPassengerAttachmentPoint`: the passenger point for the
+    /// passenger's place on this vehicle (the last point for any later place).
+    #[must_use]
+    pub fn default_passenger_attachment_point(
+        &self,
+        passenger: &dyn EntityBase,
+        attachments: &EntityAttachments,
+    ) -> Vector3<f64> {
+        let id = passenger.get_entity().entity_id;
+        let index = self
+            .passengers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .iter()
+            .position(|p| p.get_entity().entity_id == id)
+            .unwrap_or(0);
+        attachments.passenger_clamped(index, self.yaw.load())
+    }
+
     /// The type's default size, vanilla `EntityType.getDimensions`.
     #[must_use]
     pub const fn type_dimensions(entity_type: &EntityType) -> EntityDimensions {
-        EntityDimensions {
-            width: entity_type.dimension[0],
-            height: entity_type.dimension[1],
-            eye_height: entity_type.eye_height,
-        }
+        EntityDimensions::new(
+            entity_type.dimension[0],
+            entity_type.dimension[1],
+            entity_type.eye_height,
+        )
+        .with_attachments(
+            AttachmentPoints::Points(entity_type.passenger_attachments),
+            AttachmentPoints::Points(entity_type.vehicle_attachments),
+        )
     }
 
     /// Stores the baby age (see [`Self::age`]) without `AgeableMob.setAge`'s side effects.
@@ -1647,17 +1697,19 @@ impl Entity {
 
     #[must_use]
     pub fn get_dimensions(&self, pose: EntityPose) -> EntityDimensions {
+        use pumpkin_data::entity_dimensions as dims;
         if pose == EntityPose::Sleeping {
-            return EntityDimensions::new(0.2, 0.2, 0.2);
+            return dims::LIVING_ENTITY_SLEEPING_DIMENSIONS;
         }
         if self.entity_type == &EntityType::PLAYER {
+            // Vanilla `Avatar.POSES`.
             match pose {
-                EntityPose::FallFlying | EntityPose::Swimming | EntityPose::SpinAttack => {
-                    return EntityDimensions::new(0.6, 0.6, 0.4);
-                }
-                EntityPose::Crouching => return EntityDimensions::new(0.6, 1.5, 1.27),
-                EntityPose::Dying => return EntityDimensions::new(0.2, 0.2, 1.62),
-                _ => {}
+                EntityPose::FallFlying => return dims::AVATAR_POSES_FALL_FLYING,
+                EntityPose::Swimming => return dims::AVATAR_POSES_SWIMMING,
+                EntityPose::SpinAttack => return dims::AVATAR_POSES_SPIN_ATTACK,
+                EntityPose::Crouching => return dims::AVATAR_POSES_CROUCHING,
+                EntityPose::Dying => return dims::AVATAR_POSES_DYING,
+                _ => return dims::AVATAR_POSES_STANDING,
             }
         }
         Self::type_dimensions(self.entity_type)
@@ -4921,8 +4973,25 @@ impl Entity {
 }
 
 impl Entity {
+    /// The `Pos` vanilla `saveWithoutId` writes: a passenger is saved over its vehicle, at its
+    /// own height.
+    fn saved_position(&self) -> Vector3<f64> {
+        let mut position = self.pos.load();
+        if let Some(vehicle) = self
+            .vehicle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .as_ref()
+        {
+            let vehicle_pos = vehicle.get_entity().pos.load();
+            position.x = vehicle_pos.x;
+            position.z = vehicle_pos.z;
+        }
+        position
+    }
+
     pub fn write_nbt(&self, nbt: &mut NbtCompound) {
-        let position = self.pos.load();
+        let position = self.saved_position();
         nbt.put_string(
             "id",
             format!("minecraft:{}", self.entity_type.resource_name),
@@ -5303,4 +5372,39 @@ mod tests {
             );
         }
     }
+}
+
+/// Vanilla `LivingEntity.getPassengerRidingPosition`, or plain `Entity`'s for a vehicle that
+/// isn't living.
+///
+/// The vehicle's position plus its passenger point, measured at its current size for its
+/// pose and given its size and age scale.
+#[must_use]
+pub fn passenger_riding_position(
+    vehicle: &dyn EntityBase,
+    passenger: &dyn EntityBase,
+) -> Vector3<f64> {
+    let entity = vehicle.get_entity();
+    let (dimensions, scale) = vehicle.get_living_entity().map_or_else(
+        || (entity.entity_dimension.load(), 1.0),
+        |living| {
+            let age_scale = vehicle.get_mob().map_or_else(
+                || if entity.is_baby() { 0.5 } else { 1.0 },
+                mob::Mob::age_scale,
+            );
+            (
+                vehicle.dimensions_for_pose(entity.pose.load()),
+                living.get_scale() * age_scale,
+            )
+        },
+    );
+    entity.pos.load() + vehicle.passenger_attachment_point(passenger, dimensions, scale)
+}
+
+/// The body of vanilla `Entity.positionRider`: the passenger's vehicle point onto the
+/// vehicle's passenger point.
+pub fn set_rider_position(vehicle: &dyn EntityBase, passenger: &dyn EntityBase) {
+    let position = passenger_riding_position(vehicle, passenger);
+    let offset = passenger.vehicle_attachment_point(vehicle);
+    passenger.get_entity().set_pos(position - offset);
 }

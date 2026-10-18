@@ -11,7 +11,6 @@ use std::sync::{
 use crossbeam::atomic::AtomicCell;
 use pumpkin_data::data_component_impl::EquipmentSlot;
 use pumpkin_data::entity::EntityPose;
-use pumpkin_data::entity::EntityType;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::Sound;
@@ -43,6 +42,8 @@ pub struct ZombieHorseEntity {
     pub owner: AtomicCell<Option<Uuid>>,
     /// Vanilla `AbstractHorse.standCounter`.
     pub stand_counter: AtomicI32,
+    /// Vanilla `AbstractHorse.standAnim` and `standAnimO`.
+    pub stand_anim: crossbeam::atomic::AtomicCell<[f32; 2]>,
     pub inventory: MountInventory,
 }
 
@@ -58,6 +59,7 @@ impl ZombieHorseEntity {
             gallop_sound_counter: AtomicI32::new(0),
             owner: AtomicCell::new(None),
             stand_counter: AtomicI32::new(0),
+            stand_anim: crossbeam::atomic::AtomicCell::new([0.0; 2]),
             inventory: MountInventory::default(),
         };
         let mob_arc = Arc::new(horse);
@@ -125,9 +127,22 @@ impl Animal for ZombieHorseEntity {
 
 /// Vanilla `ZombieHorse.BABY_DIMENSIONS`.
 const BABY_DIMENSIONS: EntityDimensions =
-    Entity::type_dimensions(&EntityType::ZOMBIE_HORSE).scale(0.7);
+    pumpkin_data::entity_dimensions::ZOMBIE_HORSE_BABY_DIMENSIONS;
 
 impl Mob for ZombieHorseEntity {
+    fn mob_passenger_attachment_point(
+        &self,
+        passenger: &dyn EntityBase,
+        dimensions: pumpkin_util::math::boundingbox::EntityDimensions,
+        scale: f32,
+    ) -> pumpkin_util::math::vector3::Vector3<f64> {
+        self.horse_passenger_attachment_point(passenger, dimensions, scale)
+    }
+
+    fn mob_after_position_rider(&self, passenger: &dyn EntityBase) {
+        self.turn_rider_body(passenger);
+    }
+
     fn as_abstract_horse(&self) -> Option<&dyn AbstractHorse> {
         Some(self)
     }
@@ -296,6 +311,10 @@ impl AbstractHorse for ZombieHorseEntity {
 
     fn stand_counter(&self) -> &AtomicI32 {
         &self.stand_counter
+    }
+
+    fn stand_anim(&self) -> &crossbeam::atomic::AtomicCell<[f32; 2]> {
+        &self.stand_anim
     }
 
     fn horse_inventory(&self) -> &MountInventory {

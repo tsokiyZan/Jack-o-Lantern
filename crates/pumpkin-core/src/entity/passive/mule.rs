@@ -17,7 +17,7 @@ use pumpkin_data::sound::Sound;
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_data::tracked_data::{self, TrackedData};
 use pumpkin_nbt::compound::NbtCompound;
-use pumpkin_util::math::boundingbox::EntityDimensions;
+use pumpkin_util::math::boundingbox::{AttachmentPoints, EntityDimensions};
 use uuid::Uuid;
 
 use crate::entity::{
@@ -50,6 +50,8 @@ pub struct MuleEntity {
     pub owner: AtomicCell<Option<Uuid>>,
     /// Vanilla `AbstractHorse.standCounter`.
     pub stand_counter: AtomicI32,
+    /// Vanilla `AbstractHorse.standAnim` and `standAnimO`.
+    pub stand_anim: crossbeam::atomic::AtomicCell<[f32; 2]>,
     pub inventory: MountInventory,
 }
 
@@ -65,6 +67,7 @@ impl MuleEntity {
             temper: AtomicI32::new(0),
             owner: AtomicCell::new(None),
             stand_counter: AtomicI32::new(0),
+            stand_anim: crossbeam::atomic::AtomicCell::new([0.0; 2]),
             inventory: MountInventory::default(),
         };
         let mob_arc = Arc::new(mule);
@@ -137,9 +140,32 @@ impl Animal for MuleEntity {
 }
 
 /// Vanilla `AbstractChestedHorse.babyDimensions`.
-const BABY_DIMENSIONS: EntityDimensions = Entity::type_dimensions(&EntityType::MULE).scale(0.5);
+// Vanilla `AbstractChestedHorse`'s constructor: one passenger point over the back, then half size.
+const BABY_DIMENSIONS: EntityDimensions = Entity::type_dimensions(&EntityType::MULE)
+    .with_attachments(
+        AttachmentPoints::Points(&[[
+            0.0,
+            (EntityType::MULE.dimension[1] + 0.031_25) as f64,
+            -0.3125,
+        ]]),
+        AttachmentPoints::AtFeet,
+    )
+    .scale(0.5);
 
 impl Mob for MuleEntity {
+    fn mob_passenger_attachment_point(
+        &self,
+        passenger: &dyn EntityBase,
+        dimensions: pumpkin_util::math::boundingbox::EntityDimensions,
+        scale: f32,
+    ) -> pumpkin_util::math::vector3::Vector3<f64> {
+        self.horse_passenger_attachment_point(passenger, dimensions, scale)
+    }
+
+    fn mob_after_position_rider(&self, passenger: &dyn EntityBase) {
+        self.turn_rider_body(passenger);
+    }
+
     fn as_abstract_horse(&self) -> Option<&dyn AbstractHorse> {
         Some(self)
     }
@@ -291,6 +317,10 @@ impl AbstractHorse for MuleEntity {
 
     fn stand_counter(&self) -> &AtomicI32 {
         &self.stand_counter
+    }
+
+    fn stand_anim(&self) -> &crossbeam::atomic::AtomicCell<[f32; 2]> {
+        &self.stand_anim
     }
 
     fn horse_inventory(&self) -> &MountInventory {

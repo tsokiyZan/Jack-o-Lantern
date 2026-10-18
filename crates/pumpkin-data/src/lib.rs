@@ -169,6 +169,11 @@ pub mod entity_status;
 #[path = "generated/entity_type.rs"]
 mod entity_type;
 
+#[cfg(feature = "entity_type")]
+#[rustfmt::skip]
+#[path = "generated/entity_dimensions.rs"]
+pub mod entity_dimensions;
+
 #[cfg(feature = "spawn_egg")]
 #[rustfmt::skip]
 #[path = "generated/spawn_egg.rs"]

@@ -85,7 +85,7 @@ const FEED_DEFAULT_HEAL: f32 = 1.0;
 /// One taming attempt in this many succeeds, as `random.nextInt(3) == 0`.
 const TAMING_CHANCE_BOUND: u32 = 3;
 /// Vanilla `Nautilus.BABY_DIMENSIONS`. Pumpkin has no passenger attachment points.
-const BABY_DIMENSIONS: EntityDimensions = Entity::type_dimensions(&EntityType::NAUTILUS).scale(0.5);
+const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::NAUTILUS_BABY_DIMENSIONS;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum NautilusKind {

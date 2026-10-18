@@ -28,8 +28,7 @@ use crate::entity::{Entity, EntityBase};
 use crate::world::World;
 
 /// Vanilla `Squid.BABY_DIMENSIONS`.
-const BABY_DIMENSIONS: EntityDimensions =
-    EntityDimensions::scalable(0.5, 0.5).with_eye_height(0.37);
+const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::SQUID_BABY_DIMENSIONS;
 
 pub struct SquidEntity {
     pub mob_entity: MobEntity,

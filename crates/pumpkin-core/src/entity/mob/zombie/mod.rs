@@ -58,7 +58,7 @@ pub struct ZombieEntityBase {
 
 /// Vanilla `Zombie.BABY_DIMENSIONS`.
 pub const BABY_DIMENSIONS: EntityDimensions =
-    EntityDimensions::scalable(0.49, 0.98).with_eye_height(0.775);
+    pumpkin_data::entity_dimensions::ZOMBIE_BABY_DIMENSIONS;
 
 /// Vanilla `Zombie.REINFORCEMENT_CALLER_CHARGE_ID`.
 const REINFORCEMENT_CALLER_CHARGE_ID: &str = "minecraft:reinforcement_caller_charge";

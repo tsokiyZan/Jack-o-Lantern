@@ -46,11 +46,8 @@ impl PiglinEntity {
     /// `CrossbowItem.getDefaultProjectileRange`.
     const CROSSBOW_PROJECTILE_RANGE: i32 = 8;
 
-    pub const BABY_DIMENSIONS: EntityDimensions = EntityDimensions {
-        width: 0.49,
-        height: 0.98,
-        eye_height: 0.78,
-    };
+    pub const BABY_DIMENSIONS: EntityDimensions =
+        pumpkin_data::entity_dimensions::PIGLIN_BABY_DIMENSIONS;
 
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);

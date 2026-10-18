@@ -30,6 +30,11 @@ impl WitherSkeletonEntity {
 }
 
 impl Mob for WitherSkeletonEntity {
+    /// Vanilla `rideTick`.
+    fn mob_after_ride_tick(&self) {
+        crate::entity::mob::turn_body_with_controlled_vehicle(self);
+    }
+
     fn get_mob_entity(&self) -> &MobEntity {
         &self.entity.mob_entity
     }

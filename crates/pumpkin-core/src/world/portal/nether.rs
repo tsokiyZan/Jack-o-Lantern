@@ -899,11 +899,7 @@ mod tests {
             width: 2,
             height: 3,
         };
-        let dimensions = EntityDimensions {
-            width: 0.6,
-            height: 1.8,
-            eye_height: 1.62,
-        };
+        let dimensions = EntityDimensions::new(0.6, 1.8, 1.62);
 
         // Player is at the center of the source portal
         let player_pos = src_portal.get_teleport_position();
@@ -930,11 +926,7 @@ mod tests {
             width: 2,
             height: 3,
         };
-        let dimensions = EntityDimensions {
-            width: 0.6,
-            height: 1.8,
-            eye_height: 1.62,
-        };
+        let dimensions = EntityDimensions::new(0.6, 1.8, 1.62);
 
         // Player is at the center of the source X portal
         let player_pos = src_portal.get_teleport_position();

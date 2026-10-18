@@ -295,9 +295,8 @@ impl Animal for HappyGhastEntity {
 }
 
 /// Vanilla `HappyGhast.BABY_DIMENSIONS`.
-const BABY_DIMENSIONS: EntityDimensions = Entity::type_dimensions(&EntityType::HAPPY_GHAST)
-    .scale(0.2375)
-    .with_eye_height(0.468_75);
+const BABY_DIMENSIONS: EntityDimensions =
+    pumpkin_data::entity_dimensions::HAPPY_GHAST_BABY_DIMENSIONS;
 
 impl Mob for HappyGhastEntity {
     /// Vanilla `HappyGhast.getWalkTargetValue`: open air just above the ground is best.

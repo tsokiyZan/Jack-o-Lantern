@@ -153,8 +153,7 @@ impl Animal for OcelotEntity {
 }
 
 /// Vanilla `Ocelot.BABY_DIMENSIONS`.
-const BABY_DIMENSIONS: EntityDimensions =
-    EntityDimensions::scalable(0.3, 0.35).with_eye_height(0.343_75);
+const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::OCELOT_BABY_DIMENSIONS;
 
 impl Mob for OcelotEntity {
     /// Vanilla `Ocelot.getDefaultDimensions`.

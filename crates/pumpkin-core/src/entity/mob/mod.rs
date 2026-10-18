@@ -1846,6 +1846,33 @@ pub trait Mob: EntityBase + Send + Sync {
         None
     }
 
+    /// A vanilla `getPassengerAttachmentPoint` override.
+    fn mob_passenger_attachment_point(
+        &self,
+        passenger: &dyn EntityBase,
+        dimensions: EntityDimensions,
+        _scale: f32,
+    ) -> Vector3<f64> {
+        self.get_entity()
+            .default_passenger_attachment_point(passenger, &dimensions.attachments)
+    }
+
+    /// A vanilla `getVehicleAttachmentPoint` override.
+    fn mob_vehicle_attachment_point(&self, _vehicle: &dyn EntityBase) -> Vector3<f64> {
+        let entity = self.get_entity();
+        entity
+            .entity_dimension
+            .load()
+            .attachments
+            .vehicle(entity.yaw.load())
+    }
+
+    /// What a vanilla `positionRider` override does after placing the passenger.
+    fn mob_after_position_rider(&self, _passenger: &dyn EntityBase) {}
+
+    /// What a vanilla `rideTick` override does after `LivingEntity.rideTick`.
+    fn mob_after_ride_tick(&self) {}
+
     /// A vanilla `checkFallDamage` override. Flyers such as the phantom don't add up falls.
     fn mob_check_fall_damage(
         &self,
@@ -2708,6 +2735,24 @@ impl<T: Mob + Send + 'static> EntityBase for T {
         self.get_controlling_passenger()
     }
 
+    fn passenger_attachment_point(
+        &self,
+        passenger: &dyn EntityBase,
+        dimensions: EntityDimensions,
+        scale: f32,
+    ) -> Vector3<f64> {
+        self.mob_passenger_attachment_point(passenger, dimensions, scale)
+    }
+
+    fn vehicle_attachment_point(&self, vehicle: &dyn EntityBase) -> Vector3<f64> {
+        self.mob_vehicle_attachment_point(vehicle)
+    }
+
+    fn position_rider(&self, caller: &dyn EntityBase, passenger: &dyn EntityBase) {
+        crate::entity::set_rider_position(caller, passenger);
+        self.mob_after_position_rider(passenger);
+    }
+
     fn is_pushed_by_fluids(&self) -> bool {
         self.mob_is_pushed_by_fluids()
     }
@@ -3058,5 +3103,39 @@ pub trait RangedAttackMob: Mob + Send + Sync {
     /// Vanilla `RangedAttackMob.rangedAttackUncertainty`.
     fn ranged_attack_uncertainty(&self, world: &World) -> f32 {
         (14 - world.level_info.load().difficulty as i32 * 4) as f32
+    }
+}
+
+/// Vanilla `instanceof PathfinderMob`: every mob but the bat, the phantom, the ghast and the
+/// ender dragon.
+#[must_use]
+pub fn is_pathfinder_mob(entity: &dyn EntityBase) -> bool {
+    use pumpkin_data::entity::EntityType;
+    entity.get_mob().is_some()
+        && ![
+            &EntityType::BAT,
+            &EntityType::PHANTOM,
+            &EntityType::GHAST,
+            &EntityType::ENDER_DRAGON,
+        ]
+        .contains(&entity.get_entity().entity_type)
+}
+
+/// The `rideTick` of vanilla `AbstractSkeleton` and `Drowned`: the body turns with a
+/// pathfinding vehicle this mob steers (`getControlledVehicle`).
+pub fn turn_body_with_controlled_vehicle(mob: &dyn Mob) {
+    let entity = mob.get_entity();
+    let vehicle = entity
+        .vehicle
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone();
+    if let Some(vehicle) = vehicle
+        && vehicle
+            .controlling_passenger()
+            .is_some_and(|c| c.get_entity().entity_id == entity.entity_id)
+        && is_pathfinder_mob(vehicle.as_ref())
+    {
+        entity.body_yaw.store(vehicle.get_entity().body_yaw.load());
     }
 }

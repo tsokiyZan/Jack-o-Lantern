@@ -32,8 +32,7 @@ use crate::entity::{Entity, EntityBase};
 use crate::world::World;
 
 /// Vanilla `Hoglin.BABY_DIMENSIONS`.
-const BABY_DIMENSIONS: EntityDimensions =
-    EntityDimensions::scalable(0.75, 0.85).with_eye_height(0.625);
+const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::HOGLIN_BABY_DIMENSIONS;
 const ATTACK_DAMAGE: f64 = 6.0;
 const BABY_ATTACK_DAMAGE: f64 = 0.5;
 /// Vanilla `Hoglin`'s `xpReward`, which `ageBoundaryReached` keeps in step with the age.
