@@ -3,11 +3,11 @@ use super::*;
 use crate::world::entity_tracker::encode_pos;
 
 impl JavaClient {
-    const fn clamp_horizontal(pos: f64) -> f64 {
+    pub(super) const fn clamp_horizontal(pos: f64) -> f64 {
         pos.clamp(-3.0E7, 3.0E7)
     }
 
-    const fn clamp_vertical(pos: f64) -> f64 {
+    pub(super) const fn clamp_vertical(pos: f64) -> f64 {
         pos.clamp(-2.0E7, 2.0E7)
     }
 

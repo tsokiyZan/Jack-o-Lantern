@@ -1,5 +1,6 @@
 use crate::entity::ai::goal::run_around_like_crazy::RunAroundLikeCrazyGoal;
 use crate::entity::ai::util::goal_utils;
+use crate::entity::mob::mount_inventory::MountInventory;
 use crate::entity::passive::abstract_horse::AbstractHorse;
 use crate::entity::passive::animal::horse_can_parent;
 use std::sync::{
@@ -18,6 +19,7 @@ use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_data::tag::{self, Taggable};
+use pumpkin_data::tracked_data::{self, TrackedData};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::codec::var_int::VarInt;
 use pumpkin_util::math::boundingbox::EntityDimensions;
@@ -97,6 +99,7 @@ pub struct LlamaEntity {
     pub owner: AtomicCell<Option<Uuid>>,
     /// Vanilla `AbstractHorse.standCounter`.
     pub stand_counter: AtomicI32,
+    pub inventory: MountInventory,
     pub caravan: CaravanData,
     /// Vanilla `Llama.didSpit`: ends the retaliation after a spit.
     pub did_spit: AtomicBool,
@@ -123,6 +126,7 @@ impl LlamaEntity {
             temper: AtomicI32::new(0),
             owner: AtomicCell::new(None),
             stand_counter: AtomicI32::new(0),
+            inventory: MountInventory::default(),
             did_spit: AtomicBool::new(false),
             caravan: CaravanData::default(),
         };
@@ -249,17 +253,6 @@ impl LlamaEntity {
         self.set_flag(FLAG_TAME, val);
     }
 
-    #[must_use]
-    pub fn has_chest(&self) -> bool {
-        self.has_chest.load(Ordering::Relaxed)
-    }
-
-    pub fn set_has_chest(&self, val: bool) {
-        self.has_chest.store(val, Ordering::Relaxed);
-        let entity = self.get_entity();
-        entity.set_synced_data(pumpkin_data::tracked_data::llama::DATA_ID_CHEST, val);
-    }
-
     pub fn spit(&self, target: &Arc<dyn EntityBase>) {
         let entity = self.get_entity();
         let world = entity.world.load_full();
@@ -357,7 +350,7 @@ impl Mob for LlamaEntity {
         self.write_ageable_nbt(nbt);
         nbt.put_int("Variant", self.get_variant().id());
         nbt.put_int("Strength", self.get_strength());
-        nbt.put_bool("ChestedHorse", self.has_chest());
+        self.write_chest_nbt(nbt);
         nbt.put_bool("Tame", self.is_tame());
         nbt.put_int("Temper", self.temper.load(Ordering::Relaxed));
         if let Some(owner) = self.owner.load() {
@@ -373,9 +366,7 @@ impl Mob for LlamaEntity {
         if let Some(strength) = nbt.get_int("Strength") {
             self.set_strength(strength);
         }
-        if let Some(chested) = nbt.get_bool("ChestedHorse") {
-            self.set_has_chest(chested);
-        }
+        self.read_chest_nbt(nbt);
         if let Some(tame) = nbt.get_bool("Tame") {
             self.set_tame(tame);
         }
@@ -385,6 +376,14 @@ impl Mob for LlamaEntity {
         if let Some(owner) = nbt.get_uuid("Owner") {
             self.owner.store(Some(owner));
         }
+    }
+
+    fn open_custom_inventory_screen(&self, player: &Arc<Player>) {
+        self.open_horse_inventory(player);
+    }
+
+    fn drop_custom_death_loot(&self) {
+        self.drop_horse_inventory();
     }
 
     fn get_mob_entity(&self) -> &MobEntity {
@@ -423,16 +422,21 @@ impl Mob for LlamaEntity {
     fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
         let item = item_stack.get_item();
 
-        if self.is_tame() && item == &Item::CHEST && !self.has_chest() && !self.is_baby() {
-            self.set_has_chest(true);
-            item_stack.decrement_unless_creative(player.gamemode.load(), 1);
-            let entity = self.get_entity();
-            let world = entity.world.load();
-            world.play_sound(
-                Sound::EntityDonkeyChest,
-                SoundCategory::Neutral,
-                &entity.pos.load(),
-            );
+        // Vanilla `AbstractChestedHorse.mobInteract` and `AbstractHorse.mobInteract`.
+        if !self.is_vehicle()
+            && !self.is_baby()
+            && self.is_tame()
+            && player.get_entity().is_sneaking()
+        {
+            self.open_custom_inventory_screen(player);
+            return true;
+        }
+        if self.is_tame()
+            && item == &Item::CHEST
+            && !self.has_chest()
+            && !self.is_baby()
+            && self.equip_chest(player, item_stack)
+        {
             return true;
         }
 
@@ -496,6 +500,23 @@ impl AbstractHorse for LlamaEntity {
 
     fn stand_counter(&self) -> &AtomicI32 {
         &self.stand_counter
+    }
+
+    fn horse_inventory(&self) -> &MountInventory {
+        &self.inventory
+    }
+
+    fn chest(&self) -> Option<(&AtomicBool, TrackedData)> {
+        Some((&self.has_chest, tracked_data::llama::DATA_ID_CHEST))
+    }
+
+    /// Vanilla `Llama.getInventoryColumns`.
+    fn inventory_columns(&self) -> usize {
+        if self.has_chest() {
+            self.get_strength() as usize
+        } else {
+            0
+        }
     }
 
     fn angry_sound(&self) -> Option<Sound> {

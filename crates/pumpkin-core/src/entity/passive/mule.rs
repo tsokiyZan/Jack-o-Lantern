@@ -1,18 +1,21 @@
-use crate::entity::mob::{first_passenger_player, mob_controlling_passenger};
-use crate::entity::passive::abstract_horse::AbstractHorse;
+use crate::entity::mob::mount_inventory::MountInventory;
+use crate::entity::mob::{first_passenger_player, horse_tick_ridden, mob_controlling_passenger};
 use crate::entity::passive::abstract_horse::add_abstract_horse_goals;
+use crate::entity::passive::abstract_horse::{AbstractHorse, horse_mob_interact};
 use std::sync::{
     Arc, Weak,
     atomic::{AtomicBool, AtomicI32, AtomicU8, Ordering},
 };
 
 use crossbeam::atomic::AtomicCell;
+use pumpkin_data::data_component_impl::EquipmentSlot;
 use pumpkin_data::entity::EntityPose;
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
-use pumpkin_data::sound::{Sound, SoundCategory};
+use pumpkin_data::sound::Sound;
 use pumpkin_data::tag::{self, Taggable};
+use pumpkin_data::tracked_data::{self, TrackedData};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::math::boundingbox::EntityDimensions;
 use uuid::Uuid;
@@ -33,7 +36,6 @@ const TEMPT_ITEMS: &[&Item] = &[
 ];
 
 pub const FLAG_TAME: u8 = 2;
-pub const FLAG_SADDLE: u8 = 4;
 pub const FLAG_BRED: u8 = 8;
 pub const FLAG_EATING: u8 = 16;
 pub const FLAG_STANDING: u8 = 32;
@@ -48,6 +50,7 @@ pub struct MuleEntity {
     pub owner: AtomicCell<Option<Uuid>>,
     /// Vanilla `AbstractHorse.standCounter`.
     pub stand_counter: AtomicI32,
+    pub inventory: MountInventory,
 }
 
 impl MuleEntity {
@@ -62,6 +65,7 @@ impl MuleEntity {
             temper: AtomicI32::new(0),
             owner: AtomicCell::new(None),
             stand_counter: AtomicI32::new(0),
+            inventory: MountInventory::default(),
         };
         let mob_arc = Arc::new(mule);
         let mob_weak: Weak<dyn Mob> = {
@@ -110,26 +114,6 @@ impl MuleEntity {
 
     pub fn set_tame(&self, val: bool) {
         self.set_flag(FLAG_TAME, val);
-    }
-
-    #[must_use]
-    pub fn is_saddled(&self) -> bool {
-        self.has_flag(FLAG_SADDLE)
-    }
-
-    pub fn set_saddled(&self, val: bool) {
-        self.set_flag(FLAG_SADDLE, val);
-    }
-
-    #[must_use]
-    pub fn has_chest(&self) -> bool {
-        self.has_chest.load(Ordering::Relaxed)
-    }
-
-    pub fn set_has_chest(&self, val: bool) {
-        self.has_chest.store(val, Ordering::Relaxed);
-        let entity = self.get_entity();
-        entity.set_synced_data(pumpkin_data::tracked_data::mule::DATA_ID_CHEST, val);
     }
 }
 
@@ -191,7 +175,7 @@ impl Mob for MuleEntity {
 
     fn mob_write_nbt(&self, nbt: &mut NbtCompound) {
         self.write_ageable_nbt(nbt);
-        nbt.put_bool("ChestedHorse", self.has_chest());
+        self.write_chest_nbt(nbt);
         nbt.put_bool("Tame", self.is_tame());
         nbt.put_int("Temper", self.temper.load(Ordering::Relaxed));
         if let Some(owner) = self.owner.load() {
@@ -201,9 +185,7 @@ impl Mob for MuleEntity {
 
     fn mob_read_nbt(&self, nbt: &NbtCompound) {
         self.read_ageable_nbt(nbt);
-        if let Some(chested) = nbt.get_bool("ChestedHorse") {
-            self.set_has_chest(chested);
-        }
+        self.read_chest_nbt(nbt);
         if let Some(tame) = nbt.get_bool("Tame") {
             self.set_tame(tame);
         }
@@ -213,6 +195,37 @@ impl Mob for MuleEntity {
         if let Some(owner) = nbt.get_uuid("Owner") {
             self.owner.store(Some(owner));
         }
+    }
+
+    /// Vanilla `AbstractHorse.canUseSlot`.
+    fn can_use_slot(&self, slot: &EquipmentSlot) -> bool {
+        self.horse_can_use_slot(slot)
+    }
+
+    /// Vanilla `AbstractHorse.getEquipSound`.
+    fn equip_sound(&self, slot: &EquipmentSlot) -> Option<Sound> {
+        (*slot == EquipmentSlot::SADDLE).then_some(Sound::EntityHorseSaddle)
+    }
+
+    fn tick_ridden(&self, controller: &Player) {
+        horse_tick_ridden(self.get_entity(), controller);
+    }
+
+    fn open_custom_inventory_screen(&self, player: &Arc<Player>) {
+        self.open_horse_inventory(player);
+    }
+
+    fn drop_custom_death_loot(&self) {
+        self.drop_horse_inventory();
+    }
+
+    /// Vanilla `AbstractHorse.canJump`.
+    fn can_jump(&self) -> bool {
+        self.is_saddled()
+    }
+
+    fn handle_start_jump(&self, _jump_scale: i32) {
+        self.horse_handle_start_jump();
     }
 
     fn get_mob_entity(&self) -> &MobEntity {
@@ -251,46 +264,7 @@ impl Mob for MuleEntity {
     }
 
     fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
-        let item = item_stack.get_item();
-
-        if self.is_tame() && item == &Item::CHEST && !self.has_chest() && !self.is_baby() {
-            self.set_has_chest(true);
-            item_stack.decrement_unless_creative(player.gamemode.load(), 1);
-            let entity = self.get_entity();
-            let world = entity.world.load();
-            world.play_sound(
-                Sound::EntityDonkeyChest,
-                SoundCategory::Neutral,
-                &entity.pos.load(),
-            );
-            return true;
-        }
-
-        if self.is_tame() && item == &Item::SADDLE && !self.is_saddled() && !self.is_baby() {
-            self.set_saddled(true);
-            item_stack.decrement_unless_creative(player.gamemode.load(), 1);
-            let entity = self.get_entity();
-            let world = entity.world.load();
-            world.play_sound(
-                Sound::EntityHorseSaddle,
-                SoundCategory::Neutral,
-                &entity.pos.load(),
-            );
-            return true;
-        }
-
-        if !self.is_baby() && !self.is_food(item_stack) {
-            let world = player.world();
-            let ent = &self.mob_entity.living_entity.entity;
-            if let Some(vehicle) = world.get_entity_by_id(ent.entity_id)
-                && let Some(passenger) = world.get_player_by_id(player.entity_id())
-            {
-                ent.add_passenger(vehicle, passenger as Arc<dyn EntityBase>);
-                return true;
-            }
-        }
-
-        self.animal_interact(player, item_stack, Sound::EntityMuleAmbient)
+        horse_mob_interact(self, player, item_stack, Sound::EntityMuleAmbient)
     }
 }
 
@@ -317,6 +291,19 @@ impl AbstractHorse for MuleEntity {
 
     fn stand_counter(&self) -> &AtomicI32 {
         &self.stand_counter
+    }
+
+    fn horse_inventory(&self) -> &MountInventory {
+        &self.inventory
+    }
+
+    /// Vanilla `Mule.playJumpSound`.
+    fn jump_sound(&self) -> Sound {
+        Sound::EntityMuleJump
+    }
+
+    fn chest(&self) -> Option<(&AtomicBool, TrackedData)> {
+        Some((&self.has_chest, tracked_data::mule::DATA_ID_CHEST))
     }
 
     fn angry_sound(&self) -> Option<Sound> {

@@ -1,20 +1,23 @@
 use std::any::Any;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU8, Ordering};
 
 use crate::inventory::Inventory;
-use pumpkin_data::data_component_impl::EquipmentSlot;
 use pumpkin_data::item_stack::ItemStack;
 
 use crate::player::player_inventory::PlayerInventory;
 use crate::screen_handler::{InventoryPlayer, ScreenHandler, ScreenHandlerBehaviour};
-use crate::slot::{ArmorSlot, NormalSlot};
+use crate::slot::{NormalSlot, Slot};
 
+/// Vanilla `AbstractMountInventoryMenu.stillValid`, which the server checks every tick.
+pub type MountValidityCheck = Box<dyn Fn(&dyn InventoryPlayer) -> bool + Send + Sync>;
+
+/// Vanilla `AbstractMountInventoryMenu` with the slots of `HorseInventoryMenu` and
+/// `NautilusInventoryMenu`: the saddle, the body armor, then the mount's own inventory.
 pub struct MountScreenHandler {
     behaviour: ScreenHandlerBehaviour,
     pub mount_inventory: Arc<dyn Inventory>,
-    pub saddle_inventory: Arc<dyn Inventory>,
-    pub armor_inventory: Arc<dyn Inventory>,
-    pub inventory_columns: usize,
+    still_valid: MountValidityCheck,
 }
 
 impl MountScreenHandler {
@@ -23,37 +26,31 @@ impl MountScreenHandler {
     pub const SLOT_INVENTORY_START: usize = 2;
     pub const INVENTORY_ROWS: usize = 3;
 
+    /// Vanilla `AbstractMountInventoryMenu.getInventorySize`.
     #[must_use]
     pub const fn get_inventory_size(inventory_columns: usize) -> usize {
         inventory_columns * Self::INVENTORY_ROWS
     }
 
+    /// `saddle_inventory` and `armor_inventory` are the mount's single-slot equipment
+    /// containers (vanilla `Mob.createEquipmentSlotContainer`), whose `is_valid_slot_for` is
+    /// the mount's `isEquippableInSlot`.
     pub fn new(
         sync_id: u8,
         player_inventory: &Arc<PlayerInventory>,
         mount_inventory: Arc<dyn Inventory>,
         saddle_inventory: Arc<dyn Inventory>,
         armor_inventory: Arc<dyn Inventory>,
-        inventory_columns: usize,
+        still_valid: MountValidityCheck,
     ) -> Self {
         let mut handler = Self {
             behaviour: ScreenHandlerBehaviour::new(sync_id, None),
             mount_inventory,
-            saddle_inventory: saddle_inventory.clone(),
-            armor_inventory: armor_inventory.clone(),
-            inventory_columns,
+            still_valid,
         };
 
-        handler.add_slot(Arc::new(ArmorSlot::new(
-            saddle_inventory,
-            0,
-            EquipmentSlot::SADDLE,
-        )));
-        handler.add_slot(Arc::new(ArmorSlot::new(
-            armor_inventory,
-            0,
-            EquipmentSlot::BODY,
-        )));
+        handler.add_slot(Arc::new(MountEquipmentSlot::new(saddle_inventory)));
+        handler.add_slot(Arc::new(MountEquipmentSlot::new(armor_inventory)));
 
         let mount_size = handler.mount_inventory.size();
         for i in 0..mount_size {
@@ -68,6 +65,50 @@ impl MountScreenHandler {
 
         handler
     }
+}
+
+/// Vanilla `ArmorSlot` over a mount's single-slot equipment container.
+struct MountEquipmentSlot {
+    inventory: Arc<dyn Inventory>,
+    id: AtomicU8,
+}
+
+impl MountEquipmentSlot {
+    fn new(inventory: Arc<dyn Inventory>) -> Self {
+        Self {
+            inventory,
+            id: AtomicU8::new(0),
+        }
+    }
+}
+
+impl Slot for MountEquipmentSlot {
+    fn get_inventory(&self) -> Arc<dyn Inventory> {
+        self.inventory.clone()
+    }
+
+    fn get_index(&self) -> usize {
+        0
+    }
+
+    fn set_id(&self, id: usize) {
+        self.id.store(id as u8, Ordering::Relaxed);
+    }
+
+    /// Vanilla `ArmorSlot.mayPlace`: the mount's `isEquippableInSlot`.
+    fn can_insert(&self, stack: &ItemStack) -> bool {
+        self.inventory.is_valid_slot_for(0, stack)
+    }
+
+    fn mark_dirty(&self) {
+        self.inventory.mark_dirty();
+    }
+
+    fn get_max_item_count(&self) -> u8 {
+        1
+    }
+
+    // TODO: vanilla `ArmorSlot.mayPickup` keeps an item with curse of binding on.
 }
 
 impl ScreenHandler for MountScreenHandler {
@@ -89,6 +130,10 @@ impl ScreenHandler for MountScreenHandler {
 
     fn on_closed(&mut self, player: &dyn InventoryPlayer) {
         self.default_on_closed(player);
+    }
+
+    fn can_use(&self, player: &dyn InventoryPlayer) -> bool {
+        (self.still_valid)(player)
     }
 
     fn quick_move(&mut self, _player: &dyn InventoryPlayer, slot_index: i32) -> ItemStack {
@@ -164,57 +209,5 @@ impl ScreenHandler for MountScreenHandler {
         }
 
         clicked
-    }
-}
-
-pub struct NautilusInventoryScreenHandler {
-    pub mount_handler: MountScreenHandler,
-}
-
-impl NautilusInventoryScreenHandler {
-    pub fn new(
-        sync_id: u8,
-        player_inventory: &Arc<PlayerInventory>,
-        nautilus_inventory: Arc<dyn Inventory>,
-        saddle_inventory: Arc<dyn Inventory>,
-        armor_inventory: Arc<dyn Inventory>,
-        inventory_columns: usize,
-    ) -> Self {
-        Self {
-            mount_handler: MountScreenHandler::new(
-                sync_id,
-                player_inventory,
-                nautilus_inventory,
-                saddle_inventory,
-                armor_inventory,
-                inventory_columns,
-            ),
-        }
-    }
-}
-
-impl ScreenHandler for NautilusInventoryScreenHandler {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-
-    fn get_behaviour(&self) -> &ScreenHandlerBehaviour {
-        self.mount_handler.get_behaviour()
-    }
-
-    fn get_behaviour_mut(&mut self) -> &mut ScreenHandlerBehaviour {
-        self.mount_handler.get_behaviour_mut()
-    }
-
-    fn on_closed(&mut self, player: &dyn InventoryPlayer) {
-        self.mount_handler.on_closed(player);
-    }
-
-    fn quick_move(&mut self, player: &dyn InventoryPlayer, slot_index: i32) -> ItemStack {
-        self.mount_handler.quick_move(player, slot_index)
     }
 }

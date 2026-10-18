@@ -27,6 +27,7 @@ use pumpkin_data::data_component_impl::{
 };
 use pumpkin_data::enchantment_provider::EnchantmentProvider;
 use pumpkin_data::entity::EntityType;
+use pumpkin_data::game_event::GameEvent;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::tag::{Tag, Taggable};
@@ -900,6 +901,39 @@ pub fn equip_item_if_possible(mob: &dyn Mob, stack: ItemStack) -> ItemStack {
         .persistence_required
         .store(true, std::sync::atomic::Ordering::Relaxed);
     to_equip
+}
+
+/// The server side of vanilla `LivingEntity.onEquipItem`: the equip sound and the
+/// `equip`/`unequip` game event when `slot` changed from `old` to `new`.
+pub fn notify_equip<M: Mob + ?Sized>(
+    mob: &M,
+    slot: &EquipmentSlot,
+    old: &ItemStack,
+    new: &ItemStack,
+) {
+    if old.are_items_and_components_equal(new) {
+        return;
+    }
+    let entity = mob.get_entity();
+    let world = entity.world.load();
+    let pos = entity.pos.load();
+    let equippable = new.get_data_component::<EquippableImpl>();
+    if let Some(equippable) = equippable
+        && !entity.is_silent()
+        && equippable.slot == slot
+    {
+        if let Some(sound) = mob.equip_sound(slot) {
+            world.play_sound_fine(sound, mob.sound_source(), &pos, 1.0, 1.0);
+        } else {
+            world.play_sound_event(&equippable.equip_sound, mob.sound_source(), &pos);
+        }
+    }
+    let event = if equippable.is_some() {
+        GameEvent::Equip
+    } else {
+        GameEvent::Unequip
+    };
+    world.emit_game_event(event.name(), pos);
 }
 
 // Hand slots have no count limit, every other slot holds one item.

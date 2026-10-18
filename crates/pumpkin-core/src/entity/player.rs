@@ -25,7 +25,6 @@ use crossbeam::channel::Receiver;
 use crossbeam::queue::SegQueue;
 use pumpkin_data::dimension::Dimension;
 use pumpkin_inventory::Inventory;
-use pumpkin_inventory::merchant::merchant_screen_handler::MerchantScreenHandler;
 use pumpkin_inventory::player::ender_chest_inventory::EnderChestInventory;
 use pumpkin_protocol::RawPacket;
 use pumpkin_protocol::bedrock::client::play_status::CPlayStatus;
@@ -403,6 +402,19 @@ pub enum SpamType {
     Command,
 }
 
+/// What vanilla `ServerGamePacketListenerImpl` remembers to check the vehicle a player steers.
+#[derive(Default)]
+pub struct SteeredVehicle {
+    /// Vanilla `lastVehicle`: the vehicle the player steered at the end of the last tick.
+    pub last_vehicle: Option<i32>,
+    /// Vanilla `vehicleFirstGoodX/Y/Z`.
+    pub first_good: Vector3<f64>,
+    /// Vanilla `vehicleLastGoodX/Y/Z`.
+    pub last_good: Vector3<f64>,
+    /// Vanilla `vehiclePositionLastResetAt`.
+    pub position_last_reset_at: i32,
+}
+
 pub struct Player {
     /// The underlying living entity object that represents the player.
     pub living_entity: LivingEntity,
@@ -465,6 +477,7 @@ pub struct Player {
     pub teleport_id_count: AtomicI32,
     /// The pending teleport information, including the teleport ID and target location.
     pub awaiting_teleport: Mutex<Option<(VarInt, Vector3<f64>)>>,
+    pub steered_vehicle: Mutex<SteeredVehicle>,
     /// The coordinates of the chunk section the player is currently watching.
     pub watched_section: AtomicCell<Cylindrical>,
     /// The last time the player performed an action (for idle timeout).
@@ -746,6 +759,7 @@ impl Player {
             gameprofile,
             client,
             awaiting_teleport: Mutex::new(None),
+            steered_vehicle: Mutex::new(SteeredVehicle::default()),
             // TODO: Load this from previous instance
             hunger_manager: HungerManager::default(),
             current_block_destroy_stage: AtomicI32::new(-1),
@@ -2857,6 +2871,12 @@ impl Player {
                 .store(false, Ordering::Relaxed);
         }
 
+        // Vanilla `LivingEntity.rideTick`, which the level runs as the vehicle ticks.
+        if self.living_entity.entity.has_vehicle() {
+            self.living_entity.entity.velocity.store(Vector3::default());
+            self.living_entity.entity.reset_fall_distance();
+        }
+
         if let Some(camera_id) = self.camera_target_id.load() {
             if camera_id == self.entity_id() {
                 self.camera_target_id.store(None);
@@ -2886,12 +2906,10 @@ impl Player {
         if let Ok(current_screen_handler_guard) = self.current_screen_handler.try_lock() {
             let current_screen_handler = current_screen_handler_guard.clone();
             drop(current_screen_handler_guard);
+            // Vanilla `ServerPlayer.doTick`: `containerMenu.stillValid`.
             let is_invalid = current_screen_handler
                 .try_lock()
-                .is_ok_and(|screen_handler| {
-                    screen_handler.as_any().is::<MerchantScreenHandler>()
-                        && !screen_handler.can_use(self)
-                });
+                .is_ok_and(|screen_handler| !screen_handler.can_use(self));
 
             if is_invalid {
                 if let Some(p) = self.world().get_player_by_uuid(self.gameprofile.id) {
@@ -3237,10 +3255,6 @@ impl Player {
         if living.dead.load(Ordering::Relaxed) || living.health.load() <= 0.0 {
             return;
         }
-        // `Entity.rideTick`.
-        if entity.has_vehicle() {
-            entity.velocity.store(Vector3::default());
-        }
         entity.check_zero_velo();
 
         // Vanilla also keeps the collision state of this move; here it stays the client's.
@@ -3261,6 +3275,28 @@ impl Player {
         entity
             .on_ground_no_blocks
             .store(on_ground_no_blocks, Ordering::Relaxed);
+    }
+
+    /// The end of vanilla `ServerGamePacketListenerImpl.tickPlayer`: the vehicle this player
+    /// steers, where `handle_move_vehicle` measures the next moves from.
+    // TODO: vanilla kicks for "floating a vehicle too long"; Pumpkin kicks no floating player.
+    pub fn track_steered_vehicle(&self) {
+        let root = self.get_entity().root_vehicle();
+        let mut steered = self
+            .steered_vehicle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        steered.last_vehicle = None;
+        if let Some(vehicle) = root
+            && vehicle
+                .controlling_passenger()
+                .is_some_and(|controller| controller.get_entity().entity_id == self.entity_id())
+        {
+            let pos = vehicle.get_entity().pos.load();
+            steered.last_vehicle = Some(vehicle.get_entity().entity_id);
+            steered.first_good = pos;
+            steered.last_good = pos;
+        }
     }
 
     /// Vanilla `Player.travel`. A server player's `jumping` is never set.
@@ -7311,6 +7347,17 @@ impl EntityBase for Player {
 
     fn get_gravity(&self) -> f64 {
         self.living_entity.get_gravity()
+    }
+
+    /// Vanilla `Player.isClientAuthoritative`.
+    fn is_client_authoritative(&self) -> bool {
+        true
+    }
+
+    /// Vanilla `Player.getMoveSimulationType` (`AUTHORITATIVE_SIDE_AND_SERVER`): the server
+    /// runs its own copy of a player's movement too.
+    fn can_simulate_movement(&self) -> bool {
+        true
     }
 
     fn get_name(&self) -> TextComponent {

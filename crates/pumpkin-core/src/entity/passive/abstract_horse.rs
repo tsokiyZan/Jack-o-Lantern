@@ -1,10 +1,21 @@
-use std::sync::atomic::{AtomicI32, Ordering::Relaxed};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicI32, Ordering::Relaxed};
 
+use pumpkin_data::data_component_impl::EquipmentSlot;
 use pumpkin_data::entity::EntityStatus;
+use pumpkin_data::item::Item;
+use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::Sound;
+use pumpkin_data::tracked_data::TrackedData;
+use rand::RngExt;
 use uuid::Uuid;
 
-use crate::entity::mob::Mob;
+use crate::entity::EntityBase;
+use crate::entity::mob::mount_inventory::{MountInventory, open_mount_inventory};
+use crate::entity::mob::{Mob, is_player_holding};
+use crate::entity::passive::animal::Animal;
+use crate::entity::player::Player;
+use pumpkin_nbt::compound::NbtCompound;
 
 /// `AbstractHorse` data flag: tamed.
 pub const FLAG_TAME: u8 = 2;
@@ -22,6 +33,8 @@ pub trait AbstractHorse: Mob {
     fn set_horse_owner(&self, owner: Uuid);
     fn horse_temper(&self) -> &AtomicI32;
     fn stand_counter(&self) -> &AtomicI32;
+    /// Vanilla `AbstractHorse.inventory`.
+    fn horse_inventory(&self) -> &MountInventory;
 
     /// Vanilla `getAngrySound`; plain `AbstractHorse` has none.
     fn angry_sound(&self) -> Option<Sound> {
@@ -31,6 +44,18 @@ pub trait AbstractHorse: Mob {
     /// Vanilla `getMaxTemper`.
     fn max_temper(&self) -> i32 {
         100
+    }
+
+    /// Vanilla `playJumpSound`'s sound.
+    fn jump_sound(&self) -> Sound {
+        Sound::EntityHorseJump
+    }
+
+    /// Vanilla `AbstractHorse.handleStartJump`: the rider began a jump. The stand sliding it
+    /// also allows only matters to the steering client.
+    fn horse_handle_start_jump(&self) {
+        self.stand_if_possible();
+        self.play_sound_at_self(self.jump_sound(), 0.4, 1.0);
     }
 
     /// Vanilla `canPerformRearing`.
@@ -44,6 +69,124 @@ pub trait AbstractHorse: Mob {
 
     fn is_standing(&self) -> bool {
         self.horse_flag(FLAG_STANDING)
+    }
+
+    /// The chest flag of a vanilla `AbstractChestedHorse` and its synced data; `None` for
+    /// the kinds that never carry a chest.
+    fn chest(&self) -> Option<(&AtomicBool, TrackedData)> {
+        None
+    }
+
+    /// Vanilla `AbstractChestedHorse.hasChest`.
+    fn has_chest(&self) -> bool {
+        self.chest().is_some_and(|(flag, _)| flag.load(Relaxed))
+    }
+
+    /// Vanilla `AbstractChestedHorse.setChest`.
+    fn set_chest(&self, chest: bool) {
+        if let Some((flag, data)) = self.chest() {
+            flag.store(chest, Relaxed);
+            self.get_entity().set_synced_data(data, chest);
+        }
+    }
+
+    /// Vanilla `getInventoryColumns`: none for most kinds, five with a chest
+    /// (`AbstractChestedHorse`).
+    fn inventory_columns(&self) -> usize {
+        if self.has_chest() { 5 } else { 0 }
+    }
+
+    /// Vanilla `AbstractHorse.createInventory`.
+    fn create_inventory(&self) {
+        self.horse_inventory().create(self.inventory_columns());
+    }
+
+    /// Vanilla `AbstractHorse.openCustomInventoryScreen`.
+    fn open_horse_inventory(&self, player: &Arc<Player>) {
+        let entity = self.get_entity();
+        if (!self.is_vehicle() || entity.has_passenger(player.entity_id()))
+            && self.is_horse_tamed()
+            && let Some(mob) = self.get_mob()
+        {
+            open_mount_inventory(
+                player,
+                mob,
+                self.horse_inventory().current(),
+                self.inventory_columns(),
+                |mob, inventory| {
+                    mob.as_abstract_horse()
+                        .is_some_and(|horse| !horse.horse_inventory().has_changed(inventory))
+                },
+            );
+        }
+    }
+
+    /// Vanilla `AbstractHorse.dropEquipment` and `AbstractChestedHorse.dropEquipment`, after
+    /// the equipment itself.
+    fn drop_horse_inventory(&self) {
+        self.horse_inventory().drop_items(self.get_entity());
+        if self.has_chest() {
+            self.get_entity()
+                .spawn_at_location(ItemStack::new(1, &Item::CHEST));
+            self.set_chest(false);
+        }
+    }
+
+    /// The chest and `Items` of vanilla `AbstractChestedHorse.addAdditionalSaveData`.
+    fn write_chest_nbt(&self, nbt: &mut NbtCompound) {
+        nbt.put_bool("ChestedHorse", self.has_chest());
+        if self.has_chest() {
+            self.horse_inventory().write_items(nbt);
+        }
+    }
+
+    /// The chest and `Items` of vanilla `AbstractChestedHorse.readAdditionalSaveData`.
+    fn read_chest_nbt(&self, nbt: &NbtCompound) {
+        self.set_chest(nbt.get_bool("ChestedHorse").unwrap_or(false));
+        self.create_inventory();
+        if self.has_chest() {
+            self.horse_inventory().read_items(nbt);
+        }
+    }
+
+    /// Vanilla `AbstractChestedHorse.equipChest`. Returns `false` for a kind that carries no
+    /// chest.
+    fn equip_chest(&self, player: &Player, item_stack: &mut ItemStack) -> bool {
+        if self.chest().is_none() {
+            return false;
+        }
+        self.set_chest(true);
+        // `playChestEquipsSound`.
+        let mut rng = self.get_random();
+        let pitch = (rng.random::<f32>() - rng.random::<f32>()) * 0.2 + 1.0;
+        self.play_sound_at_self(Sound::EntityDonkeyChest, 1.0, pitch);
+        item_stack.decrement_unless_creative(player.gamemode.load(), 1);
+        self.create_inventory();
+        true
+    }
+
+    /// Vanilla `AbstractHorse.canUseSlot`: only a tame adult takes a saddle.
+    fn horse_can_use_slot(&self, slot: &EquipmentSlot) -> bool {
+        *slot != EquipmentSlot::SADDLE
+            || (self.get_entity().is_alive()
+                && !self.get_entity().is_baby()
+                && self.is_horse_tamed())
+    }
+
+    /// Vanilla `AbstractHorse.doPlayerRide`.
+    fn do_player_ride(&self, player: &Arc<Player>) {
+        self.set_horse_flag(FLAG_EATING, false);
+        self.clear_standing();
+        let entity = self.get_entity();
+        player
+            .get_entity()
+            .set_rotation(entity.yaw.load(), entity.pitch.load());
+        let world = entity.world.load();
+        if let Some(vehicle) = world.get_entity_by_id(entity.entity_id)
+            && let Some(passenger) = world.get_player_by_id(player.entity_id())
+        {
+            entity.add_passenger(vehicle, passenger as Arc<dyn EntityBase>);
+        }
     }
 
     /// Vanilla `modifyTemper`.
@@ -104,6 +247,74 @@ pub trait AbstractHorse: Mob {
             }
         }
     }
+}
+
+/// Vanilla `Horse.mobInteract`, which `AbstractChestedHorse.mobInteract` repeats with the chest:
+/// food feeds an untamed or tamed horse, any other item angers an untamed one.
+pub fn horse_mob_interact<H: AbstractHorse + Animal + ?Sized>(
+    horse: &H,
+    player: &Arc<Player>,
+    item_stack: &mut ItemStack,
+    ambient_sound: Sound,
+) -> bool {
+    let is_baby = horse.get_entity().is_baby();
+    let should_open_inventory =
+        !is_baby && horse.is_horse_tamed() && player.get_entity().is_sneaking();
+    if !horse.is_vehicle()
+        && !should_open_inventory
+        && (!is_baby || !is_player_holding(player.as_ref(), &Item::GOLDEN_DANDELION))
+        && !item_stack.is_empty()
+    {
+        // TODO: vanilla `AbstractHorse.fedFood`; Pumpkin feeds horses like other animals.
+        if horse.is_food(item_stack) {
+            return horse.animal_interact(player, item_stack, ambient_sound);
+        }
+        if !horse.is_horse_tamed() {
+            horse.make_mad();
+            return true;
+        }
+        if !horse.has_chest()
+            && item_stack.item == &Item::CHEST
+            && horse.equip_chest(player, item_stack)
+        {
+            return true;
+        }
+    }
+    abstract_horse_mob_interact(horse, player, item_stack, ambient_sound)
+}
+
+/// Vanilla `AbstractHorse.mobInteract`. Of `ItemStack.interactLivingEntity` it runs the
+/// equipping of saddles; other items are used on the horse after it returns `false`.
+pub fn abstract_horse_mob_interact<H: AbstractHorse + Animal + ?Sized>(
+    horse: &H,
+    player: &Arc<Player>,
+    item_stack: &mut ItemStack,
+    ambient_sound: Sound,
+) -> bool {
+    if horse.is_vehicle() || horse.get_entity().is_baby() {
+        return horse.animal_interact(player, item_stack, ambient_sound);
+    }
+    if horse.is_horse_tamed() && player.get_entity().is_sneaking() {
+        horse.open_custom_inventory_screen(player);
+        return true;
+    }
+    if !item_stack.is_empty() {
+        if horse.equip_on_target(player, item_stack) {
+            return true;
+        }
+        let mob_entity = horse.get_mob_entity();
+        if horse.is_equippable_in_slot(item_stack, &EquipmentSlot::BODY)
+            && mob_entity.get_item_slot(&EquipmentSlot::BODY).is_empty()
+        {
+            // `equipBodyArmor`.
+            let armor = item_stack.split_unless_creative(player.gamemode.load(), 1);
+            horse.set_item_slot_and_notify(&EquipmentSlot::BODY, armor);
+            mob_entity.set_guaranteed_drop(&EquipmentSlot::BODY);
+            return true;
+        }
+    }
+    horse.do_player_ride(player);
+    true
 }
 
 /// Vanilla `AbstractHorse.registerGoals`, before each kind's `addBehaviourGoals`.

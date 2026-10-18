@@ -3,6 +3,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use crossbeam::atomic::AtomicCell;
 
+use crate::entity::movement_emission::MovementEmission;
 use crate::entity::player::Player;
 use crate::entity::{Entity, EntityBase, living::LivingEntity};
 use crate::server::Server;
@@ -162,6 +163,19 @@ impl EntityBase for BoatEntity {
             .add_passenger(vehicle, passenger as Arc<dyn EntityBase>);
 
         true
+    }
+
+    /// Vanilla `AbstractBoat.getControllingPassenger`.
+    fn controlling_passenger(&self) -> Option<Arc<dyn EntityBase>> {
+        self.vehicle
+            .entity
+            .get_first_passenger()
+            .filter(|passenger| passenger.get_player().is_some())
+    }
+
+    /// Vanilla `AbstractBoat.getMovementEmission`.
+    fn movement_emission(&self) -> MovementEmission {
+        MovementEmission::Events
     }
 
     fn set_paddle_state(&self, left: bool, right: bool) {

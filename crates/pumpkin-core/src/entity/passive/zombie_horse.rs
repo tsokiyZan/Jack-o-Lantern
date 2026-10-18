@@ -1,18 +1,20 @@
 use crate::entity::ai::goal::tempt::TemptGoal;
-use crate::entity::mob::{first_passenger_player, mob_controlling_passenger};
-use crate::entity::passive::abstract_horse::AbstractHorse;
+use crate::entity::mob::mount_inventory::MountInventory;
+use crate::entity::mob::{first_passenger_player, horse_tick_ridden, mob_controlling_passenger};
 use crate::entity::passive::abstract_horse::add_abstract_horse_goals;
+use crate::entity::passive::abstract_horse::{AbstractHorse, abstract_horse_mob_interact};
 use std::sync::{
     Arc, Weak,
     atomic::{AtomicI32, AtomicU8, Ordering},
 };
 
 use crossbeam::atomic::AtomicCell;
+use pumpkin_data::data_component_impl::EquipmentSlot;
 use pumpkin_data::entity::EntityPose;
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
-use pumpkin_data::sound::{Sound, SoundCategory};
+use pumpkin_data::sound::Sound;
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::math::boundingbox::EntityDimensions;
 use uuid::Uuid;
@@ -27,7 +29,6 @@ use crate::entity::{
 };
 
 pub const FLAG_TAME: u8 = 2;
-pub const FLAG_SADDLE: u8 = 4;
 pub const FLAG_EATING: u8 = 16;
 pub const FLAG_STANDING: u8 = 32;
 pub const FLAG_OPEN_MOUTH: u8 = 64;
@@ -42,6 +43,7 @@ pub struct ZombieHorseEntity {
     pub owner: AtomicCell<Option<Uuid>>,
     /// Vanilla `AbstractHorse.standCounter`.
     pub stand_counter: AtomicI32,
+    pub inventory: MountInventory,
 }
 
 impl ZombieHorseEntity {
@@ -56,6 +58,7 @@ impl ZombieHorseEntity {
             gallop_sound_counter: AtomicI32::new(0),
             owner: AtomicCell::new(None),
             stand_counter: AtomicI32::new(0),
+            inventory: MountInventory::default(),
         };
         let mob_arc = Arc::new(horse);
         let mob_weak: Weak<dyn Mob> = {
@@ -105,15 +108,6 @@ impl ZombieHorseEntity {
 
     pub fn set_tame(&self, val: bool) {
         self.set_flag(FLAG_TAME, val);
-    }
-
-    #[must_use]
-    pub fn is_saddled(&self) -> bool {
-        self.has_flag(FLAG_SADDLE)
-    }
-
-    pub fn set_saddled(&self, val: bool) {
-        self.set_flag(FLAG_SADDLE, val);
     }
 }
 
@@ -199,6 +193,37 @@ impl Mob for ZombieHorseEntity {
         }
     }
 
+    /// Vanilla `ZombieHorse.canUseSlot`.
+    fn can_use_slot(&self, _slot: &EquipmentSlot) -> bool {
+        true
+    }
+
+    /// Vanilla `AbstractHorse.getEquipSound`.
+    fn equip_sound(&self, slot: &EquipmentSlot) -> Option<Sound> {
+        (*slot == EquipmentSlot::SADDLE).then_some(Sound::EntityHorseSaddle)
+    }
+
+    fn tick_ridden(&self, controller: &Player) {
+        horse_tick_ridden(self.get_entity(), controller);
+    }
+
+    fn open_custom_inventory_screen(&self, player: &Arc<Player>) {
+        self.open_horse_inventory(player);
+    }
+
+    fn drop_custom_death_loot(&self) {
+        self.drop_horse_inventory();
+    }
+
+    /// Vanilla `AbstractHorse.canJump`.
+    fn can_jump(&self) -> bool {
+        self.is_saddled()
+    }
+
+    fn handle_start_jump(&self, _jump_scale: i32) {
+        self.horse_handle_start_jump();
+    }
+
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
     }
@@ -230,34 +255,21 @@ impl Mob for ZombieHorseEntity {
         );
     }
 
+    /// Vanilla `ZombieHorse.mobInteract`.
     fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
-        let item = item_stack.get_item();
-
-        if self.is_tame() && item == &Item::SADDLE && !self.is_saddled() && !self.is_baby() {
-            self.set_saddled(true);
-            item_stack.decrement_unless_creative(player.gamemode.load(), 1);
-            let entity = self.get_entity();
-            let world = entity.world.load();
-            world.play_sound(
-                Sound::EntityHorseSaddle,
-                SoundCategory::Neutral,
-                &entity.pos.load(),
-            );
-            return true;
-        }
-
-        if !self.is_baby() {
-            let world = player.world();
-            let ent = &self.mob_entity.living_entity.entity;
-            if let Some(vehicle) = world.get_entity_by_id(ent.entity_id)
-                && let Some(passenger) = world.get_player_by_id(player.entity_id())
-            {
-                ent.add_passenger(vehicle, passenger as Arc<dyn EntityBase>);
+        let should_open_inventory =
+            !self.is_baby() && self.is_tame() && player.get_entity().is_sneaking();
+        if !self.is_vehicle() && !should_open_inventory && !item_stack.is_empty() {
+            // TODO: vanilla `AbstractHorse.fedFood`; Pumpkin feeds horses like other animals.
+            if self.is_food(item_stack) {
+                return self.animal_interact(player, item_stack, Sound::EntityZombieHorseAmbient);
+            }
+            if !self.is_tame() {
+                self.make_mad();
                 return true;
             }
         }
-
-        self.animal_interact(player, item_stack, Sound::EntityZombieHorseAmbient)
+        abstract_horse_mob_interact(self, player, item_stack, Sound::EntityZombieHorseAmbient)
     }
 }
 
@@ -284,6 +296,10 @@ impl AbstractHorse for ZombieHorseEntity {
 
     fn stand_counter(&self) -> &AtomicI32 {
         &self.stand_counter
+    }
+
+    fn horse_inventory(&self) -> &MountInventory {
+        &self.inventory
     }
 
     fn angry_sound(&self) -> Option<Sound> {

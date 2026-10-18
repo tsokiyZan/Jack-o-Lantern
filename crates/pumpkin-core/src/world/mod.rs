@@ -1828,6 +1828,7 @@ impl World {
         players.par_iter().for_each(|player| {
             let _guard = player_handle.enter();
             player.tick_server_travel();
+            player.track_steered_vehicle();
         });
 
         let total_elapsed = start.elapsed();

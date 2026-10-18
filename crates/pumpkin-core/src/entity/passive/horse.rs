@@ -1,6 +1,7 @@
-use crate::entity::mob::{first_passenger_player, mob_controlling_passenger};
-use crate::entity::passive::abstract_horse::AbstractHorse;
+use crate::entity::mob::mount_inventory::MountInventory;
+use crate::entity::mob::{first_passenger_player, horse_tick_ridden, mob_controlling_passenger};
 use crate::entity::passive::abstract_horse::add_abstract_horse_goals;
+use crate::entity::passive::abstract_horse::{AbstractHorse, horse_mob_interact};
 use crate::entity::passive::animal::horse_can_parent;
 use std::sync::{
     Arc, Weak,
@@ -10,11 +11,12 @@ use std::sync::{
 use crossbeam::atomic::AtomicCell;
 use pumpkin_data::Block;
 use pumpkin_data::block_sound_type::SoundType;
+use pumpkin_data::data_component_impl::EquipmentSlot;
 use pumpkin_data::entity::EntityPose;
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
-use pumpkin_data::sound::{Sound, SoundCategory};
+use pumpkin_data::sound::Sound;
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::codec::var_int::VarInt;
@@ -38,7 +40,6 @@ const TEMPT_ITEMS: &[&Item] = &[
 ];
 
 pub const FLAG_TAME: u8 = 2;
-pub const FLAG_SADDLE: u8 = 4;
 pub const FLAG_BRED: u8 = 8;
 pub const FLAG_EATING: u8 = 16;
 pub const FLAG_STANDING: u8 = 32;
@@ -115,6 +116,7 @@ pub struct HorseEntity {
     pub owner: AtomicCell<Option<Uuid>>,
     /// Vanilla `AbstractHorse.standCounter`.
     pub stand_counter: AtomicI32,
+    pub inventory: MountInventory,
 }
 
 impl HorseEntity {
@@ -135,6 +137,7 @@ impl HorseEntity {
             gallop_sound_counter: AtomicI32::new(0),
             owner: AtomicCell::new(None),
             stand_counter: AtomicI32::new(0),
+            inventory: MountInventory::default(),
         };
         let mob_arc = Arc::new(horse);
         let mob_weak: Weak<dyn Mob> = {
@@ -197,15 +200,6 @@ impl HorseEntity {
 
     pub fn set_tame(&self, val: bool) {
         self.set_flag(FLAG_TAME, val);
-    }
-
-    #[must_use]
-    pub fn is_saddled(&self) -> bool {
-        self.has_flag(FLAG_SADDLE)
-    }
-
-    pub fn set_saddled(&self, val: bool) {
-        self.set_flag(FLAG_SADDLE, val);
     }
 }
 
@@ -324,6 +318,37 @@ impl Mob for HorseEntity {
         }
     }
 
+    /// Vanilla `AbstractHorse.canUseSlot`.
+    fn can_use_slot(&self, slot: &EquipmentSlot) -> bool {
+        self.horse_can_use_slot(slot)
+    }
+
+    /// Vanilla `AbstractHorse.getEquipSound`.
+    fn equip_sound(&self, slot: &EquipmentSlot) -> Option<Sound> {
+        (*slot == EquipmentSlot::SADDLE).then_some(Sound::EntityHorseSaddle)
+    }
+
+    fn tick_ridden(&self, controller: &Player) {
+        horse_tick_ridden(self.get_entity(), controller);
+    }
+
+    fn open_custom_inventory_screen(&self, player: &Arc<Player>) {
+        self.open_horse_inventory(player);
+    }
+
+    fn drop_custom_death_loot(&self) {
+        self.drop_horse_inventory();
+    }
+
+    /// Vanilla `AbstractHorse.canJump`.
+    fn can_jump(&self) -> bool {
+        self.is_saddled()
+    }
+
+    fn handle_start_jump(&self, _jump_scale: i32) {
+        self.horse_handle_start_jump();
+    }
+
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
     }
@@ -360,33 +385,7 @@ impl Mob for HorseEntity {
     }
 
     fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
-        let item = item_stack.get_item();
-
-        if self.is_tame() && item == &Item::SADDLE && !self.is_saddled() && !self.is_baby() {
-            self.set_saddled(true);
-            item_stack.decrement_unless_creative(player.gamemode.load(), 1);
-            let entity = self.get_entity();
-            let world = entity.world.load();
-            world.play_sound(
-                Sound::EntityHorseSaddle,
-                SoundCategory::Neutral,
-                &entity.pos.load(),
-            );
-            return true;
-        }
-
-        if !self.is_baby() && !self.is_food(item_stack) {
-            let world = player.world();
-            let ent = &self.mob_entity.living_entity.entity;
-            if let Some(vehicle) = world.get_entity_by_id(ent.entity_id)
-                && let Some(passenger) = world.get_player_by_id(player.entity_id())
-            {
-                ent.add_passenger(vehicle, passenger as Arc<dyn EntityBase>);
-                return true;
-            }
-        }
-
-        self.animal_interact(player, item_stack, Sound::EntityHorseAmbient)
+        horse_mob_interact(self, player, item_stack, Sound::EntityHorseAmbient)
     }
 }
 
@@ -413,6 +412,10 @@ impl AbstractHorse for HorseEntity {
 
     fn stand_counter(&self) -> &AtomicI32 {
         &self.stand_counter
+    }
+
+    fn horse_inventory(&self) -> &MountInventory {
+        &self.inventory
     }
 
     fn angry_sound(&self) -> Option<Sound> {

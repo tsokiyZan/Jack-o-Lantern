@@ -60,10 +60,12 @@ impl JavaClient {
                     mob.handle_stop_jump();
                 }
             }
-            // TODO: vanilla `HasCustomInventoryScreen.openCustomInventoryScreen`; Pumpkin
-            // opens no mount inventories yet.
             Action::OpenVehicleInventory => {
-                debug!("todo");
+                if let Some(vehicle) = entity.get_vehicle()
+                    && let Some(mob) = vehicle.get_mob()
+                {
+                    mob.open_custom_inventory_screen(player);
+                }
             }
             Action::StartFlyingElytra => {
                 let fall_flying = entity.check_fall_flying();

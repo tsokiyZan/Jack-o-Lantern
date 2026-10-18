@@ -1,6 +1,12 @@
 use std::any::Any;
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 
+use pumpkin_data::tracked_data::TrackedData;
+use pumpkin_protocol::codec::var_int::VarInt;
+use rand::{Rng, RngExt};
+
+use crate::entity::Entity;
+
 pub trait ItemSteerable: Send + Sync {
     /// Attempts to boost speed. Returns `true` if boost was successfully activated.
     fn boost(&self) -> bool;
@@ -8,50 +14,42 @@ pub trait ItemSteerable: Send + Sync {
     fn as_any(&self) -> &dyn Any;
 }
 
+/// Vanilla `ItemBasedSteering`. The boost speeds up the steering client, which reads the boost
+/// time from the synced data; the server only keeps a boost from starting while one runs.
 #[derive(Default)]
 pub struct ItemBasedSteering {
     pub boosting: AtomicBool,
     pub boost_time: AtomicI32,
+    /// The synced boost time (`boostTimeAccessor`).
     pub boost_time_total: AtomicI32,
 }
 
 impl ItemBasedSteering {
-    pub const MIN_BOOST_TIME: i32 = 140;
-    pub const MAX_BOOST_TIME: i32 = 700;
-
-    #[must_use]
-    pub fn boost(&self) -> bool {
+    /// Vanilla `ItemBasedSteering.boost`.
+    pub fn boost(
+        &self,
+        random: &mut impl Rng,
+        entity: &Entity,
+        boost_time_data: TrackedData,
+    ) -> bool {
         if self.boosting.load(Ordering::Relaxed) {
-            false
-        } else {
-            self.boosting.store(true, Ordering::Relaxed);
-            self.boost_time.store(0, Ordering::Relaxed);
-            let random_range = Self::MAX_BOOST_TIME - Self::MIN_BOOST_TIME + 1;
-            let random_time =
-                (rand::random::<u32>() as i32).abs() % random_range + Self::MIN_BOOST_TIME;
-            self.boost_time_total.store(random_time, Ordering::Relaxed);
-            true
+            return false;
         }
+        self.boosting.store(true, Ordering::Relaxed);
+        self.boost_time.store(0, Ordering::Relaxed);
+        let total = random.random_range(0..841) + 140;
+        self.boost_time_total.store(total, Ordering::Relaxed);
+        entity.set_synced_data(boost_time_data, VarInt(total));
+        true
     }
 
+    /// Vanilla `ItemBasedSteering.tickBoost`.
     pub fn tick_boost(&self) {
-        if self.boosting.load(Ordering::Relaxed) {
-            let current = self.boost_time.fetch_add(1, Ordering::Relaxed) + 1;
-            let total = self.boost_time_total.load(Ordering::Relaxed);
-            if current >= total {
-                self.boosting.store(false, Ordering::Relaxed);
-            }
-        }
-    }
-
-    #[must_use]
-    pub fn boost_factor(&self) -> f32 {
-        if self.boosting.load(Ordering::Relaxed) {
-            let current = self.boost_time.load(Ordering::Relaxed) as f32;
-            let total = self.boost_time_total.load(Ordering::Relaxed).max(1) as f32;
-            1.0 + 1.15 * (current / total * std::f32::consts::PI).sin()
-        } else {
-            1.0
+        if self.boosting.load(Ordering::Relaxed)
+            && self.boost_time.fetch_add(1, Ordering::Relaxed)
+                > self.boost_time_total.load(Ordering::Relaxed)
+        {
+            self.boosting.store(false, Ordering::Relaxed);
         }
     }
 }

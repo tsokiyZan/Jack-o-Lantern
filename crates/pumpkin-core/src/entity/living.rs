@@ -1538,6 +1538,13 @@ impl LivingEntity {
             self.jumping_cooldown.fetch_sub(1, Relaxed);
         }
 
+        // Vanilla `aiStep`: a vehicle its rider's client moves only loses velocity here.
+        if !caller.can_simulate_movement() {
+            self.entity
+                .velocity
+                .store(self.entity.velocity.load() * 0.98);
+        }
+
         let should_swim_in_fluids = caller.get_player().is_none_or(|player| !player.is_flying());
 
         self.entity.check_zero_velo();
@@ -1554,7 +1561,7 @@ impl LivingEntity {
             let input = self.movement_input.load();
             self.movement_input.store(Vector3::new(0.0, input.y, 0.0));
         } else if let Some(mob) = caller.get_mob()
-            && !mob.get_mob_entity().is_no_ai()
+            && mob.is_effective_ai()
         {
             mob.get_mob_entity().server_ai_step(mob, caller);
         }
@@ -1601,14 +1608,24 @@ impl LivingEntity {
 
         let touching_water = self.entity.touching_water.load(SeqCst);
 
-        // Vanilla Mob.isEffectiveAi: NoAI mobs don't travel, so they neither move nor fall.
+        // Vanilla `Mob.isEffectiveAi`: NoAI mobs don't travel, so they neither move nor fall.
         let effective_ai = caller
             .get_mob()
-            .is_none_or(|mob| !mob.get_mob_entity().is_no_ai());
+            .is_none_or(super::mob::Mob::is_effective_ai);
 
         // Strider is the only entity that has canWalkOnFluid = false
 
-        if !effective_ai {
+        if let Some(mob) = caller.get_mob()
+            && let Some(controller) = caller.controlling_passenger()
+            && let Some(controller) = controller.get_player()
+            && self.is_alive()
+        {
+            // Vanilla `travelRidden`. The server never simulates a vehicle a player steers
+            // (`canSimulateMovement`), so of it only `tickRidden` runs; the steering client
+            // moves the vehicle with `getRiddenInput` and `getRiddenSpeed`.
+            mob.tick_ridden(controller);
+            self.entity.velocity.store(Vector3::default());
+        } else if !effective_ai || !caller.can_simulate_movement() {
             // No travel.
         } else if caller
             .get_mob()
