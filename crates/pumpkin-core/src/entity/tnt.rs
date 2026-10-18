@@ -13,14 +13,11 @@ use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::codec::var_int::VarInt;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
-use std::{
-    f64::consts::TAU,
-    sync::{
-        Arc,
-        atomic::{
-            AtomicU32,
-            Ordering::{self, Relaxed},
-        },
+use std::sync::{
+    Arc,
+    atomic::{
+        AtomicU32,
+        Ordering::{self, Relaxed},
     },
 };
 use uuid::Uuid;
@@ -111,10 +108,13 @@ impl TNTEntity {
             f64::from(position.0.z) + 0.5,
         );
         let entity = Entity::new(world.clone(), pos, &EntityType::TNT);
-        let rot = rand::random::<f64>() * TAU;
-        entity
-            .velocity
-            .store(Vector3::new(-rot.sin() * 0.02, 0.2, -rot.cos() * 0.02));
+        // Vanilla's constructor: `nextDouble() * (float) (Math.PI * 2)` and a `0.2F` pop.
+        let rot = rand::random::<f64>() * f64::from(std::f32::consts::TAU);
+        entity.velocity.store(Vector3::new(
+            -rot.sin() * 0.02,
+            f64::from(0.2f32),
+            -rot.cos() * 0.02,
+        ));
         let tnt = Self::new(entity, Self::DEFAULT_POWER, fuse);
         tnt.owner
             .store(owner.map(|owner| owner.get_entity().entity_uuid));
@@ -164,8 +164,10 @@ impl EntityBase for TNTEntity {
     fn tick(&self, caller: &dyn EntityBase, _server: &Server) {
         let entity = &self.entity;
 
+        // Vanilla `applyGravity` stores the new velocity, then `move` uses it.
         let mut velo = entity.velocity.load();
         velo.y -= self.current_gravity();
+        entity.velocity.store(velo);
 
         entity.move_entity(caller, velo);
         entity.tick_block_collisions(caller);
