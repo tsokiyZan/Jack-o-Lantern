@@ -39,6 +39,12 @@ pub struct SpiderEntity {
 impl SpiderEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        // Vanilla `Spider.createNavigation`.
+        *mob_entity
+            .navigator
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) =
+            crate::entity::ai::pathfinder::Navigator::wall_climber();
         let spider = Self {
             mob_entity,
             is_climbing: AtomicBool::new(false),
