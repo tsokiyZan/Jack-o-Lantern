@@ -21,7 +21,9 @@ use pumpkin_data::world::WorldEvent;
 use pumpkin_data::{Block, BlockDirection};
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
-use pumpkin_world::generation::generator::structure_finder::find_nearest_structure;
+use pumpkin_world::generation::generator::structure_finder::{
+    StructureSearch, find_nearest_structure,
+};
 use pumpkin_world::world::BlockFlags;
 
 use crate::entity::player::Player;
@@ -148,11 +150,25 @@ fn find_stronghold(world: &Arc<World>, origin: BlockPos) -> Option<BlockPos> {
 
     let strongholds = StructureSet::get("strongholds")?;
 
-    find_nearest_structure(
-        origin,
-        &[&strongholds.placement],
-        100, // max search radius in chunks, matches vanilla default
-        seed as i64,
-        global_cache,
-    )
+    let search = || {
+        find_nearest_structure(
+            origin,
+            &[&strongholds.placement],
+            100, // max search radius in chunks, matches vanilla default
+            seed as i64,
+            global_cache,
+        )
+    };
+    // Vanilla `getRingPositionsFor` joins the ring future: wait for the background search.
+    let result = match search() {
+        StructureSearch::Pending => {
+            global_cache.get_stronghold_chunks();
+            search()
+        }
+        result => result,
+    };
+    match result {
+        StructureSearch::Found(pos) => Some(pos),
+        StructureSearch::NotFound | StructureSearch::Pending => None,
+    }
 }

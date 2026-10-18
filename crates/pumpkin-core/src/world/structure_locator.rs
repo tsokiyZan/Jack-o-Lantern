@@ -2,7 +2,7 @@ use pumpkin_data::structures::{StructureKeys, StructurePlacementType, StructureS
 use pumpkin_data::tag::Tag;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_world::generation::generator::structure_finder::{
-    find_nearest_structure, find_nearest_structure_start,
+    StructureSearch, find_nearest_structure, find_nearest_structure_start,
 };
 
 use super::World;
@@ -78,13 +78,28 @@ impl World {
                 StructurePlacementType::ConcentricRings(_) => world_gen
                     .global_structure_cache()
                     .and_then(|global_cache| {
-                        find_nearest_structure(
-                            origin,
-                            &[&set.placement],
-                            search_radius,
-                            seed as i64,
-                            global_cache,
-                        )
+                        let search = || {
+                            find_nearest_structure(
+                                origin,
+                                &[&set.placement],
+                                search_radius,
+                                seed as i64,
+                                global_cache,
+                            )
+                        };
+                        // Vanilla `getRingPositionsFor` joins the ring future: wait for the
+                        // background search.
+                        let result = match search() {
+                            StructureSearch::Pending => {
+                                global_cache.get_stronghold_chunks();
+                                search()
+                            }
+                            result => result,
+                        };
+                        match result {
+                            StructureSearch::Found(pos) => Some(pos),
+                            StructureSearch::NotFound | StructureSearch::Pending => None,
+                        }
                     })
                     .map(|pos| (pos, keys[0])),
                 // Everything else is spread over a grid whose candidate chunks

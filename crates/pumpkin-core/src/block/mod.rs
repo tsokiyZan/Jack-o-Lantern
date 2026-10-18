@@ -515,20 +515,19 @@ pub fn projectile_may_interact(world: &World, projectile: &dyn EntityBase, pos: 
     let owner = projectile
         .get_owner_id()
         .and_then(|id| world.get_entity_by_id(id));
-    match owner {
-        Some(owner) => match owner.get_player() {
-            Some(player) => {
+    owner.is_none_or(|owner| {
+        owner.get_player().map_or_else(
+            || world.level_info.load().game_rules.mob_griefing,
+            |player| {
                 !world.is_in_spawn_protection(player, pos)
                     && world
                         .worldborder
                         .lock()
                         .unwrap_or_else(std::sync::PoisonError::into_inner)
                         .contains_block(pos.0.x, pos.0.z)
-            }
-            None => world.level_info.load().game_rules.mob_griefing,
-        },
-        None => true,
-    }
+            },
+        )
+    })
 }
 
 pub struct OnScheduledTickArgs<'a> {
