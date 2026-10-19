@@ -1437,7 +1437,12 @@ impl World {
             1.0,
             seed,
         );
-        self.broadcast_packet_all(&packet);
+        self.broadcast_sound(
+            &packet,
+            position,
+            sound_range(1.0, event_fixed_range(sound)),
+            None,
+        );
     }
 
     pub fn play_sound_event_expect(
@@ -1458,7 +1463,12 @@ impl World {
             1.0,
             seed,
         );
-        self.broadcast_packet_except(&[player.gameprofile.id], &packet);
+        self.broadcast_sound(
+            &packet,
+            position,
+            sound_range(1.0, event_fixed_range(sound)),
+            Some(player),
+        );
     }
 
     pub fn play_sound_fine(
@@ -1493,7 +1503,7 @@ impl World {
             pitch,
             seed,
         );
-        self.broadcast_packet_all(&packet);
+        self.broadcast_sound(&packet, position, sound_range(volume, None), None);
     }
 
     /// Spawns a cluster of particles in the world for all players in range.
@@ -1567,20 +1577,26 @@ impl World {
     ) {
         let seed = rand::rng().random::<i64>();
         let packet = CSoundEffect::new(IdOr::Id(sound_id), category, position, volume, pitch, seed);
+        self.broadcast_sound(&packet, position, sound_range(volume, None), None);
+    }
 
-        // Calculate the number of chunks the sound can be heard from based on its volume.
-        let audible_chunks = f64::from(volume.max(1.0)).ceil() as i32;
-        let chunk_pos = BlockPos::floored_v(*position).chunk_position();
-
+    /// Vanilla `PlayerList.broadcast`, as `ServerLevel.playSeededSound` calls it: every player
+    /// in this world but `except` closer than `range` to `position`.
+    fn broadcast_sound<P: ClientPacket>(
+        &self,
+        packet: &P,
+        position: &Vector3<f64>,
+        range: f32,
+        except: Option<&Player>,
+    ) {
+        let range = f64::from(range);
         let players = self.players.load();
         let recipients = players.iter().filter(|p| {
-            let center = p.get_entity().chunk_pos.load();
-            // If the sound reaches their chunk, send it!
-            is_within_chebyshev_distance(chunk_pos, center, audible_chunks)
+            except.is_none_or(|except| p.gameprofile.id != except.gameprofile.id)
+                && p.get_entity().pos.load().squared_distance_to_vec(position) < range * range
         });
-
         let recipients_by_version = Self::collect_java_recipients_by_version(recipients);
-        Self::broadcast_java_grouped(&packet, recipients_by_version);
+        Self::broadcast_java_grouped(packet, recipients_by_version);
     }
 
     /// Vanilla `Level.playSound(null, entity, ...)`: a sound that follows `entity`.
@@ -1601,18 +1617,7 @@ impl World {
             pitch,
             seed,
         );
-
-        let audible_chunks = f64::from(volume.max(1.0)).ceil() as i32;
-        let chunk_pos = entity.chunk_pos.load();
-
-        let players = self.players.load();
-        let recipients = players.iter().filter(|p| {
-            let center = p.get_entity().chunk_pos.load();
-            is_within_chebyshev_distance(chunk_pos, center, audible_chunks)
-        });
-
-        let recipients_by_version = Self::collect_java_recipients_by_version(recipients);
-        Self::broadcast_java_grouped(&packet, recipients_by_version);
+        self.broadcast_sound(&packet, &entity.pos.load(), sound_range(volume, None), None);
     }
 
     pub fn play_sound_raw_expect(
@@ -1626,23 +1631,7 @@ impl World {
     ) {
         let seed = rand::rng().random::<i64>();
         let packet = CSoundEffect::new(IdOr::Id(sound_id), category, position, volume, pitch, seed);
-
-        let audible_chunks = f64::from(volume.max(1.0)).ceil() as i32;
-        let chunk_pos = BlockPos::floored_v(*position).chunk_position();
-
-        let players = self.players.load();
-        let recipients = players.iter().filter(|p| {
-            // Skip the expected player
-            if p.gameprofile.id == player.gameprofile.id {
-                return false;
-            }
-
-            let center = p.get_entity().chunk_pos.load();
-            is_within_chebyshev_distance(chunk_pos, center, audible_chunks)
-        });
-
-        let recipients_by_version = Self::collect_java_recipients_by_version(recipients);
-        Self::broadcast_java_grouped(&packet, recipients_by_version);
+        self.broadcast_sound(&packet, position, sound_range(volume, None), Some(player));
     }
 
     pub fn play_block_sound(&self, sound: Sound, category: SoundCategory, position: BlockPos) {
@@ -8073,6 +8062,22 @@ fn merge_entity_records(data: &mut Vec<NbtCompound>, live: bool, fresh: Vec<NbtC
             data.retain(|existing| existing.get_uuid("UUID") != Some(uuid));
         }
         data.push(record);
+    }
+}
+
+/// Vanilla `SoundEvent.getRange`: a fixed range if the event has one, else 16 blocks,
+/// stretched for a volume above 1.
+fn sound_range(volume: f32, fixed_range: Option<f32>) -> f32 {
+    fixed_range.unwrap_or(if volume > 1.0 { 16.0 * volume } else { 16.0 })
+}
+
+/// The fixed range of an inline sound event; registry sound events have none.
+const fn event_fixed_range(
+    sound: &pumpkin_data::data_component_impl::IdOr<pumpkin_data::data_component_impl::SoundEvent>,
+) -> Option<f32> {
+    match sound {
+        pumpkin_data::data_component_impl::IdOr::Value(event) => event.range,
+        pumpkin_data::data_component_impl::IdOr::Id(_) => None,
     }
 }
 
