@@ -1894,7 +1894,6 @@ impl Entity {
         main.map(|(pos, _)| pos)
     }
 
-    #[expect(clippy::float_cmp)]
     fn adjust_movement_for_collisions(
         &self,
         movement: Vector3<f64>,
@@ -1910,7 +1909,7 @@ impl Entity {
 
         let bounding_box = self.bounding_box.load();
 
-        let (collisions, block_positions) = self
+        let (collisions, _) = self
             .world
             .load()
             .get_block_collisions(bounding_box.stretch(movement), caller);
@@ -1919,69 +1918,46 @@ impl Entity {
             return movement;
         }
 
-        let mut adjusted_movement = movement;
-
-        // Y-Axis adjustment
-        if movement.get_axis(Axis::Y) != 0.0 {
-            let mut max_time = 1.0;
-            if !block_positions.is_empty() {
-                let mut collided_below = false;
-
-                for inert_box in &collisions {
-                    if let Some(collision_time) = bounding_box.calculate_collision_time(
-                        inert_box,
-                        adjusted_movement,
-                        Axis::Y,
-                        max_time,
-                    ) {
-                        max_time = collision_time;
-
-                        if movement.get_axis(Axis::Y) < 0.0 {
-                            collided_below = true;
-                        }
-                    }
-                }
-
-                if max_time != 1.0 {
-                    let changed_component = adjusted_movement.get_axis(Axis::Y) * max_time;
-                    adjusted_movement.set_axis(Axis::Y, changed_component);
-                }
-
-                self.on_ground.store(collided_below, Ordering::SeqCst);
-            }
-        }
-
-        let mut horizontal_collision = false;
-
-        for axis in Axis::horizontal() {
-            if movement.get_axis(axis) == 0.0 {
+        // Vanilla `collideWithShapes`: each axis in `Direction.axisStepOrder`, the box moved by
+        // what the earlier axes allowed, every shape clamping the move (`Shapes.collide`).
+        let order = if movement.x.abs() < movement.z.abs() {
+            [Axis::Y, Axis::Z, Axis::X]
+        } else {
+            [Axis::Y, Axis::X, Axis::Z]
+        };
+        let mut resolved = Vector3::new(0.0, 0.0, 0.0);
+        for axis in order {
+            let axis_movement = movement.get_axis(axis);
+            if axis_movement == 0.0 {
                 continue;
             }
-
-            let mut max_time = 1.0;
-
-            for inert_box in &collisions {
-                if let Some(collision_time) = bounding_box.calculate_collision_time(
-                    inert_box,
-                    adjusted_movement,
-                    axis,
-                    max_time,
-                ) {
-                    max_time = collision_time;
+            let moving = bounding_box.shift(resolved);
+            let mut distance = axis_movement;
+            for shape in &collisions {
+                if distance.abs() < 1.0e-7 {
+                    distance = 0.0;
+                    break;
                 }
+                distance = shape.collide_along(&moving, axis, distance);
             }
-
-            if max_time != 1.0 {
-                let changed_component = adjusted_movement.get_axis(axis) * max_time;
-                adjusted_movement.set_axis(axis, changed_component);
-                horizontal_collision = true;
-            }
+            resolved.set_axis(axis, distance);
         }
 
-        self.horizontal_collision
-            .store(horizontal_collision, Ordering::SeqCst);
+        // `Entity.collide`'s `onGroundAfterCollision`, and `Entity.move`'s horizontal
+        // collision (`Mth.equal`: closer than `1.0E-5F`).
+        #[expect(
+            clippy::float_cmp,
+            reason = "vanilla compares the collided movement exactly"
+        )]
+        let collided_below = movement.y != resolved.y && movement.y < 0.0;
+        self.on_ground.store(collided_below, Ordering::SeqCst);
+        let differs = |a: f64, b: f64| (b - a).abs() >= f64::from(1.0e-5f32);
+        self.horizontal_collision.store(
+            differs(movement.x, resolved.x) || differs(movement.z, resolved.z),
+            Ordering::SeqCst,
+        );
 
-        adjusted_movement
+        resolved
     }
 
     /// Applies knockback to the entity, following vanilla Minecraft's mechanics.

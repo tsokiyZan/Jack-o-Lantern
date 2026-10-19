@@ -1,4 +1,4 @@
-use crate::math::{vector2::Vector2, vector3::Axis};
+use crate::math::vector3::Axis;
 
 use super::{position::BlockPos, vector3::Vector3};
 
@@ -9,49 +9,6 @@ pub struct BoundingBox {
     pub min: Vector3<f64>,
     /// The maximum corner of the box.
     pub max: Vector3<f64>,
-}
-
-/// Represents a 2D bounding plane used for collision checks.
-#[derive(Clone, Copy, Debug)]
-struct BoundingPlane {
-    /// The minimum corner of the plane.
-    pub min: Vector2<f64>,
-    /// The maximum corner of the plane.
-    pub max: Vector2<f64>,
-}
-
-impl BoundingPlane {
-    /// Checks whether this plane intersects another plane.
-    ///
-    /// # Arguments
-    /// * `other` – The other bounding plane to check against.
-    pub fn intersects(&self, other: &Self) -> bool {
-        self.min.x < other.max.x
-            && self.max.x > other.min.x
-            && self.min.y < other.max.y
-            && self.max.y > other.min.y
-    }
-
-    /// Projects a 3D bounding box onto a 2D plane by excluding one axis.
-    ///
-    /// # Arguments
-    /// * `bounding_box` – The 3D bounding box to project.
-    /// * `excluded` – The axis to exclude from the projection.
-    pub const fn from_box(bounding_box: &BoundingBox, excluded: Axis) -> Self {
-        let [axis1, axis2] = Axis::excluding(excluded);
-
-        Self {
-            min: Vector2::new(
-                bounding_box.get_side(false).get_axis(axis1),
-                bounding_box.get_side(false).get_axis(axis2),
-            ),
-
-            max: Vector2::new(
-                bounding_box.get_side(true).get_axis(axis1),
-                bounding_box.get_side(true).get_axis(axis2),
-            ),
-        }
-    }
 }
 
 impl BoundingBox {
@@ -256,38 +213,46 @@ impl BoundingBox {
     ///
     /// # Returns
     /// Some(f64) if a collision occurs within `max_time`, None otherwise.
+    /// Vanilla `VoxelShape.collide` for this box as a one-cell shape: how far `moving` can go
+    /// along `axis` (up to `distance`) before hitting it. The box only blocks when it overlaps
+    /// `moving` by more than `1.0E-7` on the other two axes and lies ahead of it.
     #[must_use]
-    pub fn calculate_collision_time(
-        &self,
-        other: &Self,
-        movement: Vector3<f64>,
-        axis: Axis,
-        max_time: f64, // NOTE: Start with 1.0
-    ) -> Option<f64> {
-        let movement_on_axis = movement.get_axis(axis);
-
-        if movement_on_axis == 0.0 {
-            return None;
+    pub fn collide_along(&self, moving: &Self, axis: Axis, distance: f64) -> f64 {
+        const EPSILON: f64 = 1.0e-7;
+        if distance.abs() < EPSILON {
+            return 0.0;
         }
-
-        let move_positive = movement_on_axis.is_sign_positive();
-        let self_plane_const = self.get_side(move_positive).get_axis(axis);
-        let other_plane_const = other.get_side(!move_positive).get_axis(axis);
-        let collision_time = (other_plane_const - self_plane_const) / movement_on_axis;
-
-        if collision_time < 0.0 || collision_time >= max_time {
-            return None;
+        // `findIndex` over the box's two coordinates, for the other axes' cell range.
+        let overlaps = |axis: Axis| {
+            moving.min.get_axis(axis) + EPSILON < self.max.get_axis(axis)
+                && moving.max.get_axis(axis) - EPSILON >= self.min.get_axis(axis)
+        };
+        let (b, c) = match axis {
+            Axis::X => (Axis::Y, Axis::Z),
+            Axis::Y => (Axis::Z, Axis::X),
+            Axis::Z => (Axis::X, Axis::Y),
+        };
+        if !overlaps(b) || !overlaps(c) {
+            return distance;
         }
-
-        let self_moved = self.shift(movement * collision_time);
-        let self_plane_moved = BoundingPlane::from_box(&self_moved, axis);
-        let other_plane = BoundingPlane::from_box(other, axis);
-
-        if !self_plane_moved.intersects(&other_plane) {
-            return None;
+        if distance > 0.0 {
+            let max_a = moving.max.get_axis(axis);
+            if max_a - EPSILON < self.min.get_axis(axis) {
+                let new_distance = self.min.get_axis(axis) - max_a;
+                if new_distance >= -EPSILON {
+                    return distance.min(new_distance);
+                }
+            }
+        } else {
+            let min_a = moving.min.get_axis(axis);
+            if min_a + EPSILON >= self.max.get_axis(axis) {
+                let new_distance = self.max.get_axis(axis) - min_a;
+                if new_distance <= EPSILON {
+                    return distance.max(new_distance);
+                }
+            }
         }
-
-        Some(collision_time)
+        distance
     }
 
     /// Returns the average side length of the bounding box.
