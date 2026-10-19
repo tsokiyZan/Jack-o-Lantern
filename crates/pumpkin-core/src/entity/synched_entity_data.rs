@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -56,7 +56,8 @@ pub struct DataItem {
 }
 
 pub struct SynchedEntityData {
-    items: Mutex<HashMap<TrackedData, DataItem>>,
+    /// By index, so packets list the values in vanilla's `itemsById` order.
+    items: Mutex<BTreeMap<u8, DataItem>>,
     is_dirty: AtomicBool,
 }
 
@@ -69,9 +70,9 @@ impl Default for SynchedEntityData {
 impl SynchedEntityData {
     /// An empty tracker; values are added by [`Self::define`] and [`Self::set`].
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
-            items: Mutex::new(HashMap::new()),
+            items: Mutex::new(BTreeMap::new()),
             is_dirty: AtomicBool::new(false),
         }
     }
@@ -90,7 +91,7 @@ impl SynchedEntityData {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         items.insert(
-            tracked,
+            tracked.id.0,
             DataItem {
                 tracked,
                 serializer: Box::new(holder),
@@ -115,7 +116,7 @@ impl SynchedEntityData {
             .items
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        if let Some(item) = items.get_mut(&tracked) {
+        if let Some(item) = items.get_mut(&tracked.id.0) {
             if item.canonical_bytes == new_canonical {
                 return false;
             }
@@ -125,7 +126,7 @@ impl SynchedEntityData {
             item.is_default = false;
         } else {
             items.insert(
-                tracked,
+                tracked.id.0,
                 DataItem {
                     tracked,
                     serializer: Box::new(holder),
