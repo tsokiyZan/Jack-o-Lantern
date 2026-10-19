@@ -65,6 +65,18 @@ Jack o'Lantern is tsokiyZan's fork of Pumpkin, a Minecraft server written in Rus
 | Endermen teleport by day, drop their carried block and dodge projectiles; bats fly and roost like vanilla; giants have no AI | Ported here |
 | Llamas, iron golems (village defence), polar bears, the wither and skeleton horse traps follow vanilla | Ported here from each mob's class and goals |
 | Armadillos run on vanilla's brain (rolling up, scutes, brushing) | Ported here from `Armadillo` and `ArmadilloAi` |
+| Frogs, tadpoles, allays, breezes, sniffers, goats, hoglins, zoglins, creakings, nautiluses and zombie nautiluses run on vanilla's brains | Ported here from each mob's `*Ai` |
+| The ender dragon and its phases, and dragon fireballs | Ported here from `EnderDragon` |
+| Blazes hover and shoot like vanilla; small and large fireballs, wither skulls and dragon fireballs fly like `AbstractHurtingProjectile`; experience orbs are vanilla's `ExperienceOrb` | Ported here |
+| Spiders and cave spiders climb walls with `WallClimberNavigation`; cave spiders skip `Spider`'s spawn setup | Ported here |
+| Collisions resolve one axis at a time like `collideWithShapes`, and walking mobs step up anything within their step height | Ported here from `Entity.collide` |
+| Passengers tick with their vehicle and sit where vanilla puts them, from vanilla's attachment points; saddles are equipment, and mount inventories, riding jumps and steered vehicles follow vanilla; `/summon` loads `Passengers` | Ported here from `positionRider`, `EntityAttachments` and `AbstractHorse` |
+| Primed TNT falls like `PrimedTnt`; a dying mob stops on the tick it is removed | Fixed here |
+| Post-attack enchantment effects (Thorns and others), armour wear, the mace smash, data-driven Unbreaking, Soul Speed and Frost Walker, difficulty damage scaling, vanilla fall distance | Ported here from `EnchantmentHelper` and `LivingEntity` |
+| `execute if`/`unless` and `execute store`, functions with `return`, macros and limits, `/team`, `/swing`, `/compute` and `/data` | Ported here from vanilla's commands |
+| Saves use 26.3's data version and block state codec, keep chunk tags Pumpkin doesn't model, and keep game time, world clocks and the world border; scheduled ticks take any delay | Ported here |
+| Clients get vanilla's recipe sync (furnace, smithing and brewing inputs, stonecutter recipes), so the stonecutter works and JEI starts on join | Ported here from `ClientboundUpdateRecipesPacket` |
+| Anvil stays the default chunk format; upstream's `.pump` format and `--convert-world` are available | Kept here over upstream's default |
 | `/effect` targets any entity | Fixed here |
 
 ## Issues
@@ -75,11 +87,11 @@ this fork, which says nothing about its state upstream. Please report upstream b
 
 ## Running a debug build
 
-Debug builds currently overflow the stack during chunk generation unless threads get a
-larger stack:
+Debug builds overflow the stack during chunk generation unless threads get a larger stack
+(release builds manage with 32 MiB):
 
 ```bash
-RUST_MIN_STACK=33554432 cargo run -p pumpkin
+RUST_MIN_STACK=268435456 cargo run -p pumpkin
 ```
 
 ## Credit and license
