@@ -13,7 +13,7 @@ use pumpkin_data::attributes::Attributes;
 use pumpkin_data::entity::EntityType;
 use pumpkin_util::math::boundingbox::BoundingBox;
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 use std::sync::Arc;
 
 const DEFAULT_RECIPROCAL_CHANCE: i32 = 10;
@@ -294,7 +294,11 @@ impl Goal for ActiveTargetGoal {
             return false;
         }
         if self.reciprocal_chance > 0
-            && mob.get_random().random_range(0..self.reciprocal_chance) != 0
+            && mob
+                .get_entity()
+                .random()
+                .next_bounded_i32(self.reciprocal_chance)
+                != 0
         {
             return false;
         }

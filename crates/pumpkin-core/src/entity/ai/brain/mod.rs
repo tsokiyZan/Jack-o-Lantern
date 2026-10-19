@@ -393,9 +393,8 @@ impl BrainProvider {
         for id in self.memory_types {
             brain.memories.register(*id);
         }
-        let mut rng = mob.get_random();
         for ty in self.sensor_types {
-            let sensor = SensorEntry::new(*ty, &mut rng);
+            let sensor = SensorEntry::new(*ty, &mut *mob.get_entity().random());
             for id in sensor.requires() {
                 brain.memories.register(*id);
             }

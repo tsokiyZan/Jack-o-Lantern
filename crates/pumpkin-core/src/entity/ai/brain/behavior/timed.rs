@@ -108,11 +108,7 @@ impl<B: Behavior> BehaviorControl for Timed<B> {
         }
         let min = self.inner.min_duration();
         let max = self.inner.max_duration();
-        let duration = min
-            + tick
-                .mob
-                .get_random()
-                .random_range(0..(max + 1 - min).max(1));
+        let duration = min + rand::rng().random_range(0..(max + 1 - min).max(1));
         self.start_at(tick.time, duration);
         self.inner.start(tick);
         true

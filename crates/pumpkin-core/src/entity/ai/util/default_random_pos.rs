@@ -11,12 +11,14 @@ pub fn get_pos(mob: &dyn Mob, horizontal_dist: i32, vertical_dist: i32) -> Optio
     let restrict = goal_utils::mob_restricted(mob, f64::from(horizontal_dist));
     let world = mob.get_entity().world.load_full();
     let mut context = new_context(mob, &world);
-    let mut rng = mob.get_random();
 
     random_pos::generate_random_pos(
         || {
-            let direction =
-                random_pos::generate_random_direction(&mut rng, horizontal_dist, vertical_dist);
+            let direction = random_pos::generate_random_direction(
+                &mut *mob.get_entity().random(),
+                horizontal_dist,
+                vertical_dist,
+            );
             toward_direction(
                 mob,
                 &world,
@@ -24,7 +26,6 @@ pub fn get_pos(mob: &dyn Mob, horizontal_dist: i32, vertical_dist: i32) -> Optio
                 f64::from(horizontal_dist),
                 restrict,
                 direction,
-                &mut rng,
             )
         },
         |pos| f64::from(mob.get_walk_target_value(pos)),
@@ -99,12 +100,11 @@ fn generate_in_direction(
     let restrict = goal_utils::mob_restricted(mob, f64::from(horizontal_dist));
     let world = mob.get_entity().world.load_full();
     let mut context = new_context(mob, &world);
-    let mut rng = mob.get_random();
 
     random_pos::generate_random_pos(
         || {
             let direction = random_pos::generate_random_direction_within_radians(
-                &mut rng,
+                &mut *mob.get_entity().random(),
                 0.0,
                 f64::from(horizontal_dist),
                 vertical_dist,
@@ -120,7 +120,6 @@ fn generate_in_direction(
                 f64::from(horizontal_dist),
                 restrict,
                 direction,
-                &mut rng,
             )
         },
         |pos| f64::from(mob.get_walk_target_value(pos)),
@@ -142,10 +141,13 @@ fn toward_direction(
     horizontal_dist: f64,
     restrict: bool,
     direction: Vector3<i32>,
-    rng: &mut impl rand::RngExt,
 ) -> Option<BlockPos> {
-    let pos =
-        random_pos::generate_random_pos_toward_direction(mob, horizontal_dist, rng, direction);
+    let pos = random_pos::generate_random_pos_toward_direction(
+        mob,
+        horizontal_dist,
+        &mut *mob.get_entity().random(),
+        direction,
+    );
     (!goal_utils::is_outside_limits(&pos, world)
         && !goal_utils::is_restricted(restrict, mob, &pos)
         && !goal_utils::is_not_stable(mob, world, &pos)

@@ -1,6 +1,6 @@
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::mob::Mob;
 
@@ -9,20 +9,20 @@ pub const RANDOM_POS_ATTEMPTS: usize = 10;
 const SQRT_OF_TWO: f32 = std::f32::consts::SQRT_2;
 
 pub fn generate_random_direction(
-    rng: &mut impl RngExt,
+    rng: &mut impl RandomImpl,
     horizontal_dist: i32,
     vertical_dist: i32,
 ) -> Vector3<i32> {
     Vector3::new(
-        rng.random_range(0..2 * horizontal_dist + 1) - horizontal_dist,
-        rng.random_range(0..2 * vertical_dist + 1) - vertical_dist,
-        rng.random_range(0..2 * horizontal_dist + 1) - horizontal_dist,
+        rng.next_bounded_i32(2 * horizontal_dist + 1) - horizontal_dist,
+        rng.next_bounded_i32(2 * vertical_dist + 1) - vertical_dist,
+        rng.next_bounded_i32(2 * horizontal_dist + 1) - horizontal_dist,
     )
 }
 
 #[allow(clippy::too_many_arguments, reason = "mirrors the upstream signature")]
 pub fn generate_random_direction_within_radians(
-    rng: &mut impl RngExt,
+    rng: &mut impl RandomImpl,
     min_horizontal_dist: f64,
     max_horizontal_dist: f64,
     vertical_dist: i32,
@@ -34,10 +34,10 @@ pub fn generate_random_direction_within_radians(
     // TODO: Mth.atan2
     let y_radians_center = z_dir.atan2(x_dir) - f64::from(std::f32::consts::FRAC_PI_2);
     // Separate multiplies and adds: a fused multiply-add rounds differently from Java.
-    let spread = 2.0f32 * rng.random::<f32>() - 1.0f32;
+    let spread = 2.0f32 * rng.next_f32() - 1.0f32;
     let y_radians = y_radians_center + f64::from(spread) * max_xz_radians_from_dir;
-    let lerped = min_horizontal_dist
-        + rng.random::<f64>().sqrt() * (max_horizontal_dist - min_horizontal_dist);
+    let lerped =
+        min_horizontal_dist + rng.next_f64().sqrt() * (max_horizontal_dist - min_horizontal_dist);
     let dist = lerped * f64::from(SQRT_OF_TWO);
 
     let xt = -dist * y_radians.sin();
@@ -46,7 +46,7 @@ pub fn generate_random_direction_within_radians(
         return None;
     }
 
-    let yt = rng.random_range(0..2 * vertical_dist + 1) - vertical_dist + flying_height;
+    let yt = rng.next_bounded_i32(2 * vertical_dist + 1) - vertical_dist + flying_height;
     Some(Vector3::new(
         xt.floor() as i32,
         f64::from(yt).floor() as i32,
@@ -130,7 +130,7 @@ pub fn generate_random_pos(
 pub fn generate_random_pos_toward_direction(
     mob: &dyn Mob,
     xz_dist: f64,
-    rng: &mut impl RngExt,
+    rng: &mut impl RandomImpl,
     direction: Vector3<i32>,
 ) -> BlockPos {
     let mob_entity = mob.get_mob_entity();
@@ -141,15 +141,15 @@ pub fn generate_random_pos_toward_direction(
     if mob_entity.has_position_target() && xz_dist > 1.0 {
         let center = mob_entity.position_target.load();
         if mob_pos.x > f64::from(center.0.x) {
-            xt -= rng.random::<f64>() * xz_dist / 2.0;
+            xt -= rng.next_f64() * xz_dist / 2.0;
         } else {
-            xt += rng.random::<f64>() * xz_dist / 2.0;
+            xt += rng.next_f64() * xz_dist / 2.0;
         }
 
         if mob_pos.z > f64::from(center.0.z) {
-            zt -= rng.random::<f64>() * xz_dist / 2.0;
+            zt -= rng.next_f64() * xz_dist / 2.0;
         } else {
-            zt += rng.random::<f64>() * xz_dist / 2.0;
+            zt += rng.next_f64() * xz_dist / 2.0;
         }
     }
 

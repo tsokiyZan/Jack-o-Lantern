@@ -1,7 +1,10 @@
+use std::sync::Arc;
+
 use pumpkin_data::Block;
 use pumpkin_util::math::{position::BlockPos, vector3::Vector3};
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
+use crate::entity::EntityBase;
 use crate::entity::ai::pathfinder::{
     node::{Node, PathType, Target},
     node_evaluator::{MobData, NodeEvaluator},
@@ -60,8 +63,12 @@ impl FlyNodeEvaluator {
         if let Some(n) = node { !n.closed } else { false }
     }
 
-    /// Vanilla `FlyNodeEvaluator.iteratePathfindingStartNodeCandidatePositions`.
-    fn start_node_candidate_positions(mob_data: &MobData) -> Vec<Vector3<i32>> {
+    /// Vanilla `FlyNodeEvaluator.iteratePathfindingStartNodeCandidatePositions`. Lazy like
+    /// vanilla's iterator, so a small mob only draws until a candidate is accepted.
+    fn start_node_candidate_positions(
+        mob_data: &MobData,
+        mob: Option<Arc<dyn EntityBase>>,
+    ) -> Box<dyn Iterator<Item = Vector3<i32>>> {
         let half_width = f64::from(mob_data.width) / 2.0;
         let min_x = mob_data.position.x - half_width;
         let max_x = mob_data.position.x + half_width;
@@ -77,12 +84,15 @@ impl FlyNodeEvaluator {
         let is_small_mob = (x_size + y_size + z_size) / 3.0 < SMALL_MOB_SIZE;
         if !is_small_mob {
             let block_y = mob_data.position.y.floor() as i32;
-            return vec![
-                Vector3::new(min_x.floor() as i32, block_y, min_z.floor() as i32),
-                Vector3::new(min_x.floor() as i32, block_y, max_z.floor() as i32),
-                Vector3::new(max_x.floor() as i32, block_y, min_z.floor() as i32),
-                Vector3::new(max_x.floor() as i32, block_y, max_z.floor() as i32),
-            ];
+            return Box::new(
+                [
+                    Vector3::new(min_x.floor() as i32, block_y, min_z.floor() as i32),
+                    Vector3::new(min_x.floor() as i32, block_y, max_z.floor() as i32),
+                    Vector3::new(max_x.floor() as i32, block_y, min_z.floor() as i32),
+                    Vector3::new(max_x.floor() as i32, block_y, max_z.floor() as i32),
+                ]
+                .into_iter(),
+            );
         }
 
         let inflated = f64::from(SMALL_MOB_INFLATED_START_NODE_BOUNDING_BOX);
@@ -96,18 +106,14 @@ impl FlyNodeEvaluator {
         let to_y = (max_y + y_padding).floor() as i32;
         let to_z = (max_z + z_padding).floor() as i32;
 
-        // Vanilla `BlockPos.randomBetweenClosed` draws from the mob's random; Pumpkin
-        // mobs have no random of their own, so this is the thread RNG `Mob::get_random` uses.
-        let mut random = rand::rng();
-        (0..MAX_START_NODE_CANDIDATES)
-            .map(|_| {
-                Vector3::new(
-                    from_x + random.random_range(0..=to_x - from_x),
-                    from_y + random.random_range(0..=to_y - from_y),
-                    from_z + random.random_range(0..=to_z - from_z),
-                )
-            })
-            .collect()
+        // Vanilla `BlockPos.randomBetweenClosed(mob.getRandom(), ...)`.
+        Box::new((0..MAX_START_NODE_CANDIDATES).map_while(move |_| {
+            let mut random = mob.as_ref()?.get_entity().random();
+            let x = from_x + random.next_bounded_i32(to_x - from_x + 1);
+            let y = from_y + random.next_bounded_i32(to_y - from_y + 1);
+            let z = from_z + random.next_bounded_i32(to_z - from_z + 1);
+            Some(Vector3::new(x, y, z))
+        }))
     }
 
     /// Vanilla `FlyNodeEvaluator.getPathType`.
@@ -175,7 +181,14 @@ impl NodeEvaluator for FlyNodeEvaluator {
 
         let start_pos = Vector3::new(block_x, start_y, block_z);
         if !self.can_start_at(start_pos) {
-            for candidate in Self::start_node_candidate_positions(&mob_data) {
+            let mob = mob_data.entity_id.and_then(|id| {
+                self.walk
+                    .base
+                    .context
+                    .as_ref()
+                    .and_then(|ctx| ctx.world().get_entity_by_id(id))
+            });
+            for candidate in Self::start_node_candidate_positions(&mob_data, mob) {
                 if self.can_start_at(candidate) {
                     return Some(self.walk.get_start_node(candidate));
                 }

@@ -6,7 +6,7 @@ use crate::entity::ai::pathfinder::path::Path;
 use crate::entity::mob::Mob;
 use crate::entity::predicate::EntityPredicate;
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 const CAN_USE_CHECK_INTERVAL: i64 = 20;
 
@@ -229,10 +229,10 @@ impl Goal for MeleeAttackGoal {
                 && self.pathed_target.y == 0.0
                 && self.pathed_target.z == 0.0
                 || current_target_pos.squared_distance_to_vec(&self.pathed_target) >= 1.0
-                || mob.get_random().random::<f32>() < 0.05)
+                || mob.get_entity().random().next_f32() < 0.05)
         {
             self.pathed_target = current_target_pos;
-            self.update_countdown_ticks = 4 + mob.get_random().random_range(0..7);
+            self.update_countdown_ticks = 4 + mob.get_entity().random().next_bounded_i32(7);
             let mob_entity = mob.get_mob_entity();
             let living = &mob_entity.living_entity;
             let dist_sq = living

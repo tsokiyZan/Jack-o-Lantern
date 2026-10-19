@@ -28,7 +28,7 @@ pub fn go_to_target_location(
             {
                 return true;
             }
-            let mut rng = tick.mob.get_random();
+            let mut rng = rand::rng();
             let nearby = BlockPos::new(
                 location.0.x + rng.random_range(0..3) - 1,
                 location.0.y,

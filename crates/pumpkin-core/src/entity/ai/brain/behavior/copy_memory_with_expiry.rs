@@ -27,10 +27,7 @@ pub fn copy_memory_with_expiry<T: MemoryValue + Clone>(
                 return false;
             };
             let duration = min_duration
-                + tick
-                    .mob
-                    .get_random()
-                    .random_range(0..(max_duration + 1 - min_duration).max(1));
+                + rand::rng().random_range(0..(max_duration + 1 - min_duration).max(1));
             tick.brain
                 .set_with_expiry(target, value, i64::from(duration));
             true

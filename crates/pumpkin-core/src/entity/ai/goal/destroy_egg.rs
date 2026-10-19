@@ -6,6 +6,7 @@ use crate::world::World;
 use pumpkin_data::Block;
 use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_util::math::position::BlockPos;
+use pumpkin_util::random::RandomImpl;
 use rand::{RngExt, rng};
 use std::sync::Arc;
 
@@ -67,8 +68,8 @@ impl Goal for DestroyEggGoal {
 }
 
 impl Stepping for DestroyEggGoal {
-    fn tick_stepping(&self, world: Arc<World>, block_pos: BlockPos) {
-        let random = rng().random::<f32>();
+    fn tick_stepping(&self, mob: &dyn Mob, world: Arc<World>, block_pos: BlockPos) {
+        let random = mob.get_entity().random().next_f32();
         let pos_f64 = (block_pos.0).to_f64();
         world.play_sound_raw(
             Sound::EntityZombieDestroyEgg as u16,

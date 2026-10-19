@@ -1,6 +1,5 @@
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
 
 use super::{goal_utils, random_pos};
 use crate::entity::ai::pathfinder::pathfinding_context::PathfindingContext;
@@ -25,7 +24,6 @@ pub fn get_pos(
         Vector3::new(block_pos.0.x, block_pos.0.y, block_pos.0.z),
         world.clone(),
     );
-    let mut rng = mob.get_random();
 
     random_pos::generate_random_pos(
         || {
@@ -33,7 +31,6 @@ pub fn get_pos(
                 mob,
                 &world,
                 &mut context,
-                &mut rng,
                 horizontal_dist,
                 vertical_dist,
                 flying_height,
@@ -53,7 +50,6 @@ pub fn generate_random_pos(
     mob: &dyn Mob,
     world: &World,
     context: &mut PathfindingContext,
-    rng: &mut impl RngExt,
     horizontal_dist: i32,
     vertical_dist: i32,
     flying_height: i32,
@@ -64,7 +60,7 @@ pub fn generate_random_pos(
 ) -> Option<BlockPos> {
     let max_y = world.dimension.min_y + world.dimension.height - 1;
     let direction = random_pos::generate_random_direction_within_radians(
-        rng,
+        &mut *mob.get_entity().random(),
         0.0,
         f64::from(horizontal_dist),
         vertical_dist,
@@ -76,7 +72,7 @@ pub fn generate_random_pos(
     let pos = random_pos::generate_random_pos_toward_direction(
         mob,
         f64::from(horizontal_dist),
-        rng,
+        &mut *mob.get_entity().random(),
         direction,
     );
     if goal_utils::is_outside_limits(&pos, world) || goal_utils::is_restricted(restrict, mob, &pos)

@@ -1,4 +1,4 @@
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use super::super::BrainTick;
 use super::super::memory::{MemoryModuleId, MemoryStatus};
@@ -32,7 +32,7 @@ impl Behavior for Swim {
     }
 
     fn tick(&mut self, tick: &mut BrainTick<'_>) {
-        if tick.mob.get_random().random::<f32>() < self.chance {
+        if tick.mob.get_entity().random().next_f32() < self.chance {
             tick.mob.get_mob_entity().jump();
         }
     }

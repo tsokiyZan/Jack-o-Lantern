@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use pumpkin_util::math::wrap_degrees;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use super::super::BrainTick;
 use super::super::memory::position_tracker::{BlockPosTracker, PositionTracker};
@@ -42,18 +42,22 @@ impl Behavior for RandomLookAround {
     }
 
     fn start(&mut self, tick: &mut BrainTick<'_>) {
-        let mut random = tick.mob.get_random();
-        let pitch = (random.random::<f32>() * self.pitch_range + self.min_pitch).clamp(-90.0, 90.0);
-        let rotation = wrap_degrees(
-            tick.mob.get_entity().yaw.load() + 2.0 * random.random::<f32>() * self.max_yaw
-                - self.max_yaw,
-        );
+        let entity = tick.mob.get_entity();
+        let (pitch_roll, yaw_roll) = {
+            let mut random = entity.random();
+            (random.next_f32(), random.next_f32())
+        };
+        let pitch = (pitch_roll * self.pitch_range + self.min_pitch).clamp(-90.0, 90.0);
+        let rotation =
+            wrap_degrees(entity.yaw.load() + 2.0 * yaw_roll * self.max_yaw - self.max_yaw);
         let look_at = tick.mob.get_eye_pos() + Entity::direction_from_rotation(pitch, rotation);
         tick.brain.set(
             types::LOOK_TARGET,
             Arc::new(BlockPosTracker::from_vec(look_at)) as Arc<dyn PositionTracker>,
         );
-        let cooldown = random.random_range(self.interval.0..=self.interval.1);
+        let cooldown = entity
+            .random()
+            .next_int_between_inclusive(self.interval.0, self.interval.1);
         tick.brain.set(types::GAZE_COOLDOWN_TICKS, cooldown);
     }
 

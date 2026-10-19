@@ -2,7 +2,7 @@ use std::ops::BitOr;
 
 use pumpkin_data::entity::EntityStatus;
 use pumpkin_data::tag::{self, Taggable};
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use super::{Controls, Goal};
 use crate::entity::mob::Mob;
@@ -42,7 +42,7 @@ impl Goal for OfferFlowerGoal {
             return false;
         }
 
-        if mob.get_random().random_range(0..8000) != 0 {
+        if mob.get_entity().random().next_bounded_i32(8000) != 0 {
             return false;
         }
 

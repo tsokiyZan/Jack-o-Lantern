@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use pumpkin_data::data_component_impl::EquipmentSlot;
 use pumpkin_data::item::Item;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::EntityBase;
 use crate::entity::ai::goal::ranged_crossbow_attack::RangedCrossbowAttackGoal;
@@ -74,7 +74,8 @@ impl CrossbowAttack {
                     {
                         living.clear_active_hand();
                         self.crossbow_state = CrossbowState::Charged;
-                        self.attack_delay = 20 + tick.mob.get_random().random_range(0..20);
+                        self.attack_delay =
+                            20 + tick.mob.get_entity().random().next_bounded_i32(20);
                         set_charging(tick.mob, false);
                     }
                 } else {

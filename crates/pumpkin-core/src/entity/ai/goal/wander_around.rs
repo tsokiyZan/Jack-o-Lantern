@@ -2,7 +2,7 @@ use super::{Controls, Goal, to_goal_ticks};
 use crate::entity::ai::util::{default_random_pos, land_random_pos};
 use crate::entity::{ai::pathfinder::NavigatorGoal, mob::Mob};
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -134,7 +134,7 @@ fn water_avoiding_position(mob: &dyn Mob, probability: f32) -> Option<Vector3<f6
     if mob.get_mob_entity().living_entity.is_in_water() {
         return land_random_pos::get_pos(mob, 15, 7).or_else(|| land_position(mob, probability));
     }
-    if mob.get_random().random::<f32>() >= probability {
+    if mob.get_entity().random().next_f32() >= probability {
         land_random_pos::get_pos(mob, 10, 7)
     } else {
         land_position(mob, probability)
@@ -174,8 +174,9 @@ impl Goal for WanderAroundGoal {
                 return false;
             }
             if mob
-                .get_random()
-                .random_range(0..to_goal_ticks(self.interval))
+                .get_entity()
+                .random()
+                .next_bounded_i32(to_goal_ticks(self.interval))
                 != 0
             {
                 return false;

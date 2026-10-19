@@ -1,4 +1,4 @@
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use super::{Controls, Goal};
 use crate::entity::ai::goal::melee_attack::MeleeAttackGoal;
@@ -24,8 +24,10 @@ impl Goal for SpiderAttackGoal {
     }
 
     fn should_continue(&mut self, mob: &dyn Mob) -> bool {
-        // Roll first: the daylight lookup only runs on the rare hit.
-        if mob.get_random().random_range(0..100) == 0 && mob.get_mob_entity().is_in_daylight() {
+        // Vanilla only rolls once the light check passes.
+        if mob.get_mob_entity().is_in_daylight()
+            && mob.get_entity().random().next_bounded_i32(100) == 0
+        {
             mob.set_mob_target(None);
             return false;
         }

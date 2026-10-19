@@ -4,7 +4,7 @@ use crate::entity::ai::util::default_random_pos;
 use crate::entity::mob::Mob;
 use pumpkin_data::entity::EntityStatus;
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 use std::sync::atomic::Ordering;
 
 pub struct RunAroundLikeCrazyGoal {
@@ -71,7 +71,13 @@ impl Goal for RunAroundLikeCrazyGoal {
         let Some(horse) = mob.as_abstract_horse() else {
             return;
         };
-        if horse.is_horse_tamed() || mob.get_random().random_range(0..to_goal_ticks(50)) != 0 {
+        if horse.is_horse_tamed()
+            || mob
+                .get_entity()
+                .random()
+                .next_bounded_i32(to_goal_ticks(50))
+                != 0
+        {
             return;
         }
         let entity = mob.get_entity();
@@ -81,7 +87,7 @@ impl Goal for RunAroundLikeCrazyGoal {
         if let Some(player) = passenger.get_player() {
             let temper = horse.horse_temper().load(Ordering::Relaxed);
             let max_temper = horse.max_temper();
-            if max_temper > 0 && mob.get_random().random_range(0..max_temper) < temper {
+            if max_temper > 0 && mob.get_entity().random().next_bounded_i32(max_temper) < temper {
                 horse.tame_with_name(player.gameprofile.id);
                 return;
             }

@@ -257,10 +257,7 @@ impl Behavior for MoveToTargetSink {
             stuck
         };
         if still_trying && stuck {
-            self.remaining_cooldown = tick
-                .mob
-                .get_random()
-                .random_range(0..MAX_COOLDOWN_BEFORE_RETRYING);
+            self.remaining_cooldown = rand::rng().random_range(0..MAX_COOLDOWN_BEFORE_RETRYING);
         }
 
         tick.brain.erase(types::WALK_TARGET.id());

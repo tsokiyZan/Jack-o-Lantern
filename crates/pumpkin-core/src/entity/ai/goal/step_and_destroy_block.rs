@@ -73,7 +73,7 @@ impl<S: Stepping, M: MoveToTargetPos> StepAndDestroyBlockGoal<S, M> {
 }
 
 pub trait Stepping: Send + Sync {
-    fn tick_stepping(&self, _world: Arc<World>, _block_pos: BlockPos) {}
+    fn tick_stepping(&self, _mob: &dyn Mob, _world: Arc<World>, _block_pos: BlockPos) {}
 
     fn on_destroy_block(&self, _world: Arc<World>, _block_pos: BlockPos) {}
 }
@@ -146,9 +146,13 @@ impl<S: Stepping + Send + Sync, M: MoveToTargetPos + Send + Sync> Goal
                 .set_velocity(Vector3::new(velocity.x, -0.3, velocity.z));
             if counter % 6 == 0 {
                 if let Some(stepping) = self.stepping.get() {
-                    stepping.tick_stepping(world.clone(), self.move_to_target_pos_goal.target_pos);
+                    stepping.tick_stepping(
+                        mob,
+                        world.clone(),
+                        self.move_to_target_pos_goal.target_pos,
+                    );
                 } else {
-                    self.tick_stepping(world.clone(), self.move_to_target_pos_goal.target_pos);
+                    self.tick_stepping(mob, world.clone(), self.move_to_target_pos_goal.target_pos);
                 }
             }
         }
@@ -189,7 +193,7 @@ impl<S: Stepping + Send + Sync, M: MoveToTargetPos + Send + Sync> MoveToTargetPo
 impl<S: Stepping + Send + Sync, M: MoveToTargetPos + Send + Sync> Stepping
     for StepAndDestroyBlockGoal<S, M>
 {
-    fn tick_stepping(&self, _world: Arc<World>, _block_pos: BlockPos) {}
+    fn tick_stepping(&self, _mob: &dyn Mob, _world: Arc<World>, _block_pos: BlockPos) {}
 
     fn on_destroy_block(&self, _world: Arc<World>, _block_pos: BlockPos) {}
 }

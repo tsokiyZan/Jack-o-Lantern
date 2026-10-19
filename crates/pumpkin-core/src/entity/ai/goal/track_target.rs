@@ -5,7 +5,7 @@ use crate::entity::ai::pathfinder::path::Path;
 use crate::entity::ai::target_predicate::TargetPredicate;
 use crate::entity::mob::Mob;
 use pumpkin_data::attributes::Attributes;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 use std::sync::Arc;
 
 const UNSET: i32 = 0;
@@ -63,7 +63,8 @@ impl TrackTargetGoal {
     }
 
     fn can_navigate_to_entity(&mut self, mob: &dyn Mob, target: &dyn EntityBase) -> bool {
-        self.check_can_navigate_cooldown = to_goal_ticks(10 + mob.get_random().random_range(0..5));
+        self.check_can_navigate_cooldown =
+            to_goal_ticks(10 + mob.get_entity().random().next_bounded_i32(5));
         let mob_entity = mob.get_mob_entity();
         let target_entity = target.get_entity();
         let path = mob_entity
