@@ -94,6 +94,7 @@ mod structure_metadata;
 mod structure_template;
 mod structures;
 mod sulfur_cube_archetype;
+mod synched_data_defaults;
 mod tag;
 mod template_pool;
 mod test_instance;
@@ -161,6 +162,7 @@ pub fn main() {
         (world_event::build, "world_event.rs"),
         (entity_type::build, "entity_type.rs"),
         (entity_dimensions::build, "entity_dimensions.rs"),
+        (synched_data_defaults::build, "synched_data_defaults.rs"),
         (statistic::build, "statistic.rs"),
         (noise_parameter::build, "noise_parameter.rs"),
         (biome::build, "biome.rs"),

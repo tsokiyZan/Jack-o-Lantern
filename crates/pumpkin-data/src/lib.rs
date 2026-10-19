@@ -179,6 +179,11 @@ mod entity_type;
 #[path = "generated/entity_dimensions.rs"]
 pub mod entity_dimensions;
 
+#[cfg(feature = "entity_type")]
+#[rustfmt::skip]
+#[path = "generated/synched_data_defaults.rs"]
+pub mod synched_data_defaults;
+
 #[cfg(feature = "spawn_egg")]
 #[rustfmt::skip]
 #[path = "generated/spawn_egg.rs"]
