@@ -193,14 +193,17 @@ impl EntityBase for TNTEntity {
         );
 
         if fuse == 0 {
-            entity.remove();
             let world = entity.world.load_full();
+            // Vanilla `discard()`s first but still explodes with `this` as the source; the
+            // world no longer finds a removed entity, so hold on to it.
+            let source = world.get_entity_by_id(entity.entity_id);
+            entity.remove();
             if world.level_info.load().game_rules.tnt_explodes {
                 // Vanilla `PrimedTnt.explode`: `getY(0.0625)`.
                 let pos = entity.pos.load();
                 let y = f64::from(entity.entity_type.dimension[1]) * 0.0625 + pos.y;
                 world.explode(
-                    world.get_entity_by_id(entity.entity_id),
+                    source,
                     Vector3::new(pos.x, y, pos.z),
                     self.power.load(),
                     crate::world::ExplosionInteraction::Tnt,
