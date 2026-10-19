@@ -380,7 +380,7 @@ impl DispenserBlock {
             // Empty buckets pick up the fluid in front of the dispenser
             Self::dispense_empty_bucket(ctx, dispenser, item);
         } else if item.item.id == Item::SULFUR_CUBE_BUCKET.id {
-            empty_sulfur_cube_bucket(ctx.world, item, Self::target_position(ctx));
+            empty_sulfur_cube_bucket(ctx.world, item, Self::target_position(ctx), None);
             *item = ItemStack::new(1, &Item::BUCKET);
             Self::play_dispense_effects(ctx, WorldEvent::SoundDispenserDispense);
         } else if FilledBucketItem::ids().contains(&item.item.id) {
@@ -613,7 +613,7 @@ impl DispenserBlock {
         ctx.world
             .play_sound(Sound::EntityTntPrimed, SoundCategory::Blocks, &spawn_pos);
         ctx.world
-            .emit_game_event(GameEvent::EntityPlace.name(), target.to_centered_f64());
+            .game_event_from(None, GameEvent::EntityPlace, target.to_centered_f64());
 
         Self::play_dispense_effects(ctx, WorldEvent::SoundDispenserDispense);
     }
@@ -824,6 +824,8 @@ impl DispenserBlock {
             Self::drop_item(ctx, item);
             return;
         };
+        ctx.world
+            .game_event_from(None, GameEvent::FluidPickup, front.to_centered_f64());
 
         Self::consume_with_remainder(ctx, dispenser, item, ItemStack::new(1, filled));
         Self::play_dispense_effects(ctx, WorldEvent::SoundDispenserDispense);
@@ -858,12 +860,18 @@ impl DispenserBlock {
             play_bucket_evaporation(ctx.world, &front.to_f64());
             true
         } else {
-            try_place_filled_bucket(
+            let placed = try_place_filled_bucket(
                 ctx.world,
                 item.item,
                 *ctx.position,
                 ctx.facing.to_block_direction(),
-            )
+            );
+            if placed {
+                // Vanilla `BucketItem.playEmptySound`, with no user.
+                ctx.world
+                    .game_event_from(None, GameEvent::FluidPlace, front.to_centered_f64());
+            }
+            placed
         };
 
         if emptied {

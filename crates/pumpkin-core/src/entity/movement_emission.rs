@@ -12,6 +12,7 @@ use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
 
 use super::{Entity, EntityBase};
+use crate::world::game_event::GameEventContext;
 
 /// Vanilla `Entity.MovementEmission`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -112,14 +113,14 @@ impl Entity {
                     caller.water_swim_sound(caller);
                 }
                 if emission.emits_events() {
-                    world.emit_game_event(GameEvent::Swim.name(), self.pos.load());
+                    world.game_event_from(Some(caller), GameEvent::Swim, self.pos.load());
                 }
             }
         } else if supporting_state.is_air() && caller.is_flapping() {
             // Vanilla `Entity.processFlappingMovement`.
             caller.on_flap();
             if caller.movement_emission().emits_events() {
-                world.emit_game_event(GameEvent::Flap.name(), self.pos.load());
+                world.game_event_from(Some(caller), GameEvent::Flap, self.pos.load());
             }
         }
     }
@@ -157,9 +158,11 @@ impl Entity {
                 }
             }
             if should_vibrate {
-                self.world
-                    .load()
-                    .emit_game_event(GameEvent::Step.name(), self.pos.load());
+                self.world.load().game_event(
+                    GameEvent::Step,
+                    self.pos.load(),
+                    GameEventContext::of(Some(caller), Some(state)),
+                );
             }
             return true;
         }
@@ -241,8 +244,8 @@ impl Entity {
         caller.play_sound_at_self(caller.swim_sound(), volume, swim_pitch());
     }
 
-    /// Vanilla `Entity.doWaterSplashEffect`: the sound half. Pumpkin doesn't spawn the
-    /// bubble and splash particles yet.
+    /// Vanilla `Entity.doWaterSplashEffect` without the bubble and splash particles, which
+    /// Pumpkin doesn't spawn yet.
     pub fn do_water_splash_effect(&self, caller: &dyn EntityBase) {
         if caller.is_spectator() {
             // Vanilla `Player.doWaterSplashEffect`.
@@ -255,6 +258,9 @@ impl Entity {
             caller.swim_high_speed_splash_sound()
         };
         caller.play_sound_at_self(sound, speed, swim_pitch());
+        self.world
+            .load()
+            .game_event_from(Some(caller), GameEvent::Splash, self.pos.load());
     }
 
     /// The speed term shared by `waterSwimSound` and `doWaterSplashEffect`: the controlling

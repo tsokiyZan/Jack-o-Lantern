@@ -35,6 +35,15 @@ fn toggle_trapdoor(player: &Player, world: &Arc<World>, block_pos: &BlockPos) {
         trapdoor_props.to_state_id(block),
         BlockFlags::NOTIFY_LISTENERS,
     );
+    world.game_event_from(
+        Some(player),
+        if trapdoor_props.open {
+            pumpkin_data::game_event::GameEvent::BlockOpen
+        } else {
+            pumpkin_data::game_event::GameEvent::BlockClose
+        },
+        block_pos.to_centered_f64(),
+    );
 }
 
 fn can_open_trapdoor(block: &Block) -> bool {

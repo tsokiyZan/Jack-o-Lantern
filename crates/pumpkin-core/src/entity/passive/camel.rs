@@ -296,7 +296,7 @@ impl Mob for CamelEntity {
         entity
             .world
             .load()
-            .emit_game_event(GameEvent::EntityAction.name(), entity.pos.load());
+            .game_event_from(Some(self), GameEvent::EntityAction, entity.pos.load());
         self.set_dashing(true);
     }
 

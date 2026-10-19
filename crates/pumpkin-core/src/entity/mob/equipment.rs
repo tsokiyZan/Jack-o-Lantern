@@ -933,7 +933,9 @@ pub fn notify_equip<M: Mob + ?Sized>(
     } else {
         GameEvent::Unequip
     };
-    world.emit_game_event(event.name(), pos);
+    // `this.gameEvent(...)`: the mob is the source; `M: ?Sized` can't coerce, so look it up.
+    let source = world.get_entity_by_id(entity.entity_id);
+    world.game_event_from(source.as_deref(), event, pos);
 }
 
 // Hand slots have no count limit, every other slot holds one item.

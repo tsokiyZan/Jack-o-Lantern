@@ -48,6 +48,8 @@ pub enum AdvancementTrigger {
         start: Vector3<f64>,
         cause: Option<&'static EntityType>,
     },
+    /// Vanilla `CriteriaTriggers.AVOID_VIBRATION`.
+    AvoidVibration,
 }
 
 impl Player {
@@ -675,6 +677,14 @@ impl Player {
                     self.trigger_advancement_criterion(
                         Advancement::ADVENTURE_TRADE_AT_WORLD_HEIGHT,
                         "trade_at_world_height",
+                    );
+                }
+            }
+            AdvancementTrigger::AvoidVibration => {
+                if !self.has_advancement(Advancement::ADVENTURE_AVOID_VIBRATION) {
+                    self.trigger_advancement_criterion(
+                        Advancement::ADVENTURE_AVOID_VIBRATION,
+                        "avoid_vibration",
                     );
                 }
             }

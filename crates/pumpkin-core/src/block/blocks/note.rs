@@ -5,6 +5,7 @@ use crate::block::{
 };
 use pumpkin_data::BlockStateId;
 use pumpkin_data::block_properties::{Axis, NoteblockInstrument};
+use pumpkin_data::game_event::GameEvent;
 use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_data::{Block, BlockDirection, block_properties::NoteBlockLikeProperties};
@@ -18,12 +19,19 @@ use crate::{
 };
 
 use super::redstone::block_receives_redstone_power;
+use crate::entity::EntityBase;
 
 #[pumpkin_block("minecraft:note_block")]
 pub struct NoteBlock;
 
 impl NoteBlock {
-    pub fn play_note(props: &NoteBlockLikeProperties, world: &World, pos: &BlockPos) {
+    /// Vanilla `NoteBlock.playNote`.
+    pub fn play_note(
+        source: Option<&dyn EntityBase>,
+        props: &NoteBlockLikeProperties,
+        world: &World,
+        pos: &BlockPos,
+    ) {
         if !is_base_block(props.instrument) || world.get_block_state(&pos.up()).is_air() {
             let mut event = crate::plugin::api::events::block::note_play::NotePlayEvent::new(
                 *pos,
@@ -37,10 +45,8 @@ impl NoteBlock {
                 return;
             }
             world.add_synced_block_event(*pos, 0, 0);
+            world.game_event_from(source, GameEvent::NoteBlockPlay, pos.to_centered_f64());
         }
-    }
-    fn get_note_pitch(note: u16) -> f32 {
-        ((f32::from(note) - 12.0) / 12.0).exp2()
     }
 
     fn get_state_with_instrument(
@@ -75,7 +81,7 @@ impl BlockBehaviour for NoteBlock {
         // check if powered state changed
         if note_props.powered != powered {
             if powered {
-                Self::play_note(&note_props, args.world, args.position);
+                Self::play_note(None, &note_props, args.world, args.position);
             }
             note_props.powered = powered;
             args.world.set_block_state(
@@ -95,7 +101,12 @@ impl BlockBehaviour for NoteBlock {
             note_props.to_state_id(args.block),
             BlockFlags::NOTIFY_ALL,
         );
-        Self::play_note(&note_props, args.world, args.position);
+        Self::play_note(
+            Some(args.player.as_ref()),
+            &note_props,
+            args.world,
+            args.position,
+        );
 
         args.player.increment_stat(
             pumpkin_data::statistic::StatisticCategory::Custom,
@@ -108,7 +119,12 @@ impl BlockBehaviour for NoteBlock {
 
     fn attack(&self, args: AttackArgs<'_>) {
         let note_props = NoteBlockLikeProperties::from_state_id(args.state.id);
-        Self::play_note(&note_props, args.world, args.position);
+        Self::play_note(
+            Some(args.player.as_ref()),
+            &note_props,
+            args.world,
+            args.position,
+        );
         args.player.increment_stat(
             pumpkin_data::statistic::StatisticCategory::Custom,
             pumpkin_data::statistic::CustomStatistic::PlayNoteblock as i32,
@@ -135,7 +151,7 @@ impl BlockBehaviour for NoteBlock {
         let instrument = note_props.instrument;
         let pitch = if is_base_block(instrument) {
             // checks if can be pitched
-            Self::get_note_pitch(u16::from(note_props.note))
+            get_pitch_from_note(u16::from(note_props.note))
         } else {
             1.0 // default pitch
         };
@@ -226,4 +242,10 @@ const fn is_base_block(instrument: NoteblockInstrument) -> bool {
             | NoteblockInstrument::Bit
             | NoteblockInstrument::Banjo
     )
+}
+
+/// Vanilla `NoteBlock.getPitchFromNote`.
+#[must_use]
+pub fn get_pitch_from_note(note: u16) -> f32 {
+    2.0f64.powf((f64::from(note) - 12.0) / 12.0) as f32
 }

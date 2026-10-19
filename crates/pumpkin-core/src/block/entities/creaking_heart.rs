@@ -366,7 +366,11 @@ impl CreakingHeartBlockEntity {
         // `SpawnUtil.trySpawnMob`'s `playAmbientSound`.
         spawned_creaking.play_ambient_sound();
         let creaking_entity = spawned_creaking.get_entity();
-        world.emit_game_event(GameEvent::EntityPlace.name(), creaking_entity.pos.load());
+        world.game_event_from(
+            Some(spawned_creaking.as_ref()),
+            GameEvent::EntityPlace,
+            creaking_entity.pos.load(),
+        );
         world.send_entity_status(creaking_entity, EntityStatus::Poof, None);
         spawned_creaking.set_transient(pos);
         Some(spawned_creaking)
@@ -393,8 +397,13 @@ impl CreakingHeartBlockEntity {
                         SoundCategory::Blocks,
                         block_pos,
                     );
-                    world
-                        .emit_game_event(GameEvent::BlockPlace.name(), block_pos.to_centered_f64());
+                    world.game_event(
+                        GameEvent::BlockPlace,
+                        block_pos.to_centered_f64(),
+                        crate::world::game_event::GameEventContext::of_state(
+                            world.get_block_state(&self.position),
+                        ),
+                    );
                 }
             }
         }

@@ -1,11 +1,19 @@
-use super::BlockEntity;
+use std::sync::Arc;
+
+use pumpkin_data::game_event::GameEvent;
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::math::position::BlockPos;
-use std::sync::Mutex;
+use pumpkin_util::math::vector3::Vector3;
 
+use super::BlockEntity;
+use super::sculk_sensor::SculkSensorBlockEntity;
+use crate::world::World;
+use crate::world::game_event::{GameEventContext, GameEventListener, PositionSource};
+
+/// Vanilla `CalibratedSculkSensorBlockEntity`: a sculk sensor whose vibration user has the
+/// calibrated overrides.
 pub struct CalibratedSculkSensorBlockEntity {
-    pub position: BlockPos,
-    pub last_vibration_frequency: Mutex<i32>,
+    pub sensor: SculkSensorBlockEntity,
 }
 
 impl BlockEntity for CalibratedSculkSensorBlockEntity {
@@ -14,33 +22,32 @@ impl BlockEntity for CalibratedSculkSensorBlockEntity {
     }
 
     fn get_position(&self) -> BlockPos {
-        self.position
+        self.sensor.position
     }
 
-    fn from_nbt(nbt: &pumpkin_nbt::compound::NbtCompound, position: BlockPos) -> Self
+    fn from_nbt(nbt: &NbtCompound, position: BlockPos) -> Self
     where
         Self: Sized,
     {
-        let last_vibration_frequency = nbt.get_int("last_vibration_frequency").unwrap_or(0);
-        Self {
-            position,
-            last_vibration_frequency: Mutex::new(last_vibration_frequency),
-        }
+        let sensor = Self::new(position).sensor;
+        sensor.load_additional(nbt);
+        Self { sensor }
     }
 
     fn write_nbt(&self, nbt: &mut NbtCompound) {
-        if let Ok(freq) = self.last_vibration_frequency.lock() {
-            nbt.put_int("last_vibration_frequency", *freq);
-        }
+        self.sensor.write_nbt(nbt);
+    }
+
+    fn tick(&self, world: &Arc<World>) {
+        self.sensor.tick(world);
     }
 
     fn chunk_data_nbt(&self) -> Option<NbtCompound> {
-        let mut nbt = NbtCompound::new();
-        nbt.put_int(
-            "last_vibration_frequency",
-            *self.last_vibration_frequency.try_lock().ok()?,
-        );
-        Some(nbt)
+        self.sensor.chunk_data_nbt()
+    }
+
+    fn get_listener(self: Arc<Self>) -> Option<Arc<dyn GameEventListener>> {
+        Some(self)
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
@@ -48,13 +55,34 @@ impl BlockEntity for CalibratedSculkSensorBlockEntity {
     }
 }
 
+impl GameEventListener for CalibratedSculkSensorBlockEntity {
+    fn get_listener_source(&self) -> &PositionSource {
+        self.sensor.get_listener_source()
+    }
+
+    fn get_listener_radius(&self) -> i32 {
+        GameEventListener::get_listener_radius(&self.sensor)
+    }
+
+    fn handle_game_event(
+        &self,
+        world: &World,
+        event: GameEvent,
+        context: &GameEventContext<'_>,
+        source_position: Vector3<f64>,
+    ) -> bool {
+        self.sensor
+            .handle_game_event(world, event, context, source_position)
+    }
+}
+
 impl CalibratedSculkSensorBlockEntity {
     pub const ID: &'static str = "minecraft:calibrated_sculk_sensor";
+
     #[must_use]
-    pub const fn new(position: BlockPos) -> Self {
+    pub fn new(position: BlockPos) -> Self {
         Self {
-            position,
-            last_vibration_frequency: Mutex::new(0),
+            sensor: SculkSensorBlockEntity::with_calibration(position, true),
         }
     }
 }

@@ -7,6 +7,7 @@ use pumpkin_data::data_component_impl::{BundleContentsImpl, ContainerImpl};
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::game_event::GameEvent;
 use pumpkin_data::item_stack::ItemStack;
+use pumpkin_data::tag::Taggable;
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::bedrock::client::CAddItemActor;
 use pumpkin_protocol::bedrock::network_item::ItemStackWrapper;
@@ -653,7 +654,7 @@ impl EntityBase for ItemEntity {
             }
         };
 
-        world.emit_game_event(GameEvent::EntityDamage.name(), entity.pos.load());
+        world.game_event_from(cause, GameEvent::EntityDamage, entity.pos.load());
         if destroyed {
             self.on_destroyed(&world);
             entity.remove();
@@ -798,6 +799,15 @@ impl EntityBase for ItemEntity {
 
     fn movement_emission(&self) -> crate::entity::movement_emission::MovementEmission {
         crate::entity::movement_emission::MovementEmission::None
+    }
+
+    /// Vanilla `ItemEntity.dampensVibrations`.
+    fn dampens_vibrations(&self) -> bool {
+        self.item_stack
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .item
+            .has_tag(&pumpkin_data::tag::Item::MINECRAFT_DAMPENS_VIBRATIONS)
     }
 
     fn send_bedrock_spawn_packet(&self, client: &crate::net::bedrock::BedrockClient) {

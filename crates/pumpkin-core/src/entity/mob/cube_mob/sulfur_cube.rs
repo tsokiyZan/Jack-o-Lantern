@@ -441,7 +441,7 @@ impl CubeMobEntity {
         entity
             .world
             .load()
-            .emit_game_event(GameEvent::PrimeFuse.name(), entity.pos.load());
+            .game_event_from(Some(self), GameEvent::PrimeFuse, entity.pos.load());
         true
     }
 
@@ -967,10 +967,11 @@ impl CubeMobEntity {
 
         if stack.item == &Item::SHEARS && self.ready_for_shearing() {
             self.shear();
-            entity
-                .world
-                .load()
-                .emit_game_event(GameEvent::Shear.name(), entity.pos.load());
+            entity.world.load().game_event_from(
+                Some(player.as_ref()),
+                GameEvent::Shear,
+                entity.pos.load(),
+            );
             if game_mode != GameMode::Creative {
                 let _ = stack.hurt_and_break(&self.mob_entity.living_entity.entity.world.load(), 1);
             }
@@ -981,10 +982,11 @@ impl CubeMobEntity {
             let worked = self.equip_item(stack);
             if worked {
                 stack.decrement_unless_creative(game_mode, 1);
-                entity
-                    .world
-                    .load()
-                    .emit_game_event(GameEvent::EntityInteract.name(), entity.pos.load());
+                entity.world.load().game_event_from(
+                    Some(self),
+                    GameEvent::EntityInteract,
+                    entity.pos.load(),
+                );
             }
             return worked;
         }

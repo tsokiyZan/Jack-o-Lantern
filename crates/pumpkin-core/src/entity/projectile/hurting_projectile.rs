@@ -182,7 +182,7 @@ impl HurtingProjectile {
                     .on_projectile_hit(block, &world, caller, pos, state, hit_pos, &server);
             }
         }
-        caller.on_hit(hit);
+        super::on_hit(caller, hit);
     }
 
     pub fn write_nbt(&self, nbt: &mut NbtCompound) {

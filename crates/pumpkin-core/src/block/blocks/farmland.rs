@@ -6,6 +6,7 @@ use crate::block::{
 };
 use crate::entity::EntityBase;
 use crate::world::World;
+use crate::world::game_event::GameEventContext;
 use pumpkin_data::block_properties::FarmlandLikeProperties;
 use pumpkin_data::game_event::GameEvent;
 use pumpkin_data::tag;
@@ -26,7 +27,7 @@ pub struct FarmlandBlock;
 
 impl BlockBehaviour for FarmlandBlock {
     fn on_scheduled_tick(&self, args: OnScheduledTickArgs<'_>) {
-        turn_to_base_block(args.world, args.position);
+        turn_to_base_block(None, args.world, args.position);
     }
 
     /// Vanilla `FarmlandBlock.fallOn`: a heavy enough landing tramples the farmland.
@@ -40,7 +41,7 @@ impl BlockBehaviour for FarmlandBlock {
             );
             let entity = args.entity.get_entity();
             if can_trample && entity.width() * entity.width() * entity.height() > 0.512 {
-                turn_to_base_block(args.world, args.position);
+                turn_to_base_block(Some(args.entity), args.world, args.position);
             }
         }
         crate::block::default_fall_on(&args);
@@ -102,7 +103,7 @@ impl BlockBehaviour for FarmlandBlock {
                     .get_block(&args.position.up())
                     .has_tag(&tag::Block::MINECRAFT_MAINTAINS_FARMLAND)
                 {
-                    turn_to_base_block(args.world, args.position);
+                    turn_to_base_block(None, args.world, args.position);
                 }
             } else {
                 let mut new_moisture = (props.moisture as i32 - 1).clamp(0, 7);
@@ -135,7 +136,11 @@ impl BlockBehaviour for FarmlandBlock {
 
 /// Vanilla `FarmlandBlock.turnToBaseBlock`: back to dirt, lifting whatever stands in the
 /// farmland's missing top sixteenth (`Block.pushEntitiesUp`).
-pub fn turn_to_base_block(world: &Arc<World>, pos: &BlockPos) {
+pub fn turn_to_base_block(
+    source_entity: Option<&dyn EntityBase>,
+    world: &Arc<World>,
+    pos: &BlockPos,
+) {
     let (x, y, z) = (f64::from(pos.0.x), f64::from(pos.0.y), f64::from(pos.0.z));
     let added = BoundingBox::new(
         Vector3::new(x, y + 15.0 / 16.0, z),
@@ -166,7 +171,11 @@ pub fn turn_to_base_block(world: &Arc<World>, pos: &BlockPos) {
         );
     }
     world.set_block_state(pos, Block::DIRT.default_state.id, BlockFlags::NOTIFY_ALL);
-    world.emit_game_event(GameEvent::BlockChange.name(), pos.to_centered_f64());
+    world.game_event(
+        GameEvent::BlockChange,
+        pos.to_centered_f64(),
+        GameEventContext::of(source_entity, Some(Block::DIRT.default_state)),
+    );
 }
 
 fn can_place_at(world: &dyn BlockAccessor, block_pos: &BlockPos) -> bool {

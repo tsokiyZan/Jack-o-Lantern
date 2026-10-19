@@ -71,7 +71,12 @@ impl ItemMetadata for SulfurCubeBucketItem {
 
 /// Vanilla `MobBucketItem.emptyContents` and `checkExtraContent` for a sulfur cube bucket:
 /// with no fluid to place, only the cube comes out at `pos`.
-pub(crate) fn empty_sulfur_cube_bucket(world: &Arc<World>, bucket: &ItemStack, pos: BlockPos) {
+pub(crate) fn empty_sulfur_cube_bucket(
+    world: &Arc<World>,
+    bucket: &ItemStack,
+    pos: BlockPos,
+    user: Option<&dyn EntityBase>,
+) {
     world.play_sound(
         Sound::ItemBucketEmptySulfurCube,
         SoundCategory::Neutral,
@@ -93,7 +98,7 @@ pub(crate) fn empty_sulfur_cube_bucket(world: &Arc<World>, bucket: &ItemStack, p
         cube.load_from_bucket(bucket);
     }
     world.spawn_entity(mob);
-    world.emit_game_event(GameEvent::EntityPlace.name(), pos.to_centered_f64());
+    world.game_event_from(user, GameEvent::EntityPlace, pos.to_centered_f64());
 }
 
 impl ItemBehaviour for SulfurCubeBucketItem {
@@ -130,7 +135,12 @@ impl ItemBehaviour for SulfurCubeBucketItem {
             server.plugin_manager.fire_blocking(&server, &mut event);
         }
 
-        empty_sulfur_cube_bucket(&world, &player.inventory.held_item(), place_pos);
+        empty_sulfur_cube_bucket(
+            &world,
+            &player.inventory.held_item(),
+            place_pos,
+            Some(player as &dyn EntityBase),
+        );
         // `ItemUtils.createFilledResult` with the creative stack limit.
         give_player_bucket_item(player, &Item::BUCKET);
     }
@@ -416,6 +426,11 @@ impl ItemBehaviour for EmptyBucketItem {
             SoundCategory::Blocks,
             &block_pos.to_f64(),
         );
+        world.game_event_from(
+            Some(player),
+            GameEvent::FluidPickup,
+            block_pos.to_centered_f64(),
+        );
 
         give_player_bucket_item(player, item);
     }
@@ -508,6 +523,12 @@ impl ItemBehaviour for FilledBucketItem {
             get_empty_sound(item),
             SoundCategory::Blocks,
             &place_pos.to_f64(),
+        );
+        // The end of vanilla `BucketItem.playEmptySound`.
+        world.game_event_from(
+            Some(player),
+            GameEvent::FluidPlace,
+            place_pos.to_centered_f64(),
         );
 
         if let Some((entity_type, _)) = get_mob_for_bucket(item) {

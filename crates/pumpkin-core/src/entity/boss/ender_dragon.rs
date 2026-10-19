@@ -397,7 +397,7 @@ impl EnderDragonEntity {
         let world = entity.world.load_full();
         // `processFlappingMovement`; the flap sound is the client's.
         if Mob::is_flapping(self) && Mob::movement_emission(self).emits_events() {
-            world.emit_game_event(GameEvent::Flap.name(), entity.pos.load());
+            world.game_event_from(Some(self), GameEvent::Flap, entity.pos.load());
         }
 
         if !self.has_dragon_fight.load(Relaxed)
@@ -934,7 +934,7 @@ impl EnderDragonEntity {
                 fight.set_dragon_killed(world, entity.entity_uuid);
             });
             entity.remove();
-            world.emit_game_event(GameEvent::EntityDie.name(), entity.pos.load());
+            world.game_event_from(Some(self), GameEvent::EntityDie, entity.pos.load());
         }
     }
 }
@@ -995,7 +995,7 @@ impl Mob for EnderDragonEntity {
         entity
             .world
             .load()
-            .emit_game_event(GameEvent::EntityDie.name(), entity.pos.load());
+            .game_event_from(Some(self), GameEvent::EntityDie, entity.pos.load());
         self.update_dragon_fight();
         self.with_dragon_fight(|fight, world| fight.set_dragon_killed(world, entity.entity_uuid));
     }

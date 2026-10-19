@@ -44,9 +44,13 @@ impl BlockBehaviour for DaylightDetectorBlock {
         let new_state = props.to_state_id(args.block);
         args.world
             .set_block_state(args.position, new_state, BlockFlags::NOTIFY_LISTENERS);
-        args.world.emit_game_event(
-            GameEvent::BlockChange.name(),
+        args.world.game_event(
+            GameEvent::BlockChange,
             args.position.to_centered_f64(),
+            crate::world::game_event::GameEventContext::of(
+                Some(args.player.as_ref()),
+                Some(pumpkin_data::BlockState::from_id(new_state)),
+            ),
         );
 
         Self::update_signal_strength(args.world, args.position);

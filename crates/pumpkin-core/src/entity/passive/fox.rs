@@ -1901,7 +1901,7 @@ impl FoxEatBerriesGoal {
         if block == &Block::SWEET_BERRY_BUSH {
             Self::pick_sweet_berries(fox, &world, pos, state);
         } else if CaveVinesBlock::has_glow_berries(block, state) {
-            CaveVinesBlock::use_berries(&world, &pos);
+            CaveVinesBlock::use_berries(&world, &pos, Some(fox));
         }
     }
 
@@ -1932,7 +1932,11 @@ impl FoxEatBerriesGoal {
             props.to_state_id(&Block::SWEET_BERRY_BUSH),
             BlockFlags::NOTIFY_LISTENERS,
         );
-        world.emit_game_event(GameEvent::BlockChange.name(), pos.to_centered_f64());
+        world.game_event(
+            GameEvent::BlockChange,
+            pos.to_centered_f64(),
+            crate::world::game_event::GameEventContext::of_entity(fox),
+        );
     }
 }
 

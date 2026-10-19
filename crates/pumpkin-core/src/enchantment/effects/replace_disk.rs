@@ -213,7 +213,7 @@ impl ReplaceDisk {
             if old_state_id != new_state_id {
                 changed = true;
                 if let Some(event) = self.trigger_game_event {
-                    world.emit_game_event(event.name(), pos.to_centered_f64());
+                    world.game_event_from(None, event, pos.to_centered_f64());
                 }
             }
         }

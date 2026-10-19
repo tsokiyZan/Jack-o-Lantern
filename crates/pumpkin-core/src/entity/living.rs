@@ -2561,6 +2561,11 @@ impl LivingEntity {
 
             // Vanilla `dropAllDeathLoot`.
             if perished {
+                world.game_event_from(
+                    Some(&*dyn_self),
+                    pumpkin_data::game_event::GameEvent::EntityDie,
+                    self.entity.pos.load(),
+                );
                 if let Some(mob) = dyn_self.get_mob() {
                     mob.before_drop_all_death_loot();
                 }
@@ -4067,6 +4072,11 @@ impl LivingEntity {
             }
 
             self.set_health(new_health);
+            world.game_event_from(
+                Some(caller),
+                pumpkin_data::game_event::GameEvent::EntityDamage,
+                self.entity.pos.load(),
+            );
 
             if let Some(attacker_player) = cause.or(source).and_then(|c| c.get_player()) {
                 attacker_player.increment_stat(
@@ -4721,7 +4731,7 @@ impl LivingEntity {
         } else {
             GameEvent::Eat
         };
-        world.emit_game_event(event.name(), pos);
+        world.game_event_from(Some(caller), event, pos);
         stack.decrement(1);
         stack
     }
@@ -4802,7 +4812,11 @@ impl LivingEntity {
                         self.reset_current_impulse_context();
                         // Vanilla broadcasts entity event 46 (teleport particles) on success.
                         world.send_entity_status(&self.entity, EntityStatus::Teleport, None);
-                        world.emit_game_event("teleport", center);
+                        world.game_event(
+                            pumpkin_data::game_event::GameEvent::Teleport,
+                            center,
+                            crate::world::game_event::GameEventContext::of_entity(caller),
+                        );
                         world.play_sound(
                             Sound::ItemChorusFruitTeleport,
                             SoundCategory::Players,

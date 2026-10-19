@@ -319,7 +319,7 @@ impl EntityBase for TridentEntity {
             && !super::is_deflected(caller, &self.last_deflected_by, &h)
             && !self.has_hit.swap(true, Ordering::SeqCst)
         {
-            caller.on_hit(h);
+            super::on_hit(caller, h);
         }
     }
 

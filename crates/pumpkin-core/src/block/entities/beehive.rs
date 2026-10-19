@@ -381,9 +381,13 @@ impl BeehiveBlockEntity {
             SoundCategory::Blocks,
             &self.position.to_f64(),
         );
-        world.emit_game_event(
-            GameEvent::BlockChange.name(),
+        world.game_event(
+            GameEvent::BlockChange,
             self.position.to_centered_f64(),
+            crate::world::game_event::GameEventContext::of(
+                Some(bee),
+                Some(world.get_block_state(&self.position)),
+            ),
         );
         entity.remove();
         self.mark_chunk_dirty(world);
@@ -469,7 +473,14 @@ impl BeehiveBlockEntity {
         }
 
         world.play_block_sound(Sound::BlockBeehiveExit, SoundCategory::Blocks, pos);
-        world.emit_game_event(GameEvent::BlockChange.name(), pos.to_centered_f64());
+        world.game_event(
+            GameEvent::BlockChange,
+            pos.to_centered_f64(),
+            crate::world::game_event::GameEventContext::of(
+                Some(entity.as_ref()),
+                Some(world.get_block_state(&pos)),
+            ),
+        );
         world.spawn_entity(entity)
     }
 

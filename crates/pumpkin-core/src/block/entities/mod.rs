@@ -6,6 +6,7 @@ use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::math::position::BlockPos;
 
 use crate::world::World;
+use crate::world::game_event::GameEventListener;
 use pumpkin_data::BlockStateId;
 use pumpkin_inventory::Inventory;
 
@@ -126,6 +127,11 @@ pub trait BlockEntity: Any + Send + Sync {
     }
 
     fn get_inventory(self: Arc<Self>) -> Option<Arc<dyn Inventory>> {
+        None
+    }
+
+    /// Vanilla `EntityBlock.getListener`: the game event listener this block entity provides.
+    fn get_listener(self: Arc<Self>) -> Option<Arc<dyn GameEventListener>> {
         None
     }
 

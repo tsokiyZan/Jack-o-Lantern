@@ -2,23 +2,55 @@ use std::any::Any;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
+use pumpkin_data::Block;
+use pumpkin_data::block_properties::JukeboxLikeProperties;
+use pumpkin_data::data_component_impl::{Holder, JukeboxPlayableImpl};
+use pumpkin_data::game_event::GameEvent;
 use pumpkin_data::item_stack::ItemStack;
+use pumpkin_data::jukebox_song::JukeboxSong;
+use pumpkin_data::particle::Particle;
+use pumpkin_data::world::WorldEvent;
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_nbt::tag::NbtTag;
 use pumpkin_util::math::position::BlockPos;
+use pumpkin_util::math::vector3::Vector3;
+use pumpkin_world::world::BlockFlags;
+use rand::RngExt;
 
 use crate::block::entities::BlockEntity;
+use crate::entity::Entity;
+use crate::entity::item::ItemEntity;
 use crate::world::World;
+use crate::world::game_event::GameEventContext;
+use pumpkin_data::entity::EntityType;
 use pumpkin_inventory::{Clearable, Inventory};
+
+/// Vanilla `JukeboxSongPlayer.PLAY_EVENT_INTERVAL_TICKS`.
+const PLAY_EVENT_INTERVAL_TICKS: u64 = 20;
+/// Vanilla `JukeboxSong.hasFinished`'s grace after the song's length.
+const SONG_FINISH_GRACE_TICKS: u64 = 20;
+
+/// Vanilla `JukeboxSong.fromStack`, for the registry songs Pumpkin plays.
+fn song_from_stack(stack: &ItemStack) -> Option<JukeboxSong> {
+    match stack.get_data_component::<JukeboxPlayableImpl>()?.song {
+        Holder::Reference(song) => Some(song),
+        Holder::Direct(_) => None,
+    }
+}
+
+/// Vanilla `JukeboxSong.hasFinished`, for a song `length_in_ticks` long.
+const fn has_finished(length_in_ticks: u64, ticks_since_song_started: u64) -> bool {
+    ticks_since_song_started >= length_in_ticks + SONG_FINISH_GRACE_TICKS
+}
 
 /// Matches vanilla's `JukeboxBlockEntity`
 pub struct JukeboxBlockEntity {
     position: BlockPos,
     /// The record item stored in the jukebox (`RecordItem` in NBT)
     record_stack: Arc<Mutex<ItemStack>>,
-    /// Ticks since the current song started playing
+    /// Vanilla `JukeboxSongPlayer.ticksSinceSongStarted`.
     ticks_since_song_started: AtomicU64,
-    /// Length of the current song in ticks (0 if not playing)
+    /// Vanilla `JukeboxSongPlayer.song`, by the length `hasFinished` checks; 0 for none.
     song_length_ticks: AtomicU64,
     dirty: AtomicBool,
     comparator_dirty: AtomicBool,
@@ -45,14 +77,23 @@ impl BlockEntity for JukeboxBlockEntity {
             .and_then(ItemStack::read_item_stack)
             .unwrap_or_else(|| ItemStack::EMPTY.clone());
 
-        let ticks_since_song_started =
-            nbt.get_long(TICKS_SINCE_SONG_STARTED_NBT_KEY).unwrap_or(0) as u64;
+        // Vanilla `JukeboxSongPlayer.setSongWithoutPlaying`.
+        let (song_length_ticks, ticks_since_song_started) = nbt
+            .get_long(TICKS_SINCE_SONG_STARTED_NBT_KEY)
+            .map(|ticks| ticks as u64)
+            .and_then(|ticks| {
+                song_from_stack(&record_stack)
+                    .map(|song| song.length_in_ticks())
+                    .filter(|length| !has_finished(*length, ticks))
+                    .map(|length| (length, ticks))
+            })
+            .unwrap_or((0, 0));
 
         Self {
             position,
             record_stack: Arc::new(Mutex::new(record_stack)),
             ticks_since_song_started: AtomicU64::new(ticks_since_song_started),
-            song_length_ticks: AtomicU64::new(0), // Will be set when playing starts
+            song_length_ticks: AtomicU64::new(song_length_ticks),
             dirty: AtomicBool::new(false),
             comparator_dirty: AtomicBool::new(false),
         }
@@ -69,26 +110,48 @@ impl BlockEntity for JukeboxBlockEntity {
             nbt.put(RECORD_ITEM_NBT_KEY, record_nbt);
         }
 
-        let ticks = self.ticks_since_song_started.load(Ordering::Relaxed);
-        if ticks > 0 {
-            nbt.put_long(TICKS_SINCE_SONG_STARTED_NBT_KEY, ticks as i64);
+        if self.is_playing() {
+            nbt.put_long(
+                TICKS_SINCE_SONG_STARTED_NBT_KEY,
+                self.ticks_since_song_started.load(Ordering::Relaxed) as i64,
+            );
         }
     }
 
-    fn tick(&self, _world: &Arc<World>) {
-        // Increment ticks if we're playing
+    /// Vanilla `JukeboxSongPlayer.tick`.
+    fn tick(&self, world: &Arc<World>) {
         let song_length = self.song_length_ticks.load(Ordering::Relaxed);
-        if song_length > 0 {
-            let ticks = self
-                .ticks_since_song_started
-                .fetch_add(1, Ordering::Relaxed);
-            // Check if song has finished
-            if ticks >= song_length {
-                self.stop_playing();
-                // TODO: Update block state to has_record = false? Or just stop redstone?
-                // In vanilla, the disc stays but music stops and redstone turns off
-            }
+        if song_length == 0 {
+            return;
         }
+        let ticks = self.ticks_since_song_started.load(Ordering::Relaxed);
+        if has_finished(song_length, ticks) {
+            self.stop(world);
+            return;
+        }
+        if ticks.is_multiple_of(PLAY_EVENT_INTERVAL_TICKS) {
+            world.game_event(
+                GameEvent::JukeboxPlay,
+                self.position.to_centered_f64(),
+                GameEventContext::of_state(world.get_block_state(&self.position)),
+            );
+            self.spawn_music_particles(world);
+        }
+        self.ticks_since_song_started
+            .store(ticks + 1, Ordering::Relaxed);
+    }
+
+    /// Vanilla `JukeboxBlockEntity.preRemoveSideEffects`, then `setRemoved`.
+    fn on_block_replaced(self: Arc<Self>, world: &Arc<World>, _position: &BlockPos) {
+        self.pop_out_the_item(world);
+        // The jukebox is already gone, so its old state is unknown; listeners only check
+        // the block.
+        world.game_event(
+            GameEvent::JukeboxStopPlay,
+            self.position.to_centered_f64(),
+            GameEventContext::of_state(Block::JUKEBOX.default_state),
+        );
+        world.sync_world_event(WorldEvent::SoundStopJukeboxSong, self.position, 0);
     }
 
     fn is_comparator_dirty(&self) -> bool {
@@ -151,30 +214,12 @@ impl JukeboxBlockEntity {
             .clone()
     }
 
-    /// Set the record stack - matches vanilla's `setStack()`
-    /// Note: The caller is responsible for updating block state and playing music
-    pub fn set_record(&self, stack: ItemStack) {
-        *self
-            .record_stack
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) = stack;
-        self.mark_dirty();
+    /// Vanilla `JukeboxSongPlayer.isPlaying`.
+    pub fn is_playing(&self) -> bool {
+        self.song_length_ticks.load(Ordering::Relaxed) > 0
     }
 
-    /// Clear the stack and return what was there - used for dropping
-    pub fn clear_record(&self) -> ItemStack {
-        self.stop_playing();
-        let mut record = self
-            .record_stack
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let taken = record.clone();
-        *record = ItemStack::EMPTY.clone();
-        self.mark_dirty();
-        taken
-    }
-
-    /// Start playing a song with the given length in ticks
+    /// Starts a song `length_in_ticks` long for plugins, without vanilla's sound and events.
     pub fn start_playing(&self, length_in_ticks: u64) {
         self.ticks_since_song_started.store(0, Ordering::Relaxed);
         self.song_length_ticks
@@ -182,21 +227,115 @@ impl JukeboxBlockEntity {
         self.mark_dirty();
     }
 
-    /// Stop playing the current song
+    /// Stops the song for plugins and containers, without vanilla's sound and events.
     pub fn stop_playing(&self) {
         self.ticks_since_song_started.store(0, Ordering::Relaxed);
         self.song_length_ticks.store(0, Ordering::Relaxed);
         self.mark_dirty();
     }
 
-    /// Check if a song is currently playing
-    pub fn is_playing(&self) -> bool {
-        let song_length = self.song_length_ticks.load(Ordering::Relaxed);
-        if song_length == 0 {
-            return false;
+    /// Vanilla `JukeboxBlockEntity.setTheItem`.
+    pub fn set_the_item(&self, world: &Arc<World>, stack: ItemStack) {
+        let song = song_from_stack(&stack);
+        let item_was_inserted = !stack.is_empty();
+        *self
+            .record_stack
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = stack;
+        self.mark_dirty();
+        self.notify_item_changed_in_jukebox(world, item_was_inserted);
+        match song {
+            Some(song) if item_was_inserted => self.play(world, song),
+            _ => self.stop(world),
         }
-        let ticks = self.ticks_since_song_started.load(Ordering::Relaxed);
-        ticks < song_length
+    }
+
+    /// Vanilla `JukeboxBlockEntity.notifyItemChangedInJukebox`.
+    fn notify_item_changed_in_jukebox(&self, world: &Arc<World>, was_inserted: bool) {
+        let (block, state) = world.get_block_and_state_id(&self.position);
+        if block != &Block::JUKEBOX {
+            return;
+        }
+        let mut props = JukeboxLikeProperties::from_state_id(state);
+        props.has_record = was_inserted;
+        world.set_block_state(
+            &self.position,
+            props.to_state_id(block),
+            BlockFlags::NOTIFY_LISTENERS,
+        );
+        world.game_event(
+            GameEvent::BlockChange,
+            self.position.to_centered_f64(),
+            GameEventContext::of_state(world.get_block_state(&self.position)),
+        );
+    }
+
+    /// Vanilla `JukeboxBlockEntity.popOutTheItem`.
+    pub fn pop_out_the_item(&self, world: &Arc<World>) {
+        let item_before_popping_out = self.get_record();
+        if item_before_popping_out.is_empty() {
+            return;
+        }
+        self.set_the_item(world, ItemStack::EMPTY.clone());
+        let mut rng = rand::rng();
+        // `Vec3.atLowerCornerWithOffset(pos, 0.5, 1.01, 0.5).offsetRandomXZ(random, 0.7F)`.
+        let spawn_pos = Vector3::new(
+            f64::from(self.position.0.x) + 0.5 + f64::from((rng.random::<f32>() - 0.5) * 0.7),
+            f64::from(self.position.0.y) + 1.01,
+            f64::from(self.position.0.z) + 0.5 + f64::from((rng.random::<f32>() - 0.5) * 0.7),
+        );
+        let entity = Entity::new(world.clone(), spawn_pos, &EntityType::ITEM);
+        world.spawn_entity(Arc::new(ItemEntity::new(entity, item_before_popping_out)));
+        self.on_song_changed(world);
+    }
+
+    /// Vanilla `JukeboxSongPlayer.play`.
+    fn play(&self, world: &Arc<World>, song: JukeboxSong) {
+        self.start_playing(song.length_in_ticks());
+        world.sync_world_event(
+            WorldEvent::SoundPlayJukeboxSong,
+            self.position,
+            song.get_id() as i32,
+        );
+        self.on_song_changed(world);
+    }
+
+    /// Vanilla `JukeboxSongPlayer.stop`.
+    fn stop(&self, world: &Arc<World>) {
+        if !self.is_playing() {
+            return;
+        }
+        self.stop_playing();
+        world.game_event(
+            GameEvent::JukeboxStopPlay,
+            self.position.to_centered_f64(),
+            GameEventContext::of_state(world.get_block_state(&self.position)),
+        );
+        world.sync_world_event(WorldEvent::SoundStopJukeboxSong, self.position, 0);
+        self.on_song_changed(world);
+    }
+
+    /// Vanilla `JukeboxBlockEntity.onSongChanged`.
+    fn on_song_changed(&self, world: &Arc<World>) {
+        world.update_neighbors_at(&self.position, &Block::JUKEBOX, None);
+        self.mark_dirty();
+    }
+
+    /// Vanilla `JukeboxSongPlayer.spawnMusicParticles`.
+    fn spawn_music_particles(&self, world: &World) {
+        let random_color = rand::rng().random_range(0..4) as f32 / 24.0;
+        let pos = self.position;
+        world.spawn_particle(
+            Vector3::new(
+                f64::from(pos.0.x) + 0.5,
+                f64::from(pos.0.y) + f64::from(1.2f32),
+                f64::from(pos.0.z) + 0.5,
+            ),
+            Vector3::new(random_color, 0.0, 0.0),
+            1.0,
+            0,
+            Particle::Note,
+        );
     }
 
     fn mark_dirty(&self) {
@@ -226,6 +365,8 @@ impl Inventory for JukeboxBlockEntity {
     }
 
     fn remove_stack(&self, _slot: usize) -> ItemStack {
+        // TODO: vanilla goes through `setTheItem`, which stops the song with its events; this
+        // has no world to post them to.
         self.stop_playing();
         let mut record = self
             .record_stack

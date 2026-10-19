@@ -151,10 +151,11 @@ impl Mob for BoggedSkeletonEntity {
         }
         self.shear(SoundCategory::Players, item_stack);
         let entity = self.get_entity();
-        entity
-            .world
-            .load()
-            .emit_game_event(GameEvent::Shear.name(), entity.pos.load());
+        entity.world.load().game_event_from(
+            Some(player.as_ref()),
+            GameEvent::Shear,
+            entity.pos.load(),
+        );
         if player.gamemode.load() != GameMode::Creative {
             let _ = item_stack.hurt_and_break(&entity.world.load(), 1);
         }

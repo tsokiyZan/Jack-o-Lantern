@@ -47,7 +47,9 @@ impl EnchantmentEntityEffectExt for ReplaceBlock {
     ) {
         let target = self.target_position(position);
         if let Some(event) = self.trigger_game_event {
-            world.emit_game_event(event.name(), target.to_centered_f64());
+            // TODO: vanilla passes the enchanted entity as the source; this hook only has its
+            // base `Entity`.
+            world.game_event_from(None, event, target.to_centered_f64());
         }
     }
 }

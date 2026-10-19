@@ -71,6 +71,15 @@ pub fn toggle_fence_gate(
         fence_gate_props.to_state_id(block),
         BlockFlags::NOTIFY_LISTENERS,
     );
+    world.game_event_from(
+        Some(player),
+        if fence_gate_props.open {
+            pumpkin_data::game_event::GameEvent::BlockOpen
+        } else {
+            pumpkin_data::game_event::GameEvent::BlockClose
+        },
+        block_pos.to_centered_f64(),
+    );
     fence_gate_props.to_state_id(block)
 }
 
