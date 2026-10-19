@@ -132,10 +132,13 @@ pub fn try_spawn_mob<T: Mob + 'static>(
             world,
             None,
         );
-        if !mob.check_spawn_obstruction(world) {
+        // `checkSpawnRules` (`PathfinderMob`'s walk target value) and `checkSpawnObstruction`.
+        let spawn_pos = BlockPos::floored_v(position);
+        if mob.get_walk_target_value(&spawn_pos) < 0.0 || !mob.check_spawn_obstruction(world) {
             continue;
         }
         world.spawn_entity(mob.clone() as Arc<dyn EntityBase>);
+        mob.play_ambient_sound();
         return Some(mob);
     }
 
