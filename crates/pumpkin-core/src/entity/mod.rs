@@ -914,6 +914,11 @@ pub trait EntityBase: Send + Sync + std::any::Any {
         push_apart(self.get_entity(), self.is_pushable(), entity);
     }
 
+    /// Vanilla `Entity.push(Vec3)` / `push(x, y, z)`, which subclasses can override.
+    fn push_impulse(&self, impulse: Vector3<f64>) {
+        self.get_entity().push_impulse(impulse);
+    }
+
     #[allow(clippy::too_many_lines)]
     fn push_entities(&self, dyn_self: &dyn EntityBase) -> bool {
         let mut picked_up = false;

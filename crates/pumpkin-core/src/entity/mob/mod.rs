@@ -2348,6 +2348,11 @@ pub trait Mob: EntityBase + Send + Sync {
     /// The start of a vanilla `push(Entity)` override, after the mob was pushed by `entity`.
     fn mob_push(&self, _entity: &dyn EntityBase) {}
 
+    /// A vanilla `push(x, y, z)` override.
+    fn mob_push_impulse(&self, impulse: Vector3<f64>) {
+        self.get_entity().push_impulse(impulse);
+    }
+
     /// The start of a vanilla `remove` override for a mob removed once its death
     /// animation ends (`RemovalReason.KILLED`).
     fn remove_killed(&self) {}
@@ -2783,6 +2788,10 @@ impl<T: Mob + Send + 'static> EntityBase for T {
             super::push_apart(self.get_entity(), self.is_pushable(), entity);
         }
         self.mob_push(entity);
+    }
+
+    fn push_impulse(&self, impulse: Vector3<f64>) {
+        self.mob_push_impulse(impulse);
     }
 
     fn on_lightning_strike(

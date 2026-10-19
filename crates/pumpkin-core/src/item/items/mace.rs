@@ -156,7 +156,7 @@ impl MaceItem {
             let power = Self::get_knockback_power(attacker, nearby_living, direction);
             if power > 0.0 {
                 let knockback = direction.normalize() * power;
-                nearby.get_entity().push_impulse(Vector3::new(
+                nearby.push_impulse(Vector3::new(
                     knockback.x,
                     f64::from(SMASH_ATTACK_KNOCKBACK_POWER),
                     knockback.z,

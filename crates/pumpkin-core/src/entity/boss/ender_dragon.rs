@@ -675,7 +675,7 @@ impl EnderDragonEntity {
             let xd = pos.x - xm;
             let zd = pos.z - zm;
             let dd = (xd * xd + zd * zd).max(0.1);
-            target.push_impulse(Vector3::new(
+            entity.push_impulse(Vector3::new(
                 xd / dd * 4.0,
                 f64::from(0.2f32),
                 zd / dd * 4.0,

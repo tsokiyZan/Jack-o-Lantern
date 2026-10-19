@@ -192,16 +192,16 @@ impl RavagerEntity {
                 );
             }
             if target.get_player().is_none() {
-                self.strong_knockback(target_entity);
+                self.strong_knockback(target.as_ref());
             }
         }
         world.send_entity_status(entity, EntityStatus::RavagerRoared, None);
     }
 
     /// Vanilla `strongKnockback`.
-    fn strong_knockback(&self, target: &Entity) {
+    fn strong_knockback(&self, target: &dyn EntityBase) {
         let pos = self.get_entity().pos.load();
-        let target_pos = target.pos.load();
+        let target_pos = target.get_entity().pos.load();
         let xd = target_pos.x - pos.x;
         let zd = target_pos.z - pos.z;
         let dd = (xd * xd + zd * zd).max(0.001);
@@ -310,7 +310,7 @@ impl Mob for RavagerEntity {
                 .send_entity_status(entity, EntityStatus::RavagerStunned, None);
             defender.push(self);
         } else {
-            self.strong_knockback(defender_entity);
+            self.strong_knockback(defender);
         }
         defender_entity.send_velocity();
     }

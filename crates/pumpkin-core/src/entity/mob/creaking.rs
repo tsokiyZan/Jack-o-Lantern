@@ -572,6 +572,13 @@ impl Mob for CreakingEntity {
         hurt
     }
 
+    /// Vanilla `Creaking.push(x, y, z)`: a frozen creaking can't be pushed.
+    fn mob_push_impulse(&self, impulse: Vector3<f64>) {
+        if self.can_move() {
+            self.get_entity().push_impulse(impulse);
+        }
+    }
+
     /// Vanilla `Creaking.isPushable`.
     fn mob_is_pushable(&self) -> bool {
         self.can_move()

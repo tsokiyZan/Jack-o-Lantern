@@ -196,9 +196,7 @@ impl ArrowEntity {
             let movement = Vector3::new(velocity.x, 0.0, velocity.z).normalize()
                 * (knockback * 0.6 * resistance);
             if movement.length_squared() > 0.0 {
-                target
-                    .get_entity()
-                    .push_impulse(Vector3::new(movement.x, 0.1, movement.z));
+                target.push_impulse(Vector3::new(movement.x, 0.1, movement.z));
             }
         }
     }

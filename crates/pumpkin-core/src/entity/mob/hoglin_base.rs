@@ -85,7 +85,7 @@ pub fn throw_target(body: &dyn Mob, target: &dyn EntityBase) {
     let horizontal_push_vector =
         (Vector3::new(xd, 0.0, zd).normalize() * horizontal_scale).y_rot(horizontal_push_angle);
     let vertical_scale = effective_knockback_power * f64::from(random.random::<f32>()) * 0.5;
-    target_entity.push_impulse(Vector3::new(
+    target.push_impulse(Vector3::new(
         horizontal_push_vector.x,
         vertical_scale,
         horizontal_push_vector.z,

@@ -635,7 +635,7 @@ impl Explosion {
                 * (1.0 - knockback_resistance);
             let knockback = direction * knockback_power;
             // `pushFromExplosion`.
-            entity.push_impulse(knockback);
+            entity_base.push_impulse(knockback);
             if entity
                 .entity_type
                 .has_tag(&tag::EntityType::MINECRAFT_REDIRECTABLE_PROJECTILE)
