@@ -6,7 +6,7 @@ use std::sync::atomic::Ordering;
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::sound::Sound;
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::EntityBase;
 use crate::entity::ai::control::fish_move_control::FishMoveControl;
@@ -126,10 +126,13 @@ pub fn flop(mob: &dyn Mob, sound: Sound) {
     if entity.touching_water.load(Ordering::Relaxed) || !entity.on_ground.load(Ordering::Relaxed) {
         return;
     }
-    let mut rng = mob.get_random();
+    let (x, z) = {
+        let mut rng = entity.random();
+        let x = (rng.next_f32() * 2.0 - 1.0) * 0.05;
+        let z = (rng.next_f32() * 2.0 - 1.0) * 0.05;
+        (x, z)
+    };
     let velocity = entity.velocity.load();
-    let x = (rng.random::<f32>() * 2.0 - 1.0) * 0.05;
-    let z = (rng.random::<f32>() * 2.0 - 1.0) * 0.05;
     entity.velocity.store(Vector3::new(
         velocity.x + f64::from(x),
         velocity.y + f64::from(0.4f32),

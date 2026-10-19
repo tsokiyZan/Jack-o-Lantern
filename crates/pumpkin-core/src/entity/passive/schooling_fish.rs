@@ -3,7 +3,7 @@
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::EntityBase;
 use crate::entity::ai::goal::follow_flock_leader::FollowFlockLeaderGoal;
@@ -23,7 +23,7 @@ pub fn init(mob_entity: &MobEntity) {
         .goals_selector
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
-        .add_goal(5, Box::new(FollowFlockLeaderGoal::new()));
+        .add_goal(5, Box::new(FollowFlockLeaderGoal::for_mob(mob_entity)));
 }
 
 /// The school a fish belongs to. Other fish change `school_size` from their own
@@ -126,7 +126,15 @@ impl SchoolingFish {
     /// has lost sight of every other fish of its kind forgets its school.
     pub fn tick(&self, mob: &dyn Mob) {
         if self.has_followers()
-            && mob.get_random().random_range(0..200) == 1
+            && mob
+                .get_entity()
+                .world
+                .load()
+                .random
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .next_bounded_i32(200)
+                == 1
             && others_of_same_kind(mob).is_empty()
         {
             self.school_size.store(1, Ordering::Relaxed);

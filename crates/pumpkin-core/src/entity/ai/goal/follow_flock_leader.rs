@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use pumpkin_util::random::RandomImpl;
-use rand::RngExt;
 
 use super::{Goal, to_goal_ticks};
 use crate::entity::EntityBase;
@@ -18,17 +17,6 @@ pub struct FollowFlockLeaderGoal {
 }
 
 impl FollowFlockLeaderGoal {
-    /// Draws the first start delay from a thread RNG; [`Self::for_mob`] is the vanilla one.
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            time_to_recalc_path: 0,
-            next_start_tick: to_goal_ticks(
-                INTERVAL_TICKS + rand::rng().random_range(0..INTERVAL_TICKS) % 20,
-            ),
-        }
-    }
-
     /// Vanilla's constructor: the first start delay comes from the fish's own random.
     #[must_use]
     pub fn for_mob(mob_entity: &MobEntity) -> Self {
@@ -62,12 +50,6 @@ impl FollowFlockLeaderGoal {
                 school.start_following(leader);
             }
         }
-    }
-}
-
-impl Default for FollowFlockLeaderGoal {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
