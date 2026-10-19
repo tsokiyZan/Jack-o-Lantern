@@ -63,16 +63,21 @@ impl CommandExecutor for SetBlockExecutor {
             true
         };
 
+        // Vanilla `2 | (strict ? 816 : 256)`: 256 skips block-entity side effects either way.
         let (flags, strict) = match mode {
             Mode::Strict => (
                 BlockFlags::NOTIFY_LISTENERS
                     | BlockFlags::SKIP_BLOCK_ADDED_CALLBACK
+                    | BlockFlags::SKIP_BLOCK_ENTITY_REPLACED_CALLBACK
                     | BlockFlags::FORCE_STATE,
                 true,
             ),
-            Mode::Destroy | Mode::Keep | Mode::Replace => {
-                (BlockFlags::NOTIFY_ALL | BlockFlags::FORCE_STATE, false)
-            }
+            Mode::Destroy | Mode::Keep | Mode::Replace => (
+                BlockFlags::NOTIFY_ALL
+                    | BlockFlags::SKIP_BLOCK_ENTITY_REPLACED_CALLBACK
+                    | BlockFlags::FORCE_STATE,
+                false,
+            ),
         };
         if place_needed && !place_block_input(world, &pos, &input, flags, !strict) {
             return Err(ERROR_FAILED.create_without_context());
