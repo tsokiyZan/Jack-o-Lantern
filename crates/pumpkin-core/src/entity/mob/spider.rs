@@ -195,13 +195,10 @@ impl Mob for SpiderEntity {
         &self.mob_entity
     }
 
-    fn mob_tick(&self, _caller: &dyn EntityBase) {
+    /// Vanilla `Spider.tick`: after `super.tick()` moved it, a spider climbs while it walks
+    /// into a wall.
+    fn post_tick(&self) {
         let entity = &self.mob_entity.living_entity.entity;
-        if !entity.is_alive() {
-            return;
-        }
-
-        // Vanilla `Spider.tick`: a spider climbs while it walks into a wall.
         self.set_climbing(entity.horizontal_collision.load(Ordering::Relaxed));
     }
 

@@ -113,12 +113,10 @@ impl Mob for CaveSpiderEntity {
         }
     }
 
-    /// Vanilla `Spider.tick`: a spider climbs while it walks into a wall.
-    fn mob_tick(&self, _caller: &dyn EntityBase) {
+    /// Vanilla `Spider.tick`: after `super.tick()` moved it, a spider climbs while it walks
+    /// into a wall.
+    fn post_tick(&self) {
         let entity = &self.mob_entity.living_entity.entity;
-        if !entity.is_alive() {
-            return;
-        }
         let climbing = entity
             .horizontal_collision
             .load(std::sync::atomic::Ordering::Relaxed);
