@@ -13,6 +13,7 @@ use pumpkin_data::item_stack::ItemStack;
 use pumpkin_protocol::bedrock::server::actor_event::ActorEventID;
 use pumpkin_protocol::codec::item_stack_seralizer::ItemStackSerializer;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 use uuid::Uuid;
 
 const MAX_EGG_HATCH_EVENT_SPAWNS: usize = 16;
@@ -115,12 +116,20 @@ impl EntityBase for EggEntity {
             Some(ActorEventID::Death),
         );
 
-        // Decide spawn count per probabilities:
-        // r == 0 -> spawn 4 (1/256)
-        // r in 1..31 -> spawn 1 (31/256)
-        // else -> 0
-        let r: u8 = rand::random(); // 0..=255
-        let mut to_spawn = if r == 0 { 4usize } else { usize::from(r < 32) };
+        // Vanilla `ThrownEgg.onHit`: `nextInt(8) == 0` hatches, then `nextInt(32) == 0`
+        // makes it four chickens instead of one.
+        let mut to_spawn = {
+            let mut random = self.get_entity().random();
+            if random.next_bounded_i32(8) == 0 {
+                if random.next_bounded_i32(32) == 0 {
+                    4usize
+                } else {
+                    1
+                }
+            } else {
+                0
+            }
+        };
         let mut hatching = to_spawn > 0;
         let mut hatching_type: &'static EntityType = &EntityType::CHICKEN;
 
@@ -161,7 +170,8 @@ impl EntityBase for EggEntity {
             for _ in 0..to_spawn {
                 let mob = from_type(hatching_type, spawn_pos, &world, Uuid::new_v4());
 
-                let yaw = rand::random::<f32>() * 360.0;
+                // Vanilla `chicken.snapTo(..., this.getYRot(), 0.0F)`: the egg's yaw.
+                let yaw = self.get_entity().yaw.load();
                 let new_entity = mob.get_entity();
                 new_entity.set_rotation(yaw, 0.0);
                 new_entity.set_age(-24000);

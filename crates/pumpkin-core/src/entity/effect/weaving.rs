@@ -3,8 +3,8 @@ use pumpkin_data::BlockDirection;
 use pumpkin_data::world::WorldEvent;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 use pumpkin_world::world::BlockFlags;
-use rand::RngExt;
 
 use crate::entity::effect::MobEffect;
 use crate::entity::living::LivingEntity;
@@ -20,17 +20,18 @@ impl MobEffect for WeavingMobEffect {
         }
         // `spawnCobwebsRandomlyAround`.
         let center = living.entity.block_pos.load();
-        let mut rng = rand::rng();
-        // `MobEffects.WEAVING`'s `maxCobwebs`: `randomBetweenInclusive(random, 2, 3)`.
-        let cobweb_count = rng.random_range(2..=3);
+        // `MobEffects.WEAVING`'s `maxCobwebs`: `randomBetweenInclusive(mob.getRandom(), 2, 3)`.
+        let cobweb_count = (living.entity.random().next_bounded_i32(2) + 2) as usize;
         let mut positions: Vec<BlockPos> = Vec::new();
         // `BlockPos.randomInCube(random, 15, pos, 1)`.
         for _ in 0..15 {
-            let pos = BlockPos(Vector3::new(
-                center.0.x - 1 + rng.random_range(0..3),
-                center.0.y - 1 + rng.random_range(0..3),
-                center.0.z - 1 + rng.random_range(0..3),
-            ));
+            let pos = {
+                let mut random = living.entity.random();
+                let x = center.0.x - 1 + random.next_bounded_i32(3);
+                let y = center.0.y - 1 + random.next_bounded_i32(3);
+                let z = center.0.z - 1 + random.next_bounded_i32(3);
+                BlockPos(Vector3::new(x, y, z))
+            };
             if !positions.contains(&pos)
                 && world.get_block_state(&pos).replaceable()
                 && world

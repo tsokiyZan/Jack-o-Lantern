@@ -33,6 +33,7 @@ use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::tag::{Tag, Taggable};
 use pumpkin_util::difficulty::Difficulty;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 use rand::RngExt;
 
 use crate::entity::living::LivingEntity;
@@ -889,7 +890,9 @@ pub fn equip_item_if_possible(mob: &dyn Mob, stack: ItemStack) -> ItemStack {
     }
 
     let drop_chance = mob_entity.drop_chance(&slot);
-    if !current.is_empty() && (rand::random::<f32>() - 0.1).max(0.0) < drop_chance {
+    if !current.is_empty()
+        && (mob_entity.living_entity.entity.random().next_f32() - 0.1).max(0.0) < drop_chance
+    {
         mob_entity.living_entity.entity.spawn_at_location(current);
     }
 

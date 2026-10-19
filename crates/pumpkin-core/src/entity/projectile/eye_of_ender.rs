@@ -13,6 +13,7 @@ use pumpkin_protocol::{
     codec::item_stack_seralizer::ItemStackSerializer, java::client::play::Metadata,
 };
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 use std::sync::Mutex;
 use std::sync::{
     Arc,
@@ -31,7 +32,7 @@ const TOO_FAR_SIGNAL_HEIGHT: f64 = 8.0;
 const MAX_LIFE: u32 = 80;
 
 /// Chance (1-in-5) the eye drops its item instead of playing the break effect.
-const SURVIVE_CHANCE: u32 = 5;
+const SURVIVE_CHANCE: i32 = 5;
 
 pub struct EyeOfEnder {
     entity: Entity,
@@ -75,8 +76,8 @@ impl EyeOfEnder {
             .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(clamped_target);
         self.life.store(0, Ordering::Relaxed);
 
-        // 4-in-5 chance to survive (drop item); 1-in-5 plays the break effect.
-        let survive = !rand::random::<u32>().is_multiple_of(SURVIVE_CHANCE);
+        // Vanilla `this.random.nextInt(5) > 0`: 4-in-5 chance to survive (drop item).
+        let survive = self.entity.random().next_bounded_i32(SURVIVE_CHANCE) > 0;
         self.survive_after_death.store(survive, Ordering::Relaxed);
     }
 

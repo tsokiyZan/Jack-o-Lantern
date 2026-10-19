@@ -287,6 +287,7 @@ use pumpkin_util::math::{
     boundingbox::BoundingBox, experience, position::BlockPos, vector2::Vector2, vector3::Vector3,
 };
 use pumpkin_util::permission::PermissionLvl;
+use pumpkin_util::random::RandomImpl;
 use pumpkin_util::resource_location::ResourceLocation;
 use pumpkin_util::text::TextComponent;
 use pumpkin_util::text::click::ClickEvent;
@@ -768,7 +769,8 @@ impl Player {
             current_block_destroy_stage: AtomicI32::new(-1),
             current_block_breaking_speed: AtomicU32::new(0),
             synced_mining_efficiency_level: AtomicI32::new(-1),
-            enchantment_seed: AtomicI32::new(rand::random()),
+            // Vanilla `Player.enchantmentSeed = 0`; a load without `XpSeed` draws one.
+            enchantment_seed: AtomicI32::new(0),
             open_container: AtomicCell::new(None),
             open_container_pos: AtomicCell::new(None),
             raid_omen_position: AtomicCell::new(None),
@@ -5357,20 +5359,28 @@ impl Player {
             + Vector3::new(0.0, self.living_entity.entity.get_eye_height() - 0.3, 0.0);
         let entity = Entity::new(self.world(), item_pos, &EntityType::ITEM);
 
-        let pitch = f64::from(self.living_entity.entity.pitch.load()).to_radians();
-        let yaw = f64::from(self.living_entity.entity.yaw.load()).to_radians();
-        let pitch_sin = pitch.sin();
-        let pitch_cos = pitch.cos();
-        let yaw_sin = yaw.sin();
-        let yaw_cos = yaw.cos();
-        let horizontal_offset = rand::random::<f64>() * TAU;
-        let l = 0.02 * rand::random::<f64>();
+        // Vanilla `LivingEntity.createItemStackToDrop(stack, false, ...)`, in its float
+        // arithmetic with `Mth.sin`/`Mth.cos`, drawing from the player's random.
+        let deg_to_rad = (std::f64::consts::PI / 180.0) as f32;
+        let x_rot = self.living_entity.entity.pitch.load() * deg_to_rad;
+        let y_rot = self.living_entity.entity.yaw.load() * deg_to_rad;
+        let sin_x = pumpkin_util::math::sin(x_rot);
+        let cos_x = pumpkin_util::math::cos(x_rot);
+        let sin_y = pumpkin_util::math::sin(y_rot);
+        let cos_y = pumpkin_util::math::cos(y_rot);
+        let (dir, pow2, y_jitter) = {
+            let mut random = self.living_entity.entity.random();
+            let dir = random.next_f32() * (TAU as f32);
+            let pow2 = 0.02 * random.next_f32();
+            let y_jitter = random.next_f32() - random.next_f32();
+            (dir, pow2, y_jitter)
+        };
 
         let velocity = Vector3::new(
             // Vanilla's term order, unfused.
-            -yaw_sin * pitch_cos * 0.3 + horizontal_offset.cos() * l,
-            -pitch_sin * 0.3 + 0.1 + (rand::random::<f64>() - rand::random::<f64>()) * 0.1,
-            yaw_cos * pitch_cos * 0.3 + horizontal_offset.sin() * l,
+            f64::from(-sin_y * cos_x * 0.3) + f64::from(dir).cos() * f64::from(pow2),
+            f64::from(-sin_x * 0.3 + 0.1 + y_jitter * 0.1),
+            f64::from(cos_y * cos_x * 0.3) + f64::from(dir).sin() * f64::from(pow2),
         );
 
         // TODO: Merge stacks together
@@ -5854,13 +5864,22 @@ impl Player {
 
         let mut candidates: Vec<(usize, EquipmentSlot, ItemStack)> = Vec::new();
 
+        // Vanilla `EnchantmentHelper.getRandomItemWith` walks `EquipmentSlot.VALUES` in order.
         let selected_slot = self.inventory.get_selected_slot() as usize;
         let mut slot_pairs: Vec<(usize, EquipmentSlot)> = vec![
             (selected_slot, EquipmentSlot::MAIN_HAND),
             (PlayerInventory::OFF_HAND_SLOT, EquipmentSlot::OFF_HAND),
         ];
-        for (slot_index, slot) in self.inventory.equipment_slots.iter() {
-            if slot.is_armor_slot() {
+        for slot in &EquipmentSlot::VALUES {
+            if !slot.is_armor_slot() {
+                continue;
+            }
+            if let Some((slot_index, _)) = self
+                .inventory
+                .equipment_slots
+                .iter()
+                .find(|(_, equipment_slot)| *equipment_slot == slot)
+            {
                 slot_pairs.push((*slot_index, slot.clone()));
             }
         }
@@ -5876,7 +5895,12 @@ impl Player {
             return xp;
         }
 
-        let idx = rand::random::<u32>() as usize % candidates.len();
+        // `Util.getRandomSafe(items, source.getRandom())`.
+        let idx = self
+            .living_entity
+            .entity
+            .random()
+            .next_bounded_i32(candidates.len() as i32) as usize;
         let (slot_index, equipment_slot, mut stack) = candidates.swap_remove(idx);
 
         let repaired = stack.repair_item(xp.saturating_mul(2));
@@ -7531,10 +7555,13 @@ impl EntityBase for Player {
             self.experience_points.store(points, Ordering::Relaxed);
         }
 
-        self.enchantment_seed.store(
-            nbt.get_int("XpSeed").unwrap_or_else(rand::random),
-            Ordering::Relaxed,
-        );
+        // Vanilla `Player.readAdditionalSaveData`: `XpSeed`, or `random.nextInt()` when 0.
+        let mut enchantment_seed = nbt.get_int("XpSeed").unwrap_or(0);
+        if enchantment_seed == 0 {
+            enchantment_seed = self.living_entity.entity.random().next_i32();
+        }
+        self.enchantment_seed
+            .store(enchantment_seed, Ordering::Relaxed);
 
         self.score
             .store(nbt.get_int("Score").unwrap_or(0), Ordering::Relaxed);
@@ -8454,7 +8481,10 @@ impl InventoryPlayer for Player {
             let state = world.get_block_state(&pos);
             let block = pumpkin_data::Block::from_state_id(state.id);
             if block.has_tag(&pumpkin_data::tag::Block::MINECRAFT_ANVIL) {
-                if !self.has_infinite_materials() && rand::random::<f32>() < 0.12 {
+                // Vanilla `AnvilMenu.onTake`: `player.getRandom().nextFloat() < 0.12F`.
+                if !self.has_infinite_materials()
+                    && self.living_entity.entity.random().next_f32() < 0.12
+                {
                     if let Some(new_state) =
                         crate::block::blocks::anvil::AnvilBlock::damage(state.id)
                     {

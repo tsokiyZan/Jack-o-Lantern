@@ -14,9 +14,9 @@ use pumpkin_util::math::boundingbox::BoundingBox;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
 use pumpkin_util::math::{atan2, cos, sin, wrap_degrees, wrap_degrees_f64};
+use pumpkin_util::random::RandomImpl;
 use pumpkin_world::chunk::ChunkHeightmapType;
 use pumpkin_world::world::BlockFlags;
-use rand::RngExt;
 use uuid::Uuid;
 
 use crate::enchantment::EnchantmentHelper;
@@ -638,7 +638,7 @@ impl EnderDragonEntity {
             }
         }
 
-        if self.get_random().random_range(0..10) == 0 {
+        if entity.random().next_bounded_i32(10) == 0 {
             let pos = entity.pos.load();
             let area = entity.bounding_box.load().expand_all(32.0);
             let mut nearest = None;
@@ -769,12 +769,13 @@ impl EnderDragonEntity {
         }
 
         if destroyed_block {
-            let mut random = self.get_random();
-            let random_pos = BlockPos::new(
-                x0 + random.random_range(0..x1 - x0 + 1),
-                y0 + random.random_range(0..y1 - y0 + 1),
-                z0 + random.random_range(0..z1 - z0 + 1),
-            );
+            let random_pos = {
+                let mut random = self.get_entity().random();
+                let x = x0 + random.next_bounded_i32(x1 - x0 + 1);
+                let y = y0 + random.next_bounded_i32(y1 - y0 + 1);
+                let z = z0 + random.next_bounded_i32(z1 - z0 + 1);
+                BlockPos::new(x, y, z)
+            };
             world.sync_world_event(WorldEvent::ParticlesDragonBlockBreak, random_pos, 0);
         }
 
