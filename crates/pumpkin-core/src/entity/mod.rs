@@ -1355,6 +1355,8 @@ pub struct Entity {
     /// When the entity joined its current chunk section: vanilla `EntitySection` keeps its
     /// entities in the order they entered, which box queries return them in.
     pub section_order: std::sync::atomic::AtomicU64,
+    /// Vanilla `Entity.random`: the entity's own `RandomSource`, behind [`Self::random`].
+    random: std::sync::Mutex<pumpkin_util::random::legacy_rand::LegacyRand>,
     /// The listeners vanilla's `updateDynamicGameEventListener` overrides hand out (the
     /// allay's and the warden's), set once by the entity's constructor.
     pub dynamic_game_event_listeners: std::sync::OnceLock<Box<[DynamicGameEventListener]>>,
@@ -1388,6 +1390,7 @@ impl Entity {
         )
     }
 
+    #[expect(clippy::too_many_lines, reason = "one initializer per entity field")]
     pub fn from_uuid_with_id(
         entity_id: i32,
         entity_uuid: uuid::Uuid,
@@ -1497,6 +1500,7 @@ impl Entity {
             entity_custom_data: std::sync::Mutex::new(NbtCompound::new()),
             has_glowing_tag: AtomicBool::new(false),
             section_order: std::sync::atomic::AtomicU64::new(next_section_order()),
+            random: std::sync::Mutex::new(new_entity_random()),
             dynamic_game_event_listeners: std::sync::OnceLock::new(),
         }
     }
@@ -1773,6 +1777,15 @@ impl Entity {
     /// Updates the entity's position, block position, and chunk position.
     ///
     /// This function calculates the new position, block position, and chunk position based on the provided coordinates. If any of these values change, the corresponding fields are updated.
+    /// Vanilla `Entity.getRandom()`. Draw into locals and drop the guard before calling on.
+    pub fn random(
+        &self,
+    ) -> std::sync::MutexGuard<'_, pumpkin_util::random::legacy_rand::LegacyRand> {
+        self.random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
     pub fn set_pos(&self, new_position: Vector3<f64>) {
         let pos = self.pos.load();
         if pos != new_position {
@@ -5391,6 +5404,17 @@ impl Flag {
             Self::Glowing => None,
         }
     }
+}
+
+/// Vanilla `Entity.random = RandomSource.create()`, then the two `nextLong`s
+/// `uuid = Mth.createInsecureUUID(this.random)` takes; Pumpkin keeps the UUID it was given.
+fn new_entity_random() -> pumpkin_util::random::legacy_rand::LegacyRand {
+    use pumpkin_util::random::RandomImpl;
+    let mut random =
+        pumpkin_util::random::legacy_rand::LegacyRand::from_seed(pumpkin_util::random::get_seed());
+    random.next_i64();
+    random.next_i64();
+    random
 }
 
 /// The next stamp for [`Entity::section_order`].

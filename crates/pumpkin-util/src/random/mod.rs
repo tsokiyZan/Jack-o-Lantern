@@ -215,6 +215,35 @@ pub trait RandomImpl {
         self.next_bounded_i32(max - min + 1) + min
     }
 
+    /// Vanilla `RandomSource.nextInt(origin, bound)`: `origin + nextInt(bound - origin)`.
+    fn next_int_range(&mut self, origin: i32, bound: i32) -> i32 {
+        origin + self.next_bounded_i32(bound - origin)
+    }
+
+    /// Vanilla `RandomSource.nextIntBetweenInclusive`: draws even when `min == max_inclusive`,
+    /// unlike [`Self::next_inbetween_i32`] (`Mth.nextInt`).
+    fn next_int_between_inclusive(&mut self, min: i32, max_inclusive: i32) -> i32 {
+        self.next_bounded_i32(max_inclusive - min + 1) + min
+    }
+
+    /// Vanilla `Mth.nextFloat(random, min, max)`: no draw when `min >= max`.
+    fn mth_next_float(&mut self, min: f32, max: f32) -> f32 {
+        if min >= max {
+            min
+        } else {
+            self.next_f32() * (max - min) + min
+        }
+    }
+
+    /// Vanilla `Mth.nextDouble(random, min, max)`: no draw when `min >= max`.
+    fn mth_next_double(&mut self, min: f64, max: f64) -> f64 {
+        if min >= max {
+            min
+        } else {
+            self.next_f64() * (max - min) + min
+        }
+    }
+
     fn next_inbetween_f32(&mut self, min: f32, max: f32) -> f32 {
         self.next_f32() * (max - min) + min
     }
@@ -409,6 +438,31 @@ pub fn shuffle<T>(list: &mut [T], random: &mut impl RandomImpl) {
 
 #[cfg(test)]
 mod tests {
+    /// Against `java.util.Random(42)`, which `LegacyRandomSource` matches: `nextInt(5, 12)` x4,
+    /// `nextIntBetweenInclusive(3, 3)` x4 (each still draws), `nextInt()`, then
+    /// `Mth.nextFloat(1, 2.5)` x2 and `Mth.nextDouble(-1, 4)` x2.
+    #[test]
+    fn vanilla_helpers_match_java() {
+        use super::RandomImpl;
+        let mut random = super::legacy_rand::LegacyRand::from_seed(42);
+        let ranged: Vec<i32> = (0..4).map(|_| random.next_int_range(5, 12)).collect();
+        assert_eq!(ranged, [6, 10, 11, 8]);
+        let inclusive: Vec<i32> = (0..4)
+            .map(|_| random.next_int_between_inclusive(3, 3))
+            .collect();
+        assert_eq!(inclusive, [3, 3, 3, 3]);
+        assert_eq!(random.next_i32(), -1_436_456_258);
+        assert_eq!(random.mth_next_float(1.0, 2.5), 1.136_986_9);
+        assert_eq!(random.mth_next_float(1.0, 2.5), 2.355_058_2);
+        assert_eq!(random.mth_next_double(-1.0, 4.0), 1.256_286_097_227_253_6);
+        assert_eq!(random.mth_next_double(-1.0, 4.0), 0.908_215_453_903_978_2);
+        assert_eq!(
+            random.mth_next_float(2.0, 2.0),
+            2.0,
+            "no draw when min >= max"
+        );
+    }
+
     /// Against `Util.shuffle` run on `java.util.Random(seed)`, which `LegacyRandomSource`
     /// matches.
     #[test]
