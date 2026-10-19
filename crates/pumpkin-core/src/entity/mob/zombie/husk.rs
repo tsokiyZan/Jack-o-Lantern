@@ -2,7 +2,7 @@ use pumpkin_data::data_component_impl::EquipmentSlot;
 use pumpkin_data::effect::StatusEffect;
 use pumpkin_data::potion::Effect;
 use pumpkin_util::math::boundingbox::EntityDimensions;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 use std::sync::Arc;
 
 use crate::entity::mob::equipment::RegionalDifficulty;
@@ -57,7 +57,13 @@ impl Mob for HuskEntity {
         let difficulty = RegionalDifficulty::at(world, self.get_entity().pos.load());
         // Rolled again on top of `Zombie.finalizeSpawn`'s.
         self.entity.mob_entity.set_can_pick_up_loot(
-            self.get_random().random::<f32>() < 0.55 * difficulty.special_multiplier,
+            // `level.getRandom()`.
+            world
+                .random
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .next_f32()
+                < 0.55 * difficulty.special_multiplier,
         );
         // TODO: `Husk.finalizeSpawn`'s camel husk jockey needs `CamelHusk` and the
         // `NATURAL` spawn reason.

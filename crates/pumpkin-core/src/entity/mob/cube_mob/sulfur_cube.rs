@@ -27,10 +27,8 @@ use pumpkin_util::math::boundingbox::BoundingBox;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
 use pumpkin_util::math::{clamped_map, cos, sin};
-use pumpkin_util::random::xoroshiro128::Xoroshiro;
-use pumpkin_util::random::{RandomGenerator, get_seed};
+use pumpkin_util::random::RandomImpl;
 use pumpkin_util::text::TextComponent;
-use rand::RngExt;
 
 use super::CubeMobEntity;
 use crate::block::blocks::redstone::get_best_own_or_neighbour_signal;
@@ -43,7 +41,7 @@ use crate::entity::bucketable;
 use crate::entity::item::ItemEntity;
 use crate::entity::mob::Mob;
 use crate::entity::player::Player;
-use crate::entity::tnt::{TNTEntity, UsedPortalExplosionDamageCalculator};
+use crate::entity::tnt::UsedPortalExplosionDamageCalculator;
 use crate::entity::{Entity, EntityBase};
 use crate::world::explosion::{ExplosionDamageCalculator, ExplosionEffects, ExplosionInteraction};
 
@@ -431,7 +429,8 @@ impl CubeMobEntity {
         }
         let fuse = explosion.fuse;
         let fuse_time = if imminent {
-            TNTEntity::random_short_fuse(fuse as u32) as i32
+            // `PrimedTnt.getRandomShortFuse(fuse, this.getRandom())`.
+            entity.random().next_bounded_i32((fuse / 4).max(1)) + fuse / 8
         } else {
             fuse
         };
@@ -577,8 +576,7 @@ impl CubeMobEntity {
         for damage in contact_damages {
             let source = (damage.attribute_to_source || entity.get_player().is_some())
                 .then_some(self as &dyn EntityBase);
-            let mut random = RandomGenerator::Xoroshiro(Xoroshiro::from_seed(get_seed()));
-            let amount = damage.amount.get(&mut random);
+            let amount = damage.amount.get(&mut *self.get_entity().random());
             entity.damage_with_context(entity, amount, damage.damage_type, None, source, source);
         }
     }
@@ -654,7 +652,7 @@ impl CubeMobEntity {
         if self.is_baby() {
             0
         } else {
-            1 + self.get_random().random_range(0..2)
+            1 + self.get_entity().random().next_bounded_i32(2) as u32
         }
     }
 

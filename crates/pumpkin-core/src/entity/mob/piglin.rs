@@ -16,6 +16,7 @@ use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_nbt::tag::NbtTag;
 use pumpkin_util::math::boundingbox::EntityDimensions;
 use pumpkin_util::math::position::BlockPos;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::ai::pathfinder::node::PathType;
 use crate::entity::item::ItemEntity;
@@ -69,8 +70,7 @@ impl PiglinEntity {
         mob_arc.mob_entity.init_brain(mob_arc.as_ref());
         // Vanilla does this in finalizeSpawn; a loaded mob rebuilds its brain after
         mob_arc.mob_entity.with_brain(mob_arc.as_ref(), |tick| {
-            let mut rng = tick.mob.get_random();
-            piglin_ai::init_memories(tick.brain, &mut rng);
+            piglin_ai::init_memories(tick.brain, tick.world);
         });
         mob_arc
     }
@@ -485,45 +485,45 @@ impl Mob for PiglinEntity {
 
     fn populate_default_equipment_slots(
         &self,
-        _world: &Arc<World>,
+        world: &Arc<World>,
         _difficulty: &RegionalDifficulty,
     ) {
         if !self.is_baby.load(Ordering::Relaxed) {
+            // `createSpawnWeapon` draws from the piglin's own random.
+            let weapon = {
+                let mut random = self.get_entity().random();
+                if random.next_f32() < 0.5 {
+                    &Item::CROSSBOW
+                } else if random.next_bounded_i32(10) == 0 {
+                    &Item::GOLDEN_SPEAR
+                } else {
+                    &Item::GOLDEN_SWORD
+                }
+            };
+            // `maybeWearArmor` draws from `level.getRandom()`.
+            let armor_rolls: [f32; 4] = {
+                let mut random = world
+                    .random
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                std::array::from_fn(|_| random.next_f32())
+            };
             let living = &self.mob_entity.living_entity;
             let mut equipment = living
                 .entity_equipment
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
-
-            let weapon = if rand::random::<f32>() < 0.5 {
-                &Item::CROSSBOW
-            } else if rand::random_range(0..10) == 0 {
-                &Item::GOLDEN_SPEAR
-            } else {
-                &Item::GOLDEN_SWORD
-            };
             equipment.put(&EquipmentSlot::MAIN_HAND, ItemStack::new(1, weapon));
-
-            if rand::random::<f32>() < 0.1 {
-                equipment.put(
-                    &EquipmentSlot::HEAD,
-                    ItemStack::new(1, &Item::GOLDEN_HELMET),
-                );
-            }
-            if rand::random::<f32>() < 0.1 {
-                equipment.put(
-                    &EquipmentSlot::CHEST,
-                    ItemStack::new(1, &Item::GOLDEN_CHESTPLATE),
-                );
-            }
-            if rand::random::<f32>() < 0.1 {
-                equipment.put(
-                    &EquipmentSlot::LEGS,
-                    ItemStack::new(1, &Item::GOLDEN_LEGGINGS),
-                );
-            }
-            if rand::random::<f32>() < 0.1 {
-                equipment.put(&EquipmentSlot::FEET, ItemStack::new(1, &Item::GOLDEN_BOOTS));
+            let armor = [
+                (&EquipmentSlot::HEAD, &Item::GOLDEN_HELMET),
+                (&EquipmentSlot::CHEST, &Item::GOLDEN_CHESTPLATE),
+                (&EquipmentSlot::LEGS, &Item::GOLDEN_LEGGINGS),
+                (&EquipmentSlot::FEET, &Item::GOLDEN_BOOTS),
+            ];
+            for ((slot, item), roll) in armor.into_iter().zip(armor_rolls) {
+                if roll < 0.1 {
+                    equipment.put(slot, ItemStack::new(1, item));
+                }
             }
         }
     }

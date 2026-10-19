@@ -11,8 +11,8 @@ use pumpkin_data::tag::{self, Taggable};
 use pumpkin_data::{BlockDirection, BlockStateId};
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 use pumpkin_world::world::BlockFlags;
-use rand::RngExt;
 
 use crate::entity::{
     Entity, EntityBase,
@@ -138,7 +138,6 @@ impl Goal for SilverfishWakeUpFriendsGoal {
         let entity = mob.get_entity();
         let world = entity.world.load_full();
         let base_pos = entity.block_pos.load();
-        let mut random = mob.get_random();
         for y_off in nearest_first(5) {
             for x_off in nearest_first(10) {
                 for z_off in nearest_first(10) {
@@ -154,7 +153,7 @@ impl Goal for SilverfishWakeUpFriendsGoal {
                     } else if let Some(host) = InfestedBlock::host_state_by_infested(block, state) {
                         world.set_block_state(&test_pos, host, BlockFlags::NOTIFY_ALL);
                     }
-                    if random.random::<bool>() {
+                    if entity.random().next_bool() {
                         return;
                     }
                 }
@@ -211,7 +210,6 @@ impl Goal for SilverfishMergeWithStoneGoal {
         {
             return false;
         }
-        let mut random = mob.get_random();
         if mob
             .get_entity()
             .world
@@ -220,10 +218,15 @@ impl Goal for SilverfishMergeWithStoneGoal {
             .load()
             .game_rules
             .mob_griefing
-            && random.random_range(0..to_goal_ticks(10)) == 0
+            && mob
+                .get_entity()
+                .random()
+                .next_bounded_i32(to_goal_ticks(10))
+                == 0
         {
             // `Direction.getRandom`: down, up, north, south, west, east.
-            let direction = BlockDirection::all()[random.random_range(0..6)];
+            let direction =
+                BlockDirection::all()[mob.get_entity().random().next_bounded_i32(6) as usize];
             self.selected_direction = Some(direction);
             if Self::host_at(mob, &Self::merge_pos(mob, direction)).is_some() {
                 self.do_merge = true;

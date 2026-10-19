@@ -13,7 +13,7 @@ use pumpkin_protocol::java::client::play::CEntityPositionSync;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
 
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::ai::goal::active_target::ActiveTargetGoal;
 use crate::entity::ai::goal::look_around::RandomLookAroundGoal;
@@ -255,20 +255,16 @@ impl ShulkerEntity {
         let base_pos = entity.block_pos.load();
         let world = entity.world.load();
 
-        let candidates: Vec<(i32, i32, i32)> = {
-            let mut rng = rand::rng();
-            (0..20)
-                .map(|_| {
-                    (
-                        rng.random_range(-MAX_TELEPORT_DISTANCE..=MAX_TELEPORT_DISTANCE),
-                        rng.random_range(-MAX_TELEPORT_DISTANCE..=MAX_TELEPORT_DISTANCE),
-                        rng.random_range(-MAX_TELEPORT_DISTANCE..=MAX_TELEPORT_DISTANCE),
-                    )
-                })
-                .collect()
-        };
-
-        for (dx, dy, dz) in candidates {
+        // Vanilla tries five times, drawing each offset with `Mth.randomBetweenInclusive`.
+        for _ in 0..5 {
+            let (dx, dy, dz) = {
+                let mut rng = entity.random();
+                (
+                    rng.next_int_between_inclusive(-MAX_TELEPORT_DISTANCE, MAX_TELEPORT_DISTANCE),
+                    rng.next_int_between_inclusive(-MAX_TELEPORT_DISTANCE, MAX_TELEPORT_DISTANCE),
+                    rng.next_int_between_inclusive(-MAX_TELEPORT_DISTANCE, MAX_TELEPORT_DISTANCE),
+                )
+            };
             let candidate = BlockPos::new(base_pos.0.x + dx, base_pos.0.y + dy, base_pos.0.z + dz);
 
             let candidate_state = world.get_block_state(&candidate);
@@ -323,7 +319,7 @@ impl ShulkerEntity {
         let health = living.health.load();
         let max = living.get_max_health();
 
-        if health < max * 0.5 && rand::rng().random_range(0..4) == 0 {
+        if health < max * 0.5 && self.get_entity().random().next_bounded_i32(4) == 0 {
             self.teleport_somewhere();
         }
     }
@@ -480,7 +476,7 @@ impl Goal for ShulkerAttackGoal {
 
         let cooldown = self.attack_cooldown.fetch_sub(1, Ordering::Relaxed) - 1;
         if cooldown <= 0 {
-            let new_cd = 20 + mob.get_random().random_range(0..5) * 10;
+            let new_cd = 20 + mob.get_entity().random().next_bounded_i32(10) * 20 / 2;
             self.attack_cooldown.store(new_cd, Ordering::Relaxed);
 
             let world = entity.world.load();
@@ -493,8 +489,10 @@ impl Goal for ShulkerAttackGoal {
             );
             world.spawn_entity_non_save(Arc::new(bullet));
 
-            let pitch =
-                1.0 + (mob.get_random().random::<f32>() - mob.get_random().random::<f32>()) * 0.2;
+            let pitch = {
+                let mut random = mob.get_entity().random();
+                (random.next_f32() - random.next_f32()) * 0.2 + 1.0
+            };
             world.play_sound_fine(
                 Sound::EntityShulkerShoot,
                 SoundCategory::Hostile,
@@ -526,7 +524,12 @@ impl Goal for ShulkerPeekGoal {
         if has_target {
             return false;
         }
-        if mob.get_random().random_range(0..40) != 0 {
+        if mob
+            .get_entity()
+            .random()
+            .next_bounded_i32(crate::entity::ai::goal::to_goal_ticks(40))
+            != 0
+        {
             return false;
         }
         let pos = mob.get_mob_entity().living_entity.entity.block_pos.load();
@@ -540,7 +543,8 @@ impl Goal for ShulkerPeekGoal {
     }
 
     fn start(&mut self, mob: &dyn Mob) {
-        let duration = 20 * (1 + mob.get_random().random_range(0..3));
+        let duration =
+            self.get_tick_count(20 * (1 + mob.get_entity().random().next_bounded_i32(3)));
         self.peek_time.store(duration, Ordering::Relaxed);
         self.shulker.set_raw_peek(30);
     }

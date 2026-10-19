@@ -12,8 +12,8 @@ use pumpkin_util::math::atan2;
 use pumpkin_util::math::boundingbox::BoundingBox;
 use pumpkin_util::math::position::{BlockPos, for_each_block_intersected_between};
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 use pumpkin_world::chunk::ChunkHeightmapType;
-use rand::RngExt;
 
 use crate::entity::ai::control::move_control::Operation;
 use crate::entity::ai::control::{Control, MoveControlTrait};
@@ -322,7 +322,7 @@ impl MoveControlTrait for GhastMoveControl {
         if float_duration > 0 {
             return;
         }
-        self.float_duration += mob.get_random().random_range(0..5) + 2;
+        self.float_duration += mob.get_entity().random().next_bounded_i32(5) + 2;
         let living = &mob_entity.living_entity;
         let entity = &living.entity;
         let pos = entity.pos.load();
@@ -506,12 +506,11 @@ impl RandomFloatAroundGoal {
     fn get_suitable_fly_to_position(mob: &dyn Mob, distance_to_blocks: i32) -> Vector3<f64> {
         let entity = mob.get_entity();
         let world = entity.world.load();
-        let mut random = mob.get_random();
         let center = entity.pos.load();
         let mut result = None;
 
         for _ in 0..Self::MAX_ATTEMPTS {
-            result = Self::choose_random_position_with_restriction(mob, center, &mut random);
+            result = Self::choose_random_position_with_restriction(mob, center);
             if let Some(result) = result
                 && Self::is_good_target(&world, result, distance_to_blocks)
             {
@@ -520,7 +519,7 @@ impl RandomFloatAroundGoal {
         }
 
         let mut result =
-            result.unwrap_or_else(|| Self::choose_random_position(center, &mut random));
+            result.unwrap_or_else(|| Self::choose_random_position(center, &mut *entity.random()));
         let pos = BlockPos::floored_v(result);
         // `level.getHeight` gives the first free block, one above Pumpkin's height.
         let height_y =
@@ -553,8 +552,8 @@ impl RandomFloatAroundGoal {
     }
 
     /// Vanilla `chooseRandomPosition`, in vanilla's float offsets.
-    fn choose_random_position(center: Vector3<f64>, random: &mut impl rand::Rng) -> Vector3<f64> {
-        let mut offset = || f64::from((random.random::<f32>() * 2.0 - 1.0) * 16.0);
+    fn choose_random_position(center: Vector3<f64>, random: &mut impl RandomImpl) -> Vector3<f64> {
+        let mut offset = || f64::from((random.next_f32() * 2.0 - 1.0) * 16.0);
         let x = center.x + offset();
         let y = center.y + offset();
         let z = center.z + offset();
@@ -565,9 +564,8 @@ impl RandomFloatAroundGoal {
     fn choose_random_position_with_restriction(
         mob: &dyn Mob,
         center: Vector3<f64>,
-        random: &mut impl rand::Rng,
     ) -> Option<Vector3<f64>> {
-        let target = Self::choose_random_position(center, random);
+        let target = Self::choose_random_position(center, &mut *mob.get_entity().random());
         let mob_entity = mob.get_mob_entity();
         (!mob_entity.has_position_target()
             || mob_entity.is_in_position_target_range_pos(&BlockPos::floored_v(target)))
