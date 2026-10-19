@@ -2352,6 +2352,11 @@ pub trait Mob: EntityBase + Send + Sync {
     /// The start of a vanilla `push(Entity)` override, after the mob was pushed by `entity`.
     fn mob_push(&self, _entity: &dyn EntityBase) {}
 
+    /// A vanilla `canBeCollidedWith` override; mobs aren't solid by default.
+    fn mob_can_be_collided_with(&self, _other: Option<&dyn EntityBase>) -> bool {
+        false
+    }
+
     /// A vanilla `push(x, y, z)` override.
     fn mob_push_impulse(&self, impulse: Vector3<f64>) {
         self.get_entity().push_impulse(impulse);
@@ -2873,8 +2878,8 @@ impl<T: Mob + Send + 'static> EntityBase for T {
         self.post_tick();
     }
 
-    fn is_collidable(&self, _entity: Option<Box<dyn EntityBase>>) -> bool {
-        true
+    fn is_collidable(&self, entity: Option<Box<dyn EntityBase>>) -> bool {
+        self.mob_can_be_collided_with(entity.as_deref())
     }
 
     fn kill(&self, caller: &dyn EntityBase) {

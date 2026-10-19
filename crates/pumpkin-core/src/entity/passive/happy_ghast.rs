@@ -299,6 +299,17 @@ const BABY_DIMENSIONS: EntityDimensions =
     pumpkin_data::entity_dimensions::HAPPY_GHAST_BABY_DIMENSIONS;
 
 impl Mob for HappyGhastEntity {
+    /// Vanilla `HappyGhast.canBeCollidedWith`, server side.
+    fn mob_can_be_collided_with(&self, other: Option<&dyn EntityBase>) -> bool {
+        let entity = self.get_entity();
+        if self.is_baby() || !self.get_mob_entity().living_entity.is_alive() {
+            return false;
+        }
+        let other_is_happy_ghast =
+            other.is_some_and(|other| other.get_entity().entity_type == &EntityType::HAPPY_GHAST);
+        (entity.has_passengers() && other_is_happy_ghast) || self.is_on_still_timeout()
+    }
+
     /// Vanilla `HappyGhast.getWalkTargetValue`: open air just above the ground is best.
     fn get_walk_target_value(&self, pos: &pumpkin_util::math::position::BlockPos) -> f32 {
         let world = self.get_entity().world.load();

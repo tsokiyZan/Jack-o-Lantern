@@ -788,10 +788,6 @@ impl EntityBase for MinecartEntity {
         }
     }
 
-    fn is_collidable(&self, _entity: Option<Box<dyn EntityBase>>) -> bool {
-        true
-    }
-
     fn init_data_tracker(&self) {
         self.vehicle.send_wobble_metadata();
         if let MinecartKind::Furnace(minecart) = &self.kind {

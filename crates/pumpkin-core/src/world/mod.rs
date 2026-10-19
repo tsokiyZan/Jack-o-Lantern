@@ -2526,6 +2526,23 @@ impl World {
         (collisions, positions)
     }
 
+    /// Vanilla `CollisionGetter.noCollision(AABB)`: no block shape and no collidable entity in
+    /// the box. Without a source entity vanilla skips the world-border check.
+    pub fn no_collision(&self, bounding_box: BoundingBox) -> bool {
+        self.is_space_empty(bounding_box) && self.no_entity_collision(&bounding_box)
+    }
+
+    /// Vanilla `getEntityCollisions(null, box).isEmpty()`.
+    fn no_entity_collision(&self, bounding_box: &BoundingBox) -> bool {
+        if bounding_box.get_average_side_length() < 1.0E-7 {
+            return true;
+        }
+        !self
+            .get_all_at_box(&bounding_box.expand_all(1.0E-7))
+            .iter()
+            .any(|entity| !entity.is_spectator() && entity.is_collidable(None))
+    }
+
     pub fn is_space_empty(&self, bounding_box: BoundingBox) -> bool {
         let min = bounding_box.min_block_pos();
         let max = bounding_box.max_block_pos();

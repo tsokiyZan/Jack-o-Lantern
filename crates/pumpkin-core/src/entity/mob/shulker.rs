@@ -330,6 +330,11 @@ impl ShulkerEntity {
 }
 
 impl Mob for ShulkerEntity {
+    /// Vanilla `Shulker.canBeCollidedWith`.
+    fn mob_can_be_collided_with(&self, _other: Option<&dyn EntityBase>) -> bool {
+        self.get_mob_entity().living_entity.is_alive()
+    }
+
     /// Vanilla `Shulker.playAmbientSound`: silent while closed.
     fn play_ambient_sound(&self) {
         if !self.is_closed()

@@ -139,10 +139,6 @@ impl EntityBase for CushionEntity {
         self.entity.is_alive()
     }
 
-    fn is_collidable(&self, _entity: Option<Box<dyn EntityBase>>) -> bool {
-        true
-    }
-
     fn write_custom_nbt(&self, nbt: &mut NbtCompound) {
         nbt.put_byte("Color", self.color() as i8);
     }

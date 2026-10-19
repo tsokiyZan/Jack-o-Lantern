@@ -196,6 +196,7 @@ impl EntityBase for BoatEntity {
         self.vehicle.entity.is_alive()
     }
 
+    /// Vanilla `AbstractBoat.canBeCollidedWith`.
     fn is_collidable(&self, _entity: Option<Box<dyn EntityBase>>) -> bool {
         true
     }

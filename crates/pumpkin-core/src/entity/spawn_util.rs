@@ -5,6 +5,7 @@ use pumpkin_data::{
     entity::EntityType,
     tag::{self, Taggable},
 };
+use pumpkin_util::math::wrap_degrees;
 use pumpkin_util::math::{
     boundingbox::{BoundingBox, EntityDimensions},
     position::BlockPos,
@@ -97,7 +98,7 @@ pub fn try_spawn_mob<T: Mob + 'static>(
             );
             let bounding_box =
                 BoundingBox::new_from_pos(position.x, position.y, position.z, &dimensions);
-            if !world.is_space_empty(bounding_box) {
+            if !world.no_collision(bounding_box) {
                 continue;
             }
         }
@@ -108,6 +109,12 @@ pub fn try_spawn_mob<T: Mob + 'static>(
             position,
             entity_type,
         ));
+        // `EntityType.create`: `snapTo(..., wrapDegrees(random.nextFloat() * 360), 0)`, then the
+        // head and body take that yaw.
+        let yaw = wrap_degrees(rand::rng().random::<f32>() * 360.0);
+        let entity = mob.get_entity();
+        entity.set_rotation(yaw, 0.0);
+        entity.body_yaw.store(yaw);
         // `EntityType.create` finalizes the spawn.
         crate::entity::mob::spawn::finalize_spawn(
             &(mob.clone() as Arc<dyn EntityBase>),
