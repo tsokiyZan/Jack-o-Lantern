@@ -4857,16 +4857,18 @@ impl World {
         radius: f64,
         predicate: impl Fn(&Arc<Player>) -> bool,
     ) -> Option<Arc<Player>> {
-        self.get_nearby_players(pos, radius)
-            .into_iter()
-            .filter(|player| predicate(player))
-            .min_by(|a, b| {
-                a.get_entity()
-                    .pos
-                    .load()
-                    .squared_distance_to_vec(&pos)
-                    .total_cmp(&b.get_entity().pos.load().squared_distance_to_vec(&pos))
-            })
+        // Vanilla `EntityGetter.getNearestPlayer`: strictly inside the range (any distance when
+        // negative); the first of equally near players wins.
+        let mut best: Option<(f64, &Arc<Player>)> = None;
+        let players = self.players.load();
+        for player in players.iter().filter(|player| predicate(player)) {
+            let dist = player.get_entity().pos.load().squared_distance_to_vec(&pos);
+            if (radius < 0.0 || dist < radius * radius) && best.is_none_or(|(best, _)| dist < best)
+            {
+                best = Some((dist, player));
+            }
+        }
+        best.map(|(_, player)| player.clone())
     }
 
     /// Closest entity that satisfies `predicate`. See [`Self::get_nearest_player`] for why this is

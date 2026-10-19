@@ -207,10 +207,10 @@ impl Worldborder {
             && self.contains(bounding_box.max.x - inset, bounding_box.max.z - inset)
     }
 
+    /// Vanilla `WorldBorder.isWithinBounds(BlockPos)`: the block's corner only.
     #[must_use]
     pub fn contains_block(&self, x: i32, z: i32) -> bool {
         self.contains(f64::from(x), f64::from(z))
-            && self.contains(f64::from(x + 1), f64::from(z + 1))
     }
 
     #[must_use]

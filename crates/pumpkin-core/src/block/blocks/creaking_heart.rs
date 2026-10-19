@@ -69,7 +69,12 @@ impl CreakingHeartBlock {
         world: &Arc<World>,
         pos: &BlockPos,
     ) {
-        if player.is_creative()
+        // Vanilla `Player.preventsBlockDrops`: the `instabuild` ability.
+        if player
+            .abilities
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .creative
             || player.is_spectator()
             || !CreakingHeartLikeProperties::from_state_id(state.id).natural
         {
