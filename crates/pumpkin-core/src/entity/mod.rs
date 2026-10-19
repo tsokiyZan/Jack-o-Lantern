@@ -572,6 +572,13 @@ pub trait EntityBase: Send + Sync + std::any::Any {
         None
     }
 
+    /// Vanilla `maxUpStep`: 0 for a plain entity, `LivingEntity`'s step height otherwise.
+    fn max_up_step(&self) -> f32 {
+        self.get_living_entity().map_or(0.0, |living| {
+            living_max_up_step(living, self.controlling_passenger())
+        })
+    }
+
     /// Vanilla `Entity.getVehicleAttachmentPoint`: the point of this entity that sits on
     /// `vehicle`'s passenger point.
     fn vehicle_attachment_point(&self, _vehicle: &dyn EntityBase) -> Vector3<f64> {
@@ -1900,51 +1907,70 @@ impl Entity {
         caller: &dyn EntityBase,
     ) -> Vector3<f64> {
         // A server-side move is authoritative, so vanilla resets both flags even for a
-        // move of nothing.
-        self.on_ground.store(false, Ordering::SeqCst);
+        // move of nothing. `collide` still reads the ground state from before the move.
+        let was_on_ground = self.on_ground.swap(false, Ordering::SeqCst);
         self.horizontal_collision.store(false, Ordering::SeqCst);
         if movement.length_squared() == 0.0 {
             return movement;
         }
 
         let bounding_box = self.bounding_box.load();
+        let world = self.world.load();
+        let (collisions, _) = world.get_block_collisions(bounding_box.stretch(movement), caller);
+        let movement_step = collide_with_shapes(movement, &bounding_box, &collisions);
 
-        let (collisions, _) = self
-            .world
-            .load()
-            .get_block_collisions(bounding_box.stretch(movement), caller);
-
-        if collisions.is_empty() {
-            return movement;
-        }
-
-        // Vanilla `collideWithShapes`: each axis in `Direction.axisStepOrder`, the box moved by
-        // what the earlier axes allowed, every shape clamping the move (`Shapes.collide`).
-        let order = if movement.x.abs() < movement.z.abs() {
-            [Axis::Y, Axis::Z, Axis::X]
-        } else {
-            [Axis::Y, Axis::X, Axis::Z]
-        };
-        let mut resolved = Vector3::new(0.0, 0.0, 0.0);
-        for axis in order {
-            let axis_movement = movement.get_axis(axis);
-            if axis_movement == 0.0 {
-                continue;
+        // Vanilla `Entity.collide`'s step up.
+        #[expect(
+            clippy::float_cmp,
+            reason = "vanilla compares the collided movement exactly"
+        )]
+        let (x_collision, y_collision, z_collision) = (
+            movement.x != movement_step.x,
+            movement.y != movement_step.y,
+            movement.z != movement_step.z,
+        );
+        let on_ground_after_collision = y_collision && movement.y < 0.0;
+        let max_up_step = caller.max_up_step();
+        let mut resolved = movement_step;
+        if max_up_step > 0.0
+            && (on_ground_after_collision || was_on_ground)
+            && (x_collision || z_collision)
+        {
+            let grounded = if on_ground_after_collision {
+                bounding_box.shift(Vector3::new(0.0, movement_step.y, 0.0))
+            } else {
+                bounding_box
+            };
+            let mut step_up =
+                grounded.stretch(Vector3::new(movement.x, f64::from(max_up_step), movement.z));
+            if !on_ground_after_collision {
+                step_up = step_up.stretch(Vector3::new(0.0, f64::from(-1.0e-5f32), 0.0));
             }
-            let moving = bounding_box.shift(resolved);
-            let mut distance = axis_movement;
-            for shape in &collisions {
-                if distance.abs() < 1.0e-7 {
-                    distance = 0.0;
+            let (colliders, _) = world.get_block_collisions(step_up, caller);
+            let candidates = collect_candidate_step_up_heights(
+                &grounded,
+                &colliders,
+                max_up_step,
+                movement_step.y as f32,
+            );
+            for candidate in candidates {
+                let step_from_ground = collide_with_shapes(
+                    Vector3::new(movement.x, f64::from(candidate), movement.z),
+                    &grounded,
+                    &colliders,
+                );
+                if step_from_ground.horizontal_length_squared()
+                    > movement_step.horizontal_length_squared()
+                {
+                    let distance_to_ground = bounding_box.min.y - grounded.min.y;
+                    resolved = step_from_ground - Vector3::new(0.0, distance_to_ground, 0.0);
                     break;
                 }
-                distance = shape.collide_along(&moving, axis, distance);
             }
-            resolved.set_axis(axis, distance);
         }
 
-        // `Entity.collide`'s `onGroundAfterCollision`, and `Entity.move`'s horizontal
-        // collision (`Mth.equal`: closer than `1.0E-5F`).
+        // `Entity.move`'s flags, from the final movement: `verticalCollisionBelow` and the
+        // horizontal collision (`Mth.equal`: closer than `1.0E-5F`).
         #[expect(
             clippy::float_cmp,
             reason = "vanilla compares the collided movement exactly"
@@ -5383,4 +5409,82 @@ pub fn set_rider_position(vehicle: &dyn EntityBase, passenger: &dyn EntityBase) 
     let position = passenger_riding_position(vehicle, passenger);
     let offset = passenger.vehicle_attachment_point(vehicle);
     passenger.get_entity().set_pos(position - offset);
+}
+
+/// Vanilla `LivingEntity.maxUpStep`: the `step_height` attribute, at least a block while a
+/// player steers.
+#[must_use]
+pub fn living_max_up_step(living: &LivingEntity, controller: Option<Arc<dyn EntityBase>>) -> f32 {
+    let step =
+        living.get_attribute_value(&pumpkin_data::attributes::Attributes::STEP_HEIGHT) as f32;
+    if controller.is_some_and(|c| c.get_player().is_some()) {
+        step.max(1.0)
+    } else {
+        step
+    }
+}
+
+/// Vanilla `Entity.collideWithShapes`: each axis in `Direction.axisStepOrder`, the box moved
+/// by what the earlier axes allowed, every shape clamping the move (`Shapes.collide`).
+fn collide_with_shapes(
+    movement: Vector3<f64>,
+    bounding_box: &BoundingBox,
+    shapes: &[BoundingBox],
+) -> Vector3<f64> {
+    if shapes.is_empty() {
+        return movement;
+    }
+    let order = if movement.x.abs() < movement.z.abs() {
+        [Axis::Y, Axis::Z, Axis::X]
+    } else {
+        [Axis::Y, Axis::X, Axis::Z]
+    };
+    let mut resolved = Vector3::new(0.0, 0.0, 0.0);
+    for axis in order {
+        let axis_movement = movement.get_axis(axis);
+        if axis_movement == 0.0 {
+            continue;
+        }
+        let moving = bounding_box.shift(resolved);
+        let mut distance = axis_movement;
+        for shape in shapes {
+            if distance.abs() < 1.0e-7 {
+                distance = 0.0;
+                break;
+            }
+            distance = shape.collide_along(&moving, axis, distance);
+        }
+        resolved.set_axis(axis, distance);
+    }
+    resolved
+}
+
+/// Vanilla `Entity.collectCandidateStepUpHeights`: the colliders' Y coordinates relative to
+/// the box's bottom, from 0 up to `max_step_height`, apart from the height already reached;
+/// sorted.
+fn collect_candidate_step_up_heights(
+    bounding_box: &BoundingBox,
+    colliders: &[BoundingBox],
+    max_step_height: f32,
+    step_height_to_skip: f32,
+) -> Vec<f32> {
+    let mut candidates: Vec<f32> = Vec::with_capacity(4);
+    for collider in colliders {
+        for coord in [collider.min.y, collider.max.y] {
+            let relative = (coord - bounding_box.min.y) as f32;
+            #[expect(clippy::float_cmp, reason = "vanilla skips the exact height")]
+            let skip = relative == step_height_to_skip;
+            if relative < 0.0 || skip {
+                continue;
+            }
+            if relative > max_step_height {
+                break;
+            }
+            if !candidates.contains(&relative) {
+                candidates.push(relative);
+            }
+        }
+    }
+    candidates.sort_by(f32::total_cmp);
+    candidates
 }

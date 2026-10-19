@@ -389,6 +389,18 @@ impl AgeableMob for CubeMobEntity {
 }
 
 impl Mob for CubeMobEntity {
+    /// Vanilla `SulfurCube.maxUpStep`: none while it carries a block.
+    fn mob_max_up_step(&self) -> f32 {
+        if self.has_body_item() {
+            0.0
+        } else {
+            crate::entity::living_max_up_step(
+                &self.get_mob_entity().living_entity,
+                self.get_controlling_passenger(),
+            )
+        }
+    }
+
     /// Vanilla `AbstractCubeMob.getPassengerAttachmentPoint`: on top, sunk in by its size.
     fn mob_passenger_attachment_point(
         &self,

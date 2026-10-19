@@ -1846,6 +1846,14 @@ pub trait Mob: EntityBase + Send + Sync {
         None
     }
 
+    /// A vanilla `maxUpStep` override.
+    fn mob_max_up_step(&self) -> f32 {
+        crate::entity::living_max_up_step(
+            &self.get_mob_entity().living_entity,
+            self.get_controlling_passenger(),
+        )
+    }
+
     /// A vanilla `getPassengerAttachmentPoint` override.
     fn mob_passenger_attachment_point(
         &self,
@@ -2746,6 +2754,10 @@ impl<T: Mob + Send + 'static> EntityBase for T {
 
     fn vehicle_attachment_point(&self, vehicle: &dyn EntityBase) -> Vector3<f64> {
         self.mob_vehicle_attachment_point(vehicle)
+    }
+
+    fn max_up_step(&self) -> f32 {
+        self.mob_max_up_step()
     }
 
     fn position_rider(&self, caller: &dyn EntityBase, passenger: &dyn EntityBase) {
