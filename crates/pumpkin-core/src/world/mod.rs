@@ -6988,6 +6988,7 @@ impl World {
             .get_mut(&chunk_pos)
             .and_then(|mut chunk_block_entities| chunk_block_entities.remove(block_pos));
         if let Some(removed) = &removed {
+            removed.set_removed(self);
             self.remove_game_event_listener(removed);
         }
         if removed.is_some() || removed_pending {

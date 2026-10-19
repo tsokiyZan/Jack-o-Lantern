@@ -146,6 +146,10 @@ pub trait BlockEntity: Any + Send + Sync {
     }
 
     fn set_block_state(&mut self, _block_state: BlockStateId) {}
+    /// Vanilla `BlockEntity.setRemoved` as `LevelChunk.removeBlockEntity` calls it: runs
+    /// whenever the block entity leaves the world, block-entity side effects skipped or not.
+    fn set_removed(&self, _world: &World) {}
+
     fn on_block_replaced(self: Arc<Self>, world: &Arc<World>, position: &BlockPos) {
         if let Some(inventory) = self.get_inventory() {
             world.scatter_inventory(position, &inventory);

@@ -141,9 +141,13 @@ impl BlockEntity for JukeboxBlockEntity {
             .store(ticks + 1, Ordering::Relaxed);
     }
 
-    /// Vanilla `JukeboxBlockEntity.preRemoveSideEffects`, then `setRemoved`.
+    /// Vanilla `JukeboxBlockEntity.preRemoveSideEffects`, which flag 256 skips.
     fn on_block_replaced(self: Arc<Self>, world: &Arc<World>, _position: &BlockPos) {
         self.pop_out_the_item(world);
+    }
+
+    /// Vanilla `JukeboxBlockEntity.setRemoved`.
+    fn set_removed(&self, world: &World) {
         // The jukebox is already gone, so its old state is unknown; listeners only check
         // the block.
         world.game_event(
