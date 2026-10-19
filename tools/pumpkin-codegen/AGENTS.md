@@ -7,3 +7,4 @@ The root [AGENTS.md](../../AGENTS.md) applies here too. This tool turns the extr
 - A codegen run can rewrite generated files you didn't mean to change. Keep only the files your change needs and revert the rest.
 - If generated data looks wrong at runtime, check the generator before blaming the JSON. A JSON variant the generator doesn't handle can fall through to a default without any error.
 - If the value you need isn't in `assets/` at all, it belongs in the [Extractor](https://github.com/Pumpkin-MC/Extractor), not in a hand-written table here.
+- In this fork, data the Extractor doesn't provide yet can be dumped from the real vanilla jar with `tools/vanilla-dump/*.java` (the header of each file says how to run it) into `assets/`, then generated like any other asset: `BlockSoundTypes.java` → `block_sound_types.json`, `EntityAttachments.java` → `entity_attachments.json` (`entity_type.rs`, `entity_dimensions.rs`).
