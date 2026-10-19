@@ -4137,7 +4137,8 @@ impl LivingEntity {
                     .plugin_manager
                     .fire_blocking(&server, &mut death_event);
             }
-            self.on_death(damage_type, source, cause);
+            // `hurtServer` plays the death sound only for a hit that wasn't cut by the cooldown.
+            self.die_with_sound(damage_type, source, cause, took_full_damage);
         }
 
         true
