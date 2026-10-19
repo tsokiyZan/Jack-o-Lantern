@@ -3326,18 +3326,21 @@ impl LivingEntity {
         if self.entity.is_silent() {
             return;
         }
-        let category = if self.is_player() {
-            SoundCategory::Players
+        let world = self.entity.world.load();
+        let pos = self.entity.pos.load();
+        // Vanilla `Player.playSound`: everyone but the player, whose client plays it itself.
+        if let Some(player) = entity.get_player() {
+            world.play_sound_raw_expect(
+                player,
+                sound as u16,
+                SoundCategory::Players,
+                &pos,
+                1.0,
+                self.get_pitch(),
+            );
         } else {
-            SoundCategory::Neutral
-        };
-        self.entity.world.load().play_sound_fine(
-            sound,
-            category,
-            &self.entity.pos.load(),
-            1.0,
-            self.get_pitch(),
-        );
+            world.play_sound_fine(sound, SoundCategory::Neutral, &pos, 1.0, self.get_pitch());
+        }
     }
 
     fn hurt_sound(&self, entity: &dyn EntityBase) -> Sound {
