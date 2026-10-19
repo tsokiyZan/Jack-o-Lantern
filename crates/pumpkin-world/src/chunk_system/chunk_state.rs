@@ -16,6 +16,21 @@ use crate::level::SyncChunk;
 
 use pumpkin_data::chunk::ChunkStatus;
 use pumpkin_nbt::compound::NbtCompound;
+
+/// Vanilla `WorldGenRegion.setBlock`'s stand-in for a block entity placed during
+/// generation, made into the block's own block entity once the chunk is full.
+pub const DUMMY_BLOCK_ENTITY_ID: &str = "DUMMY";
+
+/// Vanilla `LevelChunk.promotePendingBlockEntity` for a `DUMMY`: the id of the block
+/// entity the block at that spot has, if any.
+fn promoted_block_entity_id(state: BlockStateId) -> Option<String> {
+    let block_entity_type = pumpkin_data::Block::from_state_id(state)
+        .default_state
+        .block_entity_type;
+    pumpkin_data::block_properties::BLOCK_ENTITY_TYPES
+        .get(usize::from(block_entity_type))
+        .map(|name| format!("minecraft:{name}"))
+}
 use std::sync::Mutex;
 
 #[repr(u8)]
@@ -304,7 +319,30 @@ impl Chunk {
             Self::Level(_) => panic!("Cannot upgrade a Level chunk"),
         };
 
-        let proto_chunk = *proto_chunk_box;
+        let mut proto_chunk = *proto_chunk_box;
+
+        // Convert pending block entities from structure generation to actual block entities
+        let mut pending_block_entities = FxHashMap::default();
+        for mut nbt in std::mem::take(&mut proto_chunk.pending_block_entities) {
+            if let Some(x) = nbt.get_int("x")
+                && let Some(y) = nbt.get_int("y")
+                && let Some(z) = nbt.get_int("z")
+            {
+                if nbt.get_string("id") == Some(DUMMY_BLOCK_ENTITY_ID) {
+                    let state = proto_chunk
+                        .get_block_state(&pumpkin_util::math::vector3::Vector3::new(x, y, z));
+                    let Some(id) = promoted_block_entity_id(state) else {
+                        tracing::warn!(
+                            "Tried to load a DUMMY block entity @ {x} {y} {z} but found no block entity block there"
+                        );
+                        continue;
+                    };
+                    nbt.put_string("id", id);
+                }
+                pending_block_entities
+                    .insert(pumpkin_util::math::position::BlockPos::new(x, y, z), nbt);
+            }
+        }
 
         let sections = Self::build_level_sections(&proto_chunk, dimension);
         let heightmaps = Self::build_level_heightmaps(&proto_chunk, dimension.min_y);
@@ -317,18 +355,6 @@ impl Chunk {
         // Only mark lit if past the lighting stage, and the lighting config is "default" ("full" and "dark" modes skip proper lighting)
         let is_lit = proto_chunk.stage >= StagedChunkEnum::Lighting
             && *lighting_config == LightingEngineConfig::Default;
-
-        // Convert pending block entities from structure generation to actual block entities
-        let mut pending_block_entities = FxHashMap::default();
-        for nbt in proto_chunk.pending_block_entities {
-            if let Some(x) = nbt.get_int("x")
-                && let Some(y) = nbt.get_int("y")
-                && let Some(z) = nbt.get_int("z")
-            {
-                pending_block_entities
-                    .insert(pumpkin_util::math::position::BlockPos::new(x, y, z), nbt);
-            }
-        }
 
         let chunk = ChunkData {
             light_engine: Mutex::new(light_data),

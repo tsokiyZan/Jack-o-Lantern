@@ -44,7 +44,23 @@ impl<'a> WorldBlockPlacer<'a> {
     #[allow(clippy::unused_async)]
     pub fn finalize(&self) {
         for nbt in &self.block_entity_nbts {
-            if let Some(block_entity) = crate::block::entities::block_entity_from_nbt(nbt) {
+            // Vanilla `LevelChunk.promotePendingBlockEntity`: a worldgen `DUMMY` becomes the
+            // block's own fresh block entity.
+            let block_entity = if nbt.get_string("id")
+                == Some(pumpkin_world::chunk_system::chunk_state::DUMMY_BLOCK_ENTITY_ID)
+            {
+                let (Some(x), Some(y), Some(z)) =
+                    (nbt.get_int("x"), nbt.get_int("y"), nbt.get_int("z"))
+                else {
+                    continue;
+                };
+                let pos = BlockPos::new(x, y, z);
+                let state = self.world.get_block_state(&pos);
+                crate::block::entities::create_block_entity(state.block_entity_type, pos)
+            } else {
+                crate::block::entities::block_entity_from_nbt(nbt)
+            };
+            if let Some(block_entity) = block_entity {
                 self.world.add_block_entity(block_entity);
             }
         }

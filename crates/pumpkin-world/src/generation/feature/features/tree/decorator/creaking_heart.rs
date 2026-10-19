@@ -52,9 +52,13 @@ impl CreakingHeartTreeDecorator {
                 };
                 let state_id = props.to_state_id(&Block::CREAKING_HEART);
                 chunk.set_block_state(&pos.0, BlockState::from_id(state_id));
-                // `WorldGenRegion.setBlock`: the heart's block entity, made when the chunk loads.
+                // `WorldGenRegion.setBlock`: a `DUMMY` stand-in, made into the heart's block
+                // entity when the chunk is full.
                 let mut block_entity = NbtCompound::new();
-                block_entity.put_string("id", "minecraft:creaking_heart".to_string());
+                block_entity.put_string(
+                    "id",
+                    crate::chunk_system::chunk_state::DUMMY_BLOCK_ENTITY_ID.to_string(),
+                );
                 block_entity.put_int("x", pos.0.x);
                 block_entity.put_int("y", pos.0.y);
                 block_entity.put_int("z", pos.0.z);
