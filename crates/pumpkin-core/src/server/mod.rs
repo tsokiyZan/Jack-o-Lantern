@@ -1281,6 +1281,8 @@ impl Server {
         for world in worlds.iter() {
             world.flush_block_updates();
             world.flush_synced_block_events();
+            // A frozen level still runs `chunkSource.tick`, so tracked entities still send.
+            world.entity_tracker.update_all(world);
 
             let players = world.players.load();
             let player_handle = handle.clone();

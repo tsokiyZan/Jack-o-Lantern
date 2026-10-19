@@ -1691,6 +1691,9 @@ impl World {
         let t_chunks = std::time::Instant::now();
         self.tick_chunks(server);
         let chunk_elapsed = t_chunks.elapsed();
+        // Vanilla `ServerChunkCache.tick` ends with `chunkMap.tick`, every tracked entity's
+        // `sendChanges`: what changed last tick and between ticks goes out before entities tick.
+        self.entity_tracker.update_all(self);
 
         let handle = server.runtime.clone();
 
@@ -1786,8 +1789,6 @@ impl World {
                 }
             });
         let entity_elapsed = t_entities.elapsed();
-
-        self.entity_tracker.update_all(self);
 
         let mut block_entities: Vec<Arc<dyn BlockEntity>> = Vec::new();
         if self.block_entities.len() < active_chunks.len() {
