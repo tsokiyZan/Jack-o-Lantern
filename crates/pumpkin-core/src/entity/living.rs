@@ -2598,7 +2598,8 @@ impl LivingEntity {
                     }
                 }
             }
-            self.entity.pose.store(EntityPose::Dying);
+            // `setPose(Pose.DYING)`: synced, and the dimensions follow.
+            dyn_self.set_pose(EntityPose::Dying);
 
             // Broadcast death message if it's a player and the gamerule is enabled
             self.broadcast_death_message(&*dyn_self, damage_type, source, cause);
