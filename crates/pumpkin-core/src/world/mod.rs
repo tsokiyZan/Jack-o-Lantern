@@ -4698,7 +4698,8 @@ impl World {
         let entities_guard = self.entities.load();
         let players_guard = self.players.load();
 
-        entities_guard
+        // Players share the entity sections in vanilla, so they sort in among the rest.
+        let mut found = entities_guard
             .iter()
             .map(|e| e.clone() as Arc<dyn EntityBase>)
             .chain(
@@ -4707,27 +4708,37 @@ impl World {
                     .map(|p| p.clone() as Arc<dyn EntityBase>),
             )
             .filter(|entity| entity.get_entity().bounding_box.load().intersects(aabb))
-            .collect()
+            .collect::<Vec<_>>();
+        found
+            .sort_by_cached_key(|entity| crate::entity::section_iteration_key(entity.get_entity()));
+        found
     }
 
     // Gets all non Player entities at a Box
     pub fn get_entities_at_box(&self, aabb: &BoundingBox) -> Vec<Arc<dyn EntityBase>> {
-        self.entities
+        let mut found = self
+            .entities
             .load()
             .iter()
             .filter(|entity| entity.get_entity().bounding_box.load().intersects(aabb))
             .cloned()
-            .collect()
+            .collect::<Vec<_>>();
+        found
+            .sort_by_cached_key(|entity| crate::entity::section_iteration_key(entity.get_entity()));
+        found
     }
 
     // Gets all Player entities at a Box
     pub fn get_players_at_box(&self, aabb: &BoundingBox) -> Vec<Arc<Player>> {
         let players_guard = self.players.load();
-        players_guard
+        let mut found = players_guard
             .iter()
             .filter(|player| player.get_entity().bounding_box.load().intersects(aabb))
             .cloned()
-            .collect()
+            .collect::<Vec<_>>();
+        found
+            .sort_by_cached_key(|player| crate::entity::section_iteration_key(player.get_entity()));
+        found
     }
 
     /// Retrieves a player by their unique UUID.

@@ -1352,6 +1352,9 @@ pub struct Entity {
     pub entity_custom_data: std::sync::Mutex<NbtCompound>,
     /// Vanilla `hasGlowingTag`, saved as `Glowing`; the glowing effect is separate.
     pub has_glowing_tag: AtomicBool,
+    /// When the entity joined its current chunk section: vanilla `EntitySection` keeps its
+    /// entities in the order they entered, which box queries return them in.
+    pub section_order: std::sync::atomic::AtomicU64,
     /// The listeners vanilla's `updateDynamicGameEventListener` overrides hand out (the
     /// allay's and the warden's), set once by the entity's constructor.
     pub dynamic_game_event_listeners: std::sync::OnceLock<Box<[DynamicGameEventListener]>>,
@@ -1493,6 +1496,7 @@ impl Entity {
             custom_data: std::sync::Mutex::new(NbtCompound::new()),
             entity_custom_data: std::sync::Mutex::new(NbtCompound::new()),
             has_glowing_tag: AtomicBool::new(false),
+            section_order: std::sync::atomic::AtomicU64::new(next_section_order()),
             dynamic_game_event_listeners: std::sync::OnceLock::new(),
         }
     }
@@ -1793,8 +1797,11 @@ impl Entity {
                 let new_block_pos = Vector3::new(floor_x, floor_y, floor_z);
                 let new_bp = BlockPos(new_block_pos);
                 self.block_pos.store(new_bp);
-                // Vanilla `EntityInLevelCallback.onMove`'s `onSectionChange`.
+                // Vanilla `EntityInLevelCallback.onMove`'s `onSectionChange`: the entity
+                // leaves its old section and goes to the end of the new one.
                 if chunk_section_from_pos(&block_pos) != chunk_section_from_pos(&new_bp) {
+                    self.section_order
+                        .store(next_section_order(), Ordering::Relaxed);
                     let world = self.world.load();
                     self.update_dynamic_game_event_listener(|listener| {
                         listener.on_section_change(&world);
@@ -5384,6 +5391,29 @@ impl Flag {
             Self::Glowing => None,
         }
     }
+}
+
+/// The next stamp for [`Entity::section_order`].
+fn next_section_order() -> u64 {
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    NEXT.fetch_add(1, Ordering::Relaxed)
+}
+
+/// The order vanilla's entity box queries visit `entity` in.
+///
+/// `EntitySectionStorage.forEachAccessibleNonEmptySection` goes by section x, then by the
+/// section keys `SectionPos.asLong` sorts for that x (z, then y, as their masked bits); each
+/// `EntitySection` lists its entities in the order they entered.
+#[must_use]
+pub fn section_iteration_key(entity: &Entity) -> (i32, u32, u32, u64) {
+    let section = entity.block_pos.load().0;
+    let (x, y, z) = (section.x >> 4, section.y >> 4, section.z >> 4);
+    (
+        x,
+        (z as u32) & 0x3F_FFFF,
+        (y as u32) & 0xF_FFFF,
+        entity.section_order.load(Ordering::Relaxed),
+    )
 }
 
 #[cfg(test)]
