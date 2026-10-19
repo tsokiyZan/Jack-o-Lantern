@@ -69,6 +69,8 @@ impl CommandExecutor for SetBlockExecutor {
                 BlockFlags::NOTIFY_LISTENERS
                     | BlockFlags::SKIP_BLOCK_ADDED_CALLBACK
                     | BlockFlags::SKIP_BLOCK_ENTITY_REPLACED_CALLBACK
+                    | BlockFlags::SKIP_DROPS
+                    | BlockFlags::UPDATE_KNOWN_SHAPE
                     | BlockFlags::FORCE_STATE,
                 true,
             ),
