@@ -1483,7 +1483,7 @@ impl Entity {
             has_no_gravity: AtomicBool::new(false),
             scoreboard_tags: std::sync::Mutex::new(HashSet::new()),
             no_physics: AtomicBool::new(false),
-            synched_data: synched_entity_data::SynchedEntityData::new(),
+            synched_data: synched_entity_data::SynchedEntityData::for_entity_type(entity_type.id),
             movement_multiplier: AtomicCell::new(Vector3::default()),
             velocity_dirty: AtomicBool::new(true),
             sync_velocity: AtomicBool::new(false),

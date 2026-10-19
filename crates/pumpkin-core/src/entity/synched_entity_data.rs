@@ -59,6 +59,8 @@ pub struct SynchedEntityData {
     /// By index, so packets list the values in vanilla's `itemsById` order.
     items: Mutex<BTreeMap<u8, DataItem>>,
     is_dirty: AtomicBool,
+    /// Whose vanilla `defineSynchedData` defaults apply, if known.
+    entity_type_id: Option<u16>,
 }
 
 impl Default for SynchedEntityData {
@@ -74,7 +76,27 @@ impl SynchedEntityData {
         Self {
             items: Mutex::new(BTreeMap::new()),
             is_dirty: AtomicBool::new(false),
+            entity_type_id: None,
         }
+    }
+
+    /// A tracker that knows vanilla's defaults for `entity_type_id`, so values still at
+    /// their default are neither sent nor counted as set.
+    #[must_use]
+    pub const fn for_entity_type(entity_type_id: u16) -> Self {
+        Self {
+            items: Mutex::new(BTreeMap::new()),
+            is_dirty: AtomicBool::new(false),
+            entity_type_id: Some(entity_type_id),
+        }
+    }
+
+    /// Whether `canonical` is vanilla's default for its index on this entity type.
+    fn is_vanilla_default(&self, index: u8, canonical: &[u8]) -> bool {
+        self.entity_type_id.is_some_and(|type_id| {
+            pumpkin_data::synched_data_defaults::synched_data_default(type_id, index)
+                == Some(canonical)
+        })
     }
 
     /// Registers a tracked value with the default the client already assumes, so it
@@ -120,10 +142,25 @@ impl SynchedEntityData {
             if item.canonical_bytes == new_canonical {
                 return false;
             }
+            // Vanilla `DataItem.isSetToDefault`: back at the initial value, it leaves the
+            // spawn data again.
+            item.is_default = self.is_vanilla_default(tracked.id.0, &new_canonical);
             item.canonical_bytes = new_canonical;
             item.serializer = Box::new(holder);
             item.dirty = true;
-            item.is_default = false;
+        } else if self.is_vanilla_default(tracked.id.0, &new_canonical) {
+            // Vanilla's item already holds this value from `defineSynchedData`: no change.
+            items.insert(
+                tracked.id.0,
+                DataItem {
+                    tracked,
+                    serializer: Box::new(holder),
+                    canonical_bytes: new_canonical,
+                    dirty: false,
+                    is_default: true,
+                },
+            );
+            return false;
         } else {
             items.insert(
                 tracked.id.0,
