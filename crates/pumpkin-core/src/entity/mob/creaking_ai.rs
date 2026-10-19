@@ -40,8 +40,9 @@ impl Behavior for CreakingSwim {
         can_move(tick) && self.0.check_extra_start_conditions(tick)
     }
 
+    /// `Swim.canStillUse` calls the overriding start check, frozen test included.
     fn can_still_use(&mut self, tick: &BrainTick<'_>) -> bool {
-        self.0.can_still_use(tick)
+        can_move(tick) && self.0.can_still_use(tick)
     }
 
     fn tick(&mut self, tick: &mut BrainTick<'_>) {

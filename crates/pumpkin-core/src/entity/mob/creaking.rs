@@ -442,7 +442,7 @@ impl Mob for CreakingEntity {
 
     /// Vanilla `Creaking.tick`, before `super.tick()`: a creaking its heart no longer
     /// protects dies.
-    fn mob_tick(&self, _caller: &dyn EntityBase) {
+    fn mob_pre_tick(&self) {
         if let Some(home_pos) = self.get_home_pos()
             && self.protecting_heart(&home_pos).is_none()
         {

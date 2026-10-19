@@ -1563,6 +1563,10 @@ pub trait Mob: EntityBase + Send + Sync {
     /// Per-mob tick hook called each tick before AI runs. Override for mob-specific logic.
     fn mob_tick(&self, _caller: &dyn EntityBase) {}
 
+    /// The part of a vanilla `tick` override that runs before `super.tick()`, ahead of
+    /// everything `Mob.tick` does.
+    fn mob_pre_tick(&self) {}
+
     /// The start of vanilla `aiStep`, where subclasses run their own code before
     /// `super.aiStep()`: after `baseTick`, before the AI step and travel.
     fn ai_step(&self, _caller: &dyn EntityBase) {}
@@ -2820,6 +2824,7 @@ impl<T: Mob + Send + 'static> EntityBase for T {
 
     #[allow(clippy::too_many_lines)]
     fn tick(&self, caller: &dyn EntityBase, server: &Server) {
+        self.mob_pre_tick();
         let mob_entity = self.get_mob_entity();
         mob_entity.living_entity.entity.tick_leash();
 
