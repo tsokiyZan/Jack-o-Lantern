@@ -9,6 +9,7 @@ use pumpkin_data::tag::{self, Taggable};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::codec::var_int::VarInt;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 use rand::RngExt;
 
 use crate::{server::Server, world::World};
@@ -83,7 +84,12 @@ impl ExperienceOrbEntity {
 
     /// Vanilla `ExperienceOrb.tryMergeToExisting`.
     fn try_merge_to_existing(world: &World, position: Vector3<f64>, value: i32) -> bool {
-        let id = rand::rng().random_range(0..ORB_GROUPS_PER_AREA);
+        // `level.getRandom().nextInt(40)`.
+        let id = world
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .next_bounded_i32(ORB_GROUPS_PER_AREA);
         let area = pumpkin_util::math::boundingbox::BoundingBox::new(
             position.sub(&Vector3::new(0.5, 0.5, 0.5)),
             position.add(&Vector3::new(0.5, 0.5, 0.5)),

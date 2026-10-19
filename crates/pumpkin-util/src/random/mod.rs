@@ -399,8 +399,30 @@ pub const fn hash_block_pos(x: i32, y: i32, z: i32) -> i64 {
     l >> 16
 }
 
+/// Vanilla `Util.shuffle`: Fisher-Yates from the back, one `nextInt(i)` per swap.
+pub fn shuffle<T>(list: &mut [T], random: &mut impl RandomImpl) {
+    for i in (2..=list.len()).rev() {
+        let swap_to = random.next_bounded_i32(i as i32) as usize;
+        list.swap(i - 1, swap_to);
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    /// Against `Util.shuffle` run on `java.util.Random(seed)`, which `LegacyRandomSource`
+    /// matches.
+    #[test]
+    fn shuffle_matches_vanilla() {
+        for (seed, expected) in [(0, [4, 1, 2, 5, 3, 0]), (42, [1, 0, 4, 5, 3, 2])] {
+            let mut list = [0, 1, 2, 3, 4, 5];
+            super::shuffle(
+                &mut list,
+                &mut super::legacy_rand::LegacyRand::from_seed(seed),
+            );
+            assert_eq!(list, expected);
+        }
+    }
+
     use crate::random::get_region_seed;
 
     use super::hash_block_pos;

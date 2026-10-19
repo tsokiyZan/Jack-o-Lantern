@@ -8,9 +8,9 @@ use pumpkin_data::tag::{self, Taggable};
 use pumpkin_data::{BlockDirection, BlockState, BlockStateId};
 use pumpkin_macros::pumpkin_block;
 use pumpkin_util::math::position::BlockPos;
+use pumpkin_util::random::RandomImpl;
 use pumpkin_world::tick::TickPriority;
 use pumpkin_world::world::{BlockAccessor, BlockFlags};
-use rand::RngExt;
 
 use crate::block::entities::creaking_heart::CreakingHeartBlockEntity;
 use crate::block::{
@@ -80,8 +80,11 @@ impl CreakingHeartBlock {
         {
             return;
         }
-        let amount =
-            rand::rng().random_range(NATURAL_HEART_EXPERIENCE.0..=NATURAL_HEART_EXPERIENCE.1);
+        let amount = world
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .next_inbetween_i32(NATURAL_HEART_EXPERIENCE.0, NATURAL_HEART_EXPERIENCE.1);
         // Vanilla `Block.popExperience`.
         if !world.level_info.load().game_rules.block_drops {
             return;

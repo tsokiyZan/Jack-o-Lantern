@@ -269,6 +269,9 @@ pub struct World {
     pub scoreboard: std::sync::Mutex<Scoreboard>,
     /// The world's worldborder, defining the playable area and controlling its expansion or contraction.
     pub worldborder: std::sync::Mutex<Worldborder>,
+    /// Vanilla `Level.random`: one `LegacyRandomSource` for the level, seeded uniquely per run
+    /// (`RandomSource.create()`), that everything vanilla draws from `level.getRandom()` shares.
+    pub random: std::sync::Mutex<pumpkin_util::random::legacy_rand::LegacyRand>,
     /// The world's time, including counting ticks for weather, time cycles, and statistics.
     pub level_time: std::sync::Mutex<LevelTime>,
     /// The type of dimension the world is in.
@@ -429,6 +432,11 @@ impl World {
             entities: ArcSwap::new(Arc::new(Vec::new())),
             scoreboard: std::sync::Mutex::new(Scoreboard::default()),
             worldborder: std::sync::Mutex::new(worldborder),
+            random: std::sync::Mutex::new(
+                pumpkin_util::random::legacy_rand::LegacyRand::from_seed(
+                    pumpkin_util::random::get_seed(),
+                ),
+            ),
             level_time: std::sync::Mutex::new(level_time),
             dimension,
             weather: std::sync::Mutex::new(Weather::new()),

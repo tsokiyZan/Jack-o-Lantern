@@ -11,7 +11,7 @@ use pumpkin_util::math::{
     position::BlockPos,
     vector3::Vector3,
 };
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 use uuid::Uuid;
 
 use crate::entity::{Entity, EntityBase, mob::Mob};
@@ -63,11 +63,15 @@ pub fn try_spawn_mob<T: Mob + 'static>(
     check_collisions: bool,
 ) -> Option<Arc<T>> {
     for _ in 0..spawn_attempts {
+        // `Mth.randomBetweenInclusive(level.getRandom(), -range, range)`, x then z.
         let (dx, dz) = {
-            let mut random = rand::rng();
+            let mut random = world
+                .random
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             (
-                random.random_range(-spawn_range_xz..=spawn_range_xz),
-                random.random_range(-spawn_range_xz..=spawn_range_xz),
+                random.next_bounded_i32(spawn_range_xz * 2 + 1) - spawn_range_xz,
+                random.next_bounded_i32(spawn_range_xz * 2 + 1) - spawn_range_xz,
             )
         };
         let search_pos = start.add(dx, spawn_range_y, dz);
@@ -111,7 +115,14 @@ pub fn try_spawn_mob<T: Mob + 'static>(
         ));
         // `EntityType.create`: `snapTo(..., wrapDegrees(random.nextFloat() * 360), 0)`, then the
         // head and body take that yaw.
-        let yaw = wrap_degrees(rand::rng().random::<f32>() * 360.0);
+        let yaw = wrap_degrees(
+            world
+                .random
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .next_f32()
+                * 360.0,
+        );
         let entity = mob.get_entity();
         entity.set_rotation(yaw, 0.0);
         entity.body_yaw.store(yaw);

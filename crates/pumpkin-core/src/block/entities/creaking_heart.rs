@@ -18,9 +18,8 @@ use pumpkin_protocol::java::client::play::CParticle;
 use pumpkin_protocol::{VarInt, ser::NetworkWriteExt};
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 use pumpkin_world::world::BlockFlags;
-use rand::RngExt;
-use rand::seq::SliceRandom;
 use rustc_hash::FxHashSet;
 use uuid::Uuid;
 
@@ -217,10 +216,13 @@ impl CreakingHeartBlockEntity {
         }
 
         if self.ticker.fetch_sub(1, Ordering::Relaxed) < 0 {
-            self.ticker.store(
-                rand::rng().random_range(0..UPDATE_TICKS_VARIANCE) + UPDATE_TICKS,
-                Ordering::Relaxed,
-            );
+            let variance = world
+                .random
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .next_bounded_i32(UPDATE_TICKS_VARIANCE);
+            self.ticker
+                .store(variance + UPDATE_TICKS, Ordering::Relaxed);
             let updated_state = self.update_creaking_state(world, state);
             if updated_state != state {
                 world.set_block_state(&pos, updated_state, BlockFlags::NOTIFY_ALL);
@@ -389,7 +391,11 @@ impl CreakingHeartBlockEntity {
             .creaking_heart_state
             == CreakingHeartState::Awake
         {
-            let number_of_clumps = rand::rng().random_range(2..=3);
+            let number_of_clumps = world
+                .random
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .next_inbetween_i32(2, 3);
             for _ in 0..number_of_clumps {
                 if let Some(block_pos) = self.spread_resin(world) {
                     world.play_block_sound(
@@ -425,7 +431,7 @@ impl CreakingHeartBlockEntity {
             MAX_DEPTH,
             MAX_COUNT,
             |pos, accept| {
-                for dir in shuffled_directions() {
+                for dir in shuffled_directions(world) {
                     let neighbour_pos = pos.offset(dir.to_offset());
                     if is_pale_oak_log(&neighbour_pos) {
                         accept(neighbour_pos);
@@ -436,7 +442,7 @@ impl CreakingHeartBlockEntity {
                 if !is_pale_oak_log(&pos) {
                     return TraversalNodeStatus::Accept;
                 }
-                for dir in shuffled_directions() {
+                for dir in shuffled_directions(world) {
                     let neighbour_pos = pos.offset(dir.to_offset());
                     let mut neighbour_state = world.get_block_state_id(&neighbour_pos);
                     let opposite = dir.opposite();
@@ -483,26 +489,28 @@ impl CreakingHeartBlockEntity {
         } else {
             CREAKING_GRAY
         };
-        let mut random = rand::rng();
         for _ in 0..count {
             let bounding_box = creaking.get_entity().bounding_box.load();
             let size = bounding_box.max - bounding_box.min;
-            let mut source = bounding_box.min
-                + Vector3::new(
-                    random.random::<f64>() * size.x,
-                    random.random::<f64>() * size.y,
-                    random.random::<f64>() * size.z,
-                );
-            let mut destination = self.position.to_f64()
-                + Vector3::new(
-                    random.random::<f64>(),
-                    random.random::<f64>(),
-                    random.random::<f64>(),
-                );
+            // `serverLevel.getRandom()`, in vanilla's draw order.
+            let (mut source, mut destination, duration) = {
+                let mut random = world
+                    .random
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                let source = bounding_box.min
+                    + Vector3::new(
+                        random.next_f64() * size.x,
+                        random.next_f64() * size.y,
+                        random.next_f64() * size.z,
+                    );
+                let destination = self.position.to_f64()
+                    + Vector3::new(random.next_f64(), random.next_f64(), random.next_f64());
+                (source, destination, random.next_bounded_i32(40) + 10)
+            };
             if towards_creaking {
                 std::mem::swap(&mut source, &mut destination);
             }
-            let duration = random.random_range(0..40) + 10;
             send_trail_particle(world, source, destination, color, duration);
         }
     }
@@ -551,10 +559,16 @@ impl CreakingHeartBlockEntity {
     }
 }
 
-/// Vanilla `Util.shuffledCopy(Direction.values(), random)`.
-fn shuffled_directions() -> [BlockDirection; 6] {
+/// Vanilla `Util.shuffledCopy(Direction.values(), level.getRandom())`.
+fn shuffled_directions(world: &World) -> [BlockDirection; 6] {
     let mut directions = BlockDirection::all();
-    directions.shuffle(&mut rand::rng());
+    pumpkin_util::random::shuffle(
+        &mut directions,
+        &mut *world
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
+    );
     directions
 }
 
