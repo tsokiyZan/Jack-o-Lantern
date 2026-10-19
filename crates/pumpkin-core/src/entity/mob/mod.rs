@@ -2856,8 +2856,8 @@ impl<T: Mob + Send + 'static> EntityBase for T {
             neutral.update_persistent_anger();
         }
 
-        // The ambient-sound part of vanilla `Mob.baseTick`.
-        if mob_entity.living_entity.entity.is_alive()
+        // The ambient-sound part of vanilla `Mob.baseTick`; `isAlive` includes health.
+        if mob_entity.living_entity.is_alive()
             && self.get_random().random_range(0..1000)
                 < mob_entity.ambient_sound_time.fetch_add(1, Relaxed)
         {
