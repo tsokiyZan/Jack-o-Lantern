@@ -5384,9 +5384,11 @@ impl Player {
         );
 
         // TODO: Merge stacks together
-        let item_entity = Arc::new(ItemEntity::new_with_velocity(
-            entity, item_stack, velocity, 40,
-        ));
+        // Vanilla `new ItemEntity(level, x, y, z, stack)` draws its own random velocity
+        // (two `nextDouble`s on the item's random) before `setDeltaMovement` replaces it.
+        let item_entity = Arc::new(ItemEntity::new(entity, item_stack));
+        item_entity.get_entity().velocity.store(velocity);
+        item_entity.set_pickup_delay(40);
         self.world().spawn_entity(item_entity);
     }
 

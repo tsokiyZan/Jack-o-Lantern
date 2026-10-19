@@ -1307,8 +1307,10 @@ pub trait Mob: EntityBase + Send + Sync {
     }
 
     /// Vanilla `LivingEntity.makeSound`, through `Entity.playSound`, which a silent
-    /// entity skips.
+    /// entity skips. `getVoicePitch()` is an argument, so its draws happen even then.
     fn make_sound(&self, sound: Sound) {
+        let volume = self.sound_volume();
+        let pitch = self.voice_pitch();
         let entity = self.get_entity();
         if entity.is_silent() {
             return;
@@ -1317,8 +1319,8 @@ pub trait Mob: EntityBase + Send + Sync {
             sound,
             self.sound_source(),
             &entity.pos.load(),
-            self.sound_volume(),
-            self.voice_pitch(),
+            volume,
+            pitch,
         );
     }
 

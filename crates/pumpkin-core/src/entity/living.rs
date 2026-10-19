@@ -3331,6 +3331,8 @@ impl LivingEntity {
             mob.make_sound(sound);
             return;
         }
+        // `getVoicePitch()` is an argument to `playSound`, so it draws before the silent check.
+        let pitch = self.get_pitch();
         if self.entity.is_silent() {
             return;
         }
@@ -3344,10 +3346,10 @@ impl LivingEntity {
                 SoundCategory::Players,
                 &pos,
                 1.0,
-                self.get_pitch(),
+                pitch,
             );
         } else {
-            world.play_sound_fine(sound, SoundCategory::Neutral, &pos, 1.0, self.get_pitch());
+            world.play_sound_fine(sound, SoundCategory::Neutral, &pos, 1.0, pitch);
         }
     }
 
