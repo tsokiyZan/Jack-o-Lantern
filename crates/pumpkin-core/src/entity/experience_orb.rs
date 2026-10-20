@@ -10,7 +10,6 @@ use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::codec::var_int::VarInt;
 use pumpkin_util::math::vector3::Vector3;
 use pumpkin_util::random::RandomImpl;
-use rand::RngExt;
 
 use crate::{server::Server, world::World};
 
@@ -53,13 +52,15 @@ impl ExperienceOrbEntity {
     /// Vanilla `ExperienceOrb(level, pos, roughly, value)` with no rough direction: turned
     /// and thrown at random.
     fn new_awarded(entity: Entity, value: i32) -> Self {
-        let mut random = rand::rng();
-        entity.yaw.store(random.random::<f32>() * 360.0);
-        let random_movement = Vector3::new(
-            (random.random::<f64>() * 0.2 - 0.1) * 2.0,
-            random.random::<f64>() * 0.2 * 2.0,
-            (random.random::<f64>() * 0.2 - 0.1) * 2.0,
-        );
+        let (yaw, random_movement) = {
+            let mut random = entity.random();
+            let yaw = random.next_f32() * 360.0;
+            let x = (random.next_f64() * 0.2 - 0.1) * 2.0;
+            let y = random.next_f64() * 0.2 * 2.0;
+            let z = (random.next_f64() * 0.2 - 0.1) * 2.0;
+            (yaw, Vector3::new(x, y, z))
+        };
+        entity.yaw.store(yaw);
         entity.velocity.store(random_movement);
         // TODO: vanilla `unstuckIfPossible` when spawned inside a block; it needs
         // `CollisionGetter.findFreePosition`.
@@ -237,12 +238,13 @@ impl EntityBase for ExperienceOrbEntity {
             .get_fluid(&entity.block_pos.load())
             .has_tag(&tag::Fluid::MINECRAFT_LAVA)
         {
-            let mut random = rand::rng();
-            entity.velocity.store(Vector3::new(
-                f64::from((random.random::<f32>() - random.random::<f32>()) * 0.2),
-                f64::from(0.2f32),
-                f64::from((random.random::<f32>() - random.random::<f32>()) * 0.2),
-            ));
+            let velocity = {
+                let mut random = entity.random();
+                let x = (random.next_f32() - random.next_f32()) * 0.2;
+                let z = (random.next_f32() - random.next_f32()) * 0.2;
+                Vector3::new(f64::from(x), f64::from(0.2f32), f64::from(z))
+            };
+            entity.velocity.store(velocity);
         }
 
         if entity.tick_count.load(Ordering::Relaxed) % ENTITY_SCAN_PERIOD == 1 {

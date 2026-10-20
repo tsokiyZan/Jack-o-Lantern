@@ -12,6 +12,7 @@ use pumpkin_data::particle::Particle;
 use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_protocol::bedrock::server::actor_event::ActorEventID;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 
 const GRAVITY: f64 = 0.03;
 const PARTICLE_COUNT: i32 = 32;
@@ -65,17 +66,18 @@ impl EntityBase for EnderPearlEntity {
 
         // Spawn portal particles at hit position
         let hit_pos = hit.hit_pos();
+        // Vanilla `ThrownEnderpearl.onHit`: per particle `getY() + random.nextDouble() * 2.0`,
+        // then `nextGaussian()` for the x and z speeds, from the pearl's random.
         for _ in 0..PARTICLE_COUNT {
-            let offset = Vector3::new(
-                rand::random::<f32>() as f64 - 0.5,
-                rand::random::<f32>() as f64 * 2.0,
-                rand::random::<f32>() as f64 - 0.5,
-            );
-            let speed = Vector3::new(
-                rand::random::<f64>() - 0.5,
-                0.0,
-                rand::random::<f64>() - 0.5,
-            );
+            let (dy, speed_x, speed_z) = {
+                let mut random = entity.random();
+                let dy = random.next_f64() * 2.0;
+                let speed_x = random.next_gaussian();
+                let speed_z = random.next_gaussian();
+                (dy, speed_x, speed_z)
+            };
+            let offset = Vector3::new(0.0, dy, 0.0);
+            let speed = Vector3::new(speed_x, 0.0, speed_z);
 
             world.spawn_particle(
                 hit_pos.add(&offset),
@@ -118,7 +120,7 @@ impl EntityBase for EnderPearlEntity {
             // Vanilla only spawns endermites behind, and hurts, a teleported player.
             let is_player = owner.get_player().is_some();
             let should_spawn_endermite =
-                is_player && rand::random::<f32>() < ENDERMITE_SPAWN_CHANCE;
+                is_player && entity.random().next_f32() < ENDERMITE_SPAWN_CHANCE;
             if world.should_spawn_monsters() && should_spawn_endermite {
                 let entity = Entity::new(
                     world.clone(),

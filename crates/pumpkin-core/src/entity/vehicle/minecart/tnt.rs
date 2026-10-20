@@ -7,7 +7,7 @@ use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::bedrock::server::actor_event::ActorEventID;
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::Entity;
 
@@ -118,7 +118,7 @@ impl TntMinecart {
             self.explosion_power.load(),
             self.explosion_speed_factor.load(),
             horizontal_speed_squared,
-            rand::rng().random_range(0.0..1.0),
+            entity.random().next_f64(),
         );
         // The cart itself is the source, and goes only after the explosion, while it still
         // spares rails as primed.
@@ -134,6 +134,11 @@ impl TntMinecart {
             crate::world::ExplosionEffects::DEFAULT,
         );
         entity.remove();
+    }
+
+    /// Vanilla `MinecartTNT.fuse`: `-1` until primed.
+    pub(super) fn fuse(&self) -> i32 {
+        self.fuse.load(Ordering::Relaxed)
     }
 
     pub(super) fn set_fuse(&self, fuse: i32) {
@@ -171,10 +176,12 @@ impl TntMinecart {
         base: f32,
         speed_factor: f32,
         horizontal_speed_squared: f64,
-        random: f32,
+        random: f64,
     ) -> f32 {
-        let speed = horizontal_speed_squared.sqrt().min(5.0) as f32;
-        base + speed_factor * random * 1.5 * speed
+        // Vanilla `(float) (explosionPowerBase + explosionSpeedFactor * random.nextDouble() * 1.5 * speed)`,
+        // in double.
+        let speed = horizontal_speed_squared.sqrt().min(5.0);
+        (f64::from(base) + f64::from(speed_factor) * random * 1.5 * speed) as f32
     }
 }
 

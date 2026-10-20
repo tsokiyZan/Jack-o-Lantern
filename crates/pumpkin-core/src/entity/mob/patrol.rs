@@ -5,6 +5,7 @@ use pumpkin_data::data_component_impl::EquipmentSlot;
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::ai::goal::{Controls, Goal};
 use crate::entity::ai::pathfinder::NavigatorGoal;
@@ -74,8 +75,14 @@ pub trait PatrollingMonster: Mob {
 
     fn find_patrol_target(&self) {
         let block_pos = self.get_mob_entity().living_entity.entity.block_pos.load();
-        let dx: i32 = rand::random::<i32>().rem_euclid(1000) - 500;
-        let dz: i32 = rand::random::<i32>().rem_euclid(1000) - 500;
+        // `offset(-500 + random.nextInt(1000), 0, -500 + random.nextInt(1000))`.
+        let (dx, dz) = {
+            let mut random = self.get_entity().random();
+            (
+                -500 + random.next_bounded_i32(1000),
+                -500 + random.next_bounded_i32(1000),
+            )
+        };
         let target = BlockPos(Vector3::new(
             block_pos.0.x + dx,
             block_pos.0.y,

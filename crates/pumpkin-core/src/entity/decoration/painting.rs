@@ -14,6 +14,7 @@ use pumpkin_protocol::codec::var_int::VarInt;
 use pumpkin_protocol::java::client::play::Metadata;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 use pumpkin_util::version::JavaMinecraftVersion;
 
 /// The world stores a painting facing as a horizontal value: 0 south, 1 west,
@@ -156,17 +157,15 @@ impl PaintingEntity {
         true
     }
 
-    /// Chooses a placeable painting variant that fits the wall at `location` facing `face`.
-    /// Matches vanilla Minecraft: filters to variants that fit, selects the subset with
-    /// the largest area (width * height), and randomly picks one from that subset.
+    /// Vanilla `Painting.create`'s variant pick: of the placeable variants that fit the wall at
+    /// `location` facing `face`, one of the largest, drawn from the new painting's own random.
     #[must_use]
     pub fn choose_variant(
         world: &crate::world::World,
+        candidate: &Entity,
         location: BlockPos,
         face: BlockDirection,
     ) -> Option<PaintingVariant> {
-        use rand::seq::IndexedRandom;
-
         let mut fitting_variants = Vec::new();
         let mut max_area = 0;
 
@@ -183,8 +182,14 @@ impl PaintingEntity {
             }
         }
 
-        let mut rng = rand::rng();
-        fitting_variants.choose(&mut rng).copied()
+        // `Util.getRandomSafe`: no draw when nothing fits.
+        if fitting_variants.is_empty() {
+            return None;
+        }
+        let index = candidate
+            .random()
+            .next_bounded_i32(fitting_variants.len() as i32);
+        Some(fitting_variants[index as usize])
     }
 
     fn drop_and_remove(&self, caused_by: Option<&dyn EntityBase>) {

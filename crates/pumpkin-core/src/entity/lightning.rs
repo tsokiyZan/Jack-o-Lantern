@@ -11,6 +11,7 @@ use pumpkin_util::Difficulty;
 use pumpkin_util::math::boundingbox::BoundingBox;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 use pumpkin_world::world::BlockFlags;
 use rand::RngExt;
 
@@ -34,8 +35,11 @@ pub struct LightningBoltEntity {
 impl LightningBoltEntity {
     pub fn new(entity: Entity) -> Self {
         entity.no_physics.store(true, Ordering::Relaxed);
-        let seed = rand::rng().random::<i64>();
-        let flashes = rand::rng().random_range(1..=3);
+        let (seed, flashes) = {
+            let mut random = entity.random();
+            let seed = random.next_i64();
+            (seed, random.next_bounded_i32(3) + 1)
+        };
         Self {
             entity,
             life: AtomicI32::new(2),
@@ -112,10 +116,14 @@ impl LightningBoltEntity {
         try_place(pos);
 
         for _ in 0..additional_sources {
-            let dx = rand::rng().random_range(-1..=1);
-            let dy = rand::rng().random_range(-1..=1);
-            let dz = rand::rng().random_range(-1..=1);
-            let nearby_pos = pos.offset(Vector3::new(dx, dy, dz));
+            let offset = {
+                let mut random = self.entity.random();
+                let dx = random.next_bounded_i32(3) - 1;
+                let dy = random.next_bounded_i32(3) - 1;
+                let dz = random.next_bounded_i32(3) - 1;
+                Vector3::new(dx, dy, dz)
+            };
+            let nearby_pos = pos.offset(offset);
             try_place(nearby_pos);
         }
     }
@@ -234,10 +242,11 @@ impl EntityBase for LightningBoltEntity {
             if flashes == 0 {
                 entity.remove();
                 return;
-            } else if new_life < -rand::rng().random_range(0..10) {
+            } else if new_life < -entity.random().next_bounded_i32(10) {
                 self.flashes.store(flashes - 1, Ordering::Relaxed);
                 self.life.store(1, Ordering::Relaxed);
-                self.seed.store(rand::random::<i64>(), Ordering::Relaxed);
+                let seed = entity.random().next_i64();
+                self.seed.store(seed, Ordering::Relaxed);
                 let world = entity.world.load();
                 self.spawn_fire(&world, 0);
             }

@@ -22,6 +22,7 @@ use pumpkin_protocol::codec::var_int::VarInt;
 use pumpkin_util::{
     Difficulty,
     math::{position::BlockPos, vector3::Vector3},
+    random::RandomImpl,
     text::TextComponent,
 };
 use pumpkin_world::world::BlockFlags;
@@ -59,6 +60,13 @@ pub struct WitherEntity {
 impl WitherEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
+        // Vanilla's `bossEvent` field: `Mth.createInsecureUUID(this.random)`.
+        let bossbar_uuid = {
+            let mut random = mob_entity.living_entity.entity.random();
+            let most = random.next_i64() & !0xF000 | 0x4000;
+            let least = random.next_i64() & 0x3FFF_FFFF_FFFF_FFFF | i64::MIN;
+            Uuid::from_u64_pair(most as u64, least as u64)
+        };
         let wither = Self {
             mob_entity,
             invulnerable_ticks: AtomicI32::new(0),
@@ -66,7 +74,7 @@ impl WitherEntity {
             next_head_update: [AtomicI32::new(0), AtomicI32::new(0)],
             idle_head_updates: [AtomicI32::new(0), AtomicI32::new(0)],
             alternative_targets: [AtomicI32::new(0), AtomicI32::new(0), AtomicI32::new(0)],
-            bossbar_uuid: Uuid::new_v4(),
+            bossbar_uuid,
             bossbar_players: Mutex::new(Vec::new()),
             dropped_loot: AtomicBool::new(false),
         };
@@ -250,7 +258,7 @@ impl WitherEntity {
     fn perform_ranged_attack_at(&self, head: usize, target: &dyn EntityBase) {
         let entity = target.get_entity();
         let pos = entity.pos.load();
-        let dangerous = head == 0 && rand::random::<f32>() < 0.001;
+        let dangerous = head == 0 && self.get_entity().random().next_f32() < 0.001;
         self.perform_ranged_attack(
             head,
             pos.x,
@@ -460,7 +468,7 @@ impl WitherEntity {
                 continue;
             }
             self.next_head_update[i - 1].store(
-                tick_count + 10 + rand::random_range(0..10),
+                tick_count + 10 + entity.random().next_bounded_i32(10),
                 Ordering::Relaxed,
             );
             if matches!(difficulty, Difficulty::Normal | Difficulty::Hard)
@@ -468,9 +476,13 @@ impl WitherEntity {
             {
                 let pos = entity.pos.load();
                 // `Mth.nextDouble(random, min, max)`.
-                let xt = pos.x - 10.0 + rand::random::<f64>() * 20.0;
-                let yt = pos.y - 5.0 + rand::random::<f64>() * 10.0;
-                let zt = pos.z - 10.0 + rand::random::<f64>() * 20.0;
+                let (xt, yt, zt) = {
+                    let mut random = entity.random();
+                    let xt = random.mth_next_double(pos.x - 10.0, pos.x + 10.0);
+                    let yt = random.mth_next_double(pos.y - 5.0, pos.y + 5.0);
+                    let zt = random.mth_next_double(pos.z - 10.0, pos.z + 10.0);
+                    (xt, yt, zt)
+                };
                 self.perform_ranged_attack(i + 1, xt, yt, zt, true);
                 self.idle_head_updates[i - 1].store(0, Ordering::Relaxed);
             }
@@ -491,7 +503,7 @@ impl WitherEntity {
                 {
                     self.perform_ranged_attack_at(i + 1, current.as_ref());
                     self.next_head_update[i - 1].store(
-                        tick_count + 40 + rand::random_range(0..20),
+                        tick_count + 40 + entity.random().next_bounded_i32(20),
                         Ordering::Relaxed,
                     );
                     self.idle_head_updates[i - 1].store(0, Ordering::Relaxed);
@@ -514,7 +526,8 @@ impl WitherEntity {
                     })
                     .collect();
                 if !candidates.is_empty() {
-                    let selected = &candidates[rand::random_range(0..candidates.len())];
+                    let selected = &candidates
+                        [entity.random().next_bounded_i32(candidates.len() as i32) as usize];
                     self.set_alternative_target(i, selected.get_entity().entity_id);
                 }
             }

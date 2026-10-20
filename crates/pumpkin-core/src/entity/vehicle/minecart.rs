@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
 use pumpkin_protocol::java::server::play::SPlayerInput;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use crate::{
     entity::{Entity, EntityBase, living::LivingEntity, player::Player},
@@ -852,20 +852,27 @@ impl EntityBase for MinecartEntity {
                 || self.vehicle.entity.fire_ticks.load(Ordering::Relaxed) > 0;
             if ignites || speed_squared >= 0.01 {
                 self.vehicle.apply_damage_wobble(amount);
-                let fuse = rand::rng().random_range(0..20) + rand::rng().random_range(0..20);
-                if self
-                    .vehicle
-                    .entity
-                    .world
-                    .load()
-                    .level_info
-                    .load()
-                    .game_rules
-                    .tnt_explodes
-                {
-                    minecart.prime(&self.vehicle.entity, fuse);
-                } else {
-                    minecart.set_fuse(fuse);
+                // Vanilla `MinecartTNT.destroy`: only an unprimed cart primes and draws
+                // `this.random.nextInt(20) + this.random.nextInt(20)`.
+                if minecart.fuse() < 0 {
+                    let fuse = {
+                        let mut random = self.vehicle.entity.random();
+                        random.next_bounded_i32(20) + random.next_bounded_i32(20)
+                    };
+                    if self
+                        .vehicle
+                        .entity
+                        .world
+                        .load()
+                        .level_info
+                        .load()
+                        .game_rules
+                        .tnt_explodes
+                    {
+                        minecart.prime(&self.vehicle.entity, fuse);
+                    } else {
+                        minecart.set_fuse(fuse);
+                    }
                 }
                 return true;
             }

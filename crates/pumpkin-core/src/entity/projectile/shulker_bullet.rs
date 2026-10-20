@@ -10,7 +10,7 @@ use pumpkin_data::potion::Effect;
 use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 use uuid::Uuid;
 
 use crate::enchantment::EnchantmentHelper;
@@ -131,7 +131,8 @@ impl ShulkerBulletEntity {
         let tbp_cz = f64::from(tbp.0.z) + 0.5;
         let center_dist_sq =
             (tbp_cx - pos.x).powi(2) + (tbp_cy - pos.y).powi(2) + (tbp_cz - pos.z).powi(2);
-        let target_is_far = center_dist_sq > 4.0;
+        // `!targetPos.closerToCenterThan(position, 2.0)`: not `< 4.0`.
+        let target_is_far = center_dist_sq >= 4.0;
 
         let (chosen_tx, chosen_ty, chosen_tz, selected_dir) = if target_is_far {
             // Pick an axis-aligned direction toward the target
@@ -159,19 +160,18 @@ impl ShulkerBulletEntity {
                 }
             }
 
-            // If options empty, pick a random direction (up to 5 tries for an
-            // unobstructed one); ignore avoidAxis in this fallback.
+            // Vanilla draws `Direction.getRandom(this.random)` first in any case; with no
+            // options it rerolls up to 5 times for an empty block, else it picks an option.
+            let mut sel = self.random_dir();
             let sel = if options.is_empty() {
-                let mut r = Self::random_dir();
-                for _ in 0..4 {
-                    if is_empty_block(&world, &cur_bp, r) {
-                        break;
-                    }
-                    r = Self::random_dir();
+                let mut attempts = 5;
+                while !is_empty_block(&world, &cur_bp, sel) && attempts > 0 {
+                    sel = self.random_dir();
+                    attempts -= 1;
                 }
-                r
+                sel
             } else {
-                options[rand::rng().random_range(0..options.len())]
+                options[self.entity.random().next_bounded_i32(options.len() as i32) as usize]
             };
 
             (
@@ -202,12 +202,14 @@ impl ShulkerBulletEntity {
         }
 
         self.current_dir.store(selected_dir, Ordering::Relaxed);
-        let steps = 10 + rand::rng().random_range(0..5) * 10;
+        let steps = 10 + self.entity.random().next_bounded_i32(5) * 10;
         self.flight_steps.store(steps, Ordering::Relaxed);
     }
 
-    fn random_dir() -> u8 {
-        rand::rng().random_range(0u8..6)
+    /// Vanilla `Direction.getRandom(this.random)`: `Util.getRandom(VALUES, random)`, whose
+    /// order (down, up, north, south, west, east) the `DIR_*` ids follow.
+    fn random_dir(&self) -> u8 {
+        self.entity.random().next_bounded_i32(6) as u8
     }
 }
 

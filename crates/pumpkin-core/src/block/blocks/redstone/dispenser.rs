@@ -1355,7 +1355,11 @@ impl DispenserBlock {
             triangle(&mut rng(), facing.z * rd, 0.017_227_5 * 6.),
         );
 
-        let item_entity = Arc::new(ItemEntity::new_with_velocity(entity, stack, velocity, 40));
+        // Vanilla `new ItemEntity(level, x, y, z, stack)` takes the item's own two velocity
+        // draws before `setDeltaMovement` replaces them.
+        let item_entity = Arc::new(ItemEntity::new(entity, stack));
+        item_entity.get_entity().velocity.store(velocity);
+        item_entity.set_pickup_delay(40);
         ctx.world.spawn_entity(item_entity);
     }
 }

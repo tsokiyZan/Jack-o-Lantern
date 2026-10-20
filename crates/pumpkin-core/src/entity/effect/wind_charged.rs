@@ -1,4 +1,5 @@
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::effect::MobEffect;
 use crate::entity::living::LivingEntity;
@@ -16,7 +17,7 @@ impl MobEffect for WindChargedMobEffect {
         let center = Vector3::new(pos.x, pos.y + f64::from(height / 2.0), pos.z);
 
         // gustStrength = 3.0 + random * 2.0
-        let gust_strength = 3.0 + rand::random::<f32>() * 2.0;
+        let gust_strength = 3.0 + living.entity.random().next_f32() * 2.0;
 
         world.explode_full(
             world.get_entity_by_id(living.entity.entity_id),

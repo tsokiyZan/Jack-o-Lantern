@@ -18,7 +18,7 @@ use crate::entity::ai::pathfinder::path::Path;
 use crate::entity::item::ItemEntity;
 use crate::entity::mob::Mob;
 use crate::entity::mob::patrol::{PatrolData, PatrollingMonster};
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 use std::collections::HashMap;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -431,7 +431,7 @@ fn pick_up_banner(mob: &dyn Mob, banner: &dyn EntityBase) {
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .get(&EquipmentSlot::HEAD);
     let drop_chance = mob_entity.drop_chance(&EquipmentSlot::HEAD);
-    if !current.is_empty() && (mob.get_random().random::<f32>() - 0.1).max(0.0) < drop_chance {
+    if !current.is_empty() && (entity.random().next_f32() - 0.1).max(0.0) < drop_chance {
         entity.spawn_at_location(current);
     }
     let count = u32::from(stack.item_count);
@@ -473,21 +473,19 @@ impl Goal for RaiderCelebrationGoal {
         }
     }
 
+    /// Vanilla `Raider.RaiderCelebration.tick`.
     fn tick(&mut self, mob: &dyn Mob) {
         let Some(raider) = mob.as_raider() else {
             return;
         };
         let entity = mob.get_entity();
-        let pos = entity.pos.load();
-        let world = entity.world.load();
 
-        let r: f32 = rand::random();
-        if r < 0.02 && !entity.silent.load(Ordering::Relaxed) {
-            world.play_sound(
-                raider.get_celebrate_sound(),
-                pumpkin_data::sound::SoundCategory::Hostile,
-                &pos,
-            );
+        if !entity.is_silent() && entity.random().next_bounded_i32(self.get_tick_count(100)) == 0 {
+            mob.make_sound(raider.get_celebrate_sound());
+        }
+
+        if !mob.is_passenger() && entity.random().next_bounded_i32(self.get_tick_count(50)) == 0 {
+            mob.get_mob_entity().jump();
         }
     }
 }

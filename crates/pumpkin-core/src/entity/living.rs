@@ -71,8 +71,8 @@ use pumpkin_protocol::{
 };
 use pumpkin_util::math::boundingbox::BoundingBox;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 use pumpkin_util::text::TextComponent;
-use rand::RngExt;
 use std::sync::RwLock;
 
 /// Represents a living entity within the game world.
@@ -295,15 +295,19 @@ impl LivingEntity {
             .and_then(|x| x.as_ageable())
             .is_some_and(AgeableMob::is_baby);
 
-        let mut rng = rand::rng();
+        let mut random = self.entity.random();
         if is_baby {
-            (rng.random::<f32>() - rng.random::<f32>()) * 0.2 + 1.5
+            (random.next_f32() - random.next_f32()) * 0.2 + 1.5
         } else {
-            (rng.random::<f32>() - rng.random::<f32>()) * 0.2 + 1.0
+            (random.next_f32() - random.next_f32()) * 0.2 + 1.0
         }
     }
 
     pub fn new(entity: Entity) -> Self {
+        // Vanilla `LivingEntity(type, level)`: `setYRot(random.nextFloat() * (float) (Math.PI * 2))`.
+        // Every spawn path sets the real rotation afterwards, so Pumpkin keeps the yaw the
+        // entity was made with and only takes the draw.
+        entity.random().next_f32();
         let water_movement_speed_multiplier = if entity.entity_type == &EntityType::POLAR_BEAR {
             0.98
         } else if entity.entity_type == &EntityType::SKELETON_HORSE {
@@ -1713,7 +1717,7 @@ impl LivingEntity {
         };
         if max_cramming > 0
             && pushable.len() as i64 > max_cramming - 1
-            && rand::random::<u32>().is_multiple_of(4)
+            && self.entity.random().next_bounded_i32(4) == 0
         {
             let count = pushable
                 .iter()
@@ -2660,14 +2664,17 @@ impl LivingEntity {
             if item.is_empty()
                 || crate::entity::passive::allay::prevents_equipment_drop(&item)
                 || !(killed_by_player || preserved)
-                || rand::random::<f32>() >= chance
+                || self.entity.random().next_f32() >= chance
             {
                 continue;
             }
             if !preserved && let Some(max_damage) = item.get_max_damage() {
-                let mut rng = rand::rng();
-                let inner = rng.random_range(0..(max_damage - 3).max(1));
-                let outer = rng.random_range(0..=inner);
+                // `nextInt(1 + nextInt(Math.max(maxDamage - 3, 1)))`.
+                let outer = {
+                    let mut random = self.entity.random();
+                    let inner = random.next_bounded_i32((max_damage - 3).max(1));
+                    random.next_bounded_i32(1 + inner)
+                };
                 item.set_damage(max_damage - outer);
             }
             self.entity.spawn_at_location(item);
@@ -3324,6 +3331,8 @@ impl LivingEntity {
             mob.make_sound(sound);
             return;
         }
+        // `getVoicePitch()` is an argument to `playSound`, so it draws before the silent check.
+        let pitch = self.get_pitch();
         if self.entity.is_silent() {
             return;
         }
@@ -3337,10 +3346,10 @@ impl LivingEntity {
                 SoundCategory::Players,
                 &pos,
                 1.0,
-                self.get_pitch(),
+                pitch,
             );
         } else {
-            world.play_sound_fine(sound, SoundCategory::Neutral, &pos, 1.0, self.get_pitch());
+            world.play_sound_fine(sound, SoundCategory::Neutral, &pos, 1.0, pitch);
         }
     }
 
@@ -4712,11 +4721,27 @@ impl LivingEntity {
                 world.play_custom_sound(&sound.sound_name, category, &pos, volume, pitch);
             }
         };
-        let mut rng = rand::rng();
-        // `Consumable.emitParticlesAndSounds`, through `Entity.playSound`.
-        let eat_volume = if rng.random::<bool>() { 0.5 } else { 1.0 };
-        let eat_pitch = (rng.random::<f32>() - rng.random::<f32>()) * 0.2 + 1.0;
-        let drink_pitch = rng.random::<f32>() * 0.1 + 0.9;
+        // `Consumable.emitParticlesAndSounds(user.getRandom(), user, stack, 16)`, through
+        // `Entity.playSound`; then `FoodProperties.onConsume`'s `random.triangle(1.0F, 0.4F)`.
+        let (eat_volume, eat_pitch, drink_pitch, food_pitch) = {
+            let mut random = self.entity.random();
+            let eat_volume = if random.next_bool() { 0.5 } else { 1.0 };
+            let eat_pitch = 1.0 + 0.2 * (random.next_f32() - random.next_f32());
+            // `Mth.randomBetween(random, 0.9F, 1.0F)`.
+            let drink_pitch = random.next_f32() * (1.0f32 - 0.9) + 0.9;
+            // `LivingEntity.spawnItemParticles(stack, 16)`: four floats a particle, drawn
+            // on the server too.
+            if consumable.consume_particles && !stack.is_empty() {
+                for _ in 0..16 * 4 {
+                    random.next_f32();
+                }
+            }
+            let food_pitch = stack
+                .get_data_component::<FoodImpl>()
+                .is_some()
+                .then(|| 1.0 + 0.4 * (random.next_f32() - random.next_f32()));
+            (eat_volume, eat_pitch, drink_pitch, food_pitch)
+        };
         let drinks = consumable.animation == ConsumeAnimation::Drink;
         if !self.entity.is_silent() {
             if drinks {
@@ -4726,8 +4751,7 @@ impl LivingEntity {
             }
         }
         // `FoodProperties.onConsume`, the consume listener of food.
-        if stack.get_data_component::<FoodImpl>().is_some() {
-            let pitch = (rng.random::<f32>() - rng.random::<f32>()) * 0.4 + 1.0;
+        if let Some(pitch) = food_pitch {
             play(1.0, pitch, SoundCategory::Neutral);
         }
         self.apply_consumable_effects(caller, &stack);
@@ -4751,7 +4775,10 @@ impl LivingEntity {
         for consume_effect in consumable.effects.iter() {
             match consume_effect {
                 ConsumeEffect::ApplyEffects((effects, probability)) => {
-                    if !consume_effect_probability_applies(*probability, rand::random()) {
+                    if !consume_effect_probability_applies(
+                        *probability,
+                        self.entity.random().next_f32(),
+                    ) {
                         continue;
                     }
 
@@ -4926,13 +4953,17 @@ impl LivingEntity {
         let bottom_y = world.get_bottom_y();
         let top_y = world.get_top_y();
         let dimensions = self.entity.entity_dimension.load();
-        let mut rng = rand::rng();
 
         'attempts: for _ in 0..Self::RANDOM_TELEPORT_ATTEMPTS {
-            let target_x = random_teleport_coordinate(center.x, diameter, rng.random());
-            let target_z = random_teleport_coordinate(center.z, diameter, rng.random());
-            let sampled_y = random_teleport_coordinate(center.y, diameter, rng.random())
-                .clamp(f64::from(bottom_y + 1), f64::from(top_y));
+            // `TeleportRandomlyConsumeEffect.apply`: x, then y, then z from `user.getRandom()`.
+            let (target_x, sampled_y, target_z) = {
+                let mut random = self.entity.random();
+                let x = random_teleport_coordinate(center.x, diameter, random.next_f64());
+                let y = random_teleport_coordinate(center.y, diameter, random.next_f64());
+                let z = random_teleport_coordinate(center.z, diameter, random.next_f64());
+                (x, y, z)
+            };
+            let sampled_y = sampled_y.clamp(f64::from(bottom_y + 1), f64::from(top_y));
             let mut block_y = sampled_y.floor() as i32;
             let block_x = target_x.floor() as i32;
             let block_z = target_z.floor() as i32;
