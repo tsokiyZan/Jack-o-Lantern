@@ -7,6 +7,7 @@ use pumpkin_data::BlockDirection;
 use pumpkin_data::damage::DamageType;
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::sound::{Sound, SoundCategory};
+use pumpkin_data::tag::{self, Taggable};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::codec::var_int::VarInt;
 use pumpkin_protocol::java::client::play::CEntityPositionSync;
@@ -252,6 +253,10 @@ impl ShulkerEntity {
 
     pub fn teleport_somewhere(&self) -> bool {
         let entity = &self.mob_entity.living_entity.entity;
+        // Vanilla `!isNoAi() && isAlive()`: a dead or AI-less shulker draws nothing.
+        if self.mob_entity.is_no_ai() || !self.mob_entity.living_entity.is_alive() {
+            return false;
+        }
         let base_pos = entity.block_pos.load();
         let world = entity.world.load();
 
@@ -267,12 +272,26 @@ impl ShulkerEntity {
             };
             let candidate = BlockPos::new(base_pos.0.x + dx, base_pos.0.y + dy, base_pos.0.z + dz);
 
-            let candidate_state = world.get_block_state(&candidate);
-            if !candidate_state.is_air() {
+            // `target.getY() > level.getMinY() && level.isEmptyBlock(target)
+            //   && level.getWorldBorder().isWithinBounds(target)
+            //   && level.noCollision(this, new AABB(target).deflate(1.0E-6))`.
+            if candidate.0.y <= world.dimension.min_y
+                || !world.get_block_state(&candidate).is_air()
+                || !world
+                    .worldborder
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .contains_block(candidate.0.x, candidate.0.z)
+                || !world.no_collision(BoundingBox::from_block(&candidate).contract_all(1.0E-6))
+            {
                 continue;
             }
 
-            if let Some(dir) = self.find_attachable_face(&candidate) {
+            if let Some(dir) = self.find_attachable_face(&candidate)
+                && !world
+                    .get_block(&candidate.offset_direction(dir))
+                    .has_tag(&tag::Block::MINECRAFT_SHULKER_DOES_NOT_TELEPORT_TO)
+            {
                 let new_pos = Vector3::new(
                     f64::from(candidate.0.x) + 0.5,
                     f64::from(candidate.0.y),

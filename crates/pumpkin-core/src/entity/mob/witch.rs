@@ -262,7 +262,11 @@ impl Mob for WitchEntity {
     }
 
     fn mob_tick(&self, caller: &dyn EntityBase) {
-        // Vanilla `Witch.aiStep`: players are fair game once the heal cooldown runs out.
+        // Vanilla `Witch.aiStep` runs this server half only `if (this.isAlive())`.
+        if !self.mob_entity.living_entity.is_alive() {
+            return;
+        }
+        // Players are fair game once the heal cooldown runs out.
         let cooldown = self.heal_raiders_cooldown.fetch_sub(1, Ordering::Relaxed) - 1;
         self.can_attack_players
             .store(cooldown <= 0, Ordering::Relaxed);

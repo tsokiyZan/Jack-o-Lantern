@@ -21,13 +21,13 @@ use pumpkin_util::random::RandomImpl;
 use crate::entity::ai::pathfinder::node::PathType;
 use crate::entity::item::ItemEntity;
 use crate::entity::mob::equipment as mob_equipment;
+use crate::entity::mob::spawn::SpawnGroupData;
 use crate::entity::mob::{abstract_piglin, piglin_ai};
 use crate::entity::player::Player;
 use crate::entity::{
     Entity, EntityBase,
     mob::{Mob, MobEntity, crossbow_attack_mob::CrossbowAttackMob, equipment::RegionalDifficulty},
 };
-use crate::entity::mob::spawn::SpawnGroupData;
 use crate::world::World;
 
 pub struct PiglinEntity {
@@ -513,8 +513,9 @@ impl Mob for PiglinEntity {
                 .set_item_slot(&EquipmentSlot::MAIN_HAND, ItemStack::new(1, weapon));
         }
         // `PiglinAi.initMemories(this, level.getRandom())`: only here, never on load.
-        self.mob_entity
-            .with_brain(self, |tick| piglin_ai::init_memories(tick.brain, tick.world));
+        self.mob_entity.with_brain(self, |tick| {
+            piglin_ai::init_memories(tick.brain, tick.world);
+        });
         let difficulty = RegionalDifficulty::at(world, self.get_entity().pos.load());
         self.populate_default_equipment_slots(world, &difficulty);
         self.populate_default_equipment_enchantments(&difficulty);
