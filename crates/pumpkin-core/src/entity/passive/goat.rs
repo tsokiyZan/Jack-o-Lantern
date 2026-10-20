@@ -16,7 +16,6 @@ use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::math::boundingbox::EntityDimensions;
 use pumpkin_util::math::vector3::Vector3;
 use pumpkin_util::random::{RandomImpl, legacy_rand::LegacyRand};
-use rand::RngExt;
 use uuid::Uuid;
 
 use crate::entity::ai::brain::{Brain, BrainTick, memory::PackedMemories};
@@ -162,13 +161,12 @@ impl GoatEntity {
             return false;
         }
 
-        let mut random = self.get_random();
         let drop_left = if !has_left {
             false
         } else if !has_right {
             true
         } else {
-            random.random::<bool>()
+            self.get_entity().random().next_bool()
         };
         if drop_left {
             self.set_has_left_horn(false);
@@ -179,9 +177,13 @@ impl GoatEntity {
         let entity = self.get_entity();
         let body_position = entity.pos.load();
         let item = self.create_horn();
-        let delta_x = f64::from(random_between(&mut random, -0.2, 0.2));
-        let delta_y = f64::from(random_between(&mut random, 0.3, 0.7));
-        let delta_z = f64::from(random_between(&mut random, -0.2, 0.2));
+        let (delta_x, delta_y, delta_z) = {
+            let mut random = entity.random();
+            let delta_x = f64::from(random_between(&mut *random, -0.2, 0.2));
+            let delta_y = f64::from(random_between(&mut *random, 0.3, 0.7));
+            let delta_z = f64::from(random_between(&mut *random, -0.2, 0.2));
+            (delta_x, delta_y, delta_z)
+        };
         let world = entity.world.load_full();
         let item_entity = ItemEntity::new_with_velocity(
             Entity::new(world.clone(), body_position, &EntityType::ITEM),
@@ -204,8 +206,8 @@ impl GoatEntity {
 }
 
 /// Vanilla `Mth.randomBetween`.
-fn random_between(random: &mut impl RngExt, min: f32, max: f32) -> f32 {
-    random.random::<f32>() * (max - min) + min
+fn random_between(random: &mut impl RandomImpl, min: f32, max: f32) -> f32 {
+    random.next_f32() * (max - min) + min
 }
 
 /// Java's `UUID.hashCode`.
@@ -255,8 +257,14 @@ impl Animal for GoatEntity {
             new_goat
                 .mob_entity
                 .with_brain(new_goat, goat_ai::init_memories);
-            let mut random = self.get_random();
-            let screaming_parent = if random.random::<bool>() {
+            // `level.getRandom()`, locked per draw.
+            let level_random = || {
+                world
+                    .random
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+            };
+            let screaming_parent = if level_random().next_bool() {
                 self.is_screaming()
             } else {
                 partner
@@ -265,7 +273,7 @@ impl Animal for GoatEntity {
                     .is_some_and(Self::is_screaming)
             };
             let baby_is_screaming =
-                screaming_parent || random.random::<f64>() < GOAT_SCREAMING_CHANCE;
+                screaming_parent || level_random().next_f64() < GOAT_SCREAMING_CHANCE;
             new_goat.set_screaming(baby_is_screaming);
         }
         Some(baby)
@@ -279,8 +287,17 @@ impl Animal for GoatEntity {
         } else {
             Sound::EntityGoatEat
         };
-        let pitch = random_between(&mut self.get_random(), 0.8, 1.2);
-        entity.world.load().play_sound_fine(
+        // `Mth.randomBetween(this.level().getRandom(), 0.8F, 1.2F)`.
+        let world = entity.world.load();
+        let pitch = random_between(
+            &mut *world
+                .random
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+            0.8,
+            1.2,
+        );
+        world.play_sound_fine(
             sound,
             SoundCategory::Neutral,
             &entity.pos.load(),
@@ -402,15 +419,22 @@ impl Mob for GoatEntity {
     /// Vanilla `Goat.finalizeSpawn`, then `AgeableMob`'s and `Mob`'s.
     fn finalize_spawn(
         &self,
-        _world: &Arc<World>,
+        world: &Arc<World>,
         group_data: Option<SpawnGroupData>,
     ) -> Option<SpawnGroupData> {
+        // `RandomSource random = level.getRandom()`, locked per draw.
+        let level_random = || {
+            world
+                .random
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+        };
         self.mob_entity.with_brain(self, goat_ai::init_memories);
-        let mut random = self.get_random();
-        self.set_screaming(random.random::<f64>() < GOAT_SCREAMING_CHANCE);
+        let screaming = level_random().next_f64() < GOAT_SCREAMING_CHANCE;
+        self.set_screaming(screaming);
         self.age_boundary_reached();
-        if !self.is_baby() && random.random::<f32>() < UNIHORN_CHANCE {
-            if random.random::<bool>() {
+        if !self.is_baby() && level_random().next_f32() < UNIHORN_CHANCE {
+            if level_random().next_bool() {
                 self.set_has_left_horn(false);
             } else {
                 self.set_has_right_horn(false);

@@ -8,7 +8,7 @@ use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_util::GameMode;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::EntityBase;
 use crate::entity::ai::brain::activity::ActivityData;
@@ -232,9 +232,21 @@ fn throw_item(tick: &mut BrainTick<'_>, target_pos: Vector3<f64>) {
         THROW_HAND_Y_DISTANCE_FROM_EYE,
     );
     // TODO: `CriteriaTriggers.ALLAY_DROP_ITEM_ON_BLOCK` for the liked player.
-    let mut random = tick.mob.get_random();
-    if tick.time % 7 == 0 && random.random::<f64>() < 0.9 {
-        let pitch = THROW_SOUND_PITCHES[random.random_range(0..THROW_SOUND_PITCHES.len())];
+    // `level.getRandom()` for both the roll and `Util.getRandom` over the pitches.
+    let pitch = (tick.time % 7 == 0)
+        .then(|| {
+            let mut random = tick
+                .world
+                .random
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            (random.next_f64() < 0.9).then(|| {
+                THROW_SOUND_PITCHES
+                    [random.next_bounded_i32(THROW_SOUND_PITCHES.len() as i32) as usize]
+            })
+        })
+        .flatten();
+    if let Some(pitch) = pitch {
         tick.world.play_sound_fine(
             Sound::EntityAllayItemThrown,
             SoundCategory::Neutral,

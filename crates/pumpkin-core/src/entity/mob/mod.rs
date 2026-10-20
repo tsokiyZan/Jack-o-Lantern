@@ -41,9 +41,8 @@ use pumpkin_util::math::boundingbox::{BoundingBox, EntityDimensions};
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
 use pumpkin_util::random::xoroshiro128::Xoroshiro;
-use pumpkin_util::random::{RandomGenerator, get_seed};
+use pumpkin_util::random::{RandomGenerator, RandomImpl, get_seed};
 use pumpkin_util::version::JavaMinecraftVersion;
-use rand::RngExt;
 use std::sync::Arc;
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU8, Ordering};
@@ -1139,7 +1138,7 @@ impl MobEntity {
         // `noActionTime` (and so stops strolling) once no player is near.
         if !is_persistent
             && self.living_entity.no_action_time.load(Relaxed) > 600
-            && rand::random_range(0..800) == 0
+            && entity.random().next_bounded_i32(800) == 0
             && dist_sqr > no_despawn_distance * no_despawn_distance
             && mob.remove_when_far_away(dist_sqr)
         {
@@ -1198,10 +1197,6 @@ pub trait Mob: EntityBase + Send + Sync {
         LivingEntity::get_comfortable_fall_distance(sacrifice as f32)
     }
 
-    fn get_random(&self) -> rand::rngs::ThreadRng {
-        rand::rng()
-    }
-
     /// Vanilla `Mob.getAmbientSound`.
     fn ambient_sound(&self) -> Option<Sound> {
         sounds::ambient_sound(self.get_entity().entity_type)
@@ -1224,6 +1219,21 @@ pub trait Mob: EntityBase + Send + Sync {
         self.get_mob_entity()
             .ambient_sound_time
             .store(-self.ambient_sound_interval(), Relaxed);
+    }
+
+    /// The ambient-sound roll of vanilla `Mob.baseTick` (Mob.java:288), after
+    /// `super.baseTick()` and before `LivingEntity.tick` reaches `aiStep`. `isAlive`
+    /// includes health.
+    fn mob_base_tick(&self) {
+        let mob_entity = self.get_mob_entity();
+        if !mob_entity.living_entity.is_alive() {
+            return;
+        }
+        let roll = self.get_entity().random().next_bounded_i32(1000);
+        if roll < mob_entity.ambient_sound_time.fetch_add(1, Relaxed) {
+            self.reset_ambient_sound_time();
+            self.play_ambient_sound();
+        }
     }
 
     /// Vanilla `LivingEntity.getSoundVolume`.
@@ -1302,14 +1312,16 @@ pub trait Mob: EntityBase + Send + Sync {
         } else {
             1.0
         };
-        let mut random = self.get_random();
+        let mut random = self.get_entity().random();
         // Vanilla rounds the product before adding, so no fused multiply-add.
-        (random.random::<f32>() - random.random::<f32>()) * 0.2 + base
+        (random.next_f32() - random.next_f32()) * 0.2 + base
     }
 
     /// Vanilla `LivingEntity.makeSound`, through `Entity.playSound`, which a silent
-    /// entity skips.
+    /// entity skips. `getVoicePitch()` is an argument, so its draws happen even then.
     fn make_sound(&self, sound: Sound) {
+        let volume = self.sound_volume();
+        let pitch = self.voice_pitch();
         let entity = self.get_entity();
         if entity.is_silent() {
             return;
@@ -1318,8 +1330,8 @@ pub trait Mob: EntityBase + Send + Sync {
             sound,
             self.sound_source(),
             &entity.pos.load(),
-            self.sound_volume(),
-            self.voice_pitch(),
+            volume,
+            pitch,
         );
     }
 
@@ -2684,7 +2696,7 @@ pub fn mob_base_experience_reward<M: Mob + ?Sized>(mob: &M) -> u32 {
             && !mob_entity.get_item_slot(slot).is_empty()
             && mob_entity.drop_chance(slot) <= 1.0
         {
-            result += 1 + mob.get_random().random_range(0..3);
+            result += 1 + mob.get_entity().random().next_bounded_i32(3) as u32;
         }
     }
     result
@@ -2861,19 +2873,11 @@ impl<T: Mob + Send + 'static> EntityBase for T {
             neutral.update_persistent_anger();
         }
 
-        // The ambient-sound part of vanilla `Mob.baseTick`; `isAlive` includes health.
-        if mob_entity.living_entity.is_alive()
-            && self.get_random().random_range(0..1000)
-                < mob_entity.ambient_sound_time.fetch_add(1, Relaxed)
-        {
-            self.reset_ambient_sound_time();
-            self.play_ambient_sound();
-        }
-
         self.mob_tick(caller);
 
         // Vanilla Mob.isEffectiveAi: NoAI skips the whole serverAiStep, which
-        // `LivingEntity::tick_movement` runs at its vanilla place in `aiStep`.
+        // `LivingEntity::tick_movement` runs at its vanilla place in `aiStep`. The
+        // ambient-sound roll of `Mob.baseTick` runs inside it too, via `mob_base_tick`.
         mob_entity.living_entity.tick(caller, server);
         self.post_tick();
     }

@@ -20,6 +20,7 @@ use pumpkin_data::tracked_data::{self, TrackedData};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::codec::var_int::VarInt;
 use pumpkin_util::math::boundingbox::EntityDimensions;
+use pumpkin_util::random::RandomImpl;
 use rand::RngExt;
 use uuid::Uuid;
 
@@ -297,8 +298,11 @@ impl TraderLlamaEntity {
         spit.thrown.set_velocity(dx, dy + yo, dz, 1.5, 10.0);
 
         if !entity.silent.load(Ordering::Relaxed) {
-            let mut rng = rand::rng();
-            let pitch = 1.0 + (rng.random::<f32>() - rng.random::<f32>()) * 0.2;
+            // `1.0F + (this.random.nextFloat() - this.random.nextFloat()) * 0.2F`.
+            let pitch = {
+                let mut random = entity.random();
+                1.0 + (random.next_f32() - random.next_f32()) * 0.2
+            };
             world.play_sound_fine(
                 Sound::EntityLlamaSpit,
                 SoundCategory::Neutral,

@@ -1059,11 +1059,20 @@ impl VillagerEntity {
     }
 
     fn work_at_job_site(&self, game_time: i64, day_time: i64, day: i64) {
-        use rand::RngExt;
+        use pumpkin_util::random::RandomImpl;
 
+        // `WorkAtPoi.checkExtraStartConditions`: `level.getRandom().nextInt(2) != 0` skips.
         if !(2_000..9_000).contains(&day_time)
             || game_time - self.last_worked_at_poi.load(Ordering::Relaxed) < 300
-            || !rand::rng().random_bool(0.5)
+            || self
+                .get_entity()
+                .world
+                .load()
+                .random
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .next_bounded_i32(2)
+                != 0
         {
             return;
         }

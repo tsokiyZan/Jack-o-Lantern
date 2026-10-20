@@ -2,7 +2,7 @@ use std::sync::atomic::Ordering;
 
 use pumpkin_data::entity::EntityPose;
 use pumpkin_data::sound::{Sound, SoundCategory};
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use super::super::BrainTick;
 use super::super::memory::{MemoryModuleId, MemoryStatus, types};
@@ -77,7 +77,13 @@ impl Behavior for LongJumpMidJump {
         tick.mob.set_pose(EntityPose::Standing);
         tick.brain.erase(types::LONG_JUMP_MID_JUMP.id());
         let (min, max) = self.time_between_long_jumps;
-        let cooldown = tick.mob.get_random().random_range(min..=max);
+        // `timeBetweenLongJumps.sample(level.getRandom())` (LongJumpMidJump.java:42), UniformInt.
+        let cooldown = tick
+            .world
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .next_int_between_inclusive(min, max);
         tick.brain.set(types::LONG_JUMP_COOLDOWN_TICKS, cooldown);
     }
 

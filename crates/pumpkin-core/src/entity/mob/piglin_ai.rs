@@ -10,7 +10,6 @@ use pumpkin_util::Hand;
 use pumpkin_util::math::vector3::Vector3;
 use pumpkin_util::random::RandomImpl;
 use pumpkin_util::random::legacy_rand::LegacyRand;
-use rand::RngExt;
 
 use crate::entity::ai::brain::activity::ActivityData;
 use crate::entity::ai::brain::behavior::one_shot::OneShot;
@@ -74,9 +73,22 @@ const BARTERING_LOOT_TABLE: &str = "minecraft:gameplay/piglin_bartering";
 pub const THROW_SPEED: f64 = 0.3;
 pub const THROW_HAND_Y_DISTANCE_FROM_EYE: f64 = 0.3;
 
+/// Vanilla `UniformInt.sample`: `Mth.randomBetweenInclusive`, one draw.
 #[must_use]
-pub fn sample(range: (i32, i32), rng: &mut impl RngExt) -> i32 {
-    range.0 + rng.random_range(0..(range.1 + 1 - range.0).max(1))
+pub fn sample_uniform(range: (i32, i32), rng: &mut impl RandomImpl) -> i32 {
+    rng.next_int_between_inclusive(range.0, range.1)
+}
+
+/// [`sample_uniform`] on the level's random, vanilla's `body.level().getRandom()`.
+#[must_use]
+pub fn sample_level(range: (i32, i32), world: &World) -> i32 {
+    sample_uniform(
+        range,
+        &mut *world
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
+    )
 }
 
 #[must_use]
@@ -224,13 +236,14 @@ pub fn eat(brain: &mut Brain) {
     brain.set_with_expiry(types::ATE_RECENTLY, true, EAT_COOLDOWN);
 }
 
-pub fn init_memories(brain: &mut Brain, rng: &mut impl RngExt) {
-    let delay = sample(TIME_BETWEEN_HUNTS, rng);
+/// Vanilla `initMemories`, called with `level.getRandom()`.
+pub fn init_memories(brain: &mut Brain, world: &World) {
+    let delay = sample_level(TIME_BETWEEN_HUNTS, world);
     brain.set_with_expiry(types::HUNTED_RECENTLY, true, i64::from(delay));
 }
 
-pub fn dont_kill_any_more_hoglins_for_a_while(brain: &mut Brain, rng: &mut impl RngExt) {
-    let delay = sample(TIME_BETWEEN_HUNTS, rng);
+pub fn dont_kill_any_more_hoglins_for_a_while(brain: &mut Brain, world: &World) {
+    let delay = sample_level(TIME_BETWEEN_HUNTS, world);
     brain.set_with_expiry(types::HUNTED_RECENTLY, true, i64::from(delay));
 }
 
@@ -356,7 +369,6 @@ pub fn set_anger_target(
     ctx_world: &Arc<World>,
     mob: &dyn Mob,
     target: &Arc<dyn EntityBase>,
-    rng: &mut impl RngExt,
 ) {
     let attackable = {
         let ctx = VisibilityContext {
@@ -386,7 +398,7 @@ pub fn set_anger_target(
             .downcast_ref::<PiglinEntity>()
             .is_some_and(PiglinEntity::can_hunt)
     {
-        dont_kill_any_more_hoglins_for_a_while(brain, rng);
+        dont_kill_any_more_hoglins_for_a_while(brain, ctx_world);
     }
     if target_type == &EntityType::PLAYER && ctx_world.level_info.load().game_rules.universal_anger
     {
@@ -396,15 +408,15 @@ pub fn set_anger_target(
 
 pub fn set_avoid_target_and_dont_hunt_for_a_while(
     brain: &mut Brain,
+    world: &World,
     target: Arc<dyn EntityBase>,
-    rng: &mut impl RngExt,
 ) {
     brain.erase(types::ANGRY_AT.id());
     brain.erase(types::ATTACK_TARGET.id());
     brain.erase(types::WALK_TARGET.id());
-    let duration = sample(RETREAT_DURATION, rng);
+    let duration = sample_level(RETREAT_DURATION, world);
     brain.set_with_expiry(types::AVOID_TARGET, target, i64::from(duration));
-    dont_kill_any_more_hoglins_for_a_while(brain, rng);
+    dont_kill_any_more_hoglins_for_a_while(brain, world);
 }
 
 /// Queues `set_anger_target` on every nearby adult piglin; vanilla writes them inline.
@@ -447,8 +459,7 @@ fn set_anger_target_if_closer_than_current(
         return;
     }
     let world = Arc::clone(tick.world);
-    let mut rng = tick.mob.get_random();
-    set_anger_target(tick.brain, &world, tick.mob, &nearest, &mut rng);
+    set_anger_target(tick.brain, &world, tick.mob, &nearest);
 }
 
 pub fn broadcast_universal_anger(tick: &mut BrainTick<'_>) {
@@ -467,8 +478,7 @@ pub fn broadcast_universal_anger(tick: &mut BrainTick<'_>) {
             };
             let player = player as Arc<dyn EntityBase>;
             let world = Arc::clone(tick.world);
-            let mut rng = tick.mob.get_random();
-            set_anger_target(tick.brain, &world, tick.mob, &player, &mut rng);
+            set_anger_target(tick.brain, &world, tick.mob, &player);
         }));
     }
 }
@@ -479,7 +489,6 @@ pub fn broadcast_retreat(tick: &mut BrainTick<'_>, target: &Arc<dyn EntityBase>)
         .get(types::NEAREST_VISIBLE_ADULT_PIGLINS)
         .cloned()
         .unwrap_or_default();
-    let seed = tick.time;
     for other in visible {
         if as_piglin(other.as_ref()).is_none() {
             continue;
@@ -490,30 +499,22 @@ pub fn broadcast_retreat(tick: &mut BrainTick<'_>, target: &Arc<dyn EntityBase>)
         let target = Arc::clone(target);
         let body = Arc::clone(&other);
         mob_entity.post_to_brain(Box::new(move |tick| {
-            retreat_from_nearest_target(tick.brain, body.as_ref(), target, seed);
+            retreat_from_nearest_target(tick.brain, tick.world, body.as_ref(), target);
         }));
     }
 }
 
 fn retreat_from_nearest_target(
     brain: &mut Brain,
+    world: &World,
     body: &dyn EntityBase,
     new_avoid_target: Arc<dyn EntityBase>,
-    seed: i64,
 ) {
     let mut nearest = new_avoid_target;
     nearest = get_nearest_target(body, brain.get(types::AVOID_TARGET).cloned(), nearest);
     nearest = get_nearest_target(body, brain.get(types::ATTACK_TARGET).cloned(), nearest);
-    let _ = seed;
-    let duration =
-        RETREAT_DURATION.0 + rand::random_range(0..RETREAT_DURATION.1 + 1 - RETREAT_DURATION.0);
-    brain.erase(types::ANGRY_AT.id());
-    brain.erase(types::ATTACK_TARGET.id());
-    brain.erase(types::WALK_TARGET.id());
-    brain.set_with_expiry(types::AVOID_TARGET, nearest, i64::from(duration));
-    let hunt_delay = TIME_BETWEEN_HUNTS.0
-        + rand::random_range(0..TIME_BETWEEN_HUNTS.1 + 1 - TIME_BETWEEN_HUNTS.0);
-    brain.set_with_expiry(types::HUNTED_RECENTLY, true, i64::from(hunt_delay));
+    // `setAvoidTargetAndDontHuntForAWhile`.
+    set_avoid_target_and_dont_hunt_for_a_while(brain, world, nearest);
 }
 
 #[must_use]
@@ -732,15 +733,14 @@ pub fn start_hunting_hoglin() -> OneShot {
             };
 
             let world = Arc::clone(tick.world);
-            let mut rng = tick.mob.get_random();
-            set_anger_target(tick.brain, &world, tick.mob, &target, &mut rng);
-            dont_kill_any_more_hoglins_for_a_while(tick.brain, &mut rng);
+            set_anger_target(tick.brain, &world, tick.mob, &target);
+            dont_kill_any_more_hoglins_for_a_while(tick.brain, &world);
             broadcast_anger_target(tick, &target);
             for other in nearby {
                 let Some(mob_entity) = other.as_mob_entity() else {
                     continue;
                 };
-                let delay = sample(TIME_BETWEEN_HUNTS, &mut rng);
+                let delay = sample_level(TIME_BETWEEN_HUNTS, &world);
                 mob_entity.post_to_brain(Box::new(move |tick| {
                     tick.brain
                         .set_with_expiry(types::HUNTED_RECENTLY, true, i64::from(delay));
@@ -775,7 +775,7 @@ pub fn remember_if_hoglin_was_killed() -> OneShot {
                     && is_dead_or_dying(target.as_ref())
             });
             if killed_hoglin {
-                let delay = sample(TIME_BETWEEN_HUNTS, &mut tick.mob.get_random());
+                let delay = sample_level(TIME_BETWEEN_HUNTS, tick.world);
                 tick.brain
                     .set_with_expiry(types::HUNTED_RECENTLY, true, i64::from(delay));
             }
@@ -978,12 +978,15 @@ fn throw_items_toward_pos(piglin: &PiglinEntity, stacks: Vec<ItemStack>, target:
         if stack.is_empty() {
             continue;
         }
-        let item_entity = ItemEntity::new_with_velocity(
+        // `BehaviorUtils.throwItem`: the 5-argument `new ItemEntity(level, x, y, z, item)`
+        // takes its own random velocity draws, then `setDeltaMovement` replaces the velocity
+        // (BehaviorUtils.java:98-103).
+        let item_entity = ItemEntity::new(
             Entity::new(world.clone(), hand_pos, &EntityType::ITEM),
             stack,
-            velocity,
-            ItemEntity::DEFAULT_PICKUP_DELAY,
         );
+        item_entity.get_entity().velocity.store(velocity);
+        item_entity.set_pickup_delay(ItemEntity::DEFAULT_PICKUP_DELAY);
         world.spawn_entity(Arc::new(item_entity));
     }
 }
@@ -1025,7 +1028,6 @@ pub fn was_hurt_by(
         tick.brain.erase(types::AVOID_TARGET.id());
     }
 
-    let mut rng = tick.mob.get_random();
     if piglin.is_baby() {
         tick.brain.set_with_expiry(
             types::AVOID_TARGET,
@@ -1042,7 +1044,8 @@ pub fn was_hurt_by(
         return;
     }
     if attacker_type == &EntityType::HOGLIN && hoglins_outnumber_piglins(tick.brain) {
-        set_avoid_target_and_dont_hunt_for_a_while(tick.brain, Arc::clone(attacker), &mut rng);
+        let world = Arc::clone(tick.world);
+        set_avoid_target_and_dont_hunt_for_a_while(tick.brain, &world, Arc::clone(attacker));
         broadcast_retreat(tick, attacker);
         return;
     }
@@ -1074,20 +1077,19 @@ pub fn maybe_retaliate(tick: &mut BrainTick<'_>, attacker: &Arc<dyn EntityBase>)
     }
 
     let world = Arc::clone(tick.world);
-    let mut rng = tick.mob.get_random();
     if attacker.get_entity().entity_type == &EntityType::PLAYER
         && world.level_info.load().game_rules.universal_anger
     {
         match get_nearest_visible_targetable_player(tick.brain) {
             Some(player) => {
                 let player = player as Arc<dyn EntityBase>;
-                set_anger_target(tick.brain, &world, tick.mob, &player, &mut rng);
+                set_anger_target(tick.brain, &world, tick.mob, &player);
             }
-            None => set_anger_target(tick.brain, &world, tick.mob, attacker, &mut rng),
+            None => set_anger_target(tick.brain, &world, tick.mob, attacker),
         }
         broadcast_universal_anger(tick);
     } else {
-        set_anger_target(tick.brain, &world, tick.mob, attacker, &mut rng);
+        set_anger_target(tick.brain, &world, tick.mob, attacker);
         broadcast_anger_target(tick, attacker);
     }
 }
@@ -1210,7 +1212,15 @@ fn baby_sometimes_ride_baby_hoglin() -> Box<dyn BehaviorControl> {
                 .cast_any()
                 .downcast_ref::<PiglinEntity>()
                 .is_some_and(PiglinEntity::is_baby);
-            is_baby && ticker.tick_down_and_check(&mut tick.mob.get_random())
+            // `ticker.tickDownAndCheck(e.level().getRandom())` (PiglinAi:659).
+            is_baby
+                && ticker.tick_down_and_check(
+                    &mut *tick
+                        .world
+                        .random
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner),
+                )
         },
         types::NEAREST_VISIBLE_BABY_HOGLIN,
         types::RIDE_TARGET,

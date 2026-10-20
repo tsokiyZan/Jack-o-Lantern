@@ -8,6 +8,7 @@ use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::Sound;
 use pumpkin_data::tracked_data;
 use pumpkin_nbt::compound::NbtCompound;
+use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
 use pumpkin_util::text::TextComponent;
 
@@ -15,10 +16,11 @@ use crate::entity::EntityBase;
 use crate::entity::ai::goal::{Controls, Goal};
 use crate::entity::ai::pathfinder::NavigatorGoal;
 use crate::entity::ai::pathfinder::path::Path;
+use crate::entity::ai::util::default_random_pos;
 use crate::entity::item::ItemEntity;
 use crate::entity::mob::Mob;
 use crate::entity::mob::patrol::{PatrolData, PatrollingMonster};
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 use std::collections::HashMap;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -431,7 +433,7 @@ fn pick_up_banner(mob: &dyn Mob, banner: &dyn EntityBase) {
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .get(&EquipmentSlot::HEAD);
     let drop_chance = mob_entity.drop_chance(&EquipmentSlot::HEAD);
-    if !current.is_empty() && (mob.get_random().random::<f32>() - 0.1).max(0.0) < drop_chance {
+    if !current.is_empty() && (entity.random().next_f32() - 0.1).max(0.0) < drop_chance {
         entity.spawn_at_location(current);
     }
     let count = u32::from(stack.item_count);
@@ -473,68 +475,180 @@ impl Goal for RaiderCelebrationGoal {
         }
     }
 
+    /// Vanilla `Raider.RaiderCelebration.tick`.
     fn tick(&mut self, mob: &dyn Mob) {
         let Some(raider) = mob.as_raider() else {
             return;
         };
         let entity = mob.get_entity();
-        let pos = entity.pos.load();
-        let world = entity.world.load();
 
-        let r: f32 = rand::random();
-        if r < 0.02 && !entity.silent.load(Ordering::Relaxed) {
-            world.play_sound(
-                raider.get_celebrate_sound(),
-                pumpkin_data::sound::SoundCategory::Hostile,
-                &pos,
-            );
+        if !entity.is_silent() && entity.random().next_bounded_i32(self.get_tick_count(100)) == 0 {
+            mob.make_sound(raider.get_celebrate_sound());
+        }
+
+        if !mob.is_passenger() && entity.random().next_bounded_i32(self.get_tick_count(50)) == 0 {
+            mob.get_mob_entity().jump();
         }
     }
 }
 
-/// Goal for moving through village homes during active raids.
+/// Vanilla `Raider.RaiderMoveThroughVillageGoal`: during a raid, walk from home to home.
+///
+/// Pumpkin keeps no `PoiTypes.HOME` (bed) records, so `PoiManager.getRandom` finds nothing
+/// here and the goal never starts, as in a vanilla village without beds.
 pub struct RaiderMoveThroughVillageGoal {
     speed_modifier: f64,
+    distance_to_poi: i32,
+    poi_pos: BlockPos,
+    visited: Vec<BlockPos>,
+    stuck: bool,
 }
 
 impl RaiderMoveThroughVillageGoal {
     #[must_use]
-    pub const fn new(speed_modifier: f64) -> Self {
-        Self { speed_modifier }
+    pub const fn new(speed_modifier: f64, distance_to_poi: i32) -> Self {
+        Self {
+            speed_modifier,
+            distance_to_poi,
+            poi_pos: BlockPos::ZERO,
+            visited: Vec::new(),
+            stuck: false,
+        }
+    }
+
+    /// Vanilla `isValidRaid`.
+    fn is_valid_raid(mob: &dyn Mob) -> bool {
+        mob.as_raider()
+            .and_then(|raider| active_raid_of(mob, raider))
+            .is_some_and(|(is_over, _)| !is_over)
+    }
+
+    /// Vanilla `hasSuitablePoi`.
+    fn has_suitable_poi(&mut self, mob: &dyn Mob) -> bool {
+        let Some(home_pos) = Self::random_home_poi(mob, |pos| self.has_not_visited(pos)) else {
+            return false;
+        };
+        self.poi_pos = home_pos;
+        true
+    }
+
+    /// Vanilla `PoiManager.getRandom(HOME, filter, ANY, blockPosition(), 48, raider.random)`.
+    /// Pumpkin keeps no home POIs, so none is found, and the shuffle of the empty list
+    /// draws nothing.
+    fn random_home_poi(_mob: &dyn Mob, _filter: impl Fn(&BlockPos) -> bool) -> Option<BlockPos> {
+        None
+    }
+
+    fn has_not_visited(&self, poi: &BlockPos) -> bool {
+        !self.visited.contains(poi)
+    }
+
+    /// Vanilla `updateVisited`.
+    fn update_visited(&mut self) {
+        if self.visited.len() > 2 {
+            self.visited.remove(0);
+        }
+    }
+
+    /// Vanilla `BlockPos.closerToCenterThan(position, distance)`.
+    fn poi_closer_to_center_than(&self, position: Vector3<f64>, distance: f64) -> bool {
+        self.poi_pos
+            .to_centered_f64()
+            .squared_distance_to_vec(&position)
+            < distance * distance
+    }
+
+    /// Vanilla `navigation.moveTo(x, y, z, speedModifier)`.
+    fn move_to(&self, mob: &dyn Mob, target: Vector3<f64>) {
+        mob.get_mob_entity()
+            .navigator
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .set_progress(NavigatorGoal::new(
+                mob.get_entity().pos.load(),
+                target,
+                self.speed_modifier,
+            ));
     }
 }
 
 impl Goal for RaiderMoveThroughVillageGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
-        let Some(raider) = mob.as_raider() else {
-            return false;
-        };
-        if !raider.has_active_raid() {
+        self.update_visited();
+        Self::is_valid_raid(mob)
+            && self.has_suitable_poi(mob)
+            && mob.get_mob_entity().get_target().is_none()
+    }
+
+    fn should_continue(&mut self, mob: &dyn Mob) -> bool {
+        if mob.is_navigator_idle() {
             return false;
         }
-        let target = mob.get_mob_entity().get_target().clone();
-        target.is_none()
+        let distance = f64::from(mob.get_entity().width()) + f64::from(self.distance_to_poi);
+        mob.get_mob_entity().get_target().is_none()
+            && !self.poi_closer_to_center_than(mob.get_entity().pos.load(), distance)
+            && !self.stuck
+    }
+
+    fn start(&mut self, mob: &dyn Mob) {
+        mob.get_mob_entity()
+            .living_entity
+            .no_action_time
+            .store(0, Ordering::Relaxed);
+        let poi = self.poi_pos.0;
+        self.move_to(
+            mob,
+            Vector3::new(f64::from(poi.x), f64::from(poi.y), f64::from(poi.z)),
+        );
+        self.stuck = false;
+    }
+
+    fn stop(&mut self, mob: &dyn Mob) {
+        if self
+            .poi_closer_to_center_than(mob.get_entity().pos.load(), f64::from(self.distance_to_poi))
+        {
+            self.visited.push(self.poi_pos);
+        }
     }
 
     fn controls(&self) -> Controls {
         Controls::MOVE
     }
 
+    /// Vanilla `tick` (Raider.java:539-554): `DefaultRandomPos.getPosTowards` on the
+    /// raider's own random, narrow first and then wide.
     fn tick(&mut self, mob: &dyn Mob) {
-        let entity = mob.get_entity();
-        let pos = entity.pos.load();
-        let mut nav = mob
-            .get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-
-        if nav.is_idle() {
-            let dx: f64 = (rand::random::<f64>() - 0.5) * 32.0;
-            let dz: f64 = (rand::random::<f64>() - 0.5) * 32.0;
-            let dest = Vector3::new(pos.x + dx, pos.y, pos.z + dz);
-            nav.set_progress(NavigatorGoal::new(pos, dest, self.speed_modifier));
+        if !mob.is_navigator_idle() {
+            return;
         }
+        // `Vec3.atBottomCenterOf(poiPos)`.
+        let poi = self.poi_pos.0;
+        let poi_vec = Vector3::new(
+            f64::from(poi.x) + 0.5,
+            f64::from(poi.y),
+            f64::from(poi.z) + 0.5,
+        );
+        let next_pos = default_random_pos::get_pos_towards(
+            mob,
+            16,
+            7,
+            poi_vec,
+            f64::from(std::f32::consts::PI / 10.0),
+        )
+        .or_else(|| {
+            default_random_pos::get_pos_towards(
+                mob,
+                8,
+                7,
+                poi_vec,
+                f64::from(std::f32::consts::FRAC_PI_2),
+            )
+        });
+        let Some(next_pos) = next_pos else {
+            self.stuck = true;
+            return;
+        };
+        self.move_to(mob, next_pos);
     }
 }
 
@@ -551,7 +665,7 @@ pub fn add_raider_goals(goal_selector: &mut crate::entity::ai::goal::goal_select
     );
     goal_selector.add_goal(1, Box::new(ObtainRaidLeaderBannerGoal::default()));
     goal_selector.add_goal(3, Box::new(PathfindToRaidGoal::default()));
-    goal_selector.add_goal(4, Box::new(RaiderMoveThroughVillageGoal::new(1.05)));
+    goal_selector.add_goal(4, Box::new(RaiderMoveThroughVillageGoal::new(1.05, 1)));
     goal_selector.add_goal(5, Box::new(RaiderCelebrationGoal));
 }
 

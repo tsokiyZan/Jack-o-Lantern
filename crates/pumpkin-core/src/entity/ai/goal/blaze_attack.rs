@@ -1,7 +1,7 @@
-use crate::entity::ai::util::RandomExt;
 use pumpkin_data::attributes::Attributes;
 use pumpkin_data::world::WorldEvent;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 use std::sync::Arc;
 
 use crate::entity::{
@@ -164,12 +164,12 @@ fn shoot_fireball(blaze: &BlazeEntity, dx: f64, yd: f64, dz: f64, distance_sq: f
         world.sync_world_event(WorldEvent::SoundBlazeFireball, entity.block_pos.load(), 0);
     }
 
-    let mut random = blaze.get_random();
-    let direction = Vector3::new(
-        random.triangle(dx, 2.297 * sqd),
-        yd,
-        random.triangle(dz, 2.297 * sqd),
-    );
+    let direction = {
+        let mut random = entity.random();
+        let x = random.next_triangular(dx, 2.297 * sqd);
+        let z = random.next_triangular(dz, 2.297 * sqd);
+        Vector3::new(x, yd, z)
+    };
     let base_entity = Entity::from_uuid(
         uuid::Uuid::new_v4(),
         world.clone(),

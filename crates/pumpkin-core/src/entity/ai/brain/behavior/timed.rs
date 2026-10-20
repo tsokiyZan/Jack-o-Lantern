@@ -1,4 +1,4 @@
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use super::super::BrainTick;
 use super::super::memory::{MemoryModuleId, MemoryStatus};
@@ -108,11 +108,14 @@ impl<B: Behavior> BehaviorControl for Timed<B> {
         }
         let min = self.inner.min_duration();
         let max = self.inner.max_duration();
+        // `minDuration + level.getRandom().nextInt(maxDuration + 1 - minDuration)` (Behavior.java:47).
         let duration = min
             + tick
-                .mob
-                .get_random()
-                .random_range(0..(max + 1 - min).max(1));
+                .world
+                .random
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .next_bounded_i32((max + 1 - min).max(1));
         self.start_at(tick.time, duration);
         self.inner.start(tick);
         true

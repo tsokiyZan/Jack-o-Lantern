@@ -11,7 +11,7 @@ use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_util::math::position::BlockPos;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 use uuid::Uuid;
 
 use super::frog::{self, FrogEntity};
@@ -49,7 +49,13 @@ const PREFERRED_BLOCKS_CHANCE: f32 = 0.5;
 /// Vanilla `FrogAi.initMemories`.
 pub fn init_memories(tick: &mut BrainTick<'_>) {
     let (min, max) = TIME_BETWEEN_LONG_JUMPS;
-    let cooldown = tick.mob.get_random().random_range(min..=max);
+    // `FrogAi.initMemories(frog, level.getRandom())`: the level's random.
+    let cooldown = tick
+        .world
+        .random
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .next_int_between_inclusive(min, max);
     tick.brain.set(types::LONG_JUMP_COOLDOWN_TICKS, cooldown);
 }
 

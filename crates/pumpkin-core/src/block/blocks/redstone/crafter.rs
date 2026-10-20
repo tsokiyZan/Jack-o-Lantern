@@ -220,9 +220,11 @@ impl CrafterBlock {
                 triangle(&mut rng(), facing_normal.z * rd, 0.017_227_5 * 6.),
             );
 
-            let item_entity = Arc::new(ItemEntity::new_with_velocity(
-                entity, drop_stack, velocity, 40,
-            ));
+            // Vanilla `new ItemEntity(level, x, y, z, stack)` takes the item's own two
+            // velocity draws before `setDeltaMovement` replaces them.
+            let item_entity = Arc::new(ItemEntity::new(entity, drop_stack));
+            item_entity.get_entity().velocity.store(velocity);
+            item_entity.set_pickup_delay(40);
             world.spawn_entity(item_entity);
 
             world.sync_world_event(WorldEvent::SoundCrafterCraft, *pos, 0);

@@ -19,6 +19,7 @@ use pumpkin_protocol::java::client::play::{CEntityVelocity, CSoundEffect};
 use pumpkin_util::math::boundingbox::BoundingBox;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 
 use super::arrow::ArrowPickup;
 use super::{ProjectileHit, calculate_ray_intersection};
@@ -125,17 +126,18 @@ impl TridentEntity {
     }
 
     pub fn set_velocity(&self, x: f64, y: f64, z: f64, power: f64, uncertainty: f64) {
-        fn next_triangular(mode: f64, deviation: f64) -> f64 {
-            deviation * (rand::random::<f64>() - rand::random::<f64>()) + mode
-        }
-
+        // Vanilla `Projectile.getMovementToShoot`: three `random.triangle`s from the
+        // projectile's random.
+        let (dx, dy, dz) = {
+            let mut random = self.entity.random();
+            let dx = random.next_triangular(0.0, 0.017_227_5 * uncertainty);
+            let dy = random.next_triangular(0.0, 0.017_227_5 * uncertainty);
+            let dz = random.next_triangular(0.0, 0.017_227_5 * uncertainty);
+            (dx, dy, dz)
+        };
         let velocity = Vector3::new(x, y, z)
             .normalize()
-            .add_raw(
-                next_triangular(0.0, 0.017_227_5 * uncertainty),
-                next_triangular(0.0, 0.017_227_5 * uncertainty),
-                next_triangular(0.0, 0.017_227_5 * uncertainty),
-            )
+            .add_raw(dx, dy, dz)
             .multiply(power, power, power);
 
         self.entity.velocity.store(velocity);

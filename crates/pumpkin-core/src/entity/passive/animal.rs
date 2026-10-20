@@ -24,7 +24,7 @@ use crate::entity::{
 use crate::world::World;
 use pumpkin_protocol::bedrock::server::actor_event::ActorEventID;
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 use uuid::Uuid;
 
 /// Vanilla `Animal`'s constructor: animals keep clear of fire.
@@ -85,7 +85,7 @@ pub trait Animal: Mob {
 
     /// Vanilla `Animal.getBaseExperienceReward`.
     fn animal_base_experience_reward(&self) -> u32 {
-        1 + self.get_random().random_range(0..3)
+        1 + self.get_entity().random().next_bounded_i32(3) as u32
     }
 
     /// Vanilla `Mob.usePlayerItem`, short of the `use_remainder` component.
@@ -199,7 +199,12 @@ pub fn get_dye_color_from_item(item: &pumpkin_data::item::Item) -> Option<u8> {
 #[must_use]
 pub fn get_mixed_color(world: &World, color1: DyeColor, color2: DyeColor) -> DyeColor {
     find_color_mix_in_recipes(world, color1, color2).unwrap_or_else(|| {
-        if rand::random::<bool>() {
+        if world
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .next_bool()
+        {
             color1
         } else {
             color2

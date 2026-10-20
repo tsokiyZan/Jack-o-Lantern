@@ -14,6 +14,7 @@ use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::codec::item_stack_seralizer::ItemStackSerializer;
 use pumpkin_protocol::java::client::play::{CSetEntityMetadata, Metadata};
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 
 /// An item frame or glow item frame.
 ///
@@ -262,7 +263,7 @@ impl ItemFrameEntity {
 
         if !item_stack.is_empty() {
             let drop_chance = self.item_drop_chance.load();
-            if rand::random::<f32>() < drop_chance {
+            if self.entity.random().next_f32() < drop_chance {
                 world.drop_stack(&pos, item_stack);
             }
         }

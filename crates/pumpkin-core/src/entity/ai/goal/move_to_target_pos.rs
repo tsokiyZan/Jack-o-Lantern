@@ -5,7 +5,7 @@ use crate::entity::{ai::goal::ParentHandle, mob::Mob};
 use crate::world::World;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 use std::sync::Arc;
 
 const GIVE_UP_TICKS: i32 = 1200;
@@ -56,7 +56,7 @@ impl<M: MoveToTargetPos> MoveToTargetPosGoal<M> {
     }
 
     pub fn get_interval(mob: &dyn Mob) -> i32 {
-        to_goal_ticks(INTERVAL_TICKS + mob.get_random().random_range(0..INTERVAL_TICKS))
+        to_goal_ticks(INTERVAL_TICKS + mob.get_entity().random().next_bounded_i32(INTERVAL_TICKS))
     }
 
     pub fn find_target_pos(&mut self, mob: &dyn Mob) -> bool {
@@ -191,8 +191,8 @@ impl<M: MoveToTargetPos> Goal for MoveToTargetPosGoal<M> {
     fn start(&mut self, mob: &dyn Mob) {
         self.move_mob_to_block(mob);
         self.trying_time = 0;
-        let bound = mob.get_random().random_range(0..STAY_TICKS) + STAY_TICKS;
-        self.safe_waiting_time = mob.get_random().random_range(0..bound) + STAY_TICKS;
+        let bound = mob.get_entity().random().next_bounded_i32(STAY_TICKS) + STAY_TICKS;
+        self.safe_waiting_time = mob.get_entity().random().next_bounded_i32(bound) + STAY_TICKS;
     }
 
     fn tick(&mut self, mob: &dyn Mob) {

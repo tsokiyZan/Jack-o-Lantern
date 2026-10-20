@@ -20,7 +20,7 @@ use pumpkin_data::{
 use pumpkin_nbt::{compound::NbtCompound, tag::NbtTag};
 use pumpkin_protocol::codec::var_int::VarInt;
 use pumpkin_util::math::{boundingbox::BoundingBox, position::BlockPos, vector3::Vector3};
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::{
     Entity, EntityBase,
@@ -141,11 +141,11 @@ impl EndermanEntity {
         let entity = &self.mob_entity.living_entity.entity;
         let pos = entity.pos.load();
         let (x, y, z) = {
-            let mut rng = self.get_random();
+            let mut rng = entity.random();
             (
-                pos.x + (rng.random_range(0.0..1.0) - 0.5) * 64.0,
-                pos.y + (rng.random_range(0i32..64) - 32) as f64,
-                pos.z + (rng.random_range(0.0..1.0) - 0.5) * 64.0,
+                pos.x + (rng.next_f64() - 0.5) * 64.0,
+                pos.y + f64::from(rng.next_bounded_i32(64) - 32),
+                pos.z + (rng.next_f64() - 0.5) * 64.0,
             )
         };
 
@@ -166,11 +166,11 @@ impl EndermanEntity {
         .normalize();
         let (nx, ny, nz) = (dir.x, dir.y, dir.z);
         let (x, y, z) = {
-            let mut rng = self.get_random();
+            let mut rng = entity.random();
             (
-                pos.x + (rng.random_range(0.0..1.0) - 0.5) * 8.0 - nx * 16.0,
-                pos.y + (rng.random_range(0i32..16) - 8) as f64 - ny * 16.0,
-                pos.z + (rng.random_range(0.0..1.0) - 0.5) * 8.0 - nz * 16.0,
+                pos.x + (rng.next_f64() - 0.5) * 8.0 - nx * 16.0,
+                pos.y + f64::from(rng.next_bounded_i32(16) - 8) - ny * 16.0,
+                pos.z + (rng.next_f64() - 0.5) * 8.0 - nz * 16.0,
             )
         };
 
@@ -477,7 +477,7 @@ impl Mob for EndermanEntity {
             let br = world.get_light_level_dependent_magic_value(&eye);
             if br > 0.5
                 && world.can_see_sky(&entity.block_pos.load())
-                && self.get_random().random::<f32>() * 30.0 < (br - 0.4) * 2.0
+                && entity.random().next_f32() * 30.0 < (br - 0.4) * 2.0
             {
                 self.set_target(None);
                 self.teleport_randomly();
@@ -557,7 +557,7 @@ impl Mob for EndermanEntity {
             cause,
         );
         if cause.is_none_or(|cause| cause.get_living_entity().is_none())
-            && self.get_random().random_range(0..10) != 0
+            && self.get_entity().random().next_bounded_i32(10) != 0
         {
             self.teleport_randomly();
         }

@@ -7,7 +7,7 @@ use crate::entity::mob::Mob;
 use crate::entity::predicate::EntityPredicate;
 use pumpkin_data::entity::EntityType;
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 use std::sync::{Arc, Weak};
 
 pub struct LookAtEntityGoal {
@@ -92,7 +92,7 @@ impl LookAtEntityGoal {
 
 impl Goal for LookAtEntityGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
-        if mob.get_random().random::<f32>() >= self.chance {
+        if mob.get_entity().random().next_f32() >= self.chance {
             return false;
         }
 
@@ -147,7 +147,7 @@ impl Goal for LookAtEntityGoal {
     }
 
     fn start(&mut self, mob: &dyn Mob) {
-        self.look_time = self.get_tick_count(40 + mob.get_random().random_range(0..40));
+        self.look_time = self.get_tick_count(40 + mob.get_entity().random().next_bounded_i32(40));
     }
 
     fn stop(&mut self, _mob: &dyn Mob) {

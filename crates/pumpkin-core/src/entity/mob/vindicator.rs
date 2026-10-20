@@ -10,7 +10,7 @@ use pumpkin_data::entity::EntityType;
 use pumpkin_data::sound::Sound;
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::Difficulty;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::{
     Entity, EntityBase,
@@ -248,7 +248,11 @@ impl VindicatorBreakDoorGoal {
 impl Goal for VindicatorBreakDoorGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
         has_active_raid(mob)
-            && mob.get_random().random_range(0..to_goal_ticks(10)) == 0
+            && mob
+                .get_entity()
+                .random()
+                .next_bounded_i32(to_goal_ticks(10))
+                == 0
             && self.inner.can_start(mob)
     }
 

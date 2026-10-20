@@ -1,6 +1,6 @@
 use crate::entity::ai::goal::{Controls, Goal};
 use crate::entity::mob::Mob;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 /// Vanilla `RandomStandGoal`: a horse now and then rears up on its own.
 pub struct AmbientStandGoal {
@@ -24,11 +24,12 @@ impl AmbientStandGoal {
 impl Goal for AmbientStandGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
         self.next_stand += 1;
-        if self.next_stand > 0 && mob.get_random().random_range(0..1000) < self.next_stand {
+        if self.next_stand > 0 && mob.get_entity().random().next_bounded_i32(1000) < self.next_stand
+        {
             self.reset_stand_interval(mob);
             // `isImmobile` is `isDeadOrDying` for living entities.
             mob.get_mob_entity().living_entity.health.load() > 0.0
-                && mob.get_random().random_range(0..10) == 0
+                && mob.get_entity().random().next_bounded_i32(10) == 0
         } else {
             false
         }

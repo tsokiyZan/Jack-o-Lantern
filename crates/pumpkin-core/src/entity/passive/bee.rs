@@ -17,8 +17,8 @@ use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_nbt::tag::NbtTag;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 use pumpkin_world::world::BlockFlags;
-use rand::RngExt;
 
 use crate::block::BonemealArgs;
 use crate::block::blocks::plant::crop::next_age_state;
@@ -144,10 +144,9 @@ impl BeeEntity {
             stay_out_of_hive_countdown: AtomicI32::new(0),
             num_crops_grown_since_pollination: AtomicI32::new(0),
             remaining_cooldown_before_locating_new_hive: AtomicI32::new(0),
-            remaining_cooldown_before_locating_new_flower: AtomicI32::new(
-                rand::rng()
-                    .random_range(MIN_FIND_FLOWER_RETRY_COOLDOWN..=MAX_FIND_FLOWER_RETRY_COOLDOWN),
-            ),
+            // Drawn below, after the goals: a field initializer runs after `Mob`'s
+            // constructor has called `registerGoals`.
+            remaining_cooldown_before_locating_new_flower: AtomicI32::new(0),
             saved_flower_pos: AtomicCell::new(None),
             hive_pos: AtomicCell::new(None),
             under_water_ticks: AtomicI32::new(0),
@@ -178,8 +177,8 @@ impl BeeEntity {
                     false,
                 )),
             );
-            goal_selector.add_goal(3, Box::new(ValidateHiveGoal::new()));
-            goal_selector.add_goal(3, Box::new(ValidateFlowerGoal::new()));
+            goal_selector.add_goal(3, Box::new(ValidateHiveGoal::new(&mob_arc.mob_entity)));
+            goal_selector.add_goal(3, Box::new(ValidateFlowerGoal::new(&mob_arc.mob_entity)));
             goal_selector.add_goal(4, Box::new(BeePollinateGoal::default()));
             goal_selector.add_goal(5, Box::new(FollowParentGoal::new(1.25)));
             goal_selector.add_goal(5, Box::new(BeeLocateHiveGoal));
@@ -220,6 +219,9 @@ impl BeeEntity {
             );
             target_selector.add_goal(3, ResetUniversalAngerGoal::new(true));
         };
+
+        // The field's `Mth.nextInt(this.random, 20, 60)`, the same draw `dropFlower` makes.
+        mob_arc.drop_flower();
 
         mob_arc
     }
@@ -320,8 +322,10 @@ impl BeeEntity {
     fn drop_flower(&self) {
         self.saved_flower_pos.store(None);
         self.remaining_cooldown_before_locating_new_flower.store(
-            self.get_random()
-                .random_range(MIN_FIND_FLOWER_RETRY_COOLDOWN..=MAX_FIND_FLOWER_RETRY_COOLDOWN),
+            self.get_entity().random().next_inbetween_i32(
+                MIN_FIND_FLOWER_RETRY_COOLDOWN,
+                MAX_FIND_FLOWER_RETRY_COOLDOWN,
+            ),
             Ordering::Relaxed,
         );
     }
@@ -677,8 +681,8 @@ impl Mob for BeeEntity {
         if has_stung {
             let time_since_sting = self.time_since_sting.fetch_add(1, Ordering::Relaxed) + 1;
             if time_since_sting % 5 == 0
-                && self.get_random().random_range(
-                    0..(STING_DEATH_COUNTDOWN - time_since_sting).clamp(1, STING_DEATH_COUNTDOWN),
+                && self.get_entity().random().next_bounded_i32(
+                    (STING_DEATH_COUNTDOWN - time_since_sting).clamp(1, STING_DEATH_COUNTDOWN),
                 ) == 0
             {
                 let health = self.mob_entity.living_entity.health.load();
@@ -724,6 +728,31 @@ impl Mob for BeeEntity {
         self.set_rolling(should_roll);
         if entity.tick_count.load(Ordering::Relaxed) % 20 == 0 && !self.is_hive_valid() {
             self.set_hive_pos(None);
+        }
+
+        // The rest of vanilla `Bee.tick`: falling-nectar drips. `level.addParticle` does
+        // nothing on a server level, but the random numbers are drawn there too.
+        if self.has_nectar()
+            && self
+                .num_crops_grown_since_pollination
+                .load(Ordering::Relaxed)
+                < MAX_CROPS_GROWABLE
+            && entity.random().next_f32() < 0.05
+        {
+            let world = entity.world.load();
+            let mut i = 0;
+            // `i < this.random.nextInt(2) + 1` draws again on every check.
+            while i < entity.random().next_bounded_i32(2) + 1 {
+                // `spawnFluidParticle`: two `level.getRandom().nextDouble()`s.
+                let mut level_random = world
+                    .random
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                level_random.next_f64();
+                level_random.next_f64();
+                drop(level_random);
+                i += 1;
+            }
         }
     }
 
@@ -792,9 +821,14 @@ struct ValidateHiveGoal {
 }
 
 impl ValidateHiveGoal {
-    fn new() -> Self {
+    /// `VALIDATE_HIVE_COOLDOWN = Mth.nextInt(Bee.this.random, 20, 40)`.
+    fn new(mob_entity: &MobEntity) -> Self {
         Self {
-            validate_hive_cooldown: rand::rng().random_range(20..=40),
+            validate_hive_cooldown: mob_entity
+                .living_entity
+                .entity
+                .random()
+                .next_inbetween_i32(20, 40),
             last_validate_tick: -1,
         }
     }
@@ -835,9 +869,14 @@ struct ValidateFlowerGoal {
 }
 
 impl ValidateFlowerGoal {
-    fn new() -> Self {
+    /// `validateFlowerCooldown = Mth.nextInt(Bee.this.random, 20, 40)`.
+    fn new(mob_entity: &MobEntity) -> Self {
         Self {
-            validate_flower_cooldown: rand::rng().random_range(20..=40),
+            validate_flower_cooldown: mob_entity
+                .living_entity
+                .entity
+                .random()
+                .next_inbetween_i32(20, 40),
             last_validate_tick: -1,
         }
     }
@@ -905,8 +944,10 @@ impl BeePollinateGoal {
         }
         let Some(flower_pos) = self.find_nearby_flower(bee) else {
             bee.remaining_cooldown_before_locating_new_flower.store(
-                bee.get_random()
-                    .random_range(MIN_FIND_FLOWER_RETRY_COOLDOWN..=MAX_FIND_FLOWER_RETRY_COOLDOWN),
+                bee.get_entity().random().next_inbetween_i32(
+                    MIN_FIND_FLOWER_RETRY_COOLDOWN,
+                    MAX_FIND_FLOWER_RETRY_COOLDOWN,
+                ),
                 Ordering::Relaxed,
             );
             return false;
@@ -929,7 +970,7 @@ impl BeePollinateGoal {
             return false;
         }
         if self.has_pollinated_long_enough() {
-            bee.get_random().random::<f32>() < 0.2
+            bee.get_entity().random().next_f32() < 0.2
         } else {
             true
         }
@@ -955,7 +996,7 @@ impl BeePollinateGoal {
     }
 
     fn get_offset(bee: &BeeEntity) -> f32 {
-        (bee.get_random().random::<f32>() * 2.0 - 1.0) * Self::HOVER_POS_OFFSET
+        (bee.get_entity().random().next_f32() * 2.0 - 1.0) * Self::HOVER_POS_OFFSET
     }
 
     /// Vanilla `findNearbyFlower`: the nearest flower by Manhattan order that a path
@@ -1081,8 +1122,9 @@ impl Goal for BeePollinateGoal {
         }
         if arrived_at_hover_pos {
             let should_change_hover_positions = bee
-                .get_random()
-                .random_range(0..Self::POSITION_CHANGE_CHANCE)
+                .get_entity()
+                .random()
+                .next_bounded_i32(Self::POSITION_CHANGE_CHANCE)
                 == 0;
             if should_change_hover_positions {
                 self.hover_pos = Some(Vector3::new(
@@ -1110,7 +1152,7 @@ impl Goal for BeePollinateGoal {
         }
 
         self.successful_pollinating_ticks += 1;
-        if bee.get_random().random::<f32>() < 0.05
+        if bee.get_entity().random().next_f32() < 0.05
             && self.successful_pollinating_ticks > self.last_sound_played_tick + 60
         {
             self.last_sound_played_tick = self.successful_pollinating_ticks;
@@ -1429,7 +1471,7 @@ impl BeeGrowCropGoal {
         {
             return false;
         }
-        if bee.get_random().random::<f32>() < 0.3 {
+        if bee.get_entity().random().next_f32() < 0.3 {
             return false;
         }
         bee.has_nectar() && bee.is_hive_valid()
@@ -1450,8 +1492,9 @@ impl Goal for BeeGrowCropGoal {
             return;
         };
         if bee
-            .get_random()
-            .random_range(0..self.get_tick_count(Self::GROW_CHANCE))
+            .get_entity()
+            .random()
+            .next_bounded_i32(self.get_tick_count(Self::GROW_CHANCE))
             != 0
         {
             return;
@@ -1549,7 +1592,7 @@ impl BeeWanderGoal {
 
 impl Goal for BeeWanderGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
-        mob.is_navigator_idle() && mob.get_random().random_range(0..10) == 0
+        mob.is_navigator_idle() && mob.get_entity().random().next_bounded_i32(10) == 0
     }
 
     fn should_continue(&mut self, mob: &dyn Mob) -> bool {

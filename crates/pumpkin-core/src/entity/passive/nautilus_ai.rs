@@ -7,7 +7,7 @@ use pumpkin_data::environment_attribute::Activity;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::Sound;
 use pumpkin_data::tag::{self, Taggable};
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::EntityBase;
 use crate::entity::ageable::AgeableMob;
@@ -21,7 +21,6 @@ use crate::entity::ai::brain::memory::{MemoryModuleId, MemoryStatus, types};
 use crate::entity::ai::brain::sensing::{SensorType, is_entity_attackable_ignoring_line_of_sight};
 use crate::entity::ai::brain::{BrainProvider, BrainTick};
 use crate::entity::ai::target_predicate::TargetPredicate;
-use crate::entity::mob::piglin_ai::sample;
 use crate::entity::passive::tamable::TamableAnimal;
 
 const SPEED_MULTIPLIER_WHEN_IDLING_IN_WATER: f32 = 1.0;
@@ -65,7 +64,14 @@ pub fn attack_target_conditions() -> TargetPredicate {
 
 /// Vanilla `NautilusAi.initMemories`.
 pub fn init_memories(tick: &mut BrainTick<'_>) {
-    let cooldown = sample(TIME_BETWEEN_NON_PLAYER_ATTACKS, &mut tick.mob.get_random());
+    // `AbstractNautilus.finalizeSpawn` passes `level.getRandom()`; `UniformInt.sample`.
+    let (min, max) = TIME_BETWEEN_NON_PLAYER_ATTACKS;
+    let cooldown = tick
+        .world
+        .random
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .next_int_between_inclusive(min, max);
     tick.brain.set(types::ATTACK_TARGET_COOLDOWN, cooldown);
 }
 
@@ -217,12 +223,19 @@ fn find_nearest_valid_attack_target(tick: &mut BrainTick<'_>) -> Option<Arc<dyn 
     {
         return None;
     }
-    let mut random = body.get_random();
-    tick.brain.set(
-        types::ATTACK_TARGET_COOLDOWN,
-        sample(TIME_BETWEEN_NON_PLAYER_ATTACKS, &mut random),
-    );
-    if random.random::<f32>() < SKIP_NON_PLAYER_ATTACK_CHANCE {
+    // `level.getRandom()`: the cooldown's `UniformInt.sample`, then the skip roll.
+    let (min, max) = TIME_BETWEEN_NON_PLAYER_ATTACKS;
+    let (cooldown, skip_roll) = {
+        let mut random = tick
+            .world
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let cooldown = random.next_int_between_inclusive(min, max);
+        (cooldown, random.next_f32())
+    };
+    tick.brain.set(types::ATTACK_TARGET_COOLDOWN, cooldown);
+    if skip_roll < SKIP_NON_PLAYER_ATTACK_CHANCE {
         return None;
     }
     let visibility = tick.visibility();

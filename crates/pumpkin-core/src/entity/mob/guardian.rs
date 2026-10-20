@@ -14,7 +14,7 @@ use pumpkin_protocol::codec::var_int::VarInt;
 use pumpkin_util::Difficulty;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::custom_sound::CustomSound;
 use crate::entity::{
@@ -101,6 +101,9 @@ impl GuardianData {
             .move_control
             .lock()
             .unwrap_or_else(PoisonError::into_inner) = Box::new(GuardianMoveControl::default());
+        // The constructor's `clientSideTailAnimation = this.random.nextFloat()`: the value is
+        // the client's, but the server draws it too.
+        mob_entity.living_entity.entity.random().next_f32();
 
         let mut goal_selector = mob_entity
             .goals_selector
@@ -189,16 +192,19 @@ impl GuardianData {
         if entity.is_in_water() {
             living.breath.set_air_supply(caller, 300);
         } else if entity.on_ground.load(Ordering::Relaxed) {
-            let mut random = mob.get_random();
-            let x = (random.random::<f32>() * 2.0 - 1.0) * 0.4;
-            let z = (random.random::<f32>() * 2.0 - 1.0) * 0.4;
+            let (x, z, y_rot) = {
+                let mut random = entity.random();
+                let x = (random.next_f32() * 2.0 - 1.0) * 0.4;
+                let z = (random.next_f32() * 2.0 - 1.0) * 0.4;
+                (x, z, random.next_f32() * 360.0)
+            };
             let velocity = entity.velocity.load();
             entity.velocity.store(Vector3::new(
                 velocity.x + f64::from(x),
                 velocity.y + 0.5,
                 velocity.z + f64::from(z),
             ));
-            entity.yaw.store(random.random::<f32>() * 360.0);
+            entity.yaw.store(y_rot);
             entity.on_ground.store(false, Ordering::Relaxed);
             entity.velocity_dirty.store(true, Ordering::SeqCst);
         }

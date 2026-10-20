@@ -1,4 +1,5 @@
 use pumpkin_data::tag::{self, Taggable};
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::{Entity, EntityBase};
 use std::sync::atomic::Ordering;
@@ -33,7 +34,8 @@ impl ProjectileDeflectionType {
             Self::None => {}
             Self::Custom(deflect) => deflect(projectile, hit_entity),
             Self::Simple => {
-                let vel = rand::random::<f32>() * 20.0 + 170.0;
+                // Vanilla `ProjectileDeflection.REVERSE`, with the projectile's own random.
+                let vel = 170.0 + projectile.get_entity().random().next_f32() * 20.0;
 
                 let current_velocity = projectile
                     .get_entity()

@@ -5,7 +5,7 @@ use pumpkin_util::Hand;
 use pumpkin_util::math::boundingbox::EntityDimensions;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, PoisonError, Weak};
 
@@ -224,7 +224,13 @@ impl Mob for DrownedEntity {
         if mob_entity
             .get_item_slot(&EquipmentSlot::OFF_HAND)
             .is_empty()
-            && self.get_random().random::<f32>() < NAUTILUS_SHELL_CHANCE
+            // `level.getRandom()`.
+            && world
+                .random
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .next_f32()
+                < NAUTILUS_SHELL_CHANCE
         {
             mob_entity.set_item_slot(
                 &EquipmentSlot::OFF_HAND,
@@ -241,16 +247,24 @@ impl Mob for DrownedEntity {
     /// a fishing rod.
     fn populate_default_equipment_slots(
         &self,
-        _world: &Arc<World>,
+        world: &Arc<World>,
         _difficulty: &RegionalDifficulty,
     ) {
-        let mut random = self.get_random();
-        if f64::from(random.random::<f32>()) > 0.9 {
-            let item = if random.random_range(0..16) < 10 {
-                &Item::TRIDENT
-            } else {
-                &Item::FISHING_ROD
-            };
+        // `level.getRandom()`, passed down from `finalizeSpawn`.
+        let item = {
+            let mut random = world
+                .random
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            (f64::from(random.next_f32()) > 0.9).then(|| {
+                if random.next_bounded_i32(16) < 10 {
+                    &Item::TRIDENT
+                } else {
+                    &Item::FISHING_ROD
+                }
+            })
+        };
+        if let Some(item) = item {
             self.entity
                 .mob_entity
                 .set_item_slot(&EquipmentSlot::MAIN_HAND, ItemStack::new(1, item));
@@ -378,7 +392,7 @@ impl RangedAttackMob for DrownedEntity {
         trident.apply_on_projectile_spawned(&trident_item);
 
         if !entity.is_silent() {
-            let pitch = 1.0 / (self.get_random().random::<f32>() * 0.4 + 0.8);
+            let pitch = 1.0 / (entity.random().next_f32() * 0.4 + 0.8);
             world.play_sound_fine(
                 Sound::EntityDrownedShoot,
                 self.sound_source(),
@@ -494,13 +508,17 @@ impl DrownedGoToWaterGoal {
     }
 
     fn get_water_pos(mob: &dyn Mob) -> Option<Vector3<f64>> {
-        let mut random = mob.get_random();
         let pos = mob.get_entity().block_pos.load();
         let world = mob.get_entity().world.load();
         for _ in 0..10 {
-            let x = random.random_range(0..20) - 10;
-            let y = 2 - random.random_range(0..8);
-            let z = random.random_range(0..20) - 10;
+            let (x, y, z) = {
+                let mut random = mob.get_entity().random();
+                (
+                    random.next_bounded_i32(20) - 10,
+                    2 - random.next_bounded_i32(8),
+                    random.next_bounded_i32(20) - 10,
+                )
+            };
             let random_pos = pos.add(x, y, z);
             if world.get_block(&random_pos) == &pumpkin_data::Block::WATER {
                 // `Vec3.atBottomCenterOf`.

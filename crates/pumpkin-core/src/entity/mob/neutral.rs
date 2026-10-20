@@ -5,6 +5,7 @@ use std::sync::atomic::{AtomicBool, AtomicI64, Ordering::Relaxed};
 use crossbeam::atomic::AtomicCell;
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::math::boundingbox::BoundingBox;
+use pumpkin_util::random::RandomImpl;
 use uuid::Uuid;
 
 use crate::entity::EntityBase;
@@ -121,7 +122,12 @@ pub trait NeutralMob: Mob {
 
     /// `start_persistent_anger_timer` with a world age the caller already read.
     fn start_persistent_anger_timer_at(&self, now: i64) {
-        let ticks = rand::random_range(self.anger_duration());
+        // `PERSISTENT_ANGER_TIME.sample(this.random)`.
+        let range = self.anger_duration();
+        let ticks = self
+            .get_entity()
+            .random()
+            .next_int_between_inclusive(*range.start(), *range.end());
         self.set_anger_end_time(now + i64::from(ticks));
     }
 

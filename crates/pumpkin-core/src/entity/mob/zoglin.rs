@@ -10,7 +10,7 @@ use pumpkin_data::tracked_data;
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::math::boundingbox::EntityDimensions;
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::ai::brain::activity::ActivityData;
 use crate::entity::ai::brain::behavior::utils::{
@@ -329,10 +329,16 @@ impl Mob for ZoglinEntity {
     /// Vanilla `Zoglin.finalizeSpawn`.
     fn finalize_spawn(
         &self,
-        _world: &Arc<World>,
+        world: &Arc<World>,
         group_data: Option<SpawnGroupData>,
     ) -> Option<SpawnGroupData> {
-        if self.get_random().random::<f32>() < hoglin_base::PROBABILITY_OF_SPAWNING_AS_BABY {
+        // `level.getRandom()`.
+        let roll = world
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .next_f32();
+        if roll < hoglin_base::PROBABILITY_OF_SPAWNING_AS_BABY {
             self.set_baby(true);
         }
         self.mob_entity.finalize_spawn_base();

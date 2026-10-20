@@ -81,7 +81,7 @@ impl BehaviorControl for GateBehavior {
             return false;
         }
         self.status = Status::Running;
-        let mut rng = tick.mob.get_random();
+        let mut rng = rand::rng();
         self.pick_order(&mut rng);
         for behavior in self.behaviors.iter_mut() {
             if behavior.status() == Status::Stopped

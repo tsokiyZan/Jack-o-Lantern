@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use pumpkin_data::attributes::Attributes;
 use pumpkin_data::effect::StatusEffect;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::EntityBase;
 use crate::entity::attributes::{Modifier, ModifierOperation};
@@ -50,9 +50,10 @@ impl SpawnGroupData {
 }
 
 impl MobEntity {
-    /// Vanilla `Mob.finalizeSpawn`: random follow range bonus and left-handedness.
+    /// Vanilla `Mob.finalizeSpawn`: random follow range bonus and left-handedness, both drawn
+    /// from `level.getRandom()` (Mob.java:1081).
     pub fn finalize_spawn_base(&self) {
-        let mut rng = rand::rng();
+        let world = self.living_entity.entity.world.load_full();
         // `getAttribute(FOLLOW_RANGE)`.
         self.living_entity
             .get_attribute_instance(&Attributes::FOLLOW_RANGE);
@@ -68,10 +69,15 @@ impl MobEntity {
                     .iter()
                     .any(|modifier| modifier.id == RANDOM_SPAWN_BONUS_ID)
             {
+                // `random.triangle(0.0, 0.11485000000000001)`, in double (Mob.java:1085).
+                let amount = world
+                    .random
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .next_triangular(0.0, 0.114_850_000_000_000_01);
                 follow_range.add_or_replace_modifier(Modifier {
                     id: RANDOM_SPAWN_BONUS_ID.to_string(),
-                    // Triangle distribution around 0.
-                    amount: 0.114_85 * f64::from(rng.random::<f32>() - rng.random::<f32>()),
+                    amount,
                     operation: ModifierOperation::MultiplyBase,
                 });
                 true
@@ -86,12 +92,18 @@ impl MobEntity {
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
                 .update_pathfinder_max_visited_nodes(&self.living_entity);
         }
-        self.set_left_handed(rng.random::<f32>() < 0.05);
+        // `random.nextFloat() < 0.05F` (Mob.java:1089).
+        let left_handed = world
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .next_f32()
+            < 0.05;
+        self.set_left_handed(left_handed);
 
         // Spawn equipment and the loot-pickup roll belong to `finalizeSpawn`
         // (`populateDefaultEquipmentSlots`, `setCanPickUpLoot`), so mobs loaded from disk or
         // summoned with NBT keep what they had.
-        let world = self.living_entity.entity.world.load_full();
         super::equipment::equip_mob_on_spawn(&self.living_entity, &world);
         let entity = &self.living_entity.entity;
         if let Some(def) =

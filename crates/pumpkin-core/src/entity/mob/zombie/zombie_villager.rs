@@ -18,8 +18,8 @@ use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::codec::var_int::VarInt;
 use pumpkin_protocol::java::client::play::Metadata;
 use pumpkin_util::math::position::BlockPos;
+use pumpkin_util::random::RandomImpl;
 use pumpkin_util::version::JavaMinecraftVersion;
-use rand::RngExt;
 use uuid::Uuid;
 
 use crate::entity::item::ItemEntity;
@@ -42,10 +42,11 @@ fn speeds_up_conversion(block: &Block) -> bool {
 
 /// Vanilla `initializeZombieVillagerData`: a plains villager with a random profession, so
 /// a cured villager has trades.
-fn initialize_zombie_villager_data() -> VillagerData {
+/// `VILLAGER_PROFESSION.getRandom(random)` picks one of the 15 registered professions.
+fn initialize_zombie_villager_data(random: &mut impl RandomImpl) -> VillagerData {
     VillagerData::new(
         pumpkin_data::villager::VillagerType::Plains,
-        pumpkin_data::villager::VillagerProfession::from_i32(rand::random_range(0..15))
+        pumpkin_data::villager::VillagerProfession::from_i32(random.next_bounded_i32(15))
             .unwrap_or(pumpkin_data::villager::VillagerProfession::None),
         1,
     )
@@ -82,11 +83,13 @@ impl ZombieVillagerEntity {
 
     #[must_use]
     pub fn with_can_break_doors(entity: Entity, can_break_doors: bool) -> Arc<Self> {
+        // `defineSynchedData`, run by the `Entity` constructor.
+        let villager_data = initialize_zombie_villager_data(&mut *entity.random());
         let mob_entity =
             ZombieEntityBase::with_can_break_doors(entity, can_break_doors, BABY_DIMENSIONS);
         let zombie_villager = Arc::new(Self {
             mob_entity,
-            villager_data: std::sync::Mutex::new(initialize_zombie_villager_data()),
+            villager_data: std::sync::Mutex::new(villager_data),
             villager_data_finalized: AtomicBool::new(false),
             villager_nbt: std::sync::Mutex::new(NbtCompound::new()),
             villager_xp: AtomicI32::new(0),
@@ -196,8 +199,7 @@ impl ZombieVillagerEntity {
     #[expect(clippy::cast_possible_truncation)]
     fn conversion_progress(&self) -> i32 {
         let mut progress = 1;
-        let mut random = self.get_random();
-        if random.random::<f32>() >= 0.01 {
+        if self.get_entity().random().next_f32() >= 0.01 {
             return progress;
         }
 
@@ -215,7 +217,7 @@ impl ZombieVillagerEntity {
                     }
                     let block = world.get_block(&BlockPos::new(block_x, block_y, block_z));
                     if speeds_up_conversion(block) {
-                        if random.random::<f32>() < 0.3 {
+                        if entity.random().next_f32() < 0.3 {
                             progress += 1;
                         }
                         special_blocks += 1;
@@ -429,8 +431,8 @@ impl Mob for ZombieVillagerEntity {
     /// Vanilla `ZombieVillager.getVoicePitch`: babies squeak an octave up.
     fn voice_pitch(&self) -> f32 {
         let base = if self.is_baby() { 2.0 } else { 1.0 };
-        let mut random = self.get_random();
-        (random.random::<f32>() - random.random::<f32>()) * 0.2 + base
+        let mut random = self.get_entity().random();
+        (random.next_f32() - random.next_f32()) * 0.2 + base
     }
 
     fn remove_when_far_away(&self, _distance_sq: f64) -> bool {
@@ -469,9 +471,10 @@ impl Mob for ZombieVillagerEntity {
                 item_stack.decrement_unless_creative(player.gamemode.load(), 1);
                 self.start_converting(
                     Some(player.get_entity().entity_uuid),
-                    self.get_random().random_range(
-                        Self::VILLAGER_CONVERSION_WAIT_MIN..=Self::VILLAGER_CONVERSION_WAIT_MAX,
-                    ),
+                    // `this.random.nextInt(2401) + 3600`.
+                    self.get_entity().random().next_bounded_i32(
+                        Self::VILLAGER_CONVERSION_WAIT_MAX - Self::VILLAGER_CONVERSION_WAIT_MIN + 1,
+                    ) + Self::VILLAGER_CONVERSION_WAIT_MIN,
                 );
             }
             return true;
@@ -534,9 +537,10 @@ impl Mob for ZombieVillagerEntity {
         let villager_data_nbt = nbt.get_compound("VillagerData");
         if nbt.get_bool("VillagerDataFinalized").unwrap_or(false) || villager_data_nbt.is_some() {
             self.set_villager_data_finalized(true);
-            let data = villager_data_nbt.map_or_else(initialize_zombie_villager_data, |data_nbt| {
-                read_villager_data(data_nbt, self.get_villager_data())
-            });
+            let data = villager_data_nbt.map_or_else(
+                || initialize_zombie_villager_data(&mut *self.get_entity().random()),
+                |data_nbt| read_villager_data(data_nbt, self.get_villager_data()),
+            );
             // Vanilla sets the synced data directly here, keeping any trades.
             *self
                 .villager_data

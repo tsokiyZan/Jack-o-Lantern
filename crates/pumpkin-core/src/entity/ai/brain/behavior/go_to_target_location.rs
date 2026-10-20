@@ -1,5 +1,5 @@
 use pumpkin_util::math::position::BlockPos;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use super::super::memory::{MemoryModuleType, MemoryStatus, types};
 use super::one_shot::OneShot;
@@ -28,12 +28,18 @@ pub fn go_to_target_location(
             {
                 return true;
             }
-            let mut rng = tick.mob.get_random();
-            let nearby = BlockPos::new(
-                location.0.x + rng.random_range(0..3) - 1,
-                location.0.y,
-                location.0.z + rng.random_range(0..3) - 1,
-            );
+            // `getNearbyPos`: `body.level().getRandom()`, `nextInt(3) - 1` for x then z
+            // (GoToTargetLocation.java:11-16).
+            let (dx, dz) = {
+                let mut random = tick
+                    .world
+                    .random
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                let dx = random.next_bounded_i32(3) - 1;
+                (dx, random.next_bounded_i32(3) - 1)
+            };
+            let nearby = BlockPos::new(location.0.x + dx, location.0.y, location.0.z + dz);
             set_walk_and_look_target_memories_to_block(
                 tick.brain,
                 nearby,

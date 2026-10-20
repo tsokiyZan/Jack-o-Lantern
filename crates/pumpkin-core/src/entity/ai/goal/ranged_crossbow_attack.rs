@@ -1,3 +1,4 @@
+use pumpkin_util::random::RandomImpl;
 use std::sync::Arc;
 
 use pumpkin_data::data_component_impl::EquipmentSlot;
@@ -225,7 +226,9 @@ impl Goal for RangedCrossbowAttackGoal {
                     .lock()
                     .unwrap_or_else(std::sync::PoisonError::into_inner)
                     .set_progress(NavigatorGoal::new(mob_pos, target_pos, move_speed));
-                self.update_path_delay = 20 + rand::random_range(0..20);
+                // Vanilla `PATHFINDING_DELAY_RANGE.sample`: `TimeUtil.rangeOfSeconds(1, 2)`.
+                self.update_path_delay =
+                    mob.get_entity().random().next_int_between_inclusive(20, 40);
             }
         } else {
             self.update_path_delay = 0;
@@ -283,7 +286,7 @@ impl Goal for RangedCrossbowAttackGoal {
                 if self.charge_ticks >= Self::CHARGE_DURATION {
                     mob.get_mob_entity().living_entity.clear_active_hand();
                     self.state = CrossbowState::Charged;
-                    self.attack_delay = 20 + rand::random_range(0..20);
+                    self.attack_delay = 20 + mob.get_entity().random().next_bounded_i32(20);
                     if let Some(crossbow_mob) = mob.as_crossbow_attack_mob() {
                         crossbow_mob.set_charging_crossbow(false);
                     }

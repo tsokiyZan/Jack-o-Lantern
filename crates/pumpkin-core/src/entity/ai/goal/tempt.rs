@@ -9,7 +9,7 @@ use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::tag::{Tag, Taggable};
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 const DEFAULT_STOP_DISTANCE: f64 = 2.5;
 /// Following stops once the player moves further than this while being watched.
@@ -214,7 +214,7 @@ impl TemptGoal {
             (navigation.towards)(mob, player);
         } else if self.non_pathfinder {
             let eye = Vector3::new(player_pos.x, player.get_entity().get_eye_y(), player_pos.z);
-            let target = (eye - mob_pos) * mob.get_random().random::<f64>() + mob_pos;
+            let target = (eye - mob_pos) * mob.get_entity().random().next_f64() + mob_pos;
             mob_entity
                 .move_control
                 .lock()

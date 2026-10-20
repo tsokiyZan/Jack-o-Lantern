@@ -20,8 +20,8 @@ use pumpkin_protocol::codec::var_int::VarInt;
 use pumpkin_util::math::boundingbox::EntityDimensions;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 use pumpkin_world::world::BlockFlags;
-use rand::RngExt;
 use uuid::Uuid;
 
 use crate::block::blocks::plant::cave_vines::CaveVinesBlock;
@@ -744,7 +744,8 @@ fn fox_offspring(mob: &dyn Mob, partner: &dyn EntityBase, offspring: &dyn Entity
         return;
     };
     // Vanilla `Fox.getBreedOffspring`.
-    let variant = if fox.get_random().random::<bool>() {
+    let use_own = fox.get_entity().random().next_bool();
+    let variant = if use_own {
         fox.get_variant()
     } else {
         partner_fox.get_variant()
@@ -794,7 +795,7 @@ impl Mob for FoxEntity {
         }
         let entity = self.get_entity();
         let world = entity.world.load();
-        if !world.is_bright_outside() && self.get_random().random::<f32>() < 0.1 {
+        if !world.is_bright_outside() && entity.random().next_f32() < 0.1 {
             let area = entity.bounding_box.load().expand(16.0, 16.0, 16.0);
             if world
                 .get_players_at_box(&area)
@@ -906,7 +907,7 @@ impl Mob for FoxEntity {
                     self.mob_entity
                         .set_item_slot(&EquipmentSlot::MAIN_HAND, remaining_food);
                     self.ticks_since_eaten.store(0, Ordering::Relaxed);
-                } else if ticks_since_eaten > 560 && self.get_random().random::<f32>() < 0.1 {
+                } else if ticks_since_eaten > 560 && self.get_entity().random().next_f32() < 0.1 {
                     self.play_sound_at_self(Sound::EntityFoxEat, 1.0, 1.0);
                     let entity = self.get_entity();
                     entity
@@ -942,7 +943,7 @@ impl Mob for FoxEntity {
                 self.pick_up_item(item);
             }
         });
-        if self.is_defending() && self.get_random().random::<f32>() < 0.05 {
+        if self.is_defending() && self.get_entity().random().next_f32() < 0.05 {
             self.play_sound_at_self(Sound::EntityFoxAggro, 1.0, 1.0);
         }
 
@@ -956,7 +957,15 @@ impl Mob for FoxEntity {
             if in_water || self.is_sleeping() {
                 self.set_sitting(false);
             }
-            if self.is_faceplanted() && rand::random::<f32>() < 0.2 {
+            // `this.level().getRandom().nextFloat() < 0.2F`.
+            if self.is_faceplanted()
+                && world
+                    .random
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .next_f32()
+                    < 0.2
+            {
                 let pos = entity.block_pos.load();
                 let state = world.get_block_state_id(&pos);
                 world.sync_world_event(
@@ -1063,20 +1072,26 @@ impl Mob for FoxEntity {
     /// its mouth.
     fn populate_default_equipment_slots(
         &self,
-        _world: &Arc<World>,
+        world: &Arc<World>,
         _difficulty: &RegionalDifficulty,
     ) {
-        let mut rng = rand::rng();
-        if rng.random::<f32>() >= 0.2 {
+        // `finalizeSpawn` passes `level.getRandom()`.
+        let level_random = || {
+            world
+                .random
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+        };
+        if level_random().next_f32() >= 0.2 {
             return;
         }
-        let odds = rng.random::<f32>();
+        let odds = level_random().next_f32();
         let held_in_mouth = if odds < 0.05 {
             &Item::EMERALD
         } else if odds < 0.2 {
             &Item::EGG
         } else if odds < 0.4 {
-            if rng.random::<bool>() {
+            if level_random().next_bool() {
                 &Item::RABBIT_FOOT
             } else {
                 &Item::RABBIT_HIDE
@@ -1711,8 +1726,9 @@ impl SleepGoal {
     fn new(fox: &FoxEntity) -> Self {
         Self {
             countdown: fox
-                .get_random()
-                .random_range(0..Self::WAIT_TIME_BEFORE_SLEEP),
+                .get_entity()
+                .random()
+                .next_bounded_i32(Self::WAIT_TIME_BEFORE_SLEEP),
         }
     }
 
@@ -1749,8 +1765,9 @@ impl Goal for SleepGoal {
             return;
         };
         self.countdown = fox
-            .get_random()
-            .random_range(0..Self::WAIT_TIME_BEFORE_SLEEP);
+            .get_entity()
+            .random()
+            .next_bounded_i32(Self::WAIT_TIME_BEFORE_SLEEP);
         fox.clear_states();
     }
 
@@ -1914,7 +1931,14 @@ impl FoxEatBerriesGoal {
     ) {
         let mut props = NetherWartLikeProperties::from_state_id(state);
         let age = props.age;
-        let mut count = 1 + rand::rng().random_range(0..2) + u8::from(age == 3);
+        // `1 + Fox.this.level().getRandom().nextInt(2) + (age == 3 ? 1 : 0)`.
+        let mut count = 1
+            + world
+                .random
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .next_bounded_i32(2) as u8
+            + u8::from(age == 3);
         if fox.main_hand().is_empty() {
             fox.mob_entity.set_item_slot(
                 &EquipmentSlot::MAIN_HAND,
@@ -1986,7 +2010,7 @@ impl Goal for FoxEatBerriesGoal {
                 } else {
                     self.ticks_waited += 1;
                 }
-            } else if fox.get_random().random::<f32>() < 0.05 {
+            } else if fox.get_entity().random().next_f32() < 0.05 {
                 fox.play_sound_at_self(Sound::EntityFoxSniff, 1.0, 1.0);
             }
         }
@@ -2059,7 +2083,12 @@ impl Goal for FoxSearchForItemsGoal {
         if !fox.can_move() {
             return false;
         }
-        if fox.get_random().random_range(0..to_goal_ticks(10)) != 0 {
+        if fox
+            .get_entity()
+            .random()
+            .next_bounded_i32(to_goal_ticks(10))
+            != 0
+        {
             return false;
         }
         !Self::allowed_items(fox).is_empty() && fox.main_hand().is_empty()
@@ -2140,11 +2169,14 @@ struct PerchAndSearchGoal {
 impl PerchAndSearchGoal {
     /// Vanilla `resetLook`.
     fn reset_look(&mut self, fox: &FoxEntity) {
-        let mut rng = fox.get_random();
-        let rnd = std::f64::consts::TAU * rng.random::<f64>();
+        let (rnd, extra) = {
+            let mut random = fox.get_entity().random();
+            let rnd = std::f64::consts::TAU * random.next_f64();
+            (rnd, random.next_bounded_i32(20))
+        };
         self.rel_x = rnd.cos();
         self.rel_z = rnd.sin();
-        self.look_time = self.get_tick_count(80 + rng.random_range(0..20));
+        self.look_time = self.get_tick_count(80 + extra);
     }
 }
 
@@ -2157,7 +2189,10 @@ impl Goal for PerchAndSearchGoal {
             .living_entity
             .get_last_hurt_by_mob()
             .is_none()
-            && fox.get_random().random::<f32>() < 0.02
+            && {
+                let roll = fox.get_entity().random().next_f32();
+                roll < 0.02
+            }
             && !fox.is_sleeping()
             && fox.mob_entity.get_target().is_none()
             && fox.is_navigator_idle()
@@ -2175,7 +2210,7 @@ impl Goal for PerchAndSearchGoal {
             return;
         };
         self.reset_look(fox);
-        self.looks_remaining = 2 + fox.get_random().random_range(0..3);
+        self.looks_remaining = 2 + fox.get_entity().random().next_bounded_i32(3);
         fox.set_sitting(true);
         fox.mob_entity
             .navigator
@@ -2284,7 +2319,12 @@ impl DefendTrustedTargetGoal {
 
 impl Goal for DefendTrustedTargetGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
-        if mob.get_random().random_range(0..to_goal_ticks(10)) != 0 {
+        if mob
+            .get_entity()
+            .random()
+            .next_bounded_i32(to_goal_ticks(10))
+            != 0
+        {
             return false;
         }
         let Some(fox) = self.fox.upgrade() else {

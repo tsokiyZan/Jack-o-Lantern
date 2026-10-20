@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::environment_attribute::Activity;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::EntityBase;
 use crate::entity::ai::brain::activity::ActivityData;
@@ -15,7 +15,7 @@ use crate::entity::mob::piglin_brute::PiglinBruteEntity;
 
 pub const ANGER_DURATION: i64 = 600;
 pub const MELEE_ATTACK_COOLDOWN: i32 = 20;
-pub const ACTIVITY_SOUND_LIKELIHOOD_PER_TICK: f32 = 0.0125;
+pub const ACTIVITY_SOUND_LIKELIHOOD_PER_TICK: f64 = 0.0125;
 pub const MAX_LOOK_DIST: f32 = 8.0;
 pub const INTERACTION_RANGE: i32 = 8;
 pub const SPEED_MULTIPLIER_WHEN_IDLING: f32 = 0.6;
@@ -219,7 +219,14 @@ pub fn update_activity(tick: &mut BrainTick<'_>) {
 }
 
 pub fn maybe_play_activity_sound(tick: &mut BrainTick<'_>) {
-    if tick.mob.get_random().random::<f32>() < ACTIVITY_SOUND_LIKELIHOOD_PER_TICK {
+    // `body.level().getRandom().nextFloat() < 0.0125`, compared as a double.
+    let roll = tick
+        .world
+        .random
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .next_f32();
+    if f64::from(roll) < ACTIVITY_SOUND_LIKELIHOOD_PER_TICK {
         play_activity_sound(tick);
     }
 }

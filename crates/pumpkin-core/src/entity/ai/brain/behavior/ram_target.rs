@@ -20,7 +20,7 @@ use crate::entity::combat::knockback_after_resistance;
 use crate::entity::damage_source::DamageSource;
 use crate::entity::living::LivingEntity;
 use crate::entity::mob::Mob;
-use crate::entity::mob::piglin_ai::sample;
+use crate::entity::mob::piglin_ai::sample_level;
 use crate::entity::passive::goat::GoatEntity;
 use crate::entity::{Entity, EntityBase};
 
@@ -105,10 +105,8 @@ impl RamTarget {
     fn finish_ram(&self, tick: &mut BrainTick<'_>) {
         tick.world
             .send_entity_status(tick.mob.get_entity(), EntityStatus::EndRam, None);
-        let cooldown = sample(
-            (self.get_time_between_rams)(tick.mob),
-            &mut tick.mob.get_random(),
-        );
+        // `getTimeBetweenRams.apply(body).sample(level.getRandom())` (RamTarget.java:125).
+        let cooldown = sample_level((self.get_time_between_rams)(tick.mob), tick.world);
         tick.brain.set(types::RAM_COOLDOWN_TICKS, cooldown);
         tick.brain.erase(types::RAM_TARGET.id());
     }

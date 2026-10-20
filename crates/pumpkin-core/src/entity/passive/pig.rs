@@ -323,7 +323,6 @@ impl Mob for PigEntity {
 impl ItemSteerable for PigEntity {
     fn boost(&self) -> bool {
         self.steering.boost(
-            &mut self.get_random(),
             self.get_entity(),
             pumpkin_data::tracked_data::pig::DATA_BOOST_TIME,
         )

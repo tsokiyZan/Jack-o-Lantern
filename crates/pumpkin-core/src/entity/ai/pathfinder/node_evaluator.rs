@@ -66,6 +66,8 @@ pub struct MobData {
     pub path_type_malus: [Option<f32>; PATH_TYPE_COUNT],
     /// Vanilla `Creaking.getHomePos`, which its `HomeNodeEvaluator` keeps paths near.
     pub home_pos: Option<BlockPos>,
+    /// The pathing entity, for draws from its random (vanilla `mob.getRandom()`).
+    pub entity_id: Option<i32>,
 }
 
 impl MobData {
@@ -82,6 +84,7 @@ impl MobData {
             is_in_water: false,
             path_type_malus: [None; PATH_TYPE_COUNT],
             home_pos: None,
+            entity_id: None,
         }
     }
 

@@ -25,6 +25,7 @@ use pumpkin_protocol::java::client::play::{CEntityVelocity, CSoundEffect, Metada
 use pumpkin_util::math::boundingbox::BoundingBox;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 use pumpkin_util::version::JavaMinecraftVersion;
 
 /// Represents the pickup rules for arrows
@@ -368,17 +369,17 @@ impl ArrowEntity {
     }
 
     pub fn set_velocity(&self, x: f64, y: f64, z: f64, power: f64, uncertainty: f64) {
-        fn next_triangular(mode: f64, deviation: f64) -> f64 {
-            deviation * (rand::random::<f64>() - rand::random::<f64>()) + mode
-        }
-
+        // Vanilla `Projectile.getMovementToShoot`: three `random.triangle`s from the arrow's random.
+        let (dx, dy, dz) = {
+            let mut random = self.entity.random();
+            let dx = random.next_triangular(0.0, 0.017_227_5 * uncertainty);
+            let dy = random.next_triangular(0.0, 0.017_227_5 * uncertainty);
+            let dz = random.next_triangular(0.0, 0.017_227_5 * uncertainty);
+            (dx, dy, dz)
+        };
         let velocity = Vector3::new(x, y, z)
             .normalize()
-            .add_raw(
-                next_triangular(0.0, 0.017_227_5 * uncertainty),
-                next_triangular(0.0, 0.017_227_5 * uncertainty),
-                next_triangular(0.0, 0.017_227_5 * uncertainty),
-            )
+            .add_raw(dx, dy, dz)
             .multiply(power, power, power);
 
         self.entity.velocity.store(velocity);
@@ -420,11 +421,8 @@ impl ArrowEntity {
     }
 
     pub fn set_base_damage_from_mob(&self, power: f64, difficulty_id: i32) {
-        fn next_triangular(mode: f64, deviation: f64) -> f64 {
-            deviation * (rand::random::<f64>() - rand::random::<f64>()) + mode
-        }
         let diff_factor = f64::from(difficulty_id) * 0.11;
-        let base = power * 2.0 + next_triangular(diff_factor, 0.57425);
+        let base = power * 2.0 + self.entity.random().next_triangular(diff_factor, 0.57425);
         self.set_base_damage(base);
     }
 
@@ -683,10 +681,18 @@ impl EntityBase for ArrowEntity {
                         pumpkin_data::tracked_data::abstract_arrow::IN_GROUND,
                         false,
                     );
+                    // Vanilla `AbstractArrow.startFalling`: three `nextFloat() * 0.2F`.
+                    let (fx, fy, fz) = {
+                        let mut random = entity.random();
+                        let fx = random.next_f32() * 0.2;
+                        let fy = random.next_f32() * 0.2;
+                        let fz = random.next_f32() * 0.2;
+                        (fx, fy, fz)
+                    };
                     let mut vel = entity.velocity.load();
-                    vel.x *= rand::random::<f64>() * 0.2;
-                    vel.y *= rand::random::<f64>() * 0.2;
-                    vel.z *= rand::random::<f64>() * 0.2;
+                    vel.x *= f64::from(fx);
+                    vel.y *= f64::from(fy);
+                    vel.z *= f64::from(fz);
                     entity.velocity.store(vel);
                 }
             }
@@ -963,7 +969,7 @@ impl EntityBase for ArrowEntity {
                 entity.set_synced_data(pumpkin_data::tracked_data::abstract_arrow::IN_GROUND, true);
 
                 // Play sound with vanilla pitch formula
-                let sound_pitch = 1.2 / (rand::random::<f32>() * 0.2 + 0.9);
+                let sound_pitch = 1.2 / (entity.random().next_f32() * 0.2 + 0.9);
                 let sound_packet = CSoundEffect::new(
                     IdOr::Id(Sound::EntityArrowHit as u16),
                     SoundCategory::Neutral,
@@ -1021,7 +1027,8 @@ impl EntityBase for ArrowEntity {
 
                 // Apply critical hit bonus
                 if self.is_critical.load(Ordering::Relaxed) {
-                    let bonus = (rand::random::<u32>() % (damage.max(0) / 2 + 2) as u32) as i32;
+                    // `this.random.nextInt(damage / 2 + 2)`.
+                    let bonus = entity.random().next_bounded_i32(damage / 2 + 2);
                     damage = damage.saturating_add(bonus);
                 }
 
@@ -1045,19 +1052,6 @@ impl EntityBase for ArrowEntity {
                 );
 
                 if let Some(living) = target.get_living_entity() {
-                    // Play hit sound
-                    let sound_pitch = 1.2 / (rand::random::<f32>() * 0.2 + 0.9);
-                    let sound_packet = CSoundEffect::new(
-                        IdOr::Id(Sound::EntityArrowHit as u16),
-                        SoundCategory::Neutral,
-                        &hit_pos,
-                        1.0,
-                        sound_pitch,
-                        0,
-                    );
-                    let chunk_pos = entity.chunk_pos.load();
-                    world.broadcast_to_chunk(chunk_pos, &sound_packet);
-
                     if damage_succeeded {
                         self.do_knockback(&world, target.as_ref(), living, &damage_source);
                         // The weapon is the arrow's own copy, so item damage never reaches the
@@ -1090,6 +1084,24 @@ impl EntityBase for ArrowEntity {
                         if is_spectral {
                             living.add_effect(Self::spectral_glowing_effect());
                         }
+                    }
+                }
+
+                // Vanilla `onHitEntity`: once the hurt lands, `playSound(soundEvent, 1.0F,
+                // 1.2F / (random.nextFloat() * 0.2F + 0.9F))`, for any target. The pitch is
+                // drawn before `playSound`'s silent check.
+                if damage_succeeded {
+                    let sound_pitch = 1.2 / (entity.random().next_f32() * 0.2 + 0.9);
+                    if !entity.is_silent() {
+                        let sound_packet = CSoundEffect::new(
+                            IdOr::Id(Sound::EntityArrowHit as u16),
+                            SoundCategory::Neutral,
+                            &hit_pos,
+                            1.0,
+                            sound_pitch,
+                            0,
+                        );
+                        world.broadcast_to_chunk(entity.chunk_pos.load(), &sound_packet);
                     }
                 }
 

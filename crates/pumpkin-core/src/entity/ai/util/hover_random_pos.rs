@@ -1,5 +1,5 @@
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use super::{goal_utils, land_random_pos, random_pos};
 use crate::entity::ai::pathfinder::pathfinding_context::PathfindingContext;
@@ -27,12 +27,11 @@ pub fn get_pos(
         Vector3::new(block_pos.0.x, block_pos.0.y, block_pos.0.z),
         world.clone(),
     );
-    let mut rng = mob.get_random();
 
     random_pos::generate_random_pos(
         || {
             let direction = random_pos::generate_random_direction_within_radians(
-                &mut rng,
+                &mut *mob.get_entity().random(),
                 0.0,
                 f64::from(horizontal_dist),
                 vertical_dist,
@@ -47,10 +46,12 @@ pub fn get_pos(
                 f64::from(horizontal_dist),
                 restrict,
                 direction,
-                &mut rng,
             )?;
-            let above_solid_amount =
-                rng.random_range(0..hover_max_height - hover_min_height + 1) + hover_min_height;
+            let above_solid_amount = mob
+                .get_entity()
+                .random()
+                .next_bounded_i32(hover_max_height - hover_min_height + 1)
+                + hover_min_height;
             let pos =
                 random_pos::move_up_to_above_solid(pos, above_solid_amount, max_y, |candidate| {
                     goal_utils::is_solid(&world, candidate)

@@ -1,6 +1,6 @@
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::ai::pathfinder::path::Path;
 use crate::entity::ai::util::default_random_pos;
@@ -257,10 +257,13 @@ impl Behavior for MoveToTargetSink {
             stuck
         };
         if still_trying && stuck {
+            // `level.getRandom().nextInt(40)` (MoveToTargetSink.java:82).
             self.remaining_cooldown = tick
-                .mob
-                .get_random()
-                .random_range(0..MAX_COOLDOWN_BEFORE_RETRYING);
+                .world
+                .random
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .next_bounded_i32(MAX_COOLDOWN_BEFORE_RETRYING);
         }
 
         tick.brain.erase(types::WALK_TARGET.id());

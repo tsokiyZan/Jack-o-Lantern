@@ -4,7 +4,7 @@ use crate::entity::mob::Mob;
 use crate::entity::player::Player;
 use pumpkin_data::item::Item;
 use pumpkin_data::tag::{self, Taggable};
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 use std::sync::Arc;
 
 pub struct BegGoal {
@@ -91,7 +91,7 @@ impl Goal for BegGoal {
 
     fn start(&mut self, mob: &dyn Mob) {
         Self::set_is_interested(mob, true);
-        let ticks = 40 + mob.get_random().random_range(0..40);
+        let ticks = 40 + mob.get_entity().random().next_bounded_i32(40);
         self.look_time = self.get_tick_count(ticks);
     }
 

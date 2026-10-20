@@ -2,7 +2,7 @@ use std::sync::atomic::Ordering;
 
 use super::{Controls, Goal};
 use crate::entity::mob::{Mob, MobEntity};
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 pub struct SwimGoal {
     goal_control: Controls,
@@ -42,7 +42,7 @@ impl Goal for SwimGoal {
     }
 
     fn tick(&mut self, mob: &dyn Mob) {
-        if mob.get_random().random::<f32>() < 0.8 {
+        if mob.get_entity().random().next_f32() < 0.8 {
             mob.get_mob_entity().jump();
         }
     }

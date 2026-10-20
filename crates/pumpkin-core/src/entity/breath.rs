@@ -15,7 +15,7 @@ use pumpkin_data::tag::Taggable;
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::codec::var_int::VarInt;
 use pumpkin_util::math::position::BlockPos;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 use std::sync::atomic::{AtomicI32, Ordering};
 
 /// Vanilla `Entity.getMaxAirSupply`.
@@ -81,7 +81,7 @@ impl BreathManager {
         // `getAttribute(OXYGEN_BONUS)` makes the instance.
         living.get_attribute_instance(&Attributes::OXYGEN_BONUS);
         let oxygen_bonus = living.get_attribute_value(&Attributes::OXYGEN_BONUS);
-        if oxygen_bonus > 0.0 && rand::rng().random::<f64>() >= 1.0 / (oxygen_bonus + 1.0) {
+        if oxygen_bonus > 0.0 && living.entity.random().next_f64() >= 1.0 / (oxygen_bonus + 1.0) {
             current
         } else {
             current - 1

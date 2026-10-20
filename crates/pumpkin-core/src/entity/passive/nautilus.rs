@@ -23,7 +23,7 @@ use pumpkin_protocol::codec::var_int::VarInt;
 use pumpkin_util::math::boundingbox::EntityDimensions;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 use uuid::Uuid;
 
 use crate::entity::ai::brain::behavior::utils::is_alive;
@@ -83,7 +83,7 @@ const MAX_Y_ROT_FROM_CENTER: f32 = 10.0;
 const FEED_HEALING_FACTOR: f32 = 2.0;
 const FEED_DEFAULT_HEAL: f32 = 1.0;
 /// One taming attempt in this many succeeds, as `random.nextInt(3) == 0`.
-const TAMING_CHANCE_BOUND: u32 = 3;
+const TAMING_CHANCE_BOUND: i32 = 3;
 /// Vanilla `Nautilus.BABY_DIMENSIONS`. Pumpkin has no passenger attachment points.
 const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::NAUTILUS_BABY_DIMENSIONS;
 
@@ -273,7 +273,12 @@ impl NautilusEntity {
     fn try_to_tame(&self, player: &Arc<Player>) {
         let entity = self.get_entity();
         let world = entity.world.load();
-        if self.get_random().random_range(0..TAMING_CHANCE_BOUND) == 0 {
+        if self
+            .get_entity()
+            .random()
+            .next_bounded_i32(TAMING_CHANCE_BOUND)
+            == 0
+        {
             TamableAnimal::tame(self, player.gameprofile.id);
             Mob::tame(self, player);
             self.mob_entity
@@ -711,8 +716,8 @@ impl Mob for NautilusEntity {
         self.check_restriction();
     }
 
-    /// The part of vanilla `AbstractNautilus.tick` after `super.tick()`. The bubbles it
-    /// spawns are client-side.
+    /// The part of vanilla `AbstractNautilus.tick` after `super.tick()`. Its bubble
+    /// particles are client-side, but their random numbers are drawn here too.
     fn post_tick(&self) {
         self.apply_effects();
         if self.is_dashing() && self.dash_cooldown.load(Ordering::Relaxed) < DASH_MINIMUM_COOLDOWN {
@@ -725,6 +730,9 @@ impl Mob for NautilusEntity {
             if dash_cooldown == 1 {
                 self.make_sound(self.get_dash_ready_sound());
             }
+        }
+        if self.get_entity().is_in_water() {
+            spawn_bubbles(self.get_entity());
         }
     }
 
@@ -885,5 +893,20 @@ impl Mob for NautilusEntity {
         {
             self.set_variant(variant);
         }
+    }
+}
+
+/// Vanilla `AbstractNautilus.spawnBubbles`. `level.addParticle` does nothing on a server
+/// level, so only the random numbers are drawn.
+fn spawn_bubbles(entity: &Entity) {
+    let speed = entity.velocity.load().length();
+    let bubble_probability = (speed * 2.0).clamp(f64::from(0.15f32), 1.0);
+    let mut random = entity.random();
+    if f64::from(random.next_f32()) < bubble_probability {
+        // `spread` from `nextDouble`, then `dx`, `dy` and `dz` from `nextFloat`s.
+        random.next_f64();
+        random.next_f32();
+        random.next_f32();
+        random.next_f32();
     }
 }

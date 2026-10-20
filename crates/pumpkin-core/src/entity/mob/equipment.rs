@@ -33,6 +33,7 @@ use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::tag::{Tag, Taggable};
 use pumpkin_util::difficulty::Difficulty;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 use rand::RngExt;
 
 use crate::entity::living::LivingEntity;
@@ -213,57 +214,7 @@ pub struct MobEquipmentDef {
 /// equipment tables).
 pub static EQUIPMENT_REGISTRY: LazyLock<HashMap<&'static str, MobEquipmentDef>> =
     LazyLock::new(|| {
-        static PIGLIN_WEAPONS: [WeaponEntry; 3] = [
-            WeaponEntry {
-                item: &Item::CROSSBOW,
-                weight: 5.0,
-            },
-            WeaponEntry {
-                item: &Item::GOLDEN_SWORD,
-                weight: 4.5,
-            },
-            WeaponEntry {
-                item: &Item::GOLDEN_SPEAR,
-                weight: 0.5,
-            },
-        ];
-
-        static PIGLIN_ARMOR: [ArmorSlotEntry; 4] = [
-            ArmorSlotEntry {
-                slot: &EquipmentSlot::HEAD,
-                item: &Item::GOLDEN_HELMET,
-                chance: 0.1,
-            },
-            ArmorSlotEntry {
-                slot: &EquipmentSlot::CHEST,
-                item: &Item::GOLDEN_CHESTPLATE,
-                chance: 0.1,
-            },
-            ArmorSlotEntry {
-                slot: &EquipmentSlot::LEGS,
-                item: &Item::GOLDEN_LEGGINGS,
-                chance: 0.1,
-            },
-            ArmorSlotEntry {
-                slot: &EquipmentSlot::FEET,
-                item: &Item::GOLDEN_BOOTS,
-                chance: 0.1,
-            },
-        ];
-
         let mut m = HashMap::new();
-
-        // ─── Piglin ───
-        m.insert(
-            "piglin",
-            MobEquipmentDef {
-                entity_type: "piglin",
-                weapon: WeaponConfig::AlwaysWeighted(&PIGLIN_WEAPONS),
-                armor: ArmorConfig::CustomPerSlot(&PIGLIN_ARMOR),
-                enchanted: true,
-                can_pick_up_loot: false,
-            },
-        );
 
         // ─── Pillager ───
         m.insert(
@@ -889,7 +840,9 @@ pub fn equip_item_if_possible(mob: &dyn Mob, stack: ItemStack) -> ItemStack {
     }
 
     let drop_chance = mob_entity.drop_chance(&slot);
-    if !current.is_empty() && (rand::random::<f32>() - 0.1).max(0.0) < drop_chance {
+    if !current.is_empty()
+        && (mob_entity.living_entity.entity.random().next_f32() - 0.1).max(0.0) < drop_chance
+    {
         mob_entity.living_entity.entity.spawn_at_location(current);
     }
 

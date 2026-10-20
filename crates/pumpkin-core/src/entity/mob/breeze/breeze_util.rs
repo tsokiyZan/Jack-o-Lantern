@@ -2,8 +2,8 @@
 
 use pumpkin_data::attributes::Attributes;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 use pumpkin_world::clip::{ClipBlock, ClipContext, ClipFluid};
-use rand::{Rng, RngExt};
 
 use super::breeze_ai::{JUMP_CIRCLE_INNER_RADIUS, JUMP_CIRCLE_MIDDLE_RADIUS};
 use crate::entity::mob::Mob;
@@ -14,27 +14,18 @@ const MAX_LINE_OF_SIGHT_TEST_RANGE: f64 = 50.0;
 /// The `spreadDegrees` of vanilla `BreezeUtil.randomPointBehindTarget`.
 const SPREAD_DEGREES: f32 = 90.0;
 
-/// Vanilla `RandomSource.nextGaussian`, the polar method of `MarsagliaPolarGaussian`.
-fn next_gaussian(random: &mut impl Rng) -> f64 {
-    loop {
-        let x = 2.0 * random.random::<f64>() - 1.0;
-        let y = 2.0 * random.random::<f64>() - 1.0;
-        let s = x * x + y * y;
-        if s < 1.0 && s != 0.0 {
-            return x * (-2.0 * s.ln() / s).sqrt();
-        }
-    }
-}
-
 /// Vanilla `BreezeUtil.randomPointBehindTarget`: four to eight blocks behind where `enemy`
 /// looks, spread around its back.
 #[must_use]
-pub fn random_point_behind_target(enemy: &dyn EntityBase, random: &mut impl Rng) -> Vector3<f64> {
+pub fn random_point_behind_target(
+    enemy: &dyn EntityBase,
+    random: &mut impl RandomImpl,
+) -> Vector3<f64> {
     let entity = enemy.get_entity();
     let view_angle =
-        entity.head_yaw.load() + 180.0 + next_gaussian(random) as f32 * SPREAD_DEGREES / 2.0;
+        entity.head_yaw.load() + 180.0 + random.next_gaussian() as f32 * SPREAD_DEGREES / 2.0;
     let r = pumpkin_util::math::lerp(
-        random.random::<f32>(),
+        random.next_f32(),
         JUMP_CIRCLE_INNER_RADIUS,
         JUMP_CIRCLE_MIDDLE_RADIUS,
     );

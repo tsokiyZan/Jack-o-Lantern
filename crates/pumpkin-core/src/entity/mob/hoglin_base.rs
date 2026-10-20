@@ -5,7 +5,7 @@ use std::sync::atomic::Ordering;
 use pumpkin_data::attributes::Attributes;
 use pumpkin_data::damage::DamageType;
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use crate::enchantment::EnchantmentHelper;
 use crate::entity::EntityBase;
@@ -25,7 +25,16 @@ pub fn hurt_and_throw_target(body: &dyn Mob, target: &dyn EntityBase) -> bool {
         .get_attribute_value(&Attributes::ATTACK_DAMAGE) as f32;
     let is_baby = body.get_entity().is_baby();
     let actual_damage = if !is_baby && attack_damage as i32 > 0 {
-        attack_damage / 2.0 + body.get_random().random_range(0..attack_damage as i32) as f32
+        // `level.getRandom().nextInt((int) attackDamage)`.
+        let roll = body
+            .get_entity()
+            .world
+            .load()
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .next_bounded_i32(attack_damage as i32);
+        attack_damage / 2.0 + roll as f32
     } else {
         attack_damage
     };
@@ -77,14 +86,25 @@ pub fn throw_target(body: &dyn Mob, target: &dyn EntityBase) {
     let target_pos = target_entity.pos.load();
     let xd = target_pos.x - body_pos.x;
     let zd = target_pos.z - body_pos.z;
-    let mut random = body.get_random();
+    // `body.level().getRandom()`.
+    let (angle_roll, horizontal_roll, vertical_roll) = {
+        let world = body.get_entity().world.load();
+        let mut random = world
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        (
+            random.next_bounded_i32(21),
+            random.next_f32(),
+            random.next_f32(),
+        )
+    };
     // Vanilla passes these degrees to `yRot` as radians.
-    let horizontal_push_angle = (random.random_range(0..21) - 10) as f32;
-    let horizontal_scale =
-        effective_knockback_power * f64::from(random.random::<f32>() * 0.5 + 0.2);
+    let horizontal_push_angle = (angle_roll - 10) as f32;
+    let horizontal_scale = effective_knockback_power * f64::from(horizontal_roll * 0.5 + 0.2);
     let horizontal_push_vector =
         (Vector3::new(xd, 0.0, zd).normalize() * horizontal_scale).y_rot(horizontal_push_angle);
-    let vertical_scale = effective_knockback_power * f64::from(random.random::<f32>()) * 0.5;
+    let vertical_scale = effective_knockback_power * f64::from(vertical_roll) * 0.5;
     target.push_impulse(Vector3::new(
         horizontal_push_vector.x,
         vertical_scale,

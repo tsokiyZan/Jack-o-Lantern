@@ -29,6 +29,7 @@ use pumpkin_util::math;
 use pumpkin_util::math::boundingbox::EntityDimensions;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 use pumpkin_world::world::BlockFlags;
 use rand::RngExt;
 
@@ -206,6 +207,12 @@ impl RabbitEntity {
             );
         };
 
+        // The field `idleAnimationTimeout = this.random.nextInt(40) + 180` only feeds the
+        // client's animation, but its initializer draws on the server too. Java runs it after
+        // `Mob`'s constructor has called `registerGoals`; nothing between it and the end of
+        // vanilla's constructor draws.
+        mob_arc.get_entity().random().next_bounded_i32(40);
+
         mob_arc
     }
 
@@ -338,9 +345,11 @@ impl RabbitEntity {
             .jumping
             .store(jump, Ordering::Relaxed);
         if jump {
-            let mut random = self.get_random();
             // Vanilla rounds each product, so no fused multiply-add.
-            let pitch = ((random.random::<f32>() - random.random::<f32>()) * 0.2 + 1.0) * 0.8;
+            let pitch = {
+                let mut random = self.get_entity().random();
+                ((random.next_f32() - random.next_f32()) * 0.2 + 1.0) * 0.8
+            };
             self.play_sound_at_self(Sound::EntityRabbitJump, self.sound_volume(), pitch);
         }
     }
@@ -446,7 +455,7 @@ impl Mob for RabbitEntity {
 
         let ticks = self.more_carrot_ticks.load(Ordering::Relaxed);
         if ticks > 0 {
-            let ticks = ticks - self.get_random().random_range(0..3);
+            let ticks = ticks - self.get_entity().random().next_bounded_i32(3);
             self.more_carrot_ticks
                 .store(ticks.max(0), Ordering::Relaxed);
         }

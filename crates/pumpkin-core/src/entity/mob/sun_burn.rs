@@ -6,6 +6,7 @@ use pumpkin_data::item_stack::DamageResult;
 use crate::entity::mob::Mob;
 use crate::entity::{Entity, EntityBase, equipment_break_status};
 use crate::world::brightness::DAYLIGHT_BRIGHTNESS;
+use pumpkin_util::random::RandomImpl;
 
 /// Fire an unprotected mob is set alight for.
 const BURN_SECONDS: f32 = 8.0;
@@ -30,7 +31,10 @@ fn is_sun_burn_tick(entity: &Entity) -> bool {
     // Vanilla getLightLevelDependentMagicValue: block light counts too.
     let brightness = world.light_level_dependent_magic_value_with_sky(&eye, sky_light);
     // Nearly every tick ends at the roll: the sky and wet checks stay behind it.
-    if !passes_burn_roll(brightness, rand::random()) {
+    // Vanilla draws `this.random.nextFloat()` only once `br > 0.5F` holds.
+    if !(brightness > DAYLIGHT_BRIGHTNESS
+        && passes_burn_roll(brightness, entity.random().next_f32()))
+    {
         return false;
     }
     if !world.can_see_sky_with_light(&eye, sky_light) {
@@ -75,8 +79,10 @@ fn burn(mob: &dyn Mob) {
         return;
     }
 
-    // 0 or 1 wear, thinned out by Unbreaking.
-    match stack.hurt_and_break(&entity.world.load(), rand::random_range(0..2)) {
+    // 0 or 1 wear, thinned out by Unbreaking. Drawn first: a guard in the `match`
+    // scrutinee would live through every arm.
+    let wear = entity.random().next_bounded_i32(2);
+    match stack.hurt_and_break(&entity.world.load(), wear) {
         DamageResult::Untouched => {}
         DamageResult::Damaged => {
             mob_entity.set_item_slot(&slot, stack);

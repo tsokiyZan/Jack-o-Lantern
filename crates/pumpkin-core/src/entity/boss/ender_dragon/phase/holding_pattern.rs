@@ -3,8 +3,8 @@ use std::sync::{Arc, Mutex};
 
 use crossbeam::atomic::AtomicCell;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 use pumpkin_world::chunk::ChunkHeightmapType;
-use rand::RngExt;
 
 use super::{DragonPhaseInstance, EnderDragonPhase, navigate_to_next_path_node};
 use crate::entity::EntityBase;
@@ -32,7 +32,7 @@ impl DragonHoldingPatternPhase {
         if path_done {
             let egg = dragon.podium_heightmap_pos(ChunkHeightmapType::MotionBlockingNoLeaves);
             let crystals = dragon.alive_crystals().unwrap_or(0);
-            if dragon.get_random().random_range(0..crystals + 3) == 0 {
+            if dragon.get_entity().random().next_bounded_i32(crystals + 3) == 0 {
                 dragon.set_phase(EnderDragonPhase::LandingApproach);
                 return;
             }
@@ -48,8 +48,13 @@ impl DragonHoldingPatternPhase {
                     / 512.0
             });
             if let Some(player) = player_nearest_to_egg
-                && (dragon.get_random().random_range(0..(dist_sqr + 2.0) as i32) == 0
-                    || dragon.get_random().random_range(0..crystals + 2) == 0)
+                && {
+                    // One guard for both draws; `||` still skips the second draw when the
+                    // first succeeds, as vanilla does.
+                    let mut random = dragon.get_entity().random();
+                    random.next_bounded_i32((dist_sqr + 2.0) as i32) == 0
+                        || random.next_bounded_i32(crystals + 2) == 0
+                }
             {
                 Self::strafe_player(dragon, player);
                 return;
@@ -63,7 +68,7 @@ impl DragonHoldingPatternPhase {
         if current_path.as_ref().is_none_or(DragonPath::is_done) {
             let current_node_index = dragon.find_closest_node();
             let mut target_node_index = current_node_index as i32;
-            if dragon.get_random().random_range(0..8) == 0 {
+            if dragon.get_entity().random().next_bounded_i32(8) == 0 {
                 self.clockwise.fetch_xor(true, Relaxed);
                 target_node_index += 6;
             }

@@ -199,9 +199,11 @@ impl BlockBehaviour for DropperBlock {
                     triangle(&mut rng(), facing.z * rd, 0.017_227_5 * 6.),
                 );
 
-                let item_entity = Arc::new(ItemEntity::new_with_velocity(
-                    entity, drop_item, velocity, 40,
-                ));
+                // Vanilla `new ItemEntity(level, x, y, z, stack)` takes the item's own two
+                // velocity draws before `setDeltaMovement` replaces them.
+                let item_entity = Arc::new(ItemEntity::new(entity, drop_item));
+                item_entity.get_entity().velocity.store(velocity);
+                item_entity.set_pickup_delay(40);
                 args.world.spawn_entity(item_entity);
 
                 args.world

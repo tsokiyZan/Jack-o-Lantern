@@ -24,7 +24,6 @@ pub fn get_pos_towards(
         Vector3::new(block_pos.0.x, block_pos.0.y, block_pos.0.z),
         world.clone(),
     );
-    let mut rng = mob.get_random();
 
     random_pos::generate_random_pos(
         || {
@@ -32,7 +31,6 @@ pub fn get_pos_towards(
                 mob,
                 &world,
                 &mut context,
-                &mut rng,
                 horizontal_dist,
                 vertical_dist,
                 flying_height,

@@ -57,6 +57,7 @@ use pumpkin_util::math::{
     vector3::Vector3,
     wrap_degrees,
 };
+use pumpkin_util::random::RandomImpl;
 use pumpkin_util::text::TextComponent;
 use pumpkin_util::text::hover::HoverEvent;
 use pumpkin_util::version::JavaMinecraftVersion;
@@ -1774,9 +1775,6 @@ impl Entity {
         f64::from(self.entity_dimension.load().eye_height)
     }
 
-    /// Updates the entity's position, block position, and chunk position.
-    ///
-    /// This function calculates the new position, block position, and chunk position based on the provided coordinates. If any of these values change, the corresponding fields are updated.
     /// Vanilla `Entity.getRandom()`. Draw into locals and drop the guard before calling on.
     pub fn random(
         &self,
@@ -1786,6 +1784,9 @@ impl Entity {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
+    /// Updates the entity's position, block position, and chunk position.
+    ///
+    /// This function calculates the new position, block position, and chunk position based on the provided coordinates. If any of these values change, the corresponding fields are updated.
     pub fn set_pos(&self, new_position: Vector3<f64>) {
         let pos = self.pos.load();
         if pos != new_position {
@@ -2056,9 +2057,9 @@ impl Entity {
 
         // `xd * xd + zd * zd < 1.0E-5F`, rounded like vanilla, no fused multiply-add.
         while x * x + z * z < f64::from(1.0e-5f32) {
-            x = (rand::random::<f64>() - rand::random::<f64>()) * 0.01;
-
-            z = (rand::random::<f64>() - rand::random::<f64>()) * 0.01;
+            let mut random = self.random();
+            x = (random.next_f64() - random.next_f64()) * 0.01;
+            z = (random.next_f64() - random.next_f64()) * 0.01;
         }
 
         let var8 = Vector3::new(x, 0.0, z).normalize() * strength;
@@ -2901,7 +2902,8 @@ impl Entity {
             }
         }
 
-        let amplitude = rand::random::<f64>() * 0.2 + 0.1;
+        // `float speed = this.random.nextFloat() * 0.2F + 0.1F`, in float.
+        let amplitude = f64::from(self.random().next_f32() * 0.2 + 0.1);
 
         let axis = direction.to_axis().into();
 
@@ -3307,8 +3309,9 @@ impl Entity {
         let mut z = z;
         // `xd * xd + zd * zd < 1.0E-5F`, rounded like vanilla.
         while x * x + z * z < f64::from(1.0e-5f32) {
-            x = (rand::random::<f64>() - rand::random::<f64>()) * 0.01;
-            z = (rand::random::<f64>() - rand::random::<f64>()) * 0.01;
+            let mut random = self.random();
+            x = (random.next_f64() - random.next_f64()) * 0.01;
+            z = (random.next_f64() - random.next_f64()) * 0.01;
         }
 
         let var8 = Vector3::new(x, 0.0, z).normalize() * strength;
@@ -4144,23 +4147,25 @@ impl Entity {
 
     /// Vanilla `Entity.getRandomX`.
     pub fn get_random_x(&self, spread: f64) -> f64 {
-        self.pos.load().x + f64::from(self.width()) * ((2.0 * rand::random::<f64>() - 1.0) * spread)
+        self.pos.load().x
+            + f64::from(self.width()) * ((2.0 * self.random().next_f64() - 1.0) * spread)
     }
 
     /// Vanilla `Entity.getRandomY()`.
     pub fn get_random_y(&self) -> f64 {
-        self.pos.load().y + f64::from(self.height()) * rand::random::<f64>()
+        self.pos.load().y + f64::from(self.height()) * self.random().next_f64()
     }
 
     /// Vanilla `Entity.getRandomY(double)`.
     pub fn get_random_y_spread(&self, spread: f64) -> f64 {
         self.pos.load().y
-            + f64::from(self.height()) * ((2.0 * rand::random::<f64>() - 1.0) * spread)
+            + f64::from(self.height()) * ((2.0 * self.random().next_f64() - 1.0) * spread)
     }
 
     /// Vanilla `Entity.getRandomZ`.
     pub fn get_random_z(&self, spread: f64) -> f64 {
-        self.pos.load().z + f64::from(self.width()) * ((2.0 * rand::random::<f64>() - 1.0) * spread)
+        self.pos.load().z
+            + f64::from(self.width()) * ((2.0 * self.random().next_f64() - 1.0) * spread)
     }
 
     pub fn is_removed(&self) -> bool {
@@ -5409,7 +5414,6 @@ impl Flag {
 /// Vanilla `Entity.random = RandomSource.create()`, then the two `nextLong`s
 /// `uuid = Mth.createInsecureUUID(this.random)` takes; Pumpkin keeps the UUID it was given.
 fn new_entity_random() -> pumpkin_util::random::legacy_rand::LegacyRand {
-    use pumpkin_util::random::RandomImpl;
     let mut random =
         pumpkin_util::random::legacy_rand::LegacyRand::from_seed(pumpkin_util::random::get_seed());
     random.next_i64();

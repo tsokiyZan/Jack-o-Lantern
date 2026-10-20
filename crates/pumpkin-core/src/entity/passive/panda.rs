@@ -19,7 +19,7 @@ use pumpkin_util::GameMode;
 use pumpkin_util::math;
 use pumpkin_util::math::boundingbox::EntityDimensions;
 use pumpkin_util::math::vector3::Vector3;
-use rand::{Rng, RngExt};
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::ai::control::move_control::MoveControl;
 use crate::entity::ai::control::{Control, MoveControlTrait};
@@ -143,8 +143,8 @@ impl PandaGene {
     }
 
     /// Vanilla `Gene.getRandom`.
-    pub fn get_random(random: &mut impl Rng) -> Self {
-        let next_int = random.random_range(0..16);
+    pub fn get_random(random: &mut impl RandomImpl) -> Self {
+        let next_int = random.next_bounded_i32(16);
         if next_int == 0 {
             Self::Lazy
         } else if next_int == 1 {
@@ -547,12 +547,11 @@ impl PandaEntity {
 
     /// Vanilla `Panda.handleEating`.
     fn handle_eating(&self) {
-        let mut random = self.get_random();
         if !self.is_eating()
             && self.is_sitting()
             && !self.is_scared()
             && !self.main_hand().is_empty()
-            && random.random_range(0..80) == 1
+            && self.get_entity().random().next_bounded_i32(80) == 1
         {
             self.eat(true);
         } else if self.main_hand().is_empty() || !self.is_sitting() {
@@ -563,7 +562,7 @@ impl PandaEntity {
             return;
         }
         self.add_eating_particles();
-        if self.get_eat_counter() > 80 && random.random_range(0..20) == 1 {
+        if self.get_eat_counter() > 80 && self.get_entity().random().next_bounded_i32(20) == 1 {
             if self.get_eat_counter() > 100
                 && self
                     .main_hand()
@@ -586,13 +585,23 @@ impl PandaEntity {
     }
 
     /// Vanilla `Panda.addEatingParticles`. The item particles are the client's own, so only the
-    /// sound is left on the server.
+    /// sound is left on the server, but the server still draws the particles' random numbers.
     fn add_eating_particles(&self) {
         if self.get_eat_counter() % EAT_TICK_INTERVAL == 0 {
-            let mut random = self.get_random();
-            let volume = 0.5 + 0.5 * random.random_range(0..2) as f32;
-            let pitch = (random.random::<f32>() - random.random::<f32>()) * 0.2 + 1.0;
+            let (volume, pitch) = {
+                let mut random = self.get_entity().random();
+                let volume = 0.5 + 0.5 * random.next_bounded_i32(2) as f32;
+                (volume, (random.next_f32() - random.next_f32()) * 0.2 + 1.0)
+            };
             self.play_sound_at_self(Sound::EntityPandaEat, volume, pitch);
+            if !self.main_hand().is_empty() {
+                // Six particles, each with three velocity and three position `nextFloat`s;
+                // `addParticle` does nothing on the server.
+                let mut random = self.get_entity().random();
+                for _ in 0..6 * 6 {
+                    random.next_f32();
+                }
+            }
         }
     }
 
@@ -730,33 +739,40 @@ impl PandaEntity {
 
     /// Vanilla `Panda.setGeneFromParents`.
     pub fn set_gene_from_parents(&self, parent1: &Self, parent2: Option<&Self>) {
-        let mut random = self.get_random();
+        // `this.random`, one lock per draw: the parents draw from their own randoms in
+        // between.
+        let random = || self.get_entity().random();
         if let Some(parent2) = parent2 {
-            if random.random::<bool>() {
+            if random().next_bool() {
                 self.set_main_gene(parent1.get_one_of_genes_randomly());
                 self.set_hidden_gene(parent2.get_one_of_genes_randomly());
             } else {
                 self.set_main_gene(parent2.get_one_of_genes_randomly());
                 self.set_hidden_gene(parent1.get_one_of_genes_randomly());
             }
-        } else if random.random::<bool>() {
+        } else if random().next_bool() {
             self.set_main_gene(parent1.get_one_of_genes_randomly());
-            self.set_hidden_gene(PandaGene::get_random(&mut random));
+            let gene = PandaGene::get_random(&mut *random());
+            self.set_hidden_gene(gene);
         } else {
-            self.set_main_gene(PandaGene::get_random(&mut random));
+            let gene = PandaGene::get_random(&mut *random());
+            self.set_main_gene(gene);
             self.set_hidden_gene(parent1.get_one_of_genes_randomly());
         }
 
-        if random.random_range(0..32) == 0 {
-            self.set_main_gene(PandaGene::get_random(&mut random));
+        if random().next_bounded_i32(32) == 0 {
+            let gene = PandaGene::get_random(&mut *random());
+            self.set_main_gene(gene);
         }
-        if random.random_range(0..32) == 0 {
-            self.set_hidden_gene(PandaGene::get_random(&mut random));
+        if random().next_bounded_i32(32) == 0 {
+            let gene = PandaGene::get_random(&mut *random());
+            self.set_hidden_gene(gene);
         }
     }
 
     fn get_one_of_genes_randomly(&self) -> PandaGene {
-        if self.get_random().random::<bool>() {
+        let main = self.get_entity().random().next_bool();
+        if main {
             self.get_main_gene()
         } else {
             self.get_hidden_gene()
@@ -992,12 +1008,20 @@ impl Mob for PandaEntity {
     /// babies.
     fn finalize_spawn(
         &self,
-        _world: &Arc<World>,
+        world: &Arc<World>,
         group_data: Option<SpawnGroupData>,
     ) -> Option<SpawnGroupData> {
-        let mut random = self.get_random();
-        self.set_main_gene(PandaGene::get_random(&mut random));
-        self.set_hidden_gene(PandaGene::get_random(&mut random));
+        // `RandomSource random = level.getRandom()`.
+        let (main, hidden) = {
+            let mut random = world
+                .random
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let main = PandaGene::get_random(&mut *random);
+            (main, PandaGene::get_random(&mut *random))
+        };
+        self.set_main_gene(main);
+        self.set_hidden_gene(hidden);
         self.set_attributes();
         let group_data = group_data.or(Some(SpawnGroupData::ageable(BABY_SPAWN_CHANCE)));
         let group_data = self.finalize_ageable_spawn(group_data);
@@ -1301,11 +1325,10 @@ impl Goal for PandaSitGoal {
         let Some(panda) = as_panda(mob) else {
             return false;
         };
-        let mut random = mob.get_random();
-        if !panda.get_entity().is_in_water()
-            && (panda.is_lazy() || random.random_range(0..to_goal_ticks(600)) != 1)
-        {
-            random.random_range(0..to_goal_ticks(2000)) != 1
+        // The panda's own random, one lock per draw.
+        let roll = |bound: i32| mob.get_entity().random().next_bounded_i32(bound);
+        if !panda.get_entity().is_in_water() && (panda.is_lazy() || roll(to_goal_ticks(600)) != 1) {
+            roll(to_goal_ticks(2000)) != 1
         } else {
             false
         }
@@ -1354,11 +1377,12 @@ impl Goal for PandaSitGoal {
             panda
                 .mob_entity
                 .set_item_slot(&EquipmentSlot::MAIN_HAND, ItemStack::EMPTY.clone());
-            let mut random = mob.get_random();
+            // The panda's own random, one lock per draw.
+            let roll = |bound: i32| mob.get_entity().random().next_bounded_i32(bound);
             let wait_seconds = if panda.is_lazy() {
-                random.random_range(0..50) + 10
+                roll(50) + 10
             } else {
-                random.random_range(0..150) + 10
+                roll(150) + 10
             };
             self.cooldown =
                 panda.get_entity().tick_count.load(Ordering::Relaxed) + wait_seconds * 20;
@@ -1382,7 +1406,11 @@ impl Goal for PandaLieOnBackGoal {
             self.cooldown < panda.get_entity().tick_count.load(Ordering::Relaxed)
                 && panda.is_lazy()
                 && panda.can_perform_action()
-                && mob.get_random().random_range(0..to_goal_ticks(400)) == 1
+                && mob
+                    .get_entity()
+                    .random()
+                    .next_bounded_i32(to_goal_ticks(400))
+                    == 1
         })
     }
 
@@ -1390,11 +1418,10 @@ impl Goal for PandaLieOnBackGoal {
         let Some(panda) = as_panda(mob) else {
             return false;
         };
-        let mut random = mob.get_random();
-        if !panda.get_entity().is_in_water()
-            && (panda.is_lazy() || random.random_range(0..to_goal_ticks(600)) != 1)
-        {
-            random.random_range(0..to_goal_ticks(2000)) != 1
+        // The panda's own random, one lock per draw.
+        let roll = |bound: i32| mob.get_entity().random().next_bounded_i32(bound);
+        if !panda.get_entity().is_in_water() && (panda.is_lazy() || roll(to_goal_ticks(600)) != 1) {
+            roll(to_goal_ticks(2000)) != 1
         } else {
             false
         }
@@ -1426,11 +1453,12 @@ impl Goal for PandaSneezeGoal {
         if !panda.get_entity().is_baby() || !panda.can_perform_action() {
             return false;
         }
-        let mut random = mob.get_random();
-        if panda.is_weak() && random.random_range(0..to_goal_ticks(500)) == 1 {
+        // The panda's own random, one lock per draw.
+        let roll = |bound: i32| mob.get_entity().random().next_bounded_i32(bound);
+        if panda.is_weak() && roll(to_goal_ticks(500)) == 1 {
             true
         } else {
-            random.random_range(0..to_goal_ticks(6000)) == 1
+            roll(to_goal_ticks(6000)) == 1
         }
     }
 
@@ -1476,11 +1504,12 @@ impl Goal for PandaRollGoal {
         if entity.world.load().get_block_state(&below).is_air() {
             return true;
         }
-        let mut random = mob.get_random();
-        if panda.is_playful() && random.random_range(0..to_goal_ticks(60)) == 1 {
+        // The panda's own random, one lock per draw.
+        let roll = |bound: i32| mob.get_entity().random().next_bounded_i32(bound);
+        if panda.is_playful() && roll(to_goal_ticks(60)) == 1 {
             true
         } else {
-            random.random_range(0..to_goal_ticks(500)) == 1
+            roll(to_goal_ticks(500)) == 1
         }
     }
 
@@ -1545,7 +1574,7 @@ impl Goal for PandaLookAtPlayerGoal {
         let Some(panda) = as_panda(mob) else {
             return false;
         };
-        if mob.get_random().random::<f32>() >= Self::PROBABILITY {
+        if mob.get_entity().random().next_f32() >= Self::PROBABILITY {
             return false;
         }
         let mut look_at = panda
@@ -1584,7 +1613,8 @@ impl Goal for PandaLookAtPlayerGoal {
     }
 
     fn start(&mut self, mob: &dyn Mob) {
-        self.look_time = self.get_tick_count(40 + mob.get_random().random_range(0..40));
+        let extra = mob.get_entity().random().next_bounded_i32(40);
+        self.look_time = self.get_tick_count(40 + extra);
     }
 
     fn stop(&mut self, mob: &dyn Mob) {

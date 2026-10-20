@@ -5,7 +5,7 @@ use crate::entity::mob::Mob;
 use crate::entity::player::Player;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 use std::sync::Arc;
 
 const TELEPORT_DISTANCE_SQ: f64 = 144.0;
@@ -75,21 +75,20 @@ impl FollowOwnerGoal {
         let mob_entity = &mob.get_mob_entity().living_entity.entity;
         let world = mob_entity.world.load_full();
 
-        let offsets: [(i32, i32, i32); 10] = {
-            let mut rng = mob.get_random();
-            std::array::from_fn(|_| {
+        // Vanilla `TamableAnimal.teleportToAroundBlockPos`: y is only drawn for far enough
+        // offsets, and the draws stop at the first successful teleport.
+        for _ in 0..10 {
+            let (dx, dz) = {
+                let mut random = mob_entity.random();
                 (
-                    rng.random_range(-3..=3),
-                    rng.random_range(-1..=1),
-                    rng.random_range(-3..=3),
+                    random.next_int_between_inclusive(-3, 3),
+                    random.next_int_between_inclusive(-3, 3),
                 )
-            })
-        };
-
-        for (dx, dy, dz) in offsets {
+            };
             if dx.abs() < 2 && dz.abs() < 2 {
                 continue;
             }
+            let dy = mob_entity.random().next_int_between_inclusive(-1, 1);
 
             let target_x = owner_pos.x.floor() as i32 + dx;
             let target_y = owner_pos.y.floor() as i32 + dy;

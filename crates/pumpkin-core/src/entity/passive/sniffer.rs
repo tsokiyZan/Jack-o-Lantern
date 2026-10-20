@@ -13,7 +13,7 @@ use pumpkin_protocol::codec::var_int::VarInt;
 use pumpkin_util::math::boundingbox::EntityDimensions;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::{
     Entity, EntityBase,
@@ -389,8 +389,10 @@ impl Animal for SnifferEntity {
     fn spawn_child_from_breeding(&self, tick: &mut BrainTick<'_>, partner: &dyn EntityBase) {
         let position = self.get_entity().pos.load();
         BreedGoal::finalize_spawn_child_from_breeding(tick.mob, partner);
-        let mut random = self.get_random();
-        let pitch = (random.random::<f32>() - random.random::<f32>()) * 0.2 + 0.5;
+        let pitch = {
+            let mut random = self.get_entity().random();
+            (random.next_f32() - random.next_f32()) * 0.2 + 0.5
+        };
         self.play_sound_at_self(Sound::BlockSnifferEggPlop, 1.0, pitch);
         tick.world
             .spawn_item_at(position, ItemStack::new(1, &Item::SNIFFER_EGG));
@@ -399,9 +401,16 @@ impl Animal for SnifferEntity {
     /// Vanilla `Sniffer.playEatingSound`.
     fn play_eating_sound(&self, _sound: Sound) {
         let entity = self.get_entity();
-        // Vanilla `Mth.randomBetween(random, 0.8F, 1.2F)`.
-        let pitch = self.get_random().random::<f32>() * (1.2 - 0.8) + 0.8;
-        entity.world.load().play_sound_fine(
+        // Vanilla `Mth.randomBetween(this.level().getRandom(), 0.8F, 1.2F)`.
+        let world = entity.world.load();
+        let pitch = world
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .next_f32()
+            * (1.2 - 0.8)
+            + 0.8;
+        world.play_sound_fine(
             Sound::EntitySnifferEat,
             SoundCategory::Neutral,
             &entity.pos.load(),

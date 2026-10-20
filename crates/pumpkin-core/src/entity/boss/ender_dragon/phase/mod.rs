@@ -7,12 +7,11 @@ use pumpkin_data::damage::DamageType;
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::tracked_data;
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use super::EnderDragonEntity;
 use super::path::DragonPath;
 use crate::entity::EntityBase;
-use crate::entity::mob::Mob;
 
 mod charge_player;
 mod death;
@@ -151,7 +150,7 @@ fn sitting_on_hurt(direct: Option<&dyn EntityBase>, damage: f32) -> f32 {
 /// The y the path phases aim for over a path node: up to 20 blocks above it.
 fn random_height_above(dragon: &EnderDragonEntity, y: i32) -> f64 {
     loop {
-        let y_target = f64::from(y as f32 + dragon.get_random().random::<f32>() * 20.0);
+        let y_target = f64::from(y as f32 + dragon.get_entity().random().next_f32() * 20.0);
         if y_target >= f64::from(y) {
             return y_target;
         }

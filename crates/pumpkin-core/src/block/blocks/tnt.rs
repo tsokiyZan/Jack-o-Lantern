@@ -205,13 +205,23 @@ impl BlockBehaviour for TNTBlock {
         if !args.world.level_info.load().game_rules.tnt_explodes {
             return;
         }
-        let fuse = TNTEntity::random_short_fuse(TNTEntity::DEFAULT_FUSE);
+        // The constructor's launch draw comes first, then
+        // `setFuse(getRandomShortFuse(getFuse(), level.getRandom()))` (TntBlock.java:73-74).
         let tnt = TNTEntity::primed(
             args.world,
             args.position,
-            fuse,
+            TNTEntity::DEFAULT_FUSE,
             args.explosion.indirect_source_entity().as_ref(),
         );
+        let fuse = TNTEntity::random_short_fuse(
+            tnt.fuse(),
+            &mut *args
+                .world
+                .random
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+        );
+        tnt.set_fuse(fuse);
         args.world.spawn_entity(tnt);
     }
 

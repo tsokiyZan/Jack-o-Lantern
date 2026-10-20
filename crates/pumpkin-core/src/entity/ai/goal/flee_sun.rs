@@ -4,7 +4,7 @@ use crate::entity::mob::Mob;
 use crate::entity::mob::sun_burn;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 pub struct FleeSunGoal {
     goal_control: Controls,
@@ -42,14 +42,15 @@ impl FleeSunGoal {
     fn get_hide_pos(mob: &dyn Mob) -> Option<Vector3<f64>> {
         let pos = mob.get_entity().block_pos.load();
         let world = mob.get_entity().world.load();
-        let mut rng = mob.get_random();
 
         for _ in 0..10 {
-            let random_pos = BlockPos::new(
-                pos.0.x + rng.random_range(0..20) - 10,
-                pos.0.y + rng.random_range(0..6) - 3,
-                pos.0.z + rng.random_range(0..20) - 10,
-            );
+            let random_pos = {
+                let mut random = mob.get_entity().random();
+                let dx = random.next_bounded_i32(20) - 10;
+                let dy = random.next_bounded_i32(6) - 3;
+                let dz = random.next_bounded_i32(20) - 10;
+                BlockPos::new(pos.0.x + dx, pos.0.y + dy, pos.0.z + dz)
+            };
             if !world.can_see_sky(&random_pos) && mob.get_walk_target_value(&random_pos) < 0.0 {
                 return Some(Vector3::new(
                     f64::from(random_pos.0.x) + 0.5,

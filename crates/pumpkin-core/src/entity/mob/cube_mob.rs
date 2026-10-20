@@ -20,7 +20,7 @@ use pumpkin_util::math::boundingbox::EntityDimensions;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
 use pumpkin_util::math::wrap_degrees_90;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use crate::enchantment::EnchantmentHelper;
 use crate::entity::ageable::{AgeableData, AgeableMob};
@@ -226,7 +226,7 @@ impl CubeMobEntity {
     }
 
     fn get_jump_delay(&self) -> i32 {
-        let delay = self.get_random().random_range(0..20) + 10;
+        let delay = self.get_entity().random().next_bounded_i32(20) + 10;
         match self.kind {
             CubeKind::Slime | CubeKind::SulfurCube => delay,
             CubeKind::MagmaCube => delay * 4,
@@ -239,8 +239,8 @@ impl CubeMobEntity {
 
     fn get_sound_pitch(&self) -> f32 {
         let pitch_adjuster = if self.is_tiny() { 1.4 } else { 0.8 };
-        let mut rng = self.get_random();
-        ((rng.random::<f32>() - rng.random::<f32>()) * 0.2 + 1.0) * pitch_adjuster
+        let mut rng = self.get_entity().random();
+        ((rng.next_f32() - rng.next_f32()) * 0.2 + 1.0) * pitch_adjuster
     }
 
     fn get_jump_sound(&self) -> Sound {
@@ -321,8 +321,8 @@ impl CubeMobEntity {
             )
         {
             let pitch = {
-                let mut rng = self.get_random();
-                (rng.random::<f32>() - rng.random::<f32>()) * 0.2 + 1.0
+                let mut rng = self.get_entity().random();
+                (rng.next_f32() - rng.next_f32()) * 0.2 + 1.0
             };
             self.play_sound(Sound::EntitySlimeAttack, 1.0, pitch);
             EnchantmentHelper::do_post_attack_effects(
@@ -522,11 +522,16 @@ impl Mob for CubeMobEntity {
             *group_size += 1;
         }
         let difficulty = RegionalDifficulty::at(world, self.get_entity().pos.load());
-        let mut rng = rand::rng();
-        let mut size_scale = rng.random_range(0..3);
-        if size_scale < 2 && rng.random::<f32>() < 0.5 * difficulty.special_multiplier {
+        // `level.getRandom()`.
+        let mut rng = world
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut size_scale = rng.next_bounded_i32(3);
+        if size_scale < 2 && rng.next_f32() < 0.5 * difficulty.special_multiplier {
             size_scale += 1;
         }
+        drop(rng);
         self.set_size(1 << size_scale, true);
         Some(group_data)
     }
@@ -550,16 +555,16 @@ impl Mob for CubeMobEntity {
         if on_ground && !was_on_ground {
             let size = entity.entity_dimension.load().width * 2.0;
             let pitch = {
-                let mut rng = self.get_random();
+                let mut rng = self.get_entity().random();
                 // The landing particles are the client's, but the server draws their random
                 // numbers too.
                 let mut i = 0;
                 while (i as f32) < size * 16.0 {
-                    rng.random::<f32>();
-                    rng.random::<f32>();
+                    rng.next_f32();
+                    rng.next_f32();
                     i += 1;
                 }
-                ((rng.random::<f32>() - rng.random::<f32>()) * 0.2 + 1.0) / 0.8
+                ((rng.next_f32() - rng.next_f32()) * 0.2 + 1.0) / 0.8
             };
             self.play_sound(self.get_squish_sound(), self.get_sound_volume(), pitch);
             self.target_squish.store(-0.5);
@@ -657,7 +662,7 @@ impl Mob for CubeMobEntity {
         let half_size = size / 2;
         // `getSplitCount`.
         let count = self.sulfur.as_ref().map_or_else(
-            || 2 + self.get_random().random_range(0..3),
+            || 2 + self.get_entity().random().next_bounded_i32(3),
             sulfur_cube::SulfurCubeData::split_count,
         );
         for i in 0..count {
@@ -689,7 +694,8 @@ impl Mob for CubeMobEntity {
                 pos.y + 0.5,
                 pos.z + f64::from(zd),
             ));
-            child_entity.set_rotation(self.get_random().random::<f32>() * 360.0, 0.0);
+            let y_rot = self.get_entity().random().next_f32() * 360.0;
+            child_entity.set_rotation(y_rot, 0.0);
             if self.kind == CubeKind::SulfurCube {
                 cube.set_baby(true);
             }
@@ -938,7 +944,8 @@ impl Goal for CubeMobFloatGoal {
         let Some(cube) = self.cube.upgrade() else {
             return;
         };
-        if cube.get_random().random::<f32>() < 0.8 {
+        let roll = cube.get_entity().random().next_f32();
+        if roll < 0.8 {
             cube.mob_entity.jump();
         }
         cube.set_wanted_movement(1.2);
@@ -999,8 +1006,8 @@ impl Goal for CubeMobRandomDirectionGoal {
         self.next_randomize_time -= 1;
         if self.next_randomize_time <= 0 {
             let (ticks, degrees) = {
-                let mut rng = cube.get_random();
-                (40 + rng.random_range(0..60), rng.random_range(0..360))
+                let mut rng = cube.get_entity().random();
+                (40 + rng.next_bounded_i32(60), rng.next_bounded_i32(360))
             };
             self.next_randomize_time = self.get_tick_count(ticks);
             self.chosen_degrees = degrees as f32;

@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use super::{Goal, to_goal_ticks};
 use crate::entity::EntityBase;
-use crate::entity::mob::Mob;
+use crate::entity::mob::{Mob, MobEntity};
 use crate::entity::passive::schooling_fish::{SchoolingFish, others_of_same_kind, school_of};
 
 const INTERVAL_TICKS: i32 = 200;
@@ -17,16 +17,18 @@ pub struct FollowFlockLeaderGoal {
 }
 
 impl FollowFlockLeaderGoal {
+    /// Vanilla's constructor: the first start delay comes from the fish's own random.
     #[must_use]
-    pub fn new() -> Self {
+    pub fn for_mob(mob_entity: &MobEntity) -> Self {
         Self {
             time_to_recalc_path: 0,
-            next_start_tick: Self::next_start_tick(),
+            next_start_tick: Self::next_start_tick(&mob_entity.living_entity.entity),
         }
     }
 
-    fn next_start_tick() -> i32 {
-        to_goal_ticks(INTERVAL_TICKS + rand::rng().random_range(0..INTERVAL_TICKS) % 20)
+    /// Vanilla `nextStartTick`.
+    fn next_start_tick(entity: &crate::entity::Entity) -> i32 {
+        to_goal_ticks(INTERVAL_TICKS + entity.random().next_bounded_i32(INTERVAL_TICKS) % 20)
     }
 
     /// Vanilla's `AbstractSchoolingFish.addFollowers`. The limit is applied
@@ -51,12 +53,6 @@ impl FollowFlockLeaderGoal {
     }
 }
 
-impl Default for FollowFlockLeaderGoal {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl Goal for FollowFlockLeaderGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
         let Some(school) = mob.as_schooling_fish() else {
@@ -72,7 +68,7 @@ impl Goal for FollowFlockLeaderGoal {
             self.next_start_tick -= 1;
             return false;
         }
-        self.next_start_tick = Self::next_start_tick();
+        self.next_start_tick = Self::next_start_tick(mob.get_entity());
 
         let entity = mob.get_entity();
         let Some(this) = entity.world.load().get_entity_by_id(entity.entity_id) else {

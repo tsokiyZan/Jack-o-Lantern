@@ -16,7 +16,7 @@ use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::codec::var_int::VarInt;
 use pumpkin_util::GameMode;
 use pumpkin_util::math::boundingbox::EntityDimensions;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::{
     Entity, EntityBase,
@@ -211,7 +211,7 @@ impl ArmadilloEntity {
 
     /// Vanilla `Armadillo.pickNextScuteDropTime`.
     fn pick_next_scute_drop_time(&self) -> i32 {
-        self.get_random().random_range(0..SCUTE_DROP_TIME) + SCUTE_DROP_TIME
+        self.get_entity().random().next_bounded_i32(SCUTE_DROP_TIME) + SCUTE_DROP_TIME
     }
 
     /// Vanilla `Armadillo.isScaredBy`.
@@ -448,8 +448,10 @@ impl Mob for ArmadilloEntity {
                 .living_entity
                 .drop_from_gift_loot_table(ARMADILLO_SHED)
             {
-                let mut random = self.get_random();
-                let pitch = (random.random::<f32>() - random.random::<f32>()) * 0.2 + 1.0;
+                let pitch = {
+                    let mut random = self.get_entity().random();
+                    (random.next_f32() - random.next_f32()) * 0.2 + 1.0
+                };
                 self.play_sound_at_self(Sound::EntityArmadilloScuteDrop, 1.0, pitch);
                 self.game_event(GameEvent::EntityPlace);
             }

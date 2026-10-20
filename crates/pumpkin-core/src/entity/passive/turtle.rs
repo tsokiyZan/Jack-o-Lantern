@@ -32,8 +32,8 @@ use pumpkin_util::math;
 use pumpkin_util::math::boundingbox::EntityDimensions;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 use pumpkin_world::world::BlockFlags;
-use rand::RngExt;
 
 use crate::entity::{
     Entity, EntityBase,
@@ -450,7 +450,8 @@ fn turtle_breed(mob: &dyn Mob, mate: &dyn EntityBase) {
         ExperienceOrbEntity::spawn(
             &world,
             mob.get_entity().pos.load(),
-            mob.get_random().random_range(1..8),
+            // `this.animal.getRandom().nextInt(7) + 1`.
+            (mob.get_entity().random().next_bounded_i32(7) + 1) as u32,
         );
     }
 }
@@ -541,7 +542,11 @@ impl Goal for TurtleGoHomeGoal {
         if turtle.has_egg() {
             return true;
         }
-        mob.get_random().random_range(0..to_goal_ticks(700)) == 0 && !turtle.home_closer_than(64.0)
+        let roll = mob
+            .get_entity()
+            .random()
+            .next_bounded_i32(to_goal_ticks(700));
+        roll == 0 && !turtle.home_closer_than(64.0)
     }
 
     fn should_continue(&mut self, mob: &dyn Mob) -> bool {
@@ -633,10 +638,12 @@ impl Goal for TurtleTravelGoal {
         let Some(turtle) = as_turtle(mob) else {
             return;
         };
-        let mut random = mob.get_random();
-        let xt = random.random_range(0..1025) - 512;
-        let mut yt = random.random_range(0..9) - 4;
-        let zt = random.random_range(0..1025) - 512;
+        let (xt, mut yt, zt) = {
+            let mut random = mob.get_entity().random();
+            let xt = random.next_bounded_i32(1025) - 512;
+            let yt = random.next_bounded_i32(9) - 4;
+            (xt, yt, random.next_bounded_i32(1025) - 512)
+        };
         let entity = mob.get_entity();
         let pos = entity.pos.load();
         if f64::from(yt) + pos.y > f64::from(entity.world.load().sea_level - 1) {
@@ -809,7 +816,14 @@ impl Goal for TurtleLayEggGoal {
         } else if counter > self.get_tick_count(200) {
             let world = entity.world.load_full();
             let turtle_pos = entity.block_pos.load();
-            let pitch = 0.9 + mob.get_random().random::<f32>() * 0.2;
+            // `0.9F + level.getRandom().nextFloat() * 0.2F`.
+            let pitch = 0.9
+                + world
+                    .random
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .next_f32()
+                    * 0.2;
             world.play_sound_fine(
                 Sound::EntityTurtleLayEgg,
                 SoundCategory::Blocks,
@@ -823,7 +837,8 @@ impl Goal for TurtleLayEggGoal {
             );
             let egg_pos = self.goal.target_pos.up();
             let mut egg = TurtleEggProperties::default(&Block::TURTLE_EGG);
-            egg.eggs = mob.get_random().random_range(0..4) + 1;
+            // `this.turtle.random.nextInt(4) + 1`.
+            egg.eggs = (mob.get_entity().random().next_bounded_i32(4) + 1) as u8;
             let egg_state: BlockStateId = egg.to_state_id(&Block::TURTLE_EGG);
             world.set_block_state(&egg_pos, egg_state, BlockFlags::NOTIFY_ALL);
             turtle.set_has_egg(false);

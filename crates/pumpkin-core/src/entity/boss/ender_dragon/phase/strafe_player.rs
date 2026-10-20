@@ -4,12 +4,11 @@ use std::sync::{Arc, Mutex};
 use crossbeam::atomic::AtomicCell;
 use pumpkin_data::world::WorldEvent;
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use super::{DragonPhaseInstance, EnderDragonPhase, navigate_to_next_path_node};
 use crate::entity::boss::ender_dragon::path::{DragonPath, Node};
 use crate::entity::boss::ender_dragon::{EnderDragonEntity, get_y};
-use crate::entity::mob::Mob;
 use crate::entity::projectile::dragon_fireball::DragonFireballEntity;
 use crate::entity::{Entity, EntityBase};
 use pumpkin_data::entity::EntityType;
@@ -40,7 +39,7 @@ impl DragonStrafePlayerPhase {
         if current_path.as_ref().is_none_or(DragonPath::is_done) {
             let current_node_index = dragon.find_closest_node();
             let mut target_node_index = current_node_index as i32;
-            if dragon.get_random().random_range(0..8) == 0 {
+            if dragon.get_entity().random().next_bounded_i32(8) == 0 {
                 self.holding_pattern_clockwise.fetch_xor(true, Relaxed);
                 target_node_index += 6;
             }

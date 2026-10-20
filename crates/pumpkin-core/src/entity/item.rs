@@ -20,6 +20,7 @@ use pumpkin_protocol::java::client::play::{CSetEntityMetadata, Metadata};
 use pumpkin_util::math::atomic_f32::AtomicF32;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 use std::sync::atomic::Ordering::{AcqRel, Relaxed};
 
 use std::sync::{
@@ -92,13 +93,27 @@ const MERGE_MAX_COUNT: u8 = 64;
 impl ItemEntity {
     pub const DEFAULT_PICKUP_DELAY: u8 = 10;
 
+    /// Vanilla `ItemEntity(type, level)`: the `bobOffs` field initialiser's `nextFloat`
+    /// (client rendering only, so not kept), then `setYRot(random.nextFloat() * 360.0F)`.
+    fn take_construction_draws(entity: &Entity) {
+        let yaw = {
+            let mut random = entity.random();
+            random.next_f32();
+            random.next_f32() * 360.0
+        };
+        entity.yaw.store(yaw);
+    }
+
+    /// Vanilla `ItemEntity(level, x, y, z, stack)`.
     pub fn new(entity: Entity, item_stack: ItemStack) -> Self {
-        entity.velocity.store(Vector3::new(
-            rand::random::<f64>() * 0.2 - 0.1,
-            0.2,
-            rand::random::<f64>() * 0.2 - 0.1,
-        ));
-        entity.yaw.store(rand::random::<f32>() * 360.0);
+        Self::take_construction_draws(&entity);
+        let velocity = {
+            let mut random = entity.random();
+            let x = random.next_f64() * 0.2 - 0.1;
+            let z = random.next_f64() * 0.2 - 0.1;
+            Vector3::new(x, 0.2, z)
+        };
+        entity.velocity.store(velocity);
         Self::update_fire_immune(&entity, &item_stack);
 
         Self {
@@ -119,8 +134,8 @@ impl ItemEntity {
         velocity: Vector3<f64>,
         pickup_delay: u8,
     ) -> Self {
+        Self::take_construction_draws(&entity);
         entity.velocity.store(velocity);
-        entity.yaw.store(rand::random::<f32>() * 360.0);
         Self::update_fire_immune(&entity, &item_stack);
 
         Self {
