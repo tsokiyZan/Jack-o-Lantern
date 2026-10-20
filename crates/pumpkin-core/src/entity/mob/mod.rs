@@ -1197,10 +1197,6 @@ pub trait Mob: EntityBase + Send + Sync {
         LivingEntity::get_comfortable_fall_distance(sacrifice as f32)
     }
 
-    fn get_random(&self) -> rand::rngs::ThreadRng {
-        rand::rng()
-    }
-
     /// Vanilla `Mob.getAmbientSound`.
     fn ambient_sound(&self) -> Option<Sound> {
         sounds::ambient_sound(self.get_entity().entity_type)

@@ -5,6 +5,7 @@ use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_data::tracked_data;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering::Relaxed};
 
 use crate::entity::mob::Mob;
@@ -157,7 +158,19 @@ pub trait AgeableMob: Mob {
             baby_spawn_chance,
         } = &mut group_data
         {
-            if *should_spawn_baby && *group_size > 0 && rand::random::<f32>() <= *baby_spawn_chance
+            // `level.getRandom().nextFloat()`, drawn only past the first two checks
+            // (AgeableMob.java:54-56).
+            if *should_spawn_baby
+                && *group_size > 0
+                && self
+                    .get_entity()
+                    .world
+                    .load()
+                    .random
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .next_f32()
+                    <= *baby_spawn_chance
             {
                 self.set_age(self.get_baby_start_age());
             }

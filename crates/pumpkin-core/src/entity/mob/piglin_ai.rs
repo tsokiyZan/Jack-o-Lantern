@@ -10,7 +10,6 @@ use pumpkin_util::Hand;
 use pumpkin_util::math::vector3::Vector3;
 use pumpkin_util::random::RandomImpl;
 use pumpkin_util::random::legacy_rand::LegacyRand;
-use rand::RngExt;
 
 use crate::entity::ai::brain::activity::ActivityData;
 use crate::entity::ai::brain::behavior::one_shot::OneShot;
@@ -74,18 +73,13 @@ const BARTERING_LOOT_TABLE: &str = "minecraft:gameplay/piglin_bartering";
 pub const THROW_SPEED: f64 = 0.3;
 pub const THROW_HAND_Y_DISTANCE_FROM_EYE: f64 = 0.3;
 
-#[must_use]
-pub fn sample(range: (i32, i32), rng: &mut impl RngExt) -> i32 {
-    range.0 + rng.random_range(0..(range.1 + 1 - range.0).max(1))
-}
-
 /// Vanilla `UniformInt.sample`: `Mth.randomBetweenInclusive`, one draw.
 #[must_use]
 pub fn sample_uniform(range: (i32, i32), rng: &mut impl RandomImpl) -> i32 {
     rng.next_int_between_inclusive(range.0, range.1)
 }
 
-/// [`sample`] on the level's random, vanilla's `body.level().getRandom()`.
+/// [`sample_uniform`] on the level's random, vanilla's `body.level().getRandom()`.
 #[must_use]
 pub fn sample_level(range: (i32, i32), world: &World) -> i32 {
     sample_uniform(
@@ -984,12 +978,15 @@ fn throw_items_toward_pos(piglin: &PiglinEntity, stacks: Vec<ItemStack>, target:
         if stack.is_empty() {
             continue;
         }
-        let item_entity = ItemEntity::new_with_velocity(
+        // `BehaviorUtils.throwItem`: the 5-argument `new ItemEntity(level, x, y, z, item)`
+        // takes its own random velocity draws, then `setDeltaMovement` replaces the velocity
+        // (BehaviorUtils.java:98-103).
+        let item_entity = ItemEntity::new(
             Entity::new(world.clone(), hand_pos, &EntityType::ITEM),
             stack,
-            velocity,
-            ItemEntity::DEFAULT_PICKUP_DELAY,
         );
+        item_entity.get_entity().velocity.store(velocity);
+        item_entity.set_pickup_delay(ItemEntity::DEFAULT_PICKUP_DELAY);
         world.spawn_entity(Arc::new(item_entity));
     }
 }
@@ -1215,7 +1212,15 @@ fn baby_sometimes_ride_baby_hoglin() -> Box<dyn BehaviorControl> {
                 .cast_any()
                 .downcast_ref::<PiglinEntity>()
                 .is_some_and(PiglinEntity::is_baby);
-            is_baby && ticker.tick_down_and_check(&mut tick.mob.get_random())
+            // `ticker.tickDownAndCheck(e.level().getRandom())` (PiglinAi:659).
+            is_baby
+                && ticker.tick_down_and_check(
+                    &mut *tick
+                        .world
+                        .random
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner),
+                )
         },
         types::NEAREST_VISIBLE_BABY_HOGLIN,
         types::RIDE_TARGET,

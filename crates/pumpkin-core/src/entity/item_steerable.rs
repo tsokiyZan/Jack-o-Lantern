@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 
 use pumpkin_data::tracked_data::TrackedData;
 use pumpkin_protocol::codec::var_int::VarInt;
-use rand::{Rng, RngExt};
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::Entity;
 
@@ -25,19 +25,15 @@ pub struct ItemBasedSteering {
 }
 
 impl ItemBasedSteering {
-    /// Vanilla `ItemBasedSteering.boost`.
-    pub fn boost(
-        &self,
-        random: &mut impl Rng,
-        entity: &Entity,
-        boost_time_data: TrackedData,
-    ) -> bool {
+    /// Vanilla `ItemBasedSteering.boost`, with the entity's random (`Pig.boost` /
+    /// `Strider.boost` pass `this.getRandom()`).
+    pub fn boost(&self, entity: &Entity, boost_time_data: TrackedData) -> bool {
         if self.boosting.load(Ordering::Relaxed) {
             return false;
         }
         self.boosting.store(true, Ordering::Relaxed);
         self.boost_time.store(0, Ordering::Relaxed);
-        let total = random.random_range(0..841) + 140;
+        let total = entity.random().next_bounded_i32(841) + 140;
         self.boost_time_total.store(total, Ordering::Relaxed);
         entity.set_synced_data(boost_time_data, VarInt(total));
         true

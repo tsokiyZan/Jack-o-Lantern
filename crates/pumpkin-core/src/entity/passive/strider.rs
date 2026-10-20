@@ -348,7 +348,6 @@ impl Mob for StriderEntity {
 impl ItemSteerable for StriderEntity {
     fn boost(&self) -> bool {
         self.steering.boost(
-            &mut self.get_random(),
             self.get_entity(),
             pumpkin_data::tracked_data::strider::DATA_BOOST_TIME,
         )

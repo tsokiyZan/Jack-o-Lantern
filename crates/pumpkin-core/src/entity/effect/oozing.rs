@@ -3,7 +3,7 @@ use uuid::Uuid;
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::game_rules::{GameRule, GameRuleValue};
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::effect::MobEffect;
 use crate::entity::living::LivingEntity;
@@ -56,7 +56,14 @@ impl MobEffect for OozingMobEffect {
             }
             let slime_entity = slime.get_entity();
             slime_entity.set_pos(Vector3::new(pos.x, pos.y + 0.5, pos.z));
-            slime_entity.set_rotation(rand::rng().random::<f32>() * 360.0, 0.0);
+            // `level.getRandom().nextFloat() * 360.0F` (OozingMobEffect.java:51).
+            let yaw = world
+                .random
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .next_f32()
+                * 360.0;
+            slime_entity.set_rotation(yaw, 0.0);
             world.spawn_entity(slime);
         }
     }

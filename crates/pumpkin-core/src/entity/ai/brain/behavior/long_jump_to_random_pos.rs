@@ -9,7 +9,6 @@ use pumpkin_data::tag::{Tag, Taggable};
 use pumpkin_util::math::boundingbox::{BoundingBox, EntityDimensions};
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
 use rand::seq::SliceRandom;
 
 use super::super::BrainTick;
@@ -19,6 +18,7 @@ use super::timed::Behavior;
 use crate::entity::ai::pathfinder::pathfinding_context::PathfindingContext;
 use crate::entity::ai::pathfinder::walk_node_evaluator::WalkNodeEvaluator;
 use crate::entity::mob::Mob;
+use crate::world::World;
 
 /// Vanilla `LongJumpToRandomPos.FIND_JUMP_TRIES`.
 const FIND_JUMP_TRIES: i32 = 20;
@@ -140,19 +140,29 @@ impl LongJumpToRandomPos {
         behavior
     }
 
-    fn sample_time_between_long_jumps(&self) -> i32 {
+    /// `timeBetweenLongJumps.sample(level.getRandom())` (LongJumpToRandomPos.java:96/109),
+    /// `UniformInt`.
+    fn sample_time_between_long_jumps(&self, world: &World) -> i32 {
         let (min, max) = self.time_between_long_jumps;
-        rand::rng().random_range(min..=max)
+        world
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .next_int_between_inclusive(min, max)
     }
 
     /// Vanilla `LongJumpToRandomPos.getJumpCandidate`: `WeightedRandom.getRandomItem`,
-    /// removing the pick.
-    fn get_random_jump_candidate(&mut self) -> Option<PossibleJump> {
+    /// removing the pick. Draws from `level.getRandom()` (LongJumpToRandomPos.java:179).
+    fn get_random_jump_candidate(&mut self, world: &World) -> Option<PossibleJump> {
         let total_weight: i32 = self.jump_candidates.iter().map(|jump| jump.weight).sum();
         if total_weight <= 0 {
             return None;
         }
-        let mut selection = rand::rng().random_range(0..total_weight);
+        let mut selection = world
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .next_bounded_i32(total_weight);
         let index = self.jump_candidates.iter().position(|jump| {
             selection -= jump.weight;
             selection < 0
@@ -168,10 +178,10 @@ impl LongJumpToRandomPos {
             .as_ref()
             .is_some_and(|preferred| preferred.currently_wanting_preferred_ones);
         if !wanting_preferred {
-            return self.get_random_jump_candidate();
+            return self.get_random_jump_candidate(tick.world);
         }
         while !self.jump_candidates.is_empty() {
-            if let Some(jump) = self.get_random_jump_candidate()
+            if let Some(jump) = self.get_random_jump_candidate(tick.world)
                 && let Some(preferred) = self.preferred.as_mut()
             {
                 if tick
@@ -275,7 +285,7 @@ impl Behavior for LongJumpToRandomPos {
             && !entity.touching_lava.load(Ordering::Relaxed)
             && tick.world.get_block(&entity.block_pos.load()) != &pumpkin_data::Block::HONEY_BLOCK;
         if !can_start {
-            let cooldown = self.sample_time_between_long_jumps() / 2;
+            let cooldown = self.sample_time_between_long_jumps(tick.world) / 2;
             tick.brain.set(types::LONG_JUMP_COOLDOWN_TICKS, cooldown);
         }
         can_start
@@ -350,7 +360,7 @@ impl Behavior for LongJumpToRandomPos {
     /// The side effects of vanilla `canStillUse` turning false.
     fn stop(&mut self, tick: &mut BrainTick<'_>) {
         if self.stopped_invalid && !tick.brain.has_memory_value(types::LONG_JUMP_MID_JUMP.id()) {
-            let cooldown = self.sample_time_between_long_jumps() / 2;
+            let cooldown = self.sample_time_between_long_jumps(tick.world) / 2;
             tick.brain.set(types::LONG_JUMP_COOLDOWN_TICKS, cooldown);
             tick.brain.erase(types::LOOK_TARGET.id());
         }

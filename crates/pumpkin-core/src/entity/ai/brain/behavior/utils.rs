@@ -214,16 +214,18 @@ pub fn throw_item(
         throw_vector.z * throw_velocity.z,
     );
     let world = entity.world.load_full();
-    let item_entity = ItemEntity::new_with_velocity(
+    // The 5-argument `new ItemEntity(level, x, y, z, item)` takes its own random velocity
+    // draws, then `setDeltaMovement` replaces the velocity (BehaviorUtils.java:98-103).
+    let item_entity = ItemEntity::new(
         Entity::new(
             world.clone(),
             Vector3::new(pos.x, y_hand_pos, pos.z),
             &EntityType::ITEM,
         ),
         item,
-        velocity,
-        ItemEntity::DEFAULT_PICKUP_DELAY,
     );
+    item_entity.get_entity().velocity.store(velocity);
+    item_entity.set_pickup_delay(ItemEntity::DEFAULT_PICKUP_DELAY);
     world.spawn_entity(Arc::new(item_entity));
 }
 

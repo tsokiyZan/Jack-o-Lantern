@@ -149,13 +149,25 @@ impl LightningBoltEntity {
                 world.set_block_state(&strike_pos, new_state_id, BlockFlags::NOTIFY_ALL);
             }
 
-            let strikes_count = rand::rng().random_range(3..=5);
+            // `level.getRandom()`: `nextInt(3) + 3` strikes, `nextInt(8) + 1` steps each
+            // (LightningBolt.java:201-205).
+            let strikes_count = Self::level_random(world).next_bounded_i32(3) + 3;
 
             for _ in 0..strikes_count {
-                let step_count = rand::rng().random_range(1..=8);
+                let step_count = Self::level_random(world).next_bounded_i32(8) + 1;
                 Self::random_walk_cleaning_copper(world, &strike_pos, step_count);
             }
         }
+    }
+
+    /// `level.getRandom()`.
+    fn level_random(
+        world: &World,
+    ) -> std::sync::MutexGuard<'_, pumpkin_util::random::legacy_rand::LegacyRand> {
+        world
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
     fn random_walk_cleaning_copper(
@@ -174,9 +186,18 @@ impl LightningBoltEntity {
         }
     }
 
+    /// Vanilla `randomStepCleaningCopper`. `BlockPos.randomInCube(level.getRandom(), 10, pos, 1)`
+    /// is a lazy iterator, so each candidate is drawn (x, y, z) only when the previous one was
+    /// rejected.
     fn random_step_cleaning_copper(world: &Arc<World>, pos: &BlockPos) -> Option<BlockPos> {
-        let candidates = random_in_cube(10, pos, 1);
-        for candidate in candidates {
+        for _ in 0..10 {
+            let candidate = {
+                let mut random = Self::level_random(world);
+                let dx = random.next_bounded_i32(3) - 1;
+                let dy = random.next_bounded_i32(3) - 1;
+                let dz = random.next_bounded_i32(3) - 1;
+                pos.offset(Vector3::new(dx, dy, dz))
+            };
             let state = world.get_block_state(&candidate);
             let block = state.id.to_block();
 
@@ -208,6 +229,8 @@ impl EntityBase for LightningBoltEntity {
             let world = entity.world.load();
             let pos = entity.pos.load();
 
+            // Vanilla plays both sounds on the client only (LightningBolt.java:79), so these
+            // pitches must not draw from the bolt's server random.
             let pitch_thunder = 0.8 + rand::rng().random::<f32>() * 0.2;
             world.play_sound_fine(
                 Sound::EntityLightningBoltThunder,
@@ -289,17 +312,6 @@ impl EntityBase for LightningBoltEntity {
     fn cast_any(&self) -> &dyn std::any::Any {
         self
     }
-}
-
-fn random_in_cube(count: usize, center: &BlockPos, radius: i32) -> Vec<BlockPos> {
-    let mut list = Vec::with_capacity(count);
-    for _ in 0..count {
-        let dx = rand::rng().random_range(-radius..=radius);
-        let dy = rand::rng().random_range(-radius..=radius);
-        let dz = rand::rng().random_range(-radius..=radius);
-        list.push(center.offset(Vector3::new(dx, dy, dz)));
-    }
-    list
 }
 
 #[must_use]

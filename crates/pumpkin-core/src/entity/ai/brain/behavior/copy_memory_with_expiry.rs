@@ -1,4 +1,4 @@
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use super::super::BrainTick;
 use super::super::memory::{MemoryModuleType, MemoryStatus, value::MemoryValue};
@@ -26,8 +26,13 @@ pub fn copy_memory_with_expiry<T: MemoryValue + Clone>(
             let Some(value) = tick.brain.get(source).cloned() else {
                 return false;
             };
-            let duration = min_duration
-                + rand::rng().random_range(0..(max_duration + 1 - min_duration).max(1));
+            // `durationOfCopy.sample(level.getRandom())` (CopyMemoryWithExpiry.java:18), UniformInt.
+            let duration = tick
+                .world
+                .random
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .next_int_between_inclusive(min_duration, max_duration);
             tick.brain
                 .set_with_expiry(target, value, i64::from(duration));
             true

@@ -614,12 +614,14 @@ fn drop_item(mob: &dyn Mob) -> bool {
     // TODO: vanilla also records the dolphin as the item's thrower, which Pumpkin's
     // item entities do not track yet.
     let world = entity.world.load_full();
-    let item = ItemEntity::new_with_velocity(
+    // The 5-argument `new ItemEntity(level, x, y, z, stack)` takes its own random velocity
+    // draws, then `setDeltaMovement` replaces the velocity (Dolphin.java:521-527).
+    let item = ItemEntity::new(
         Entity::new(world.clone(), hand_pos, &EntityType::ITEM),
         stack,
-        velocity,
-        THROWN_ITEM_PICKUP_DELAY,
     );
+    item.get_entity().velocity.store(velocity);
+    item.set_pickup_delay(THROWN_ITEM_PICKUP_DELAY);
     world.spawn_entity(Arc::new(item));
     true
 }

@@ -13,6 +13,7 @@ use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::codec::var_int::VarInt;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 use std::sync::{
     Arc,
     atomic::{
@@ -108,8 +109,14 @@ impl TNTEntity {
             f64::from(position.0.z) + 0.5,
         );
         let entity = Entity::new(world.clone(), pos, &EntityType::TNT);
-        // Vanilla's constructor: `nextDouble() * (float) (Math.PI * 2)` and a `0.2F` pop.
-        let rot = rand::random::<f64>() * f64::from(std::f32::consts::TAU);
+        // Vanilla's constructor: `level.getRandom().nextDouble() * (float) (Math.PI * 2)` and a
+        // `0.2F` pop (PrimedTnt.java:69).
+        let rot = world
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .next_f64()
+            * f64::from(std::f32::consts::TAU);
         entity.velocity.store(Vector3::new(
             -rot.sin() * 0.02,
             f64::from(0.2f32),
@@ -121,10 +128,21 @@ impl TNTEntity {
         Arc::new(tnt)
     }
 
-    /// Vanilla `PrimedTnt.getRandomShortFuse`.
+    /// Vanilla `PrimedTnt.getRandomShortFuse`: `nextInt(max(1, fuse / 4)) + fuse / 8`.
     #[must_use]
-    pub fn random_short_fuse(fuse: u32) -> u32 {
-        rand::random_range(0..(fuse / 4).max(1)) + fuse / 8
+    pub fn random_short_fuse(fuse: u32, random: &mut impl RandomImpl) -> u32 {
+        random.next_bounded_i32((fuse / 4).max(1) as i32) as u32 + fuse / 8
+    }
+
+    /// Vanilla `PrimedTnt.getFuse`.
+    #[must_use]
+    pub fn fuse(&self) -> u32 {
+        self.fuse.load(Relaxed)
+    }
+
+    /// Vanilla `PrimedTnt.setFuse`, for a TNT that has not entered the world yet.
+    pub fn set_fuse(&self, fuse: u32) {
+        self.fuse.store(fuse, Relaxed);
     }
 }
 

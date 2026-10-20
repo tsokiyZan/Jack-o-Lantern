@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::EntityBase;
 
@@ -25,10 +25,11 @@ impl Ticker {
         }
     }
 
-    pub fn tick_down_and_check(&mut self, rng: &mut impl RngExt) -> bool {
+    /// Vanilla `Ticker.tickDownAndCheck`: `interval.sample(random) - 1` (`UniformInt`, one draw).
+    pub fn tick_down_and_check(&mut self, rng: &mut impl RandomImpl) -> bool {
         if self.ticks_until_next_start == 0 {
-            let span = (self.max_interval + 1 - self.min_interval).max(1);
-            self.ticks_until_next_start = self.min_interval + rng.random_range(0..span) - 1;
+            self.ticks_until_next_start =
+                rng.next_int_between_inclusive(self.min_interval, self.max_interval) - 1;
             return false;
         }
         self.ticks_until_next_start -= 1;
@@ -74,7 +75,15 @@ pub fn set_entity_look_target_sometimes(
             let Some(target) = target else {
                 return false;
             };
-            if !ticker.tick_down_and_check(&mut rand::rng()) {
+            // `ticker.tickDownAndCheck(level.getRandom())`.
+            let fire = ticker.tick_down_and_check(
+                &mut *tick
+                    .world
+                    .random
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner),
+            );
+            if !fire {
                 return false;
             }
             tick.brain.set(
@@ -88,21 +97,20 @@ pub fn set_entity_look_target_sometimes(
 
 #[cfg(test)]
 mod tests {
-    use rand::SeedableRng;
-    use rand::rngs::StdRng;
+    use pumpkin_util::random::legacy_rand::LegacyRand;
 
     use super::Ticker;
 
     #[test]
     fn a_fresh_ticker_arms_itself_instead_of_firing() {
-        let mut rng = StdRng::seed_from_u64(1);
+        let mut rng = LegacyRand::from_seed(1);
         let mut ticker = Ticker::new(30, 60);
         assert!(!ticker.tick_down_and_check(&mut rng));
     }
 
     #[test]
     fn a_fixed_interval_fires_exactly_on_its_period() {
-        let mut rng = StdRng::seed_from_u64(1);
+        let mut rng = LegacyRand::from_seed(1);
         let mut ticker = Ticker::new(3, 3);
         assert!(!ticker.tick_down_and_check(&mut rng));
         assert!(!ticker.tick_down_and_check(&mut rng));

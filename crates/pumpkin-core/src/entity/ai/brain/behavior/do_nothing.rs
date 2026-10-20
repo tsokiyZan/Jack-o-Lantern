@@ -1,4 +1,4 @@
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use super::super::BrainTick;
 use super::super::memory::MemoryModuleId;
@@ -34,8 +34,14 @@ impl BehaviorControl for DoNothing {
 
     fn try_start(&mut self, tick: &mut BrainTick<'_>) -> bool {
         self.status = Status::Running;
+        // `minDuration + level.getRandom().nextInt(maxDuration + 1 - minDuration)` (DoNothing.java:32).
         let duration = self.min_duration
-            + rand::rng().random_range(0..(self.max_duration + 1 - self.min_duration).max(1));
+            + tick
+                .world
+                .random
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .next_bounded_i32((self.max_duration + 1 - self.min_duration).max(1));
         self.end_timestamp = tick.time + i64::from(duration);
         true
     }
