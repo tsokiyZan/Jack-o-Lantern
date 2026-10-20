@@ -15,8 +15,8 @@ use pumpkin_util::math::vector3::Vector3;
 use pumpkin_util::math::{
     approach, approach_degrees, atan2, cos, degrees_difference_abs, sin, wrap_degrees,
 };
+use pumpkin_util::random::RandomImpl;
 use pumpkin_world::chunk::ChunkHeightmapType;
-use rand::RngExt;
 
 use crate::entity::ai::control::body_rotation_control::BodyRotationControlTrait;
 use crate::entity::ai::control::{Control, MoveControlTrait};
@@ -390,7 +390,7 @@ impl PhantomAttackStrategyGoal {
             .get_entity()
             .block_pos
             .load()
-            .up_height(20 + mob.get_random().random_range(0..20));
+            .up_height(20 + mob.get_entity().random().next_bounded_i32(20));
         let sea_level = phantom.get_entity().world.load().sea_level;
         if anchor.0.y < sea_level {
             anchor = BlockPos::new(anchor.0.x, sea_level + 1, anchor.0.z);
@@ -426,7 +426,7 @@ impl Goal for PhantomAttackStrategyGoal {
             ) + 1;
             let anchor = BlockPos::new(
                 anchor.0.x,
-                surface + 10 + mob.get_random().random_range(0..20),
+                surface + 10 + mob.get_entity().random().next_bounded_i32(20),
                 anchor.0.z,
             );
             phantom.anchor_point.store(Some(anchor));
@@ -444,9 +444,9 @@ impl Goal for PhantomAttackStrategyGoal {
         if self.next_sweep_tick <= 0 {
             phantom.attack_phase.store(AttackPhase::Swoop);
             Self::set_anchor_above_target(mob, phantom);
-            let mut random = mob.get_random();
-            self.next_sweep_tick = self.get_tick_count((8 + random.random_range(0..4)) * 20);
-            let pitch = 0.95 + random.random::<f32>() * 0.1;
+            let delay = 8 + mob.get_entity().random().next_bounded_i32(4);
+            self.next_sweep_tick = self.get_tick_count(delay * 20);
+            let pitch = 0.95 + mob.get_entity().random().next_f32() * 0.1;
             phantom.play_sound_at_self(Sound::EntityPhantomSwoop, 10.0, pitch);
         }
     }
@@ -607,10 +607,11 @@ impl Goal for PhantomCircleAroundAnchorGoal {
         let Some(phantom) = as_phantom(mob) else {
             return;
         };
-        let mut random = mob.get_random();
-        self.distance = 5.0 + random.random::<f32>() * 10.0;
-        self.height = -4.0 + random.random::<f32>() * 9.0;
-        self.clockwise = if random.random::<bool>() { 1.0 } else { -1.0 };
+        let mut random = mob.get_entity().random();
+        self.distance = 5.0 + random.next_f32() * 10.0;
+        self.height = -4.0 + random.next_f32() * 9.0;
+        self.clockwise = if random.next_bool() { 1.0 } else { -1.0 };
+        drop(random);
         self.select_next(phantom);
     }
 
@@ -618,12 +619,12 @@ impl Goal for PhantomCircleAroundAnchorGoal {
         let Some(phantom) = as_phantom(mob) else {
             return;
         };
-        let mut random = mob.get_random();
-        if random.random_range(0..self.get_tick_count(350)) == 0 {
-            self.height = -4.0 + random.random::<f32>() * 9.0;
+        let entity = mob.get_entity();
+        if entity.random().next_bounded_i32(self.get_tick_count(350)) == 0 {
+            self.height = -4.0 + entity.random().next_f32() * 9.0;
         }
 
-        if random.random_range(0..self.get_tick_count(250)) == 0 {
+        if entity.random().next_bounded_i32(self.get_tick_count(250)) == 0 {
             self.distance += 1.0;
             if self.distance > 15.0 {
                 self.distance = 5.0;
@@ -631,8 +632,8 @@ impl Goal for PhantomCircleAroundAnchorGoal {
             }
         }
 
-        if random.random_range(0..self.get_tick_count(450)) == 0 {
-            self.angle = random.random::<f32>() * 2.0 * std::f32::consts::PI;
+        if entity.random().next_bounded_i32(self.get_tick_count(450)) == 0 {
+            self.angle = entity.random().next_f32() * 2.0 * std::f32::consts::PI;
             self.select_next(phantom);
         }
 

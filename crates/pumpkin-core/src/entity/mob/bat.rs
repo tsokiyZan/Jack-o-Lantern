@@ -10,8 +10,8 @@ use pumpkin_data::world::WorldEvent;
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 use pumpkin_world::chunk::ChunkHeightmapType;
-use rand::RngExt;
 
 use crate::entity::ai::target_predicate::TargetPredicate;
 use crate::entity::mob::{Mob, MobEntity};
@@ -100,7 +100,7 @@ impl Mob for BatEntity {
 
     /// Vanilla `Bat.getAmbientSound`: a resting bat squeaks one time in four.
     fn ambient_sound(&self) -> Option<Sound> {
-        if self.is_roosting() && self.get_random().random_range(0..4) != 0 {
+        if self.is_roosting() && self.get_entity().random().next_bounded_i32(4) != 0 {
             None
         } else {
             Some(Sound::EntityBatAmbient)
@@ -114,8 +114,8 @@ impl Mob for BatEntity {
         } else {
             1.0
         };
-        let mut random = self.get_random();
-        ((random.random::<f32>() - random.random::<f32>()) * 0.2 + base) * 0.95
+        let mut random = self.get_entity().random();
+        ((random.next_f32() - random.next_f32()) * 0.2 + base) * 0.95
     }
 
     fn mob_init_data_tracker(&self) {
@@ -148,9 +148,9 @@ impl Mob for BatEntity {
         if self.is_roosting() {
             if world.get_block_state(&above).is_solid_block() {
                 {
-                    let mut rng = self.get_random();
-                    if rng.random_range(0..200) == 0 {
-                        entity.head_yaw.store(rng.random_range(0..360) as f32);
+                    let mut rng = entity.random();
+                    if rng.next_bounded_i32(200) == 0 {
+                        entity.head_yaw.store(rng.next_bounded_i32(360) as f32);
                     }
                 }
                 // `BAT_RESTING_TARGETING`: non-combat, within 4 blocks.
@@ -176,18 +176,19 @@ impl Mob for BatEntity {
         {
             *target_position = None;
         }
-        let mut rng = self.get_random();
         let pick_new = target_position.is_none_or(|target| {
-            rng.random_range(0..30) == 0 || {
+            entity.random().next_bounded_i32(30) == 0 || {
                 // `closerToCenterThan(position, 2.0)`.
                 let center = target.0.to_f64() + Vector3::new(0.5, 0.5, 0.5);
                 center.squared_distance_to_vec(&position) < 4.0
             }
         });
         if pick_new {
-            let (x1, x2) = (rng.random_range(0..7), rng.random_range(0..7));
-            let y = rng.random_range(0..6);
-            let (z1, z2) = (rng.random_range(0..7), rng.random_range(0..7));
+            let mut rng = entity.random();
+            let (x1, x2) = (rng.next_bounded_i32(7), rng.next_bounded_i32(7));
+            let y = rng.next_bounded_i32(6);
+            let (z1, z2) = (rng.next_bounded_i32(7), rng.next_bounded_i32(7));
+            drop(rng);
             *target_position = Some(BlockPos::floored(
                 position.x + f64::from(x1) - f64::from(x2),
                 position.y + f64::from(y) - 2.0,
@@ -220,8 +221,8 @@ impl Mob for BatEntity {
             .movement_input
             .store(Vector3::new(input.x, input.y, 0.5));
         entity.yaw.store(entity.yaw.load() + rot_diff);
-        if rng.random_range(0..100) == 0 && world.get_block_state(&above).is_solid_block() {
-            drop(rng);
+        let roll = entity.random().next_bounded_i32(100);
+        if roll == 0 && world.get_block_state(&above).is_solid_block() {
             self.set_roosting(true);
         }
     }

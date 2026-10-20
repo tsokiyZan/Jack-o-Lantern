@@ -5,7 +5,7 @@ use std::sync::atomic::Ordering;
 
 use pumpkin_data::entity::EntityPose;
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use super::breeze_ai::{
     JUMP_CIRCLE_INNER_RADIUS, JUMP_CIRCLE_MIDDLE_RADIUS, SPEED_MULTIPLIER_WHEN_SLIDING,
@@ -37,7 +37,7 @@ impl Slide {
         let direction = enemy.get_entity().pos.load() - breeze_pos;
         let distance = direction.length()
             - pumpkin_util::math::lerp(
-                breeze.get_random().random::<f64>(),
+                breeze.get_entity().random().next_f64(),
                 f64::from(JUMP_CIRCLE_MIDDLE_RADIUS),
                 f64::from(JUMP_CIRCLE_INNER_RADIUS),
             );
@@ -74,8 +74,8 @@ impl Behavior for Slide {
             None
         };
         let position = position.unwrap_or_else(|| {
-            if breeze.get_random().random::<bool>() {
-                random_point_behind_target(enemy.as_ref(), &mut breeze.get_random())
+            if breeze.get_entity().random().next_bool() {
+                random_point_behind_target(enemy.as_ref(), &mut *breeze.get_entity().random())
             } else {
                 Self::random_point_in_middle_circle(breeze, enemy.as_ref())
             }

@@ -14,7 +14,7 @@ use pumpkin_data::entity::EntityType;
 use pumpkin_data::sound::Sound;
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::math::{self, position::BlockPos, vector3::Vector3};
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::{
     Entity, EntityBase,
@@ -369,20 +369,19 @@ impl Spell for EvokerSummonSpell {
                     && other.pos.load().squared_distance_to_vec(&pos) <= 16.0 * 16.0
             })
             .count();
-        mob.get_random().random_range(0..8) + 1 > vexes
+        mob.get_entity().random().next_bounded_i32(8) as usize + 1 > vexes
     }
 
     fn perform(&mut self, mob: &dyn Mob) {
         let evoker = mob.get_entity();
         let world = evoker.world.load_full();
         let evoker_block_pos = evoker.block_pos.load();
-        let mut random = mob.get_random();
         for _ in 0..3 {
-            let pos = evoker_block_pos.offset(Vector3::new(
-                -2 + random.random_range(0..5),
-                1,
-                -2 + random.random_range(0..5),
-            ));
+            let (dx, dz) = {
+                let mut random = evoker.random();
+                (random.next_bounded_i32(5), random.next_bounded_i32(5))
+            };
+            let pos = evoker_block_pos.offset(Vector3::new(-2 + dx, 1, -2 + dz));
             let vex = from_type(
                 &EntityType::VEX,
                 // `snapTo(pos)`: the bottom centre of the block.
@@ -401,7 +400,8 @@ impl Spell for EvokerSummonSpell {
             {
                 vex_mob.set_owner(evoker.entity_uuid);
                 vex_mob.set_bound_origin(Some(pos));
-                vex_mob.set_limited_life(20 * (30 + random.random_range(0..90)));
+                let life = evoker.random().next_bounded_i32(90);
+                vex_mob.set_limited_life(20 * (30 + life));
             }
             world.spawn_entity(vex);
         }
@@ -465,7 +465,7 @@ impl Spell for EvokerWololoSpell {
         if sheep.is_empty() {
             return false;
         }
-        let index = mob.get_random().random_range(0..sheep.len());
+        let index = entity.random().next_bounded_i32(sheep.len() as i32) as usize;
         evoker.set_wololo_target(Some(sheep[index].clone()));
         true
     }

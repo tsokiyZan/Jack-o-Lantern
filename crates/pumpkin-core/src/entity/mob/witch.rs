@@ -1,13 +1,13 @@
 use crate::entity::ai::goal::{Controls, Goal, to_goal_ticks};
 use crate::entity::mob::raider::{add_raider_goals, is_raider};
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 use std::sync::{Arc, Weak};
 
 use pumpkin_data::damage::DamageType;
 use pumpkin_data::data_component_impl::EquipmentSlot;
 use pumpkin_data::effect::StatusEffect;
-use pumpkin_data::entity::EntityType;
+use pumpkin_data::entity::{EntityStatus, EntityType};
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::potion::Potion;
@@ -190,7 +190,7 @@ impl WitchEntity {
                 potion = &Potion::POISON;
             } else if dist <= 3.0
                 && !target_living.has_effect(&StatusEffect::WEAKNESS)
-                && rand::random::<f32>() < 0.25
+                && entity.random().next_f32() < 0.25
             {
                 potion = &Potion::WEAKNESS;
             }
@@ -208,7 +208,14 @@ impl WitchEntity {
         splash.thrown.set_velocity(xd, yd + yo, zd, speed, 8.0);
 
         if !entity.silent.load(Ordering::Relaxed) {
-            world.play_sound(Sound::EntityWitchThrow, SoundCategory::Hostile, &witch_pos);
+            let pitch = 0.8 + entity.random().next_f32() * 0.4;
+            world.play_sound_fine(
+                Sound::EntityWitchThrow,
+                SoundCategory::Hostile,
+                &witch_pos,
+                1.0,
+                pitch,
+            );
         }
 
         let splash_arc: Arc<dyn EntityBase> = Arc::new(splash);
@@ -255,7 +262,11 @@ impl Mob for WitchEntity {
     }
 
     fn mob_tick(&self, caller: &dyn EntityBase) {
-        // Vanilla `Witch.aiStep`: players are fair game once the heal cooldown runs out.
+        // Vanilla `Witch.aiStep` runs this server half only `if (this.isAlive())`.
+        if !self.mob_entity.living_entity.is_alive() {
+            return;
+        }
+        // Players are fair game once the heal cooldown runs out.
         let cooldown = self.heal_raiders_cooldown.fetch_sub(1, Ordering::Relaxed) - 1;
         self.can_attack_players
             .store(cooldown <= 0, Ordering::Relaxed);
@@ -292,21 +303,22 @@ impl Mob for WitchEntity {
             }
         } else {
             let mut potion: Option<&'static Potion> = None;
-            let r: f32 = rand::random();
+            // Vanilla draws a fresh `nextFloat` for each branch it reaches.
+            let roll = || entity.random().next_f32();
 
-            if r < 0.15
+            if roll() < 0.15
                 && entity.touching_water.load(Ordering::Relaxed)
                 && !living.has_effect(&StatusEffect::WATER_BREATHING)
             {
                 potion = Some(&Potion::WATER_BREATHING);
-            } else if r < 0.15
+            } else if roll() < 0.15
                 && entity.fire_ticks.load(Ordering::Relaxed) > 0
                 && !living.has_effect(&StatusEffect::FIRE_RESISTANCE)
             {
                 potion = Some(&Potion::FIRE_RESISTANCE);
-            } else if r < 0.05 && living.health.load() < living.get_max_health() {
+            } else if roll() < 0.05 && living.health.load() < living.get_max_health() {
                 potion = Some(&Potion::HEALING);
-            } else if r < 0.5
+            } else if roll() < 0.5
                 && let Some(target) = self.mob_entity.get_target()
                 && !living.has_effect(&StatusEffect::SPEED)
             {
@@ -335,9 +347,20 @@ impl Mob for WitchEntity {
 
                 if !entity.silent.load(Ordering::Relaxed) {
                     let pos = entity.pos.load();
-                    world.play_sound(Sound::EntityWitchDrink, SoundCategory::Hostile, &pos);
+                    let pitch = 0.8 + entity.random().next_f32() * 0.4;
+                    world.play_sound_fine(
+                        Sound::EntityWitchDrink,
+                        SoundCategory::Hostile,
+                        &pos,
+                        1.0,
+                        pitch,
+                    );
                 }
             }
+        }
+
+        if entity.random().next_f32() < 7.5E-4 {
+            world.send_entity_status(entity, EntityStatus::WitchHatMagic, None);
         }
     }
 }
@@ -384,7 +407,7 @@ impl Goal for NearestHealableRaiderTargetGoal {
             return false;
         };
         if witch.heal_raiders_cooldown.load(Ordering::Relaxed) > 0
-            || !mob.get_random().random::<bool>()
+            || !mob.get_entity().random().next_bool()
         {
             return false;
         }

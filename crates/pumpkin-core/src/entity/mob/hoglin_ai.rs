@@ -6,7 +6,7 @@ use pumpkin_data::entity::EntityType;
 use pumpkin_data::environment_attribute::Activity;
 use pumpkin_data::sound::Sound;
 use pumpkin_util::math::position::BlockPos;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::EntityBase;
 use crate::entity::ai::brain::activity::ActivityData;
@@ -258,10 +258,13 @@ fn retreat_from_nearest_target(tick: &mut BrainTick<'_>, new_avoid_target: Arc<d
 fn set_avoid_target(tick: &mut BrainTick<'_>, avoid_target: Arc<dyn EntityBase>) {
     tick.brain.erase(types::ATTACK_TARGET.id());
     tick.brain.erase(types::WALK_TARGET.id());
+    // `RETREAT_DURATION.sample(body.level().getRandom())`.
     let duration = tick
-        .mob
-        .get_random()
-        .random_range(RETREAT_DURATION.0..=RETREAT_DURATION.1);
+        .world
+        .random
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .next_int_between_inclusive(RETREAT_DURATION.0, RETREAT_DURATION.1);
     tick.brain
         .set_with_expiry(types::AVOID_TARGET, avoid_target, i64::from(duration));
 }

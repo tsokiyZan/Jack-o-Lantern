@@ -12,7 +12,6 @@ use pumpkin_data::tag::{self, Taggable};
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
 use pumpkin_world::clip::{ClipBlock, ClipContext, ClipFluid};
-use rand::seq::SliceRandom;
 
 use super::breeze_ai::JUMP_CIRCLE_INNER_RADIUS;
 use super::breeze_util::{has_line_of_sight, random_point_behind_target};
@@ -83,7 +82,10 @@ impl LongJump {
         if !Self::can_jump_from_current_position(tick) {
             return false;
         }
-        let behind = random_point_behind_target(attack_target.as_ref(), &mut tick.mob.get_random());
+        let behind = random_point_behind_target(
+            attack_target.as_ref(),
+            &mut *tick.mob.get_entity().random(),
+        );
         let Some(target_pos) = Self::snap_to_surface(entity, behind) else {
             return false;
         };
@@ -186,7 +188,7 @@ impl LongJump {
         target_pos: Vector3<f64>,
     ) -> Option<Vector3<f64>> {
         let mut angles = ALLOWED_ANGLES;
-        angles.shuffle(&mut body.get_random());
+        pumpkin_util::random::shuffle(&mut angles, &mut *body.get_entity().random());
         let living = &body.get_mob_entity().living_entity;
         angles.into_iter().find_map(|angle| {
             let max_jump_velocity = MAX_JUMP_VELOCITY_MULTIPLIER

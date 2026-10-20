@@ -6,7 +6,7 @@ use crossbeam::atomic::AtomicCell;
 use pumpkin_data::entity::EntityType;
 use pumpkin_util::math::vector3::Vector3;
 
-use crate::entity::ai::util::RandomExt;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::{
     Entity, EntityBase,
@@ -126,8 +126,8 @@ impl Mob for BlazeEntity {
         {
             self.next_height_offset_change_tick
                 .store(100, Ordering::Relaxed);
-            self.allowed_height_offset
-                .store(self.get_random().triangle(0.5, 6.891) as f32);
+            let offset = self.get_entity().random().next_triangular(0.5, 6.891);
+            self.allowed_height_offset.store(offset as f32);
         }
 
         let Some(target) = self.entity.get_target() else {

@@ -7,8 +7,8 @@ use pumpkin_data::entity::EntityStatus;
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 use pumpkin_world::world::BlockFlags;
-use rand::RngExt;
 
 use crate::entity::mob::raider::{add_raider_goals, is_abstract_villager, raider_hurt_by_target};
 use pumpkin_data::entity::EntityType;
@@ -145,10 +145,10 @@ impl RavagerEntity {
 
     /// Vanilla `stunEffect`: its particle is the client's, but the server draws the numbers.
     fn stun_effect(&self) {
-        let mut rng = self.get_random();
-        if rng.random_range(0..6) == 0 {
-            rng.random::<f64>();
-            rng.random::<f64>();
+        let mut rng = self.get_entity().random();
+        if rng.next_bounded_i32(6) == 0 {
+            rng.next_f64();
+            rng.next_f64();
         }
     }
 
@@ -298,7 +298,7 @@ impl Mob for RavagerEntity {
         if self.roar_tick.load(Relaxed) != 0 {
             return;
         }
-        let stun = self.get_random().random::<f64>() < 0.5;
+        let stun = self.get_entity().random().next_f64() < 0.5;
         let defender_entity = defender.get_entity();
         if stun {
             self.stunned_tick.store(STUN_DURATION, Relaxed);

@@ -19,7 +19,7 @@ use pumpkin_nbt::tag::NbtTag;
 use pumpkin_util::math;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 use uuid::Uuid;
 
 use crate::entity::{
@@ -349,7 +349,9 @@ impl Goal for VexChargeAttackGoal {
         let Some(target) = living_target(mob) else {
             return false;
         };
-        if move_control_has_wanted(mob) || mob.get_random().random_range(0..to_goal_ticks(7)) != 0 {
+        if move_control_has_wanted(mob)
+            || mob.get_entity().random().next_bounded_i32(to_goal_ticks(7)) != 0
+        {
             return false;
         }
         mob.get_entity()
@@ -430,7 +432,8 @@ struct VexRandomMoveGoal;
 
 impl Goal for VexRandomMoveGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
-        !move_control_has_wanted(mob) && mob.get_random().random_range(0..to_goal_ticks(7)) == 0
+        !move_control_has_wanted(mob)
+            && mob.get_entity().random().next_bounded_i32(to_goal_ticks(7)) == 0
     }
 
     fn should_continue(&mut self, _mob: &dyn Mob) -> bool {
@@ -443,13 +446,16 @@ impl Goal for VexRandomMoveGoal {
             .and_then(VexEntity::get_bound_origin)
             .unwrap_or_else(|| entity.block_pos.load());
         let world = entity.world.load();
-        let mut random = mob.get_random();
         for _ in 0..3 {
-            let test_pos = bound_origin.offset(Vector3::new(
-                random.random_range(0..15) - 7,
-                random.random_range(0..11) - 5,
-                random.random_range(0..15) - 7,
-            ));
+            let offset = {
+                let mut random = entity.random();
+                Vector3::new(
+                    random.next_bounded_i32(15) - 7,
+                    random.next_bounded_i32(11) - 5,
+                    random.next_bounded_i32(15) - 7,
+                )
+            };
+            let test_pos = bound_origin.offset(offset);
             if world.get_block_state(&test_pos).is_air() {
                 let wanted = Vector3::new(
                     f64::from(test_pos.0.x) + 0.5,

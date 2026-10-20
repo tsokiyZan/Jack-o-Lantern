@@ -9,7 +9,7 @@ use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_util::Difficulty;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::item::ItemEntity;
 use crate::entity::mob::spawn::{SpawnGroupData, is_halloween};
@@ -198,16 +198,22 @@ impl SkeletonEntityBase {
         mob.populate_default_equipment_slots(world, &difficulty);
         mob.populate_default_equipment_enchantments(&difficulty);
         self.reassess_weapon_goal(mob);
-        let mut random = mob.get_random();
+        // `level.getRandom()`.
+        let roll = || {
+            world
+                .random
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .next_f32()
+        };
         mob_entity.set_can_pick_up_loot(
-            random.random::<f32>()
-                < MobEntity::MAX_PICKUP_LOOT_CHANCE * difficulty.special_multiplier,
+            roll() < MobEntity::MAX_PICKUP_LOOT_CHANCE * difficulty.special_multiplier,
         );
         if mob_entity.get_item_slot(&EquipmentSlot::HEAD).is_empty()
             && is_halloween()
-            && random.random::<f32>() < 0.25
+            && roll() < 0.25
         {
-            let head = if random.random::<f32>() < 0.1 {
+            let head = if roll() < 0.1 {
                 &Item::JACK_O_LANTERN
             } else {
                 &Item::CARVED_PUMPKIN
@@ -351,16 +357,21 @@ impl Mob for SkeletonEntityBase {
     /// Vanilla `AbstractSkeleton.populateDefaultEquipmentSlots`.
     fn populate_default_equipment_slots(
         &self,
-        _world: &Arc<World>,
+        world: &Arc<World>,
         difficulty: &RegionalDifficulty,
     ) {
-        // `super.populateDefaultEquipmentSlots`: the `Mob` armor roll.
-        if rand::random::<f32>()
-            < MobEntity::MAX_WEARING_ARMOR_CHANCE * difficulty.special_multiplier
+        // `super.populateDefaultEquipmentSlots`: the `Mob` armor roll, on `level.getRandom()`.
+        let random = || {
+            world
+                .random
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+        };
+        if random().next_f32() < MobEntity::MAX_WEARING_ARMOR_CHANCE * difficulty.special_multiplier
         {
-            let mut armor_type = rand::random_range(0..3);
+            let mut armor_type = random().next_bounded_i32(3);
             for _ in 1..=3 {
-                if rand::random::<f32>() < MobEntity::WEARING_ARMOR_UPGRADE_MATERIAL_CHANCE {
+                if random().next_f32() < MobEntity::WEARING_ARMOR_UPGRADE_MATERIAL_CHANCE {
                     armor_type += 1;
                 }
             }
@@ -380,7 +391,7 @@ impl Mob for SkeletonEntityBase {
 
             for slot in &MobEntity::EQUIPMENT_POPULATION_ORDER {
                 let current = equipment.get(slot);
-                if !first && rand::random::<f32>() < partial_chance {
+                if !first && random().next_f32() < partial_chance {
                     break;
                 }
                 first = false;

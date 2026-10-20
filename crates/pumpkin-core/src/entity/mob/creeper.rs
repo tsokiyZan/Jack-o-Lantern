@@ -12,6 +12,7 @@ use pumpkin_data::{
 };
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::codec::var_int::VarInt;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::{
     Entity, EntityBase,
@@ -313,13 +314,14 @@ impl Mob for CreeperEntity {
         let entity = &self.mob_entity.living_entity.entity;
         let world = entity.world.load();
         let pos = entity.pos.load();
+        let pitch = entity.random().next_f32() * 0.4 + 0.8;
 
         world.play_sound_fine(
             Sound::ItemFlintandsteelUse,
             SoundCategory::Hostile,
             &pos,
             1.0,
-            rand::random::<f32>() * 0.4 + 0.8,
+            pitch,
         );
 
         self.ignited.store(true, Ordering::Relaxed);

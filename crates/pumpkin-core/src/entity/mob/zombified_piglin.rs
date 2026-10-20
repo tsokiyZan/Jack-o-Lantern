@@ -2,7 +2,7 @@ use crate::entity::ai::goal::spear_use::SpearUseGoal;
 use crate::entity::ai::goal::zombie_attack::ZombieAttackGoal;
 use pumpkin_data::attributes::Attributes;
 use pumpkin_util::math::boundingbox::EntityDimensions;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, Ordering};
 
@@ -130,11 +130,15 @@ impl ZombifiedPiglinEntity {
             }
         }
 
-        self.ticks_until_next_alert.store(
-            self.get_random().random_range(ALERT_INTERVAL),
-            Ordering::Relaxed,
-        );
+        let alert_in = sample(&ALERT_INTERVAL, &mut *self.get_entity().random());
+        self.ticks_until_next_alert
+            .store(alert_in, Ordering::Relaxed);
     }
+}
+
+/// Vanilla `UniformInt.sample`: `Mth.randomBetweenInclusive`.
+fn sample(range: &std::ops::RangeInclusive<i32>, random: &mut impl RandomImpl) -> i32 {
+    random.next_int_between_inclusive(*range.start(), *range.end())
 }
 
 crate::impl_neutral_mob!(ZombifiedPiglinEntity, neutral_data);
@@ -175,10 +179,16 @@ impl Mob for ZombifiedPiglinEntity {
     /// Vanilla `ZombifiedPiglin.populateDefaultEquipmentSlots`.
     fn populate_default_equipment_slots(
         &self,
-        _world: &Arc<World>,
+        world: &Arc<World>,
         _difficulty: &RegionalDifficulty,
     ) {
-        let weapon = if self.get_random().random_range(0..20) == 0 {
+        // `level.getRandom()`, passed down from `finalizeSpawn`.
+        let roll = world
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .next_bounded_i32(20);
+        let weapon = if roll == 0 {
             &Item::GOLDEN_SPEAR
         } else {
             &Item::GOLDEN_SWORD
@@ -196,13 +206,17 @@ impl Mob for ZombifiedPiglinEntity {
     /// the alert countdowns.
     fn set_mob_target(&self, target: Option<Arc<dyn EntityBase>>) {
         if self.zombie.mob_entity.get_target().is_none() && target.is_some() {
-            let mut random = self.get_random();
-            self.play_first_anger_sound_in.store(
-                random.random_range(FIRST_ANGER_SOUND_DELAY),
-                Ordering::Relaxed,
-            );
+            let (first_anger_sound_in, alert_in) = {
+                let mut random = self.get_entity().random();
+                (
+                    sample(&FIRST_ANGER_SOUND_DELAY, &mut *random),
+                    sample(&ALERT_INTERVAL, &mut *random),
+                )
+            };
+            self.play_first_anger_sound_in
+                .store(first_anger_sound_in, Ordering::Relaxed);
             self.ticks_until_next_alert
-                .store(random.random_range(ALERT_INTERVAL), Ordering::Relaxed);
+                .store(alert_in, Ordering::Relaxed);
         }
         set_mob_target_base(self, target);
     }

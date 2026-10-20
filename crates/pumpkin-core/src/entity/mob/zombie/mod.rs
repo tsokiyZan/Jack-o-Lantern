@@ -32,7 +32,8 @@ use pumpkin_util::Difficulty;
 use pumpkin_util::math::boundingbox::EntityDimensions;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
+use pumpkin_util::random::legacy_rand::LegacyRand;
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 use std::sync::{Arc, Weak};
 
@@ -341,7 +342,7 @@ impl ZombieEntityBase {
 
     /// Vanilla `Zombie.hurtServer`: on hard difficulty a hurt zombie may call another of its
     /// kind to fight its target. `mob_hurt_server` has already applied the damage.
-    pub fn summon_reinforcements(&self, mob: &dyn Mob, cause: Option<&dyn EntityBase>) {
+    pub fn summon_reinforcements(&self, _mob: &dyn Mob, cause: Option<&dyn EntityBase>) {
         let living = &self.mob_entity.living_entity;
         let entity = &living.entity;
         let world = entity.world.load_full();
@@ -352,9 +353,8 @@ impl ZombieEntityBase {
         }) else {
             return;
         };
-        let mut random = mob.get_random();
         if world.level_info.load().difficulty != Difficulty::Hard
-            || f64::from(random.random::<f32>())
+            || f64::from(entity.random().next_f32())
                 >= living.get_attribute_value(&Attributes::SPAWN_REINFORCEMENTS)
             || !world.should_spawn_monsters()
         {
@@ -373,9 +373,11 @@ impl ZombieEntityBase {
         let Some(reinforcement_mob) = reinforcement.get_mob() else {
             return;
         };
-        let mut offset = || {
-            random.random_range(REINFORCEMENT_RANGE_MIN..=REINFORCEMENT_RANGE_MAX)
-                * random.random_range(-1..=1)
+        // `Mth.nextInt(this.random, 7, 40) * Mth.nextInt(this.random, -1, 1)`.
+        let offset = || {
+            let mut random = entity.random();
+            random.next_inbetween_i32(REINFORCEMENT_RANGE_MIN, REINFORCEMENT_RANGE_MAX)
+                * random.next_inbetween_i32(-1, 1)
         };
 
         for _ in 0..REINFORCEMENT_ATTEMPTS {
@@ -433,7 +435,7 @@ impl ZombieEntityBase {
 
     /// Vanilla `Zombie.doHurtTarget` after a hit lands: a burning, empty-handed zombie
     /// may set its target alight.
-    pub fn on_attack(&self, mob: &dyn Mob, target: &dyn EntityBase) {
+    pub fn on_attack(&self, _mob: &dyn Mob, target: &dyn EntityBase) {
         let entity = &self.mob_entity.living_entity.entity;
         let world = entity.world.load_full();
         let difficulty = RegionalDifficulty::at(&world, entity.pos.load()).effective_difficulty;
@@ -442,7 +444,7 @@ impl ZombieEntityBase {
             .get_item_slot(&EquipmentSlot::MAIN_HAND)
             .is_empty()
             && entity.is_on_fire()
-            && mob.get_random().random::<f32>() < difficulty * 0.3
+            && entity.random().next_f32() < difficulty * 0.3
         {
             target.set_on_fire_for((2 * difficulty as i32) as f32);
         }
@@ -450,7 +452,7 @@ impl ZombieEntityBase {
 
     /// Vanilla `Zombie.killedEntity`: on normal and hard difficulty a killed villager may
     /// rise again as a zombie villager, which leaves no loot.
-    pub fn killed_entity(&self, mob: &dyn Mob, victim: &dyn EntityBase) -> bool {
+    pub fn killed_entity(&self, _mob: &dyn Mob, victim: &dyn EntityBase) -> bool {
         let entity = &self.mob_entity.living_entity.entity;
         let difficulty = entity.world.load().level_info.load().difficulty;
         if !matches!(difficulty, Difficulty::Normal | Difficulty::Hard) {
@@ -462,7 +464,7 @@ impl ZombieEntityBase {
         else {
             return true;
         };
-        if difficulty != Difficulty::Hard && mob.get_random().random::<bool>() {
+        if difficulty != Difficulty::Hard && entity.random().next_bool() {
             return true;
         }
         !self.convert_villager_to_zombie_villager(villager)
@@ -511,14 +513,15 @@ impl ZombieEntityBase {
         let entity = &self.mob_entity.living_entity.entity;
         let difficulty = RegionalDifficulty::at(world, entity.pos.load());
         let difficulty_modifier = difficulty.special_multiplier;
-        let mut random = mob.get_random();
+        // `level.getRandom()`, locked per draw: the jockey and equipment code below draws
+        // from it too.
         if !conversion {
-            self.mob_entity
-                .set_can_pick_up_loot(random.random::<f32>() < 0.55 * difficulty_modifier);
+            let can_pick_up_loot = level_random(world).next_f32() < 0.55 * difficulty_modifier;
+            self.mob_entity.set_can_pick_up_loot(can_pick_up_loot);
         }
 
         let group_data = group_data.unwrap_or_else(|| SpawnGroupData::Zombie {
-            is_baby: get_spawn_as_baby_odds(&mut random),
+            is_baby: get_spawn_as_baby_odds(&mut *level_random(world)),
             can_spawn_jockey: true,
         });
         if let SpawnGroupData::Zombie {
@@ -529,14 +532,13 @@ impl ZombieEntityBase {
             if is_baby {
                 self.set_baby(true);
                 if can_spawn_jockey {
-                    self.ride_chicken_jockey(world, &mut random);
+                    self.ride_chicken_jockey(world);
                 }
             }
 
-            self.set_can_break_doors(
-                random.random::<f32>() < difficulty_modifier * BREAK_DOOR_CHANCE,
-                mob,
-            );
+            let can_break_doors =
+                level_random(world).next_f32() < difficulty_modifier * BREAK_DOOR_CHANCE;
+            self.set_can_break_doors(can_break_doors, mob);
             if !conversion {
                 mob.populate_default_equipment_slots(world, &difficulty);
                 mob.populate_default_equipment_enchantments(&difficulty);
@@ -548,9 +550,9 @@ impl ZombieEntityBase {
             .get_item_slot(&EquipmentSlot::HEAD)
             .is_empty()
             && is_halloween()
-            && random.random::<f32>() < 0.25
+            && level_random(world).next_f32() < 0.25
         {
-            let pumpkin = if random.random::<f32>() < 0.1 {
+            let pumpkin = if level_random(world).next_f32() < 0.1 {
                 &Item::JACK_O_LANTERN
             } else {
                 &Item::CARVED_PUMPKIN
@@ -575,9 +577,9 @@ impl ZombieEntityBase {
         clippy::same_functions_in_if_condition,
         reason = "vanilla rolls the second chance afresh"
     )]
-    fn ride_chicken_jockey(&self, world: &Arc<World>, random: &mut impl rand::Rng) {
+    fn ride_chicken_jockey(&self, world: &Arc<World>) {
         let entity = &self.mob_entity.living_entity.entity;
-        if f64::from(random.random::<f32>()) < 0.05 {
+        if f64::from(level_random(world).next_f32()) < 0.05 {
             let search_box = entity.bounding_box.load().expand(5.0, 3.0, 5.0);
             // `EntitySelector.ENTITY_NOT_BEING_RIDDEN`.
             let chicken = world
@@ -598,7 +600,7 @@ impl ZombieEntityBase {
                 }
                 self.mob_entity.set_pending_vehicle(chicken);
             }
-        } else if f64::from(random.random::<f32>()) < 0.05 {
+        } else if f64::from(level_random(world).next_f32()) < 0.05 {
             let chicken = crate::entity::r#type::from_type(
                 &EntityType::CHICKEN,
                 entity.pos.load(),
@@ -619,16 +621,18 @@ impl ZombieEntityBase {
     /// the only reason Pumpkin runs it with that keeps the health as it is.
     pub fn handle_attributes(&self, mob: &dyn Mob, difficulty_modifier: f32, conversion: bool) {
         let living = &self.mob_entity.living_entity;
-        let mut random = mob.get_random();
-        self.randomize_reinforcements_chance(&mut random);
+        let entity = &living.entity;
+        self.randomize_reinforcements_chance();
+        let knockback_bonus = entity.random().next_f64() * f64::from(0.05f32);
         living.update_attribute(&Attributes::KNOCKBACK_RESISTANCE, |instance| {
             instance.add_or_replace_permanent_modifier(Modifier {
                 id: RANDOM_SPAWN_BONUS_ID.to_string(),
-                amount: random.random::<f64>() * f64::from(0.05f32),
+                amount: knockback_bonus,
                 operation: ModifierOperation::Add,
             });
         });
-        let follow_range_modifier = random.random::<f64>() * 1.5 * f64::from(difficulty_modifier);
+        let follow_range_modifier =
+            entity.random().next_f64() * 1.5 * f64::from(difficulty_modifier);
         if follow_range_modifier > 1.0 {
             living.update_attribute(&Attributes::FOLLOW_RANGE, |instance| {
                 instance.add_or_replace_permanent_modifier(Modifier {
@@ -645,18 +649,20 @@ impl ZombieEntityBase {
                 .update_pathfinder_max_visited_nodes(living);
         }
 
-        if random.random::<f32>() < difficulty_modifier * ZOMBIE_LEADER_CHANCE {
+        if entity.random().next_f32() < difficulty_modifier * ZOMBIE_LEADER_CHANCE {
+            let reinforcement_bonus = entity.random().next_f64() * 0.25 + 0.5;
             living.update_attribute(&Attributes::SPAWN_REINFORCEMENTS, |instance| {
                 instance.add_or_replace_permanent_modifier(Modifier {
                     id: LEADER_ZOMBIE_BONUS_ID.to_string(),
-                    amount: random.random::<f64>() * 0.25 + 0.5,
+                    amount: reinforcement_bonus,
                     operation: ModifierOperation::Add,
                 });
             });
+            let health_bonus = entity.random().next_f64() * 3.0 + 1.0;
             living.update_attribute(&Attributes::MAX_HEALTH, |instance| {
                 instance.add_or_replace_permanent_modifier(Modifier {
                     id: LEADER_ZOMBIE_BONUS_ID.to_string(),
-                    amount: random.random::<f64>() * 3.0 + 1.0,
+                    amount: health_bonus,
                     operation: ModifierOperation::MultiplyTotal,
                 });
             });
@@ -669,11 +675,11 @@ impl ZombieEntityBase {
 
     /// Vanilla `randomizeReinforcementsChance`; zombified piglins never call for help on
     /// their own.
-    fn randomize_reinforcements_chance(&self, random: &mut impl rand::Rng) {
+    fn randomize_reinforcements_chance(&self) {
         let chance = if self.entity_type() == &EntityType::ZOMBIFIED_PIGLIN {
             0.0
         } else {
-            random.random::<f64>() * f64::from(0.1f32)
+            self.mob_entity.living_entity.entity.random().next_f64() * f64::from(0.1f32)
         };
         self.mob_entity
             .living_entity
@@ -727,8 +733,16 @@ impl ZombieEntityBase {
 }
 
 /// Vanilla `Zombie.getSpawnAsBabyOdds`.
-fn get_spawn_as_baby_odds(random: &mut impl rand::Rng) -> bool {
-    random.random::<f32>() < 0.05
+fn get_spawn_as_baby_odds(random: &mut impl RandomImpl) -> bool {
+    random.next_f32() < 0.05
+}
+
+/// `level.getRandom()`. Lock it for one draw at a time: spawn code it calls draws from it too.
+fn level_random(world: &World) -> std::sync::MutexGuard<'_, LegacyRand> {
+    world
+        .random
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
 /// Vanilla `SpecialDates.isHalloween`, in the server's local time.
@@ -839,16 +853,17 @@ impl Mob for ZombieEntityBase {
     /// Vanilla `Zombie.populateDefaultEquipmentSlots`.
     fn populate_default_equipment_slots(
         &self,
-        _world: &Arc<World>,
+        world: &Arc<World>,
         difficulty: &RegionalDifficulty,
     ) {
-        // Default armor slots (super.populateDefaultEquipmentSlots)
-        if rand::random::<f32>()
+        // Default armor slots (super.populateDefaultEquipmentSlots), on `level.getRandom()`.
+        if level_random(world).next_f32()
             < MobEntity::MAX_WEARING_ARMOR_CHANCE * difficulty.special_multiplier
         {
-            let mut armor_type = rand::random_range(0..3);
+            let mut armor_type = level_random(world).next_bounded_i32(3);
             for _ in 1..=3 {
-                if rand::random::<f32>() < MobEntity::WEARING_ARMOR_UPGRADE_MATERIAL_CHANCE {
+                if level_random(world).next_f32() < MobEntity::WEARING_ARMOR_UPGRADE_MATERIAL_CHANCE
+                {
                     armor_type += 1;
                 }
             }
@@ -868,7 +883,7 @@ impl Mob for ZombieEntityBase {
 
             for slot in &MobEntity::EQUIPMENT_POPULATION_ORDER {
                 let current = equipment.get(slot);
-                if !first && rand::random::<f32>() < partial_chance {
+                if !first && level_random(world).next_f32() < partial_chance {
                     break;
                 }
                 first = false;
@@ -885,8 +900,8 @@ impl Mob for ZombieEntityBase {
         } else {
             0.01f32
         };
-        if rand::random::<f32>() < weapon_chance {
-            let r = rand::random_range(0..6);
+        if level_random(world).next_f32() < weapon_chance {
+            let r = level_random(world).next_bounded_i32(6);
             let weapon_item = match r {
                 0 => &Item::IRON_SWORD,
                 1 => &Item::IRON_SPEAR,

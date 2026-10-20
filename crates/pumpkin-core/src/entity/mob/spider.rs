@@ -7,7 +7,7 @@ use pumpkin_data::effect::StatusEffect;
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::potion::Effect;
 use pumpkin_util::difficulty::Difficulty;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 use uuid::Uuid;
 
 use crate::entity::{
@@ -123,11 +123,17 @@ pub fn finalize_spider_spawn(
     group_data: Option<SpawnGroupData>,
 ) -> Option<SpawnGroupData> {
     mob.finalize_spawn_base();
-    let mut rng = rand::rng();
+    // `level.getRandom()`, locked per draw: the skeleton's `finalizeSpawn` draws from it too.
+    let rng = || {
+        world
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    };
     let entity = &mob.living_entity.entity;
     let pos = entity.pos.load();
 
-    if rng.random_range(0..100) == 0 {
+    if rng().next_bounded_i32(100) == 0 {
         let skeleton = from_type(&EntityType::SKELETON, pos, world, Uuid::new_v4());
         skeleton.get_entity().set_rotation(entity.yaw.load(), 0.0);
         finalize_spawn(&skeleton, world, None);
@@ -137,8 +143,8 @@ pub fn finalize_spider_spawn(
     let group_data = group_data.unwrap_or_else(|| {
         let difficulty = RegionalDifficulty::at(world, pos);
         let effect = (difficulty.base_difficulty == Difficulty::Hard
-            && rng.random::<f32>() < 0.1 * difficulty.special_multiplier)
-            .then(|| match rng.random_range(0..5) {
+            && rng().next_f32() < 0.1 * difficulty.special_multiplier)
+            .then(|| match rng().next_bounded_i32(5) {
                 0 | 1 => &StatusEffect::SPEED,
                 2 => &StatusEffect::STRENGTH,
                 3 => &StatusEffect::REGENERATION,
