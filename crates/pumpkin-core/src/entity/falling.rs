@@ -12,6 +12,7 @@ use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::bedrock::client::CUpdateBlock;
 use pumpkin_protocol::java::client::play::CBlockUpdate;
 use pumpkin_util::math::position::BlockPos;
+use pumpkin_util::random::RandomImpl;
 use pumpkin_world::world::BlockFlags;
 use std::sync::{
     Arc, Mutex,
@@ -334,7 +335,7 @@ impl EntityBase for FallingEntity {
         }
         if is_anvil
             && damage > 0.0
-            && rand::random::<f32>() < 0.05 + fall_distance_int as f32 * 0.05
+            && self.entity.random().next_f32() < 0.05 + fall_distance_int as f32 * 0.05
         {
             match AnvilBlock::damage(state_id) {
                 Some(damaged) => self.block_state_id.store(damaged),

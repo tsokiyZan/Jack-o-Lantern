@@ -6337,7 +6337,10 @@ impl World {
             );
 
             let entity = Entity::new(self.clone(), Vector3::new(x, y, z), &EntityType::ITEM);
-            let entity = Arc::new(ItemEntity::new_with_velocity(entity, item, velocity, 10));
+            // Vanilla `new ItemEntity(level, x, y, z, stack)` takes the item's own two
+            // velocity draws before `setDeltaMovement` replaces them.
+            let entity = Arc::new(ItemEntity::new(entity, item));
+            entity.get_entity().velocity.store(velocity);
             self.spawn_entity(entity);
         }
     }

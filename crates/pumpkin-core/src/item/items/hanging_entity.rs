@@ -55,6 +55,14 @@ impl ItemBehaviour for HangingEntityItem {
                 return BlockActionResult::Fail;
             }
 
+            // Vanilla `Painting.create`: the painting exists first and draws its variant from
+            // its own random, also when the item's variant component replaces it afterwards.
+            let entity = Entity::new(world.clone(), pos, &EntityType::PAINTING);
+            let Some(random_variant) =
+                PaintingEntity::choose_variant(&world, &entity, location, face)
+            else {
+                return BlockActionResult::Fail;
+            };
             let variant = if let Some(comp) = item.get_data_component::<PaintingVariantImpl>() {
                 // TODO: place inline (non-registry) paintings, which vanilla also accepts.
                 if let Holder::Reference(v) = comp.variant {
@@ -66,10 +74,7 @@ impl ItemBehaviour for HangingEntityItem {
                     return BlockActionResult::Fail;
                 }
             } else {
-                let Some(v) = PaintingEntity::choose_variant(&world, location, face) else {
-                    return BlockActionResult::Fail;
-                };
-                v
+                random_variant
             };
 
             let spawn_pos = PaintingEntity::calculate_center_pos(
@@ -78,7 +83,7 @@ impl ItemBehaviour for HangingEntityItem {
                 variant.width(),
                 variant.height(),
             );
-            let entity = Entity::new(world.clone(), spawn_pos, &EntityType::PAINTING);
+            entity.set_pos(spawn_pos);
             entity
                 .data
                 .store(i32::from(face.to_index()), Ordering::Relaxed);

@@ -10,6 +10,7 @@ use pumpkin_data::tag::{self, Taggable};
 use pumpkin_data::{Block, BlockState};
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 
 use super::{Entity, EntityBase};
 use crate::world::game_event::GameEventContext;
@@ -46,8 +47,9 @@ fn is_state_climbable(block: &Block) -> bool {
 }
 
 /// `(rand - rand) * 0.4 + 1`, vanilla's swim and splash pitch.
-fn swim_pitch() -> f32 {
-    1.0 + (rand::random::<f32>() - rand::random::<f32>()) * 0.4
+fn swim_pitch(entity: &Entity) -> f32 {
+    let mut random = entity.random();
+    1.0 + (random.next_f32() - random.next_f32()) * 0.4
 }
 
 impl Entity {
@@ -227,7 +229,7 @@ impl Entity {
             self.crystal_sound_intensity.load() * 0.997f64.powf(f64::from(elapsed)) as f32;
         intensity = (intensity + 0.07).min(1.0);
         self.crystal_sound_intensity.store(intensity);
-        let pitch = 0.5 + intensity * rand::random::<f32>() * 1.2;
+        let pitch = 0.5 + intensity * self.random().next_f32() * 1.2;
         let volume = 0.1 + intensity * 1.2;
         caller.play_sound_at_self(Sound::BlockAmethystBlockChime, volume, pitch);
         self.last_crystal_sound_play_tick.store(tick_count, Relaxed);
@@ -241,11 +243,10 @@ impl Entity {
 
     /// Vanilla `Entity.playSwimSound`, the default for [`EntityBase::play_swim_sound`].
     pub fn play_swim_sound_default(&self, caller: &dyn EntityBase, volume: f32) {
-        caller.play_sound_at_self(caller.swim_sound(), volume, swim_pitch());
+        caller.play_sound_at_self(caller.swim_sound(), volume, swim_pitch(self));
     }
 
-    /// Vanilla `Entity.doWaterSplashEffect` without the bubble and splash particles, which
-    /// Pumpkin doesn't spawn yet.
+    /// Vanilla `Entity.doWaterSplashEffect`.
     pub fn do_water_splash_effect(&self, caller: &dyn EntityBase) {
         if caller.is_spectator() {
             // Vanilla `Player.doWaterSplashEffect`.
@@ -257,7 +258,26 @@ impl Entity {
         } else {
             caller.swim_high_speed_splash_sound()
         };
-        caller.play_sound_at_self(sound, speed, swim_pitch());
+        caller.play_sound_at_self(sound, speed, swim_pitch(self));
+        // The bubble and splash particles: `addParticle` does nothing on the server, but
+        // vanilla still evaluates their arguments, three draws per bubble and two per splash.
+        let particle_limit = 1.0 + self.entity_dimension.load().width * 20.0;
+        {
+            let mut random = self.random();
+            let mut i = 0;
+            while (i as f32) < particle_limit {
+                random.next_f64();
+                random.next_f64();
+                random.next_f64();
+                i += 1;
+            }
+            let mut i = 0;
+            while (i as f32) < particle_limit {
+                random.next_f64();
+                random.next_f64();
+                i += 1;
+            }
+        }
         self.world
             .load()
             .game_event_from(Some(caller), GameEvent::Splash, self.pos.load());
