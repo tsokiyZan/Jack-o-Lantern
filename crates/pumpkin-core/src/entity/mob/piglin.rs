@@ -27,6 +27,7 @@ use crate::entity::{
     Entity, EntityBase,
     mob::{Mob, MobEntity, crossbow_attack_mob::CrossbowAttackMob, equipment::RegionalDifficulty},
 };
+use crate::entity::mob::spawn::SpawnGroupData;
 use crate::world::World;
 
 pub struct PiglinEntity {
@@ -68,11 +69,19 @@ impl PiglinEntity {
         let mob_arc = Arc::new(piglin);
         mob_arc.mob_entity.set_can_pick_up_loot(true);
         mob_arc.mob_entity.init_brain(mob_arc.as_ref());
-        // Vanilla does this in finalizeSpawn; a loaded mob rebuilds its brain after
-        mob_arc.mob_entity.with_brain(mob_arc.as_ref(), |tick| {
-            piglin_ai::init_memories(tick.brain, tick.world);
-        });
         mob_arc
+    }
+
+    /// Vanilla `createSpawnWeapon`, on the piglin's own random.
+    fn create_spawn_weapon(&self) -> &'static Item {
+        let mut random = self.get_entity().random();
+        if random.next_f32() < 0.5 {
+            &Item::CROSSBOW
+        } else if random.next_bounded_i32(10) == 0 {
+            &Item::GOLDEN_SPEAR
+        } else {
+            &Item::GOLDEN_SWORD
+        }
     }
 
     #[must_use]
@@ -483,47 +492,63 @@ impl Mob for PiglinEntity {
         &self.mob_entity
     }
 
+    /// Vanilla `Piglin.finalizeSpawn`. Pumpkin has no spawn reasons, so the `STRUCTURE`
+    /// exception is never taken.
+    fn finalize_spawn(
+        &self,
+        world: &Arc<World>,
+        group_data: Option<SpawnGroupData>,
+    ) -> Option<SpawnGroupData> {
+        // `random = level.getRandom()`.
+        let baby_roll = world
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .next_f32();
+        if baby_roll < 0.2 {
+            self.set_baby(true);
+        } else if self.is_adult() {
+            let weapon = self.create_spawn_weapon();
+            self.mob_entity
+                .set_item_slot(&EquipmentSlot::MAIN_HAND, ItemStack::new(1, weapon));
+        }
+        // `PiglinAi.initMemories(this, level.getRandom())`: only here, never on load.
+        self.mob_entity
+            .with_brain(self, |tick| piglin_ai::init_memories(tick.brain, tick.world));
+        let difficulty = RegionalDifficulty::at(world, self.get_entity().pos.load());
+        self.populate_default_equipment_slots(world, &difficulty);
+        self.populate_default_equipment_enchantments(&difficulty);
+        // `super.finalizeSpawn`: `Mob.finalizeSpawn`.
+        self.mob_entity.finalize_spawn_base();
+        group_data
+    }
+
+    /// Vanilla `Piglin.populateDefaultEquipmentSlots`: each golden armor piece one time in
+    /// ten, on the `level.getRandom()` that `finalizeSpawn` passes down.
     fn populate_default_equipment_slots(
         &self,
         world: &Arc<World>,
         _difficulty: &RegionalDifficulty,
     ) {
-        if !self.is_baby.load(Ordering::Relaxed) {
-            // `createSpawnWeapon` draws from the piglin's own random.
-            let weapon = {
-                let mut random = self.get_entity().random();
-                if random.next_f32() < 0.5 {
-                    &Item::CROSSBOW
-                } else if random.next_bounded_i32(10) == 0 {
-                    &Item::GOLDEN_SPEAR
-                } else {
-                    &Item::GOLDEN_SWORD
-                }
-            };
-            // `maybeWearArmor` draws from `level.getRandom()`.
-            let armor_rolls: [f32; 4] = {
-                let mut random = world
-                    .random
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner);
-                std::array::from_fn(|_| random.next_f32())
-            };
-            let living = &self.mob_entity.living_entity;
-            let mut equipment = living
-                .entity_equipment
+        if !self.is_adult() {
+            return;
+        }
+        let armor_rolls: [f32; 4] = {
+            let mut random = world
+                .random
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
-            equipment.put(&EquipmentSlot::MAIN_HAND, ItemStack::new(1, weapon));
-            let armor = [
-                (&EquipmentSlot::HEAD, &Item::GOLDEN_HELMET),
-                (&EquipmentSlot::CHEST, &Item::GOLDEN_CHESTPLATE),
-                (&EquipmentSlot::LEGS, &Item::GOLDEN_LEGGINGS),
-                (&EquipmentSlot::FEET, &Item::GOLDEN_BOOTS),
-            ];
-            for ((slot, item), roll) in armor.into_iter().zip(armor_rolls) {
-                if roll < 0.1 {
-                    equipment.put(slot, ItemStack::new(1, item));
-                }
+            std::array::from_fn(|_| random.next_f32())
+        };
+        let armor = [
+            (&EquipmentSlot::HEAD, &Item::GOLDEN_HELMET),
+            (&EquipmentSlot::CHEST, &Item::GOLDEN_CHESTPLATE),
+            (&EquipmentSlot::LEGS, &Item::GOLDEN_LEGGINGS),
+            (&EquipmentSlot::FEET, &Item::GOLDEN_BOOTS),
+        ];
+        for ((slot, item), roll) in armor.into_iter().zip(armor_rolls) {
+            if roll < 0.1 {
+                self.mob_entity.set_item_slot(slot, ItemStack::new(1, item));
             }
         }
     }

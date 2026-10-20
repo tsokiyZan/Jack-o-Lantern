@@ -56,15 +56,15 @@ impl Mob for HuskEntity {
             .finalize_zombie_spawn(self, world, group_data, false);
         let difficulty = RegionalDifficulty::at(world, self.get_entity().pos.load());
         // Rolled again on top of `Zombie.finalizeSpawn`'s.
-        self.entity.mob_entity.set_can_pick_up_loot(
-            // `level.getRandom()`.
-            world
-                .random
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .next_f32()
-                < 0.55 * difficulty.special_multiplier,
-        );
+        // `level.getRandom()`.
+        let roll = world
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .next_f32();
+        self.entity
+            .mob_entity
+            .set_can_pick_up_loot(roll < 0.55 * difficulty.special_multiplier);
         // TODO: `Husk.finalizeSpawn`'s camel husk jockey needs `CamelHusk` and the
         // `NATURAL` spawn reason.
         group_data

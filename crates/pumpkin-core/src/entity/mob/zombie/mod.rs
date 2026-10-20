@@ -516,8 +516,8 @@ impl ZombieEntityBase {
         // `level.getRandom()`, locked per draw: the jockey and equipment code below draws
         // from it too.
         if !conversion {
-            self.mob_entity
-                .set_can_pick_up_loot(level_random(world).next_f32() < 0.55 * difficulty_modifier);
+            let can_pick_up_loot = level_random(world).next_f32() < 0.55 * difficulty_modifier;
+            self.mob_entity.set_can_pick_up_loot(can_pick_up_loot);
         }
 
         let group_data = group_data.unwrap_or_else(|| SpawnGroupData::Zombie {
@@ -536,10 +536,9 @@ impl ZombieEntityBase {
                 }
             }
 
-            self.set_can_break_doors(
-                level_random(world).next_f32() < difficulty_modifier * BREAK_DOOR_CHANCE,
-                mob,
-            );
+            let can_break_doors =
+                level_random(world).next_f32() < difficulty_modifier * BREAK_DOOR_CHANCE;
+            self.set_can_break_doors(can_break_doors, mob);
             if !conversion {
                 mob.populate_default_equipment_slots(world, &difficulty);
                 mob.populate_default_equipment_enchantments(&difficulty);
