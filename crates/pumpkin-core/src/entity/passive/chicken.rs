@@ -1,6 +1,6 @@
 use std::sync::{
     Arc, Weak,
-    atomic::{AtomicBool, AtomicI32, AtomicU8, Ordering, Ordering::Relaxed},
+    atomic::{AtomicBool, AtomicI32, AtomicU8, Ordering},
 };
 
 use crate::entity::ai::pathfinder::node::PathType;
@@ -135,6 +135,49 @@ impl ChickenEntity {
             VarInt(sound_variant as u8 as i32),
         );
     }
+
+    /// The part of vanilla `Chicken.aiStep` after `super.aiStep()`: the slow fall, then
+    /// the egg (Chicken.java:129-142).
+    fn chicken_ai_step(&self) {
+        let living = &self.mob_entity.living_entity;
+        let entity = &living.entity;
+        let current_velocity = entity.velocity.load();
+        if !entity.on_ground.load(Ordering::Relaxed) && current_velocity.y < 0.0 {
+            entity.set_velocity(current_velocity.multiply(1.0, 0.6, 1.0));
+        }
+        // Babies and jockeys lay no eggs, and their timer stands still.
+        if living.is_alive()
+            && !self.is_baby()
+            && !self.is_chicken_jockey()
+            && self.egg_lay_time.fetch_sub(1, Ordering::Relaxed) <= 1
+        {
+            let world = entity.world.load_full();
+            let entity_id = entity.entity_id;
+            let mut drop_event =
+                crate::plugin::api::events::entity::entity_drop_item::EntityDropItemEvent::new(
+                    entity_id,
+                    "minecraft:egg".to_string(),
+                    1,
+                );
+            if let Some(server) = world.server.upgrade() {
+                server
+                    .plugin_manager
+                    .fire_blocking(&server, &mut drop_event);
+            }
+            if !drop_event.cancelled {
+                self.get_entity()
+                    .spawn_at_location(ItemStack::new(1, &Item::EGG));
+                // `playSound(CHICKEN_EGG, 1.0F, (nextFloat() - nextFloat()) * 0.2F + 1.0F)`.
+                let pitch = {
+                    let mut random = entity.random();
+                    (random.next_f32() - random.next_f32()) * 0.2 + 1.0
+                };
+                self.play_sound_at_self(Sound::EntityChickenEgg, 1.0, pitch);
+            }
+            let next_time = entity.random().next_bounded_i32(6000) + 6000;
+            self.egg_lay_time.store(next_time, Ordering::Relaxed);
+        }
+    }
 }
 
 impl CustomSound for ChickenEntity {
@@ -220,9 +263,11 @@ impl Mob for ChickenEntity {
         Some(self)
     }
 
-    /// Vanilla `AgeableMob.aiStep`, which runs inside this mob's `super.aiStep()`.
+    /// Vanilla `Chicken.aiStep`: `super.aiStep()` (which ends with `AgeableMob.aiStep`),
+    /// then the slow fall and the egg.
     fn ai_step_end(&self, _caller: &dyn EntityBase) {
         self.ageable_ai_step();
+        self.chicken_ai_step();
     }
 
     fn as_custom_sound(&self) -> Option<&dyn CustomSound> {
@@ -309,51 +354,6 @@ impl Mob for ChickenEntity {
             pumpkin_data::tracked_data::chicken::DATA_SOUND_VARIANT_ID,
             VarInt(self.sound_variant.load(Ordering::Relaxed) as i32),
         );
-    }
-
-    fn mob_tick(&self, _caller: &dyn EntityBase) {
-        if self.mob_entity.living_entity.dead.load(Relaxed) {
-            return;
-        }
-        let entity = &self.mob_entity.living_entity.entity;
-        let current_velocity = entity.velocity.load();
-        let on_ground = entity.on_ground.load(Ordering::Relaxed);
-
-        // TODO: move velocity logic to physics tick when implemented
-        if (!on_ground) && current_velocity.y < 0.0 {
-            entity.set_velocity(current_velocity.multiply(1.0, 0.6, 1.0));
-        }
-        // Vanilla `aiStep`: babies and jockeys lay no eggs, and their timer stands still.
-        if !self.is_baby()
-            && !self.is_chicken_jockey()
-            && self.egg_lay_time.fetch_sub(1, Ordering::Relaxed) <= 1
-        {
-            let world = entity.world.load_full();
-            let entity_id = entity.entity_id;
-            let mut drop_event =
-                crate::plugin::api::events::entity::entity_drop_item::EntityDropItemEvent::new(
-                    entity_id,
-                    "minecraft:egg".to_string(),
-                    1,
-                );
-            if let Some(server) = world.server.upgrade() {
-                server
-                    .plugin_manager
-                    .fire_blocking(&server, &mut drop_event);
-            }
-            if !drop_event.cancelled {
-                self.get_entity()
-                    .spawn_at_location(ItemStack::new(1, &Item::EGG));
-                // `playSound(CHICKEN_EGG, 1.0F, (nextFloat() - nextFloat()) * 0.2F + 1.0F)`.
-                let pitch = {
-                    let mut random = entity.random();
-                    (random.next_f32() - random.next_f32()) * 0.2 + 1.0
-                };
-                self.play_sound_at_self(Sound::EntityChickenEgg, 1.0, pitch);
-            }
-            let next_time = entity.random().next_bounded_i32(6000) + 6000;
-            self.egg_lay_time.store(next_time, Ordering::Relaxed);
-        }
     }
 
     fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {

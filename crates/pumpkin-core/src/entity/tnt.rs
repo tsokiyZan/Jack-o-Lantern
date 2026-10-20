@@ -268,3 +268,18 @@ impl EntityBase for TNTEntity {
         crate::entity::movement_emission::MovementEmission::None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use pumpkin_util::random::legacy_rand::LegacyRand;
+
+    use super::TNTEntity;
+
+    /// Java: `new Random(42)`, `nextInt(max(1, 80 / 4)) + 80 / 8` twice gives 20, 13.
+    #[test]
+    fn random_short_fuse_matches_java_random() {
+        let mut random = LegacyRand::from_seed(42);
+        assert_eq!(TNTEntity::random_short_fuse(80, &mut random), 20);
+        assert_eq!(TNTEntity::random_short_fuse(80, &mut random), 13);
+    }
+}

@@ -4,9 +4,9 @@ use std::sync::{
     atomic::{AtomicBool, AtomicI32, AtomicI64, Ordering},
 };
 
+use pumpkin_data::Block;
 use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_data::world::WorldEvent;
-use pumpkin_data::{Block, BlockId, BlockStateId};
 use pumpkin_util::Difficulty;
 use pumpkin_util::math::boundingbox::BoundingBox;
 use pumpkin_util::math::position::BlockPos;
@@ -16,6 +16,7 @@ use pumpkin_world::world::BlockFlags;
 use rand::RngExt;
 
 use crate::block::blocks::fire::FireBlockBase;
+use crate::block::blocks::weathering_copper;
 use crate::entity::player::Player;
 use crate::entity::{Entity, EntityBase};
 use crate::server::Server;
@@ -128,25 +129,23 @@ impl LightningBoltEntity {
         }
     }
 
+    /// Vanilla `clearCopperOnLightningStrike` (LightningBolt.java:190-207).
     fn clear_copper_on_lightning_strike(&self, world: &Arc<World>) {
         let strike_pos = self.get_strike_position();
         let struck_state = world.get_block_state(&strike_pos);
         let struck_block = struck_state.id.to_block();
 
-        let is_waxed = is_waxed_copper(struck_block.id);
-        let is_weathering = is_weathering_copper(struck_block.id);
+        let is_waxed = weathering_copper::is_waxed(struck_block);
+        let is_weathering = weathering_copper::get_weather_state(struck_block).is_some();
 
         if is_weathering || is_waxed {
-            if is_weathering && let Some(first_block_id) = get_first_stage_copper(struck_block.id) {
-                let first_block = first_block_id.to_block();
-                let offset = struck_state
-                    .id
-                    .as_u16()
-                    .saturating_sub(struck_block.default_state.id.as_u16());
-                let new_state_id =
-                    BlockStateId::new(first_block.default_state.id.as_u16() + offset)
-                        .unwrap_or(first_block.default_state.id);
-                world.set_block_state(&strike_pos, new_state_id, BlockFlags::NOTIFY_ALL);
+            if is_weathering {
+                // `setBlockAndUpdate(struckPos, WeatheringCopper.getFirst(state))`; setting the
+                // state it already has changes nothing.
+                let first_state = weathering_copper::get_first_state(struck_block, struck_state.id);
+                if first_state != struck_state.id {
+                    world.set_block_state(&strike_pos, first_state, BlockFlags::NOTIFY_ALL);
+                }
             }
 
             // `level.getRandom()`: `nextInt(3) + 3` strikes, `nextInt(8) + 1` steps each
@@ -186,9 +185,11 @@ impl LightningBoltEntity {
         }
     }
 
-    /// Vanilla `randomStepCleaningCopper`. `BlockPos.randomInCube(level.getRandom(), 10, pos, 1)`
-    /// is a lazy iterator, so each candidate is drawn (x, y, z) only when the previous one was
-    /// rejected.
+    /// Vanilla `randomStepCleaningCopper` (LightningBolt.java:224-235).
+    /// `BlockPos.randomInCube(level.getRandom(), 10, pos, 1)` is a lazy iterator, so each
+    /// candidate is drawn (x, y, z) only when the previous one was rejected. Any weathering
+    /// copper block stops the step, unaffected copper too: it has no previous stage to set,
+    /// but still gets the spark (level event 3002).
     fn random_step_cleaning_copper(world: &Arc<World>, pos: &BlockPos) -> Option<BlockPos> {
         for _ in 0..10 {
             let candidate = {
@@ -201,17 +202,10 @@ impl LightningBoltEntity {
             let state = world.get_block_state(&candidate);
             let block = state.id.to_block();
 
-            if is_weathering_copper(block.id)
-                && let Some(prev_block_id) = get_previous_stage_copper(block.id)
-            {
-                let prev_block = prev_block_id.to_block();
-                let offset = state
-                    .id
-                    .as_u16()
-                    .saturating_sub(block.default_state.id.as_u16());
-                let new_state_id = BlockStateId::new(prev_block.default_state.id.as_u16() + offset)
-                    .unwrap_or(prev_block.default_state.id);
-                world.set_block_state(&candidate, new_state_id, BlockFlags::NOTIFY_ALL);
+            if weathering_copper::get_weather_state(block).is_some() {
+                if let Some(previous) = weathering_copper::get_previous_state(block, state.id) {
+                    world.set_block_state(&candidate, previous, BlockFlags::NOTIFY_ALL);
+                }
                 world.sync_world_event(WorldEvent::ParticlesElectricSpark, candidate, -1);
                 return Some(candidate);
             }
@@ -311,186 +305,5 @@ impl EntityBase for LightningBoltEntity {
     }
     fn cast_any(&self) -> &dyn std::any::Any {
         self
-    }
-}
-
-#[must_use]
-pub const fn is_waxed_copper(id: BlockId) -> bool {
-    matches!(
-        id,
-        BlockId::WAXED_COPPER_BLOCK
-            | BlockId::WAXED_EXPOSED_COPPER
-            | BlockId::WAXED_WEATHERED_COPPER
-            | BlockId::WAXED_OXIDIZED_COPPER
-            | BlockId::WAXED_CHISELED_COPPER
-            | BlockId::WAXED_EXPOSED_CHISELED_COPPER
-            | BlockId::WAXED_WEATHERED_CHISELED_COPPER
-            | BlockId::WAXED_OXIDIZED_CHISELED_COPPER
-            | BlockId::WAXED_COPPER_GRATE
-            | BlockId::WAXED_EXPOSED_COPPER_GRATE
-            | BlockId::WAXED_WEATHERED_COPPER_GRATE
-            | BlockId::WAXED_OXIDIZED_COPPER_GRATE
-            | BlockId::WAXED_CUT_COPPER
-            | BlockId::WAXED_EXPOSED_CUT_COPPER
-            | BlockId::WAXED_WEATHERED_CUT_COPPER
-            | BlockId::WAXED_OXIDIZED_CUT_COPPER
-            | BlockId::WAXED_CUT_COPPER_STAIRS
-            | BlockId::WAXED_EXPOSED_CUT_COPPER_STAIRS
-            | BlockId::WAXED_WEATHERED_CUT_COPPER_STAIRS
-            | BlockId::WAXED_OXIDIZED_CUT_COPPER_STAIRS
-            | BlockId::WAXED_CUT_COPPER_SLAB
-            | BlockId::WAXED_EXPOSED_CUT_COPPER_SLAB
-            | BlockId::WAXED_WEATHERED_CUT_COPPER_SLAB
-            | BlockId::WAXED_OXIDIZED_CUT_COPPER_SLAB
-            | BlockId::WAXED_COPPER_BULB
-            | BlockId::WAXED_EXPOSED_COPPER_BULB
-            | BlockId::WAXED_WEATHERED_COPPER_BULB
-            | BlockId::WAXED_OXIDIZED_COPPER_BULB
-            | BlockId::WAXED_COPPER_DOOR
-            | BlockId::WAXED_EXPOSED_COPPER_DOOR
-            | BlockId::WAXED_WEATHERED_COPPER_DOOR
-            | BlockId::WAXED_OXIDIZED_COPPER_DOOR
-            | BlockId::WAXED_COPPER_TRAPDOOR
-            | BlockId::WAXED_EXPOSED_COPPER_TRAPDOOR
-            | BlockId::WAXED_WEATHERED_COPPER_TRAPDOOR
-            | BlockId::WAXED_OXIDIZED_COPPER_TRAPDOOR
-    )
-}
-
-#[must_use]
-pub const fn is_weathering_copper(id: BlockId) -> bool {
-    matches!(
-        id,
-        BlockId::COPPER_BLOCK
-            | BlockId::EXPOSED_COPPER
-            | BlockId::WEATHERED_COPPER
-            | BlockId::OXIDIZED_COPPER
-            | BlockId::CHISELED_COPPER
-            | BlockId::EXPOSED_CHISELED_COPPER
-            | BlockId::WEATHERED_CHISELED_COPPER
-            | BlockId::OXIDIZED_CHISELED_COPPER
-            | BlockId::COPPER_GRATE
-            | BlockId::EXPOSED_COPPER_GRATE
-            | BlockId::WEATHERED_COPPER_GRATE
-            | BlockId::OXIDIZED_COPPER_GRATE
-            | BlockId::CUT_COPPER
-            | BlockId::EXPOSED_CUT_COPPER
-            | BlockId::WEATHERED_CUT_COPPER
-            | BlockId::OXIDIZED_CUT_COPPER
-            | BlockId::CUT_COPPER_STAIRS
-            | BlockId::EXPOSED_CUT_COPPER_STAIRS
-            | BlockId::WEATHERED_CUT_COPPER_STAIRS
-            | BlockId::OXIDIZED_CUT_COPPER_STAIRS
-            | BlockId::CUT_COPPER_SLAB
-            | BlockId::EXPOSED_CUT_COPPER_SLAB
-            | BlockId::WEATHERED_CUT_COPPER_SLAB
-            | BlockId::OXIDIZED_CUT_COPPER_SLAB
-            | BlockId::COPPER_BULB
-            | BlockId::EXPOSED_COPPER_BULB
-            | BlockId::WEATHERED_COPPER_BULB
-            | BlockId::OXIDIZED_COPPER_BULB
-            | BlockId::COPPER_DOOR
-            | BlockId::EXPOSED_COPPER_DOOR
-            | BlockId::WEATHERED_COPPER_DOOR
-            | BlockId::OXIDIZED_COPPER_DOOR
-            | BlockId::COPPER_TRAPDOOR
-            | BlockId::EXPOSED_COPPER_TRAPDOOR
-            | BlockId::WEATHERED_COPPER_TRAPDOOR
-            | BlockId::OXIDIZED_COPPER_TRAPDOOR
-    )
-}
-
-#[must_use]
-pub const fn get_first_stage_copper(id: BlockId) -> Option<BlockId> {
-    match id {
-        BlockId::COPPER_BLOCK
-        | BlockId::EXPOSED_COPPER
-        | BlockId::WEATHERED_COPPER
-        | BlockId::OXIDIZED_COPPER => Some(BlockId::COPPER_BLOCK),
-
-        BlockId::CHISELED_COPPER
-        | BlockId::EXPOSED_CHISELED_COPPER
-        | BlockId::WEATHERED_CHISELED_COPPER
-        | BlockId::OXIDIZED_CHISELED_COPPER => Some(BlockId::CHISELED_COPPER),
-
-        BlockId::COPPER_GRATE
-        | BlockId::EXPOSED_COPPER_GRATE
-        | BlockId::WEATHERED_COPPER_GRATE
-        | BlockId::OXIDIZED_COPPER_GRATE => Some(BlockId::COPPER_GRATE),
-
-        BlockId::CUT_COPPER
-        | BlockId::EXPOSED_CUT_COPPER
-        | BlockId::WEATHERED_CUT_COPPER
-        | BlockId::OXIDIZED_CUT_COPPER => Some(BlockId::CUT_COPPER),
-
-        BlockId::CUT_COPPER_STAIRS
-        | BlockId::EXPOSED_CUT_COPPER_STAIRS
-        | BlockId::WEATHERED_CUT_COPPER_STAIRS
-        | BlockId::OXIDIZED_CUT_COPPER_STAIRS => Some(BlockId::CUT_COPPER_STAIRS),
-
-        BlockId::CUT_COPPER_SLAB
-        | BlockId::EXPOSED_CUT_COPPER_SLAB
-        | BlockId::WEATHERED_CUT_COPPER_SLAB
-        | BlockId::OXIDIZED_CUT_COPPER_SLAB => Some(BlockId::CUT_COPPER_SLAB),
-
-        BlockId::COPPER_BULB
-        | BlockId::EXPOSED_COPPER_BULB
-        | BlockId::WEATHERED_COPPER_BULB
-        | BlockId::OXIDIZED_COPPER_BULB => Some(BlockId::COPPER_BULB),
-
-        BlockId::COPPER_DOOR
-        | BlockId::EXPOSED_COPPER_DOOR
-        | BlockId::WEATHERED_COPPER_DOOR
-        | BlockId::OXIDIZED_COPPER_DOOR => Some(BlockId::COPPER_DOOR),
-
-        BlockId::COPPER_TRAPDOOR
-        | BlockId::EXPOSED_COPPER_TRAPDOOR
-        | BlockId::WEATHERED_COPPER_TRAPDOOR
-        | BlockId::OXIDIZED_COPPER_TRAPDOOR => Some(BlockId::COPPER_TRAPDOOR),
-
-        _ => None,
-    }
-}
-
-#[must_use]
-pub const fn get_previous_stage_copper(id: BlockId) -> Option<BlockId> {
-    match id {
-        BlockId::OXIDIZED_COPPER => Some(BlockId::WEATHERED_COPPER),
-        BlockId::WEATHERED_COPPER => Some(BlockId::EXPOSED_COPPER),
-        BlockId::EXPOSED_COPPER => Some(BlockId::COPPER_BLOCK),
-
-        BlockId::OXIDIZED_CHISELED_COPPER => Some(BlockId::WEATHERED_CHISELED_COPPER),
-        BlockId::WEATHERED_CHISELED_COPPER => Some(BlockId::EXPOSED_CHISELED_COPPER),
-        BlockId::EXPOSED_CHISELED_COPPER => Some(BlockId::CHISELED_COPPER),
-
-        BlockId::OXIDIZED_COPPER_GRATE => Some(BlockId::WEATHERED_COPPER_GRATE),
-        BlockId::WEATHERED_COPPER_GRATE => Some(BlockId::EXPOSED_COPPER_GRATE),
-        BlockId::EXPOSED_COPPER_GRATE => Some(BlockId::COPPER_GRATE),
-
-        BlockId::OXIDIZED_CUT_COPPER => Some(BlockId::WEATHERED_CUT_COPPER),
-        BlockId::WEATHERED_CUT_COPPER => Some(BlockId::EXPOSED_CUT_COPPER),
-        BlockId::EXPOSED_CUT_COPPER => Some(BlockId::CUT_COPPER),
-
-        BlockId::OXIDIZED_CUT_COPPER_STAIRS => Some(BlockId::WEATHERED_CUT_COPPER_STAIRS),
-        BlockId::WEATHERED_CUT_COPPER_STAIRS => Some(BlockId::EXPOSED_CUT_COPPER_STAIRS),
-        BlockId::EXPOSED_CUT_COPPER_STAIRS => Some(BlockId::CUT_COPPER_STAIRS),
-
-        BlockId::OXIDIZED_CUT_COPPER_SLAB => Some(BlockId::WEATHERED_CUT_COPPER_SLAB),
-        BlockId::WEATHERED_CUT_COPPER_SLAB => Some(BlockId::EXPOSED_CUT_COPPER_SLAB),
-        BlockId::EXPOSED_CUT_COPPER_SLAB => Some(BlockId::CUT_COPPER_SLAB),
-
-        BlockId::OXIDIZED_COPPER_BULB => Some(BlockId::WEATHERED_COPPER_BULB),
-        BlockId::WEATHERED_COPPER_BULB => Some(BlockId::EXPOSED_COPPER_BULB),
-        BlockId::EXPOSED_COPPER_BULB => Some(BlockId::COPPER_BULB),
-
-        BlockId::OXIDIZED_COPPER_DOOR => Some(BlockId::WEATHERED_COPPER_DOOR),
-        BlockId::WEATHERED_COPPER_DOOR => Some(BlockId::EXPOSED_COPPER_DOOR),
-        BlockId::EXPOSED_COPPER_DOOR => Some(BlockId::COPPER_DOOR),
-
-        BlockId::OXIDIZED_COPPER_TRAPDOOR => Some(BlockId::WEATHERED_COPPER_TRAPDOOR),
-        BlockId::WEATHERED_COPPER_TRAPDOOR => Some(BlockId::EXPOSED_COPPER_TRAPDOOR),
-        BlockId::EXPOSED_COPPER_TRAPDOOR => Some(BlockId::COPPER_TRAPDOOR),
-
-        _ => None,
     }
 }

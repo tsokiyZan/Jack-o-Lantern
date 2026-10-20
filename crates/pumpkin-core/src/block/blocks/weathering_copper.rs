@@ -134,7 +134,8 @@ pub trait WeatheringCopper: ChangeOverTimeBlock<WeatherState> {
     }
 }
 
-/// All 14 copper families with their 4 weathering stages (Unaffected, Exposed, Weathered, Oxidized).
+/// All 15 copper families with their 4 weathering stages (Unaffected, Exposed, Weathered,
+/// Oxidized): every vanilla `WeatheringCopper` block.
 const COPPER_PROGRESSIONS: &[(&Block, &Block, &Block, &Block)] = &[
     (
         &Block::COPPER_BLOCK,
@@ -220,7 +221,25 @@ const COPPER_PROGRESSIONS: &[(&Block, &Block, &Block, &Block)] = &[
         &Block::WEATHERED_COPPER_CHAIN,
         &Block::OXIDIZED_COPPER_CHAIN,
     ),
+    (
+        &Block::LIGHTNING_ROD,
+        &Block::EXPOSED_LIGHTNING_ROD,
+        &Block::WEATHERED_LIGHTNING_ROD,
+        &Block::OXIDIZED_LIGHTNING_ROD,
+    ),
 ];
+
+/// Vanilla `HoneycombItem.WAX_OFF_BY_BLOCK.get(block) != null`: a waxed copper block, the
+/// inverse of the waxables over every weathering copper block.
+#[must_use]
+pub fn is_waxed(block: &Block) -> bool {
+    COPPER_PROGRESSIONS
+        .iter()
+        .flat_map(|&family| <[&Block; 4]>::from(family))
+        .any(|unwaxed| {
+            crate::item::items::honeycomb::get_waxed_equivalent(unwaxed.id) == Some(block.id)
+        })
+}
 
 /// Returns the next oxidized block in sequence, or `None` if already oxidized or not a weathering copper block.
 #[must_use]

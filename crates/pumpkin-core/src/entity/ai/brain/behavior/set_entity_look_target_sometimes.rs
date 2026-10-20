@@ -108,6 +108,19 @@ mod tests {
         assert!(!ticker.tick_down_and_check(&mut rng));
     }
 
+    /// Java: `new Random(7).nextInt(31) + 30 - 1` arms the countdown at 34.
+    #[test]
+    fn the_armed_countdown_matches_java_random() {
+        let mut rng = LegacyRand::from_seed(7);
+        let mut ticker = Ticker::new(30, 60);
+        assert!(!ticker.tick_down_and_check(&mut rng));
+        assert_eq!(ticker.ticks_until_next_start, 34);
+        for _ in 1..34 {
+            assert!(!ticker.tick_down_and_check(&mut rng));
+        }
+        assert!(ticker.tick_down_and_check(&mut rng));
+    }
+
     #[test]
     fn a_fixed_interval_fires_exactly_on_its_period() {
         let mut rng = LegacyRand::from_seed(1);

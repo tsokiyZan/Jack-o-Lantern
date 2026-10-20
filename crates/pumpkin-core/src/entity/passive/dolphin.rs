@@ -306,14 +306,21 @@ impl Mob for DolphinEntity {
         TOTAL_AIR_SUPPLY
     }
 
-    /// Vanilla `Dolphin.tick`: drying out on land, and flopping about there.
-    fn mob_tick(&self, caller: &dyn EntityBase) {
+    /// Vanilla `AgeableMob.aiStep`, which runs inside this mob's `super.aiStep()`.
+    fn ai_step_end(&self, _caller: &dyn EntityBase) {
+        self.ageable_ai_step();
+    }
+
+    /// The looting part of vanilla `Mob.aiStep`, which runs after the move; then the rest of
+    /// vanilla `Dolphin.tick` after `super.tick()` (Dolphin.java:237-256): drying out on
+    /// land, and flopping about there.
+    fn post_tick(&self) {
+        self.mob_entity
+            .for_each_item_in_pickup_reach(|item| self.pick_up_item(item));
         let living = &self.mob_entity.living_entity;
         let entity = &living.entity;
-        // `AgeableMob.aiStep`, which vanilla runs inside `super.tick()`.
-        self.ageable_ai_step();
         if self.mob_entity.is_no_ai() {
-            living.breath.set_air_supply(caller, TOTAL_AIR_SUPPLY);
+            living.breath.set_air_supply(self, TOTAL_AIR_SUPPLY);
             return;
         }
         if entity.is_in_water_or_rain() {
@@ -322,7 +329,7 @@ impl Mob for DolphinEntity {
         }
         self.set_moistness_level(self.moistness_level.load(Ordering::Relaxed) - 1);
         if self.moistness_level.load(Ordering::Relaxed) <= 0 {
-            living.damage(caller, 1.0, DamageType::DRY_OUT);
+            living.damage(self, 1.0, DamageType::DRY_OUT);
         }
         if entity.on_ground.load(Ordering::Relaxed) {
             let (x, z, yaw) = {
@@ -370,12 +377,6 @@ impl Mob for DolphinEntity {
 
     fn mob_is_pushed_by_fluids(&self) -> bool {
         false
-    }
-
-    /// The looting part of vanilla `Mob.aiStep`, which runs after the move.
-    fn post_tick(&self) {
-        self.mob_entity
-            .for_each_item_in_pickup_reach(|item| self.pick_up_item(item));
     }
 
     fn mob_write_nbt(&self, nbt: &mut NbtCompound) {

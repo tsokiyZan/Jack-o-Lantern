@@ -79,8 +79,10 @@ fn burn(mob: &dyn Mob) {
         return;
     }
 
-    // 0 or 1 wear, thinned out by Unbreaking.
-    match stack.hurt_and_break(&entity.world.load(), entity.random().next_bounded_i32(2)) {
+    // 0 or 1 wear, thinned out by Unbreaking. Drawn first: a guard in the `match`
+    // scrutinee would live through every arm.
+    let wear = entity.random().next_bounded_i32(2);
+    match stack.hurt_and_break(&entity.world.load(), wear) {
         DamageResult::Untouched => {}
         DamageResult::Damaged => {
             mob_entity.set_item_slot(&slot, stack);

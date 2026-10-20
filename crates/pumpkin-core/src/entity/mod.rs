@@ -1775,9 +1775,6 @@ impl Entity {
         f64::from(self.entity_dimension.load().eye_height)
     }
 
-    /// Updates the entity's position, block position, and chunk position.
-    ///
-    /// This function calculates the new position, block position, and chunk position based on the provided coordinates. If any of these values change, the corresponding fields are updated.
     /// Vanilla `Entity.getRandom()`. Draw into locals and drop the guard before calling on.
     pub fn random(
         &self,
@@ -1787,6 +1784,9 @@ impl Entity {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
+    /// Updates the entity's position, block position, and chunk position.
+    ///
+    /// This function calculates the new position, block position, and chunk position based on the provided coordinates. If any of these values change, the corresponding fields are updated.
     pub fn set_pos(&self, new_position: Vector3<f64>) {
         let pos = self.pos.load();
         if pos != new_position {

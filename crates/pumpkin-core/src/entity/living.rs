@@ -4376,6 +4376,10 @@ impl EntityBase for LivingEntity {
         if self.health.load() <= 0.0 && !own_tick_death && !is_player {
             self.tick_death(caller);
         }
+        // `Mob.baseTick` follows `super.baseTick()` with its ambient-sound roll.
+        if let Some(mob) = caller.get_mob() {
+            mob.mob_base_tick();
+        }
         let in_death_animation = self.health.load() <= 0.0 && !self.entity.removed.load(Relaxed);
         if (is_alive || in_death_animation) && !is_player {
             self.tick_movement(caller);

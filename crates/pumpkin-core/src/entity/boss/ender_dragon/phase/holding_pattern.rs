@@ -49,7 +49,8 @@ impl DragonHoldingPatternPhase {
             });
             if let Some(player) = player_nearest_to_egg
                 && {
-                    // One guard for both draws: `||` keeps the first operand's temporaries.
+                    // One guard for both draws; `||` still skips the second draw when the
+                    // first succeeds, as vanilla does.
                     let mut random = dragon.get_entity().random();
                     random.next_bounded_i32((dist_sqr + 2.0) as i32) == 0
                         || random.next_bounded_i32(crystals + 2) == 0

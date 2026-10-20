@@ -1221,6 +1221,21 @@ pub trait Mob: EntityBase + Send + Sync {
             .store(-self.ambient_sound_interval(), Relaxed);
     }
 
+    /// The ambient-sound roll of vanilla `Mob.baseTick` (Mob.java:288), after
+    /// `super.baseTick()` and before `LivingEntity.tick` reaches `aiStep`. `isAlive`
+    /// includes health.
+    fn mob_base_tick(&self) {
+        let mob_entity = self.get_mob_entity();
+        if !mob_entity.living_entity.is_alive() {
+            return;
+        }
+        let roll = self.get_entity().random().next_bounded_i32(1000);
+        if roll < mob_entity.ambient_sound_time.fetch_add(1, Relaxed) {
+            self.reset_ambient_sound_time();
+            self.play_ambient_sound();
+        }
+    }
+
     /// Vanilla `LivingEntity.getSoundVolume`.
     fn sound_volume(&self) -> f32 {
         sounds::sound_volume(self.get_entity().entity_type)
@@ -2858,19 +2873,11 @@ impl<T: Mob + Send + 'static> EntityBase for T {
             neutral.update_persistent_anger();
         }
 
-        // The ambient-sound part of vanilla `Mob.baseTick`; `isAlive` includes health.
-        if mob_entity.living_entity.is_alive()
-            && self.get_entity().random().next_bounded_i32(1000)
-                < mob_entity.ambient_sound_time.fetch_add(1, Relaxed)
-        {
-            self.reset_ambient_sound_time();
-            self.play_ambient_sound();
-        }
-
         self.mob_tick(caller);
 
         // Vanilla Mob.isEffectiveAi: NoAI skips the whole serverAiStep, which
-        // `LivingEntity::tick_movement` runs at its vanilla place in `aiStep`.
+        // `LivingEntity::tick_movement` runs at its vanilla place in `aiStep`. The
+        // ambient-sound roll of `Mob.baseTick` runs inside it too, via `mob_base_tick`.
         mob_entity.living_entity.tick(caller, server);
         self.post_tick();
     }

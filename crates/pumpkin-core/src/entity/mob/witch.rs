@@ -261,7 +261,8 @@ impl Mob for WitchEntity {
         amount
     }
 
-    fn mob_tick(&self, caller: &dyn EntityBase) {
+    /// The start of vanilla `Witch.aiStep`, before `super.aiStep()`.
+    fn ai_step(&self, caller: &dyn EntityBase) {
         // Vanilla `Witch.aiStep` runs this server half only `if (this.isAlive())`.
         if !self.mob_entity.living_entity.is_alive() {
             return;

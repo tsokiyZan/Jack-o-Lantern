@@ -106,7 +106,7 @@ impl HoneyCombItem {
     }
 }
 
-const fn get_waxed_equivalent(id: BlockId) -> Option<BlockId> {
+pub(crate) const fn get_waxed_equivalent(id: BlockId) -> Option<BlockId> {
     match id {
         BlockId::OXIDIZED_COPPER => Some(BlockId::WAXED_OXIDIZED_COPPER),
         BlockId::WEATHERED_COPPER => Some(BlockId::WAXED_WEATHERED_COPPER),
