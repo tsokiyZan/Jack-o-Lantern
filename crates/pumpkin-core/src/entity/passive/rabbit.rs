@@ -207,6 +207,12 @@ impl RabbitEntity {
             );
         };
 
+        // The field `idleAnimationTimeout = this.random.nextInt(40) + 180` only feeds the
+        // client's animation, but its initializer draws on the server too. Java runs it after
+        // `Mob`'s constructor has called `registerGoals`; nothing between it and the end of
+        // vanilla's constructor draws.
+        mob_arc.get_entity().random().next_bounded_i32(40);
+
         mob_arc
     }
 

@@ -729,6 +729,31 @@ impl Mob for BeeEntity {
         if entity.tick_count.load(Ordering::Relaxed) % 20 == 0 && !self.is_hive_valid() {
             self.set_hive_pos(None);
         }
+
+        // The rest of vanilla `Bee.tick`: falling-nectar drips. `level.addParticle` does
+        // nothing on a server level, but the random numbers are drawn there too.
+        if self.has_nectar()
+            && self
+                .num_crops_grown_since_pollination
+                .load(Ordering::Relaxed)
+                < MAX_CROPS_GROWABLE
+            && entity.random().next_f32() < 0.05
+        {
+            let world = entity.world.load();
+            let mut i = 0;
+            // `i < this.random.nextInt(2) + 1` draws again on every check.
+            while i < entity.random().next_bounded_i32(2) + 1 {
+                // `spawnFluidParticle`: two `level.getRandom().nextDouble()`s.
+                let mut level_random = world
+                    .random
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                level_random.next_f64();
+                level_random.next_f64();
+                drop(level_random);
+                i += 1;
+            }
+        }
     }
 
     fn mob_init_data_tracker(&self) {
