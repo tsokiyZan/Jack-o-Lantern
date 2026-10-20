@@ -77,7 +77,7 @@ impl Behavior for LongJumpMidJump {
         tick.mob.set_pose(EntityPose::Standing);
         tick.brain.erase(types::LONG_JUMP_MID_JUMP.id());
         let (min, max) = self.time_between_long_jumps;
-        let cooldown = tick.mob.get_random().random_range(min..=max);
+        let cooldown = rand::rng().random_range(min..=max);
         tick.brain.set(types::LONG_JUMP_COOLDOWN_TICKS, cooldown);
     }
 

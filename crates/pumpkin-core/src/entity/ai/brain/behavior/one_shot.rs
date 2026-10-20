@@ -115,7 +115,7 @@ pub fn trigger_gate(
     }
     OneShot::new(name, Vec::new(), move |tick| {
         if order == OrderPolicy::Shuffled {
-            let mut rng = tick.mob.get_random();
+            let mut rng = rand::rng();
             triggers.shuffle(&mut rng);
         }
         for trigger in triggers.iter_mut() {

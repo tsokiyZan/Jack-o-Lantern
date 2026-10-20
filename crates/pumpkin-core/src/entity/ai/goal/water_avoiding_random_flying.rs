@@ -8,7 +8,7 @@ use pumpkin_util::math::position::BlockPos;
 const WATER_AVOIDING_PROBABILITY: f32 = 0.001;
 use crate::entity::mob::Mob;
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 pub struct WaterAvoidingRandomFlyingGoal {
     goal_control: Controls,
@@ -46,7 +46,7 @@ impl WaterAvoidingRandomFlyingGoal {
         } else {
             None
         };
-        if mob.get_random().random::<f32>() >= WATER_AVOIDING_PROBABILITY {
+        if mob.get_entity().random().next_f32() >= WATER_AVOIDING_PROBABILITY {
             Self::tree_pos(mob)
         } else {
             land_pos
@@ -130,7 +130,7 @@ impl Goal for WaterAvoidingRandomFlyingGoal {
             .no_action_time
             .load(std::sync::atomic::Ordering::Relaxed)
             >= 100
-            || mob.get_random().random_range(0..self.chance) != 0
+            || mob.get_entity().random().next_bounded_i32(self.chance) != 0
         {
             return false;
         }

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, Ordering};
 
-use rand::{Rng, RngExt};
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::ai::target_predicate::TargetPredicate;
 use crate::entity::passive::armadillo;
@@ -155,7 +155,7 @@ impl SensorType {
         }
     }
 
-    pub fn create<R: Rng>(self, rng: &mut R) -> SensorEntry {
+    pub fn create(self, rng: &mut impl RandomImpl) -> SensorEntry {
         SensorEntry::new(self, rng)
     }
 }
@@ -168,13 +168,14 @@ pub struct SensorEntry {
 }
 
 impl SensorEntry {
-    pub fn new<R: Rng>(ty: SensorType, rng: &mut R) -> Self {
+    /// Vanilla `Sensor.randomlyDelayStart` with the brain's `body.getRandom()`.
+    pub fn new(ty: SensorType, rng: &mut impl RandomImpl) -> Self {
         let scan_rate = ty.scan_rate();
         Self {
             ty,
             sensor: ty.create_sensor(),
             scan_rate,
-            time_to_tick: i64::from(rng.random_range(0..scan_rate)),
+            time_to_tick: i64::from(rng.next_bounded_i32(scan_rate)),
         }
     }
 

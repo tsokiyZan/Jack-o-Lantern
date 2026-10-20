@@ -21,6 +21,7 @@ use pumpkin_data::tag::{self, Taggable};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::codec::var_int::VarInt;
 use pumpkin_util::math::boundingbox::EntityDimensions;
+use pumpkin_util::random::RandomImpl;
 use rand::RngExt;
 use uuid::Uuid;
 
@@ -74,7 +75,8 @@ pub fn play_horse_step_sound(
         if count > 5 && count % 3 == 0 {
             // Vanilla `AbstractHorse.playGallopSound`.
             caller.play_sound_at_self(Sound::EntityHorseGallop, volume, pitch);
-            if breathe && rand::rng().random_range(0..10) == 0 {
+            // `Horse.playGallopSound`: `this.random.nextInt(10)`.
+            if breathe && entity.random().next_bounded_i32(10) == 0 {
                 let sound = if entity.is_baby() {
                     Sound::EntityBabyHorseBreathe
                 } else {

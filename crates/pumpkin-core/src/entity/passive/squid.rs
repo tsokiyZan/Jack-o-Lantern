@@ -15,7 +15,7 @@ use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::math::boundingbox::EntityDimensions;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::ageable::{AgeableData, AgeableMob};
 use crate::entity::ai::goal::{Goal, to_goal_ticks};
@@ -57,8 +57,8 @@ impl SquidMovement {
     }
 }
 
-fn random_tentacle_speed(rng: &mut impl RngExt) -> f32 {
-    1.0 / (rng.random::<f32>() + 1.0) * 0.2
+fn random_tentacle_speed(random: &mut impl RandomImpl) -> f32 {
+    1.0 / (random.next_f32() + 1.0) * 0.2
 }
 
 impl SquidEntity {
@@ -66,10 +66,12 @@ impl SquidEntity {
         let mob_entity = MobEntity::new(entity);
         // Vanilla `AgeableWaterCreature`'s constructor.
         mob_entity.set_pathfinding_malus(PathType::Water, 0.0);
+        // `Squid`'s constructor: `this.tentacleSpeed = 1.0F / (this.random.nextFloat() + 1.0F) * 0.2F`.
+        let tentacle_speed = random_tentacle_speed(&mut *mob_entity.living_entity.entity.random());
         let movement = Arc::new(SquidMovement {
             movement_vector: AtomicCell::new(Vector3::default()),
             tentacle_movement: AtomicCell::new(0.0),
-            tentacle_speed: AtomicCell::new(random_tentacle_speed(&mut rand::rng())),
+            tentacle_speed: AtomicCell::new(tentacle_speed),
             x_body_rot: AtomicCell::new(0.0),
             x_body_rot_o: AtomicCell::new(0.0),
             y_body_rot_o: AtomicCell::new(0.0),
@@ -121,11 +123,13 @@ impl SquidEntity {
         let world = entity.world.load();
         let entity_pos = entity.pos.load();
         let is_baby = self.is_baby();
-        let mut rng = self.get_random();
-        // `makeSound` with `getVoicePitch`.
+        // `makeSound` with `getVoicePitch`: the pitch is drawn before `playSound` checks
+        // `isSilent`.
+        let pitch = {
+            let mut random = entity.random();
+            (random.next_f32() - random.next_f32()) * 0.2 + if is_baby { 1.5 } else { 1.0 }
+        };
         if !entity.silent.load(Relaxed) {
-            let pitch =
-                (rng.random::<f32>() - rng.random::<f32>()) * 0.2 + if is_baby { 1.5 } else { 1.0 };
             let squirt = if self.glow {
                 Sound::EntityGlowSquidSquirt
             } else {
@@ -145,14 +149,23 @@ impl SquidEntity {
             Particle::SquidInk
         };
         let pos = self.rotate_vector(Vector3::new(0.0, -1.0, 0.0)) + entity_pos;
-        for _ in 0..30 {
+        // Three `nextFloat`s per particle, in order: x, z, then the offset scale.
+        let draws: [[f32; 3]; 30] = {
+            let mut random = entity.random();
+            std::array::from_fn(|_| {
+                let x = random.next_f32();
+                let z = random.next_f32();
+                [x, z, random.next_f32()]
+            })
+        };
+        for [x, z, scale] in draws {
             let dir = self.rotate_vector(Vector3::new(
-                f64::from(rng.random::<f32>()) * 0.6 - 0.3,
+                f64::from(x) * 0.6 - 0.3,
                 -1.0,
-                f64::from(rng.random::<f32>()) * 0.6 - 0.3,
+                f64::from(z) * 0.6 - 0.3,
             ));
             let ink_pos_offset_scale = if is_baby { 0.1f32 } else { 0.3 };
-            let dir_offset = dir * f64::from(ink_pos_offset_scale + rng.random::<f32>() * 2.0);
+            let dir_offset = dir * f64::from(ink_pos_offset_scale + scale * 2.0);
             // A count of zero makes the client read the offset as a velocity.
             world.spawn_particle(
                 Vector3::new(pos.x, pos.y + 0.5, pos.z),
@@ -206,7 +219,7 @@ impl Mob for SquidEntity {
 
     /// Vanilla `AgeableWaterCreature.getBaseExperienceReward`.
     fn get_base_experience_reward(&self) -> u32 {
-        1 + self.get_random().random_range(0..3)
+        1 + self.get_entity().random().next_bounded_i32(3) as u32
     }
 
     fn mob_is_pushed_by_fluids(&self) -> bool {
@@ -295,11 +308,11 @@ impl Mob for SquidEntity {
         if tentacle_movement > TAU {
             tentacle_movement -= TAU;
             {
-                let mut rng = self.get_random();
-                if rng.random_range(0..10) == 0 {
+                let mut random = entity.random();
+                if random.next_bounded_i32(10) == 0 {
                     movement
                         .tentacle_speed
-                        .store(random_tentacle_speed(&mut rng));
+                        .store(random_tentacle_speed(&mut *random));
                 }
             }
             entity
@@ -354,10 +367,11 @@ impl Mob for SquidEntity {
             if dark_ticks > 0 {
                 self.set_dark_ticks(dark_ticks - 1);
             }
-            // The glow particle is the client's, but the server draws its random numbers.
-            let mut rng = self.get_random();
+            // The glow particle is the client's, but the server draws its random numbers:
+            // `getRandomX(0.6)`, `getRandomY()` and `getRandomZ(0.6)`, one `nextDouble` each.
+            let mut random = entity.random();
             for _ in 0..3 {
-                rng.random::<f64>();
+                random.next_f64();
             }
         }
     }
@@ -379,15 +393,18 @@ impl Goal for SquidRandomMovementGoal {
             self.movement.movement_vector.store(Vector3::default());
             return;
         }
-        let mut rng = mob.get_random();
-        if rng.random_range(0..to_goal_ticks(50)) == 0
+        if living.entity.random().next_bounded_i32(to_goal_ticks(50)) == 0
             || !living.entity.touching_water.load(Relaxed)
             || !self.movement.has_movement_vector()
         {
-            let angle = rng.random::<f32>() * TAU;
+            let (angle, y) = {
+                let mut random = living.entity.random();
+                let angle = random.next_f32() * TAU;
+                (angle, random.next_f32())
+            };
             self.movement.movement_vector.store(Vector3::new(
                 f64::from(pumpkin_util::math::cos(angle) * 0.2),
-                f64::from(-0.1 + rng.random::<f32>() * 0.2),
+                f64::from(-0.1 + y * 0.2),
                 f64::from(pumpkin_util::math::sin(angle) * 0.2),
             ));
         }

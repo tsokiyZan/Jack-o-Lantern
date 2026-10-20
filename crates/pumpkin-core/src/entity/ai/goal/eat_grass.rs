@@ -5,8 +5,8 @@ use pumpkin_data::Block;
 use pumpkin_data::entity::EntityStatus;
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_data::world::WorldEvent;
+use pumpkin_util::random::RandomImpl;
 use pumpkin_world::world::BlockFlags;
-use rand::RngExt;
 
 const MAX_TIMER: i32 = 40;
 const MAX_INTERVAL: i32 = 1000;
@@ -40,7 +40,7 @@ impl Goal for EatGrassGoal {
         } else {
             MAX_INTERVAL
         });
-        if mob.get_random().random_range(0..interval) != 0 {
+        if mob.get_entity().random().next_bounded_i32(interval) != 0 {
             return false;
         }
 

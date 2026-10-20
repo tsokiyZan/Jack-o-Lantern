@@ -1,6 +1,7 @@
 use pumpkin_data::fluid::Fluid;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::ai::pathfinder::pathfinding_context::PathfindingContext;
 use crate::entity::mob::Mob;
@@ -17,7 +18,7 @@ pub fn land_random_pos(
     let restrict = mob_restricted(mob, f64::from(horizontal_dist));
     generate_random_pos(
         || {
-            let direction = generate_random_direction(horizontal_dist, vertical_dist);
+            let direction = generate_random_direction(mob, horizontal_dist, vertical_dist);
             let pos = generate_random_pos_toward_direction(
                 mob,
                 f64::from(horizontal_dist),
@@ -55,12 +56,12 @@ fn generate_random_pos(
     })
 }
 
-fn generate_random_direction(horizontal_dist: i32, vertical_dist: i32) -> BlockPos {
-    BlockPos::new(
-        rand::random_range(0..2 * horizontal_dist + 1) - horizontal_dist,
-        rand::random_range(0..2 * vertical_dist + 1) - vertical_dist,
-        rand::random_range(0..2 * horizontal_dist + 1) - horizontal_dist,
-    )
+fn generate_random_direction(mob: &dyn Mob, horizontal_dist: i32, vertical_dist: i32) -> BlockPos {
+    let mut random = mob.get_entity().random();
+    let xt = random.next_bounded_i32(2 * horizontal_dist + 1) - horizontal_dist;
+    let yt = random.next_bounded_i32(2 * vertical_dist + 1) - vertical_dist;
+    let zt = random.next_bounded_i32(2 * horizontal_dist + 1) - horizontal_dist;
+    BlockPos::new(xt, yt, zt)
 }
 
 fn mob_restricted(mob: &dyn Mob, horizontal_dist: f64) -> bool {
@@ -100,15 +101,16 @@ fn generate_random_pos_toward_direction(
         != -1;
     if has_home && horizontal_dist > 1.0 {
         let home = mob_entity.position_target.load();
+        let mut random = entity.random();
         if mob_pos.x > f64::from(home.0.x) {
-            xt -= rand::random::<f64>() * horizontal_dist / 2.0;
+            xt -= random.next_f64() * horizontal_dist / 2.0;
         } else {
-            xt += rand::random::<f64>() * horizontal_dist / 2.0;
+            xt += random.next_f64() * horizontal_dist / 2.0;
         }
         if mob_pos.z > f64::from(home.0.z) {
-            zt -= rand::random::<f64>() * horizontal_dist / 2.0;
+            zt -= random.next_f64() * horizontal_dist / 2.0;
         } else {
-            zt += rand::random::<f64>() * horizontal_dist / 2.0;
+            zt += random.next_f64() * horizontal_dist / 2.0;
         }
     }
     let pos = BlockPos::floored(

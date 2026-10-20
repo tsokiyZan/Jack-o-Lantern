@@ -5,7 +5,7 @@ use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::Sound;
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_util::Hand;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, Ordering};
 
@@ -173,10 +173,10 @@ impl Goal for BowAttackGoal {
         }
 
         if self.strafing_time >= 20 {
-            if mob.get_random().random::<f32>() < 0.3 {
+            if mob.get_entity().random().next_f32() < 0.3 {
                 self.strafing_clockwise = !self.strafing_clockwise;
             }
-            if mob.get_random().random::<f32>() < 0.3 {
+            if mob.get_entity().random().next_f32() < 0.3 {
                 self.strafing_backwards = !self.strafing_backwards;
             }
             self.strafing_time = 0;
@@ -356,7 +356,7 @@ pub fn perform_bow_attack(
     world.spawn_entity(arrow.clone());
     arrow.apply_on_projectile_spawned(&projectile);
 
-    let pitch = 1.0 / (mob.get_random().random::<f32>() * 0.4 + 0.8);
+    let pitch = 1.0 / (mob.get_entity().random().next_f32() * 0.4 + 0.8);
     mob.play_sound_at_self(Sound::EntitySkeletonShoot, 1.0, pitch);
 }
 

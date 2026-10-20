@@ -35,10 +35,7 @@ impl BehaviorControl for DoNothing {
     fn try_start(&mut self, tick: &mut BrainTick<'_>) -> bool {
         self.status = Status::Running;
         let duration = self.min_duration
-            + tick
-                .mob
-                .get_random()
-                .random_range(0..(self.max_duration + 1 - self.min_duration).max(1));
+            + rand::rng().random_range(0..(self.max_duration + 1 - self.min_duration).max(1));
         self.end_timestamp = tick.time + i64::from(duration);
         true
     }

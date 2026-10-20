@@ -105,10 +105,7 @@ impl RamTarget {
     fn finish_ram(&self, tick: &mut BrainTick<'_>) {
         tick.world
             .send_entity_status(tick.mob.get_entity(), EntityStatus::EndRam, None);
-        let cooldown = sample(
-            (self.get_time_between_rams)(tick.mob),
-            &mut tick.mob.get_random(),
-        );
+        let cooldown = sample((self.get_time_between_rams)(tick.mob), &mut rand::rng());
         tick.brain.set(types::RAM_COOLDOWN_TICKS, cooldown);
         tick.brain.erase(types::RAM_TARGET.id());
     }

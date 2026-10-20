@@ -1,5 +1,5 @@
 use crate::entity::breath::BreathManager;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 use std::sync::Arc;
 use std::sync::PoisonError;
 use std::sync::atomic::{AtomicI32, Ordering};
@@ -205,7 +205,7 @@ impl Mob for PufferfishEntity {
 
     /// Vanilla `WaterAnimal.getBaseExperienceReward`.
     fn get_base_experience_reward(&self) -> u32 {
-        1 + self.get_random().random_range(0..3)
+        1 + self.get_entity().random().next_bounded_i32(3) as u32
     }
 
     /// Vanilla `WaterAnimal.handleAirSupply`.

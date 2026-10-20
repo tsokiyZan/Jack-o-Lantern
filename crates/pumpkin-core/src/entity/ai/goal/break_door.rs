@@ -3,8 +3,8 @@ use std::sync::Arc;
 use pumpkin_data::BlockStateId;
 use pumpkin_data::world::WorldEvent;
 use pumpkin_util::Difficulty;
+use pumpkin_util::random::RandomImpl;
 use pumpkin_world::world::BlockFlags;
-use rand::RngExt;
 
 use super::door_interact::DoorInteractGoal;
 use super::{Controls, Goal};
@@ -121,7 +121,7 @@ impl Goal for BreakDoorGoal {
         self.door_interact_goal.tick_interaction(mob);
         let world = mob.get_entity().world.load_full();
 
-        if mob.get_random().random_range(0..20) == 0 {
+        if mob.get_entity().random().next_bounded_i32(20) == 0 {
             world.sync_world_event(
                 WorldEvent::SoundZombieWoodenDoor,
                 self.door_interact_goal.door_pos,

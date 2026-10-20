@@ -74,7 +74,7 @@ pub fn set_entity_look_target_sometimes(
             let Some(target) = target else {
                 return false;
             };
-            if !ticker.tick_down_and_check(&mut tick.mob.get_random()) {
+            if !ticker.tick_down_and_check(&mut rand::rng()) {
                 return false;
             }
             tick.brain.set(

@@ -20,7 +20,7 @@ use pumpkin_protocol::codec::var_int::VarInt;
 use pumpkin_util::math::boundingbox::{BoundingBox, EntityDimensions};
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 use uuid::Uuid;
 
 use crate::block::entities::chest::ChestBlockEntity;
@@ -274,8 +274,10 @@ impl CatEntity {
     fn handle_lie_down(&self) {
         let tick_count = self.get_entity().tick_count.load(Ordering::Relaxed);
         if (self.is_lying() || self.is_relax_state_one()) && tick_count % 5 == 0 {
-            let mut random = self.get_random();
-            let volume = 0.6 + 0.4 * (random.random::<f32>() - random.random::<f32>());
+            let volume = {
+                let mut random = self.get_entity().random();
+                0.6 + 0.4 * (random.next_f32() - random.next_f32())
+            };
             let sound = self
                 .get_sound_variant()
                 .purr_sound(self.get_entity().is_baby());
@@ -286,7 +288,7 @@ impl CatEntity {
     /// Vanilla `Cat.tryToTame`.
     fn try_to_tame(&self, player: &Player) {
         let world = self.get_entity().world.load();
-        if self.get_random().random_range(0..3) == 0 {
+        if self.get_entity().random().next_bounded_i32(3) == 0 {
             TamableAnimal::tame(self, player.gameprofile.id);
             // The `complete_catalogue` criteria of vanilla's `TAME_ANIMAL` trigger.
             player.trigger_advancement_criterion(
@@ -332,9 +334,16 @@ fn select_variant_to_spawn(world: &World, pos: &BlockPos) -> Option<CatVariant> 
         .copied()
         .filter(|variant| *variant != CatVariant::AllBlack || full_moon)
         .collect();
-    candidates
-        .get(rand::random_range(0..candidates.len()))
-        .copied()
+    // `Util.getRandomSafe(selected, level.getRandom())`.
+    if candidates.is_empty() {
+        return None;
+    }
+    let index = world
+        .random
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .next_bounded_i32(candidates.len() as i32);
+    candidates.get(index as usize).copied()
 }
 
 /// Vanilla `Cat.customServerAiStep`, which `Ocelot` repeats: crouches while tempted, sprints
@@ -413,7 +422,8 @@ impl Animal for CatEntity {
         if let Some(baby_cat) = baby.cast_any().downcast_ref::<Self>()
             && let Some(partner_cat) = partner.cast_any().downcast_ref::<Self>()
         {
-            baby_cat.set_variant(if self.get_random().random::<bool>() {
+            let use_own = self.get_entity().random().next_bool();
+            baby_cat.set_variant(if use_own {
                 self.get_variant()
             } else {
                 partner_cat.get_variant()
@@ -450,7 +460,7 @@ impl Mob for CatEntity {
             sounds.stray_ambient_sound(baby)
         } else if self.get_mob_entity().is_in_love() {
             sounds.purr_sound(baby)
-        } else if self.get_random().random_range(0..4) == 0 {
+        } else if self.get_entity().random().next_bounded_i32(4) == 0 {
             sounds.purreow_sound(baby)
         } else {
             sounds.ambient_sound(baby)
@@ -518,9 +528,14 @@ impl Mob for CatEntity {
         if let Some(variant) = select_variant_to_spawn(world, &self.get_entity().block_pos.load()) {
             self.set_variant(variant);
         }
-        // Vanilla `CatSoundVariants.pickRandomSoundVariant`.
+        // Vanilla `CatSoundVariants.pickRandomSoundVariant(.., level.getRandom())`.
         let sound_variants = CatSoundVariant::all();
-        self.set_sound_variant(sound_variants[rand::random_range(0..sound_variants.len())]);
+        let index = world
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .next_bounded_i32(sound_variants.len() as i32);
+        self.set_sound_variant(sound_variants[index as usize]);
         Some(group_data)
     }
 
@@ -718,10 +733,12 @@ impl Goal for CatTemptGoal {
 
     fn tick(&mut self, mob: &dyn Mob) {
         self.goal.tick(mob);
-        let mut random = mob.get_random();
-        if self.selected_player.is_none() && random.random_range(0..self.get_tick_count(600)) == 0 {
+        let entity = mob.get_entity();
+        if self.selected_player.is_none()
+            && entity.random().next_bounded_i32(self.get_tick_count(600)) == 0
+        {
             self.selected_player = self.goal.player().cloned();
-        } else if random.random_range(0..self.get_tick_count(500)) == 0 {
+        } else if entity.random().next_bounded_i32(self.get_tick_count(500)) == 0 {
             self.selected_player = None;
         }
     }
@@ -781,12 +798,10 @@ impl CatRelaxOnOwnerGoal {
             |holder| holder.get_entity().block_pos.load(),
         );
         let (x, y, z) = {
-            let mut random = cat.get_random();
-            (
-                center.0.x + random.random_range(0..11) - 5,
-                center.0.y + random.random_range(0..5) - 2,
-                center.0.z + random.random_range(0..11) - 5,
-            )
+            let mut random = entity.random();
+            let x = center.0.x + random.next_bounded_i32(11) - 5;
+            let y = center.0.y + random.next_bounded_i32(5) - 2;
+            (x, y, center.0.z + random.next_bounded_i32(11) - 5)
         };
         cat.mob_entity.living_entity.random_teleport(
             cat,
@@ -910,7 +925,13 @@ impl Goal for CatRelaxOnOwnerGoal {
                 EnvironmentAttribute::GameplayCatWakingUpGiftChance,
                 &cat.get_entity().block_pos.load(),
             );
-            if rand::random::<f32>() < chance {
+            // `this.cat.level().getRandom().nextFloat()`.
+            let roll = world
+                .random
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .next_f32();
+            if roll < chance {
                 Self::give_morning_gift(cat);
             }
         }

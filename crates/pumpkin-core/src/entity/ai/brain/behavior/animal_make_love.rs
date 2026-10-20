@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use pumpkin_data::entity::EntityType;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use super::super::BrainTick;
 use super::super::memory::{MemoryModuleId, MemoryStatus, types};
@@ -149,8 +149,9 @@ impl Behavior for AnimalMakeLove {
         let duration = MIN_TIME_TO_CHILD
             + tick
                 .mob
-                .get_random()
-                .random_range(0..MAX_EXTRA_TIME_TO_CHILD);
+                .get_entity()
+                .random()
+                .next_bounded_i32(MAX_EXTRA_TIME_TO_CHILD);
         self.spawn_child_at_time = tick.time + i64::from(duration);
     }
 

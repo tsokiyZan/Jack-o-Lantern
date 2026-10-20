@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use pumpkin_data::entity::EntityStatus;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::ageable::BABY_START_AGE;
 use crate::entity::ai::goal::revenge::EntityTypeFilter;
@@ -163,11 +163,8 @@ impl BreedGoal {
 
         world.send_entity_status(entity, EntityStatus::InLoveHearts, None);
         if world.level_info.load().game_rules.mob_drops {
-            ExperienceOrbEntity::spawn(
-                &world,
-                entity.pos.load(),
-                mob.get_random().random_range(1..8),
-            );
+            let amount = (entity.random().next_bounded_i32(7) + 1).unsigned_abs();
+            ExperienceOrbEntity::spawn(&world, entity.pos.load(), amount);
         }
     }
 }

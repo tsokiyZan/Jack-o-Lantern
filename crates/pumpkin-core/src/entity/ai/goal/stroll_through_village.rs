@@ -1,7 +1,7 @@
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 use pumpkin_world::chunk::ChunkHeightmapType;
-use rand::RngExt;
 
 use super::{Controls, Goal, to_goal_ticks};
 use crate::entity::ai::util::land_random_pos;
@@ -55,13 +55,12 @@ impl StrollThroughVillageGoal {
 
     /// Vanilla `moveRandomly`.
     fn move_randomly(mob: &dyn Mob) {
-        let mut rng = mob.get_random();
         let pos = mob.get_entity().block_pos.load();
-        let offset = BlockPos::new(
-            pos.0.x - 8 + rng.random_range(0..16),
-            pos.0.y,
-            pos.0.z - 8 + rng.random_range(0..16),
-        );
+        let (dx, dz) = {
+            let mut random = mob.get_entity().random();
+            (random.next_bounded_i32(16), random.next_bounded_i32(16))
+        };
+        let offset = BlockPos::new(pos.0.x - 8 + dx, pos.0.y, pos.0.z - 8 + dz);
         let path_target =
             Self::motion_blocking_no_leaves_pos(&mob.get_entity().world.load(), offset);
         Self::move_to(mob, path_target);
@@ -78,7 +77,7 @@ impl Goal for StrollThroughVillageGoal {
         if world.is_bright_outside() {
             return false;
         }
-        if mob.get_random().random_range(0..self.interval) != 0 {
+        if mob.get_entity().random().next_bounded_i32(self.interval) != 0 {
             return false;
         }
         if !world.is_close_to_village(&entity.block_pos.load(), 6) {

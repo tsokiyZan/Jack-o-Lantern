@@ -529,6 +529,7 @@ impl PathNavigation {
         mob_data.can_stand_on_lava = entity.entity.entity_type == &EntityType::STRIDER;
         mob_data.on_ground = entity.entity.on_ground.load(Ordering::Relaxed);
         mob_data.is_in_water = entity.entity.is_in_water();
+        mob_data.entity_id = Some(entity.entity.entity_id);
 
         for (&path_type, &malus) in &self.path_type_overrides {
             mob_data.set_pathfinding_malus(path_type, malus);

@@ -3,7 +3,7 @@ use crate::entity::EntityBase;
 use crate::entity::mob::Mob;
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
@@ -56,7 +56,7 @@ impl Goal for LeapAtTargetGoal {
         }
 
         entity.on_ground.load(Ordering::Relaxed)
-            && mob.get_random().random_range(0..to_goal_ticks(5)) == 0
+            && mob.get_entity().random().next_bounded_i32(to_goal_ticks(5)) == 0
     }
 
     fn should_continue(&mut self, mob: &dyn Mob) -> bool {

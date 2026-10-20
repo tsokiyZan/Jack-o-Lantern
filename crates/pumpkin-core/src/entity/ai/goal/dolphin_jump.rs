@@ -7,7 +7,7 @@ use pumpkin_data::tag::{self, Taggable};
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::rot_lerp;
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use super::try_find_water::TryFindWaterGoal;
 use super::{Controls, Goal, to_goal_ticks};
@@ -56,7 +56,12 @@ impl DolphinJumpGoal {
 
 impl Goal for DolphinJumpGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
-        if mob.get_random().random_range(0..self.interval.max(1)) != 0 {
+        if mob
+            .get_entity()
+            .random()
+            .next_bounded_i32(self.interval.max(1))
+            != 0
+        {
             return false;
         }
         let entity = mob.get_entity();
