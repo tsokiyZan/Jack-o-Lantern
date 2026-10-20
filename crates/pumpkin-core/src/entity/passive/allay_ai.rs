@@ -241,7 +241,8 @@ fn throw_item(tick: &mut BrainTick<'_>, target_pos: Vector3<f64>) {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             (random.next_f64() < 0.9).then(|| {
-                THROW_SOUND_PITCHES[random.next_bounded_i32(THROW_SOUND_PITCHES.len() as i32) as usize]
+                THROW_SOUND_PITCHES
+                    [random.next_bounded_i32(THROW_SOUND_PITCHES.len() as i32) as usize]
             })
         })
         .flatten();

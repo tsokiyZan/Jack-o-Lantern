@@ -67,8 +67,7 @@ impl SquidEntity {
         // Vanilla `AgeableWaterCreature`'s constructor.
         mob_entity.set_pathfinding_malus(PathType::Water, 0.0);
         // `Squid`'s constructor: `this.tentacleSpeed = 1.0F / (this.random.nextFloat() + 1.0F) * 0.2F`.
-        let tentacle_speed =
-            random_tentacle_speed(&mut *mob_entity.living_entity.entity.random());
+        let tentacle_speed = random_tentacle_speed(&mut *mob_entity.living_entity.entity.random());
         let movement = Arc::new(SquidMovement {
             movement_vector: AtomicCell::new(Vector3::default()),
             tentacle_movement: AtomicCell::new(0.0),

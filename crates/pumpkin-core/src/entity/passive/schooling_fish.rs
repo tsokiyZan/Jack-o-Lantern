@@ -125,18 +125,18 @@ impl SchoolingFish {
     /// The school part of vanilla's `AbstractSchoolingFish.tick`: a leader that
     /// has lost sight of every other fish of its kind forgets its school.
     pub fn tick(&self, mob: &dyn Mob) {
-        if self.has_followers()
-            && mob
-                .get_entity()
+        // `this.level().getRandom().nextInt(200) == 1`, drawn only with followers; the
+        // guard is dropped before the entity search.
+        let roll = || {
+            mob.get_entity()
                 .world
                 .load()
                 .random
                 .lock()
                 .unwrap_or_else(PoisonError::into_inner)
                 .next_bounded_i32(200)
-                == 1
-            && others_of_same_kind(mob).is_empty()
-        {
+        };
+        if self.has_followers() && roll() == 1 && others_of_same_kind(mob).is_empty() {
             self.school_size.store(1, Ordering::Relaxed);
         }
     }

@@ -32,8 +32,8 @@ use pumpkin_util::math;
 use pumpkin_util::math::boundingbox::EntityDimensions;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
-use pumpkin_world::world::BlockFlags;
 use pumpkin_util::random::RandomImpl;
+use pumpkin_world::world::BlockFlags;
 
 use crate::entity::{
     Entity, EntityBase,
@@ -542,8 +542,11 @@ impl Goal for TurtleGoHomeGoal {
         if turtle.has_egg() {
             return true;
         }
-        mob.get_entity().random().next_bounded_i32(to_goal_ticks(700)) == 0
-            && !turtle.home_closer_than(64.0)
+        let roll = mob
+            .get_entity()
+            .random()
+            .next_bounded_i32(to_goal_ticks(700));
+        roll == 0 && !turtle.home_closer_than(64.0)
     }
 
     fn should_continue(&mut self, mob: &dyn Mob) -> bool {

@@ -9,9 +9,9 @@ use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_data::tracked_data;
 use pumpkin_nbt::compound::NbtCompound;
-use pumpkin_util::random::RandomImpl;
 use pumpkin_protocol::codec::optional_int::OptionalInt;
 use pumpkin_protocol::codec::var_int::VarInt;
+use pumpkin_util::random::RandomImpl;
 
 use super::frog_ai;
 use crate::entity::{

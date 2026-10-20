@@ -174,7 +174,12 @@ impl ArmadilloBallUp {
     }
 
     fn pick_next_peek_timer(tick: &BrainTick<'_>) -> i32 {
-        ArmadilloState::Scared.animation_duration() + tick.mob.get_entity().random().next_int_between_inclusive(100, 400)
+        ArmadilloState::Scared.animation_duration()
+            + tick
+                .mob
+                .get_entity()
+                .random()
+                .next_int_between_inclusive(100, 400)
     }
 }
 

@@ -358,10 +358,15 @@ impl Mob for AxolotlEntity {
         let living = &self.mob_entity.living_entity;
         let current_health = living.health.load();
         let max_health = living.get_max_health();
-        if !self.mob_entity.is_no_ai()
-            && living.entity.random().next_bounded_i32(3) == 0
-            && ((living.entity.random().next_bounded_i32(3) as f32) < amount
-                || current_health / max_health < 0.5)
+        // `this.random.nextInt(3) == 0 && (this.random.nextInt(3) < damage || ...)`, short-
+        // circuited as in vanilla; one guard for both draws.
+        let rolls_pass = !self.mob_entity.is_no_ai() && {
+            let mut random = living.entity.random();
+            random.next_bounded_i32(3) == 0
+                && ((random.next_bounded_i32(3) as f32) < amount
+                    || current_health / max_health < 0.5)
+        };
+        if rolls_pass
             && amount < current_health
             && living.entity.is_in_water()
             && (cause.is_some() || source.is_some())

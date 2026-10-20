@@ -273,7 +273,12 @@ impl NautilusEntity {
     fn try_to_tame(&self, player: &Arc<Player>) {
         let entity = self.get_entity();
         let world = entity.world.load();
-        if self.get_entity().random().next_bounded_i32(TAMING_CHANCE_BOUND) == 0 {
+        if self
+            .get_entity()
+            .random()
+            .next_bounded_i32(TAMING_CHANCE_BOUND)
+            == 0
+        {
             TamableAnimal::tame(self, player.gameprofile.id);
             Mob::tame(self, player);
             self.mob_entity

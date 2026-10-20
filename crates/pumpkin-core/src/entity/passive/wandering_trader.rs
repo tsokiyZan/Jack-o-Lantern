@@ -26,6 +26,7 @@ use pumpkin_protocol::codec::var_int::VarInt;
 use pumpkin_protocol::java::client::play::CMerchantOffers;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 use pumpkin_util::text::TextComponent;
 use rand::RngExt;
 use rand::seq::IndexedRandom;
@@ -501,7 +502,7 @@ impl WanderingTraderEntity {
     }
 
     fn complete_trade(&self, offer_index: usize, world: &Arc<World>, player_uuid: Uuid) {
-        let (reward_exp, reward_amount) = {
+        let reward_exp = {
             let mut offers = self
                 .offers
                 .lock()
@@ -510,8 +511,7 @@ impl WanderingTraderEntity {
                 return;
             };
             offer.uses += 1;
-            let reward_xp = rand::rng().random_range(3..=6);
-            (offer.reward_exp, reward_xp)
+            offer.reward_exp
         };
 
         self.get_entity()
@@ -519,6 +519,8 @@ impl WanderingTraderEntity {
         self.trade_sound_cooldown.store(20, Ordering::Relaxed);
 
         if reward_exp {
+            // `rewardTradeXp`: `3 + this.random.nextInt(4)`, only for an offer that rewards XP.
+            let reward_amount = 3 + self.get_entity().random().next_bounded_i32(4) as u32;
             let position = self.get_entity().pos.load().add_raw(0.0, 0.5, 0.0);
             ExperienceOrbEntity::spawn(world, position, reward_amount);
         }
