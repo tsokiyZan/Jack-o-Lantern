@@ -9,6 +9,7 @@ use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_data::tracked_data;
 use pumpkin_nbt::compound::NbtCompound;
+use pumpkin_util::random::RandomImpl;
 use pumpkin_protocol::codec::optional_int::OptionalInt;
 use pumpkin_protocol::codec::var_int::VarInt;
 
@@ -127,19 +128,20 @@ fn select_variant_to_spawn(world: &World, entity: &Entity) -> FrogVariant {
     let cold = tag::WorldgenBiome::MINECRAFT_SPAWNS_COLD_VARIANT_FROGS
         .0
         .contains(&biome);
-    match (warm, cold) {
-        // `Util.getRandomSafe` over the variants that matched, in registry order.
-        (true, true) => {
-            if rand::random::<bool>() {
-                FrogVariant::Cold
-            } else {
-                FrogVariant::Warm
-            }
-        }
-        (true, false) => FrogVariant::Warm,
-        (false, true) => FrogVariant::Cold,
-        (false, false) => FrogVariant::Temperate,
-    }
+    let selected: &[FrogVariant] = match (warm, cold) {
+        (true, true) => &[FrogVariant::Cold, FrogVariant::Warm],
+        (true, false) => &[FrogVariant::Warm],
+        (false, true) => &[FrogVariant::Cold],
+        (false, false) => &[FrogVariant::Temperate],
+    };
+    // `Util.getRandomSafe` over the variants that matched, in registry order, with
+    // `level.getRandom()`: it draws `nextInt(size)` even for a single candidate.
+    let index = world
+        .random
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .next_bounded_i32(selected.len() as i32);
+    selected[index as usize]
 }
 
 /// The `minecraft:frog/variant` component of `entity`, when it is a frog.

@@ -10,7 +10,7 @@ use pumpkin_data::tag::{self, Taggable};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::bedrock::server::actor_event::ActorEventID;
 use pumpkin_util::math::boundingbox::EntityDimensions;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::ageable::{AgeableData, AgeableMob};
 use crate::entity::ai::goal::leap_at_target::LeapAtTargetGoal;
@@ -251,7 +251,7 @@ impl Mob for OcelotEntity {
             // `spawnTrustingParticles` adds nothing on the server; the entity event makes
             // the client show them.
             let world = self.get_entity().world.load();
-            if self.get_random().random_range(0..3) == 0 {
+            if self.get_entity().random().next_bounded_i32(3) == 0 {
                 self.set_trusting(true);
                 world.send_entity_status(
                     self.get_entity(),

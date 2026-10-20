@@ -3,6 +3,7 @@
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::environment_attribute::Activity;
 use pumpkin_data::sound::Sound;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::ai::brain::activity::ActivityData;
 use crate::entity::ai::brain::behavior::{
@@ -14,7 +15,6 @@ use crate::entity::ai::brain::sensing::SensorType;
 use crate::entity::ai::brain::{BrainProvider, BrainTick};
 use crate::entity::ai::target_predicate::TargetPredicate;
 use crate::entity::mob::Mob;
-use crate::entity::mob::piglin_ai::sample;
 use crate::entity::passive::goat::GoatEntity;
 
 pub const RAM_PREPARE_TIME: i32 = 20;
@@ -63,15 +63,22 @@ fn ram_target_conditions() -> TargetPredicate {
 
 /// Vanilla `GoatAi.initMemories`.
 pub fn init_memories(tick: &mut BrainTick<'_>) {
-    let mut random = tick.mob.get_random();
-    tick.brain.set(
-        types::LONG_JUMP_COOLDOWN_TICKS,
-        sample(TIME_BETWEEN_LONG_JUMPS, &mut random),
-    );
-    tick.brain.set(
-        types::RAM_COOLDOWN_TICKS,
-        sample(TIME_BETWEEN_RAMS, &mut random),
-    );
+    // Both callers pass `level.getRandom()`; `UniformInt.sample` each.
+    let (long_jump, ram) = {
+        let mut random = tick
+            .world
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let long_jump =
+            random.next_int_between_inclusive(TIME_BETWEEN_LONG_JUMPS.0, TIME_BETWEEN_LONG_JUMPS.1);
+        (
+            long_jump,
+            random.next_int_between_inclusive(TIME_BETWEEN_RAMS.0, TIME_BETWEEN_RAMS.1),
+        )
+    };
+    tick.brain.set(types::LONG_JUMP_COOLDOWN_TICKS, long_jump);
+    tick.brain.set(types::RAM_COOLDOWN_TICKS, ram);
 }
 
 fn init_core_activity() -> ActivityData {

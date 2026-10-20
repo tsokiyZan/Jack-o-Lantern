@@ -16,6 +16,7 @@ use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::Sound;
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::math::boundingbox::EntityDimensions;
+use pumpkin_util::random::RandomImpl;
 use uuid::Uuid;
 
 use crate::entity::{
@@ -245,16 +246,13 @@ impl crate::entity::ai::goal::Goal for SkeletonTrapGoal {
         for _ in 0..3 {
             let other_horse = horse.create_trap_horse(&world);
             let other_skeleton = SkeletonHorseEntity::create_trap_skeleton(&world, &other_horse);
-            // `horse.push(triangle(0, 1.1485), 0, triangle(0, 1.1485))`.
-            let mut rng = rand::rng();
-            let triangle = |rng: &mut rand::rngs::ThreadRng| {
-                1.1485 * (rand::RngExt::random::<f64>(rng) - rand::RngExt::random::<f64>(rng))
+            // `otherHorse.push(this.horse.getRandom().triangle(0.0, 1.1485), 0.0, ...)`.
+            let (push_x, push_z) = {
+                let mut random = entity.random();
+                let x = random.next_triangular(0.0, 1.1485);
+                (x, random.next_triangular(0.0, 1.1485))
             };
-            let push = pumpkin_util::math::vector3::Vector3::new(
-                triangle(&mut rng),
-                0.0,
-                triangle(&mut rng),
-            );
+            let push = pumpkin_util::math::vector3::Vector3::new(push_x, 0.0, push_z);
             other_horse.get_entity().push_impulse(push);
             world.spawn_entity(other_horse.clone());
             world.spawn_entity(other_skeleton.clone());

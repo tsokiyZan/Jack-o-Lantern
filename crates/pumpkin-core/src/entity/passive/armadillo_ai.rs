@@ -4,7 +4,7 @@ use pumpkin_data::entity::EntityType;
 use pumpkin_data::environment_attribute::Activity;
 use pumpkin_data::sound::Sound;
 use pumpkin_data::tag;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::EntityBase;
 use crate::entity::ai::brain::activity::ActivityData;
@@ -174,7 +174,7 @@ impl ArmadilloBallUp {
     }
 
     fn pick_next_peek_timer(tick: &BrainTick<'_>) -> i32 {
-        ArmadilloState::Scared.animation_duration() + tick.mob.get_random().random_range(100..=400)
+        ArmadilloState::Scared.animation_duration() + tick.mob.get_entity().random().next_int_between_inclusive(100, 400)
     }
 }
 

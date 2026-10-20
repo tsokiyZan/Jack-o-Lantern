@@ -7,7 +7,7 @@ use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::Sound;
 use pumpkin_data::tracked_data::TrackedData;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 use uuid::Uuid;
 
 use crate::entity::EntityBase;
@@ -159,8 +159,10 @@ pub trait AbstractHorse: Mob {
         }
         self.set_chest(true);
         // `playChestEquipsSound`.
-        let mut rng = self.get_random();
-        let pitch = (rng.random::<f32>() - rng.random::<f32>()) * 0.2 + 1.0;
+        let pitch = {
+            let mut random = self.get_entity().random();
+            (random.next_f32() - random.next_f32()) * 0.2 + 1.0
+        };
         self.play_sound_at_self(Sound::EntityDonkeyChest, 1.0, pitch);
         item_stack.decrement_unless_creative(player.gamemode.load(), 1);
         self.create_inventory();

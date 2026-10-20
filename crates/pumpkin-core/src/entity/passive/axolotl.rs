@@ -14,6 +14,7 @@ use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::codec::var_int::VarInt;
+use pumpkin_util::random::RandomImpl;
 use rand::RngExt;
 
 use crate::entity::{
@@ -357,10 +358,10 @@ impl Mob for AxolotlEntity {
         let living = &self.mob_entity.living_entity;
         let current_health = living.health.load();
         let max_health = living.get_max_health();
-        let mut random = rand::rng();
         if !self.mob_entity.is_no_ai()
-            && random.random_range(0..3) == 0
-            && ((random.random_range(0..3) as f32) < amount || current_health / max_health < 0.5)
+            && living.entity.random().next_bounded_i32(3) == 0
+            && ((living.entity.random().next_bounded_i32(3) as f32) < amount
+                || current_health / max_health < 0.5)
             && amount < current_health
             && living.entity.is_in_water()
             && (cause.is_some() || source.is_some())

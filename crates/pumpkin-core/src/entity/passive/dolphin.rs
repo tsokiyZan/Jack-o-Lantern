@@ -17,7 +17,7 @@ use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::VarInt;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::ageable::{AgeableData, AgeableMob};
 use crate::entity::mob::spawn::SpawnGroupData;
@@ -267,7 +267,7 @@ impl Mob for DolphinEntity {
 
     /// Vanilla `AgeableWaterCreature.getBaseExperienceReward`.
     fn get_base_experience_reward(&self) -> u32 {
-        1 + self.get_random().random_range(0..3)
+        1 + self.get_entity().random().next_bounded_i32(3) as u32
     }
 
     /// Vanilla `Dolphin.getAmbientSound`.
@@ -325,15 +325,20 @@ impl Mob for DolphinEntity {
             living.damage(caller, 1.0, DamageType::DRY_OUT);
         }
         if entity.on_ground.load(Ordering::Relaxed) {
-            let mut rng = self.get_random();
+            let (x, z, yaw) = {
+                let mut random = entity.random();
+                let x = (random.next_f32() * 2.0 - 1.0) * 0.2;
+                let z = (random.next_f32() * 2.0 - 1.0) * 0.2;
+                (x, z, random.next_f32() * 360.0)
+            };
             let velocity = entity.velocity.load();
             // Sent at once, as vanilla flags the hop with needsSync.
             entity.set_velocity(Vector3::new(
-                velocity.x + f64::from((rng.random::<f32>() * 2.0 - 1.0) * 0.2),
+                velocity.x + f64::from(x),
                 velocity.y + 0.5,
-                velocity.z + f64::from((rng.random::<f32>() * 2.0 - 1.0) * 0.2),
+                velocity.z + f64::from(z),
             ));
-            entity.yaw.store(rng.random::<f32>() * 360.0);
+            entity.yaw.store(yaw);
             entity.on_ground.store(false, Ordering::Relaxed);
         }
     }
@@ -513,7 +518,16 @@ impl Goal for DolphinSwimWithPlayerGoal {
         }
         drop(navigator);
 
-        if player.is_swimming() && rand::rng().random_range(0..6) == 0 {
+        // `this.player.level().getRandom().nextInt(6)`.
+        if player.is_swimming()
+            && player
+                .world()
+                .random
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .next_bounded_i32(6)
+                == 0
+        {
             Self::give_dolphins_grace(&player);
         }
     }
@@ -583,9 +597,11 @@ fn drop_item(mob: &dyn Mob) -> bool {
     let entity = mob.get_entity();
     let pos = entity.pos.load();
     let hand_pos = Vector3::new(pos.x, entity.get_eye_y() - f64::from(0.3f32), pos.z);
-    let mut rng = mob.get_random();
-    let dir = rng.random::<f32>() * std::f32::consts::TAU;
-    let pow = 0.02 * rng.random::<f32>();
+    let (dir, pow) = {
+        let mut random = entity.random();
+        let dir = random.next_f32() * std::f32::consts::TAU;
+        (dir, 0.02 * random.next_f32())
+    };
     let (yaw, pitch) = (
         entity.yaw.load().to_radians(),
         entity.pitch.load().to_radians(),
@@ -656,7 +672,7 @@ impl Goal for MoveToItemGoal {
     fn stop(&mut self, mob: &dyn Mob) {
         if drop_item(mob) {
             self.cooldown = mob.get_entity().world.load().get_world_age()
-                + i64::from(mob.get_random().random_range(0..100));
+                + i64::from(mob.get_entity().random().next_bounded_i32(100));
         }
     }
 
@@ -861,7 +877,17 @@ impl Goal for DolphinSwimToTreasureGoal {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .set_progress(NavigatorGoal::new(pos, next, 1.3));
-        if mob.get_random().random_range(0..to_goal_ticks(80)) == 0 {
+        // `level.getRandom().nextInt(this.adjustedTickDelay(80))`.
+        if mob
+            .get_entity()
+            .world
+            .load()
+            .random
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .next_bounded_i32(to_goal_ticks(80))
+            == 0
+        {
             Self::broadcast_looking(mob);
         }
     }

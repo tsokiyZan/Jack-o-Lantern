@@ -16,7 +16,7 @@ use pumpkin_data::entity::EntityType;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_protocol::bedrock::server::actor_event::ActorEventID;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::ai::pathfinder::node::PathType;
 use crate::entity::{
@@ -338,13 +338,17 @@ impl Mob for ParrotEntity {
     /// Vanilla `Parrot.getAmbient`: one time in a thousand, outside peaceful, a parrot
     /// imitates a mob.
     fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
-        use rand::RngExt;
-        let entity = self.get_entity();
-        let mut random = self.get_random();
-        if entity.world.load().level_info.load().difficulty != pumpkin_util::Difficulty::Peaceful
-            && random.random_range(0..1000) == 0
+        // `getAmbient(this.level(), this.level().getRandom())`.
+        let world = self.get_entity().world.load();
+        let mut random = world
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if world.level_info.load().difficulty != pumpkin_util::Difficulty::Peaceful
+            && random.next_bounded_i32(1000) == 0
         {
-            return Some(PARROT_IMITATIONS[random.random_range(0..PARROT_IMITATIONS.len())].1);
+            let index = random.next_bounded_i32(PARROT_IMITATIONS.len() as i32) as usize;
+            return Some(PARROT_IMITATIONS[index].1);
         }
         Some(pumpkin_data::sound::Sound::EntityParrotAmbient)
     }
@@ -375,9 +379,11 @@ impl Mob for ParrotEntity {
         if !self.is_tame() && item.has_tag(&tag::Item::MINECRAFT_PARROT_FOOD) {
             item_stack.decrement_unless_creative(player.gamemode.load(), 1);
             let entity = self.get_entity();
-            let mut random = self.get_random();
             if !entity.is_silent() {
-                let pitch = 1.0 + (random.random::<f32>() - random.random::<f32>()) * 0.2;
+                let pitch = {
+                    let mut random = entity.random();
+                    1.0 + (random.next_f32() - random.next_f32()) * 0.2
+                };
                 entity.world.load().play_sound_fine(
                     pumpkin_data::sound::Sound::EntityParrotEat,
                     self.sound_source(),
@@ -386,7 +392,7 @@ impl Mob for ParrotEntity {
                     pitch,
                 );
             }
-            let (status, bedrock) = if random.random_range(0..10) == 0 {
+            let (status, bedrock) = if entity.random().next_bounded_i32(10) == 0 {
                 TamableAnimal::tame(self, player.gameprofile.id);
                 Mob::tame(self, player);
                 (EntityStatus::TamingSucceeded, ActorEventID::TamingSucceeded)

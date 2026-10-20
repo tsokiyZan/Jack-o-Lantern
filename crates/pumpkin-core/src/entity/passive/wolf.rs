@@ -13,7 +13,7 @@ use pumpkin_data::wolf_variant::WolfVariant;
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::codec::var_int::VarInt;
 use pumpkin_util::math::boundingbox::EntityDimensions;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::ai::pathfinder::node::PathType;
 use crate::entity::custom_sound::CustomSound;
@@ -315,7 +315,6 @@ impl Mob for WolfEntity {
 
     /// Vanilla `Wolf.getAmbientSound`.
     fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
-        use rand::RngExt;
         let sounds = WolfSoundVariant::from_id(self.sound_variant.load(Ordering::Relaxed))
             .unwrap_or_default();
         let baby = self.get_entity().is_baby();
@@ -325,7 +324,7 @@ impl Mob for WolfEntity {
                 .is_some_and(crate::entity::mob::neutral::NeutralMob::is_angry)
             {
                 sounds.growl_sound(baby)
-            } else if self.get_random().random_range(0..3) == 0 {
+            } else if self.get_entity().random().next_bounded_i32(3) == 0 {
                 if self.is_tame() && self.get_mob_entity().living_entity.health.load() < 20.0 {
                     sounds.whine_sound(baby)
                 } else {
@@ -534,8 +533,8 @@ impl Mob for WolfEntity {
             }
         } else if item == &Item::BONE && !self.mob_entity.is_attacking() {
             item_stack.decrement_unless_creative(player.gamemode.load(), 1);
-            let mut rng = rand::rng();
-            if rng.random_range(0..3) == 0 {
+            // `Wolf.tryToTame`: `this.random.nextInt(3) == 0`.
+            if self.get_entity().random().next_bounded_i32(3) == 0 {
                 TamableAnimal::tame(self, player.gameprofile.id);
                 self.set_ordered_to_sit(true);
                 self.spawn_taming_particles(true);
