@@ -716,8 +716,8 @@ impl Mob for NautilusEntity {
         self.check_restriction();
     }
 
-    /// The part of vanilla `AbstractNautilus.tick` after `super.tick()`. The bubbles it
-    /// spawns are client-side.
+    /// The part of vanilla `AbstractNautilus.tick` after `super.tick()`. Its bubble
+    /// particles are client-side, but their random numbers are drawn here too.
     fn post_tick(&self) {
         self.apply_effects();
         if self.is_dashing() && self.dash_cooldown.load(Ordering::Relaxed) < DASH_MINIMUM_COOLDOWN {
@@ -730,6 +730,9 @@ impl Mob for NautilusEntity {
             if dash_cooldown == 1 {
                 self.make_sound(self.get_dash_ready_sound());
             }
+        }
+        if self.get_entity().is_in_water() {
+            spawn_bubbles(self.get_entity());
         }
     }
 
@@ -890,5 +893,20 @@ impl Mob for NautilusEntity {
         {
             self.set_variant(variant);
         }
+    }
+}
+
+/// Vanilla `AbstractNautilus.spawnBubbles`. `level.addParticle` does nothing on a server
+/// level, so only the random numbers are drawn.
+fn spawn_bubbles(entity: &Entity) {
+    let speed = entity.velocity.load().length();
+    let bubble_probability = (speed * 2.0).clamp(f64::from(0.15f32), 1.0);
+    let mut random = entity.random();
+    if f64::from(random.next_f32()) < bubble_probability {
+        // `spread` from `nextDouble`, then `dx`, `dy` and `dz` from `nextFloat`s.
+        random.next_f64();
+        random.next_f32();
+        random.next_f32();
+        random.next_f32();
     }
 }
