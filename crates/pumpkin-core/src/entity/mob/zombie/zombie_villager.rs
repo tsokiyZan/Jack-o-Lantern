@@ -4,8 +4,6 @@ use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 
 use crossbeam::atomic::AtomicCell;
 use pumpkin_data::Block;
-use pumpkin_data::Enchantment;
-use pumpkin_data::data_component_impl::EquipmentSlot;
 use pumpkin_data::effect::StatusEffect;
 use pumpkin_data::entity::{EntityStatus, EntityType};
 use pumpkin_data::item::Item;
@@ -22,7 +20,6 @@ use pumpkin_util::random::RandomImpl;
 use pumpkin_util::version::JavaMinecraftVersion;
 use uuid::Uuid;
 
-use crate::entity::item::ItemEntity;
 use crate::entity::mob::conversion::{ConversionParams, convert_to};
 use crate::entity::mob::equipment::RegionalDifficulty;
 use crate::entity::mob::spawn::SpawnGroupData;
@@ -230,40 +227,13 @@ impl ZombieVillagerEntity {
     }
 
     /// The `dropPreservedEquipment` part of vanilla `finishConversion`: guaranteed drops fall
-    /// to the ground. Items with Curse of Binding would move into the villager's inventory.
+    /// to the ground, but not items held on by `prevent_armor_change`.
     fn drop_preserved_equipment(&self) {
-        let mob_entity = &self.mob_entity.mob_entity;
-        let entity = &mob_entity.living_entity.entity;
-        let world = entity.world.load();
-        // Vanilla `EquipmentSlot.VALUES` order.
-        for slot in [
-            EquipmentSlot::MAIN_HAND,
-            EquipmentSlot::OFF_HAND,
-            EquipmentSlot::FEET,
-            EquipmentSlot::LEGS,
-            EquipmentSlot::CHEST,
-            EquipmentSlot::HEAD,
-            EquipmentSlot::BODY,
-            EquipmentSlot::SADDLE,
-        ] {
-            let stack = mob_entity.get_item_slot(&slot);
-            if stack.is_empty() {
-                continue;
-            }
-            if stack.get_enchantment_level(&Enchantment::BINDING_CURSE) > 0 {
-                // TODO: vanilla moves it into the villager's inventory (`SlotAccess` 300 +
-                // slot index).
-                continue;
-            }
-            if mob_entity.drop_chance(&slot) > 1.0 {
-                mob_entity.set_item_slot(&slot, ItemStack::EMPTY.clone());
-                let item_entity = ItemEntity::new(
-                    Entity::new(world.clone(), entity.pos.load(), &EntityType::ITEM),
-                    stack,
-                );
-                world.spawn_entity(Arc::new(item_entity));
-            }
-        }
+        // TODO: vanilla moves the items left behind into the villager's inventory
+        // (`SlotAccess` 300 + slot index).
+        crate::entity::mob::drop_preserved_equipment(self, |stack| {
+            !crate::entity::mob::has_prevent_armor_change(stack)
+        });
     }
 
     /// Vanilla `finishConversion`: the zombie villager turns back into the villager it

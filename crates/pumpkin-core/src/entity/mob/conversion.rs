@@ -205,9 +205,10 @@ fn convert_single_type(from: &dyn Mob, to: &dyn Mob, params: ConversionParams) {
     let fall_flying = old_entity.is_fall_flying();
     new_entity.fall_flying.store(fall_flying, Relaxed);
     new_entity.set_flag(crate::entity::Flag::FallFlying, fall_flying);
-    new_living.set_last_hurt_by_player(
-        old_living.last_hurt_by_player.load(),
+    // Vanilla copies only the memory time, not the player.
+    new_living.last_hurt_by_player_memory_time.store(
         old_living.last_hurt_by_player_memory_time.load(Relaxed),
+        Relaxed,
     );
     new_living
         .hurt_time

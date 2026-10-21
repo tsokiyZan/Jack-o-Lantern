@@ -2853,14 +2853,7 @@ fn attempt_to_shear_equipment<M: Mob + ?Sized>(mob: &M, player: &Arc<Player>) ->
         let Some(equippable) = stack.get_data_component::<EquippableImpl>() else {
             continue;
         };
-        let held_on = stack
-            .get_data_component::<pumpkin_data::data_component_impl::EnchantmentsImpl>()
-            .is_some_and(|enchantments| {
-                enchantments
-                    .enchantment
-                    .iter()
-                    .any(|(enchantment, _)| enchantment.effects.prevent_armor_change)
-            });
+        let held_on = has_prevent_armor_change(&stack);
         if !equippable.can_be_sheared
             || (held_on && player.gamemode.load() != pumpkin_util::GameMode::Creative)
         {
@@ -3072,6 +3065,42 @@ pub fn can_dispenser_equip_into_slot(mob: &dyn Mob, slot: &EquipmentSlot) -> boo
     } else {
         can_pick_up_loot()
     }
+}
+
+/// Vanilla `Mob.dropPreservedEquipment`: every guaranteed drop leaves its slot and falls, except
+/// the items `should_drop` refuses, whose slots are returned.
+pub fn drop_preserved_equipment<M: Mob + ?Sized>(
+    mob: &M,
+    should_drop: impl Fn(&ItemStack) -> bool,
+) -> Vec<EquipmentSlot> {
+    let mob_entity = mob.get_mob_entity();
+    let mut prevented = Vec::new();
+    for slot in &EquipmentSlot::VALUES {
+        let stack = mob_entity.get_item_slot(slot);
+        if stack.is_empty() {
+            continue;
+        }
+        if !should_drop(&stack) {
+            prevented.push(slot.clone());
+        } else if mob_entity.drop_chance(slot) > 1.0 {
+            mob.set_item_slot_and_notify(slot, ItemStack::EMPTY.clone());
+            mob.get_entity().spawn_at_location(stack);
+        }
+    }
+    prevented
+}
+
+/// Vanilla `EnchantmentHelper.has(stack, PREVENT_ARMOR_CHANGE)`.
+#[must_use]
+pub fn has_prevent_armor_change(stack: &ItemStack) -> bool {
+    stack
+        .get_data_component::<pumpkin_data::data_component_impl::EnchantmentsImpl>()
+        .is_some_and(|enchantments| {
+            enchantments
+                .enchantment
+                .iter()
+                .any(|(enchantment, _)| enchantment.effects.prevent_armor_change)
+        })
 }
 
 /// Vanilla `TamableAnimal.isTame` for a target or avoid candidate.
@@ -3294,6 +3323,11 @@ pub fn convert_common(from: &dyn Mob, to: &dyn Mob, params: conversion::Conversi
         new.persistence_required.store(true, Relaxed);
     }
     new_entity.set_custom_name_visible(old_entity.custom_name_visible.load(Relaxed));
+    // `setSharedFlagOnFire(from.isOnFire())`, the server's `isOnFire`.
+    new_entity.set_flag(
+        crate::entity::Flag::OnFire,
+        !old_entity.entity_type.fire_immune && old_entity.fire_ticks.load(Relaxed) > 0,
+    );
     new_entity.set_invulnerable(old_entity.invulnerable.load(Relaxed));
     new_living
         .hurt_cooldown

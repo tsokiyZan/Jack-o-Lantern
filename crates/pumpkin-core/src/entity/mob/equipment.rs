@@ -238,16 +238,7 @@ fn compare_armor(
     current_item: &ItemStack,
     slot: &EquipmentSlot,
 ) -> bool {
-    // `EnchantmentHelper.has(current, PREVENT_ARMOR_CHANGE)`.
-    if current_item
-        .get_data_component::<EnchantmentsImpl>()
-        .is_some_and(|enchantments| {
-            enchantments
-                .enchantment
-                .iter()
-                .any(|(enchantment, _)| enchantment.effects.prevent_armor_change)
-        })
-    {
+    if super::has_prevent_armor_change(current_item) {
         return false;
     }
     let new_defense = approximate_attribute_with(mob, new_item, &Attributes::ARMOR, slot);
