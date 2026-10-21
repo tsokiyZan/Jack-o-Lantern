@@ -550,9 +550,8 @@ impl ItemEntity {
     fn mark_needs_sync(&self, caller: &dyn EntityBase, original_velo: Vector3<f64>) {
         let entity = &self.entity;
 
-        // Vanilla runs `updateFluidInteraction` again here, but the fluid damage only
-        // comes from the block effects, so it must not be applied a second time.
-        let in_fluid = !entity.update_fluid_interaction(caller).is_empty();
+        // Vanilla runs `updateFluidInteraction` again here, pushing by the current twice.
+        let in_fluid = entity.update_fluid_interaction(caller);
 
         if in_fluid || entity.velocity.load().sub(&original_velo).length_squared() > 0.01 {
             entity.velocity_dirty.store(true, Ordering::SeqCst);

@@ -169,6 +169,26 @@ impl EntityBase for BoatEntity {
         }
     }
 
+    /// Vanilla `AbstractBoat.modifyPassengerFluidInteractionBox`: only what sticks out above
+    /// the boat touches fluids. Boats don't track their `status` yet, so being under water is
+    /// the entity's own `isUnderWater`.
+    fn modify_passenger_fluid_interaction_box(
+        &self,
+        passenger_box: pumpkin_util::math::boundingbox::BoundingBox,
+    ) -> Option<pumpkin_util::math::boundingbox::BoundingBox> {
+        let entity = self.get_entity();
+        if entity.is_under_water() {
+            return Some(passenger_box);
+        }
+        let boat_box = entity.bounding_box.load();
+        if boat_box.max.y >= passenger_box.max.y {
+            return None;
+        }
+        let mut fluid_box = passenger_box;
+        fluid_box.min.y = passenger_box.min.y.max(boat_box.max.y);
+        Some(fluid_box)
+    }
+
     fn get_entity(&self) -> &Entity {
         &self.vehicle.entity
     }

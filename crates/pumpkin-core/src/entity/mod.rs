@@ -62,7 +62,7 @@ use pumpkin_util::random::RandomImpl;
 use pumpkin_util::text::TextComponent;
 use pumpkin_util::text::hover::HoverEvent;
 use pumpkin_util::version::JavaMinecraftVersion;
-use std::collections::{BTreeMap, HashSet};
+use std::collections::HashSet;
 use std::sync::{
     Arc,
     atomic::{
@@ -873,6 +873,15 @@ pub trait EntityBase: Send + Sync + std::any::Any {
         );
     }
 
+    /// Vanilla `Entity.modifyPassengerFluidInteractionBox`: `None` keeps the passenger out of
+    /// every fluid.
+    fn modify_passenger_fluid_interaction_box(
+        &self,
+        passenger_box: BoundingBox,
+    ) -> Option<BoundingBox> {
+        Some(passenger_box)
+    }
+
     /// Vanilla `Entity.shouldPlayLavaHurtSound`.
     fn should_play_lava_hurt_sound(&self) -> bool {
         true
@@ -1228,6 +1237,73 @@ struct SpawnState {
 pub enum DelayedLeash {
     Holder(uuid::Uuid),
     Knot(BlockPos),
+}
+
+/// Vanilla `Entity.WATER_FLOW_SCALE`.
+const WATER_FLOW_SCALE: f64 = 0.014;
+/// Vanilla `Entity.LAVA_FAST_FLOW_SCALE`.
+const LAVA_FAST_FLOW_SCALE: f64 = 0.007;
+/// Vanilla `Entity.LAVA_SLOW_FLOW_SCALE`.
+const LAVA_SLOW_FLOW_SCALE: f64 = 0.002_333_333_333_333_333_5;
+/// The smallest push `CurrentAccumulator.applyTo` gives an entity that is nearly still.
+const MIN_FLUID_CURRENT_IMPULSE: f64 = 0.004_500_000_000_000_000_5;
+
+/// The `EntityFluidInteraction` slot of a fluid: 0 for `#water`, 1 for `#lava`.
+fn fluid_current_index(fluid: &Fluid) -> Option<usize> {
+    if fluid.has_tag(&tag::Fluid::MINECRAFT_WATER) {
+        Some(0)
+    } else if fluid.has_tag(&tag::Fluid::MINECRAFT_LAVA) {
+        Some(1)
+    } else {
+        None
+    }
+}
+
+/// Vanilla `EntityFluidInteraction.CurrentAccumulator`.
+#[derive(Clone, Copy, Default)]
+struct FluidCurrent {
+    height: f64,
+    accumulated: Vector3<f64>,
+    count: i32,
+}
+
+impl FluidCurrent {
+    /// Vanilla `CurrentAccumulator.applyTo`.
+    fn apply_to(&self, entity: &Entity, scale: f64) {
+        let old_movement = entity.velocity.load();
+        if let Some(impulse) = self.impulse(
+            entity.entity_type == &EntityType::PLAYER,
+            old_movement,
+            scale,
+        ) {
+            entity.velocity.store(old_movement + impulse);
+        }
+    }
+
+    /// The push `applyTo` adds to `old_movement`, if any.
+    fn impulse(
+        &self,
+        is_player: bool,
+        old_movement: Vector3<f64>,
+        scale: f64,
+    ) -> Option<Vector3<f64>> {
+        if self.count == 0 || self.accumulated.length_squared() < f64::from(1.0E-5f32) {
+            return None;
+        }
+        let impulse = if is_player {
+            self.accumulated * (1.0 / f64::from(self.count))
+        } else {
+            self.accumulated.normalize()
+        };
+        let impulse = impulse * scale;
+        if old_movement.x.abs() < 0.003
+            && old_movement.z.abs() < 0.003
+            && impulse.length() < MIN_FLUID_CURRENT_IMPULSE
+        {
+            return Some(impulse.normalize() * MIN_FLUID_CURRENT_IMPULSE);
+        }
+        Some(impulse)
+    }
 }
 
 /// Vanilla `Entity.Movement`: one move the entity made, swept for the blocks it passed.
@@ -2523,146 +2599,143 @@ impl Entity {
         self.update_fluid_interaction(caller);
     }
 
-    /// Vanilla `Entity.updateFluidInteraction`: fluid flags and current push only, without the
-    /// fluid's `entityInside` effects. Returns the fluids the entity is in.
-    fn update_fluid_interaction(&self, caller: &dyn EntityBase) -> Vec<&'static Fluid> {
-        let is_pushed = caller.is_pushed_by_fluids();
-        let mut fluids = BTreeMap::new();
-
-        let water_push = Vector3::default();
-
-        let water_n = 0;
-
-        let lava_push = Vector3::default();
-
-        let lava_n = 0;
-
-        let mut fluid_push = [water_push, lava_push];
-
-        let mut fluid_n = [water_n, lava_n];
-
-        let mut in_fluid = [false, false];
-
-        // The maximum fluid height found
-
-        let mut fluid_height: [f64; 2] = [0.0, 0.0];
-
-        let entity_box = self.bounding_box.load();
-        let bounding_box = entity_box.expand(-0.001, -0.001, -0.001);
-
-        let min = bounding_box.min_block_pos();
-
-        let max = bounding_box.max_block_pos();
-
+    /// Vanilla `Entity.updateFluidInteraction`, with `EntityFluidInteraction.update`: the
+    /// fluid heights, eyes and current push. Returns whether the entity is in any fluid.
+    fn update_fluid_interaction(&self, caller: &dyn EntityBase) -> bool {
+        let pushed = caller.is_pushed_by_fluids();
         let world = self.world.load();
+        // Index 0 is `#water`, 1 is `#lava`.
+        let mut height = [0.0f64; 2];
+        let mut eyes_inside = [false; 2];
+        let mut current = [FluidCurrent::default(); 2];
+        let mut in_any_fluid = false;
 
-        for x in min.0.x..=max.0.x {
-            for y in min.0.y..=max.0.y {
-                for z in min.0.z..=max.0.z {
-                    let pos = BlockPos::new(x, y, z);
-
-                    let (fluid, state) = world.get_fluid_and_fluid_state(&pos);
-
-                    if fluid.id != Fluid::EMPTY.id {
-                        let surface_y =
-                            f64::from(world.get_fluid_height(&pos, fluid, &state)) + f64::from(y);
-
-                        if surface_y >= bounding_box.min.y {
-                            let marginal_height = surface_y - entity_box.min.y;
-                            let i = usize::from(
-                                fluid.id == Fluid::FLOWING_LAVA.id || fluid.id == Fluid::LAVA.id,
-                            );
-
-                            fluid_height[i] = fluid_height[i].max(marginal_height);
-
-                            in_fluid[i] = true;
-
-                            if !is_pushed {
-                                fluids.insert(fluid.id, fluid);
-
+        if let Some(fluid_box) = self.fluid_interaction_box() {
+            let x0 = fluid_box.min.x.floor() as i32;
+            let y0 = fluid_box.min.y.floor() as i32;
+            let z0 = fluid_box.min.z.floor() as i32;
+            let x1 = fluid_box.max.x.ceil() as i32 - 1;
+            let y1 = fluid_box.max.y.ceil() as i32 - 1;
+            let z1 = fluid_box.max.z.ceil() as i32 - 1;
+            // `hasFluidAndLoaded`: every chunk around the box has to be loaded.
+            let loaded = (get_section_cord(z0 - 1)..=get_section_cord(z1 + 1)).all(|chunk_z| {
+                (get_section_cord(x0 - 1)..=get_section_cord(x1 + 1)).all(|chunk_x| {
+                    world
+                        .level
+                        .read_chunk_sync(&Vector2::new(chunk_x, chunk_z), |_| ())
+                        .is_some()
+                })
+            });
+            if loaded {
+                let entity_y = self.bounding_box.load().min.y;
+                let pos = self.pos.load();
+                let eye_block_x = pos.x.floor() as i32;
+                let eye_y = self.get_eye_y();
+                let eye_block_z = pos.z.floor() as i32;
+                for x in x0..=x1 {
+                    for y in y0..=y1 {
+                        for z in z0..=z1 {
+                            let block_pos = BlockPos::new(x, y, z);
+                            let (fluid, state) = world.get_fluid_and_fluid_state(&block_pos);
+                            if state.is_empty {
                                 continue;
                             }
-
-                            let mut fluid_velo = world.get_fluid_velocity(pos, fluid, &state);
-
-                            if fluid_height[i] < 0.4 {
-                                fluid_velo = fluid_velo * fluid_height[i];
+                            let fluid_bottom = f64::from(y);
+                            let fluid_top = fluid_bottom
+                                + f64::from(world.get_fluid_height(&block_pos, fluid, &state));
+                            if fluid_top < fluid_box.min.y {
+                                continue;
                             }
-
-                            fluid_push[i] += fluid_velo;
-
-                            fluid_n[i] += 1;
-
-                            fluids.insert(fluid.id, fluid);
+                            in_any_fluid = true;
+                            let Some(i) = fluid_current_index(fluid) else {
+                                continue;
+                            };
+                            if x == eye_block_x && z == eye_block_z && eye_y >= fluid_bottom {
+                                let fluid_top_for_camera = fluid_bottom
+                                    + f64::from(Self::fluid_height_for_camera(
+                                        &world, &block_pos, fluid, &state,
+                                    ));
+                                if eye_y <= fluid_top_for_camera {
+                                    eyes_inside[i] = true;
+                                }
+                            }
+                            height[i] = height[i].max(fluid_top - entity_y);
+                            if pushed {
+                                let mut flow = world.get_fluid_velocity(block_pos, fluid, &state);
+                                current[i].height = height[i].max(current[i].height);
+                                if current[i].height < 0.4 {
+                                    flow = flow * current[i].height;
+                                }
+                                current[i].accumulated += flow;
+                                current[i].count += 1;
+                            }
                         }
                     }
                 }
             }
         }
 
-        let lava_speed = if world.dimension.fast_lava {
-            0.007
-        } else {
-            0.002_333_333
-        };
-
-        self.push_by_fluid(0.014, fluid_push[0], fluid_n[0]);
-
-        self.push_by_fluid(lava_speed, fluid_push[1], fluid_n[1]);
-
-        let water_height = fluid_height[0];
-
-        let in_water = in_fluid[0];
-
+        let in_water = height[0] > 0.0;
+        let in_lava = height[1] > 0.0;
+        self.water_height.store(height[0]);
+        self.lava_height.store(height[1]);
+        self.eye_in_water.store(eyes_inside[0], Ordering::Relaxed);
         if in_water {
             self.reset_fall_distance();
-
             if !self.touching_water.load(Ordering::SeqCst)
                 && !self.first_tick.load(Ordering::Relaxed)
             {
                 self.do_water_splash_effect(caller);
             }
         }
-
-        self.water_height.store(water_height);
-
         self.touching_water.store(in_water, Ordering::SeqCst);
-        self.eye_in_water
-            .store(self.is_submerged_in_water(), Ordering::Relaxed);
-
-        let lava_height = fluid_height[1];
-
-        let in_lava = in_fluid[1];
-
-        self.lava_height.store(lava_height);
-
         self.touching_lava.store(in_lava, Ordering::SeqCst);
 
-        // BTreeMap auto-sorts water before lava as in vanilla
-        fluids.into_values().collect()
+        if pushed {
+            if in_water {
+                current[0].apply_to(self, WATER_FLOW_SCALE);
+            }
+            if in_lava {
+                let lava_flow_scale = if world.dimension.fast_lava {
+                    LAVA_FAST_FLOW_SCALE
+                } else {
+                    LAVA_SLOW_FLOW_SCALE
+                };
+                current[1].apply_to(self, lava_flow_scale);
+            }
+        }
+        in_any_fluid
     }
 
-    fn push_by_fluid(&self, speed: f64, mut push: Vector3<f64>, n: usize) {
-        if push.length_squared() != 0.0 {
-            if n > 0 {
-                push = push * (1.0 / (n as f64));
-            }
+    /// Vanilla `Entity.getFluidInteractionBox`: `None` when a vehicle keeps its passenger out
+    /// of the fluid.
+    fn fluid_interaction_box(&self) -> Option<BoundingBox> {
+        let fluid_box = self.bounding_box.load().expand(-0.001, -0.001, -0.001);
+        let vehicle = self
+            .vehicle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        vehicle.map_or(Some(fluid_box), |vehicle| {
+            vehicle.modify_passenger_fluid_interaction_box(fluid_box)
+        })
+    }
 
-            if self.entity_type != &EntityType::PLAYER {
-                push = push.normalize();
-            }
-
-            push = push * speed;
-
-            let velo = self.velocity.load();
-
-            if velo.x.abs() < 0.003 && velo.z.abs() < 0.003 && velo.length_squared() < 0.000_020_25
-            {
-                push = push.normalize() * 0.0045;
-            }
-
-            self.velocity.store(velo + push);
+    /// Vanilla `FluidState.getHeightForCamera`: a source under a sturdy face fills its block.
+    fn fluid_height_for_camera(
+        world: &World,
+        pos: &BlockPos,
+        fluid: &Fluid,
+        state: &FluidState,
+    ) -> f32 {
+        if state.is_source
+            && world
+                .get_block_state(&pos.up())
+                .is_side_solid(BlockDirection::Down)
+        {
+            return 1.0;
         }
+        world.get_fluid_height(pos, fluid, state)
     }
 
     fn get_pos_with_y_offset(
@@ -3703,17 +3776,10 @@ impl Entity {
         self.is_in_water() || self.is_in_rain()
     }
 
+    /// Vanilla `Entity.isEyeInFluid(WATER)`, from the last fluid update.
     #[must_use]
     pub fn is_submerged_in_water(&self) -> bool {
-        let pos = self.pos.load();
-        let eye_y = pos.y + self.get_eye_height();
-        let eye_pos = BlockPos::floored(pos.x, eye_y, pos.z);
-        let world = self.world.load();
-        let (fluid, state) = world.get_fluid_and_fluid_state(&eye_pos);
-        fluid.matches_type(&Fluid::WATER)
-            && eye_y
-                <= f64::from(eye_pos.0.y)
-                    + f64::from(world.get_fluid_height(&eye_pos, fluid, &state))
+        self.eye_in_water.load(Ordering::Relaxed)
     }
 
     /// Vanilla `Entity.isUnderWater`, which reads the eyes from the previous fluid update.
@@ -5705,6 +5771,37 @@ pub fn section_iteration_key(entity: &Entity) -> (i32, u32, u32, u64) {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn fluid_current_impulse_like_vanilla() {
+        use super::{FluidCurrent, LAVA_SLOW_FLOW_SCALE, WATER_FLOW_SCALE};
+        use pumpkin_util::math::vector3::Vector3;
+        let current = FluidCurrent {
+            height: 1.0,
+            accumulated: Vector3::new(0.0, 0.0, 2.0),
+            count: 2,
+        };
+        // A mob at rest in flowing water gets the full 0.014, not the 0.0045 floor.
+        let impulse = current
+            .impulse(false, Vector3::new(0.0, 0.0, 0.0), WATER_FLOW_SCALE)
+            .unwrap_or_default();
+        assert!((impulse.z - 0.014).abs() < 1e-12);
+        // Slow lava is raised to the floor even while the entity moves vertically.
+        let impulse = current
+            .impulse(false, Vector3::new(0.0, -0.5, 0.0), LAVA_SLOW_FLOW_SCALE)
+            .unwrap_or_default();
+        assert!((impulse.z - 0.004_500_000_000_000_000_5).abs() < 1e-15);
+        // A negligible current does nothing.
+        let tiny = FluidCurrent {
+            height: 1.0,
+            accumulated: Vector3::new(0.0, 0.0, 0.001),
+            count: 1,
+        };
+        assert!(
+            tiny.impulse(false, Vector3::new(0.0, 0.0, 0.0), WATER_FLOW_SCALE)
+                .is_none()
+        );
+    }
     use super::*;
 
     #[test]
