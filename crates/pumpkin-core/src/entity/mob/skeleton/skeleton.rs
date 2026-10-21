@@ -104,8 +104,12 @@ impl Mob for SkeletonEntity {
             .populate_default_equipment_slots(world, difficulty);
     }
 
-    fn ai_step_end(&self, _caller: &dyn EntityBase) {
-        self.entity.pick_up_loot(self);
+    fn wants_to_pick_up(
+        &self,
+        _brain: &crate::entity::ai::brain::Brain,
+        stack: &pumpkin_data::item_stack::ItemStack,
+    ) -> bool {
+        super::wants_to_pick_up(self, stack)
     }
 
     fn get_preferred_weapon_type(&self) -> Option<&'static pumpkin_data::tag::Tag> {

@@ -411,10 +411,7 @@ impl HostMob for PluginHostState {
 
     fn get_target(&mut self, this: Resource<WitMob>) -> wasmtime::Result<Option<Resource<Entity>>> {
         let entity = self.get(&this)?;
-        if let Some(target) = entity
-            .get_mob()
-            .and_then(|mob| mob.get_mob_entity().get_target())
-        {
+        if let Some(target) = entity.get_mob().and_then(|mob| mob.get_target()) {
             return Ok(Some(self.add(target)?));
         }
         Ok(None)

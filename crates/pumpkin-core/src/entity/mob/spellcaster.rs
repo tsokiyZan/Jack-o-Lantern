@@ -154,7 +154,6 @@ impl Goal for SpellcasterCastingSpellGoal {
 
     fn tick(&mut self, mob: &dyn Mob) {
         let look_at = mob
-            .get_mob_entity()
             .get_target()
             .or_else(|| as_spellcaster(mob).and_then(SpellcasterIllager::casting_look_fallback));
         if let Some(look_at) = look_at {
@@ -214,7 +213,7 @@ pub trait Spell: Send + Sync {
 
 /// The mob's target while it is alive.
 pub fn living_target(mob: &dyn Mob) -> Option<std::sync::Arc<dyn EntityBase>> {
-    mob.get_mob_entity().get_target().filter(|target| {
+    mob.get_target().filter(|target| {
         target
             .get_living_entity()
             .is_some_and(crate::entity::living::LivingEntity::is_alive)

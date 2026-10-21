@@ -34,7 +34,7 @@ use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_data::tracked_data;
-use pumpkin_data::{Block, BlockDirection, BlockState};
+use pumpkin_data::{Block, BlockState};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::Difficulty;
 use pumpkin_util::math::boundingbox::{BoundingBox, EntityDimensions};
@@ -44,7 +44,7 @@ use pumpkin_util::random::RandomImpl;
 use pumpkin_util::version::JavaMinecraftVersion;
 use std::sync::Arc;
 use std::sync::atomic::Ordering::Relaxed;
-use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicI64, AtomicU8, Ordering};
 use uuid::Uuid;
 
 pub mod abstract_piglin;
@@ -126,6 +126,14 @@ pub struct MobEntity {
     pub ambient_sound_time: AtomicI32,
     pub breeder: AtomicCell<Option<Uuid>>,
     pub persistence_required: AtomicBool,
+    /// Vanilla `Mob.canPickUpLoot`, a plain field, not one of the synced mob flags.
+    can_pick_up_loot: AtomicBool,
+    /// Vanilla `Mob.lootTable`: a `DeathLootTable` that replaces the type's death loot.
+    death_loot_table: std::sync::Mutex<Option<String>>,
+    /// Vanilla `Mob.lootTableSeed`.
+    death_loot_table_seed: AtomicI64,
+    /// The follow range the navigator last sized its search for (`onAttributeUpdated`).
+    applied_follow_range: AtomicCell<f64>,
     pending_riders: std::sync::Mutex<Vec<Arc<dyn EntityBase>>>,
     pending_vehicle: std::sync::Mutex<Option<Arc<dyn EntityBase>>>,
     mob_flags: AtomicU8,
@@ -134,7 +142,6 @@ impl MobEntity {
     const AI_DISABLED_FLAG: u8 = 1;
     const LEFT_HANDED_FLAG: u8 = 2;
     const ATTACKING_FLAG: u8 = 4;
-    const CAN_PICK_UP_LOOT_FLAG: u8 = 8;
 
     pub const MAX_WEARING_ARMOR_CHANCE: f32 = 0.15;
     pub const WEARING_ARMOR_UPGRADE_MATERIAL_CHANCE: f32 = 0.1087;
@@ -152,49 +159,6 @@ impl MobEntity {
 
     /// Vanilla `Mob.ITEM_PICKUP_REACH`.
     pub const ITEM_PICKUP_REACH: Vector3<i32> = Vector3::new(1, 0, 1);
-
-    /// The looting part of vanilla `Mob.aiStep`: runs `pick_up` on every item in reach that
-    /// can be picked up, while this mob picks up loot and `mobGriefing` is on.
-    pub fn for_each_item_in_pickup_reach(&self, pick_up: impl FnMut(&ItemEntity)) {
-        if self.can_pick_up_loot() {
-            self.for_each_item_in_reach(Self::ITEM_PICKUP_REACH, pick_up);
-        }
-    }
-
-    /// `for_each_item_in_pickup_reach` for a mob that overrides `getPickupReach` and
-    /// `canPickUpLoot`; the caller has already checked the latter.
-    pub fn for_each_item_in_reach(
-        &self,
-        pickup_reach: Vector3<i32>,
-        mut pick_up: impl FnMut(&ItemEntity),
-    ) {
-        let entity = &self.living_entity.entity;
-        if !entity.is_alive() || self.living_entity.dead.load(Relaxed) {
-            return;
-        }
-        let world = entity.world.load();
-        if !world.level_info.load().game_rules.mob_griefing {
-            return;
-        }
-        let reach = entity.bounding_box.load().expand(
-            f64::from(pickup_reach.x),
-            f64::from(pickup_reach.y),
-            f64::from(pickup_reach.z),
-        );
-        for candidate in world.get_entities_at_box(&reach) {
-            let Some(item) = candidate.get_item_entity() else {
-                continue;
-            };
-            let empty = item
-                .get_item_stack()
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .is_empty();
-            if !item.get_entity().removed.load(Relaxed) && !empty && item.get_pickup_delay() == 0 {
-                pick_up(item);
-            }
-        }
-    }
 
     /// Vanilla `Mob.setSpeed`: the speed travel uses, also set as the forward input.
     pub fn set_speed(&self, speed: f32) {
@@ -305,6 +269,10 @@ impl MobEntity {
             ambient_sound_time: AtomicI32::new(0),
             breeder: AtomicCell::new(None),
             persistence_required: AtomicBool::new(false),
+            can_pick_up_loot: AtomicBool::new(false),
+            death_loot_table: std::sync::Mutex::new(None),
+            death_loot_table_seed: AtomicI64::new(0),
+            applied_follow_range: AtomicCell::new(f64::NAN),
             pending_riders: std::sync::Mutex::new(Vec::new()),
             pending_vehicle: std::sync::Mutex::new(None),
             mob_flags: AtomicU8::new(0),
@@ -342,11 +310,31 @@ impl MobEntity {
     }
 
     pub fn can_pick_up_loot(&self) -> bool {
-        (self.mob_flags.load(Relaxed) & Self::CAN_PICK_UP_LOOT_FLAG) != 0
+        self.can_pick_up_loot.load(Relaxed)
     }
 
     pub fn set_can_pick_up_loot(&self, value: bool) {
-        self.set_mob_flag(Self::CAN_PICK_UP_LOOT_FLAG, value);
+        self.can_pick_up_loot.store(value, Relaxed);
+    }
+
+    /// Vanilla `Mob.getLootTable` and `getLootTableSeed`: a saved `DeathLootTable` and its
+    /// seed, if the mob has one.
+    pub fn death_loot_table(&self) -> (Option<String>, i64) {
+        (
+            self.death_loot_table
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .clone(),
+            self.death_loot_table_seed.load(Relaxed),
+        )
+    }
+
+    /// Vanilla `Mob.dropFromLootTable`: the death loot table is used once.
+    pub fn clear_death_loot_table(&self) {
+        *self
+            .death_loot_table
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
     }
 
     pub fn is_left_handed(&self) -> bool {
@@ -372,6 +360,19 @@ impl MobEntity {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .tick();
+
+        // Vanilla `Mob.onAttributeUpdated`: a changed follow range resizes the path search.
+        // Attributes change where the mob can't be reached, so the AI step, after
+        // `tickEffects`, picks it up.
+        let follow_range = self
+            .living_entity
+            .get_attribute_value(&Attributes::FOLLOW_RANGE);
+        if self.applied_follow_range.swap(follow_range).to_bits() != follow_range.to_bits() {
+            self.navigator
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .update_pathfinder_max_visited_nodes(&self.living_entity);
+        }
 
         // 1. "Take" selectors out of the mutexes
         let mut target_selector = {
@@ -634,18 +635,23 @@ impl MobEntity {
         }
     }
 
+    /// Vanilla `DropChances.CODEC` through `ValueInput.read`: the saved map replaces the old
+    /// one, missing slots are the default, and entries the codec rejects (an unknown slot, a
+    /// negative chance) are left out.
     fn read_drop_chances(&self, nbt: &NbtCompound) {
-        let Some(compound) = nbt.get_compound("drop_chances") else {
-            return;
-        };
         let mut chances = self
             .living_entity
             .equipment_drop_chances
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
+        chances.clear();
+        let Some(compound) = nbt.get_compound("drop_chances") else {
+            return;
+        };
         for (name, tag) in &compound.child_tags {
             if let Some(slot) = EquipmentSlot::get_from_name(name)
-                && let Some(chance) = tag.extract_float()
+                && let Some(chance) = tag.as_numeric_float()
+                && chance >= 0.0
             {
                 chances.insert(slot.clone(), chance);
             }
@@ -751,8 +757,9 @@ impl MobEntity {
         f(&mut tick)
     }
 
-    pub fn write_mob_nbt(&self, nbt: &mut NbtCompound) {
-        self.write_drop_chances(nbt);
+    /// Vanilla `Mob.addAdditionalSaveData`, after `LivingEntity`'s brain. `can_pick_up_loot` is
+    /// the mob's `canPickUpLoot()`, which some mobs override.
+    pub fn write_mob_nbt(&self, nbt: &mut NbtCompound, can_pick_up_loot: bool) {
         nbt.put_compound(
             "Brain",
             self.brain
@@ -761,16 +768,13 @@ impl MobEntity {
                 .pack()
                 .into_nbt(),
         );
-        if self.is_no_ai() {
-            nbt.put_bool("NoAI", true);
-        }
-        // Vanilla always writes these three, false included.
-        nbt.put_bool("LeftHanded", self.is_left_handed());
-        nbt.put_bool("CanPickUpLoot", self.can_pick_up_loot());
+        nbt.put_bool("CanPickUpLoot", can_pick_up_loot);
         nbt.put_bool(
             "PersistenceRequired",
             self.persistence_required.load(Relaxed),
         );
+        self.write_drop_chances(nbt);
+        self.living_entity.entity.write_leash_nbt(nbt);
         if self.has_position_target() {
             let home = self.position_target.load();
             nbt.put_int("home_radius", self.position_target_range.load(Relaxed));
@@ -779,22 +783,27 @@ impl MobEntity {
                 pumpkin_nbt::tag::NbtTag::IntArray(vec![home.0.x, home.0.y, home.0.z]),
             );
         }
-        self.living_entity.entity.write_leash_nbt(nbt);
+        nbt.put_bool("LeftHanded", self.is_left_handed());
+        let (loot_table, loot_table_seed) = self.death_loot_table();
+        if let Some(loot_table) = loot_table {
+            nbt.put_string("DeathLootTable", loot_table);
+        }
+        if loot_table_seed != 0 {
+            nbt.put_long("DeathLootTableSeed", loot_table_seed);
+        }
+        if self.is_no_ai() {
+            nbt.put_bool("NoAI", true);
+        }
     }
 
+    /// Vanilla `Mob.readAdditionalSaveData`: every tag falls back to its default when missing.
     pub fn read_mob_nbt(&self, nbt: &NbtCompound) {
-        self.read_drop_chances(nbt);
-        // Vanilla getBooleanOr: `/data remove ... NoAI` turns the AI back on.
-        self.set_no_ai(nbt.get_bool("NoAI").unwrap_or(false));
-        if let Some(left_handed) = nbt.get_bool("LeftHanded") {
-            self.set_left_handed(left_handed);
-        }
-        // Vanilla getBooleanOr: a summoned mob only picks up loot when its NBT says so.
         self.set_can_pick_up_loot(nbt.get_bool("CanPickUpLoot").unwrap_or(false));
-        if let Some(persistence_required) = nbt.get_bool("PersistenceRequired") {
-            self.persistence_required
-                .store(persistence_required, Relaxed);
-        }
+        self.persistence_required.store(
+            nbt.get_bool("PersistenceRequired").unwrap_or(false),
+            Relaxed,
+        );
+        self.read_drop_chances(nbt);
         self.living_entity.entity.read_leash_nbt(nbt);
         // Vanilla `home_radius` (-1 for no home), then `home_pos` (the origin if missing).
         let radius = nbt.get_int("home_radius").unwrap_or(-1);
@@ -806,6 +815,22 @@ impl MobEntity {
             };
             self.position_target.store(home);
         }
+        self.set_left_handed(nbt.get_bool("LeftHanded").unwrap_or(false));
+        // `LootTable.KEY_CODEC`: an identifier, `minecraft` when it names no namespace.
+        *self
+            .death_loot_table
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) =
+            nbt.get_string("DeathLootTable").map(|key| {
+                if key.contains(':') {
+                    key.to_string()
+                } else {
+                    format!("minecraft:{key}")
+                }
+            });
+        self.death_loot_table_seed
+            .store(nbt.get_long("DeathLootTableSeed").unwrap_or(0), Relaxed);
+        self.set_no_ai(nbt.get_bool("NoAI").unwrap_or(false));
     }
 
     pub fn add_goal<G: crate::entity::ai::goal::Goal + 'static>(&self, priority: u8, goal: G) {
@@ -834,7 +859,9 @@ impl MobEntity {
         *t = target;
     }
 
-    pub fn get_target(&self) -> Option<Arc<dyn EntityBase>> {
+    /// Vanilla `Mob.getTargetUnchecked`: the stored target, valid or not. `Mob::get_target`
+    /// is vanilla's `getTarget`.
+    pub fn get_target_unchecked(&self) -> Option<Arc<dyn EntityBase>> {
         self.target
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -873,23 +900,39 @@ impl MobEntity {
             && self.breeding_cooldown.load(Relaxed) <= 0
     }
 
+    /// Vanilla `Mob.isWithinMeleeAttackRange`: the active item's `attack_range` (scaled by its
+    /// `mob_factor`) or the default reach, against the target's hitbox.
     pub fn is_in_attack_range(&self, target: &dyn EntityBase) -> bool {
         // Vanilla `Math.sqrt(2.04F) - 0.6F`, with both literals rounded to float first.
         const DEFAULT_ATTACK_REACH: f64 = 0.828_285_648_512_600_4;
 
-        // TODO: Implement DataComponent lookup for ATTACK_RANGE when components are ready
-        let max_range = DEFAULT_ATTACK_REACH;
-        let min_range = 0.0;
+        let (max_range, min_range) = self
+            .active_item()
+            .get_data_component::<pumpkin_data::data_component_impl::AttackRangeImpl>()
+            .map_or((DEFAULT_ATTACK_REACH, 0.0), |range| {
+                // `effectiveMaxRange`/`effectiveMinRange` for a mob.
+                (
+                    f64::from(range.max_reach * range.mob_factor),
+                    f64::from(range.min_reach * range.mob_factor),
+                )
+            });
 
-        // TODO: vanilla `LivingEntity.getHitbox` raises minY to the vehicle's passenger riding
-        // position for a mounted target; Pumpkin has no passenger attachment points yet.
-        let target_hitbox = target.get_entity().bounding_box.load();
-
+        let target_hitbox = hitbox(target);
         if !self.get_attack_box(max_range).intersects(&target_hitbox) {
             return false;
         }
 
         min_range <= 0.0 || !self.get_attack_box(min_range).intersects(&target_hitbox)
+    }
+
+    /// Vanilla `LivingEntity.getActiveItem`: the item in use, else the main hand.
+    fn active_item(&self) -> ItemStack {
+        self.living_entity
+            .item_in_use
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+            .unwrap_or_else(|| self.get_item_slot(&EquipmentSlot::MAIN_HAND))
     }
 
     /// Vanilla `Monster.isDarkEnoughToSpawn`, drawing from the random `checkSpawnRules` is given.
@@ -919,44 +962,58 @@ impl MobEntity {
         i32::from(brightness) <= dimension.monster_spawn_light_level.get(random)
     }
 
-    pub fn check_mob_spawn_rules(world: &World, pos: &BlockPos) -> bool {
-        let below = pos.down();
-        let state = world.get_block_state(&below);
-        state.is_side_solid(BlockDirection::Up)
+    /// Vanilla `Mob.checkMobSpawnRules`: a spawner ignores the floor, anything else needs one
+    /// that `BlockState.isValidSpawn` allows for `entity_type`.
+    pub fn check_mob_spawn_rules(
+        world: &World,
+        entity_type: &'static EntityType,
+        reason: spawn::EntitySpawnReason,
+        pos: &BlockPos,
+    ) -> bool {
+        reason.is_spawner()
+            || crate::world::natural_spawner::is_valid_spawn_floor(
+                world.get_block_state(&pos.down()),
+                entity_type,
+            )
     }
 
+    /// Vanilla `Monster.checkMonsterSpawnRules`: dark enough, unless a trial spawner ignores
+    /// the light, then `checkMobSpawnRules`.
     pub fn check_monster_spawn_rules(
         world: &World,
+        entity_type: &'static EntityType,
+        reason: spawn::EntitySpawnReason,
         pos: &BlockPos,
         is_thundering: bool,
         random: &mut pumpkin_util::random::legacy_rand::LegacyRand,
     ) -> bool {
-        if world.level_info.load().difficulty == Difficulty::Peaceful {
-            return false;
-        }
-
-        if !Self::is_dark_enough_to_spawn(world, pos, is_thundering, random) {
-            return false;
-        }
-
-        Self::check_mob_spawn_rules(world, pos)
+        (reason.ignores_light_requirements()
+            || Self::is_dark_enough_to_spawn(world, pos, is_thundering, random))
+            && Self::check_mob_spawn_rules(world, entity_type, reason, pos)
     }
 
-    pub fn check_any_light_monster_spawn_rules(world: &World, pos: &BlockPos) -> bool {
-        if world.level_info.load().difficulty == Difficulty::Peaceful {
-            return false;
-        }
-
-        Self::check_mob_spawn_rules(world, pos)
+    /// Vanilla `Monster.checkAnyLightMonsterSpawnRules`.
+    pub fn check_any_light_monster_spawn_rules(
+        world: &World,
+        entity_type: &'static EntityType,
+        reason: spawn::EntitySpawnReason,
+        pos: &BlockPos,
+    ) -> bool {
+        Self::check_mob_spawn_rules(world, entity_type, reason, pos)
     }
 
+    /// Vanilla `Monster.checkSurfaceMonstersSpawnRules`: also under open sky, unless spawned by
+    /// a spawner.
     pub fn check_surface_monsters_spawn_rules(
         world: &World,
+        entity_type: &'static EntityType,
+        reason: spawn::EntitySpawnReason,
         pos: &BlockPos,
         is_thundering: bool,
         random: &mut pumpkin_util::random::legacy_rand::LegacyRand,
     ) -> bool {
-        Self::check_monster_spawn_rules(world, pos, is_thundering, random) && world.can_see_sky(pos)
+        Self::check_monster_spawn_rules(world, entity_type, reason, pos, is_thundering, random)
+            && (reason.is_spawner() || world.can_see_sky(pos))
     }
 
     pub fn check_animal_spawn_rules(world: &World, pos: &BlockPos) -> bool {
@@ -989,31 +1046,30 @@ impl MobEntity {
         Self::check_surface_water_animal_spawn_rules(world, pos)
     }
 
+    /// Vanilla `Mob.doHurtTarget`.
     pub fn try_attack(&self, caller: &dyn EntityBase, target: &dyn EntityBase) -> bool {
-        if self.living_entity.dead.load(Relaxed) {
-            return false;
-        }
-
+        let living = &self.living_entity;
+        let world = living.entity.world.load_full();
+        let mut damage = living.get_attribute_value(&Attributes::ATTACK_DAMAGE) as f32;
+        let weapon = living.held_item(caller);
         let damage_source = DamageSource {
-            damage_type: caller
-                .get_mob()
-                .map_or(DamageType::MOB_ATTACK, Mob::melee_damage_type),
+            damage_type: weapon_damage_type(caller, &weapon),
             direct: Some(caller),
             causing: Some(caller),
         };
-        // Vanilla `Mob.doHurtTarget`: the weapon's enchantments against this target.
-        let world = self.living_entity.entity.world.load_full();
-        let attack_damage = EnchantmentHelper::modify_damage(
-            &world,
-            &self.living_entity.held_item(caller),
-            target,
-            &damage_source,
-            self.living_entity
-                .get_attribute_value(&Attributes::ATTACK_DAMAGE) as f32,
-        );
+        damage = EnchantmentHelper::modify_damage(&world, &weapon, target, &damage_source, damage);
+        // `getItem().getAttackDamageBonus`: only the mace has one.
+        if weapon.item == &Item::MACE {
+            damage += crate::item::items::mace::MaceItem::get_attack_damage_bonus(
+                living,
+                &weapon,
+                target,
+                &damage_source,
+            );
+        }
         let damaged = target.damage_with_context(
             target,
-            attack_damage,
+            damage,
             damage_source.damage_type,
             None,
             damage_source.direct,
@@ -1021,16 +1077,74 @@ impl MobEntity {
         );
 
         if damaged {
+            let knockback = self.get_knockback(&world, &weapon, target, &damage_source);
+            self.cause_extra_knockback(caller, target, knockback, damage);
+            // TODO: `weaponItem.hurtEnemy`, whose only effect for a mob is the mace's smash
+            // (`MaceItem.hurtEnemy`), which Pumpkin only ports for players.
             EnchantmentHelper::do_post_attack_effects(&world, target, &damage_source);
-            self.living_entity
-                .last_attacking_id
-                .store(target.get_entity().entity_id, Relaxed);
-            self.living_entity
+            // `setLastHurtMob`.
+            if target.get_living_entity().is_some() {
+                living
+                    .last_attacking_id
+                    .store(target.get_entity().entity_id, Relaxed);
+            }
+            living
                 .last_attack_time
-                .store(self.living_entity.entity.tick_count.load(Relaxed), Relaxed);
+                .store(living.entity.tick_count.load(Relaxed), Relaxed);
+            if let Some(mob) = caller.get_mob() {
+                mob.play_attack_sound();
+            }
         }
-
+        // TODO: `postPiercingAttack` runs `EnchantmentHelper.doPostPiercingAttackEffects`,
+        // which Pumpkin has no port of; no vanilla enchantment applies it to a melee hit.
         damaged
+    }
+
+    /// Vanilla `LivingEntity.getKnockback`: the `attack_knockback` attribute through the
+    /// weapon's enchantments, halved.
+    fn get_knockback(
+        &self,
+        world: &World,
+        weapon: &ItemStack,
+        target: &dyn EntityBase,
+        damage_source: &DamageSource<'_>,
+    ) -> f32 {
+        let knockback = self
+            .living_entity
+            .get_attribute_value(&Attributes::ATTACK_KNOCKBACK) as f32;
+        EnchantmentHelper::modify_knockback(world, weapon, target, damage_source, knockback) / 2.0
+    }
+
+    /// Vanilla `LivingEntity.causeExtraKnockback`: a living target is pushed along this mob's
+    /// facing, and the mob slows down.
+    fn cause_extra_knockback(
+        &self,
+        caller: &dyn EntityBase,
+        target: &dyn EntityBase,
+        knockback: f32,
+        damage: f32,
+    ) {
+        let Some(target_living) = target.get_living_entity() else {
+            return;
+        };
+        if knockback <= 0.0 {
+            return;
+        }
+        let entity = &self.living_entity.entity;
+        let yaw = entity.yaw.load() * (std::f32::consts::PI / 180.0);
+        if target.get_mob().is_none_or(Mob::takes_knockback) {
+            target_living.knockback(
+                target,
+                f64::from(knockback),
+                f64::from(pumpkin_util::math::sin(yaw)),
+                f64::from(-pumpkin_util::math::cos(yaw)),
+                Some(caller),
+                damage,
+                true,
+            );
+        }
+        let velocity = entity.velocity.load();
+        entity.velocity.store(velocity.multiply(0.6, 1.0, 0.6));
     }
 
     fn get_attack_box(&self, attack_range: f64) -> BoundingBox {
@@ -1074,52 +1188,25 @@ impl MobEntity {
             >= DAYLIGHT_BRIGHTNESS
     }
 
-    pub fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
-        let entity = &self.living_entity.entity;
-
-        // If already leashed to player, right-clicking unleashes the mob
-        let currently_leashed = entity
-            .leashed_to
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .is_some();
-
-        if currently_leashed {
-            entity.unleash();
-            let lead_item =
-                pumpkin_data::item_stack::ItemStack::new(1, &pumpkin_data::item::Item::LEAD);
-            entity.spawn_at_location(lead_item);
-            return true;
-        }
-
-        // If holding a lead, leash the mob to the player
-        if item_stack.item.registry_key == "lead"
-            || item_stack.item.registry_key == "minecraft:lead"
-        {
-            let diff = entity.pos.load() - player.get_entity().pos.load();
-            let dist_sq = diff.length_squared();
-            if dist_sq <= Entity::LEASH_SNAP_DISTANCE * Entity::LEASH_SNAP_DISTANCE {
-                entity.leash_to(player.clone() as Arc<dyn EntityBase>);
-                if player.gamemode.load() != pumpkin_util::GameMode::Creative {
-                    item_stack.decrement(1);
-                }
-                return true;
-            }
-        }
-
-        false
+    /// Vanilla `Mob.clearHome`.
+    pub fn clear_home(&self) {
+        self.position_target_range.store(-1, Relaxed);
     }
 
-    /// Vanilla `Mob.checkDespawn`. With no player in the world nothing despawns, and a
-    /// player within the no-despawn distance resets the mob's `noActionTime`.
+    /// Vanilla `Mob.checkDespawn`: Peaceful removes the types it doesn't allow; otherwise, with
+    /// no player in the world nothing despawns, and a player within the no-despawn distance
+    /// resets the mob's `noActionTime`.
     pub fn check_despawn(&self, mob: &dyn Mob) {
         let entity = &self.living_entity.entity;
-        // Pumpkin also keeps named mobs, which vanilla does by making a name tag set
-        // persistence.
-        let is_persistent = self.persistence_required.load(Relaxed)
-            || mob.requires_custom_persistence()
-            || (**entity.custom_name.load()).is_some();
         let world = entity.world.load();
+        if world.level_info.load().difficulty == Difficulty::Peaceful
+            && !entity.entity_type.allowed_in_peaceful
+        {
+            entity.remove();
+            return;
+        }
+        let is_persistent =
+            self.persistence_required.load(Relaxed) || mob.requires_custom_persistence();
         let pos = entity.pos.load();
         let players = world.players.load();
         let Some(dist_sqr) = players
@@ -1137,12 +1224,10 @@ impl MobEntity {
             && mob.remove_when_far_away(dist_sqr)
         {
             entity.remove();
-            return;
         }
 
+        // Vanilla goes on after an instant despawn, so the `nextInt(800)` roll still draws.
         let no_despawn_distance = f64::from(NO_DESPAWN_DISTANCE);
-        // Persistence only stops the despawn: like any mob, a persistent one stops resetting
-        // `noActionTime` (and so stops strolling) once no player is near.
         if !is_persistent
             && self.living_entity.no_action_time.load(Relaxed) > 600
             && entity.random().next_bounded_i32(800) == 0
@@ -1190,7 +1275,7 @@ pub trait Mob: EntityBase + Send + Sync {
     /// has a target and health to spare.
     fn get_max_fall_distance(&self) -> i32 {
         let mob_entity = self.get_mob_entity();
-        if mob_entity.get_target().is_none() {
+        if self.get_target().is_none() {
             return LivingEntity::get_comfortable_fall_distance(0.0);
         }
 
@@ -1785,14 +1870,26 @@ pub trait Mob: EntityBase + Send + Sync {
 
     fn on_attack(&self, _target: &dyn EntityBase) {}
 
+    /// Vanilla `LivingEntity.playAttackSound`, which `Mob.doHurtTarget` plays on a hit.
+    fn play_attack_sound(&self) {}
+
     /// Vanilla `Mob.canHoldItem`.
     fn can_hold_item(&self, _stack: &ItemStack) -> bool {
         true
     }
 
-    /// Vanilla `Mob.wantsToPickUp`, for the loot pickup in `Mob.aiStep`.
-    fn mob_wants_to_pick_up(&self, stack: &ItemStack) -> bool {
-        self.can_hold_item(stack)
+    /// Vanilla `Mob.getPickupReach`: how far past its box the mob picks up items.
+    fn pickup_reach(&self) -> Vector3<i32> {
+        MobEntity::ITEM_PICKUP_REACH
+    }
+
+    /// Vanilla `Mob.pickUpItem`, with `Raider`'s override for every raider.
+    fn mob_pick_up_item(&self, item: &ItemEntity) {
+        if self.as_raider().is_some() {
+            raider::pick_up_item(self, item);
+        } else {
+            equipment::pick_up_item(self, item);
+        }
     }
 
     /// Vanilla `doHurtTarget` as `MeleeAttackGoal` calls it.
@@ -2060,109 +2157,70 @@ pub trait Mob: EntityBase + Send + Sync {
         group_data
     }
 
+    /// Vanilla `Mob.populateDefaultEquipmentSlots`, on the `level.getRandom()` that
+    /// `finalizeSpawn` passes down.
     fn populate_default_equipment_slots(
         &self,
-        _world: &Arc<World>,
+        world: &Arc<World>,
         difficulty: &crate::entity::mob::equipment::RegionalDifficulty,
     ) {
-        if rand::random::<f32>()
-            < MobEntity::MAX_WEARING_ARMOR_CHANCE * difficulty.special_multiplier
-        {
-            let mut armor_type = rand::random_range(0..3);
-            for _ in 1..=3 {
-                if rand::random::<f32>() < MobEntity::WEARING_ARMOR_UPGRADE_MATERIAL_CHANCE {
-                    armor_type += 1;
-                }
-            }
-
-            let partial_chance = if difficulty.base_difficulty == Difficulty::Hard {
-                0.1f32
-            } else {
-                0.25f32
-            };
-
-            let living = &self.get_mob_entity().living_entity;
-            let mut equipment = living
-                .entity_equipment
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            let mut first = true;
-
-            for slot in &MobEntity::EQUIPMENT_POPULATION_ORDER {
-                let current = equipment.get(slot);
-                if !first && rand::random::<f32>() < partial_chance {
-                    break;
-                }
-                first = false;
-                if current.is_empty()
-                    && let Some(item) = MobEntity::get_equipment_for_slot(slot, armor_type)
-                {
-                    equipment.put(slot, ItemStack::new(1, item));
-                }
-            }
-        }
+        populate_default_armor(self, world, difficulty);
     }
 
+    /// Vanilla `Mob.populateDefaultEquipmentEnchantments`: the weapon, then each armor slot in
+    /// `EquipmentSlot.VALUES` order (feet first).
     fn populate_default_equipment_enchantments(
         &self,
+        world: &Arc<World>,
         difficulty: &crate::entity::mob::equipment::RegionalDifficulty,
     ) {
-        self.enchant_spawned_weapon(difficulty);
-        for slot in &MobEntity::EQUIPMENT_POPULATION_ORDER {
-            self.enchant_spawned_armor(slot, difficulty);
+        self.enchant_spawned_weapon(world, difficulty);
+        for slot in &EquipmentSlot::VALUES {
+            if slot.slot_type() == pumpkin_data::data_component_impl::EquipmentType::HumanoidArmor {
+                self.enchant_spawned_armor(world, slot, difficulty);
+            }
         }
     }
 
+    /// Vanilla `Mob.enchantSpawnedWeapon`.
     fn enchant_spawned_weapon(
         &self,
+        world: &Arc<World>,
         difficulty: &crate::entity::mob::equipment::RegionalDifficulty,
     ) {
-        self.enchant_spawned_equipment(
+        enchant_spawned_equipment(
+            self,
+            world,
             &EquipmentSlot::MAIN_HAND,
             MobEntity::MAX_ENCHANTED_WEAPON_CHANCE,
             difficulty,
         );
     }
 
+    /// Vanilla `Mob.enchantSpawnedArmor`.
     fn enchant_spawned_armor(
         &self,
+        world: &Arc<World>,
         slot: &EquipmentSlot,
         difficulty: &crate::entity::mob::equipment::RegionalDifficulty,
     ) {
-        self.enchant_spawned_equipment(slot, MobEntity::MAX_ENCHANTED_ARMOR_CHANCE, difficulty);
-    }
-
-    fn enchant_spawned_equipment(
-        &self,
-        slot: &EquipmentSlot,
-        chance: f32,
-        difficulty: &crate::entity::mob::equipment::RegionalDifficulty,
-    ) {
-        let living = &self.get_mob_entity().living_entity;
-        let mut equipment = living
-            .entity_equipment
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        if let Some(stack) = equipment.equipment.get_mut(slot)
-            && !stack.is_empty()
-            && rand::random::<f32>() < chance * difficulty.special_multiplier
-        {
-            crate::entity::mob::equipment::apply_vanilla_enchantments(
-                stack,
-                slot,
-                difficulty.special_multiplier,
-            );
-        }
+        enchant_spawned_equipment(
+            self,
+            world,
+            slot,
+            MobEntity::MAX_ENCHANTED_ARMOR_CHANCE,
+            difficulty,
+        );
     }
 
     /// Runs after navigation and before the movement controls, where vanilla ticks a mob's brain.
     fn custom_server_ai_step(&self, _caller: &dyn EntityBase) {}
 
-    /// Vanilla `Mob.wantsToPickUp`, which a plain mob answers with `canHoldItem`, always true.
-    /// Takes the brain because the nearest item sensor asks from inside the brain tick, where
-    /// locking it again would deadlock.
-    fn wants_to_pick_up(&self, _brain: &Brain, _stack: &ItemStack) -> bool {
-        true
+    /// Vanilla `Mob.wantsToPickUp`, which a plain mob answers with `canHoldItem`. Takes the
+    /// brain because the nearest item sensor asks from inside the brain tick, where locking it
+    /// again would deadlock.
+    fn wants_to_pick_up(&self, _brain: &Brain, stack: &ItemStack) -> bool {
+        self.can_hold_item(stack)
     }
 
     /// Vanilla `Mob.canPickUpLoot`, which a plain mob answers from its saved flag. Takes the
@@ -2257,6 +2315,12 @@ pub trait Mob: EntityBase + Send + Sync {
     /// weapon goal here.
     fn on_equip_item(&self, _slot: &EquipmentSlot) {}
 
+    /// Vanilla `Mob.getTarget`: the stored target while it is still a valid one, so a player
+    /// who turned creative or spectator, or a target the mob may no longer attack, reads as none.
+    fn get_target(&self) -> Option<Arc<dyn EntityBase>> {
+        self.as_valid_target(self.get_mob_entity().get_target_unchecked())
+    }
+
     /// Drops a target the mob is not allowed to attack, such as a creative player.
     fn as_valid_target(&self, target: Option<Arc<dyn EntityBase>>) -> Option<Arc<dyn EntityBase>> {
         let target = target?;
@@ -2271,8 +2335,52 @@ pub trait Mob: EntityBase + Send + Sync {
         set_mob_target_base(self, target);
     }
 
-    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
-        self.get_mob_entity().mob_interact(player, item_stack)
+    /// Vanilla `Mob.mobInteract`, which runs after the name tag, the spawn egg and the leash
+    /// had their turn. Returns whether it consumed the interaction.
+    fn mob_interact(&self, _player: &Arc<Player>, _item_stack: &mut ItemStack) -> bool {
+        false
+    }
+
+    /// The start of a vanilla `interact` override before `super.interact`, which runs even on
+    /// a dead mob.
+    fn before_interact(&self) {}
+
+    /// Vanilla `Mob.canShearEquipment`: not while something rides it.
+    fn can_shear_equipment(&self, _player: &Player) -> bool {
+        !self.get_entity().has_passengers()
+    }
+
+    /// Vanilla `Leashable.canBeLeashed`: `Mob`'s "anything but an `Enemy`", with the fixed
+    /// answers of `AmbientCreature`, `WaterAnimal`, `AbstractVillager`, `Turtle`, `Panda`,
+    /// `Hoglin` and `Zoglin`. Mobs whose answer changes override it.
+    fn can_be_leashed(&self) -> bool {
+        let entity_type = self.get_entity().entity_type;
+        if [
+            &EntityType::BAT,
+            &EntityType::COD,
+            &EntityType::SALMON,
+            &EntityType::PUFFERFISH,
+            &EntityType::TROPICAL_FISH,
+            &EntityType::TADPOLE,
+            &EntityType::VILLAGER,
+            &EntityType::WANDERING_TRADER,
+            &EntityType::TURTLE,
+            &EntityType::PANDA,
+        ]
+        .contains(&entity_type)
+        {
+            return false;
+        }
+        entity_type == &EntityType::HOGLIN
+            || entity_type == &EntityType::ZOGLIN
+            || !entity_type.is_enemy
+    }
+
+    /// Vanilla `Mob.onLeashRemoved`: losing the leash clears the home it gave.
+    fn on_leash_removed(&self) {
+        if !self.get_entity().is_leashed() {
+            self.get_mob_entity().clear_home();
+        }
     }
 
     fn tame(&self, player: &Arc<Player>) {
@@ -2459,6 +2567,543 @@ pub trait Mob: EntityBase + Send + Sync {
             .on_lightning_strike(caller, lightning);
     }
 }
+/// The looting part of vanilla `Mob.aiStep`, right after the sun burn: every item in reach
+/// that the mob wants, while it picks up loot and `mobGriefing` is on.
+pub fn ai_step_looting(mob: &dyn Mob) {
+    let mob_entity = mob.get_mob_entity();
+    let living = &mob_entity.living_entity;
+    let entity = &living.entity;
+    let world = entity.world.load_full();
+    if !living.is_alive()
+        || living.dead.load(Relaxed)
+        || !world.level_info.load().game_rules.mob_griefing
+        || !mob_entity.with_brain(mob, |tick| mob.can_pick_up_loot(tick.brain))
+    {
+        return;
+    }
+    let reach = mob.pickup_reach();
+    let pickup_box = entity.bounding_box.load().expand(
+        f64::from(reach.x),
+        f64::from(reach.y),
+        f64::from(reach.z),
+    );
+    for candidate in world.get_entities_at_box(&pickup_box) {
+        let Some(item) = candidate.get_item_entity() else {
+            continue;
+        };
+        let stack = item
+            .get_item_stack()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        if !item.get_entity().removed.load(Relaxed)
+            && !stack.is_empty()
+            && item.get_pickup_delay() == 0
+            && mob_entity.with_brain(mob, |tick| mob.wants_to_pick_up(tick.brain, &stack))
+        {
+            mob.mob_pick_up_item(item);
+        }
+    }
+}
+
+/// Vanilla `Mob.interact`: the name tag and spawn egg first, then `Entity.interact`'s leash
+/// handling, then `mobInteract`, with an `entity_interact` game event when either of the
+/// mob's own steps takes the click.
+pub fn mob_interact_entry<M: Mob + ?Sized>(
+    mob: &M,
+    player: &Arc<Player>,
+    item_stack: &mut ItemStack,
+) -> bool {
+    mob.before_interact();
+    if !mob.get_mob_entity().living_entity.is_alive() {
+        return false;
+    }
+    if check_and_handle_important_interactions(mob, player, item_stack) {
+        entity_interact_game_event(mob, player);
+        return true;
+    }
+    if entity_interact(mob, player, item_stack) {
+        return true;
+    }
+    if mob.mob_interact(player, item_stack) {
+        entity_interact_game_event(mob, player);
+        return true;
+    }
+    false
+}
+
+/// `this.gameEvent(GameEvent.ENTITY_INTERACT, player)`.
+fn entity_interact_game_event<M: Mob + ?Sized>(mob: &M, player: &Arc<Player>) {
+    let entity = mob.get_entity();
+    entity.world.load().game_event_from(
+        Some(player.as_ref()),
+        pumpkin_data::game_event::GameEvent::EntityInteract,
+        entity.pos.load(),
+    );
+}
+
+/// Vanilla `Mob.checkAndHandleImportantInteractions`: a name tag, then a spawn egg, used on
+/// the mob before anything else.
+fn check_and_handle_important_interactions<M: Mob + ?Sized>(
+    mob: &M,
+    player: &Arc<Player>,
+    item_stack: &mut ItemStack,
+) -> bool {
+    let is_name_tag = item_stack.item == &Item::NAME_TAG;
+    let is_spawn_egg = pumpkin_data::entity::entity_from_egg(item_stack.item.id).is_some();
+    if !is_name_tag && !is_spawn_egg {
+        return false;
+    }
+    let entity = mob.get_entity();
+    let world = entity.world.load();
+    let (Some(server), Some(target)) = (
+        world.server.upgrade(),
+        world.get_entity_by_id(entity.entity_id),
+    ) else {
+        return false;
+    };
+    // `itemStack.interactLivingEntity` for the name tag, `spawnOffspringFromSpawnEgg` for the
+    // egg; both pass when they did nothing.
+    server
+        .item_registry
+        .use_on_entity(item_stack, player, target)
+}
+
+/// Vanilla `Entity.interact` for a mob: a sneaking player hands the mobs it leads over to this
+/// one, shears cut the leashes on this mob or shear off its equipment, the holder takes its lead
+/// back, and a lead ties up a mob that isn't held by a player.
+fn entity_interact<M: Mob + ?Sized>(
+    mob: &M,
+    player: &Arc<Player>,
+    item_stack: &mut ItemStack,
+) -> bool {
+    let entity = mob.get_entity();
+    let world = entity.world.load_full();
+    let player_base: &dyn EntityBase = player.as_ref();
+    let sneaking = player.get_entity().is_sneaking();
+    if sneaking && mob.can_be_leashed() && !entity.is_baby() {
+        // `leashableInArea(this, l -> l.getLeashHolder() == player)`.
+        let mut any_leashed = false;
+        let this = world.get_entity_by_id(entity.entity_id);
+        for leashed in leashed_in_area(&world, entity, player.entity_id()) {
+            if let Some(this) = &this
+                && can_have_a_leash_attached_to(leashed.as_ref(), entity)
+            {
+                let leashed_entity = leashed.get_entity();
+                leashed_entity.leash_to(this.clone());
+                if let Some(vehicle) = leashed_entity.get_vehicle() {
+                    vehicle
+                        .get_entity()
+                        .remove_passenger(leashed_entity.entity_id);
+                }
+                any_leashed = true;
+            }
+        }
+        if any_leashed {
+            world.game_event_from(
+                Some(player_base),
+                pumpkin_data::game_event::GameEvent::EntityAction,
+                entity.block_pos.load().to_centered_f64(),
+            );
+            mob.play_sound_at_self(Sound::ItemLeadTied, 1.0, 1.0);
+            return true;
+        }
+    }
+
+    if item_stack.item == &Item::SHEARS && shear_off_all_leash_connections(mob, player) {
+        player.damage_held_item(1);
+        return true;
+    }
+    if item_stack.item == &Item::SHEARS
+        && mob.can_shear_equipment(player)
+        && !sneaking
+        && attempt_to_shear_equipment(mob, player)
+    {
+        return true;
+    }
+
+    let holder = entity
+        .leashed_to
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone();
+    if holder
+        .as_ref()
+        .is_some_and(|holder| holder.get_entity().entity_id == player.entity_id())
+    {
+        // `removeLeash` in creative, else `dropLeash`.
+        drop_leash(
+            mob,
+            player.gamemode.load() != pumpkin_util::GameMode::Creative,
+        );
+        entity_interact_game_event(mob, player);
+        mob.play_sound_at_self(Sound::ItemLeadUntied, 1.0, 1.0);
+        return true;
+    }
+    if item_stack.item != &Item::LEAD
+        || holder
+            .as_ref()
+            .is_some_and(|holder| holder.get_player().is_some())
+    {
+        return false;
+    }
+    let Some(this) = world.get_entity_by_id(entity.entity_id) else {
+        return false;
+    };
+    if !can_have_a_leash_attached_to(this.as_ref(), player.get_entity()) {
+        return false;
+    }
+    if holder.is_some() {
+        drop_leash(mob, true);
+    }
+    entity.leash_to(player.clone());
+    // `setLeashedTo`: a leashed mob gets off what it rides.
+    if let Some(vehicle) = entity.get_vehicle() {
+        vehicle.get_entity().remove_passenger(entity.entity_id);
+    }
+    mob.play_sound_at_self(Sound::ItemLeadTied, 1.0, 1.0);
+    item_stack.decrement_unless_creative(player.gamemode.load(), 1);
+    true
+}
+
+/// Vanilla `Leashable.leashableInArea`: entities in the 32-block box around `entity` that are
+/// leashed to the entity with id `holder_id`.
+fn leashed_in_area(world: &World, entity: &Entity, holder_id: i32) -> Vec<Arc<dyn EntityBase>> {
+    let center = entity.bounding_box.load().get_center();
+    let area = BoundingBox::new(
+        Vector3::new(center.x - 16.0, center.y - 16.0, center.z - 16.0),
+        Vector3::new(center.x + 16.0, center.y + 16.0, center.z + 16.0),
+    );
+    world
+        .get_entities_at_box(&area)
+        .into_iter()
+        .filter(|candidate| {
+            candidate
+                .get_entity()
+                .leashed_to
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .as_ref()
+                .is_some_and(|holder| holder.get_entity().entity_id == holder_id)
+        })
+        .collect()
+}
+
+/// Vanilla `Leashable.canHaveALeashAttachedTo`: not itself, box centres within the snap
+/// distance, and `canBeLeashed`.
+fn can_have_a_leash_attached_to(leashable: &dyn EntityBase, holder: &Entity) -> bool {
+    let entity = leashable.get_entity();
+    if entity.entity_id == holder.entity_id {
+        return false;
+    }
+    let leash_distance = holder
+        .bounding_box
+        .load()
+        .get_center()
+        .squared_distance_to_vec(&entity.bounding_box.load().get_center())
+        .sqrt();
+    leash_distance <= Entity::LEASH_SNAP_DISTANCE
+        && leashable.get_mob().is_none_or(Mob::can_be_leashed)
+}
+
+/// Vanilla `Entity.shearOffAllLeashConnections` through `dropAllLeashConnections`: every leash
+/// held by this mob and its own drop, with a `shear` game event and the snip sound.
+fn shear_off_all_leash_connections<M: Mob + ?Sized>(mob: &M, player: &Arc<Player>) -> bool {
+    let entity = mob.get_entity();
+    let world = entity.world.load_full();
+    let leashed = leashed_in_area(&world, entity, entity.entity_id);
+    let dropped = if entity.is_leashed() {
+        drop_leash(mob, true);
+        true
+    } else {
+        !leashed.is_empty()
+    };
+    for leashed in &leashed {
+        let leashed_entity = leashed.get_entity();
+        leashed_entity.unleash();
+        if let Some(leashed_mob) = leashed.get_mob() {
+            leashed_mob.on_leash_removed();
+        }
+        leashed_entity.spawn_at_location(ItemStack::new(1, &Item::LEAD));
+    }
+    if !dropped {
+        return false;
+    }
+    let player_base: &dyn EntityBase = player.as_ref();
+    world.game_event_from(
+        Some(player_base),
+        pumpkin_data::game_event::GameEvent::Shear,
+        entity.pos.load(),
+    );
+    // `level.playSound(null, blockPosition(), SHEARS_SNIP, player.getSoundSource())`.
+    world.play_sound(
+        Sound::ItemShearsSnip,
+        SoundCategory::Players,
+        &entity.block_pos.load().to_centered_f64(),
+    );
+    true
+}
+
+/// Vanilla `Mob.attemptToShearEquipment`: the first equipped item, in `EquipmentSlot.VALUES`
+/// order, that can be sheared off and isn't held on by `prevent_armor_change` (creative
+/// ignores it).
+fn attempt_to_shear_equipment<M: Mob + ?Sized>(mob: &M, player: &Arc<Player>) -> bool {
+    let mob_entity = mob.get_mob_entity();
+    for slot in &EquipmentSlot::VALUES {
+        let stack = mob_entity.get_item_slot(slot);
+        let Some(equippable) = stack.get_data_component::<EquippableImpl>() else {
+            continue;
+        };
+        let held_on = has_prevent_armor_change(&stack);
+        if !equippable.can_be_sheared
+            || (held_on && player.gamemode.load() != pumpkin_util::GameMode::Creative)
+        {
+            continue;
+        }
+        let shearing_sound = equippable.shearing_sound.clone();
+        shear_item(mob, player, slot, stack.clone());
+        // `this.playSound(equippable.shearingSound().value())`.
+        let entity = mob.get_entity();
+        if !entity.is_silent() {
+            entity.world.load().play_seeded_sound_event(
+                &shearing_sound,
+                mob.sound_source(),
+                &entity.pos.load(),
+                rand::random(),
+            );
+        }
+        return true;
+    }
+    false
+}
+
+/// Vanilla `Mob.shearItem`: the shears wear, the item leaves its slot and drops from the
+/// passenger seat.
+fn shear_item<M: Mob + ?Sized>(
+    mob: &M,
+    player: &Arc<Player>,
+    slot: &EquipmentSlot,
+    sheared: ItemStack,
+) {
+    player.damage_held_item(1);
+    let entity = mob.get_entity();
+    let offset = entity
+        .entity_dimension
+        .load()
+        .attachments
+        .passenger_average();
+    mob.set_item_slot_and_notify(slot, ItemStack::EMPTY.clone());
+    let player_base: &dyn EntityBase = player.as_ref();
+    let world = entity.world.load_full();
+    world.game_event_from(
+        Some(player_base),
+        pumpkin_data::game_event::GameEvent::Shear,
+        entity.pos.load(),
+    );
+    // `spawnAtLocation(level, stack, offset)`.
+    world.spawn_item_at(entity.pos.load() + offset, sheared);
+}
+
+/// Vanilla `Leashable.dropLeash` (`drop_lead`) and `removeLeash`.
+fn drop_leash<M: Mob + ?Sized>(mob: &M, drop_lead: bool) {
+    let entity = mob.get_entity();
+    entity.unleash();
+    mob.on_leash_removed();
+    if drop_lead {
+        entity.spawn_at_location(ItemStack::new(1, &Item::LEAD));
+    }
+}
+
+/// Vanilla `ItemStack.getDamageSource(attacker)`: the weapon's `damage_type` component, the
+/// mace's smash while the attacker can smash, else the attacker's own melee source.
+fn weapon_damage_type(attacker: &dyn EntityBase, weapon: &ItemStack) -> DamageType {
+    if let Some(damage_type) =
+        weapon.get_data_component::<pumpkin_data::data_component_impl::DamageTypeImpl>()
+    {
+        return damage_type.damage_type;
+    }
+    if weapon.item == &Item::MACE
+        && attacker
+            .get_living_entity()
+            .is_some_and(crate::item::items::mace::MaceItem::can_smash_attack)
+    {
+        return DamageType::MACE_SMASH;
+    }
+    attacker
+        .get_mob()
+        .map_or(DamageType::MOB_ATTACK, Mob::melee_damage_type)
+}
+
+/// Vanilla `LivingEntity.getHitbox` for a target: a rider's box starts at its seat.
+fn hitbox(target: &dyn EntityBase) -> BoundingBox {
+    let entity = target.get_entity();
+    let mut hitbox = entity.bounding_box.load();
+    if target.get_living_entity().is_some()
+        && let Some(vehicle) = entity.get_vehicle()
+    {
+        let seat = crate::entity::passenger_riding_position(vehicle.as_ref(), target);
+        hitbox.min.y = seat.y.max(hitbox.min.y);
+    }
+    hitbox
+}
+
+/// Vanilla `Mob.populateDefaultEquipmentSlots`, which overrides call as `super`.
+///
+/// Now and then a set of armor, its material rolled up from leather, often missing its lower
+/// pieces, drawn from `level.getRandom()`.
+pub fn populate_default_armor<M: Mob + ?Sized>(
+    mob: &M,
+    world: &World,
+    difficulty: &crate::entity::mob::equipment::RegionalDifficulty,
+) {
+    // One lock per draw: `level.getRandom()` is shared.
+    let random = || {
+        world
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    };
+    if random().next_f32() >= MobEntity::MAX_WEARING_ARMOR_CHANCE * difficulty.special_multiplier {
+        return;
+    }
+    let mut armor_type = random().next_bounded_i32(3);
+    let mut attempt = 1;
+    while attempt as f32 <= MobEntity::WEARING_ARMOR_UPGRADE_MATERIAL_ATTEMPTS {
+        if random().next_f32() < MobEntity::WEARING_ARMOR_UPGRADE_MATERIAL_CHANCE {
+            armor_type += 1;
+        }
+        attempt += 1;
+    }
+    let partial_chance = if world.level_info.load().difficulty == Difficulty::Hard {
+        0.1f32
+    } else {
+        0.25f32
+    };
+    let mob_entity = mob.get_mob_entity();
+    let mut first = true;
+    for slot in &MobEntity::EQUIPMENT_POPULATION_ORDER {
+        let current = mob_entity.get_item_slot(slot);
+        if !first && random().next_f32() < partial_chance {
+            break;
+        }
+        first = false;
+        if current.is_empty()
+            && let Some(item) = MobEntity::get_equipment_for_slot(slot, armor_type)
+        {
+            mob_entity
+                .living_entity
+                .entity_equipment
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .put(slot, ItemStack::new(1, item));
+        }
+    }
+}
+
+/// Vanilla `Mob.enchantSpawnedEquipment`: the `level.getRandom()` roll, then the
+/// `mob_spawn_equipment` enchantment provider.
+// TODO: the provider's own picks still come from Pumpkin's `EnchantmentProvider`, not
+// vanilla's `EnchantmentHelper.enchantItemFromProvider` on the level random.
+fn enchant_spawned_equipment<M: Mob + ?Sized>(
+    mob: &M,
+    world: &World,
+    slot: &EquipmentSlot,
+    chance: f32,
+    difficulty: &crate::entity::mob::equipment::RegionalDifficulty,
+) {
+    let mut equipment = mob
+        .get_mob_entity()
+        .living_entity
+        .entity_equipment
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if let Some(stack) = equipment.equipment.get_mut(slot)
+        && !stack.is_empty()
+        && world
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .next_f32()
+            < chance * difficulty.special_multiplier
+    {
+        crate::entity::mob::equipment::apply_vanilla_enchantments(
+            stack,
+            slot,
+            difficulty.special_multiplier,
+        );
+    }
+}
+
+/// Vanilla `canDispenserEquipIntoSlot` for a mob.
+///
+/// `Mob` answers with `canPickUpLoot`; the saddled and armored mounts, the happy ghast, the
+/// sulfur cube and the mobs that only carry an item in their mouth or hand override it.
+#[must_use]
+pub fn can_dispenser_equip_into_slot(mob: &dyn Mob, slot: &EquipmentSlot) -> bool {
+    let entity_type = mob.get_entity().entity_type;
+    let mob_entity = mob.get_mob_entity();
+    let can_pick_up_loot = || mob_entity.with_brain(mob, |tick| mob.can_pick_up_loot(tick.brain));
+    let is_body_or_saddle = *slot == EquipmentSlot::BODY || *slot == EquipmentSlot::SADDLE;
+    if entity_type == &EntityType::SULFUR_CUBE || entity_type == &EntityType::HAPPY_GHAST {
+        *slot == EquipmentSlot::BODY
+    } else if entity_type == &EntityType::ALLAY {
+        false
+    } else if entity_type == &EntityType::DOLPHIN
+        || entity_type == &EntityType::FOX
+        || entity_type == &EntityType::PANDA
+    {
+        *slot == EquipmentSlot::MAIN_HAND && can_pick_up_loot()
+    } else if entity_type == &EntityType::PIG || entity_type == &EntityType::STRIDER {
+        *slot == EquipmentSlot::SADDLE || can_pick_up_loot()
+    } else if entity_type == &EntityType::NAUTILUS || entity_type == &EntityType::ZOMBIE_NAUTILUS {
+        is_body_or_saddle || can_pick_up_loot()
+    } else if let Some(horse) = mob.as_abstract_horse() {
+        // `AbstractHorse`: body armor and saddles once tamed.
+        is_body_or_saddle && horse.is_horse_tamed() || can_pick_up_loot()
+    } else if entity_type == &EntityType::CAMEL || entity_type == &EntityType::CAMEL_HUSK {
+        // `Camel.isTamed` is always true.
+        is_body_or_saddle || can_pick_up_loot()
+    } else {
+        can_pick_up_loot()
+    }
+}
+
+/// Vanilla `Mob.dropPreservedEquipment`: every guaranteed drop leaves its slot and falls, except
+/// the items `should_drop` refuses, whose slots are returned.
+pub fn drop_preserved_equipment<M: Mob + ?Sized>(
+    mob: &M,
+    should_drop: impl Fn(&ItemStack) -> bool,
+) -> Vec<EquipmentSlot> {
+    let mob_entity = mob.get_mob_entity();
+    let mut prevented = Vec::new();
+    for slot in &EquipmentSlot::VALUES {
+        let stack = mob_entity.get_item_slot(slot);
+        if stack.is_empty() {
+            continue;
+        }
+        if !should_drop(&stack) {
+            prevented.push(slot.clone());
+        } else if mob_entity.drop_chance(slot) > 1.0 {
+            mob.set_item_slot_and_notify(slot, ItemStack::EMPTY.clone());
+            mob.get_entity().spawn_at_location(stack);
+        }
+    }
+    prevented
+}
+
+/// Vanilla `EnchantmentHelper.has(stack, PREVENT_ARMOR_CHANGE)`.
+#[must_use]
+pub fn has_prevent_armor_change(stack: &ItemStack) -> bool {
+    stack
+        .get_data_component::<pumpkin_data::data_component_impl::EnchantmentsImpl>()
+        .is_some_and(|enchantments| {
+            enchantments
+                .enchantment
+                .iter()
+                .any(|(enchantment, _)| enchantment.effects.prevent_armor_change)
+        })
+}
+
 /// Vanilla `TamableAnimal.isTame` for a target or avoid candidate.
 #[must_use]
 pub fn is_tame(target: &crate::entity::living::LivingEntity) -> bool {
@@ -2680,6 +3325,11 @@ pub fn convert_common(from: &dyn Mob, to: &dyn Mob, params: conversion::Conversi
         new.persistence_required.store(true, Relaxed);
     }
     new_entity.set_custom_name_visible(old_entity.custom_name_visible.load(Relaxed));
+    // `setSharedFlagOnFire(from.isOnFire())`, the server's `isOnFire`.
+    new_entity.set_flag(
+        crate::entity::Flag::OnFire,
+        !old_entity.entity_type.fire_immune && old_entity.fire_ticks.load(Relaxed) > 0,
+    );
     new_entity.set_invulnerable(old_entity.invulnerable.load(Relaxed));
     new_living
         .hurt_cooldown
@@ -2934,7 +3584,7 @@ impl<T: Mob + Send + 'static> EntityBase for T {
     }
 
     fn interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
-        self.mob_interact(player, item_stack)
+        mob_interact_entry(self, player, item_stack)
     }
 
     fn on_player_collision(&self, player: &Arc<Player>) {
@@ -3041,7 +3691,10 @@ impl<T: Mob + Send + 'static> EntityBase for T {
     }
 
     fn write_custom_nbt(&self, nbt: &mut NbtCompound) {
-        self.get_mob_entity().write_mob_nbt(nbt);
+        let mob_entity = self.get_mob_entity();
+        let can_pick_up_loot =
+            mob_entity.with_brain(self, |tick| self.can_pick_up_loot(tick.brain));
+        mob_entity.write_mob_nbt(nbt, can_pick_up_loot);
         if let Some(ageable) = self.as_ageable() {
             ageable.write_ageable_nbt(nbt);
         }

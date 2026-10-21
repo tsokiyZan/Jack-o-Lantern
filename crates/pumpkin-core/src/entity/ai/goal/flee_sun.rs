@@ -66,7 +66,7 @@ impl FleeSunGoal {
 
 impl Goal for FleeSunGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
-        if mob.get_mob_entity().get_target().is_some() {
+        if mob.get_target().is_some() {
             return false;
         }
         let entity = mob.get_entity();

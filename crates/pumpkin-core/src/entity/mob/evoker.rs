@@ -218,7 +218,7 @@ impl Spell for EvokerAttackSpell {
     }
 
     fn perform(&mut self, mob: &dyn Mob) {
-        let Some(target) = mob.get_mob_entity().get_target() else {
+        let Some(target) = mob.get_target() else {
             return;
         };
         let evoker = mob.get_entity();
@@ -443,7 +443,7 @@ impl Spell for EvokerWololoSpell {
             return false;
         };
         let entity = mob.get_entity();
-        if mob.get_mob_entity().get_target().is_some()
+        if mob.get_target().is_some()
             || evoker.is_casting_spell()
             || entity.tick_count.load(std::sync::atomic::Ordering::Relaxed) < next_attack_tick
         {

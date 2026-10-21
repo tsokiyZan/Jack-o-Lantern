@@ -5,7 +5,7 @@ use pumpkin_nbt::compound::NbtCompound;
 
 use crate::entity::mob::spawn::SpawnGroupData;
 use crate::entity::{
-    Entity, EntityBase,
+    Entity,
     mob::{Mob, MobEntity, equipment::RegionalDifficulty, skeleton::SkeletonEntityBase},
 };
 use crate::world::World;
@@ -58,8 +58,12 @@ impl Mob for ParchedSkeletonEntity {
             .populate_default_equipment_slots(world, difficulty);
     }
 
-    fn ai_step_end(&self, _caller: &dyn EntityBase) {
-        self.entity.pick_up_loot(self);
+    fn wants_to_pick_up(
+        &self,
+        _brain: &crate::entity::ai::brain::Brain,
+        stack: &pumpkin_data::item_stack::ItemStack,
+    ) -> bool {
+        super::wants_to_pick_up(self, stack)
     }
 
     fn get_preferred_weapon_type(&self) -> Option<&'static pumpkin_data::tag::Tag> {

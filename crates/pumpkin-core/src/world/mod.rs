@@ -1462,7 +1462,20 @@ impl World {
         category: SoundCategory,
         position: &Vector3<f64>,
     ) {
-        let seed = rng().random::<i64>();
+        self.play_seeded_sound_event(sound, category, position, rng().random::<i64>());
+    }
+
+    /// Vanilla `playSeededSound` at full volume and pitch, for callers that draw the seed
+    /// from their own random.
+    pub fn play_seeded_sound_event(
+        &self,
+        sound: &pumpkin_data::data_component_impl::IdOr<
+            pumpkin_data::data_component_impl::SoundEvent,
+        >,
+        category: SoundCategory,
+        position: &Vector3<f64>,
+        seed: i64,
+    ) {
         let packet = CSoundEffect::new(
             data_to_proto_sound(sound),
             category,

@@ -214,7 +214,7 @@ impl PiglinEntity {
 
     #[must_use]
     pub fn can_replace_current_item_for(&self, new_item: &ItemStack) -> bool {
-        let slot = mob_equipment::get_equipment_slot_for_item(new_item);
+        let slot = mob_equipment::get_equipment_slot_for_item(self, new_item);
         let current = self
             .mob_entity
             .living_entity
@@ -257,47 +257,8 @@ impl PiglinEntity {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .get(&EquipmentSlot::MAIN_HAND)
     }
-    #[must_use]
-    fn wants_item_entity(&self, item: &ItemEntity) -> bool {
-        let stack = item
-            .get_item_stack()
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        !stack.is_empty()
-            && self.mob_entity.with_brain(self, |tick| {
-                <Self as Mob>::wants_to_pick_up(self, tick.brain, &stack)
-            })
-    }
-    fn pick_up_nearby_items(&self) {
-        let living = &self.mob_entity.living_entity;
-        let entity = &living.entity;
-        if !self.mob_entity.can_pick_up_loot()
-            || !entity.is_alive()
-            || living.health.load() <= 0.0
-            || living.dead.load(Ordering::Relaxed)
-        {
-            return;
-        }
-        let world = entity.world.load();
-        if !world.level_info.load().game_rules.mob_griefing {
-            return;
-        }
-
-        let reach = entity.bounding_box.load().expand(1.0, 0.0, 1.0);
-        for candidate in world.get_entities_at_box(&reach) {
-            let Some(item) = candidate.get_item_entity() else {
-                continue;
-            };
-            if item.get_entity().is_alive()
-                && item.get_pickup_delay() == 0
-                && self.wants_item_entity(item)
-            {
-                self.pick_up_item(item);
-            }
-        }
-    }
-
-    fn pick_up_item(&self, item: &ItemEntity) {
+    /// Vanilla `Piglin.pickUpItem`.
+    fn piglin_pick_up_item(&self, item: &ItemEntity) {
         let count = {
             let stack = item
                 .get_item_stack()
@@ -519,7 +480,7 @@ impl Mob for PiglinEntity {
         });
         let difficulty = RegionalDifficulty::at(world, self.get_entity().pos.load());
         self.populate_default_equipment_slots(world, &difficulty);
-        self.populate_default_equipment_enchantments(&difficulty);
+        self.populate_default_equipment_enchantments(world, &difficulty);
         // `super.finalizeSpawn`: `Mob.finalizeSpawn`.
         self.mob_entity.finalize_spawn_base();
         group_data
@@ -612,6 +573,9 @@ impl Mob for PiglinEntity {
     }
 
     fn mob_read_nbt(&self, nbt: &NbtCompound) {
+        // Vanilla `AbstractPiglin.readAdditionalSaveData`: piglins pick up loot by default.
+        self.mob_entity
+            .set_can_pick_up_loot(nbt.get_bool("CanPickUpLoot").unwrap_or(true));
         if let Some(immune) = nbt.get_bool("IsImmuneToZombification") {
             self.set_immune_to_zombification(immune);
         }
@@ -657,7 +621,7 @@ impl Mob for PiglinEntity {
             });
             return true;
         }
-        self.mob_entity.mob_interact(player, item_stack)
+        false
     }
 
     fn make_brain(
@@ -718,8 +682,8 @@ impl Mob for PiglinEntity {
         })
     }
 
-    fn post_tick(&self) {
-        self.pick_up_nearby_items();
+    fn mob_pick_up_item(&self, item: &ItemEntity) {
+        self.piglin_pick_up_item(item);
     }
 
     fn on_damage(

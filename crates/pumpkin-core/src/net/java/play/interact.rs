@@ -102,11 +102,27 @@ impl JavaClient {
 
                             let item_id = stack.item.id;
                             let before = stack.clone();
+                            // Vanilla `Player.interactOn`: the entity's own `interact` first
+                            // (for a mob, `Mob.interact`), then the item's
+                            // `interactLivingEntity`. A mob already had the spawn egg.
                             let interacted = event.target.interact(player, &mut stack);
-                            if !interacted {
-                                server
-                                    .item_registry
-                                    .use_on_entity(&mut stack, player, event.target);
+                            let is_mob_spawn_egg = event.target.get_mob().is_some()
+                                && pumpkin_data::entity::entity_from_egg(stack.item.id).is_some();
+                            if !interacted
+                                && !stack.is_empty()
+                                && !is_mob_spawn_egg
+                                && server.item_registry.use_on_entity(
+                                    &mut stack,
+                                    player,
+                                    Arc::clone(&event.target),
+                                )
+                                && event.target.get_living_entity().is_some()
+                            {
+                                world.game_event_from(
+                                    Some(player.as_ref()),
+                                    pumpkin_data::game_event::GameEvent::EntityInteract,
+                                    event.target.get_entity().pos.load(),
+                                );
                             }
                             if !stack.are_equal(&before) {
                                 player.increment_stat(StatisticCategory::Used, item_id as i32, 1);

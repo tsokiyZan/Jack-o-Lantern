@@ -224,7 +224,7 @@ impl GuardianData {
         entity.update_velocity_from_input(living.movement_input.load(), f64::from(0.1f32));
         living.make_move(caller);
         let mut velocity = entity.velocity.load() * 0.9;
-        if !self.is_moving() && mob_entity.get_target().is_none() {
+        if !self.is_moving() && mob.get_target().is_none() {
             velocity.y -= 0.005;
         }
         entity.velocity.store(velocity);
@@ -386,7 +386,7 @@ struct GuardianAttackGoal {
 
 impl Goal for GuardianAttackGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
-        mob.get_mob_entity().get_target().is_some_and(|target| {
+        mob.get_target().is_some_and(|target| {
             target
                 .get_living_entity()
                 .is_some_and(crate::entity::living::LivingEntity::is_alive)
@@ -401,7 +401,7 @@ impl Goal for GuardianAttackGoal {
             return false;
         };
         guardian.elder
-            || mob.get_mob_entity().get_target().is_some_and(|target| {
+            || mob.get_target().is_some_and(|target| {
                 mob.get_entity()
                     .pos
                     .load()
@@ -418,7 +418,7 @@ impl Goal for GuardianAttackGoal {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .stop();
-        if let Some(target) = mob_entity.get_target() {
+        if let Some(target) = mob.get_target() {
             mob_entity
                 .look_control
                 .lock()
@@ -437,7 +437,7 @@ impl Goal for GuardianAttackGoal {
             return;
         };
         guardian.set_active_attack_target(mob.get_entity(), 0);
-        mob.get_mob_entity().set_target(None);
+        mob.set_mob_target(None);
         guardian.stroll_trigger.store(true, Ordering::Relaxed);
     }
 
@@ -447,7 +447,7 @@ impl Goal for GuardianAttackGoal {
         };
         let mob_entity = mob.get_mob_entity();
         let entity = &mob_entity.living_entity.entity;
-        let Some(target) = mob_entity.get_target() else {
+        let Some(target) = mob.get_target() else {
             return;
         };
         mob_entity
@@ -461,7 +461,7 @@ impl Goal for GuardianAttackGoal {
             .unwrap_or_else(PoisonError::into_inner)
             .look_at_entity_with_range(&target, 90.0, 90.0);
         if !entity.has_line_of_sight(target.get_entity()) {
-            mob_entity.set_target(None);
+            mob.set_mob_target(None);
             return;
         }
 
@@ -493,7 +493,7 @@ impl Goal for GuardianAttackGoal {
                 Some(caller),
             );
             mob_entity.try_attack(caller, target.as_ref());
-            mob_entity.set_target(None);
+            mob.set_mob_target(None);
         }
     }
 

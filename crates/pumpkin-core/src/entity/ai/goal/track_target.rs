@@ -139,7 +139,7 @@ impl TrackTargetGoal {
 impl Goal for TrackTargetGoal {
     fn should_continue(&mut self, mob: &dyn Mob) -> bool {
         let mob_entity = mob.get_mob_entity();
-        let Some(target_base) = mob_entity.get_target().or_else(|| self.target_mob.clone()) else {
+        let Some(target_base) = mob.get_target().or_else(|| self.target_mob.clone()) else {
             return false;
         };
 

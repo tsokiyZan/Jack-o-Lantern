@@ -113,7 +113,7 @@ impl BowAttackGoal {
 
 impl Goal for BowAttackGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
-        mob.get_mob_entity().get_target().is_some() && Self::is_holding_bow(mob)
+        mob.get_target().is_some() && Self::is_holding_bow(mob)
     }
 
     fn should_continue(&mut self, mob: &dyn Mob) -> bool {
@@ -132,7 +132,7 @@ impl Goal for BowAttackGoal {
     }
 
     fn tick(&mut self, mob: &dyn Mob) {
-        let Some(target) = mob.get_mob_entity().get_target().clone() else {
+        let Some(target) = mob.get_target().clone() else {
             return;
         };
         let mob_entity = mob.get_mob_entity();

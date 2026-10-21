@@ -130,7 +130,7 @@ impl Mob for BlazeEntity {
             self.allowed_height_offset.store(offset as f32);
         }
 
-        let Some(target) = self.entity.get_target() else {
+        let Some(target) = self.get_target() else {
             return;
         };
         let base_entity = &self.entity.living_entity.entity;

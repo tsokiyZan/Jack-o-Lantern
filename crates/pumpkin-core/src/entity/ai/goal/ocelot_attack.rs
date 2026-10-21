@@ -29,7 +29,7 @@ impl OcelotAttackGoal {
 
 impl Goal for OcelotAttackGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
-        let Some(target) = mob.get_mob_entity().get_target() else {
+        let Some(target) = mob.get_target() else {
             return false;
         };
         self.target = Some(target);

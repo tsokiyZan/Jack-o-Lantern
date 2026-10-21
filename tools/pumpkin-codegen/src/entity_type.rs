@@ -28,6 +28,14 @@ pub fn read_attachments() -> AttachmentsDump {
         .expect("Failed to parse entity_attachments.json")
 }
 
+/// `entity_allowed_in_peaceful.json` (`tools/vanilla-dump/EntityPeaceful.java`).
+pub fn read_allowed_in_peaceful() -> BTreeMap<String, bool> {
+    serde_json::from_str(
+        &fs::read_to_string("../../assets/entity_allowed_in_peaceful.json").unwrap(),
+    )
+    .expect("Failed to parse entity_allowed_in_peaceful.json")
+}
+
 /// A `&[[f64; 3]]` literal.
 pub fn points_tokens(points: &[[f64; 3]]) -> TokenStream {
     let points = points.iter().map(|[x, y, z]| quote! { [#x, #y, #z] });
@@ -114,7 +122,7 @@ pub enum MobCategory {
 }
 
 /// Pairs a raw entity name string with its deserialized [`EntityType`] data for token generation.
-pub struct NamedEntityType<'a>(&'a str, &'a EntityType, &'a DimensionsDump);
+pub struct NamedEntityType<'a>(&'a str, &'a EntityType, &'a DimensionsDump, bool);
 
 impl ToTokens for NamedEntityType<'_> {
     /// Emits an `EntityType { … }` struct literal token stream for the wrapped entity.
@@ -122,6 +130,7 @@ impl ToTokens for NamedEntityType<'_> {
         let name = self.0;
         let entity = self.1;
         let dump = self.2;
+        let allowed_in_peaceful = self.3;
         assert!(
             dump.width == entity.dimension[0] && dump.height == entity.dimension[1],
             "entity_attachments.json is from another version than entities.json ({name})"
@@ -239,6 +248,7 @@ impl ToTokens for NamedEntityType<'_> {
                 attackable: #attackable,
                 mob: #mob,
                 is_enemy: #is_enemy,
+                allowed_in_peaceful: #allowed_in_peaceful,
                 saveable: #saveable,
                 limit_per_chunk: #limit_per_chunk,
                 summonable: #summonable,
@@ -268,6 +278,7 @@ pub fn build() -> TokenStream {
             .expect("Failed to parse entities.json");
 
     let attachments = read_attachments();
+    let allowed_in_peaceful = read_allowed_in_peaceful();
 
     let mut consts = TokenStream::new();
     let mut type_from_raw_id_arms = TokenStream::new();
@@ -283,7 +294,10 @@ pub fn build() -> TokenStream {
             .types
             .get(name)
             .unwrap_or_else(|| panic!("{name} missing from entity_attachments.json"));
-        let entity_tokens = NamedEntityType(name, entity, dump).to_token_stream();
+        let allowed = *allowed_in_peaceful
+            .get(name)
+            .unwrap_or_else(|| panic!("{name} missing from entity_allowed_in_peaceful.json"));
+        let entity_tokens = NamedEntityType(name, entity, dump, allowed).to_token_stream();
 
         consts.extend(quote! {
             pub const #upper_name: EntityType = #entity_tokens;
@@ -322,6 +336,8 @@ pub fn build() -> TokenStream {
             pub attackable: Option<bool>,
             pub mob: bool,
             pub is_enemy: bool,
+            /// Vanilla `EntityType.isAllowedInPeaceful`: false for types built `notInPeaceful`.
+            pub allowed_in_peaceful: bool,
             pub saveable: bool,
             pub limit_per_chunk: i32,
             pub summonable: bool,

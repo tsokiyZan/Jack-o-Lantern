@@ -1158,8 +1158,12 @@ pub fn is_valid_empty_spawn_block_at(
         && !is_block_dangerous(entity_type, state)
 }
 
+/// Vanilla `BlockState.isValidSpawn` for a block below `entity_type`.
 #[must_use]
-fn is_valid_spawn_floor(state: &'static BlockState, entity_type: &'static EntityType) -> bool {
+pub(crate) fn is_valid_spawn_floor(
+    state: &'static BlockState,
+    entity_type: &'static EntityType,
+) -> bool {
     match Block::from_state_id(state.id).spawn_floor_predicate() {
         SpawnFloorPredicate::Default => {
             state.is_side_solid(BlockDirection::Up) && state.luminance < 14

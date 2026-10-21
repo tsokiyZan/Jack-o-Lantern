@@ -542,7 +542,7 @@ impl FoxEntity {
     }
 
     fn target_is_alive(&self) -> bool {
-        self.mob_entity.get_target().is_some_and(|target| {
+        self.get_target().is_some_and(|target| {
             target
                 .get_living_entity()
                 .is_some_and(LivingEntity::is_alive)
@@ -552,13 +552,13 @@ impl FoxEntity {
     /// Vanilla `Fox.canEat`.
     fn can_eat(&self, item_in_mouth: &ItemStack) -> bool {
         is_consumable_food(item_in_mouth)
-            && self.mob_entity.get_target().is_none()
+            && self.get_target().is_none()
             && self.get_entity().on_ground.load(Ordering::Relaxed)
             && !self.is_sleeping()
     }
 
     /// Vanilla `Fox.canHoldItem`.
-    fn can_hold_item(&self, stack: &ItemStack) -> bool {
+    fn fox_can_hold_item(&self, stack: &ItemStack) -> bool {
         let held = self.main_hand();
         held.is_empty()
             || self.ticks_since_eaten.load(Ordering::Relaxed) > 0
@@ -603,13 +603,13 @@ impl FoxEntity {
     }
 
     /// Vanilla `Fox.pickUpItem`.
-    fn pick_up_item(&self, item_entity: &ItemEntity) {
+    fn fox_pick_up_item(&self, item_entity: &ItemEntity) {
         let mut item_stack = item_entity
             .get_item_stack()
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone();
-        if !self.can_hold_item(&item_stack) {
+        if !self.fox_can_hold_item(&item_stack) {
             return;
         }
         let count = item_stack.item_count;
@@ -618,8 +618,7 @@ impl FoxEntity {
         }
         self.spit_out_item(self.main_hand());
         let held = item_stack.split(1);
-        self.mob_entity
-            .set_item_slot(&EquipmentSlot::MAIN_HAND, held);
+        self.set_item_slot_and_notify(&EquipmentSlot::MAIN_HAND, held);
         self.mob_entity
             .set_guaranteed_drop(&EquipmentSlot::MAIN_HAND);
         // Vanilla takes the count left after the split: none.
@@ -933,16 +932,6 @@ impl Mob for FoxEntity {
 
     /// The rest of vanilla `Fox.aiStep` after `super.aiStep()`, then the end of `Fox.tick`.
     fn post_tick(&self) {
-        self.mob_entity.for_each_item_in_pickup_reach(|item| {
-            let stack = item
-                .get_item_stack()
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .clone();
-            if self.can_hold_item(&stack) {
-                self.pick_up_item(item);
-            }
-        });
         if self.is_defending() && self.get_entity().random().next_f32() < 0.05 {
             self.play_sound_at_self(Sound::EntityFoxAggro, 1.0, 1.0);
         }
@@ -951,7 +940,7 @@ impl Mob for FoxEntity {
         if !self.mob_entity.is_no_ai() {
             let world = entity.world.load();
             let in_water = entity.is_in_water();
-            if in_water || self.mob_entity.get_target().is_some() || world.is_thundering() {
+            if in_water || self.get_target().is_some() || world.is_thundering() {
                 self.wake_up();
             }
             if in_water || self.is_sleeping() {
@@ -1042,13 +1031,14 @@ impl Mob for FoxEntity {
         set_mob_target_base(self, target);
     }
 
-    /// Vanilla `Fox.wantsToPickUp`, through `Mob.wantsToPickUp`: `canHoldItem`.
-    fn wants_to_pick_up(
-        &self,
-        _brain: &crate::entity::ai::brain::Brain,
-        stack: &ItemStack,
-    ) -> bool {
-        self.can_hold_item(stack)
+    /// Vanilla `Fox.canHoldItem`.
+    fn can_hold_item(&self, stack: &ItemStack) -> bool {
+        self.fox_can_hold_item(stack)
+    }
+
+    /// Vanilla `Fox.pickUpItem`.
+    fn mob_pick_up_item(&self, item: &ItemEntity) {
+        self.fox_pick_up_item(item);
     }
 
     /// Vanilla `Fox.dropAllDeathLoot`: whatever is in the fox's mouth always drops.
@@ -1337,7 +1327,7 @@ impl Goal for StalkPreyGoal {
         if fox.is_sleeping() {
             return false;
         }
-        let Some(target) = fox.mob_entity.get_target() else {
+        let Some(target) = fox.get_target() else {
             return false;
         };
         target
@@ -1366,7 +1356,7 @@ impl Goal for StalkPreyGoal {
         let Some(fox) = as_fox(mob) else {
             return;
         };
-        if let Some(target) = fox.mob_entity.get_target()
+        if let Some(target) = fox.get_target()
             && fox.is_path_clear(target.get_entity())
         {
             fox.set_interested(true);
@@ -1383,7 +1373,7 @@ impl Goal for StalkPreyGoal {
         let Some(fox) = as_fox(mob) else {
             return;
         };
-        let Some(target) = fox.mob_entity.get_target() else {
+        let Some(target) = fox.get_target() else {
             return;
         };
         Self::look_at_target(fox, &target);
@@ -1439,7 +1429,7 @@ impl Goal for FoxPounceGoal {
         if !fox.is_fully_crouched() {
             return false;
         }
-        let Some(target) = fox.mob_entity.get_target() else {
+        let Some(target) = fox.get_target() else {
             return false;
         };
         if !target
@@ -1491,7 +1481,7 @@ impl Goal for FoxPounceGoal {
         living.jumping.store(true, Ordering::Relaxed);
         fox.set_pouncing(true);
         fox.set_interested(false);
-        if let Some(target) = fox.mob_entity.get_target() {
+        if let Some(target) = fox.get_target() {
             Self::look_at_target(fox, &target);
             let entity = fox.get_entity();
             let pos = entity.pos.load();
@@ -1533,7 +1523,7 @@ impl Goal for FoxPounceGoal {
         let Some(fox) = as_fox(mob) else {
             return;
         };
-        let target = fox.mob_entity.get_target();
+        let target = fox.get_target();
         if let Some(target) = &target {
             Self::look_at_target(fox, target);
         }
@@ -1639,7 +1629,7 @@ impl Goal for SeekShelterGoal {
         let Some(fox) = as_fox(mob) else {
             return false;
         };
-        if fox.is_sleeping() || fox.mob_entity.get_target().is_some() {
+        if fox.is_sleeping() || fox.get_target().is_some() {
             return false;
         }
         let entity = fox.get_entity();
@@ -1848,7 +1838,7 @@ impl FoxStrollThroughVillageGoal {
             !fox.is_sleeping()
                 && !fox.is_sitting()
                 && !fox.is_defending()
-                && fox.mob_entity.get_target().is_none()
+                && fox.get_target().is_none()
         })
     }
 }
@@ -2072,7 +2062,7 @@ impl Goal for FoxSearchForItemsGoal {
         if !fox.main_hand().is_empty() {
             return false;
         }
-        if fox.mob_entity.get_target().is_some()
+        if fox.get_target().is_some()
             || fox
                 .mob_entity
                 .living_entity
@@ -2195,7 +2185,7 @@ impl Goal for PerchAndSearchGoal {
                 roll < 0.02
             }
             && !fox.is_sleeping()
-            && fox.mob_entity.get_target().is_none()
+            && fox.get_target().is_none()
             && fox.is_navigator_idle()
             && !fox.alertable()
             && !fox.is_pouncing()

@@ -306,6 +306,5 @@ impl Mob for TadpoleEntity {
             return true;
         }
         self.bucket_mob_pickup(player, item_stack)
-            || self.mob_entity.mob_interact(player, item_stack)
     }
 }

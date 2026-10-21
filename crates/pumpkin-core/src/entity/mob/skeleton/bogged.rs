@@ -137,8 +137,12 @@ impl Mob for BoggedSkeletonEntity {
             .populate_default_equipment_slots(world, difficulty);
     }
 
-    fn ai_step_end(&self, _caller: &dyn EntityBase) {
-        self.entity.pick_up_loot(self);
+    fn wants_to_pick_up(
+        &self,
+        _brain: &crate::entity::ai::brain::Brain,
+        stack: &pumpkin_data::item_stack::ItemStack,
+    ) -> bool {
+        super::wants_to_pick_up(self, stack)
     }
 
     fn get_preferred_weapon_type(&self) -> Option<&'static pumpkin_data::tag::Tag> {
@@ -148,7 +152,7 @@ impl Mob for BoggedSkeletonEntity {
     /// Vanilla `Bogged.mobInteract`.
     fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
         if item_stack.item != &Item::SHEARS || !self.ready_for_shearing() {
-            return self.get_mob_entity().mob_interact(player, item_stack);
+            return false;
         }
         self.shear(SoundCategory::Players, item_stack);
         let entity = self.get_entity();

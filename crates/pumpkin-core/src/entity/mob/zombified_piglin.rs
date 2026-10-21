@@ -121,9 +121,7 @@ impl ZombifiedPiglinEntity {
                 let Some(other_mob) = other.get_mob() else {
                     continue;
                 };
-                if other_mob.get_mob_entity().get_target().is_some()
-                    || other.is_allied_to(target.as_ref())
-                {
+                if other_mob.get_target().is_some() || other.is_allied_to(target.as_ref()) {
                     continue;
                 }
                 other_mob.set_mob_target(Some(target.clone()));
@@ -214,7 +212,7 @@ impl Mob for ZombifiedPiglinEntity {
     /// Vanilla `ZombifiedPiglin.setTarget`: a fresh target restarts the anger sound and
     /// the alert countdowns.
     fn set_mob_target(&self, target: Option<Arc<dyn EntityBase>>) {
-        if self.zombie.mob_entity.get_target().is_none() && target.is_some() {
+        if self.get_target().is_none() && target.is_some() {
             let (first_anger_sound_in, alert_in) = {
                 let mut random = self.get_entity().random();
                 (
@@ -263,7 +261,7 @@ impl Mob for ZombifiedPiglinEntity {
         }
 
         self.update_persistent_anger();
-        if let Some(target) = self.zombie.mob_entity.get_target() {
+        if let Some(target) = self.get_target() {
             self.maybe_alert_others(&target);
         }
     }

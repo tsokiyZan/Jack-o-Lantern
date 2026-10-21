@@ -325,7 +325,7 @@ impl ShulkerEntity {
                 );
 
                 self.set_raw_peek(0);
-                self.mob_entity.set_target(None);
+                self.set_mob_target(None);
 
                 return true;
             }
@@ -445,14 +445,14 @@ impl Goal for ShulkerAttackGoal {
     }
 
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
-        let target = mob.get_mob_entity().get_target();
+        let target = mob.get_target();
         target
             .as_ref()
             .is_some_and(|t| t.get_living_entity().is_some_and(|l| l.entity.is_alive()))
     }
 
     fn should_continue(&mut self, mob: &dyn Mob) -> bool {
-        let target = mob.get_mob_entity().get_target();
+        let target = mob.get_target();
         target
             .as_ref()
             .is_some_and(|t| t.get_living_entity().is_some_and(|l| l.entity.is_alive()))
@@ -473,7 +473,7 @@ impl Goal for ShulkerAttackGoal {
 
     fn tick(&mut self, mob: &dyn Mob) {
         let mob_entity = mob.get_mob_entity();
-        let target_arc = mob_entity.get_target();
+        let target_arc = mob.get_target();
 
         let Some(target) = target_arc else {
             return;
@@ -489,7 +489,7 @@ impl Goal for ShulkerAttackGoal {
         let dist_sq = shulker_pos.squared_distance_to_vec(&target_pos);
 
         if dist_sq > 400.0 {
-            mob_entity.set_target(None);
+            mob.set_mob_target(None);
             return;
         }
 
@@ -539,7 +539,7 @@ impl ShulkerPeekGoal {
 
 impl Goal for ShulkerPeekGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
-        let has_target = mob.get_mob_entity().get_target().is_some();
+        let has_target = mob.get_target().is_some();
         if has_target {
             return false;
         }
@@ -557,7 +557,7 @@ impl Goal for ShulkerPeekGoal {
     }
 
     fn should_continue(&mut self, mob: &dyn Mob) -> bool {
-        let has_target = mob.get_mob_entity().get_target().is_some();
+        let has_target = mob.get_target().is_some();
         !has_target && self.peek_time.load(Ordering::Relaxed) > 0
     }
 
@@ -569,7 +569,7 @@ impl Goal for ShulkerPeekGoal {
     }
 
     fn stop(&mut self, _mob: &dyn Mob) {
-        let has_target = self.shulker.mob_entity.get_target().is_some();
+        let has_target = self.shulker.get_target().is_some();
         if !has_target {
             self.shulker.set_raw_peek(0);
         }

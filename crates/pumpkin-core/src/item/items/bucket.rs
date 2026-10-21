@@ -440,7 +440,12 @@ impl ItemBehaviour for EmptyBucketItem {
         give_player_bucket_item(player, item);
     }
 
-    fn use_on_entity(&self, _item: &mut ItemStack, player: &Player, entity: Arc<dyn EntityBase>) {
+    fn use_on_entity(
+        &self,
+        _item: &mut ItemStack,
+        player: &Player,
+        entity: Arc<dyn EntityBase>,
+    ) -> bool {
         let ent = entity.get_entity();
         let entity_type = ent.entity_type;
         if (entity_type == &EntityType::COW
@@ -464,7 +469,9 @@ impl ItemBehaviour for EmptyBucketItem {
             };
             world.play_sound(sound, SoundCategory::Neutral, &ent.pos.load());
             give_player_bucket_item(player, &Item::MILK_BUCKET);
+            return true;
         }
+        false
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
@@ -563,7 +570,12 @@ impl ItemBehaviour for FilledBucketItem {
         }
     }
 
-    fn use_on_entity(&self, item: &mut ItemStack, player: &Player, entity: Arc<dyn EntityBase>) {
+    fn use_on_entity(
+        &self,
+        item: &mut ItemStack,
+        player: &Player,
+        entity: Arc<dyn EntityBase>,
+    ) -> bool {
         if item.item.id == Item::WATER_BUCKET.id {
             let entity_type = entity.get_entity().entity_type;
             let result_item = if entity_type == &EntityType::AXOLOTL {
@@ -588,8 +600,10 @@ impl ItemBehaviour for FilledBucketItem {
                 world.play_sound(sound, SoundCategory::Neutral, &ent.pos.load());
                 give_player_bucket_item(player, mob_bucket);
                 ent.remove();
+                return true;
             }
         }
+        false
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

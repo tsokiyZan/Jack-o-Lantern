@@ -219,7 +219,7 @@ pub trait NeutralMob: Mob {
     fn update_persistent_anger(&self) {
         let world = self.get_entity().world.load();
         self.restore_persistent_target(&world);
-        let target = self.get_mob_entity().get_target();
+        let target = self.get_target();
         let anger_target = self.get_persistent_anger_target();
 
         // Calm and unprovoked: nothing to track, nothing to lock.

@@ -1842,9 +1842,10 @@ impl LivingEntity {
             caller.damage(caller, 1.0, DamageType::DROWN);
         }
 
-        // Vanilla `Mob.aiStep` burns undead right after `super.aiStep()`.
+        // Vanilla `Mob.aiStep` burns undead right after `super.aiStep()`, then loots.
         if let Some(mob) = caller.get_mob() {
             super::mob::sun_burn::tick(mob);
+            super::mob::ai_step_looting(mob);
             mob.ai_step_end(caller);
         }
     }
@@ -2744,9 +2745,10 @@ impl LivingEntity {
                     .map(crate::entity::mob::cube_mob::CubeMobEntity::get_size),
                 ..Default::default()
             };
-            self.drop_loot(&params);
+            self.drop_loot(dyn_self.get_mob(), &params);
             if let Some(mob) = dyn_self.get_mob() {
                 self.drop_mob_equipment(
+                    mob,
                     &DamageSource {
                         damage_type,
                         direct: source,
@@ -2838,7 +2840,12 @@ impl LivingEntity {
     /// Vanilla `Mob.dropCustomDeathLoot`: each slot's equipment drops by its chance (Looting
     /// raising it), but only for a kill a player had a hand in unless the chance marks the
     /// item as preserved. A dropped item that isn't preserved comes out worn.
-    fn drop_mob_equipment(&self, killing_blow: &DamageSource<'_>, killed_by_player: bool) {
+    fn drop_mob_equipment(
+        &self,
+        mob: &dyn super::mob::Mob,
+        killing_blow: &DamageSource<'_>,
+        killed_by_player: bool,
+    ) {
         let world = self.entity.world.load();
         for slot in &EquipmentSlot::VALUES {
             let mut chance = self
@@ -2886,10 +2893,8 @@ impl LivingEntity {
                 item.set_damage(max_damage - outer);
             }
             self.entity.spawn_at_location(item);
-            self.entity_equipment
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .put(slot, ItemStack::EMPTY.clone());
+            // `setItemSlot`: the clients see the slot empty, with an `unequip` game event.
+            mob.set_item_slot_and_notify(slot, ItemStack::EMPTY.clone());
         }
     }
 
@@ -3011,15 +3016,28 @@ impl LivingEntity {
         }
     }
 
-    fn drop_loot(&self, params: &LootContextParameters) {
-        let resource_name = self.get_entity().entity_type.resource_name;
-        let key = format!("minecraft:entities/{resource_name}");
+    fn drop_loot(&self, mob: Option<&dyn super::mob::Mob>, params: &LootContextParameters) {
+        // Vanilla `Mob.getLootTable`/`getLootTableSeed`: a `DeathLootTable` wins.
+        let (death_loot_table, death_loot_table_seed) =
+            mob.map_or((None, 0), |mob| mob.get_mob_entity().death_loot_table());
+        let key = death_loot_table.unwrap_or_else(|| {
+            let resource_name = self.get_entity().entity_type.resource_name;
+            format!("minecraft:entities/{resource_name}")
+        });
         let world = self.entity.world.load();
         if let Some(loot_table) = world.get_loot_table(&key) {
-            let seed: i64 = rand::random();
+            let seed: i64 = if death_loot_table_seed == 0 {
+                rand::random()
+            } else {
+                death_loot_table_seed
+            };
             for stack in crate::world::loot::generate_loot_from_handle(&loot_table, seed, params) {
                 self.entity.spawn_at_location(stack);
             }
+        }
+        // Vanilla `Mob.dropFromLootTable`: the death loot table is used once.
+        if let Some(mob) = mob {
+            mob.get_mob_entity().clear_death_loot_table();
         }
     }
 

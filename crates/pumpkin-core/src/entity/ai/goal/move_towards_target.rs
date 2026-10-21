@@ -34,7 +34,7 @@ impl MoveTowardsTargetGoal {
 
 impl Goal for MoveTowardsTargetGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
-        let target = mob.get_mob_entity().get_target();
+        let target = mob.get_target();
         let Some(target) = target else {
             self.target = None;
             return false;

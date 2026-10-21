@@ -88,20 +88,6 @@ const DROWNED_CONVERSION_TIME: i32 = 300;
 const NOT_CONVERTING: i32 = -1;
 
 impl ZombieEntityBase {
-    /// The looting part of vanilla `Mob.aiStep`, which every zombie runs after its own.
-    pub fn pick_up_loot(&self, mob: &dyn Mob) {
-        self.mob_entity.for_each_item_in_pickup_reach(|item| {
-            let stack = item
-                .get_item_stack()
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .clone();
-            if mob.mob_wants_to_pick_up(&stack) {
-                crate::entity::mob::equipment::pick_up_item(mob, item, stack);
-            }
-        });
-    }
-
     /// Vanilla `Zombie.canHoldItem`: a baby riding something won't take eggs.
     #[must_use]
     pub fn can_hold_item(&self, stack: &ItemStack) -> bool {
@@ -375,7 +361,7 @@ impl ZombieEntityBase {
         let living = &self.mob_entity.living_entity;
         let entity = &living.entity;
         let world = entity.world.load_full();
-        let Some(target) = self.mob_entity.get_target().or_else(|| {
+        let Some(target) = self.get_target().or_else(|| {
             cause
                 .filter(|cause| cause.get_living_entity().is_some())
                 .and_then(|cause| world.get_entity_by_id(cause.get_entity().entity_id))
@@ -579,7 +565,7 @@ impl ZombieEntityBase {
             self.set_can_break_doors(can_break_doors, mob);
             if !conversion {
                 mob.populate_default_equipment_slots(world, &difficulty);
-                mob.populate_default_equipment_enchantments(&difficulty);
+                mob.populate_default_equipment_enchantments(world, &difficulty);
             }
         }
 
@@ -899,44 +885,7 @@ impl Mob for ZombieEntityBase {
         world: &Arc<World>,
         difficulty: &RegionalDifficulty,
     ) {
-        // Default armor slots (super.populateDefaultEquipmentSlots), on `level.getRandom()`.
-        if level_random(world).next_f32()
-            < MobEntity::MAX_WEARING_ARMOR_CHANCE * difficulty.special_multiplier
-        {
-            let mut armor_type = level_random(world).next_bounded_i32(3);
-            for _ in 1..=3 {
-                if level_random(world).next_f32() < MobEntity::WEARING_ARMOR_UPGRADE_MATERIAL_CHANCE
-                {
-                    armor_type += 1;
-                }
-            }
-
-            let partial_chance = if difficulty.base_difficulty == Difficulty::Hard {
-                0.1f32
-            } else {
-                0.25f32
-            };
-
-            let living = &self.mob_entity.living_entity;
-            let mut equipment = living
-                .entity_equipment
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            let mut first = true;
-
-            for slot in &MobEntity::EQUIPMENT_POPULATION_ORDER {
-                let current = equipment.get(slot);
-                if !first && level_random(world).next_f32() < partial_chance {
-                    break;
-                }
-                first = false;
-                if current.is_empty()
-                    && let Some(item) = MobEntity::get_equipment_for_slot(slot, armor_type)
-                {
-                    equipment.put(slot, ItemStack::new(1, item));
-                }
-            }
-        }
+        crate::entity::mob::populate_default_armor(self, world, difficulty);
 
         let weapon_chance = if difficulty.base_difficulty == Difficulty::Hard {
             0.05f32
@@ -1032,10 +981,6 @@ macro_rules! impl_zombie_mob {
 
         fn can_hold_item(&self, stack: &pumpkin_data::item_stack::ItemStack) -> bool {
             self.$field.can_hold_item(stack)
-        }
-
-        fn ai_step_end(&self, _caller: &dyn $crate::entity::EntityBase) {
-            self.$field.pick_up_loot(self);
         }
     };
 }

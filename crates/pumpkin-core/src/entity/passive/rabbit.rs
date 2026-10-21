@@ -402,6 +402,18 @@ impl Animal for RabbitEntity {
 const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::RABBIT_BABY_DIMENSIONS;
 
 impl Mob for RabbitEntity {
+    /// Vanilla `Rabbit.playAttackSound`: only the killer bunny, with a voice pitch drawn even
+    /// when it is silent.
+    fn play_attack_sound(&self) {
+        if self.get_variant() == RabbitVariant::Evil {
+            let pitch = {
+                let mut random = self.get_entity().random();
+                (random.next_f32() - random.next_f32()) * 0.2 + 1.0
+            };
+            self.play_sound_at_self(pumpkin_data::sound::Sound::EntityRabbitAttack, 1.0, pitch);
+        }
+    }
+
     /// Vanilla `Rabbit.getDefaultDimensions`.
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
         let entity = self.get_entity();
@@ -469,7 +481,7 @@ impl Mob for RabbitEntity {
 
             if self.get_variant() == RabbitVariant::Evil
                 && self.jump_delay_ticks.load(Ordering::Relaxed) == 0
-                && let Some(target) = self.mob_entity.get_target()
+                && let Some(target) = self.get_target()
             {
                 let target_pos = target.get_entity().pos.load();
                 if entity.pos.load().squared_distance_to_vec(&target_pos) < 16.0 {

@@ -183,6 +183,15 @@ impl Mob for PiglinBruteEntity {
         &self.mob_entity
     }
 
+    /// Vanilla `PiglinBrute.wantsToPickUp`: only golden axes.
+    fn wants_to_pick_up(
+        &self,
+        _brain: &crate::entity::ai::brain::Brain,
+        stack: &pumpkin_data::item_stack::ItemStack,
+    ) -> bool {
+        stack.item == &pumpkin_data::item::Item::GOLDEN_AXE && self.can_hold_item(stack)
+    }
+
     /// Vanilla `AbstractPiglin.playAmbientSound`: only while idle.
     fn play_ambient_sound(&self) {
         if self
@@ -212,10 +221,12 @@ impl Mob for PiglinBruteEntity {
         if time_in_overworld > 0 {
             nbt.put_int("TimeInOverworld", time_in_overworld);
         }
-        nbt.put_bool("CanPickUpLoot", true);
     }
 
     fn mob_read_nbt(&self, nbt: &NbtCompound) {
+        // Vanilla `AbstractPiglin.readAdditionalSaveData`: piglins pick up loot by default.
+        self.mob_entity
+            .set_can_pick_up_loot(nbt.get_bool("CanPickUpLoot").unwrap_or(true));
         if let Some(immune) = nbt.get_bool("IsImmuneToZombification") {
             self.set_immune_to_zombification(immune);
         }

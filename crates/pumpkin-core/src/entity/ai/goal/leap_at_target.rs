@@ -43,7 +43,7 @@ impl Goal for LeapAtTargetGoal {
         }
 
         // Vanilla keeps the target even when the leap is refused.
-        self.target = mob_entity.get_target();
+        self.target = mob.get_target();
         let Some(target) = &self.target else {
             return false;
         };

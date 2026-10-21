@@ -80,7 +80,12 @@ impl ItemBehaviour for ShearsItem {
         }
     }
 
-    fn use_on_entity(&self, _item: &mut ItemStack, player: &Player, entity: Arc<dyn EntityBase>) {
+    fn use_on_entity(
+        &self,
+        _item: &mut ItemStack,
+        player: &Player,
+        entity: Arc<dyn EntityBase>,
+    ) -> bool {
         if let Some(sheep) = entity
             .cast_any()
             .downcast_ref::<crate::entity::passive::sheep::SheepEntity>()
@@ -97,7 +102,7 @@ impl ItemBehaviour for ShearsItem {
                 };
                 server.plugin_manager.fire_blocking(&server, &mut event);
                 if event.cancelled {
-                    return;
+                    return false;
                 }
             }
             sheep.set_sheared(true);
@@ -113,7 +118,9 @@ impl ItemBehaviour for ShearsItem {
             ));
             world.spawn_entity(item_entity);
             player.damage_held_item(1);
+            return true;
         }
+        false
     }
 
     fn as_any(&self) -> &dyn Any {

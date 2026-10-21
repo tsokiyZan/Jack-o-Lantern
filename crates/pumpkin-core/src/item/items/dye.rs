@@ -25,7 +25,12 @@ impl ItemMetadata for DyeItem {
 }
 
 impl ItemBehaviour for DyeItem {
-    fn use_on_entity(&self, item: &mut ItemStack, player: &Player, entity: Arc<dyn EntityBase>) {
+    fn use_on_entity(
+        &self,
+        item: &mut ItemStack,
+        player: &Player,
+        entity: Arc<dyn EntityBase>,
+    ) -> bool {
         if let Some(sheep) = entity
             .cast_any()
             .downcast_ref::<crate::entity::passive::sheep::SheepEntity>()
@@ -43,6 +48,7 @@ impl ItemBehaviour for DyeItem {
                 &ent.pos.load(),
             );
             item.decrement_unless_creative(player.gamemode.load(), 1);
+            true
         } else if let Some(cushion) = entity
             .cast_any()
             .downcast_ref::<crate::entity::decoration::cushion::CushionEntity>(
@@ -59,6 +65,9 @@ impl ItemBehaviour for DyeItem {
                 &ent.pos.load(),
             );
             item.decrement_unless_creative(player.gamemode.load(), 1);
+            true
+        } else {
+            false
         }
     }
 

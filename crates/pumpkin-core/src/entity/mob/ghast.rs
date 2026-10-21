@@ -177,7 +177,7 @@ pub fn face_movement_direction(mob: &dyn Mob) {
     let mob_entity = mob.get_mob_entity();
     let entity = &mob_entity.living_entity.entity;
     let pos = entity.pos.load();
-    let y_rot = if let Some(target) = mob_entity.get_target() {
+    let y_rot = if let Some(target) = mob.get_target() {
         let target_pos = target.get_entity().pos.load();
         if target_pos.squared_distance_to_vec(&pos) >= MAX_TARGET_DISTANCE_SQ {
             return;
@@ -397,7 +397,7 @@ fn as_ghast(mob: &dyn Mob) -> Option<&GhastEntity> {
 
 impl Goal for GhastShootFireballGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
-        mob.get_mob_entity().get_target().is_some()
+        mob.get_target().is_some()
     }
 
     fn start(&mut self, _mob: &dyn Mob) {
@@ -418,7 +418,7 @@ impl Goal for GhastShootFireballGoal {
         let Some(ghast) = as_ghast(mob) else {
             return;
         };
-        let Some(target) = ghast.mob_entity.get_target() else {
+        let Some(target) = ghast.get_target() else {
             return;
         };
 

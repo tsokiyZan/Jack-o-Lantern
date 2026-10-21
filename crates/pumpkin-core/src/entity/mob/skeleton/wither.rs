@@ -77,10 +77,27 @@ impl Mob for WitherSkeletonEntity {
             );
     }
 
-    fn populate_default_equipment_enchantments(&self, _difficulty: &RegionalDifficulty) {}
+    fn populate_default_equipment_enchantments(
+        &self,
+        _world: &Arc<World>,
+        _difficulty: &RegionalDifficulty,
+    ) {
+    }
 
-    fn ai_step_end(&self, _caller: &dyn EntityBase) {
-        self.entity.pick_up_loot(self);
+    fn wants_to_pick_up(
+        &self,
+        _brain: &crate::entity::ai::brain::Brain,
+        stack: &pumpkin_data::item_stack::ItemStack,
+    ) -> bool {
+        super::wants_to_pick_up(self, stack)
+    }
+
+    /// Vanilla `WitherSkeleton.canHoldItem`: not the weapons it dislikes.
+    fn can_hold_item(&self, stack: &pumpkin_data::item_stack::ItemStack) -> bool {
+        !pumpkin_data::tag::Taggable::has_tag(
+            stack.item,
+            &pumpkin_data::tag::Item::MINECRAFT_WITHER_SKELETON_DISLIKED_WEAPONS,
+        )
     }
 
     /// Vanilla `WitherSkeleton.doHurtTarget`: a hit that lands withers the target.

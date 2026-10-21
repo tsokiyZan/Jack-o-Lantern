@@ -191,7 +191,7 @@ impl SkeletonEntityBase {
         let living = &mob_entity.living_entity;
         let difficulty = RegionalDifficulty::at(world, living.entity.pos.load());
         mob.populate_default_equipment_slots(world, &difficulty);
-        mob.populate_default_equipment_enchantments(&difficulty);
+        mob.populate_default_equipment_enchantments(world, &difficulty);
         self.reassess_weapon_goal(mob);
         // `level.getRandom()`.
         let roll = || {
@@ -229,34 +229,11 @@ impl SkeletonEntityBase {
         living.apply_current_equipment_attribute_modifiers();
         group_data
     }
-
-    /// The looting part of vanilla `Mob.aiStep`, with `AbstractSkeleton.wantsToPickUp`.
-    pub fn pick_up_loot(&self, mob: &dyn Mob) {
-        let entity_type = self.mob_entity.living_entity.entity.entity_type;
-        self.mob_entity.for_each_item_in_pickup_reach(|item| {
-            let stack = item
-                .get_item_stack()
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .clone();
-            if wants_to_pick_up(entity_type, &stack) {
-                crate::entity::mob::equipment::pick_up_item(mob, item, stack);
-            }
-        });
-    }
 }
 
 /// Vanilla `AbstractSkeleton.wantsToPickUp`: anything but spears that the mob can hold.
-fn wants_to_pick_up(entity_type: &EntityType, stack: &ItemStack) -> bool {
-    !stack.item.has_tag(&tag::Item::MINECRAFT_SPEARS) && can_hold_item(entity_type, stack)
-}
-
-/// Vanilla `Mob.canHoldItem`, which `WitherSkeleton` narrows to the weapons it likes.
-fn can_hold_item(entity_type: &EntityType, stack: &ItemStack) -> bool {
-    entity_type != &EntityType::WITHER_SKELETON
-        || !stack
-            .item
-            .has_tag(&tag::Item::MINECRAFT_WITHER_SKELETON_DISLIKED_WEAPONS)
+pub fn wants_to_pick_up(mob: &dyn Mob, stack: &ItemStack) -> bool {
+    !stack.item.has_tag(&tag::Item::MINECRAFT_SPEARS) && mob.can_hold_item(stack)
 }
 
 /// Vanilla `AbstractSkeleton.getHardAttackInterval`, which bogged and parched raise.
@@ -325,48 +302,7 @@ impl Mob for SkeletonEntityBase {
         world: &Arc<World>,
         difficulty: &RegionalDifficulty,
     ) {
-        // `super.populateDefaultEquipmentSlots`: the `Mob` armor roll, on `level.getRandom()`.
-        let random = || {
-            world
-                .random
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-        };
-        if random().next_f32() < MobEntity::MAX_WEARING_ARMOR_CHANCE * difficulty.special_multiplier
-        {
-            let mut armor_type = random().next_bounded_i32(3);
-            for _ in 1..=3 {
-                if random().next_f32() < MobEntity::WEARING_ARMOR_UPGRADE_MATERIAL_CHANCE {
-                    armor_type += 1;
-                }
-            }
-
-            let partial_chance = if difficulty.base_difficulty == Difficulty::Hard {
-                0.1f32
-            } else {
-                0.25f32
-            };
-
-            let living = &self.mob_entity.living_entity;
-            let mut equipment = living
-                .entity_equipment
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            let mut first = true;
-
-            for slot in &MobEntity::EQUIPMENT_POPULATION_ORDER {
-                let current = equipment.get(slot);
-                if !first && random().next_f32() < partial_chance {
-                    break;
-                }
-                first = false;
-                if current.is_empty()
-                    && let Some(item) = MobEntity::get_equipment_for_slot(slot, armor_type)
-                {
-                    equipment.put(slot, ItemStack::new(1, item));
-                }
-            }
-        }
+        crate::entity::mob::populate_default_armor(self, world, difficulty);
 
         let living = &self.mob_entity.living_entity;
         let mut equipment = living

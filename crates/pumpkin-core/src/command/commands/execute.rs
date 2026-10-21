@@ -338,7 +338,7 @@ fn execute_on_target_modifier(
     let mut sources = Vec::new();
     if let Some(ref entity) = context.source.entity {
         if let Some(mob) = entity.get_mob() {
-            if let Some(target) = mob.get_mob_entity().get_target() {
+            if let Some(target) = mob.get_target() {
                 let mut source = context.source.as_ref().clone();
                 let name = target.get_name().get_text();
                 let display_name = target.get_display_name();

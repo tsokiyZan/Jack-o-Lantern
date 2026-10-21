@@ -118,7 +118,7 @@ impl Goal for TeleportTowardsPlayerGoal {
             if dist_sq > follow_range * follow_range {
                 return false;
             }
-            let needs_reset = mob_entity.get_target().is_none();
+            let needs_reset = mob.get_target().is_none();
             if needs_reset {
                 mob.set_mob_target(Some(target.clone()));
             }
@@ -135,7 +135,7 @@ impl Goal for TeleportTowardsPlayerGoal {
     }
 
     fn tick(&mut self, mob: &dyn Mob) {
-        let external_target = mob.get_mob_entity().get_target().clone();
+        let external_target = mob.get_target().clone();
         if external_target.is_none()
             && self.target_player.is_none()
             && self.committed_target.is_none()

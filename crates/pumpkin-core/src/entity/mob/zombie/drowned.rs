@@ -98,15 +98,12 @@ impl DrownedEntity {
         goal_selector.add_goal(
             2,
             ZombieAttackGoal::new(1.0, false).gated_by(|mob| {
-                mob.get_mob_entity()
-                    .get_target()
-                    .as_deref()
-                    .is_some_and(|target| {
-                        let world = mob.get_entity().world.load();
-                        target
-                            .get_living_entity()
-                            .is_some_and(|target| ok_target(target, &world))
-                    })
+                mob.get_target().as_deref().is_some_and(|target| {
+                    let world = mob.get_entity().world.load();
+                    target
+                        .get_living_entity()
+                        .is_some_and(|target| ok_target(target, &world))
+                })
             }),
         );
         goal_selector.add_goal(5, DrownedGoToBeachGoal::new(1.0));
@@ -157,8 +154,6 @@ impl DrownedEntity {
     fn wants_to_swim(&self) -> bool {
         self.is_searching_for_land()
             || self
-                .entity
-                .mob_entity
                 .get_target()
                 .is_some_and(|target| target.get_entity().is_in_water())
     }
@@ -209,7 +204,11 @@ const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::DROWN
 
 impl Mob for DrownedEntity {
     /// Vanilla `Drowned.wantsToPickUp`: never spears.
-    fn mob_wants_to_pick_up(&self, stack: &ItemStack) -> bool {
+    fn wants_to_pick_up(
+        &self,
+        _brain: &crate::entity::ai::brain::Brain,
+        stack: &pumpkin_data::item_stack::ItemStack,
+    ) -> bool {
         !stack
             .item
             .has_tag(&pumpkin_data::tag::Item::MINECRAFT_SPEARS)
@@ -501,7 +500,7 @@ impl MoveControlTrait for DrownedMoveControl {
         let entity = &living.entity;
         if drowned.wants_to_swim() && entity.is_in_water() {
             let y = entity.pos.load().y;
-            if mob_entity
+            if mob
                 .get_target()
                 .is_some_and(|target| target.get_entity().pos.load().y > y)
                 || drowned.is_searching_for_land()

@@ -181,7 +181,7 @@ impl WitchEntity {
                 } else {
                     &Potion::REGENERATION
                 };
-                self.mob_entity.set_target(None);
+                self.set_mob_target(None);
             } else if dist >= 8.0 && !target_living.has_effect(&StatusEffect::SLOWNESS) {
                 potion = &Potion::SLOWNESS;
             } else if target_living.health.load() >= 8.0
@@ -326,7 +326,7 @@ impl Mob for WitchEntity {
             } else if roll() < 0.05 && living.health.load() < living.get_max_health() {
                 potion = Some(&Potion::HEALING);
             } else if roll() < 0.5
-                && let Some(target) = self.mob_entity.get_target()
+                && let Some(target) = self.get_target()
                 && !living.has_effect(&StatusEffect::SPEED)
             {
                 let target_pos = target.get_entity().pos.load();
