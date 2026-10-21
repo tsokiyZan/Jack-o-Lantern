@@ -4314,12 +4314,15 @@ impl LivingEntity {
         let world = self.entity.world.load();
         let fall_location = FallLocation::get_current_fall_location(self, &world);
         let fall_distance = self.entity.fall_distance.load();
-        self.combat_tracker
+        // `recordDamage` starts with `recheckStatus`, which may leave combat.
+        self.recheck_combat_status();
+        let entered_combat = self
+            .combat_tracker
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .record_damage(
                 i64::from(self.entity.tick_count.load(Relaxed)),
-                self.health.load() > 0.0 && !self.dead.load(Relaxed),
+                self.is_alive(),
                 fall_distance,
                 fall_location,
                 damage_source.damage_type,
@@ -4327,6 +4330,28 @@ impl LivingEntity {
                 damage_source.direct,
                 damage_source.causing,
             );
+        // `ServerPlayer.onEnterCombat`.
+        if entered_combat && let Some(player) = self.self_player() {
+            player.try_send_client_packet(&pumpkin_protocol::java::client::play::CCombatEnter);
+        }
+    }
+
+    /// Vanilla `CombatTracker.recheckStatus`, with `ServerPlayer.onLeaveCombat`.
+    fn recheck_combat_status(&self) {
+        let tick_count = i64::from(self.entity.tick_count.load(Relaxed));
+        let mut tracker = self
+            .combat_tracker
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if tracker.recheck_status(tick_count, self.is_alive()) {
+            let duration = tracker.get_combat_duration(tick_count);
+            drop(tracker);
+            if let Some(player) = self.self_player() {
+                player.try_send_client_packet(
+                    &pumpkin_protocol::java::client::play::CCombatEnd::new(VarInt(duration as i32)),
+                );
+            }
+        }
     }
 
     /// Vanilla `playSecondaryHurtSound`: thorns sting.
@@ -4830,13 +4855,7 @@ impl EntityBase for LivingEntity {
         self.updating_using_item(caller, server);
         self.tick_arrows_and_stingers();
         if self.entity.tick_count.load(Relaxed) % 20 == 0 {
-            self.combat_tracker
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .recheck_status(
-                    i64::from(self.entity.tick_count.load(Relaxed)),
-                    self.health.load() > 0.0 && !self.dead.load(Relaxed),
-                );
+            self.recheck_combat_status();
         }
         // TODO: `checkBedExists`: only players keep a bed, and the bed's own removal wakes them.
 

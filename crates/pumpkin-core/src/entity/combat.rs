@@ -70,9 +70,10 @@ pub fn handle_knockback(
     damage: f32,
     comes_from_effect: bool,
 ) {
-    let yaw = attacker.yaw.load();
-    let xd = f64::from((yaw.to_radians()).sin());
-    let zd = f64::from(-(yaw.to_radians()).cos());
+    // `Mth.sin(yRot * (float) (Math.PI / 180.0))`: the lookup table, in float.
+    let yaw = attacker.yaw.load() * (std::f64::consts::PI / 180.0) as f32;
+    let xd = f64::from(pumpkin_util::math::sin(yaw));
+    let zd = f64::from(-pumpkin_util::math::cos(yaw));
     let handled = victim.get_mob().is_some_and(|mob| {
         mob.custom_knockback(
             strength * 0.5,
@@ -103,16 +104,18 @@ pub fn handle_knockback(
 }
 
 pub fn spawn_sweep_particle(attacker_entity: &Entity, world: &World, pos: &Vector3<f64>) {
-    let yaw = attacker_entity.yaw.load();
-    let d = -f64::from((yaw.to_radians()).sin());
-    let e = f64::from((yaw.to_radians()).cos());
+    // Vanilla `doSweepAttack`: `Mth.sin`/`Mth.cos` of the yaw, also sent as the particle's
+    // offset (a count of 0 makes it a direction).
+    let yaw = attacker_entity.yaw.load() * (std::f64::consts::PI / 180.0) as f32;
+    let d = -f64::from(pumpkin_util::math::sin(yaw));
+    let e = f64::from(pumpkin_util::math::cos(yaw));
 
     let scale = 0.5;
     let body_y = f64::from(attacker_entity.height()) * scale + pos.y;
 
     world.spawn_particle(
         Vector3::new(pos.x + d, body_y, pos.z + e),
-        Vector3::new(0.0, 0.0, 0.0),
+        Vector3::new(d as f32, 0.0, e as f32),
         0.0,
         0,
         Particle::SweepAttack,
@@ -342,6 +345,7 @@ impl CombatTracker {
         Self::default()
     }
 
+    /// Vanilla `recordDamage`. Returns whether the entity entered combat (`onEnterCombat`).
     #[allow(clippy::too_many_arguments)]
     pub fn record_damage(
         &mut self,
@@ -353,7 +357,7 @@ impl CombatTracker {
         damage: f32,
         source: Option<&dyn EntityBase>,
         cause: Option<&dyn EntityBase>,
-    ) {
+    ) -> bool {
         self.recheck_status(current_tick, is_alive);
 
         let attacker = cause.or(source);
@@ -417,21 +421,27 @@ impl CombatTracker {
             self.in_combat = true;
             self.combat_start_time = current_tick;
             self.combat_end_time = self.combat_start_time;
+            return true;
         }
+        false
     }
 
-    pub fn recheck_status(&mut self, current_tick: i64, is_alive: bool) {
+    /// Vanilla `recheckStatus`. Returns whether the entity left combat (`onLeaveCombat`).
+    pub fn recheck_status(&mut self, current_tick: i64, is_alive: bool) -> bool {
         let reset = if self.in_combat {
             RESET_COMBAT_STATUS_TIME
         } else {
             RESET_DAMAGE_STATUS_TIME
         };
         if self.taking_damage && (!is_alive || current_tick - self.last_damage_time > reset) {
+            let was_in_combat = self.in_combat;
             self.taking_damage = false;
             self.in_combat = false;
             self.combat_end_time = current_tick;
             self.entries.clear();
+            return was_in_combat;
         }
+        false
     }
 
     #[must_use]
