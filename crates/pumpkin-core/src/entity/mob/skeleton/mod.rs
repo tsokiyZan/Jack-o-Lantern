@@ -11,7 +11,6 @@ use pumpkin_data::tag::{self, Taggable};
 use pumpkin_util::Difficulty;
 use pumpkin_util::random::RandomImpl;
 
-use crate::entity::item::ItemEntity;
 use crate::entity::mob::spawn::{SpawnGroupData, is_halloween};
 use crate::entity::{
     Entity, EntityBase,
@@ -29,11 +28,7 @@ use crate::entity::{
         wander_around::WanderAroundGoal,
     },
     living::LivingEntity,
-    mob::{
-        Mob, MobEntity,
-        equipment::{RegionalDifficulty, equip_item_if_possible},
-        zombie::baby_turtle_on_land_target,
-    },
+    mob::{Mob, MobEntity, equipment::RegionalDifficulty, zombie::baby_turtle_on_land_target},
 };
 use crate::world::World;
 
@@ -245,39 +240,9 @@ impl SkeletonEntityBase {
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
                 .clone();
             if wants_to_pick_up(entity_type, &stack) {
-                pick_up_item(mob, item, stack);
+                crate::entity::mob::equipment::pick_up_item(mob, item, stack);
             }
         });
-    }
-}
-
-/// Vanilla `Mob.pickUpItem`.
-fn pick_up_item(mob: &dyn Mob, item: &ItemEntity, stack: ItemStack) {
-    let equipped = equip_item_if_possible(mob, stack);
-    if equipped.is_empty() {
-        return;
-    }
-    let count = equipped.item_count;
-    // `take` tells the clients before the item goes.
-    if !mob
-        .get_mob_entity()
-        .living_entity
-        .pickup(item.get_entity(), u32::from(count))
-    {
-        return;
-    }
-    let emptied = {
-        let mut item_stack = item
-            .get_item_stack()
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        item_stack.decrement(count);
-        item_stack.is_empty()
-    };
-    if emptied {
-        item.get_entity().remove();
-    } else {
-        item.init_data_tracker();
     }
 }
 

@@ -208,6 +208,18 @@ const ZOMBIE_NAUTILUS_JOCKEY_CHANCE: f32 = 0.5;
 const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::DROWNED_BABY_DIMENSIONS;
 
 impl Mob for DrownedEntity {
+    /// Vanilla `Drowned.wantsToPickUp`: never spears.
+    fn mob_wants_to_pick_up(&self, stack: &ItemStack) -> bool {
+        !stack
+            .item
+            .has_tag(&pumpkin_data::tag::Item::MINECRAFT_SPEARS)
+            && crate::entity::mob::zombie::ZombieEntityBase::zombie_wants_to_pick_up(self, stack)
+    }
+
+    fn as_custom_sound(&self) -> Option<&dyn crate::entity::custom_sound::CustomSound> {
+        Some(self)
+    }
+
     /// Vanilla `Drowned.checkSpawnObstruction`: water doesn't obstruct it.
     fn check_spawn_obstruction(&self, world: &crate::world::World) -> bool {
         let entity = self.get_entity();
@@ -397,6 +409,26 @@ impl Mob for DrownedEntity {
     }
 }
 
+impl crate::entity::custom_sound::CustomSound for DrownedEntity {
+    /// Vanilla `Drowned.getDeathSound`.
+    fn death_sound(&self) -> Option<Sound> {
+        Some(if self.get_entity().is_in_water() {
+            Sound::EntityDrownedDeathWater
+        } else {
+            Sound::EntityDrownedDeath
+        })
+    }
+
+    /// Vanilla `Drowned.getHurtSound`.
+    fn hurt_sound(&self) -> Option<Sound> {
+        Some(if self.get_entity().is_in_water() {
+            Sound::EntityDrownedHurtWater
+        } else {
+            Sound::EntityDrownedHurt
+        })
+    }
+}
+
 impl RangedAttackMob for DrownedEntity {
     /// Vanilla `Drowned.performRangedAttack`.
     fn perform_ranged_attack(&self, target: &Arc<dyn EntityBase>, _power: f32) {
@@ -440,8 +472,9 @@ impl RangedAttackMob for DrownedEntity {
         world.spawn_entity(trident.clone());
         trident.apply_on_projectile_spawned(&trident_item);
 
+        // `playSound`'s pitch argument draws before its silent check.
+        let pitch = 1.0 / (entity.random().next_f32() * 0.4 + 0.8);
         if !entity.is_silent() {
-            let pitch = 1.0 / (entity.random().next_f32() * 0.4 + 0.8);
             world.play_sound_fine(
                 Sound::EntityDrownedShoot,
                 self.sound_source(),

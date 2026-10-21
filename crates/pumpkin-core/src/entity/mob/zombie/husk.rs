@@ -39,6 +39,11 @@ impl HuskEntity {
 const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::HUSK_BABY_DIMENSIONS;
 
 impl Mob for HuskEntity {
+    /// Vanilla `Zombie.wantsToPickUp`.
+    fn mob_wants_to_pick_up(&self, stack: &pumpkin_data::item_stack::ItemStack) -> bool {
+        crate::entity::mob::zombie::ZombieEntityBase::zombie_wants_to_pick_up(self, stack)
+    }
+
     crate::impl_zombie_mob!(entity);
 
     fn get_mob_entity(&self) -> &MobEntity {

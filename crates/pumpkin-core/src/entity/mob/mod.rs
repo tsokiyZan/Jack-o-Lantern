@@ -1787,6 +1787,16 @@ pub trait Mob: EntityBase + Send + Sync {
 
     fn on_attack(&self, _target: &dyn EntityBase) {}
 
+    /// Vanilla `Mob.canHoldItem`.
+    fn can_hold_item(&self, _stack: &ItemStack) -> bool {
+        true
+    }
+
+    /// Vanilla `Mob.wantsToPickUp`, for the loot pickup in `Mob.aiStep`.
+    fn mob_wants_to_pick_up(&self, stack: &ItemStack) -> bool {
+        self.can_hold_item(stack)
+    }
+
     /// Vanilla `doHurtTarget` as `MeleeAttackGoal` calls it.
     fn goal_do_hurt_target(&self, attacker: &dyn EntityBase, target: &dyn EntityBase) -> bool {
         self.get_mob_entity().try_attack(attacker, target)

@@ -973,3 +973,33 @@ mod tests {
         assert_eq!(stack5.get_enchantment_level(&Enchantment::SHARPNESS), 2);
     }
 }
+
+/// Vanilla `Mob.pickUpItem`.
+pub fn pick_up_item(mob: &dyn Mob, item: &crate::entity::item::ItemEntity, stack: ItemStack) {
+    let equipped = equip_item_if_possible(mob, stack);
+    if equipped.is_empty() {
+        return;
+    }
+    let count = equipped.item_count;
+    // `take` tells the clients before the item goes.
+    if !mob
+        .get_mob_entity()
+        .living_entity
+        .pickup(item.get_entity(), u32::from(count))
+    {
+        return;
+    }
+    let emptied = {
+        let mut item_stack = item
+            .get_item_stack()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        item_stack.decrement(count);
+        item_stack.is_empty()
+    };
+    if emptied {
+        item.get_entity().remove();
+    } else {
+        crate::entity::EntityBase::init_data_tracker(item);
+    }
+}
