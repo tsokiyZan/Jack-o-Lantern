@@ -40,8 +40,7 @@ use pumpkin_util::Difficulty;
 use pumpkin_util::math::boundingbox::{BoundingBox, EntityDimensions};
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
-use pumpkin_util::random::xoroshiro128::Xoroshiro;
-use pumpkin_util::random::{RandomGenerator, RandomImpl, get_seed};
+use pumpkin_util::random::RandomImpl;
 use pumpkin_util::version::JavaMinecraftVersion;
 use std::sync::Arc;
 use std::sync::atomic::Ordering::Relaxed;
@@ -895,7 +894,13 @@ impl MobEntity {
 
     pub fn is_dark_enough_to_spawn(world: &World, pos: &BlockPos, is_thundering: bool) -> bool {
         let sky_light = world.get_sky_light_level(pos);
-        if sky_light > rand::random_range(0..32) {
+        // `level.random`, passed to `checkSpawnRules`.
+        let sky_roll = world
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .next_bounded_i32(32);
+        if i32::from(sky_light) > sky_roll {
             return false;
         }
 
@@ -913,9 +918,13 @@ impl MobEntity {
             sky_light.max(block_light)
         };
 
-        // TODO
-        let mut random = RandomGenerator::Xoroshiro(Xoroshiro::from_seed(get_seed()));
-        current_brightness <= dimension.monster_spawn_light_level.get(&mut random) as u8
+        let light_limit = dimension.monster_spawn_light_level.get(
+            &mut *world
+                .random
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+        );
+        i32::from(current_brightness) <= light_limit
     }
 
     pub fn check_mob_spawn_rules(world: &World, pos: &BlockPos) -> bool {

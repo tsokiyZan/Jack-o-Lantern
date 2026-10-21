@@ -4,6 +4,7 @@ use pumpkin_data::entity::EntityType;
 use pumpkin_data::tag::Taggable;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 use uuid::Uuid;
 
 use crate::entity::boss::ender_dragon::EnderDragonEntity;
@@ -350,6 +351,16 @@ pub fn from_type(
     mob
 }
 
+/// Vanilla `level.random`, which the natural spawner passes to `checkSpawnRules`.
+fn level_random(
+    world: &World,
+) -> std::sync::MutexGuard<'_, pumpkin_util::random::legacy_rand::LegacyRand> {
+    world
+        .random
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
 #[expect(clippy::too_many_lines)]
 pub fn check_spawn_rules(
     entity_type: &'static EntityType,
@@ -431,7 +442,7 @@ pub fn check_spawn_rules(
         if world.level_info.load().difficulty == pumpkin_util::Difficulty::Peaceful {
             return false;
         }
-        if rand::random_range(0..20) != 0 {
+        if level_random(world).next_bounded_i32(20) != 0 {
             return false;
         }
         return mob::MobEntity::check_mob_spawn_rules(world, pos);
@@ -573,7 +584,7 @@ pub fn check_spawn_rules(
             && mob::MobEntity::is_bright_enough_to_spawn(world, pos);
     }
     if id == EntityType::OCELOT.id {
-        if rand::random_range(0..3) == 0 {
+        if level_random(world).next_bounded_i32(3) == 0 {
             return false;
         }
         return mob::MobEntity::check_mob_spawn_rules(world, pos);
@@ -653,28 +664,29 @@ pub fn check_spawn_rules(
             && world.get_block(&pos.up()) == &pumpkin_data::Block::WATER;
     }
     if id == EntityType::DROWNED.id {
-        if world.level_info.load().difficulty == pumpkin_util::Difficulty::Peaceful {
-            return false;
-        }
+        // Vanilla `Drowned.checkDrownedSpawnRules` for a natural spawn: the biome roll draws
+        // even when `canMonsterSpawn` is false.
         if !world
             .get_fluid(&pos.down())
             .has_tag(&pumpkin_data::tag::Fluid::MINECRAFT_WATER)
-            || !world
-                .get_fluid(pos)
-                .has_tag(&pumpkin_data::tag::Fluid::MINECRAFT_WATER)
         {
-            return false;
-        }
-        if !mob::MobEntity::is_dark_enough_to_spawn(world, pos, is_thundering) {
             return false;
         }
         let biome = world.get_zoomed_biome(pos);
+        let can_monster_spawn = world.level_info.load().difficulty
+            != pumpkin_util::Difficulty::Peaceful
+            && mob::MobEntity::is_dark_enough_to_spawn(world, pos, is_thundering)
+            && world
+                .get_fluid(pos)
+                .has_tag(&pumpkin_data::tag::Fluid::MINECRAFT_WATER);
+        let mut random = level_random(world);
         if biome.has_tag(&pumpkin_data::tag::WorldgenBiome::MINECRAFT_MORE_FREQUENT_DROWNED_SPAWNS)
         {
-            return rand::random_range(0..15) == 0;
+            return random.next_bounded_i32(15) == 0 && can_monster_spawn;
         }
-        let sea_level = world.sea_level;
-        return pos.0.y < sea_level - 5 && rand::random_range(0..40) == 0;
+        return random.next_bounded_i32(40) == 0
+            && pos.0.y < world.sea_level - 5
+            && can_monster_spawn;
     }
     if id == EntityType::GUARDIAN.id || id == EntityType::ELDER_GUARDIAN.id {
         if world.level_info.load().difficulty == pumpkin_util::Difficulty::Peaceful {
@@ -689,7 +701,7 @@ pub fn check_spawn_rules(
         {
             return false;
         }
-        return rand::random_range(0..20) == 0 || !world.can_see_sky(pos);
+        return level_random(world).next_bounded_i32(20) == 0 || !world.can_see_sky(pos);
     }
 
     // Generic mob spawn rules (Iron Golem, Snow Golem, Villager, Phantom, Shulker, Wandering Trader, Ender Dragon, etc.)

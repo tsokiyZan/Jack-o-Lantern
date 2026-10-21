@@ -42,10 +42,21 @@ impl BatEntity {
         {
             return false;
         }
-        if rand::random_bool(0.5) {
+        // `level.random`, passed to `checkSpawnRules`.
+        if world
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .next_bool()
+        {
             return false;
         }
-        if world.get_max_local_raw_brightness(pos) > rand::random_range(0..4) {
+        let light_roll = world
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .next_bounded_i32(4);
+        if i32::from(world.get_max_local_raw_brightness(pos)) > light_roll {
             return false;
         }
         let below_pos = BlockPos::new(pos.0.x, pos.0.y - 1, pos.0.z);
@@ -55,7 +66,7 @@ impl BatEntity {
         {
             return false;
         }
-        true
+        crate::entity::mob::MobEntity::check_mob_spawn_rules(world, pos)
     }
 
     #[must_use]
