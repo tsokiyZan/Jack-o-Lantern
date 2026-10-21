@@ -905,6 +905,11 @@ pub trait EntityBase: Send + Sync + std::any::Any {
         Some(passenger_box)
     }
 
+    /// Vanilla `Entity.isOnRails`.
+    fn is_on_rails(&self) -> bool {
+        false
+    }
+
     /// Vanilla `Entity.shouldPlayLavaHurtSound`.
     fn should_play_lava_hurt_sound(&self) -> bool {
         true
@@ -4096,6 +4101,25 @@ impl Entity {
         }
     }
 
+    /// Vanilla `Entity.updateSwimming`: a sprinting entity swims while under water.
+    pub fn update_swimming_base(&self) {
+        let sprinting = self.is_sprinting();
+        let passenger = self.has_vehicle();
+        if self.is_swimming() {
+            self.set_swimming(sprinting && self.is_in_water() && !passenger);
+        } else {
+            let in_water_block = sprinting
+                && self.is_under_water()
+                && !passenger
+                && self
+                    .world
+                    .load()
+                    .get_fluid(&self.block_pos.load())
+                    .has_tag(&tag::Fluid::MINECRAFT_WATER);
+            self.set_swimming(in_water_block);
+        }
+    }
+
     /// Sets whether the entity is invisible and sends updated metadata.
     pub fn set_invisible(&self, invisible: bool) {
         if self.invisible.load(Ordering::Relaxed) != invisible {
@@ -6167,6 +6191,8 @@ impl EntityBase for Entity {
         self.update_fluid_state(caller);
         if let Some(mob) = caller.get_mob() {
             mob.update_swimming();
+        } else if caller.get_player().is_none() {
+            self.update_swimming_base();
         }
 
         let fire_ticks = self.fire_ticks.load(Ordering::Relaxed);

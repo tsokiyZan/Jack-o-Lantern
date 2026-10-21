@@ -146,10 +146,12 @@ impl Entity {
             return false;
         }
         let is_climbable = is_state_climbable(block);
-        // Pumpkin has no minecarts on rails moving entities yet (`isOnRails`).
+        // `isCrouching` is the pose.
         if (self.on_ground.load(Relaxed)
             || is_climbable
-            || self.is_sneaking() && clipped_movement.y == 0.0)
+            || self.pose.load() == pumpkin_data::entity::EntityPose::Crouching
+                && clipped_movement.y == 0.0
+            || caller.is_on_rails())
             && !self.is_swimming()
         {
             if should_sound {

@@ -66,6 +66,8 @@ pub struct MinecartEntity {
     display_offset: std::sync::atomic::AtomicI32,
     /// Vanilla `AbstractMinecart.flipped`.
     flipped: std::sync::atomic::AtomicBool,
+    /// Vanilla `AbstractMinecart.onRails`.
+    on_rails: std::sync::atomic::AtomicBool,
 }
 
 enum MinecartKind {
@@ -98,6 +100,7 @@ impl MinecartEntity {
             custom_display_state: crossbeam::atomic::AtomicCell::new(None),
             display_offset: std::sync::atomic::AtomicI32::new(display_offset),
             flipped: std::sync::atomic::AtomicBool::new(false),
+            on_rails: std::sync::atomic::AtomicBool::new(false),
         }
     }
 
@@ -150,6 +153,11 @@ impl MinecartEntity {
 }
 
 impl EntityBase for MinecartEntity {
+    /// Vanilla `AbstractMinecart.isOnRails`.
+    fn is_on_rails(&self) -> bool {
+        self.on_rails.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
     /// Vanilla `AbstractMinecart.canCollideWith`.
     fn can_collide_with(&self, caller: &dyn EntityBase, other: &dyn EntityBase) -> bool {
         crate::entity::vehicle::can_vehicle_collide(caller, other)
@@ -309,6 +317,8 @@ impl EntityBase for MinecartEntity {
                 is_on_rails = true;
             }
         }
+        self.on_rails
+            .store(is_on_rails, std::sync::atomic::Ordering::Relaxed);
 
         if is_powered_rail || is_activator_rail {
             let props = PoweredRailLikeProperties::from_state_id(state_id);

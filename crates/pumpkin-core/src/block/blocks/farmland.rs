@@ -16,6 +16,7 @@ use pumpkin_macros::pumpkin_block;
 use pumpkin_util::math::boundingbox::BoundingBox;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 use pumpkin_world::tick::TickPriority;
 use pumpkin_world::world::BlockAccessor;
 use pumpkin_world::world::BlockFlags;
@@ -32,9 +33,13 @@ impl BlockBehaviour for FarmlandBlock {
 
     /// Vanilla `FarmlandBlock.fallOn`: a heavy enough landing tramples the farmland.
     fn fall_on(&self, args: FallOnArgs<'_>) {
-        if f64::from(rand::random::<f32>()) < args.fall_distance - 0.5
-            && args.entity.get_living_entity().is_some()
-        {
+        let roll = args
+            .world
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .next_f32();
+        if f64::from(roll) < args.fall_distance - 0.5 && args.entity.get_living_entity().is_some() {
             let can_trample = args.entity.get_player().map_or_else(
                 || args.world.level_info.load().game_rules.mob_griefing,
                 |player| !args.world.is_in_spawn_protection(player, args.position),

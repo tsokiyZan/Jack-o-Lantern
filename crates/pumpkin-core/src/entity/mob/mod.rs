@@ -2236,9 +2236,10 @@ pub trait Mob: EntityBase + Send + Sync {
         true
     }
 
-    /// Vanilla `Entity.updateSwimming`, run right after the fluid update. Only the
-    /// drowned's override is ported for mobs.
-    fn update_swimming(&self) {}
+    /// Vanilla `Entity.updateSwimming`, run right after the fluid update.
+    fn update_swimming(&self) {
+        self.get_entity().update_swimming_base();
+    }
 
     /// Builds this mob's brain from its saved memories; goal mobs keep the brain-dead default.
     fn make_brain(&self, _packed: &PackedMemories) -> Brain {
