@@ -9,6 +9,9 @@ use xoroshiro128::{Xoroshiro, XoroshiroSplitter};
 
 mod gaussian;
 pub mod legacy_rand;
+#[doc(hidden)]
+pub mod trace;
+pub mod weighted;
 pub mod worldgen_random;
 pub mod xoroshiro128;
 

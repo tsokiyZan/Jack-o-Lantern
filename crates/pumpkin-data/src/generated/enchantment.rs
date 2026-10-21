@@ -3962,12 +3962,12 @@ impl Enchantment {
     pub fn can_enchant(&self, item: &'static Item) -> bool {
         self.supported_items.1.contains(&item.id)
     }
+    #[doc = r" Vanilla `Enchantment.isPrimaryItem`: supported, and in the primary items when set."]
     pub fn is_primary_item(&self, item: &'static Item) -> bool {
-        if let Some(primary) = self.primary_items {
-            primary.1.contains(&item.id)
-        } else {
-            self.can_enchant(item)
-        }
+        self.can_enchant(item)
+            && self
+                .primary_items
+                .is_none_or(|primary| primary.1.contains(&item.id))
     }
     pub fn are_compatible(&self, other: &'static Enchantment) -> bool {
         if self == other {

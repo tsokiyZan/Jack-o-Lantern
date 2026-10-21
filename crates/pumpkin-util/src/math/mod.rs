@@ -131,6 +131,14 @@ pub fn approach_degrees(current: f32, target: f32, increment: f32) -> f32 {
     approach(current, current + difference, increment)
 }
 
+/// Java `Math.round(float)`: `floor(x + 0.5)` as an `int`, NaN to 0, saturating.
+///
+/// The addition is done in `f64`, where it is exact for every `f32`, so `0.49999997` rounds to 0.
+#[must_use]
+pub fn java_round_f32(value: f32) -> i32 {
+    (f64::from(value) + 0.5).floor() as i32
+}
+
 #[must_use]
 pub const fn squared_magnitude(a: f64, b: f64, c: f64) -> f64 {
     a * a + b * b + c * c
@@ -1107,5 +1115,21 @@ mod atan2_tests {
                 expected
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod java_round_tests {
+    use super::java_round_f32;
+
+    #[test]
+    fn matches_java_math_round() {
+        assert_eq!(java_round_f32(2.5), 3);
+        assert_eq!(java_round_f32(-2.5), -2);
+        assert_eq!(java_round_f32(-0.5), 0);
+        assert_eq!(java_round_f32(0.49999997), 0);
+        assert_eq!(java_round_f32(f32::NAN), 0);
+        assert_eq!(java_round_f32(3.0e10), i32::MAX);
+        assert_eq!(java_round_f32(-3.0e10), i32::MIN);
     }
 }

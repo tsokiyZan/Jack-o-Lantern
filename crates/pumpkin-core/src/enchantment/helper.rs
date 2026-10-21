@@ -11,17 +11,94 @@ use crate::entity::living::LivingEntity;
 use crate::entity::projectile::arrow::ArrowEntity;
 use crate::world::World;
 use pumpkin_data::attributes::Attributes;
-use pumpkin_data::data_component_impl::{EnchantmentsImpl, EquipmentSlot};
+use pumpkin_data::data_component_impl::{EnchantableImpl, EnchantmentsImpl, EquipmentSlot};
 use pumpkin_data::enchantment::{
     ConditionalEffect, Enchantment, EnchantmentEntityEffect, EnchantmentTarget,
     EnchantmentValueEffect,
 };
+use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::{DamageResult, ItemStack};
+use pumpkin_util::math::java_round_f32;
+use pumpkin_util::random::RandomImpl;
+use pumpkin_util::random::weighted;
 
 /// Data-driven helper for enchantment effects matching vanilla `EnchantmentHelper`.
 pub struct EnchantmentHelper;
 
 impl EnchantmentHelper {
+    /// Vanilla `EnchantmentHelper.selectEnchantment`: the enchantments (as `EnchantmentInstance`
+    /// pairs) the enchanting table, loot functions and mob equipment give a stack at `cost`.
+    pub fn select_enchantment<R: RandomImpl>(
+        random: &mut R,
+        stack: &ItemStack,
+        mut cost: i32,
+        source: &[&'static Enchantment],
+    ) -> Vec<(&'static Enchantment, i32)> {
+        let mut results = Vec::new();
+        let Some(enchantable) = stack.get_data_component::<EnchantableImpl>() else {
+            return results;
+        };
+
+        cost += 1
+            + random.next_bounded_i32(enchantable.value / 4 + 1)
+            + random.next_bounded_i32(enchantable.value / 4 + 1);
+        let random_span = (random.next_f32() + random.next_f32() - 1.0) * 0.15;
+        cost = java_round_f32(cost as f32 + cost as f32 * random_span).max(1);
+
+        let mut enchantments = Self::get_available_enchantment_results(cost, stack, source);
+        if !enchantments.is_empty() {
+            let weight = |instance: &(&'static Enchantment, i32)| instance.0.weight;
+            if let Some(picked) = weighted::get_random_item(random, &enchantments, weight) {
+                results.push(*picked);
+            }
+
+            while random.next_bounded_i32(50) <= cost {
+                if let Some(last) = results.last() {
+                    Self::filter_compatible_enchantments(&mut enchantments, last.0);
+                }
+                if enchantments.is_empty() {
+                    break;
+                }
+                if let Some(picked) = weighted::get_random_item(random, &enchantments, weight) {
+                    results.push(*picked);
+                }
+                cost /= 2;
+            }
+        }
+        results
+    }
+
+    /// Vanilla `EnchantmentHelper.filterCompatibleEnchantments`.
+    pub fn filter_compatible_enchantments(
+        enchantments: &mut Vec<(&'static Enchantment, i32)>,
+        target: &'static Enchantment,
+    ) {
+        enchantments.retain(|(enchantment, _)| target.are_compatible(enchantment));
+    }
+
+    /// Vanilla `EnchantmentHelper.getAvailableEnchantmentResults`, in `source` order.
+    #[must_use]
+    pub fn get_available_enchantment_results(
+        value: i32,
+        stack: &ItemStack,
+        source: &[&'static Enchantment],
+    ) -> Vec<(&'static Enchantment, i32)> {
+        let is_book = stack.item == &Item::BOOK;
+        source
+            .iter()
+            .filter(|enchantment| enchantment.is_primary_item(stack.item) || is_book)
+            .filter_map(|enchantment| {
+                (1..=enchantment.max_level)
+                    .rev()
+                    .find(|&level| {
+                        value >= enchantment.min_cost.calculate(level)
+                            && value <= enchantment.max_cost.calculate(level)
+                    })
+                    .map(|level| (*enchantment, level))
+            })
+            .collect()
+    }
+
     /// Iterates through enchantments on an item stack, matching vanilla `runIterationOnItem`.
     pub fn run_iteration_on_item<F>(item_stack: &ItemStack, mut visitor: F)
     where
@@ -868,8 +945,72 @@ fn location_effect_deactivated(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pumpkin_data::item::Item;
+    use pumpkin_util::random::trace::{Draw, TraceRandom};
     use std::borrow::Cow;
+
+    /// The `#minecraft:in_enchanting_table` enchantments in vanilla's resolved tag order.
+    fn enchanting_table_source() -> Vec<&'static Enchantment> {
+        pumpkin_data::tag::Enchantment::MINECRAFT_IN_ENCHANTING_TABLE
+            .1
+            .iter()
+            .filter_map(|&id| Enchantment::from_id(id as u8))
+            .collect()
+    }
+
+    #[test]
+    fn select_enchantment_draws_in_vanilla_order() {
+        let stack = ItemStack::new(1, &Item::IRON_SWORD);
+        let source = enchanting_table_source();
+        let mut random = TraceRandom::from_seed(7);
+        let picked = EnchantmentHelper::select_enchantment(&mut random, &stack, 13, &source);
+
+        // Iron swords have enchantability 14, so both draws are nextInt(14 / 4 + 1).
+        assert_eq!(
+            random.draws[..4],
+            [
+                Draw::NextIntBounded(4),
+                Draw::NextIntBounded(4),
+                Draw::NextFloat,
+                Draw::NextFloat
+            ]
+        );
+        assert!(matches!(random.draws[4], Draw::NextIntBounded(total) if total > 1));
+        assert_eq!(random.draws[5], Draw::NextIntBounded(50));
+        assert!(!picked.is_empty());
+        assert!(picked.iter().all(|(e, _)| e.is_primary_item(stack.item)));
+    }
+
+    #[test]
+    fn select_enchantment_without_enchantable_draws_nothing() {
+        let stack = ItemStack::new(1, &Item::STICK);
+        let source = enchanting_table_source();
+        let mut random = TraceRandom::from_seed(7);
+        assert!(EnchantmentHelper::select_enchantment(&mut random, &stack, 30, &source).is_empty());
+        assert!(random.draws.is_empty());
+    }
+
+    #[test]
+    fn available_results_keep_source_order_and_highest_level() {
+        let stack = ItemStack::new(1, &Item::IRON_SWORD);
+        let source = [
+            &Enchantment::SMITE,
+            &Enchantment::SHARPNESS,
+            &Enchantment::PROTECTION,
+        ];
+        // Sharpness 5 costs 45..=65, level 4 costs 34..=54.
+        let results = EnchantmentHelper::get_available_enchantment_results(45, &stack, &source);
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].0.id, Enchantment::SMITE.id);
+        assert_eq!(
+            (results[1].0.id, results[1].1),
+            (Enchantment::SHARPNESS.id, 5)
+        );
+
+        // A book takes everything in range, whatever its primary items.
+        let book = ItemStack::new(1, &Item::BOOK);
+        let results = EnchantmentHelper::get_available_enchantment_results(45, &book, &source);
+        assert_eq!(results.len(), 3);
+    }
 
     #[test]
     fn for_each_modifier_yields_efficiency_for_the_main_hand_only() {

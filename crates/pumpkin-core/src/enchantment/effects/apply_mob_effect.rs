@@ -3,6 +3,7 @@ use std::sync::Arc;
 use pumpkin_data::effect::StatusEffect;
 use pumpkin_data::enchantment::LevelBasedValue;
 use pumpkin_data::potion::Effect;
+use pumpkin_util::math::java_round_f32;
 use pumpkin_util::math::vector3::Vector3;
 
 use super::EnchantmentEntityEffectExt;
@@ -44,11 +45,6 @@ fn random_between(min: f32, max: f32) -> f32 {
     rand::random::<f32>() * (max - min) + min
 }
 
-/// Java `Math.round(float)`.
-fn java_round(value: f32) -> i32 {
-    (value + 0.5).floor() as i32
-}
-
 impl EnchantmentEntityEffectExt for ApplyMobEffect {
     fn apply(
         &self,
@@ -66,13 +62,13 @@ impl EnchantmentEntityEffectExt for ApplyMobEffect {
             return;
         }
         let selected = self.to_apply[rand::random_range(0..self.to_apply.len())];
-        let ticks = java_round(
+        let ticks = java_round_f32(
             random_between(
                 self.min_duration.calculate(enchantment_level),
                 self.max_duration.calculate(enchantment_level),
             ) * 20.0,
         );
-        let amplifier = java_round(random_between(
+        let amplifier = java_round_f32(random_between(
             self.min_amplifier.calculate(enchantment_level),
             self.max_amplifier.calculate(enchantment_level),
         ))
