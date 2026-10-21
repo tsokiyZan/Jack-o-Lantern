@@ -207,6 +207,9 @@ pub struct LivingEntity {
     /// Vanilla `lastEquipmentItems`, in `EquipmentSlot::VALUES` order: the equipment as the
     /// last `detect_equipment_updates` saw it.
     last_equipment_items: std::sync::Mutex<[ItemStack; 8]>,
+    /// Attributes changed outside `detect_equipment_updates` that vanilla only marks dirty;
+    /// the next `detect_equipment_updates` syncs them with its own.
+    pending_dirty_attributes: std::sync::Mutex<Vec<Attributes>>,
     /// Vanilla `activeLocationDependentEnchantments`: the location-changed effects active per
     /// slot, as the enchantment and the effect's index in its `location_changed` list.
     pub active_location_effects:
@@ -406,6 +409,7 @@ impl LivingEntity {
             last_equipment_items: std::sync::Mutex::new(std::array::from_fn(|_| {
                 ItemStack::EMPTY.clone()
             })),
+            pending_dirty_attributes: std::sync::Mutex::new(Vec::new()),
             active_location_effects: std::sync::Mutex::new(Vec::new()),
             breath: BreathManager::default(),
         };
@@ -446,7 +450,12 @@ impl LivingEntity {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone();
-        let mut touched = Vec::new();
+        let mut touched = std::mem::take(
+            &mut *self
+                .pending_dirty_attributes
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+        );
         if let Some(mut changed) = self.collect_equipment_changes(caller, &last, &mut touched) {
             self.handle_hand_swap(&mut changed);
             if !changed.is_empty() {
@@ -456,6 +465,17 @@ impl LivingEntity {
         // Vanilla syncs the dirty attributes later in the tick (`sendDirtyEntityData`).
         if !touched.is_empty() {
             crate::entity::attributes::send_attribute_updates_for_living(self, touched);
+        }
+    }
+
+    /// Leaves `attributes` dirty for the next `detect_equipment_updates` to sync.
+    pub fn mark_attributes_dirty(&self, attributes: &[Attributes]) {
+        let mut pending = self
+            .pending_dirty_attributes
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        for attribute in attributes {
+            push_unique_attribute(&mut pending, attribute);
         }
     }
 
@@ -649,7 +669,7 @@ impl LivingEntity {
                 let Some(base) = self.supplier_base_value(attribute) else {
                     return false;
                 };
-                entry.insert(AttributeInstance::new(base))
+                entry.insert(AttributeInstance::new(attribute, base))
             }
         };
         if !f(instance) {
@@ -928,7 +948,7 @@ impl LivingEntity {
                 );
                 attribute.default_value
             });
-            AttributeInstance::new(base)
+            AttributeInstance::new(attribute, base)
         });
 
         f(inst);
@@ -947,8 +967,10 @@ impl LivingEntity {
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         map.get(&attribute.id).map_or_else(
             || {
-                self.supplier_base_value(attribute)
-                    .unwrap_or(attribute.default_value)
+                attribute.sanitize_value(
+                    self.supplier_base_value(attribute)
+                        .unwrap_or(attribute.default_value),
+                )
             },
             AttributeInstance::value,
         )
@@ -1052,7 +1074,7 @@ impl LivingEntity {
         let Some(base) = self.supplier_base_value(attribute) else {
             return false;
         };
-        map.insert(attribute.id, AttributeInstance::new(base));
+        map.insert(attribute.id, AttributeInstance::new(attribute, base));
         true
     }
 
@@ -1100,8 +1122,7 @@ impl LivingEntity {
             inst.base_value = new_base;
             inst.dirty.store(true, Ordering::Relaxed);
         } else {
-            let ai = AttributeInstance::new(new_base);
-            ai.dirty.store(true, Ordering::Relaxed);
+            let ai = AttributeInstance::new(attribute, new_base);
             map.insert(attribute.id, ai);
         }
         drop(map);

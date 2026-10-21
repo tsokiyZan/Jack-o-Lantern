@@ -56,6 +56,8 @@ pub struct Modifier {
 /// Per-entity attribute instance used at runtime.
 #[derive(Debug)]
 pub struct AttributeInstance {
+    /// The attribute this is an instance of; its range bounds the value.
+    pub attribute: Attributes,
     pub base_value: f64,
     pub modifiers: Vec<Modifier>,
     /// Ids of the modifiers vanilla saves with the entity (`permanentModifiers`).
@@ -66,13 +68,15 @@ pub struct AttributeInstance {
 
 impl AttributeInstance {
     #[must_use]
-    pub const fn new(base_value: f64) -> Self {
+    pub fn new(attribute: &Attributes, base_value: f64) -> Self {
         Self {
+            attribute: attribute.clone(),
             base_value,
             modifiers: Vec::new(),
             permanent_modifiers: Vec::new(),
-            cached_value: AtomicU64::new(base_value.to_bits()),
-            dirty: AtomicBool::new(false),
+            cached_value: AtomicU64::new(0),
+            // Vanilla starts dirty, so the first read computes (and sanitizes) the value.
+            dirty: AtomicBool::new(true),
         }
     }
 
@@ -100,10 +104,7 @@ impl AttributeInstance {
             value *= 1.0 + amount;
         }
 
-        if value.is_nan() || value.is_infinite() {
-            value = self.base_value;
-        }
-
+        let value = self.attribute.sanitize_value(value);
         self.cached_value.store(value.to_bits(), Ordering::Relaxed);
         self.dirty.store(false, Ordering::Relaxed);
 
@@ -247,6 +248,7 @@ pub fn send_attribute_updates_for_living(
 impl Clone for AttributeInstance {
     fn clone(&self) -> Self {
         Self {
+            attribute: self.attribute.clone(),
             base_value: self.base_value,
             modifiers: self.modifiers.clone(),
             permanent_modifiers: self.permanent_modifiers.clone(),
@@ -347,7 +349,7 @@ mod tests {
 
     #[test]
     fn sprinting_modifier_calculation() {
-        let mut instance = AttributeInstance::new(0.1);
+        let mut instance = AttributeInstance::new(&Attributes::MOVEMENT_SPEED, 0.1);
         assert!((instance.value() - 0.1).abs() < f64::EPSILON);
 
         let sprinting_mod = Modifier {
@@ -365,9 +367,26 @@ mod tests {
         assert!((instance.value() - 0.1).abs() < f64::EPSILON);
     }
 
+    /// Vanilla `RangedAttribute.sanitizeValue`: Weakness can't take attack damage below 0.
+    #[test]
+    fn attribute_value_is_clamped_to_its_range() {
+        let mut instance = AttributeInstance::new(&Attributes::ATTACK_DAMAGE, 1.0);
+        instance.add_or_replace_modifier(Modifier {
+            id: "minecraft:effect.weakness".to_string(),
+            amount: -4.0,
+            operation: ModifierOperation::Add,
+        });
+        assert!(instance.value().abs() < f64::EPSILON);
+        let mut scale = AttributeInstance::new(&Attributes::SCALE, f64::NAN);
+        assert!((scale.value() - Attributes::SCALE.min_value).abs() < f64::EPSILON);
+        scale.base_value = 100.0;
+        scale.dirty.store(true, Ordering::Relaxed);
+        assert!((scale.value() - Attributes::SCALE.max_value).abs() < f64::EPSILON);
+    }
+
     #[test]
     fn attribute_modifier_operations() {
-        let mut instance = AttributeInstance::new(10.0);
+        let mut instance = AttributeInstance::new(&Attributes::ATTACK_DAMAGE, 10.0);
 
         // ADD: 10.0 + 2.0 + 3.0 = 15.0
         instance.add_or_replace_modifier(Modifier {

@@ -4572,6 +4572,9 @@ impl World {
                 .entity_tracker
                 .repair_respawned_player(player, &target_world);
         }
+        // Vanilla respawns a fresh `ServerPlayer` with an empty `lastEquipmentItems`: after
+        // `CRespawn` and the re-add, the next tick sends its equipment and modifiers again.
+        player.living_entity.clear_last_equipment_items();
 
         // Load chunks and send world info FIRST (before teleport packet)
         target_world.send_world_info(player);

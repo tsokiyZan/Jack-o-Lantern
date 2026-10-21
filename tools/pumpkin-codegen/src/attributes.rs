@@ -15,11 +15,21 @@ struct Attributes {
     default_value: f64,
 }
 
+/// `RangedAttribute` bounds from `attribute_ranges.json` (`tools/vanilla-dump/AttributeRanges.java`).
+#[derive(Deserialize)]
+struct AttributeRange {
+    min_value: f64,
+    max_value: f64,
+}
+
 /// Generates the `TokenStream` for the `Attributes` struct and its associated constants.
 pub fn build() -> TokenStream {
     let attributes: BTreeMap<String, Attributes> =
         serde_json::from_str(&fs::read_to_string("../../assets/attributes.json").unwrap())
             .expect("Failed to parse attributes.json");
+    let ranges: BTreeMap<String, AttributeRange> =
+        serde_json::from_str(&fs::read_to_string("../../assets/attribute_ranges.json").unwrap())
+            .expect("Failed to parse attribute_ranges.json");
 
     let mut sorted_attributes: Vec<(String, Attributes)> = attributes.into_iter().collect();
     sorted_attributes.sort_by_key(|(_, raw)| raw.id);
@@ -34,11 +44,18 @@ pub fn build() -> TokenStream {
         let id_lit = LitInt::new(&raw_value.id.to_string(), Span::call_site());
         let default_value_lit = raw_value.default_value;
         let name_str = format!("minecraft:{raw_name}");
+        let range = ranges
+            .get(&raw_name)
+            .unwrap_or_else(|| panic!("No range for attribute {raw_name}"));
+        let min_value_lit = range.min_value;
+        let max_value_lit = range.max_value;
 
         constant_defs.push(quote!(
             pub const #constant_ident: Self = Self {
                 id: #id_lit,
                 default_value: #default_value_lit,
+                min_value: #min_value_lit,
+                max_value: #max_value_lit,
                 name: #name_str,
             };
         ));
@@ -51,6 +68,10 @@ pub fn build() -> TokenStream {
         pub struct Attributes {
             pub id: u8,
             pub default_value: f64,
+            /// Vanilla `RangedAttribute.minValue`.
+            pub min_value: f64,
+            /// Vanilla `RangedAttribute.maxValue`.
+            pub max_value: f64,
             pub name: &'static str,
         }
         impl PartialEq for Attributes {
@@ -66,6 +87,17 @@ pub fn build() -> TokenStream {
         }
         impl Attributes {
             #(#constant_defs)*
+
+            /// Vanilla `RangedAttribute.sanitizeValue`: NaN becomes the minimum, anything else
+            /// is clamped to the range.
+            #[must_use]
+            pub fn sanitize_value(&self, value: f64) -> f64 {
+                if value.is_nan() {
+                    self.min_value
+                } else {
+                    value.clamp(self.min_value, self.max_value)
+                }
+            }
 
             pub const ALL: &'static [Self] = &[
                 #(Self::#constant_idents),*

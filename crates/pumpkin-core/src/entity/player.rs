@@ -1423,8 +1423,7 @@ impl Player {
         };
         self.last_attacked_ticks.store(0, Ordering::Relaxed);
 
-        // Only reduce attack damage if in cooldown
-        // TODO: Enchantments are reduced in the same way, just without the square.
+        // Vanilla `baseDamageScaleFactor`.
         if attack_cooldown_progress < 1.0 {
             damage_multiplier = attack_cooldown_progress.powi(2) * 0.8 + 0.2;
         }
@@ -1433,6 +1432,10 @@ impl Player {
         // Weakness are already in `ATTACK_DAMAGE` through their attribute modifiers.
         let mut damage = base_damage * damage_multiplier;
         let magic_boost = extra_ench_damage * attack_cooldown_progress;
+        // Vanilla skips the whole hit (and its no-damage sound) when neither part is positive.
+        if damage <= 0.0 && magic_boost <= 0.0 {
+            return;
+        }
 
         let pos = victim_entity.pos.load();
         let attack_type = AttackType::new(self, attack_cooldown_progress as f32);
@@ -1452,7 +1455,7 @@ impl Player {
         if matches!(attack_type, AttackType::Critical) {
             damage *= 1.5;
         }
-        let total_damage = (damage + magic_boost).max(0.0);
+        let total_damage = damage + magic_boost;
 
         let old_living_entity_health = victim
             .get_living_entity()
@@ -4932,9 +4935,6 @@ impl Player {
     pub async fn respawn(self: &Arc<Self>) {
         // Vanilla `PlayerList.respawn` removes the dead player with `RemovalReason.KILLED`.
         self.living_entity.trigger_on_death_mob_effects();
-        // Vanilla makes a fresh `ServerPlayer` with an empty `lastEquipmentItems`, so the next
-        // tick sends the equipment and its attribute modifiers again.
-        self.living_entity.clear_last_equipment_items();
         self.world().respawn_player(self, false).await;
     }
 
