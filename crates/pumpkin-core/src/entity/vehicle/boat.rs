@@ -217,8 +217,13 @@ impl EntityBase for BoatEntity {
     }
 
     /// Vanilla `AbstractBoat.canBeCollidedWith`.
-    fn is_collidable(&self, _entity: Option<Box<dyn EntityBase>>) -> bool {
+    fn is_collidable(&self, _entity: Option<&dyn EntityBase>) -> bool {
         true
+    }
+
+    /// Vanilla `AbstractBoat.canCollideWith` (`canVehicleCollide`).
+    fn can_collide_with(&self, caller: &dyn EntityBase, other: &dyn EntityBase) -> bool {
+        crate::entity::vehicle::can_vehicle_collide(caller, other)
     }
 
     fn damage_with_context(

@@ -2907,8 +2907,8 @@ impl<T: Mob + Send + 'static> EntityBase for T {
         self.post_tick();
     }
 
-    fn is_collidable(&self, entity: Option<Box<dyn EntityBase>>) -> bool {
-        self.mob_can_be_collided_with(entity.as_deref())
+    fn is_collidable(&self, entity: Option<&dyn EntityBase>) -> bool {
+        self.mob_can_be_collided_with(entity)
     }
 
     fn kill(&self, caller: &dyn EntityBase) {

@@ -2567,6 +2567,28 @@ impl World {
         self.is_space_empty(bounding_box) && self.no_entity_collision(&bounding_box)
     }
 
+    /// Vanilla `CollisionGetter.getEntityCollisions(source, box)`: the boxes of the entities
+    /// `source` can't pass through.
+    pub fn get_entity_collisions(
+        &self,
+        source: &dyn EntityBase,
+        bounding_box: BoundingBox,
+    ) -> Vec<BoundingBox> {
+        if bounding_box.get_average_side_length() < 1.0E-7 {
+            return Vec::new();
+        }
+        let source_id = source.get_entity().entity_id;
+        self.get_all_at_box(&bounding_box.expand_all(1.0E-7))
+            .iter()
+            .filter(|entity| {
+                entity.get_entity().entity_id != source_id
+                    && !entity.is_spectator()
+                    && source.can_collide_with(source, entity.as_ref())
+            })
+            .map(|entity| entity.get_entity().bounding_box.load())
+            .collect()
+    }
+
     /// Vanilla `getEntityCollisions(null, box).isEmpty()`.
     fn no_entity_collision(&self, bounding_box: &BoundingBox) -> bool {
         if bounding_box.get_average_side_length() < 1.0E-7 {

@@ -131,6 +131,15 @@ impl WindChargeEntity {
 }
 
 impl EntityBase for WindChargeEntity {
+    /// Vanilla `AbstractWindCharge.canCollideWith`: wind charges pass through each other.
+    fn can_collide_with(&self, caller: &dyn EntityBase, other: &dyn EntityBase) -> bool {
+        let other_type = other.get_entity().entity_type;
+        other_type != &pumpkin_data::entity::EntityType::WIND_CHARGE
+            && other_type != &pumpkin_data::entity::EntityType::BREEZE_WIND_CHARGE
+            && other.is_collidable(Some(caller))
+            && caller.get_entity().root_vehicle_id() != other.get_entity().root_vehicle_id()
+    }
+
     /// Vanilla `Projectile.isPickable`: only redirectable projectiles.
     fn can_hit(&self) -> bool {
         self.get_entity()

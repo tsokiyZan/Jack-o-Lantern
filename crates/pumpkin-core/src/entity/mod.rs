@@ -548,8 +548,14 @@ pub trait EntityBase: Send + Sync + std::any::Any {
     }
 
     /// Vanilla `canBeCollidedWith`: whether other movement treats this entity as solid.
-    fn is_collidable(&self, _entity: Option<Box<dyn EntityBase>>) -> bool {
+    fn is_collidable(&self, _entity: Option<&dyn EntityBase>) -> bool {
         false
+    }
+
+    /// Vanilla `Entity.canCollideWith`: `caller` (this entity) can't move through `other`.
+    fn can_collide_with(&self, caller: &dyn EntityBase, other: &dyn EntityBase) -> bool {
+        other.is_collidable(Some(caller))
+            && caller.get_entity().root_vehicle_id() != other.get_entity().root_vehicle_id()
     }
 
     /// Vanilla `isPickable`: `false` for `Entity`, "not removed" for `LivingEntity`.
@@ -1948,12 +1954,66 @@ impl Entity {
 
     /// Stores new dimensions and rebuilds the bounding box around the current position,
     /// the core of vanilla `Entity.refreshDimensions`.
+    /// Vanilla `Entity.refreshDimensions`: a small non-player entity that grows is moved out
+    /// of the blocks it would grow into.
     pub fn apply_dimensions(&self, dimension: EntityDimensions) {
+        let old_dimension = self.entity_dimension.load();
         let position = self.pos.load();
         self.bounding_box.store(BoundingBox::new_from_pos(
             position.x, position.y, position.z, &dimension,
         ));
         self.entity_dimension.store(dimension);
+        let is_small = dimension.width <= 4.0 && dimension.height <= 4.0;
+        if !self.first_tick.load(Ordering::Relaxed)
+            && !self.no_physics.load(Ordering::Relaxed)
+            && is_small
+            && (dimension.width > old_dimension.width || dimension.height > old_dimension.height)
+            && self.entity_type != &EntityType::PLAYER
+        {
+            self.fudge_position_after_size_change(old_dimension, dimension);
+        }
+    }
+
+    /// Vanilla `Entity.fudgePositionAfterSizeChange`.
+    fn fudge_position_after_size_change(
+        &self,
+        previous: EntityDimensions,
+        new: EntityDimensions,
+    ) -> bool {
+        let world = self.world.load();
+        let Some(caller) = world.get_entity_by_id(self.entity_id) else {
+            return false;
+        };
+        let old_center = self.pos.load() + Vector3::new(0.0, f64::from(previous.height) / 2.0, 0.0);
+        let width_delta = f64::from((new.width - previous.width).max(0.0)) + 1.0E-6;
+        let height_delta = f64::from((new.height - previous.height).max(0.0)) + 1.0E-6;
+        let free_position = |allowed_height: f64, size_y: f64| {
+            // `AABB.ofSize(oldCenter, widthDelta, allowedHeight, widthDelta)`.
+            let half = Vector3::new(width_delta / 2.0, allowed_height / 2.0, width_delta / 2.0);
+            let allowed = BoundingBox::new(old_center - half, old_center + half);
+            let size = Vector3::new(f64::from(new.width), size_y, f64::from(new.width));
+            let search_area = allowed.expand(size.x, size.y, size.z);
+            let mut collisions = world.get_block_collisions(search_area, caller.as_ref()).0;
+            let border = world
+                .worldborder
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            collisions.retain(|shape| border.contains_box(shape));
+            drop(border);
+            find_free_position(allowed, &collisions, old_center, size)
+        };
+        if let Some(free) = free_position(height_delta, f64::from(new.height)) {
+            self.set_pos(free + Vector3::new(0.0, -f64::from(new.height) / 2.0, 0.0));
+            return true;
+        }
+        if new.width > previous.width
+            && new.height > previous.height
+            && let Some(free) = free_position(1.0E-6, f64::from(previous.height))
+        {
+            self.set_pos(free + Vector3::new(0.0, -f64::from(previous.height) / 2.0 + 1.0E-6, 0.0));
+            return true;
+        }
+        false
     }
 
     pub fn get_eye_height(&self) -> f64 {
@@ -2157,8 +2217,18 @@ impl Entity {
 
         let bounding_box = self.bounding_box.load();
         let world = self.world.load();
-        let (collisions, _) = world.get_block_collisions(bounding_box.stretch(movement), caller);
-        let movement_step = collide_with_shapes(movement, &bounding_box, &collisions);
+        let max_up_step = caller.max_up_step();
+        let entity_colliders = world.get_entity_collisions(
+            caller,
+            bounding_box
+                .stretch(movement)
+                .stretch(Vector3::new(0.0, f64::from(max_up_step), 0.0)),
+        );
+        let movement_step = collide_with_shapes(
+            movement,
+            &bounding_box,
+            &self.collect_colliders(caller, &entity_colliders, bounding_box.stretch(movement)),
+        );
 
         // Vanilla `Entity.collide`'s step up.
         #[expect(
@@ -2171,7 +2241,6 @@ impl Entity {
             movement.z != movement_step.z,
         );
         let on_ground_after_collision = y_collision && movement.y < 0.0;
-        let max_up_step = caller.max_up_step();
         let mut resolved = movement_step;
         if max_up_step > 0.0
             && (on_ground_after_collision || was_on_ground)
@@ -2187,7 +2256,7 @@ impl Entity {
             if !on_ground_after_collision {
                 step_up = step_up.stretch(Vector3::new(0.0, f64::from(-1.0e-5f32), 0.0));
             }
-            let (colliders, _) = world.get_block_collisions(step_up, caller);
+            let colliders = self.collect_colliders(caller, &entity_colliders, step_up);
             let candidates = collect_candidate_step_up_heights(
                 &grounded,
                 &colliders,
@@ -2225,6 +2294,29 @@ impl Entity {
         );
 
         resolved
+    }
+
+    /// Vanilla `Entity.collectCollidersIgnoringWorldBorder`: the entity colliders, the world
+    /// border when the entity is close to it, and the blocks in `bounding_box`.
+    fn collect_colliders(
+        &self,
+        caller: &dyn EntityBase,
+        entity_colliders: &[BoundingBox],
+        bounding_box: BoundingBox,
+    ) -> Vec<BoundingBox> {
+        let world = self.world.load();
+        let mut colliders = entity_colliders.to_vec();
+        let pos = self.pos.load();
+        let border = world
+            .worldborder
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if border.is_inside_close_to_border(pos.x, pos.z, &bounding_box) {
+            colliders.extend(border.collision_shapes());
+        }
+        drop(border);
+        colliders.extend(world.get_block_collisions(bounding_box, caller).0);
+        colliders
     }
 
     /// Applies knockback to the entity, following vanilla Minecraft's mechanics.
@@ -3540,6 +3632,77 @@ impl Entity {
     #[must_use]
     pub fn is_in_lava(&self) -> bool {
         !self.first_tick.load(Ordering::Relaxed) && self.touching_lava.load(Ordering::Relaxed)
+    }
+
+    /// Vanilla `Entity.handleOnAboveBubbleColumn`: the column's top pushes hard and sprays.
+    pub fn handle_on_above_bubble_column(caller: &dyn EntityBase, drag_down: bool, pos: BlockPos) {
+        let entity = caller.get_entity();
+        if caller.can_simulate_movement() {
+            let movement = entity.velocity.load();
+            let y = if drag_down {
+                (movement.y - 0.03).max(-0.9)
+            } else {
+                (movement.y + 0.1).min(1.8)
+            };
+            entity
+                .velocity
+                .store(Vector3::new(movement.x, y, movement.z));
+        }
+        Self::send_bubble_column_particles(&entity.world.load(), pos);
+    }
+
+    /// Vanilla `Entity.sendBubbleColumnParticles`, drawing from the level random.
+    fn send_bubble_column_particles(world: &World, pos: BlockPos) {
+        let (x, y, z) = (
+            f64::from(pos.0.x),
+            f64::from(pos.0.y + 1),
+            f64::from(pos.0.z),
+        );
+        for _ in 0..2 {
+            let (splash_x, splash_z, bubble_x, bubble_z) = {
+                let mut random = world
+                    .random
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                (
+                    random.next_f64(),
+                    random.next_f64(),
+                    random.next_f64(),
+                    random.next_f64(),
+                )
+            };
+            world.spawn_particles(
+                pumpkin_data::particle::Particle::Splash,
+                Vector3::new(x + splash_x, y, z + splash_z),
+                1,
+                Vector3::new(0.0, 0.0, 0.0),
+                1.0,
+            );
+            world.spawn_particles(
+                pumpkin_data::particle::Particle::Bubble,
+                Vector3::new(x + bubble_x, y, z + bubble_z),
+                1,
+                Vector3::new(0.0, 0.01, 0.0),
+                0.2,
+            );
+        }
+    }
+
+    /// Vanilla `Entity.handleOnInsideBubbleColumn`.
+    pub fn handle_on_inside_bubble_column(caller: &dyn EntityBase, drag_down: bool) {
+        let entity = caller.get_entity();
+        if caller.can_simulate_movement() {
+            let movement = entity.velocity.load();
+            let y = if drag_down {
+                (movement.y - 0.03).max(-0.3)
+            } else {
+                (movement.y + 0.06).min(0.7)
+            };
+            entity
+                .velocity
+                .store(Vector3::new(movement.x, y, movement.z));
+        }
+        entity.reset_fall_distance();
     }
 
     /// Vanilla `Entity.clearFreeze`.
@@ -6069,6 +6232,30 @@ pub fn section_iteration_key(entity: &Entity) -> (i32, u32, u32, u64) {
 mod tests {
 
     #[test]
+    fn find_free_position_steps_out_of_a_wall() {
+        use super::find_free_position;
+        use pumpkin_util::math::{boundingbox::BoundingBox, vector3::Vector3};
+        // A 1.0-wide box next to a wall block on its +x side can't have its centre past 0.5:
+        // a centre already clear stays put, one in the wall is pulled back to 0.5.
+        let center = Vector3::new(0.3, 0.5, 0.5);
+        let half = Vector3::new(0.2, 0.5e-6, 0.2);
+        let allowed = BoundingBox::new(center - half, center + half);
+        let wall = BoundingBox::new(Vector3::new(1.0, 0.0, 0.0), Vector3::new(2.0, 1.0, 1.0));
+        let free = find_free_position(allowed, &[wall], center, Vector3::new(1.0, 1.0, 1.0));
+        assert_eq!(free.map(|p| p.x), Some(0.3));
+        let free = find_free_position(
+            BoundingBox::new(
+                Vector3::new(0.4, 0.5, 0.3),
+                Vector3::new(0.6, 0.500_000_5, 0.7),
+            ),
+            &[wall],
+            Vector3::new(0.55, 0.5, 0.5),
+            Vector3::new(1.0, 1.0, 1.0),
+        );
+        assert_eq!(free.map(|p| p.x), Some(0.5));
+    }
+
+    #[test]
     fn fluid_current_impulse_like_vanilla() {
         use super::{FluidCurrent, LAVA_SLOW_FLOW_SCALE, WATER_FLOW_SCALE};
         use pumpkin_util::math::vector3::Vector3;
@@ -6431,4 +6618,65 @@ fn teleport_cross_dimension(
         new_base.add_passenger_without_event(new_entity.clone(), new_passenger);
     }
     new_entity
+}
+
+/// Vanilla `CollisionGetter.findFreePosition`'s geometry: the point of `allowed_centers` closest
+/// to `preferred_center` where a box of `size` centred there touches none of `collisions`.
+fn find_free_position(
+    allowed_centers: BoundingBox,
+    collisions: &[BoundingBox],
+    preferred_center: Vector3<f64>,
+    size: Vector3<f64>,
+) -> Option<Vector3<f64>> {
+    // `aabb.inflate(sizeX / 2, sizeY / 2, sizeZ / 2)`: where a centre would collide.
+    let expanded: Vec<BoundingBox> = collisions
+        .iter()
+        .map(|shape| shape.expand(size.x / 2.0, size.y / 2.0, size.z / 2.0))
+        .collect();
+    // `Shapes.join(allowedCenters, expandedCollisions, ONLY_FIRST)` on the grid of every
+    // box face inside the allowed box.
+    let coords = |axis: Axis| {
+        let (low, high) = (
+            allowed_centers.min.get_axis(axis),
+            allowed_centers.max.get_axis(axis),
+        );
+        let mut coords = vec![low, high];
+        for shape in &expanded {
+            for coord in [shape.min.get_axis(axis), shape.max.get_axis(axis)] {
+                if coord > low && coord < high {
+                    coords.push(coord);
+                }
+            }
+        }
+        coords.sort_by(f64::total_cmp);
+        coords.dedup();
+        coords
+    };
+    let (xs, ys, zs) = (coords(Axis::X), coords(Axis::Y), coords(Axis::Z));
+    let mut closest: Option<(Vector3<f64>, f64)> = None;
+    for x in xs.windows(2) {
+        for y in ys.windows(2) {
+            for z in zs.windows(2) {
+                let mid = Vector3::new(
+                    f64::midpoint(x[0], x[1]),
+                    f64::midpoint(y[0], y[1]),
+                    f64::midpoint(z[0], z[1]),
+                );
+                if expanded.iter().any(|shape| shape.contains(mid)) {
+                    continue;
+                }
+                // `VoxelShape.closestPointTo`: the clamped point, the first box on a tie.
+                let point = Vector3::new(
+                    preferred_center.x.clamp(x[0], x[1]),
+                    preferred_center.y.clamp(y[0], y[1]),
+                    preferred_center.z.clamp(z[0], z[1]),
+                );
+                let distance = preferred_center.squared_distance_to_vec(&point);
+                if closest.is_none_or(|(_, best)| distance < best) {
+                    closest = Some((point, distance));
+                }
+            }
+        }
+    }
+    closest.map(|(point, _)| point)
 }

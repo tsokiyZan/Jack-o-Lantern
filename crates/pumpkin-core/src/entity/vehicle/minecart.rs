@@ -150,6 +150,11 @@ impl MinecartEntity {
 }
 
 impl EntityBase for MinecartEntity {
+    /// Vanilla `AbstractMinecart.canCollideWith`.
+    fn can_collide_with(&self, caller: &dyn EntityBase, other: &dyn EntityBase) -> bool {
+        crate::entity::vehicle::can_vehicle_collide(caller, other)
+    }
+
     /// Vanilla `AbstractMinecart.getPassengerAttachmentPoint`: villagers and wandering
     /// traders sit lower, at the cart's origin.
     fn passenger_attachment_point(
