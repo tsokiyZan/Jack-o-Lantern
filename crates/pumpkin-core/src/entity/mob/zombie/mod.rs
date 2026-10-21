@@ -361,7 +361,7 @@ impl ZombieEntityBase {
         let living = &self.mob_entity.living_entity;
         let entity = &living.entity;
         let world = entity.world.load_full();
-        let Some(target) = self.mob_entity.get_target().or_else(|| {
+        let Some(target) = self.get_target().or_else(|| {
             cause
                 .filter(|cause| cause.get_living_entity().is_some())
                 .and_then(|cause| world.get_entity_by_id(cause.get_entity().entity_id))

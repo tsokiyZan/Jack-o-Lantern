@@ -910,8 +910,7 @@ impl Goal for CubeMobAttackGoal {
         let Some(cube) = self.cube.upgrade() else {
             return false;
         };
-        cube.mob_entity
-            .get_target()
+        cube.get_target()
             .is_some_and(|target| Mob::can_attack(&*cube, target.as_ref()))
     }
 
@@ -923,7 +922,7 @@ impl Goal for CubeMobAttackGoal {
         let Some(cube) = self.cube.upgrade() else {
             return false;
         };
-        let Some(target) = cube.mob_entity.get_target() else {
+        let Some(target) = cube.get_target() else {
             return false;
         };
         if !Mob::can_attack(&*cube, target.as_ref()) {
@@ -941,7 +940,7 @@ impl Goal for CubeMobAttackGoal {
         let Some(cube) = self.cube.upgrade() else {
             return;
         };
-        if let Some(target) = cube.mob_entity.get_target() {
+        if let Some(target) = cube.get_target() {
             cube.mob_entity.look_at(target.as_ref(), 10.0, 10.0);
         }
         cube.set_direction(cube.get_entity().yaw.load(), cube.can_deal_damage());
@@ -1015,7 +1014,7 @@ struct CubeMobRandomDirectionGoal {
 impl Goal for CubeMobRandomDirectionGoal {
     fn can_start(&mut self, _mob: &dyn Mob) -> bool {
         self.cube.upgrade().is_some_and(|cube| {
-            cube.mob_entity.get_target().is_none()
+            cube.get_target().is_none()
                 && (cube.get_entity().on_ground.load(Relaxed)
                     || cube.is_in_liquid()
                     || cube

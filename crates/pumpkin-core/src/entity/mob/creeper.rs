@@ -216,7 +216,7 @@ impl Mob for CreeperEntity {
     /// it can survive.
     fn get_max_fall_distance(&self) -> i32 {
         let living = &self.mob_entity.living_entity;
-        let allowed_damage = if self.mob_entity.get_target().is_none() {
+        let allowed_damage = if self.get_target().is_none() {
             0.0
         } else {
             living.health.load() - 1.0

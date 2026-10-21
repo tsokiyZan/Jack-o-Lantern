@@ -52,7 +52,7 @@ impl SpearUseGoal {
     /// Vanilla `ableToAttack`.
     fn able_to_attack(mob: &dyn Mob) -> bool {
         let mob_entity = mob.get_mob_entity();
-        mob_entity.get_target().is_some()
+        mob.get_target().is_some()
             && mob_entity
                 .get_item_slot(&pumpkin_data::data_component_impl::EquipmentSlot::MAIN_HAND)
                 .get_data_component::<KineticWeaponImpl>()
@@ -116,7 +116,7 @@ impl Goal for SpearUseGoal {
             return;
         };
         let mob_entity = mob.get_mob_entity();
-        let Some(target) = mob_entity.get_target() else {
+        let Some(target) = mob.get_target() else {
             return;
         };
         let Some(target_living) = target.get_living_entity() else {

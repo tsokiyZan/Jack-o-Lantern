@@ -231,7 +231,7 @@ impl Spell for IllusionerBlindnessSpell {
         if !base_can_use(mob, next_attack_tick) {
             return false;
         }
-        let Some(target) = mob.get_mob_entity().get_target() else {
+        let Some(target) = mob.get_target() else {
             return false;
         };
         if target.get_entity().entity_id == self.last_target_id.load(Ordering::Relaxed) {
@@ -244,14 +244,14 @@ impl Spell for IllusionerBlindnessSpell {
     }
 
     fn on_start(&mut self, mob: &dyn Mob) {
-        if let Some(target) = mob.get_mob_entity().get_target() {
+        if let Some(target) = mob.get_target() {
             self.last_target_id
                 .store(target.get_entity().entity_id, Ordering::Relaxed);
         }
     }
 
     fn perform(&mut self, mob: &dyn Mob) {
-        if let Some(target) = mob.get_mob_entity().get_target()
+        if let Some(target) = mob.get_target()
             && let Some(living) = target.get_living_entity()
         {
             living.add_effect(Effect {

@@ -174,7 +174,7 @@ impl Goal for LongDistancePatrolGoal {
             .query_daytime();
         let is_on_cooldown = game_time < self.cooldown_until;
 
-        let target = mob.get_mob_entity().get_target().clone();
+        let target = mob.get_target().clone();
         patrol.is_patrolling() && target.is_none() && patrol.has_patrol_target() && !is_on_cooldown
     }
 
@@ -182,7 +182,7 @@ impl Goal for LongDistancePatrolGoal {
         let Some(patrol) = mob.as_patrolling_monster() else {
             return false;
         };
-        let target = mob.get_mob_entity().get_target().clone();
+        let target = mob.get_target().clone();
         patrol.is_patrolling() && target.is_none() && patrol.has_patrol_target()
     }
 

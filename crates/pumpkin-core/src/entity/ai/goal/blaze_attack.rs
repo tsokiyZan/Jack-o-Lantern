@@ -43,7 +43,7 @@ impl Goal for BlazeShootFireballGoal {
         let Some(blaze) = self.blaze.upgrade() else {
             return false;
         };
-        let Some(target) = blaze.entity.get_target() else {
+        let Some(target) = blaze.get_target() else {
             return false;
         };
         target.get_entity().is_alive() && blaze.can_attack(target.as_ref())
@@ -71,7 +71,7 @@ impl Goal for BlazeShootFireballGoal {
             return;
         };
 
-        let target = blaze.entity.get_target();
+        let target = blaze.get_target();
         let Some(target) = target else {
             return;
         };

@@ -73,7 +73,6 @@ impl RangedAttackGoal {
 impl Goal for RangedAttackGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
         let Some(target) = mob
-            .get_mob_entity()
             .get_target()
             .filter(|target| target.get_entity().is_alive())
         else {

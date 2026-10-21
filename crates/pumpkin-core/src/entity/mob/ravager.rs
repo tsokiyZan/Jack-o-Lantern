@@ -225,7 +225,7 @@ impl Mob for RavagerEntity {
         if self.mob_is_immobile() {
             living.set_attribute_base(&Attributes::MOVEMENT_SPEED, 0.0);
         } else {
-            let max_speed = if self.mob_entity.get_target().is_some() {
+            let max_speed = if self.get_target().is_some() {
                 ATTACK_MOVEMENT_SPEED
             } else {
                 BASE_MOVEMENT_SPEED

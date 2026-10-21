@@ -535,8 +535,7 @@ impl WitherEntity {
 
         self.set_alternative_target(
             0,
-            self.mob_entity
-                .get_target()
+            self.get_target()
                 .map_or(0, |target| target.get_entity().entity_id),
         );
 

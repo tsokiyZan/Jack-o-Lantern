@@ -859,7 +859,9 @@ impl MobEntity {
         *t = target;
     }
 
-    pub fn get_target(&self) -> Option<Arc<dyn EntityBase>> {
+    /// Vanilla `Mob.getTargetUnchecked`: the stored target, valid or not. `Mob::get_target`
+    /// is vanilla's `getTarget`.
+    pub fn get_target_unchecked(&self) -> Option<Arc<dyn EntityBase>> {
         self.target
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -1259,7 +1261,7 @@ pub trait Mob: EntityBase + Send + Sync {
     /// has a target and health to spare.
     fn get_max_fall_distance(&self) -> i32 {
         let mob_entity = self.get_mob_entity();
-        if mob_entity.get_target().is_none() {
+        if self.get_target().is_none() {
             return LivingEntity::get_comfortable_fall_distance(0.0);
         }
 
@@ -2297,6 +2299,12 @@ pub trait Mob: EntityBase + Send + Sync {
     /// Vanilla `LivingEntity.onEquipItem`: an equipment slot changed. Skeletons re-pick their
     /// weapon goal here.
     fn on_equip_item(&self, _slot: &EquipmentSlot) {}
+
+    /// Vanilla `Mob.getTarget`: the stored target while it is still a valid one, so a player
+    /// who turned creative or spectator, or a target the mob may no longer attack, reads as none.
+    fn get_target(&self) -> Option<Arc<dyn EntityBase>> {
+        self.as_valid_target(self.get_mob_entity().get_target_unchecked())
+    }
 
     /// Drops a target the mob is not allowed to attack, such as a creative player.
     fn as_valid_target(&self, target: Option<Arc<dyn EntityBase>>) -> Option<Arc<dyn EntityBase>> {

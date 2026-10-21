@@ -153,7 +153,7 @@ impl RangedCrossbowAttackGoal {
 
 impl Goal for RangedCrossbowAttackGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
-        let target = mob.get_mob_entity().get_target().clone();
+        let target = mob.get_target().clone();
         let Some(target) = target else {
             return false;
         };
@@ -164,7 +164,7 @@ impl Goal for RangedCrossbowAttackGoal {
     }
 
     fn should_continue(&mut self, mob: &dyn Mob) -> bool {
-        let target = mob.get_mob_entity().get_target().clone();
+        let target = mob.get_target().clone();
         let Some(target) = target else {
             return false;
         };
@@ -194,7 +194,7 @@ impl Goal for RangedCrossbowAttackGoal {
 
     #[expect(clippy::too_many_lines)]
     fn tick(&mut self, mob: &dyn Mob) {
-        let target = mob.get_mob_entity().get_target().clone();
+        let target = mob.get_target().clone();
         let Some(target) = target else {
             return;
         };

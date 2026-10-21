@@ -341,7 +341,7 @@ impl BeeEntity {
         if self.stay_out_of_hive_countdown.load(Ordering::Relaxed) <= 0
             && !self.is_pollinating()
             && !self.has_stung()
-            && self.mob_entity.get_target().is_none()
+            && self.get_target().is_none()
         {
             let entity = self.get_entity();
             let wants_to_enter_hive = self.has_nectar()
@@ -717,7 +717,7 @@ impl Mob for BeeEntity {
         let entity = self.get_entity();
         let should_roll = self.is_angry()
             && !self.has_stung()
-            && self.mob_entity.get_target().is_some_and(|target| {
+            && self.get_target().is_some_and(|target| {
                 target
                     .get_entity()
                     .pos

@@ -366,9 +366,7 @@ fn has_attackable_target(mob: &dyn Mob) -> bool {
     let Some(phantom) = as_phantom(mob) else {
         return false;
     };
-    phantom
-        .mob_entity
-        .get_target()
+    mob.get_target()
         .is_some_and(|target| phantom.can_attack_with(target.as_ref(), &TargetPredicate::default()))
 }
 
@@ -384,7 +382,7 @@ impl PhantomAttackStrategyGoal {
         if phantom.anchor_point.load().is_none() {
             return;
         }
-        let Some(target) = phantom.mob_entity.get_target() else {
+        let Some(target) = phantom.get_target() else {
             return;
         };
         let mut anchor = target
@@ -467,13 +465,12 @@ const CAT_SEARCH_TICK_DELAY: i32 = 20;
 impl Goal for PhantomSweepAttackGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
         as_phantom(mob).is_some_and(|phantom| {
-            phantom.mob_entity.get_target().is_some()
-                && phantom.attack_phase.load() == AttackPhase::Swoop
+            phantom.get_target().is_some() && phantom.attack_phase.load() == AttackPhase::Swoop
         })
     }
 
     fn should_continue(&mut self, mob: &dyn Mob) -> bool {
-        let Some(target) = mob.get_mob_entity().get_target() else {
+        let Some(target) = mob.get_target() else {
             return false;
         };
         if !target
@@ -531,7 +528,7 @@ impl Goal for PhantomSweepAttackGoal {
         let Some(phantom) = as_phantom(mob) else {
             return;
         };
-        let Some(target) = phantom.mob_entity.get_target() else {
+        let Some(target) = phantom.get_target() else {
             return;
         };
         let target_entity = target.get_entity();
@@ -599,8 +596,7 @@ impl PhantomCircleAroundAnchorGoal {
 impl Goal for PhantomCircleAroundAnchorGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
         as_phantom(mob).is_some_and(|phantom| {
-            phantom.mob_entity.get_target().is_none()
-                || phantom.attack_phase.load() == AttackPhase::Circle
+            phantom.get_target().is_none() || phantom.attack_phase.load() == AttackPhase::Circle
         })
     }
 

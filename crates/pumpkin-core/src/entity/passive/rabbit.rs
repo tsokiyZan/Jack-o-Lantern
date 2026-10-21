@@ -481,7 +481,7 @@ impl Mob for RabbitEntity {
 
             if self.get_variant() == RabbitVariant::Evil
                 && self.jump_delay_ticks.load(Ordering::Relaxed) == 0
-                && let Some(target) = self.mob_entity.get_target()
+                && let Some(target) = self.get_target()
             {
                 let target_pos = target.get_entity().pos.load();
                 if entity.pos.load().squared_distance_to_vec(&target_pos) < 16.0 {

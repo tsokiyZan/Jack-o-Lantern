@@ -504,7 +504,7 @@ impl PandaEntity {
             }
         }
 
-        let target = self.mob_entity.get_target();
+        let target = self.get_target();
         if target.is_none() {
             self.got_bamboo.store(false, Ordering::Relaxed);
             self.did_bite.store(false, Ordering::Relaxed);
@@ -1049,7 +1049,7 @@ impl Mob for PandaEntity {
             return false;
         }
 
-        if self.mob_entity.get_target().is_some() {
+        if self.get_target().is_some() {
             self.got_bamboo.store(true, Ordering::Relaxed);
         }
         let gamemode = player.gamemode.load();

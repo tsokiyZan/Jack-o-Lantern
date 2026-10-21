@@ -68,7 +68,7 @@ impl PathfindToRaidGoal {
 
 impl Goal for PathfindToRaidGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
-        mob.get_mob_entity().get_target().is_none()
+        mob.get_target().is_none()
             && !mob.get_entity().has_passengers()
             && Self::raid_is_calling(mob)
     }

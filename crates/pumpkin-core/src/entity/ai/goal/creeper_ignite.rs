@@ -31,7 +31,7 @@ impl Goal for CreeperIgniteGoal {
             return true;
         }
 
-        let Some(target) = mob.get_mob_entity().get_target() else {
+        let Some(target) = mob.get_target() else {
             return false;
         };
         !is_dead_or_dying(target.as_ref())
@@ -49,7 +49,7 @@ impl Goal for CreeperIgniteGoal {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .stop();
-        self.target = mob.get_mob_entity().get_target();
+        self.target = mob.get_target();
     }
 
     fn stop(&mut self, _mob: &dyn Mob) {

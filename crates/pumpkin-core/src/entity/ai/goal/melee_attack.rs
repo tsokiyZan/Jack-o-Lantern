@@ -112,7 +112,7 @@ impl MeleeAttackGoal {
     }
 
     fn base_should_continue(&self, mob: &dyn Mob) -> bool {
-        let target = mob.get_mob_entity().get_target().clone();
+        let target = mob.get_target().clone();
 
         let Some(target) = target else {
             return false;
@@ -147,7 +147,7 @@ impl Goal for MeleeAttackGoal {
         self.last_can_use_check = time;
 
         let mob_entity = mob.get_mob_entity();
-        let Some(target) = mob_entity.get_target() else {
+        let Some(target) = mob.get_target() else {
             return false;
         };
         if !target.get_entity().is_alive() {
@@ -184,13 +184,9 @@ impl Goal for MeleeAttackGoal {
             on_stop(mob);
         }
         // Only clear target if they switched to creative/spectator
-        let should_clear = mob
-            .get_mob_entity()
-            .get_target()
-            .as_deref()
-            .is_some_and(|entity| {
-                !EntityPredicate::ExceptCreativeOrSpectator.test(entity.get_entity())
-            });
+        let should_clear = mob.get_target().as_deref().is_some_and(|entity| {
+            !EntityPredicate::ExceptCreativeOrSpectator.test(entity.get_entity())
+        });
         if should_clear {
             mob.set_mob_target(None);
         }
@@ -206,7 +202,7 @@ impl Goal for MeleeAttackGoal {
     }
 
     fn tick(&mut self, mob: &dyn Mob) {
-        let target = mob.get_mob_entity().get_target().clone();
+        let target = mob.get_target().clone();
         let Some(target) = target else {
             return;
         };

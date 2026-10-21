@@ -325,12 +325,10 @@ impl MoveControlTrait for VexMoveControl {
         }
         let velocity = entity.velocity.load() + delta * (self.speed_modifier * 0.05 / delta_length);
         entity.velocity.store(velocity);
-        let (x, z) = mob_entity
-            .get_target()
-            .map_or((velocity.x, velocity.z), |target| {
-                let target_pos = target.get_entity().pos.load();
-                (target_pos.x - pos.x, target_pos.z - pos.z)
-            });
+        let (x, z) = mob.get_target().map_or((velocity.x, velocity.z), |target| {
+            let target_pos = target.get_entity().pos.load();
+            (target_pos.x - pos.x, target_pos.z - pos.z)
+        });
         let yaw = -(math::atan2(x, z) as f32) * (180.0 / std::f32::consts::PI);
         entity.yaw.store(yaw);
         entity.body_yaw.store(yaw);
@@ -355,7 +353,7 @@ impl MoveControlTrait for VexMoveControl {
 struct VexChargeAttackGoal;
 
 fn living_target(mob: &dyn Mob) -> Option<Arc<dyn EntityBase>> {
-    mob.get_mob_entity().get_target().filter(|target| {
+    mob.get_target().filter(|target| {
         target
             .get_living_entity()
             .is_some_and(crate::entity::living::LivingEntity::is_alive)
@@ -386,7 +384,7 @@ impl Goal for VexChargeAttackGoal {
     }
 
     fn start(&mut self, mob: &dyn Mob) {
-        if let Some(target) = mob.get_mob_entity().get_target() {
+        if let Some(target) = mob.get_target() {
             set_wanted_position(mob, target.get_entity().get_eye_pos(), 1.0);
         }
         if let Some(vex) = as_vex(mob) {
@@ -411,7 +409,7 @@ impl Goal for VexChargeAttackGoal {
     }
 
     fn tick(&mut self, mob: &dyn Mob) {
-        let Some(target) = mob.get_mob_entity().get_target() else {
+        let Some(target) = mob.get_target() else {
             return;
         };
         let entity = mob.get_entity();
@@ -481,7 +479,7 @@ impl Goal for VexRandomMoveGoal {
                     f64::from(test_pos.0.z) + 0.5,
                 );
                 set_wanted_position(mob, wanted, 0.25);
-                if mob.get_mob_entity().get_target().is_none() {
+                if mob.get_target().is_none() {
                     mob.get_mob_entity()
                         .look_control
                         .lock()
@@ -515,11 +513,7 @@ impl VexCopyOwnerTargetGoal {
     }
 
     fn owner_target(mob: &dyn Mob) -> Option<Arc<dyn EntityBase>> {
-        as_vex(mob)?
-            .get_owner()?
-            .get_mob()?
-            .get_mob_entity()
-            .get_target()
+        as_vex(mob)?.get_owner()?.get_mob()?.get_target()
     }
 }
 

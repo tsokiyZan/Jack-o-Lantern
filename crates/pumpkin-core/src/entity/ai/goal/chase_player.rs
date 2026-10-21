@@ -22,7 +22,7 @@ impl ChasePlayerGoal {
 impl Goal for ChasePlayerGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
         let mob_entity = mob.get_mob_entity();
-        let target = mob_entity.get_target();
+        let target = mob.get_target();
 
         let Some(target) = target else {
             self.target = None;

@@ -542,7 +542,7 @@ impl FoxEntity {
     }
 
     fn target_is_alive(&self) -> bool {
-        self.mob_entity.get_target().is_some_and(|target| {
+        self.get_target().is_some_and(|target| {
             target
                 .get_living_entity()
                 .is_some_and(LivingEntity::is_alive)
@@ -552,7 +552,7 @@ impl FoxEntity {
     /// Vanilla `Fox.canEat`.
     fn can_eat(&self, item_in_mouth: &ItemStack) -> bool {
         is_consumable_food(item_in_mouth)
-            && self.mob_entity.get_target().is_none()
+            && self.get_target().is_none()
             && self.get_entity().on_ground.load(Ordering::Relaxed)
             && !self.is_sleeping()
     }
@@ -940,7 +940,7 @@ impl Mob for FoxEntity {
         if !self.mob_entity.is_no_ai() {
             let world = entity.world.load();
             let in_water = entity.is_in_water();
-            if in_water || self.mob_entity.get_target().is_some() || world.is_thundering() {
+            if in_water || self.get_target().is_some() || world.is_thundering() {
                 self.wake_up();
             }
             if in_water || self.is_sleeping() {
@@ -1327,7 +1327,7 @@ impl Goal for StalkPreyGoal {
         if fox.is_sleeping() {
             return false;
         }
-        let Some(target) = fox.mob_entity.get_target() else {
+        let Some(target) = fox.get_target() else {
             return false;
         };
         target
@@ -1356,7 +1356,7 @@ impl Goal for StalkPreyGoal {
         let Some(fox) = as_fox(mob) else {
             return;
         };
-        if let Some(target) = fox.mob_entity.get_target()
+        if let Some(target) = fox.get_target()
             && fox.is_path_clear(target.get_entity())
         {
             fox.set_interested(true);
@@ -1373,7 +1373,7 @@ impl Goal for StalkPreyGoal {
         let Some(fox) = as_fox(mob) else {
             return;
         };
-        let Some(target) = fox.mob_entity.get_target() else {
+        let Some(target) = fox.get_target() else {
             return;
         };
         Self::look_at_target(fox, &target);
@@ -1429,7 +1429,7 @@ impl Goal for FoxPounceGoal {
         if !fox.is_fully_crouched() {
             return false;
         }
-        let Some(target) = fox.mob_entity.get_target() else {
+        let Some(target) = fox.get_target() else {
             return false;
         };
         if !target
@@ -1481,7 +1481,7 @@ impl Goal for FoxPounceGoal {
         living.jumping.store(true, Ordering::Relaxed);
         fox.set_pouncing(true);
         fox.set_interested(false);
-        if let Some(target) = fox.mob_entity.get_target() {
+        if let Some(target) = fox.get_target() {
             Self::look_at_target(fox, &target);
             let entity = fox.get_entity();
             let pos = entity.pos.load();
@@ -1523,7 +1523,7 @@ impl Goal for FoxPounceGoal {
         let Some(fox) = as_fox(mob) else {
             return;
         };
-        let target = fox.mob_entity.get_target();
+        let target = fox.get_target();
         if let Some(target) = &target {
             Self::look_at_target(fox, target);
         }
@@ -1629,7 +1629,7 @@ impl Goal for SeekShelterGoal {
         let Some(fox) = as_fox(mob) else {
             return false;
         };
-        if fox.is_sleeping() || fox.mob_entity.get_target().is_some() {
+        if fox.is_sleeping() || fox.get_target().is_some() {
             return false;
         }
         let entity = fox.get_entity();
@@ -1838,7 +1838,7 @@ impl FoxStrollThroughVillageGoal {
             !fox.is_sleeping()
                 && !fox.is_sitting()
                 && !fox.is_defending()
-                && fox.mob_entity.get_target().is_none()
+                && fox.get_target().is_none()
         })
     }
 }
@@ -2062,7 +2062,7 @@ impl Goal for FoxSearchForItemsGoal {
         if !fox.main_hand().is_empty() {
             return false;
         }
-        if fox.mob_entity.get_target().is_some()
+        if fox.get_target().is_some()
             || fox
                 .mob_entity
                 .living_entity
@@ -2185,7 +2185,7 @@ impl Goal for PerchAndSearchGoal {
                 roll < 0.02
             }
             && !fox.is_sleeping()
-            && fox.mob_entity.get_target().is_none()
+            && fox.get_target().is_none()
             && fox.is_navigator_idle()
             && !fox.alertable()
             && !fox.is_pouncing()

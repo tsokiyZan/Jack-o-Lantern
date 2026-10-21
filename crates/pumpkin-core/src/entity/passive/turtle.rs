@@ -238,9 +238,7 @@ impl Mob for TurtleEntity {
         entity.update_velocity_from_input(living.movement_input.load(), f64::from(0.1f32));
         living.make_move(caller);
         let mut velocity = entity.velocity.load() * 0.9;
-        if self.mob_entity.get_target().is_none()
-            && (!self.is_going_home() || !self.home_closer_than(20.0))
-        {
+        if self.get_target().is_none() && (!self.is_going_home() || !self.home_closer_than(20.0)) {
             velocity.y -= 0.005;
         }
         entity.velocity.store(velocity);

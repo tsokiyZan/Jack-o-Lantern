@@ -112,7 +112,7 @@ impl RevengeGoal {
             let Some(other_mob) = other.get_mob() else {
                 continue;
             };
-            if other_mob.get_mob_entity().get_target().is_some() {
+            if other_mob.get_target().is_some() {
                 continue;
             }
             if mob.as_tamable().is_some()

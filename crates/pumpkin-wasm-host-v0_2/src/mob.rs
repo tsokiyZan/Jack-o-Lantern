@@ -413,7 +413,7 @@ impl HostMob for PluginHostState {
         let entity = self.get(&this)?;
         if let Some(target) = entity
             .get_mob()
-            .and_then(|mob| mob.get_mob_entity().get_target())
+            .and_then(|mob| mob.get_target())
         {
             return Ok(Some(self.add(target)?));
         }
