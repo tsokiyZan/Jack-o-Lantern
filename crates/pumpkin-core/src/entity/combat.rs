@@ -190,6 +190,62 @@ impl CombatRules {
     }
 }
 
+/// Vanilla `HolderSet<DamageType>.contains` for a `BlocksAttacks` damage type set.
+#[must_use]
+pub fn damage_type_set_contains(
+    set: &pumpkin_data::data_component_impl::DamageTypeSet,
+    damage_type: &pumpkin_data::damage::DamageType,
+) -> bool {
+    use pumpkin_data::data_component_impl::DamageTypeSet;
+    match set {
+        DamageTypeSet::Tag(tag) => damage_type.is_tagged_with(tag) == Some(true),
+        DamageTypeSet::Entries(entries) => entries.iter().any(|entry| {
+            pumpkin_data::damage::DamageType::from_name(
+                entry.strip_prefix("minecraft:").unwrap_or(entry),
+            )
+            .is_some_and(|entry| entry.id == damage_type.id)
+        }),
+    }
+}
+
+/// Vanilla `BlocksAttacks.resolveBlockedDamage`, with `DamageReduction.resolve`.
+#[must_use]
+pub fn resolve_blocked_damage(
+    blocks_attacks: &pumpkin_data::data_component_impl::BlocksAttacksImpl,
+    damage_type: &pumpkin_data::damage::DamageType,
+    dealt_damage: f32,
+    angle: f64,
+) -> f32 {
+    let mut blocked_damage = 0.0f32;
+    for reduction in blocks_attacks.damage_reductions.iter() {
+        blocked_damage += if angle
+            > f64::from((std::f64::consts::PI / 180.0) as f32 * reduction.horizontal_blocking_angle)
+            || reduction
+                .r#type
+                .as_ref()
+                .is_some_and(|set| !damage_type_set_contains(set, damage_type))
+        {
+            0.0
+        } else {
+            (reduction.base + reduction.factor * dealt_damage).clamp(0.0, dealt_damage)
+        };
+    }
+    blocked_damage.clamp(0.0, dealt_damage)
+}
+
+/// Vanilla `BlocksAttacks.ItemDamageFunction.apply`: the durability a block costs.
+#[must_use]
+pub fn blocking_item_damage(
+    function: &pumpkin_data::data_component_impl::ItemDamageFunction,
+    dealt_damage: f32,
+) -> i32 {
+    if dealt_damage < function.threshold {
+        0
+    } else {
+        (function.base + function.factor * dealt_damage).floor() as i32
+    }
+}
+
 pub const RESET_DAMAGE_STATUS_TIME: i64 = 100;
 pub const RESET_COMBAT_STATUS_TIME: i64 = 300;
 
@@ -664,6 +720,42 @@ mod tests {
     fn partial_resistance_scales_strength() {
         // Ravager has KNOCKBACK_RESISTANCE == 0.75.
         assert!((knockback_after_resistance(0.4, 0.75) - 0.1).abs() < 1e-9);
+    }
+
+    #[test]
+    fn shield_wears_only_from_three_damage() {
+        // The shield's `item_damage`: threshold 3, base 1, factor 1.
+        let shield = pumpkin_data::data_component_impl::ItemDamageFunction {
+            threshold: 3.0,
+            base: 1.0,
+            factor: 1.0,
+        };
+        assert_eq!(blocking_item_damage(&shield, 2.9), 0);
+        assert_eq!(blocking_item_damage(&shield, 3.0), 4);
+        assert_eq!(blocking_item_damage(&shield, 7.5), 8);
+    }
+
+    #[test]
+    fn blocking_angle_limits_the_reduction() {
+        let shield = pumpkin_data::data_component_impl::BlocksAttacksImpl {
+            block_delay_seconds: 0.25,
+            disable_cooldown_scale: 1.0,
+            damage_reductions: std::borrow::Cow::Borrowed(
+                pumpkin_data::data_component_impl::BlocksAttacksImpl::DEFAULT_DAMAGE_REDUCTIONS,
+            ),
+            item_damage: pumpkin_data::data_component_impl::ItemDamageFunction::DEFAULT,
+            bypassed_by: None,
+            block_sound: None,
+            disabled_sound: None,
+        };
+        let damage_type = pumpkin_data::damage::DamageType::MOB_ATTACK;
+        assert_eq!(resolve_blocked_damage(&shield, &damage_type, 5.0, 0.3), 5.0);
+        // Exactly 90 degrees still blocks: the float limit is just above `PI / 2`.
+        assert_eq!(
+            resolve_blocked_damage(&shield, &damage_type, 5.0, std::f64::consts::FRAC_PI_2),
+            5.0
+        );
+        assert_eq!(resolve_blocked_damage(&shield, &damage_type, 5.0, 1.6), 0.0);
     }
 
     #[test]

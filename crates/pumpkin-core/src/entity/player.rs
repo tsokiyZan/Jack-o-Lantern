@@ -1470,6 +1470,9 @@ impl Player {
             damage *= 1.5;
         }
 
+        let old_living_entity_health = victim
+            .get_living_entity()
+            .map_or(0.0, |living| living.health.load());
         if !victim.damage_with_context(
             victim.as_ref(),
             damage as f32,
@@ -1580,6 +1583,31 @@ impl Player {
         );
 
         self.item_attack_interaction(victim.as_ref(), &item_stack, &damage_source);
+
+        // Vanilla `damageStatsAndHearts`.
+        if let Some(living) = victim.get_living_entity() {
+            let actual_damage = old_living_entity_health - living.health.load();
+            self.increment_stat(
+                statistics::StatisticCategory::Custom,
+                statistics::CustomStatistic::DamageDealt as i32,
+                (actual_damage * 10.0).round() as i32,
+            );
+            if actual_damage > 2.0 {
+                let count = (actual_damage * 0.5) as i32;
+                let pos = victim_entity.pos.load();
+                world.spawn_particle(
+                    Vector3::new(
+                        pos.x,
+                        pos.y + f64::from(victim_entity.height()) * 0.5,
+                        pos.z,
+                    ),
+                    Vector3::new(0.1, 0.0, 0.1),
+                    0.2,
+                    count,
+                    pumpkin_data::particle::Particle::DamageIndicator,
+                );
+            }
+        }
 
         // Vanilla `Player#attack` ends the successful-hit branch with
         // `causeFoodExhaustion(0.1F)`. Only landed hits exhaust; the miss/no-damage
@@ -4651,7 +4679,7 @@ impl Player {
         {
             return false;
         }
-        if self.living_entity.health.load() <= 0.0 {
+        if self.living_entity.is_dead_or_dying() {
             return false;
         }
         // TODO: `removeEntitiesOnShoulder`; shoulder parrots aren't ported.
@@ -7677,8 +7705,11 @@ impl EntityBase for Player {
             .read_nbt(nbt);
     }
 
+    /// Vanilla `Player.getBaseExperienceReward`: nothing kept inventories or spectators.
     fn get_experience_reward(&self, _killer: Option<&dyn EntityBase>) -> u32 {
-        // vanilla: min(level * 7, 100)
+        if self.world().level_info.load().game_rules.keep_inventory || self.is_spectator() {
+            return 0;
+        }
         let level = self.experience_level.load(Ordering::Relaxed);
         (level * 7).min(100) as u32
     }

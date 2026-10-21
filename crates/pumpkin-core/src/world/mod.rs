@@ -1453,6 +1453,34 @@ impl World {
         );
     }
 
+    /// `play_sound_event` with a volume and pitch.
+    pub fn play_sound_event_fine(
+        &self,
+        sound: &pumpkin_data::data_component_impl::IdOr<
+            pumpkin_data::data_component_impl::SoundEvent,
+        >,
+        category: SoundCategory,
+        position: &Vector3<f64>,
+        volume: f32,
+        pitch: f32,
+    ) {
+        let seed = rng().random::<i64>();
+        let packet = CSoundEffect::new(
+            data_to_proto_sound(sound),
+            category,
+            position,
+            volume,
+            pitch,
+            seed,
+        );
+        self.broadcast_sound(
+            &packet,
+            position,
+            sound_range(volume, event_fixed_range(sound)),
+            None,
+        );
+    }
+
     pub fn play_sound_event_expect(
         &self,
         player: &Player,
