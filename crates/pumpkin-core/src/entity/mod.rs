@@ -1172,12 +1172,18 @@ pub trait EntityBase: Send + Sync + std::any::Any {
     }
 
     /// Kills the Entity.
+    /// Vanilla `Entity.kill`, and `LivingEntity.kill`'s generic kill damage.
     fn kill(&self, caller: &dyn EntityBase) {
         if self.get_living_entity().is_some() {
             caller.damage(caller, f32::MAX, DamageType::GENERIC_KILL);
         } else {
-            // TODO this should be removed once all entities are implemented
-            self.get_entity().remove();
+            let entity = self.get_entity();
+            entity.remove();
+            entity.world.load().game_event_from(
+                Some(caller),
+                pumpkin_data::game_event::GameEvent::EntityDie,
+                entity.pos.load(),
+            );
         }
     }
 
@@ -1239,6 +1245,8 @@ pub enum DelayedLeash {
     Knot(BlockPos),
 }
 
+/// Vanilla `Entity.DELTA_AFFECTED_BY_BLOCKS_BELOW_0_5`, a float.
+pub const DELTA_AFFECTED_BY_BLOCKS_BELOW_0_5: f64 = 0.500_001_013_278_961_2;
 /// The horizontal limit vanilla `Entity.load` clamps a saved position to.
 const MAX_HORIZONTAL_POSITION: f64 = 3.000_051_2E7;
 /// The vertical limit vanilla `Entity.load` clamps a saved position to.
@@ -1484,6 +1492,8 @@ pub struct Entity {
     pub movement_multiplier: AtomicCell<Vector3<f64>>,
     /// Vanilla `needsSync`: tracker resyncs position and velocity of entities
     pub velocity_dirty: AtomicBool,
+    /// Vanilla `syncPosition`: the tracker sends the position on its next tick.
+    pub sync_position: AtomicBool,
     /// Vanilla `syncVelocity` (`markHurt`): the velocity also goes to the entity's own client.
     /// `velocity_dirty` alone only updates other viewers, so a pushed player is never sent its
     /// own stale velocity.
@@ -1648,6 +1658,7 @@ impl Entity {
             movement_multiplier: AtomicCell::new(Vector3::default()),
             velocity_dirty: AtomicBool::new(true),
             sync_velocity: AtomicBool::new(false),
+            sync_position: AtomicBool::new(false),
             removed: AtomicBool::new(false),
             last_sent_yaw: AtomicU8::new(0),
             last_sent_pitch: AtomicU8::new(0),
@@ -2841,17 +2852,45 @@ impl Entity {
         }
     }
 
-    /// Vanilla `Entity.doCheckFallDamage`: `checkFallDamage` for a move the client made.
+    /// Vanilla `Entity.doCheckFallDamage`: `checkFallDamage` for a move the client made,
+    /// unless the entity is next to an unloaded chunk.
     pub fn do_check_fall_damage(
         &self,
         caller: &dyn EntityBase,
         movement: Vector3<f64>,
         on_ground: bool,
     ) {
+        if self.touching_unloaded_chunk() {
+            return;
+        }
         self.check_supporting_block(caller, on_ground, Some(movement));
         let pos = self.get_on_pos_legacy();
         let state = self.world.load().get_block_state(&pos);
         caller.check_fall_damage(caller, movement.y, on_ground, state, pos);
+    }
+
+    /// Vanilla `Entity.touchingUnloadedChunk`: a chunk within a block of the box isn't loaded.
+    #[must_use]
+    pub fn touching_unloaded_chunk(&self) -> bool {
+        let bounding_box = self.bounding_box.load().expand(1.0, 1.0, 1.0);
+        let world = self.world.load();
+        // `Level.hasChunksAt(x0, z0, x1, z1)`.
+        let (x0, x1) = (
+            get_section_cord(bounding_box.min.x.floor() as i32),
+            get_section_cord(bounding_box.max.x.ceil() as i32),
+        );
+        let (z0, z1) = (
+            get_section_cord(bounding_box.min.z.floor() as i32),
+            get_section_cord(bounding_box.max.z.ceil() as i32),
+        );
+        !(x0..=x1).all(|chunk_x| {
+            (z0..=z1).all(|chunk_z| {
+                world
+                    .level
+                    .read_chunk_sync(&Vector2::new(chunk_x, chunk_z), |_| ())
+                    .is_some()
+            })
+        })
     }
 
     /// Vanilla `Entity.checkFallDamage`.
@@ -2986,7 +3025,8 @@ impl Entity {
 
     #[must_use]
     pub fn get_block_pos_below_that_affects_my_movement(&self) -> BlockPos {
-        self.get_pos_with_y_offset(0.500_001).0
+        self.get_pos_with_y_offset(DELTA_AFFECTED_BY_BLOCKS_BELOW_0_5)
+            .0
     }
 
     #[must_use]
@@ -3017,7 +3057,7 @@ impl Entity {
             .jump_velocity_multiplier;
 
         let g = self
-            .get_block_with_y_offset(0.500_001)
+            .get_block_with_y_offset(DELTA_AFFECTED_BY_BLOCKS_BELOW_0_5)
             .1
             .jump_velocity_multiplier;
 
@@ -3036,14 +3076,12 @@ impl Entity {
         // `Player::tick_server_travel` puts back where the client says the player is.
         let is_player = caller.get_player().is_some();
 
-        // `Player.tick` sets `noPhysics` for spectators.
+        // `Player.tick` sets `noPhysics` for spectators. `onGround` is left as it was.
         if self.no_physics.load(Ordering::Relaxed) || caller.is_spectator() {
             self.move_pos(motion);
             self.horizontal_collision.store(false, Ordering::Relaxed);
             self.vertical_collision_below
                 .store(false, Ordering::Relaxed);
-            self.on_ground.store(false, Ordering::Relaxed);
-
             return;
         }
 
@@ -3086,11 +3124,12 @@ impl Entity {
             Some(final_move),
         );
 
+        // The block under the feet, as it was before the fall damage could change it.
+        let effect_pos = self.get_on_pos_legacy();
+        let effect_state = self.world.load().get_block_state(&effect_pos);
         // `checkFallDamage` only runs on the authoritative side, the client for a player or a
         // vehicle a player steers.
         if !caller.is_client_authoritative() {
-            let effect_pos = self.get_on_pos_legacy();
-            let effect_state = self.world.load().get_block_state(&effect_pos);
             caller.check_fall_damage(
                 caller,
                 final_move.y,
@@ -3105,12 +3144,17 @@ impl Entity {
         }
 
         if caller.can_simulate_movement() {
-            self.restitute_movement_after_collisions(caller, motion, final_move);
+            self.restitute_movement_after_collisions(caller, effect_state, motion, final_move);
         }
 
         // A player's steps are played from its movement packets instead.
         if !is_player {
-            self.apply_movement_emission_and_play_sound(caller, final_move);
+            self.apply_movement_emission_and_play_sound(
+                caller,
+                final_move,
+                effect_pos,
+                effect_state,
+            );
         }
 
         self.apply_block_speed_factor(caller);
@@ -3132,6 +3176,7 @@ impl Entity {
     fn restitute_movement_after_collisions(
         &self,
         caller: &dyn EntityBase,
+        effect_state: &'static BlockState,
         delta: Vector3<f64>,
         movement: Vector3<f64>,
     ) {
@@ -3143,7 +3188,7 @@ impl Entity {
         if !vertical_collision && !x_collision && !z_collision {
             return;
         }
-        let effect_block = self.get_block_with_y_offset(f64::from(0.2f32)).1;
+        let effect_block = Block::from_state_id(effect_state.id);
         let living = caller.get_living_entity();
         let suppressing_bounce = self.is_sneaking();
         // `getEntityBounciness`: the BOUNCINESS attribute for living entities.
@@ -3199,66 +3244,65 @@ impl Entity {
         if bounced {
             let world = self.world.load_full();
             let pos = self.get_block_pos_below_that_affects_my_movement();
-            let block = world.get_block(&pos);
-            world.block_registry.bounce_on(&world, block, &pos, caller);
-            self.velocity_dirty.store(true, Ordering::SeqCst);
+            world
+                .block_registry
+                .bounce_on(&world, effect_block, &pos, caller);
+            world.game_event_from(
+                Some(caller),
+                pumpkin_data::game_event::GameEvent::Bounce,
+                self.pos.load(),
+            );
+            self.sync_position.store(true, Ordering::Relaxed);
         }
         self.velocity.store(after);
     }
 
+    /// Vanilla `Entity.moveTowardsClosestSpace`: pushed out through the nearest open side,
+    /// trying north, south, west, east and up in that order.
     pub fn push_out_of_blocks(&self, center_pos: Vector3<f64>) {
         let block_pos = BlockPos::floored_v(center_pos);
-
         let delta = center_pos.sub(&block_pos.0.to_f64());
-
-        let mut min_dist = f64::MAX;
-
+        let world = self.world.load();
+        let mut closest = f64::MAX;
         let mut direction = BlockDirection::Up;
 
-        for dir in BlockDirection::all() {
-            if dir == BlockDirection::Down {
+        for dir in [
+            BlockDirection::North,
+            BlockDirection::South,
+            BlockDirection::West,
+            BlockDirection::East,
+            BlockDirection::Up,
+        ] {
+            let neighbor_pos = block_pos.offset(dir.to_offset());
+            let mut shapes = world
+                .get_block_state(&neighbor_pos)
+                .get_block_collision_shapes_at(&neighbor_pos);
+            // `isCollisionShapeFullBlock`.
+            let full_block = BoundingBox::full_block();
+            let is_full_block = shapes
+                .next()
+                .is_some_and(|shape| shape.min == full_block.min && shape.max == full_block.max)
+                && shapes.next().is_none();
+            if is_full_block {
                 continue;
             }
-
-            let offset = dir.to_offset();
-
-            if self
-                .world
-                .load()
-                .get_block_state(&block_pos.offset(offset))
-                .is_full_cube()
-            {
-                continue;
-            }
-
             let component = delta.get_axis(dir.to_axis().into());
-
-            let dist = if dir.positive() {
+            let oriented_delta = if dir.positive() {
                 1.0 - component
             } else {
                 component
             };
-
-            if dist < min_dist {
-                min_dist = dist;
-
+            if oriented_delta < closest {
+                closest = oriented_delta;
                 direction = dir;
             }
         }
 
         // `float speed = this.random.nextFloat() * 0.2F + 0.1F`, in float.
-        let amplitude = f64::from(self.random().next_f32() * 0.2 + 0.1);
-
-        let axis = direction.to_axis().into();
-
-        let sign = if direction.positive() { 1.0 } else { -1.0 };
-
-        let mut velo = self.velocity.load();
-
-        velo = velo * 0.75;
-
-        velo.set_axis(axis, sign * amplitude);
-
+        let speed = f64::from(self.random().next_f32() * 0.2 + 0.1);
+        let step = if direction.positive() { 1.0 } else { -1.0 };
+        let mut velo = self.velocity.load() * 0.75;
+        velo.set_axis(direction.to_axis().into(), step * speed);
         self.velocity.store(velo);
     }
 
@@ -4890,7 +4934,30 @@ impl Entity {
             .is_some()
     }
 
+    /// Vanilla `startRiding(vehicle)` once its checks passed: mounts `passenger` on this
+    /// vehicle, with the `entity_mount` game event.
     pub fn add_passenger(&self, vehicle: Arc<dyn EntityBase>, passenger: Arc<dyn EntityBase>) {
+        self.mount_passenger(vehicle, passenger, true);
+    }
+
+    /// Vanilla `startRiding(vehicle, true, false)`, as entity loading mounts passengers: no
+    /// game event.
+    pub fn add_passenger_without_event(
+        &self,
+        vehicle: Arc<dyn EntityBase>,
+        passenger: Arc<dyn EntityBase>,
+    ) {
+        self.mount_passenger(vehicle, passenger, false);
+    }
+
+    /// The end of vanilla `startRiding` and `addPassenger`: a player takes the front seat from
+    /// anything but another player.
+    fn mount_passenger(
+        &self,
+        vehicle: Arc<dyn EntityBase>,
+        passenger: Arc<dyn EntityBase>,
+        send_event: bool,
+    ) {
         let mut mount_event =
             crate::plugin::api::events::entity::entity_mount::EntityMountEvent::new(
                 passenger.get_entity().entity_id,
@@ -4913,6 +4980,7 @@ impl Entity {
             return;
         }
 
+        passenger.set_pose(EntityPose::Standing);
         let passenger_entity = passenger.get_entity();
         *passenger_entity
             .vehicle
@@ -4923,12 +4991,23 @@ impl Entity {
             .passengers
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        passengers.push(passenger);
+        let event_source = Arc::clone(&passenger);
+        if passenger.get_player().is_some()
+            && passengers
+                .first()
+                .is_some_and(|first| first.get_player().is_none())
+        {
+            passengers.insert(0, passenger);
+        } else {
+            passengers.push(passenger);
+        }
 
         let passenger_ids: Vec<VarInt> = passengers
             .iter()
             .map(|p| VarInt(p.get_entity().entity_id))
             .collect();
+
+        drop(passengers);
 
         let world = self.world.load();
         let chunk_pos = self.chunk_pos.load();
@@ -4936,6 +5015,13 @@ impl Entity {
             chunk_pos,
             &CSetPassengers::new(VarInt(self.entity_id), &passenger_ids),
         );
+        if send_event {
+            world.game_event_from(
+                Some(event_source.as_ref()),
+                pumpkin_data::game_event::GameEvent::EntityMount,
+                self.pos.load(),
+            );
+        }
     }
 
     pub(crate) fn remove_passenger_on_disconnect(&self, passenger_id: i32) {
@@ -5058,7 +5144,19 @@ impl Entity {
 
             // Vanilla: ridingCooldown = 60 (prevents immediate re-mount)
             passenger_entity.riding_cooldown.store(60, Relaxed);
-            // TODO: world.emitGameEvent(passenger, GameEvent.ENTITY_DISMOUNT, vehicle.pos)
+            // `removeVehicle`: a passenger that is only unloaded or changing dimension leaves
+            // quietly.
+            if passenger_entity
+                .removal_reason
+                .load()
+                .is_none_or(|reason| reason.should_destroy())
+            {
+                self.world.load().game_event_from(
+                    Some(passenger.as_ref()),
+                    pumpkin_data::game_event::GameEvent::EntityDismount,
+                    self.pos.load(),
+                );
+            }
 
             // Send CSetPassengers directly to the dismounting player before broadcasting it.
             let world = self.world.load();

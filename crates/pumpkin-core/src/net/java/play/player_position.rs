@@ -71,7 +71,14 @@ impl JavaClient {
             if movement.y != 0.0 {
                 entity.check_supporting_block(caller, on_ground, Some(movement));
             }
-            entity.apply_movement_emission_and_play_sound(caller, movement);
+            let effect_pos = entity.get_on_pos_legacy();
+            let effect_state = player.world().get_block_state(&effect_pos);
+            entity.apply_movement_emission_and_play_sound(
+                caller,
+                movement,
+                effect_pos,
+                effect_state,
+            );
             Self::apply_move_speed_factor(player);
         }
         entity.check_supporting_block(caller, on_ground, Some(movement));

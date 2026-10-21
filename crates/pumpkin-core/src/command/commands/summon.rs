@@ -104,7 +104,9 @@ impl CommandExecutor for SummonExecutor {
         for (e, vehicle) in loaded {
             world.spawn_entity(e.clone());
             if let Some(vehicle) = vehicle {
-                vehicle.get_entity().add_passenger(vehicle.clone(), e);
+                vehicle
+                    .get_entity()
+                    .add_passenger_without_event(vehicle.clone(), e);
             }
         }
 

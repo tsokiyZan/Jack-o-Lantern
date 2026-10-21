@@ -1789,7 +1789,7 @@ impl LivingEntity {
         let block_friction = if on_ground {
             Self::compute_modified_friction(
                 self.entity
-                    .get_block_with_y_offset(0.500_001)
+                    .get_block_with_y_offset(super::DELTA_AFFECTED_BY_BLOCKS_BELOW_0_5)
                     .1
                     .slipperiness,
                 self.get_attribute_value(&Attributes::FRICTION_MODIFIER) as f32,
