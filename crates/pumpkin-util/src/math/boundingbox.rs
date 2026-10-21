@@ -562,6 +562,18 @@ impl EntityAttachments {
         (index < self.passenger.len()).then(|| self.transform(self.passenger, index, rot_y))
     }
 
+    /// Vanilla `getAverage(PASSENGER)`: the mean of the passenger points, unrotated.
+    #[must_use]
+    pub fn passenger_average(&self) -> Vector3<f64> {
+        let count = self.passenger.len();
+        let mut sum = Vector3::new(0.0, 0.0, 0.0);
+        for index in 0..count {
+            sum += self.transform(self.passenger, index, 0.0);
+        }
+        // `sum.scale(1.0F / points.size())`.
+        sum * f64::from(1.0f32 / count as f32)
+    }
+
     /// Vanilla `get(VEHICLE, 0, rotY)`.
     #[must_use]
     pub fn vehicle(&self, rot_y: f32) -> Vector3<f64> {
