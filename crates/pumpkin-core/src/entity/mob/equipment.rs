@@ -5,7 +5,6 @@
 use std::sync::Arc;
 use std::sync::atomic::Ordering::Relaxed;
 
-use pumpkin_data::Enchantment;
 use pumpkin_data::attributes::Attributes;
 use pumpkin_data::data_component_impl::{
     AttributeModifiersImpl, CustomNameImpl, EnchantmentsImpl, EquipmentSlot, EquipmentType,
@@ -239,7 +238,16 @@ fn compare_armor(
     current_item: &ItemStack,
     slot: &EquipmentSlot,
 ) -> bool {
-    if current_item.get_enchantment_level(&Enchantment::BINDING_CURSE) > 0 {
+    // `EnchantmentHelper.has(current, PREVENT_ARMOR_CHANGE)`.
+    if current_item
+        .get_data_component::<EnchantmentsImpl>()
+        .is_some_and(|enchantments| {
+            enchantments
+                .enchantment
+                .iter()
+                .any(|(enchantment, _)| enchantment.effects.prevent_armor_change)
+        })
+    {
         return false;
     }
     let new_defense = approximate_attribute_with(mob, new_item, &Attributes::ARMOR, slot);
@@ -283,29 +291,46 @@ fn compare_weapons(
     can_replace_equal_item(new_item, current_item)
 }
 
+/// Vanilla `Mob.getApproximateAttributeWith`: the mob's base value (0 without the attribute)
+/// through the item's modifiers for `slot`.
 fn approximate_attribute_with(
     mob: &MobEntity,
     stack: &ItemStack,
     attribute: &Attributes,
     slot: &EquipmentSlot,
 ) -> f64 {
-    let base_value = mob.living_entity.get_attribute_base(attribute);
-    let mut add_value = 0.0;
-    let mut add_multiplied_base = 0.0;
-    let mut multiplied_total = 1.0;
-    if let Some(modifiers) = stack.get_data_component::<AttributeModifiersImpl>() {
-        for modifier in modifiers.attribute_modifiers.iter() {
-            if modifier.r#type.id != attribute.id || !modifier.slot.test(slot) {
-                continue;
-            }
-            match modifier.operation {
-                Operation::AddValue => add_value += modifier.amount,
-                Operation::AddMultipliedBase => add_multiplied_base += modifier.amount,
-                Operation::AddMultipliedTotal => multiplied_total *= 1.0 + modifier.amount,
-            }
+    let living = &mob.living_entity;
+    let base_value = if living.has_attribute(attribute) {
+        living.get_attribute_base(attribute)
+    } else {
+        0.0
+    };
+    stack
+        .get_data_component::<AttributeModifiersImpl>()
+        .map_or(base_value, |modifiers| {
+            compute_attribute_modifiers(modifiers, attribute, base_value, slot)
+        })
+}
+
+/// Vanilla `ItemAttributeModifiers.compute`: each matching modifier in order, the
+/// multiplied-total ones scaling what the earlier ones made.
+fn compute_attribute_modifiers(
+    modifiers: &AttributeModifiersImpl,
+    attribute: &Attributes,
+    base_value: f64,
+    slot: &EquipmentSlot,
+) -> f64 {
+    let mut value = base_value;
+    for modifier in modifiers.attribute_modifiers.iter() {
+        if modifier.slot.test(slot) && modifier.r#type.id == attribute.id {
+            value += match modifier.operation {
+                Operation::AddValue => modifier.amount,
+                Operation::AddMultipliedBase => modifier.amount * base_value,
+                Operation::AddMultipliedTotal => modifier.amount * value,
+            };
         }
     }
-    (base_value + add_value) * (1.0 + add_multiplied_base) * multiplied_total
+    value
 }
 
 #[must_use]
@@ -454,6 +479,40 @@ pub fn pick_up_item<M: Mob + ?Sized>(mob: &M, item: &crate::entity::item::ItemEn
 #[cfg(test)]
 mod tests {
     use super::moon_brightness;
+
+    #[test]
+    fn attribute_modifiers_compute_in_order() {
+        use pumpkin_data::AttributeModifierSlot;
+        use pumpkin_data::attributes::Attributes;
+        use pumpkin_data::data_component_impl::{
+            AttributeModifiersImpl, EquipmentSlot, Modifier, Operation,
+        };
+        use std::borrow::Cow;
+
+        let modifier = |operation, amount| Modifier {
+            r#type: &Attributes::ARMOR,
+            id: "test",
+            amount,
+            operation,
+            slot: AttributeModifierSlot::Any,
+        };
+        let modifiers = AttributeModifiersImpl {
+            attribute_modifiers: Cow::Owned(vec![
+                modifier(Operation::AddMultipliedTotal, 0.5),
+                modifier(Operation::AddValue, 1.0),
+                modifier(Operation::AddMultipliedBase, 1.0),
+            ]),
+        };
+        // 2 + 0.5 * 2 = 3, + 1 = 4, + 1 * 2 = 6: a total multiplier only scales what came
+        // before it, and a base one the base.
+        let value = super::compute_attribute_modifiers(
+            &modifiers,
+            &Attributes::ARMOR,
+            2.0,
+            &EquipmentSlot::HEAD,
+        );
+        assert!((value - 6.0).abs() < f64::EPSILON, "got {value}");
+    }
 
     #[test]
     fn moon_brightness_matches_the_vanilla_phase_table() {

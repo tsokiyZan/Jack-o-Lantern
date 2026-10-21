@@ -132,6 +132,8 @@ pub struct MobEntity {
     death_loot_table: std::sync::Mutex<Option<String>>,
     /// Vanilla `Mob.lootTableSeed`.
     death_loot_table_seed: AtomicI64,
+    /// The follow range the navigator last sized its search for (`onAttributeUpdated`).
+    applied_follow_range: AtomicCell<f64>,
     pending_riders: std::sync::Mutex<Vec<Arc<dyn EntityBase>>>,
     pending_vehicle: std::sync::Mutex<Option<Arc<dyn EntityBase>>>,
     mob_flags: AtomicU8,
@@ -270,6 +272,7 @@ impl MobEntity {
             can_pick_up_loot: AtomicBool::new(false),
             death_loot_table: std::sync::Mutex::new(None),
             death_loot_table_seed: AtomicI64::new(0),
+            applied_follow_range: AtomicCell::new(f64::NAN),
             pending_riders: std::sync::Mutex::new(Vec::new()),
             pending_vehicle: std::sync::Mutex::new(None),
             mob_flags: AtomicU8::new(0),
@@ -357,6 +360,19 @@ impl MobEntity {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .tick();
+
+        // Vanilla `Mob.onAttributeUpdated`: a changed follow range resizes the path search.
+        // Attributes change where the mob can't be reached, so the AI step, after
+        // `tickEffects`, picks it up.
+        let follow_range = self
+            .living_entity
+            .get_attribute_value(&Attributes::FOLLOW_RANGE);
+        if self.applied_follow_range.swap(follow_range).to_bits() != follow_range.to_bits() {
+            self.navigator
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .update_pathfinder_max_visited_nodes(&self.living_entity);
+        }
 
         // 1. "Take" selectors out of the mutexes
         let mut target_selector = {
