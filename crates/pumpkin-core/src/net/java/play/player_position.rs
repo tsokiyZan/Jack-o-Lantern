@@ -66,6 +66,8 @@ impl JavaClient {
         // Spectators have `noPhysics`, and `move` returns before any of this.
         if !player.is_spectator() {
             entity.reset_fall_on_long_move(last_pos, movement);
+            // `move` records the move for the block sweep in `applyEffectsFromBlocks`.
+            entity.record_movement(last_pos, pos, movement);
             if movement.y != 0.0 {
                 entity.check_supporting_block(caller, on_ground, Some(movement));
             }

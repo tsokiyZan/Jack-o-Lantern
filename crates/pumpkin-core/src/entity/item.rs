@@ -592,6 +592,8 @@ impl EntityBase for ItemEntity {
 
         if self.should_tick_move(move_velo) {
             self.move_and_apply_friction(caller, move_velo);
+        } else {
+            entity.apply_effects_from_blocks_for_last_movements(caller);
         }
 
         if self.process_age_and_merge() {
@@ -741,6 +743,12 @@ impl EntityBase for ItemEntity {
                 self.on_count_changed();
             }
         }
+    }
+
+    /// Vanilla `ItemEntity.shouldPlayLavaHurtSound`.
+    fn should_play_lava_hurt_sound(&self) -> bool {
+        self.health.load(Ordering::Relaxed) <= 0.0
+            || self.entity.tick_count.load(Ordering::Relaxed) % 10 == 0
     }
 
     fn get_entity(&self) -> &Entity {

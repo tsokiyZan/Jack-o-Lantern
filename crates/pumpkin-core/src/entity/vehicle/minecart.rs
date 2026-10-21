@@ -312,18 +312,13 @@ impl EntityBase for MinecartEntity {
             if is_activator_rail && let MinecartKind::Hopper(minecart) = &self.kind {
                 minecart.set_enabled(!powered);
             }
-        } else if block.id == Block::DETECTOR_RAIL.id
-            && let Some(server) = world.server.upgrade()
-        {
-            world.block_registry.on_entity_collision(
-                block,
-                &world,
-                self,
-                &block_pos,
-                world.get_block_state(&block_pos),
-                &server,
-            );
         }
+        // `AbstractMinecart.applyEffectsFromBlocks` for the old rail movement: the blocks
+        // at the minecart's position only.
+        let entity = &self.vehicle.entity;
+        let pos = entity.pos.load();
+        entity.apply_effects_from_blocks_between(caller, pos, pos);
+        entity.clear_movement_this_tick();
 
         if is_powered_rail || is_activator_rail {
             let props = PoweredRailLikeProperties::from_state_id(state_id);

@@ -12,6 +12,7 @@ pub mod flowing {
 }
 
 use super::{BlockIsReplacing, registry::BlockActionResult};
+use crate::entity::inside_block_effect::InsideBlockEffectApplier;
 use crate::entity::{EntityBase, player::Player};
 use crate::{server::Server, world::World};
 use pumpkin_data::BlockDirection;
@@ -88,7 +89,13 @@ pub trait FluidBehaviour: Send + Sync {
     ) {
     }
 
-    fn on_entity_collision(&self, _entity: &dyn EntityBase) {}
+    /// Vanilla `Fluid.entityInside`.
+    fn on_entity_collision(
+        &self,
+        _entity: &dyn EntityBase,
+        _effect_applier: &InsideBlockEffectApplier,
+    ) {
+    }
 
     fn on_scheduled_tick(&self, _world: &Arc<World>, _fluid: &Fluid, _block_pos: &BlockPos) {}
 

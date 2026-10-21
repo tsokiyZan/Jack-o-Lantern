@@ -11,6 +11,9 @@ use pumpkin_world::world::BlockFlags;
 
 use crate::block::{BlockBehaviour, FallOnArgs, OnEntityCollisionArgs, PathComputationType};
 use crate::entity::EntityBase;
+use crate::entity::inside_block_effect::InsideBlockEffectType;
+use pumpkin_data::Block;
+use pumpkin_util::random::RandomImpl;
 
 #[pumpkin_block("minecraft:powder_snow")]
 pub struct PowderSnowBlock;
@@ -90,23 +93,51 @@ impl BlockBehaviour for PowderSnowBlock {
         }
     }
 
+    /// Vanilla `PowderSnowBlock.entityInside`.
     fn on_entity_collision(&self, args: OnEntityCollisionArgs<'_>) {
         let entity = args.entity.get_entity();
-        entity.slow_movement(args.state, Vector3::new(0.9, 1.5, 0.9));
-
-        if entity.fire_ticks.load(std::sync::atomic::Ordering::Relaxed) > 0 {
-            let can_destroy = args.entity.get_player().is_some()
-                || args.world.level_info.load().game_rules.mob_griefing;
-            if can_destroy {
-                let _ = args.world.break_block(
-                    args.position,
-                    None,
-                    BlockFlags::NOTIFY_ALL | BlockFlags::SKIP_DROPS,
-                );
+        // `getInBlockState().is(this)`: a living entity only sinks in once its feet are in.
+        if args.entity.get_living_entity().is_none()
+            || args.world.get_block(&entity.block_pos.load()) == &Block::POWDER_SNOW
+        {
+            entity.slow_movement(
+                args.state,
+                Vector3::new(f64::from(0.9f32), 1.5, f64::from(0.9f32)),
+            );
+            let known_movement = args.entity.get_known_movement();
+            let is_moving = known_movement.x != 0.0 || known_movement.z != 0.0;
+            if is_moving {
+                let mut random = args
+                    .world
+                    .random
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                if random.next_bool() {
+                    // The snowflake's speeds: `Mth.randomBetween(random, -1, 1) / 12`, twice.
+                    // The particle itself needs per-axis speeds the packet can't carry yet.
+                    random.next_f32();
+                    random.next_f32();
+                }
             }
         }
 
-        entity.extinguish();
+        let world = args.world.clone();
+        let position = *args.position;
+        args.effect_applier
+            .run_before(InsideBlockEffectType::Extinguish, move |entity| {
+                if entity.get_entity().is_on_fire()
+                    && (world.level_info.load().game_rules.mob_griefing
+                        || entity.get_player().is_some())
+                {
+                    let _ = world.break_block(
+                        &position,
+                        None,
+                        BlockFlags::NOTIFY_ALL | BlockFlags::SKIP_DROPS,
+                    );
+                }
+            });
+        args.effect_applier.apply(InsideBlockEffectType::Freeze);
+        args.effect_applier.apply(InsideBlockEffectType::Extinguish);
     }
 
     fn is_pathfindable(&self, _state: &BlockState, _computation_type: PathComputationType) -> bool {

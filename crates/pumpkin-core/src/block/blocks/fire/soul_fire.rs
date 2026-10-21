@@ -29,7 +29,7 @@ impl BlockBehaviour for SoulFireBlock {
     }
 
     fn on_entity_collision(&self, args: OnEntityCollisionArgs<'_>) {
-        FireBlockBase::apply_fire_collision(&args, true);
+        FireBlockBase::entity_inside(&args, 2.0);
     }
 
     fn get_state_for_neighbor_update(

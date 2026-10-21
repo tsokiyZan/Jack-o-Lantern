@@ -1,7 +1,7 @@
 use super::{
     boundingbox::BoundingBox,
     get_section_cord,
-    vector3::{self, Vector3},
+    vector3::{self, Axis, Vector3},
 };
 use std::fmt;
 use std::hash::Hash;
@@ -841,9 +841,8 @@ pub const fn pack_local_chunk_section(block_pos: &BlockPos) -> i16 {
 /// Vanilla `BlockGetter.forEachBlockIntersectedBetween`.
 ///
 /// Visits every block a box sweeps through while moving from `from` to `to`, ending as
-/// `aabb_at_target`, with the sweep step it was reached at. Stops and returns false once
-/// `visitor` does. Vanilla walks each box in `betweenCornersInDirection` order; this walks them in plain
-/// order, which visits the same blocks and only changes which failing block ends the walk.
+/// `aabb_at_target`, with the sweep step it was reached at, in vanilla's order. Stops and
+/// returns false once `visitor` does.
 pub fn for_each_block_intersected_between(
     from: Vector3<f64>,
     to: Vector3<f64>,
@@ -853,11 +852,15 @@ pub fn for_each_block_intersected_between(
     let travel = to - from;
     let threshold = 1.0E-5f32 * 1.0E-5f32;
     if travel.length_squared() < f64::from(threshold) {
-        return between_corners(aabb_at_target).all(|pos| visitor(pos, 0));
+        return BlockPos::between_closed(
+            BlockPos::floored_v(aabb_at_target.min),
+            BlockPos::floored_v(aabb_at_target.max),
+        )
+        .all(|pos| visitor(pos, 0));
     }
 
     let mut visited_blocks = std::collections::HashSet::new();
-    for pos in between_corners(&aabb_at_target.shift(travel * -1.0)) {
+    for pos in between_corners(&aabb_at_target.shift(travel * -1.0), travel) {
         if !visitor(pos, 0) {
             return false;
         }
@@ -870,13 +873,84 @@ pub fn for_each_block_intersected_between(
         return false;
     };
 
-    between_corners(aabb_at_target)
+    between_corners(aabb_at_target, travel)
         .all(|pos| !visited_blocks.insert(pos.as_long()) || visitor(pos, iterations + 1))
 }
 
-/// The blocks `BlockPos.betweenCornersInDirection(AABB, Vec3)` covers.
-fn between_corners(aabb: &BoundingBox) -> BlockPosIterator {
-    BlockPos::between_closed(BlockPos::floored_v(aabb.min), BlockPos::floored_v(aabb.max))
+/// Vanilla `BlockPos.betweenCornersInDirection(AABB, Vec3)`.
+fn between_corners(aabb: &BoundingBox, direction: Vector3<f64>) -> impl Iterator<Item = BlockPos> {
+    between_corners_in_direction(
+        BlockPos::floored_v(aabb.min),
+        BlockPos::floored_v(aabb.max),
+        direction,
+    )
+}
+
+/// Vanilla `BlockPos.betweenCornersInDirection`: every block of the box between two corners,
+/// starting at the corner `direction` comes from and walking the axes in
+/// [`Axis::step_order`], the last of them fastest.
+pub fn between_corners_in_direction(
+    first_corner: BlockPos,
+    second_corner: BlockPos,
+    direction: Vector3<f64>,
+) -> impl Iterator<Item = BlockPos> {
+    let min = Vector3::new(
+        first_corner.0.x.min(second_corner.0.x),
+        first_corner.0.y.min(second_corner.0.y),
+        first_corner.0.z.min(second_corner.0.z),
+    );
+    let max = Vector3::new(
+        first_corner.0.x.max(second_corner.0.x),
+        first_corner.0.y.max(second_corner.0.y),
+        first_corner.0.z.max(second_corner.0.z),
+    );
+    let diff = max - min;
+    let start = Vector3::new(
+        if direction.x >= 0.0 { min.x } else { max.x },
+        if direction.y >= 0.0 { min.y } else { max.y },
+        if direction.z >= 0.0 { min.z } else { max.z },
+    );
+    let [first_axis, second_axis, third_axis] = Axis::step_order(direction);
+    let step = |axis: Axis| {
+        let mut unit = Vector3::new(0, 0, 0);
+        unit.set_axis(
+            axis,
+            if direction.get_axis(axis) >= 0.0 {
+                1
+            } else {
+                -1
+            },
+        );
+        unit
+    };
+    let (first_dir, second_dir, third_dir) =
+        (step(first_axis), step(second_axis), step(third_axis));
+    let (first_max, second_max, third_max) = (
+        diff.get_axis(first_axis),
+        diff.get_axis(second_axis),
+        diff.get_axis(third_axis),
+    );
+    let (mut first, mut second, mut third) = (0, 0, 0);
+    let mut end = false;
+    std::iter::from_fn(move || {
+        if end {
+            return None;
+        }
+        let pos = BlockPos(start + first_dir * first + second_dir * second + third_dir * third);
+        if third < third_max {
+            third += 1;
+        } else if second < second_max {
+            second += 1;
+            third = 0;
+        } else if first < first_max {
+            first += 1;
+            third = 0;
+            second = 0;
+        } else {
+            end = true;
+        }
+        Some(pos)
+    })
 }
 
 /// Vanilla `BlockGetter.addCollisionsAlongTravel`: `None` where vanilla returns -1.
@@ -966,7 +1040,7 @@ fn add_collisions_along_travel(
             (corner_hit(hit_point.z, corner_block.z) - box_size.z * f64::from(corner_dir.z)).floor()
                 as i32,
         );
-        for pos in BlockPos::between_closed(corner, opposite_corner) {
+        for pos in between_corners_in_direction(corner, opposite_corner, delta_move) {
             if visited_blocks.insert(pos.as_long()) && !visitor(pos, iterations) {
                 return None;
             }
@@ -1000,6 +1074,33 @@ mod test {
     use pumpkin_codecs::{assert_decode, assert_encode_success};
     use pumpkin_nbt::nbt_ops::NbtOps;
     use pumpkin_nbt::tag::NbtTag;
+
+    #[test]
+    fn between_corners_in_direction_walks_like_vanilla() {
+        use crate::math::position::between_corners_in_direction;
+        use crate::math::vector3::Vector3;
+        // Moving -x more than z: Y, X, Z with Z fastest, starting from the max x corner.
+        let order: Vec<_> = between_corners_in_direction(
+            BlockPos::new(0, 0, 0),
+            BlockPos::new(1, 1, 1),
+            Vector3::new(-1.0, 0.0, 0.5),
+        )
+        .map(|pos| (pos.0.x, pos.0.y, pos.0.z))
+        .collect();
+        assert_eq!(
+            order,
+            [
+                (1, 0, 0),
+                (1, 0, 1),
+                (0, 0, 0),
+                (0, 0, 1),
+                (1, 1, 0),
+                (1, 1, 1),
+                (0, 1, 0),
+                (0, 1, 1)
+            ]
+        );
+    }
 
     #[test]
     fn codec() {

@@ -502,7 +502,7 @@ impl HostEntity for PluginHostState {
         visual_fire: bool,
     ) -> wasmtime::Result<()> {
         let entity = self.get(&entity)?;
-        entity.get_entity().set_on_fire(visual_fire);
+        entity.get_entity().set_has_visual_fire(visual_fire);
         Ok(())
     }
 

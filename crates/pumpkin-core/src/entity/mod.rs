@@ -12,11 +12,12 @@ use crate::{
 use arc_swap::ArcSwap;
 use bytes::BufMut;
 use crossbeam::atomic::AtomicCell;
+use inside_block_effect::InsideBlockEffectApplier;
 use living::LivingEntity;
 use player::Player;
 use pumpkin_data::BlockState;
+use pumpkin_data::attributes::Attributes;
 use pumpkin_data::biome::Biome;
-use pumpkin_data::block_properties::blocks_movement;
 use pumpkin_data::data_component_impl::EquipmentSlot;
 use pumpkin_data::dimension::Dimension;
 use pumpkin_data::entity::EntityStatus;
@@ -52,7 +53,7 @@ use pumpkin_util::math::vector3::Axis;
 use pumpkin_util::math::{
     boundingbox::{AttachmentPoints, BoundingBox, EntityAttachments, EntityDimensions},
     get_section_cord, pack_degrees,
-    position::{BlockPos, chunk_section_from_pos},
+    position::{BlockPos, chunk_section_from_pos, for_each_block_intersected_between},
     vector2::Vector2,
     vector3::Vector3,
     wrap_degrees,
@@ -86,6 +87,7 @@ pub mod entity_reference;
 pub mod experience_orb;
 pub mod falling;
 pub mod hunger;
+pub mod inside_block_effect;
 pub mod interaction;
 pub mod item;
 pub mod item_steerable;
@@ -506,8 +508,13 @@ pub trait EntityBase: Send + Sync + std::any::Any {
         caller: &dyn EntityBase,
         lightning: &lightning::LightningBoltEntity,
     ) {
-        // Vanilla `Entity.thunderHit` hits entities with 5 damage and sets them on fire for 8 seconds.
-        self.set_on_fire_for(8.0);
+        // Vanilla `Entity.thunderHit`: one more fire tick, and 8 seconds only when that lands
+        // on exactly 0. The bolt's fire blocks do the rest.
+        let entity = self.get_entity();
+        caller.set_remaining_fire_ticks(entity.fire_ticks.load(Ordering::Relaxed) + 1);
+        if entity.fire_ticks.load(Ordering::Relaxed) == 0 {
+            caller.set_on_fire_for(8.0);
+        }
         let cause = lightning.get_cause();
         self.damage_with_context(
             caller,
@@ -812,14 +819,12 @@ pub trait EntityBase: Send + Sync + std::any::Any {
         false
     }
 
+    /// Vanilla `Entity.igniteForSeconds`.
     fn set_on_fire_for(&self, seconds: f32) {
-        let entity = self.get_entity();
-        // Exclude fire-immune entities (ex. certain items) from burn damage
-        if !entity.is_fire_immune() {
-            self.set_on_fire_for_ticks((seconds * 20.0).floor() as u32);
-        }
+        self.set_on_fire_for_ticks((seconds * 20.0).floor() as u32);
     }
 
+    /// Vanilla `Entity.igniteForTicks`, with `LivingEntity`'s `burning_time` scaling.
     fn set_on_fire_for_ticks(&self, ticks: u32) {
         let entity = self.get_entity();
         let mut event = crate::plugin::api::events::entity::entity_combust::EntityCombustEvent::new(
@@ -832,10 +837,45 @@ pub trait EntityBase: Send + Sync + std::any::Any {
                 return;
             }
         }
-        if entity.fire_ticks.load(Ordering::Relaxed) < ticks as i32 {
-            entity.fire_ticks.store(ticks as i32, Ordering::Relaxed);
+        let ticks = self.get_living_entity().map_or(ticks as i32, |living| {
+            (f64::from(ticks) * living.get_attribute_value(&Attributes::BURNING_TIME)).ceil() as i32
+        });
+        if entity.fire_ticks.load(Ordering::Relaxed) < ticks {
+            self.set_remaining_fire_ticks(ticks);
         }
-        // TODO: defrost
+        entity.clear_freeze();
+    }
+
+    /// Vanilla `Entity.setRemainingFireTicks`.
+    fn set_remaining_fire_ticks(&self, ticks: i32) {
+        self.get_entity().fire_ticks.store(ticks, Ordering::Relaxed);
+    }
+
+    /// Vanilla `Entity.getFireImmuneTicks`: the fire ticks are reset to minus this once the
+    /// entity stops burning.
+    fn fire_immune_ticks(&self) -> i32 {
+        0
+    }
+
+    /// Vanilla `Entity.playEntityOnFireExtinguishedSound`.
+    fn play_entity_on_fire_extinguished_sound(&self) {
+        let entity = self.get_entity();
+        let pitch = {
+            let mut random = entity.random();
+            1.6 + (random.next_f32() - random.next_f32()) * 0.4
+        };
+        entity.world.load().play_sound_fine(
+            Sound::EntityGenericExtinguishFire,
+            self.entity_sound_source(),
+            &entity.pos.load(),
+            0.7,
+            pitch,
+        );
+    }
+
+    /// Vanilla `Entity.shouldPlayLavaHurtSound`.
+    fn should_play_lava_hurt_sound(&self) -> bool {
+        true
     }
 
     /// Called when a player collides with an entity
@@ -1190,6 +1230,30 @@ pub enum DelayedLeash {
     Knot(BlockPos),
 }
 
+/// Vanilla `Entity.Movement`: one move the entity made, swept for the blocks it passed.
+#[derive(Clone, Copy, Debug)]
+pub struct EntityMovement {
+    pub from: Vector3<f64>,
+    pub to: Vector3<f64>,
+    /// The move before collisions, whose axis order the sweep follows.
+    pub axis_dependent_original_movement: Option<Vector3<f64>>,
+}
+
+impl EntityMovement {
+    #[must_use]
+    pub const fn new(
+        from: Vector3<f64>,
+        to: Vector3<f64>,
+        axis_dependent_original_movement: Option<Vector3<f64>>,
+    ) -> Self {
+        Self {
+            from,
+            to,
+            axis_dependent_original_movement,
+        }
+    }
+}
+
 pub struct Entity {
     /// A unique identifier for the entity
     pub entity_id: i32,
@@ -1293,6 +1357,12 @@ pub struct Entity {
     pub age: AtomicI32,
     /// Vanilla `Entity.tickCount`: ticks since this entity object was created or loaded.
     pub tick_count: AtomicI32,
+    /// Vanilla `Entity.firstTick`: cleared at the end of the first base tick.
+    pub first_tick: AtomicBool,
+    /// Vanilla `movementThisTick`: the moves made since the last block-effect sweep.
+    movement_this_tick: std::sync::Mutex<Vec<EntityMovement>>,
+    /// Vanilla `finalMovementsThisTick`: the moves the last sweep covered.
+    final_movements_this_tick: std::sync::Mutex<Vec<EntityMovement>>,
     /// Vanilla `Entity.moveDist`, `flyDist` and `nextStep`, for step sounds.
     pub move_dist: AtomicCell<f32>,
     pub fly_dist: AtomicCell<f32>,
@@ -1472,6 +1542,9 @@ impl Entity {
             riding_cooldown: AtomicI32::new(0),
             age: AtomicI32::new(0),
             tick_count: AtomicI32::new(0),
+            first_tick: AtomicBool::new(true),
+            movement_this_tick: std::sync::Mutex::new(Vec::new()),
+            final_movements_this_tick: std::sync::Mutex::new(Vec::new()),
             move_dist: AtomicCell::new(0.0),
             fly_dist: AtomicCell::new(0.0),
             next_step: AtomicCell::new(1.0),
@@ -2169,78 +2242,269 @@ impl Entity {
         */
     }
 
+    /// Vanilla `Entity.isInWall` (for the caller's suffocation damage) followed by
+    /// `applyEffectsFromBlocks`.
     pub fn tick_block_collisions(&self, caller: &dyn EntityBase) -> bool {
+        let suffocating = self.is_in_wall();
+        self.apply_effects_from_blocks(caller);
+        suffocating
+    }
+
+    /// Vanilla `Entity.addMovementThisTick`: past 100 moves the first two merge.
+    fn add_movement_this_tick(&self, movement: EntityMovement) {
+        let mut movements = self
+            .movement_this_tick
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if movements.len() >= 100 {
+            let first = movements.remove(0);
+            let second = movements.remove(0);
+            movements.insert(0, EntityMovement::new(first.from, second.to, None));
+        }
+        movements.push(movement);
+    }
+
+    /// The movement recording of vanilla `Entity.move`, for a move made outside
+    /// [`Self::move_entity`], such as a player's own movement packet.
+    pub fn record_movement(&self, from: Vector3<f64>, to: Vector3<f64>, delta: Vector3<f64>) {
+        self.add_movement_this_tick(EntityMovement::new(from, to, Some(delta)));
+    }
+
+    /// The moves recorded so far this tick, for [`Self::set_movement_this_tick`].
+    pub fn movement_this_tick(&self) -> Vec<EntityMovement> {
+        self.movement_this_tick
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+    }
+
+    /// Puts back moves saved with [`Self::movement_this_tick`], dropping any recorded since.
+    pub fn set_movement_this_tick(&self, movements: Vec<EntityMovement>) {
+        *self
+            .movement_this_tick
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = movements;
+    }
+
+    /// Vanilla `Entity.removeLatestMovementRecording`.
+    pub fn remove_latest_movement_recording(&self) {
+        self.movement_this_tick
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .pop();
+    }
+
+    /// Vanilla `Entity.clearMovementThisTick`.
+    pub fn clear_movement_this_tick(&self) {
+        self.movement_this_tick
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clear();
+    }
+
+    /// Vanilla `Entity.applyEffectsFromBlocks()`: sweeps this tick's moves, or the move from
+    /// the old position when there were none.
+    pub fn apply_effects_from_blocks(&self, caller: &dyn EntityBase) {
+        let mut movements = std::mem::take(
+            &mut *self
+                .movement_this_tick
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+        );
+        let pos = self.pos.load();
+        match movements.last() {
+            None => movements.push(EntityMovement::new(self.last_pos.load(), pos, None)),
+            Some(last) if last.to.squared_distance_to_vec(&pos) > f64::from(9.999_999_4E-11f32) => {
+                movements.push(EntityMovement::new(last.to, pos, None));
+            }
+            Some(_) => {}
+        }
+        (*self
+            .final_movements_this_tick
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner))
+        .clone_from(&movements);
+        self.apply_effects_from_movements(caller, &movements);
+    }
+
+    /// Vanilla `Entity.applyEffectsFromBlocksForLastMovements`.
+    pub fn apply_effects_from_blocks_for_last_movements(&self, caller: &dyn EntityBase) {
+        let movements = self
+            .final_movements_this_tick
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        self.apply_effects_from_movements(caller, &movements);
+    }
+
+    /// Vanilla `Entity.applyEffectsFromBlocks(Vec3, Vec3)`.
+    pub fn apply_effects_from_blocks_between(
+        &self,
+        caller: &dyn EntityBase,
+        from: Vector3<f64>,
+        to: Vector3<f64>,
+    ) {
+        self.apply_effects_from_movements(caller, &[EntityMovement::new(from, to, None)]);
+    }
+
+    /// Vanilla `Entity.applyEffectsFromBlocks(List)`.
+    fn apply_effects_from_movements(&self, caller: &dyn EntityBase, movements: &[EntityMovement]) {
         if !self.is_affected_by_blocks() {
-            return false;
+            return;
+        }
+        let world = self.world.load_full();
+        if self.on_ground.load(Ordering::Relaxed) {
+            let effect_pos = self.get_on_pos_legacy();
+            let (block, state) = world.get_block_and_state(&effect_pos);
+            world
+                .block_registry
+                .on_entity_step(block, &world, caller, &effect_pos, state);
         }
 
-        let bounding_box = self.bounding_box.load();
-        let aabb = bounding_box.expand(-1.0e-7, -1.0e-7, -1.0e-7);
+        let was_on_fire = self.is_on_fire();
+        let was_freezing = self.is_freezing();
+        let previous_fire_ticks = self.fire_ticks.load(Ordering::Relaxed);
+        let effect_applier = InsideBlockEffectApplier::default();
+        self.check_inside_blocks(caller, movements, &effect_applier);
+        effect_applier.apply_and_clear(caller);
+        if self.is_in_rain() {
+            self.extinguish();
+        }
 
-        let min = aabb.min_block_pos();
-        let max = aabb.max_block_pos();
+        if (was_on_fire && !self.is_on_fire()) || (was_freezing && !self.is_freezing()) {
+            caller.play_entity_on_fire_extinguished_sound();
+        }
 
-        let eye_height = self.get_eye_height();
-        let eye_width = f64::from(self.width()) * 0.8;
-        let mut eye_level_box = aabb;
-        let shrink_x = (aabb.max.x - aabb.min.x - eye_width) / 2.0;
-        let shrink_z = (aabb.max.z - aabb.min.z - eye_width) / 2.0;
-        eye_level_box.min.x += shrink_x;
-        eye_level_box.max.x -= shrink_x;
-        eye_level_box.min.z += shrink_z;
-        eye_level_box.max.z -= shrink_z;
-        eye_level_box.min.y += eye_height;
-        eye_level_box.max.y = eye_level_box.min.y;
+        let ignited_this_tick = self.fire_ticks.load(Ordering::Relaxed) > previous_fire_ticks;
+        if !self.is_on_fire() && !ignited_this_tick {
+            caller.set_remaining_fire_ticks(-caller.fire_immune_ticks());
+        }
+    }
 
-        let mut suffocating = false;
-        let world = self.world.load();
-
-        for pos in BlockPos::iterate(min, max) {
-            let (block, state) = world.get_block_and_state(&pos);
-            if state.is_air() {
-                continue;
+    /// Vanilla `Entity.checkInsideBlocks(List, StepBasedCollector)`.
+    fn check_inside_blocks(
+        &self,
+        caller: &dyn EntityBase,
+        movements: &[EntityMovement],
+        effect_applier: &InsideBlockEffectApplier,
+    ) {
+        if !self.is_affected_by_blocks() {
+            return;
+        }
+        let mut visited_blocks = HashSet::new();
+        for movement in movements {
+            let mut pos = movement.from;
+            let delta = movement.to - movement.from;
+            let mut max_movement_iterations = 16;
+            if let Some(original) = movement.axis_dependent_original_movement
+                && delta.length_squared() > 0.0
+            {
+                for axis in Axis::step_order(original) {
+                    let axis_move = delta.get_axis(axis);
+                    if axis_move != 0.0 {
+                        let mut to = pos;
+                        to.set_axis(axis, pos.get_axis(axis) + axis_move);
+                        max_movement_iterations -= self.check_inside_blocks_between(
+                            caller,
+                            pos,
+                            to,
+                            effect_applier,
+                            &mut visited_blocks,
+                            max_movement_iterations,
+                        );
+                        pos = to;
+                    }
+                }
+            } else {
+                max_movement_iterations -= self.check_inside_blocks_between(
+                    caller,
+                    movement.from,
+                    movement.to,
+                    effect_applier,
+                    &mut visited_blocks,
+                    16,
+                );
             }
 
-            let check_suffocation = !suffocating && state.is_suffocating();
+            if max_movement_iterations <= 0 {
+                self.check_inside_blocks_between(
+                    caller,
+                    movement.to,
+                    movement.to,
+                    effect_applier,
+                    &mut visited_blocks,
+                    1,
+                );
+            }
+        }
+    }
 
-            World::check_collision(
-                &bounding_box,
-                pos,
-                state,
-                check_suffocation,
-                |collision_shape: &BoundingBox| {
-                    if collision_shape.intersects(&eye_level_box) {
-                        suffocating = true;
-                    }
-                },
-            );
-
-            let collision_shape = if block == &Block::POWDER_SNOW {
+    /// Vanilla `Entity.checkInsideBlocks(Vec3, Vec3, ...)`: returns the sweep steps it used.
+    fn check_inside_blocks_between(
+        &self,
+        caller: &dyn EntityBase,
+        from: Vector3<f64>,
+        to: Vector3<f64>,
+        effect_applier: &InsideBlockEffectApplier,
+        visited_blocks: &mut HashSet<i64>,
+        max_movement_iterations: i32,
+    ) -> i32 {
+        let deflate = f64::from(1.0E-5f32);
+        let target_box = BoundingBox::new_from_pos(to.x, to.y, to.z, &self.entity_dimension.load())
+            .expand(-deflate, -deflate, -deflate);
+        let moved_far =
+            from.squared_distance_to_vec(&to) > 0.999_990_000_000_252_6 * 0.999_990_000_000_252_6;
+        let world = self.world.load_full();
+        let server = world.server.upgrade();
+        let full_block = BoundingBox::full_block();
+        let mut iterations = 0;
+        for_each_block_intersected_between(from, to, &target_box, |pos, iteration| {
+            if !inside_block_effect::is_alive(caller) || iteration >= max_movement_iterations {
+                return false;
+            }
+            iterations = iteration;
+            let (block, state) = world.get_block_and_state(&pos);
+            if state.is_air() {
+                return true;
+            }
+            let shape = if block == &Block::POWDER_SNOW {
                 crate::block::blocks::powder_snow::inside_collision_shape_for_entity(caller, &pos)
             } else {
                 world
                     .block_registry
                     .get_inside_collision_shape(block, &world, state, &pos)
             };
-
-            if bounding_box.intersects(&collision_shape.at_pos(pos)) {
-                if block == &Block::POWDER_SNOW {
-                    self.is_in_powder_snow.store(true, Relaxed);
-                }
-                if let Some(server_arc) = world.server.upgrade() {
+            // `intersectShape == Shapes.block()`.
+            let inside_block = (shape.min == full_block.min && shape.max == full_block.max)
+                || self.collided_with_shape_moving_from(from, to, [shape.at_pos(pos)]);
+            let (fluid, fluid_state) = world.get_fluid_and_fluid_state(&pos);
+            let inside_fluid = self.collided_with_fluid(fluid, &fluid_state, &pos, from, to);
+            if (inside_block || inside_fluid) && visited_blocks.insert(pos.as_long()) {
+                if inside_block && let Some(server) = &server {
+                    let is_precise =
+                        moved_far || target_box.intersects(&BoundingBox::from_block(&pos));
+                    effect_applier.advance_step(iteration);
                     world.block_registry.on_entity_collision(
                         block,
                         &world,
                         caller,
                         &pos,
                         state,
-                        &server_arc,
+                        server,
+                        effect_applier,
+                        is_precise,
                     );
                 }
+                if inside_fluid {
+                    effect_applier.advance_step(iteration);
+                    world
+                        .block_registry
+                        .on_entity_collision_fluid(fluid, caller, effect_applier);
+                }
             }
-        }
-
-        suffocating
+            true
+        });
+        iterations + 1
     }
 
     pub fn update_last_pos(&self) -> Vector3<f64> {
@@ -2253,13 +2517,10 @@ impl Entity {
 
     // updateWaterState() in yarn
 
+    /// Vanilla `Entity.updateFluidInteraction`. The fluids' own effects come from the
+    /// block sweep after the move.
     fn update_fluid_state(&self, caller: &dyn EntityBase) {
-        let world = self.world.load();
-        for fluid in self.update_fluid_interaction(caller) {
-            world
-                .block_registry
-                .on_entity_collision_fluid(fluid, caller);
-        }
+        self.update_fluid_interaction(caller);
     }
 
     /// Vanilla `Entity.updateFluidInteraction`: fluid flags and current push only, without the
@@ -2356,9 +2617,8 @@ impl Entity {
         if in_water {
             self.reset_fall_distance();
 
-            // Vanilla `firstTick`: the world bumps `tick_count` before the first tick.
             if !self.touching_water.load(Ordering::SeqCst)
-                && self.tick_count.load(Ordering::Relaxed) > 1
+                && !self.first_tick.load(Ordering::Relaxed)
             {
                 self.do_water_splash_effect(caller);
             }
@@ -2730,8 +2990,11 @@ impl Entity {
         // Vanilla `Entity.move` leaves out a negligible move unless collisions cut it short.
         let movement_length = final_move.length_squared();
         if movement_length > 1.0E-7 || motion.length_squared() - movement_length < 1.0E-7 {
-            self.reset_fall_on_long_move(self.pos.load(), final_move);
-            self.move_pos(final_move);
+            let pos = self.pos.load();
+            self.reset_fall_on_long_move(pos, final_move);
+            let new_position = pos + final_move;
+            self.add_movement_this_tick(EntityMovement::new(pos, new_position, Some(motion)));
+            self.set_pos(new_position);
         }
 
         // Vanilla `setOnGroundWithMovement`: `move` runs it when the entity moved vertically
@@ -3109,9 +3372,64 @@ impl Entity {
         }
     }
 
-    /// Extinguishes this entity.
+    /// Vanilla `Entity.clearFire`: never raises negative (post-fire grace) ticks to 0.
     pub fn extinguish(&self) {
-        self.fire_ticks.store(0, Ordering::Relaxed);
+        let ticks = self.fire_ticks.load(Ordering::Relaxed);
+        self.fire_ticks.store(ticks.min(0), Ordering::Relaxed);
+    }
+
+    /// Vanilla `Entity.extinguishFire`.
+    pub fn extinguish_fire(caller: &dyn EntityBase) {
+        let entity = caller.get_entity();
+        if entity.is_on_fire() {
+            caller.play_entity_on_fire_extinguished_sound();
+        }
+        entity.extinguish();
+    }
+
+    /// Vanilla `Entity.lavaIgnite`.
+    pub fn lava_ignite(caller: &dyn EntityBase) {
+        if !caller.get_entity().is_fire_immune() {
+            caller.set_on_fire_for(15.0);
+        }
+    }
+
+    /// Vanilla `Entity.lavaHurt`.
+    pub fn lava_hurt(caller: &dyn EntityBase) {
+        let entity = caller.get_entity();
+        if entity.is_fire_immune() {
+            return;
+        }
+        if caller.damage(caller, 4.0, DamageType::LAVA)
+            && caller.should_play_lava_hurt_sound()
+            && !entity.is_silent()
+        {
+            let pitch = 2.0 + entity.random().next_f32() * 0.4;
+            entity.world.load().play_sound_fine(
+                Sound::EntityGenericBurn,
+                caller.entity_sound_source(),
+                &entity.pos.load(),
+                0.4,
+                pitch,
+            );
+        }
+    }
+
+    /// Vanilla `Entity.isInLava`: never on the entity's first tick.
+    #[must_use]
+    pub fn is_in_lava(&self) -> bool {
+        !self.first_tick.load(Ordering::Relaxed) && self.touching_lava.load(Ordering::Relaxed)
+    }
+
+    /// Vanilla `Entity.clearFreeze`.
+    pub fn clear_freeze(&self) {
+        self.set_frozen_ticks(0);
+    }
+
+    /// Vanilla `Entity.isFreezing`.
+    #[must_use]
+    pub fn is_freezing(&self) -> bool {
+        self.frozen_ticks.load(Ordering::Relaxed) > 0
     }
 
     /// Maximum freeze ticks (7 seconds at 20 tps)
@@ -3166,55 +3484,34 @@ impl Entity {
         true
     }
 
-    /// Ticks the frozen state of the entity.
-    /// In powder snow and freezeable: `frozen_ticks` increases by 1 (up to `MAX_FROZEN_TICKS`)
-    /// Otherwise: `frozen_ticks` decreases by 2 (down to 0)
-    /// When fully frozen, deals 1 damage every 40 ticks
+    /// The freezing part of vanilla `LivingEntity.aiStep`: thaws when out of powder snow (the
+    /// `FREEZE` inside-block effect does the freezing), and hurts once fully frozen.
     pub fn tick_frozen(&self, caller: &dyn EntityBase) {
         let can_freeze = self.can_freeze(caller);
-        let in_powder_snow = self.is_in_powder_snow();
-        let old_frozen_ticks = self.frozen_ticks.load(Ordering::Relaxed);
-
-        let new_frozen_ticks = if in_powder_snow && can_freeze {
-            // Increase frozen ticks when in powder snow
-            (old_frozen_ticks + 1).min(Self::MAX_FROZEN_TICKS)
-        } else {
-            // Vanilla: thaw whenever not in powder snow OR when freezing is prevented
-            (old_frozen_ticks - 2).max(0)
-        };
-
-        // Only update and send metadata if the value changed
-        if new_frozen_ticks != old_frozen_ticks {
-            self.frozen_ticks.store(new_frozen_ticks, Ordering::Relaxed);
-            let mut bedrock_meta = SyncedActorDataList::new();
-            bedrock_meta.set(
-                entity_data_key::FREEZING_EFFECT_STRENGTH,
-                MetadataValue::Float(new_frozen_ticks as f32),
-            );
-            self.set_synced_data(
-                tracked_data::entity::DATA_TICKS_FROZEN,
-                VarInt(new_frozen_ticks),
-            );
-            self.send_bedrock_actor_data(&bedrock_meta);
+        if !self.is_in_powder_snow() || !can_freeze {
+            let ticks = self.frozen_ticks.load(Ordering::Relaxed);
+            let thawed = (ticks - 2).max(0);
+            if thawed != ticks {
+                self.set_frozen_ticks(thawed);
+            }
         }
 
-        // Vanilla parity: full-freeze damage is tick-phase based.
-        if can_freeze
-            && new_frozen_ticks >= Self::MAX_FROZEN_TICKS
-            && self.tick_count.load(Ordering::Relaxed) % Self::FREEZE_DAMAGE_INTERVAL == 0
+        if self.tick_count.load(Ordering::Relaxed) % Self::FREEZE_DAMAGE_INTERVAL == 0
+            && self.get_frozen_ticks() >= Self::MAX_FROZEN_TICKS
+            && can_freeze
         {
-            let world = self.world.load_full();
-            if world.level_info.load().game_rules.freeze_damage
-                && let Some(entity) = world.get_entity_by_id(self.entity_id)
+            // `Player.isInvulnerableTo`: the freeze_damage game rule only spares players.
+            if caller.get_player().is_none()
+                || self.world.load().level_info.load().game_rules.freeze_damage
             {
-                entity.damage(entity.as_ref(), 1.0, DamageType::FREEZE);
+                caller.damage(caller, 1.0, DamageType::FREEZE);
             }
         }
     }
 
-    /// Sets the number of ticks the entity has been frozen.
+    /// Vanilla `Entity.setTicksFrozen`, which doesn't clamp.
     pub fn set_frozen_ticks(&self, ticks: i32) {
-        let new_frozen_ticks = ticks.clamp(0, Self::MAX_FROZEN_TICKS);
+        let new_frozen_ticks = ticks;
         self.frozen_ticks.store(new_frozen_ticks, Ordering::Relaxed);
         let mut bedrock_meta = SyncedActorDataList::new();
         bedrock_meta.set(
@@ -3354,7 +3651,7 @@ impl Entity {
     /// Vanilla `Entity.isInLiquid`.
     #[must_use]
     pub fn is_in_liquid(&self) -> bool {
-        self.is_in_water() || self.touching_lava.load(Ordering::Relaxed)
+        self.is_in_water() || self.is_in_lava()
     }
 
     /// Vanilla `Entity.collidedWithShapeMovingFrom`: whether this entity's box, moved
@@ -3390,16 +3687,20 @@ impl Entity {
         self.collided_with_shape_moving_from(from, to, [fluid_aabb])
     }
 
-    pub fn is_in_water_or_rain(&self) -> bool {
+    /// Vanilla `Entity.isInRain`.
+    pub fn is_in_rain(&self) -> bool {
         let world = self.world.load();
         let pos = self.block_pos.load();
-        self.is_in_water()
-            || world.is_raining_at(&pos)
+        world.is_raining_at(&pos)
             || world.is_raining_at(&BlockPos::new(
                 pos.0.x,
                 self.bounding_box.load().max.y.floor() as i32,
                 pos.0.z,
             ))
+    }
+
+    pub fn is_in_water_or_rain(&self) -> bool {
+        self.is_in_water() || self.is_in_rain()
     }
 
     #[must_use]
@@ -3460,17 +3761,25 @@ impl Entity {
         }
     }
 
-    /// Sets whether the entity is on fire for visual and damage purposes. This is separate from `fire_ticks` which tracks the damage aspect of being on fire.
+    /// Vanilla `Entity.setSharedFlagOnFire`: the flag also stays set while `HasVisualFire` is.
     pub fn set_on_fire(&self, on_fire: bool) {
-        if self.has_visual_fire.load(Ordering::Relaxed) != on_fire {
-            self.has_visual_fire.store(on_fire, Ordering::Relaxed);
-            self.set_flag(Flag::OnFire, on_fire);
+        let value = on_fire || self.has_visual_fire.load(Ordering::Relaxed);
+        let mask = 1i8 << Flag::OnFire as u8;
+        if (self.flags.load(Ordering::Relaxed) & mask != 0) != value {
+            self.set_flag(Flag::OnFire, value);
         }
     }
 
+    /// Vanilla `Entity.hasVisualFire`, the permanent flames set by NBT.
+    pub fn set_has_visual_fire(&self, visual_fire: bool) {
+        self.has_visual_fire.store(visual_fire, Ordering::Relaxed);
+        self.set_on_fire(self.fire_ticks.load(Ordering::Relaxed) > 0);
+    }
+
+    /// Vanilla `Entity.isOnFire` on the server.
     #[must_use]
     pub fn is_on_fire(&self) -> bool {
-        self.fire_ticks.load(Ordering::Relaxed) > 0 || self.has_visual_fire.load(Ordering::Relaxed)
+        !self.is_fire_immune() && self.fire_ticks.load(Ordering::Relaxed) > 0
     }
 
     /// Vanilla `Entity.getLookAngle`.
@@ -4018,55 +4327,6 @@ impl Entity {
         self.invulnerable.store(invulnerable, Relaxed);
     }
 
-    pub fn check_block_collision(entity: &dyn EntityBase, server: &Server) {
-        let aabb = entity.get_entity().bounding_box.load();
-        let blockpos = BlockPos::new(
-            (aabb.min.x + 0.001).floor() as i32,
-            (aabb.min.y + 0.001).floor() as i32,
-            (aabb.min.z + 0.001).floor() as i32,
-        );
-        let blockpos1 = BlockPos::new(
-            (aabb.max.x - 0.001).floor() as i32,
-            (aabb.max.y - 0.001).floor() as i32,
-            (aabb.max.z - 0.001).floor() as i32,
-        );
-        let world = entity.get_entity().world.load();
-
-        for x in blockpos.0.x..=blockpos1.0.x {
-            for y in blockpos.0.y..=blockpos1.0.y {
-                for z in blockpos.0.z..=blockpos1.0.z {
-                    let pos = BlockPos::new(x, y, z);
-                    let (block, state) = world.get_block_and_state(&pos);
-                    let block_outlines = state.get_block_outline_shapes_at(&pos);
-
-                    if state.outline_shapes.is_empty() {
-                        world
-                            .block_registry
-                            .on_entity_collision(block, &world, entity, &pos, state, server);
-                        let fluid = world.get_fluid(&pos);
-                        world
-                            .block_registry
-                            .on_entity_collision_fluid(fluid, entity);
-                        continue;
-                    }
-                    for outline in block_outlines {
-                        let outline_aabb = outline.at_pos(pos);
-                        if outline_aabb.intersects(&aabb) {
-                            world
-                                .block_registry
-                                .on_entity_collision(block, &world, entity, &pos, state, server);
-                            let fluid = world.get_fluid(&pos);
-                            world
-                                .block_registry
-                                .on_entity_collision_fluid(fluid, entity);
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     pub fn teleport(
         &self,
         position: Vector3<f64>,
@@ -4182,37 +4442,41 @@ impl Entity {
     }
 
     #[must_use]
+    /// Vanilla `Entity.isInWall`: a suffocating block's collision shape at eye level.
     pub fn is_in_wall(&self) -> bool {
         if self.no_physics.load(Ordering::Relaxed) {
             return false;
         }
 
         let eye_pos = self.get_eye_pos();
-        let half_width = (f64::from(self.entity_dimension.load().width) * 0.8) / 2.0;
+        // `AABB.ofSize(eye, width * 0.8F, 1.0E-6, width * 0.8F)`.
+        let half_width = f64::from(self.entity_dimension.load().width * 0.8) / 2.0;
+        let half_height = 1.0e-6 / 2.0;
         let eye_bb = BoundingBox::new(
-            Vector3::new(eye_pos.x - half_width, eye_pos.y, eye_pos.z - half_width),
+            Vector3::new(
+                eye_pos.x - half_width,
+                eye_pos.y - half_height,
+                eye_pos.z - half_width,
+            ),
             Vector3::new(
                 eye_pos.x + half_width,
-                eye_pos.y + 1.0e-6,
+                eye_pos.y + half_height,
                 eye_pos.z + half_width,
             ),
         );
-        let min = eye_bb.min_block_pos();
-        let max = eye_bb.max_block_pos();
         let world = self.world.load();
-
-        for pos in BlockPos::iterate(min, max) {
-            let (block, state) = world.get_block_and_state(&pos);
-            if state.is_air() {
-                continue;
-            }
-
-            if blocks_movement(state, block.id) && state.is_full_cube() {
-                return true;
-            }
-        }
-
-        false
+        BlockPos::iterate(
+            BlockPos::floored_v(eye_bb.min),
+            BlockPos::floored_v(eye_bb.max),
+        )
+        .any(|pos| {
+            let state = world.get_block_state(&pos);
+            !state.is_air()
+                && state.is_suffocating()
+                && state
+                    .get_block_collision_shapes_at(&pos)
+                    .any(|shape| shape.at_pos(pos).intersects(&eye_bb))
+        })
     }
 
     pub const LEASH_SNAP_DISTANCE: f64 = 12.0;
@@ -5234,7 +5498,7 @@ impl Entity {
             self.has_visual_fire.store(visual_fire, Relaxed);
         }
         if let Some(frozen) = nbt.get_int("TicksFrozen") {
-            self.frozen_ticks.store(frozen, Relaxed);
+            self.set_frozen_ticks(frozen);
         }
         self.read_glowing_and_custom_data(nbt);
         if let Some(name) = nbt.get("CustomName") {
@@ -5285,51 +5549,46 @@ impl Entity {
 }
 
 impl EntityBase for Entity {
+    /// Vanilla `Entity.baseTick`.
     fn tick(&self, caller: &dyn EntityBase, _server: &Server) {
+        self.update_last_pos();
+        let riding_cooldown = self.riding_cooldown.load(Ordering::Relaxed);
+        if riding_cooldown > 0 {
+            self.riding_cooldown
+                .store(riding_cooldown - 1, Ordering::Relaxed);
+        }
+        self.tick_portal(caller);
         // Recomputed during movement/block-collision handling in the same tick.
         let was_in_powder_snow = self.is_in_powder_snow.load(Ordering::Relaxed);
         self.was_in_powder_snow
             .store(was_in_powder_snow, Ordering::Relaxed);
         self.is_in_powder_snow.store(false, Ordering::Relaxed);
-
-        self.update_last_pos();
-        self.tick_portal(caller);
         self.was_eye_in_water
             .store(self.eye_in_water.load(Ordering::Relaxed), Ordering::Relaxed);
         self.update_fluid_state(caller);
         if let Some(mob) = caller.get_mob() {
             mob.update_swimming();
         }
-        self.check_out_of_world(caller);
-        let fire_ticks = self.fire_ticks.load(Ordering::Relaxed);
 
-        // Check for fire immunity (or if the specific entity is)
-        let is_immune = self.is_fire_immune();
+        let fire_ticks = self.fire_ticks.load(Ordering::Relaxed);
         if fire_ticks > 0 {
-            if is_immune {
-                self.fire_ticks.store(fire_ticks - 4, Ordering::Relaxed);
-                if self.fire_ticks.load(Ordering::Relaxed) < 0 {
-                    self.extinguish();
-                }
+            if self.is_fire_immune() {
+                self.extinguish();
             } else {
-                // lava deals its own damage.
-                if fire_ticks % 20 == 0 && !self.touching_lava.load(Ordering::SeqCst) {
+                if fire_ticks % 20 == 0 && !self.is_in_lava() {
                     caller.damage(caller, 1.0, DamageType::ON_FIRE);
                 }
-
-                self.fire_ticks.store(fire_ticks - 1, Ordering::Relaxed);
+                caller.set_remaining_fire_ticks(self.fire_ticks.load(Ordering::Relaxed) - 1);
             }
         }
 
-        // Check if visual fire should be sent
-        let should_render_fire = self.fire_ticks.load(Ordering::Relaxed) > 0 && !is_immune;
-        self.set_on_fire(should_render_fire);
-
-        let riding_cooldown = self.riding_cooldown.load(Ordering::Relaxed);
-        if riding_cooldown > 0 {
-            self.riding_cooldown
-                .store(riding_cooldown - 1, Ordering::Relaxed);
+        if self.is_in_lava() {
+            self.fall_distance.store(self.fall_distance.load() * 0.5);
         }
+
+        self.check_out_of_world(caller);
+        self.set_on_fire(self.fire_ticks.load(Ordering::Relaxed) > 0);
+        self.first_tick.store(false, Ordering::Relaxed);
     }
 
     fn get_entity(&self) -> &Entity {

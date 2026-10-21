@@ -262,8 +262,7 @@ impl BlockBehaviour for SculkSensorBlock {
 
     /// Vanilla `SculkSensorBlock.stepOn`.
     fn on_entity_step(&self, args: OnEntityStepArgs<'_>) {
-        if args.below_supporting_block
-            || !Self::can_activate(args.state)
+        if !Self::can_activate(args.state)
             || args.entity.get_entity().entity_type == &EntityType::WARDEN
         {
             return;

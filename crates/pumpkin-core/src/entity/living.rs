@@ -4421,40 +4421,6 @@ impl EntityBase for LivingEntity {
                 .fetch_sub(1, Relaxed);
         }
 
-        // Fetch supporting blocks for players or other entities
-        let supporting_pos = caller.get_player().map_or_else(
-            || self.entity.get_supporting_block_pos(),
-            super::player::Player::get_supporting_block_pos,
-        );
-
-        // Notify the block under the entity each tick if a supporting block position is found
-        if self.entity.is_affected_by_blocks()
-            && let Some(supporting) = supporting_pos
-        {
-            let world = self.entity.world.load_full();
-            let (block, state) = world.get_block_and_state(&supporting);
-
-            world
-                .block_registry
-                .on_entity_step(block, &world, caller, &supporting, state, false);
-
-            // Check slightly below supporting_pos for additional supporting blocks (blocks under carpets and the like)
-            if !block.is_solid() {
-                let below_supporting = supporting.down();
-                let (below_block, below_state) = world.get_block_and_state(&below_supporting);
-
-                // If block is not air, notify it as well
-                world.block_registry.on_entity_step(
-                    below_block,
-                    &world,
-                    caller,
-                    &below_supporting,
-                    below_state,
-                    true, // below supporting block
-                );
-            }
-        }
-
         let current_block_pos = self.entity.block_pos.load();
         if is_alive && self.last_block_pos.load() != Some(current_block_pos) {
             self.last_block_pos.store(Some(current_block_pos));
