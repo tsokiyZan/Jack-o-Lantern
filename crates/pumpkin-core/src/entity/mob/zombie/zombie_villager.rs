@@ -297,7 +297,11 @@ impl ZombieVillagerEntity {
                 villager.set_villager_data(data);
                 // Gossips, trades and trading experience.
                 villager.mob_read_nbt(&carried);
-                villager.finalize_spawn(&world, None);
+                villager.finalize_spawn(
+                    &world,
+                    crate::entity::mob::spawn::EntitySpawnReason::Conversion,
+                    None,
+                );
 
                 if let Some(starter) = starter
                     && let Some(player) = world.get_player_by_uuid(starter)
@@ -410,6 +414,7 @@ impl Mob for ZombieVillagerEntity {
     fn finalize_spawn(
         &self,
         world: &Arc<World>,
+        _reason: crate::entity::mob::spawn::EntitySpawnReason,
         group_data: Option<SpawnGroupData>,
     ) -> Option<SpawnGroupData> {
         self.finalize_zombie_villager_spawn(world, group_data, false)

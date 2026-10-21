@@ -54,6 +54,7 @@ pub(crate) fn is_face_full_up(state: &BlockState) -> bool {
 pub fn try_spawn_mob<T: Mob + 'static>(
     entity_type: &'static EntityType,
     create: fn(Entity) -> Arc<T>,
+    reason: crate::entity::mob::spawn::EntitySpawnReason,
     world: &Arc<World>,
     start: &BlockPos,
     spawn_attempts: i32,
@@ -130,6 +131,7 @@ pub fn try_spawn_mob<T: Mob + 'static>(
         crate::entity::mob::spawn::finalize_spawn(
             &(mob.clone() as Arc<dyn EntityBase>),
             world,
+            reason,
             None,
         );
         // `checkSpawnRules` (`PathfinderMob`'s walk target value) and `checkSpawnObstruction`.

@@ -407,7 +407,11 @@ impl ZombieEntityBase {
                 continue;
             }
             reinforcement_mob.set_mob_target(Some(target));
-            reinforcement_mob.finalize_spawn(&world, None);
+            reinforcement_mob.finalize_spawn(
+                &world,
+                crate::entity::mob::spawn::EntitySpawnReason::Reinforcement,
+                None,
+            );
             world.spawn_entity(reinforcement.clone());
             living.update_attribute(&Attributes::SPAWN_REINFORCEMENTS, |instance| {
                 let existing_amount = instance
@@ -608,7 +612,12 @@ impl ZombieEntityBase {
                 uuid::Uuid::new_v4(),
             );
             chicken.get_entity().set_rotation(entity.yaw.load(), 0.0);
-            crate::entity::mob::spawn::finalize_spawn(&chicken, world, None);
+            crate::entity::mob::spawn::finalize_spawn(
+                &chicken,
+                world,
+                crate::entity::mob::spawn::EntitySpawnReason::Jockey,
+                None,
+            );
             if let Some(chicken_entity) = chicken.cast_any().downcast_ref::<ChickenEntity>() {
                 chicken_entity.set_chicken_jockey(true);
             }

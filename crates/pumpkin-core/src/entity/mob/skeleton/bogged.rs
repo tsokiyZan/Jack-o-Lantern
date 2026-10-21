@@ -122,6 +122,7 @@ impl Mob for BoggedSkeletonEntity {
     fn finalize_spawn(
         &self,
         world: &Arc<World>,
+        _reason: crate::entity::mob::spawn::EntitySpawnReason,
         group_data: Option<SpawnGroupData>,
     ) -> Option<SpawnGroupData> {
         self.entity.finalize_spawn(self, world, group_data)

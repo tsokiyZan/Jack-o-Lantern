@@ -269,6 +269,7 @@ impl Mob for TurtleEntity {
     fn finalize_spawn(
         &self,
         _world: &Arc<World>,
+        _reason: crate::entity::mob::spawn::EntitySpawnReason,
         group_data: Option<SpawnGroupData>,
     ) -> Option<SpawnGroupData> {
         self.home_pos.store(self.get_entity().block_pos.load());

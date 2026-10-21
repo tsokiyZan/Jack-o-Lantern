@@ -228,6 +228,7 @@ impl Mob for VexEntity {
     fn finalize_spawn(
         &self,
         _world: &Arc<World>,
+        _reason: crate::entity::mob::spawn::EntitySpawnReason,
         group_data: Option<SpawnGroupData>,
     ) -> Option<SpawnGroupData> {
         // `populateDefaultEquipmentSlots` (an iron sword that never drops) and

@@ -136,7 +136,12 @@ pub fn finalize_spider_spawn(
     if rng().next_bounded_i32(100) == 0 {
         let skeleton = from_type(&EntityType::SKELETON, pos, world, Uuid::new_v4());
         skeleton.get_entity().set_rotation(entity.yaw.load(), 0.0);
-        finalize_spawn(&skeleton, world, None);
+        finalize_spawn(
+            &skeleton,
+            world,
+            crate::entity::mob::spawn::EntitySpawnReason::Jockey,
+            None,
+        );
         mob.add_pending_rider(skeleton);
     }
 
@@ -192,6 +197,7 @@ impl Mob for SpiderEntity {
     fn finalize_spawn(
         &self,
         world: &Arc<World>,
+        _reason: crate::entity::mob::spawn::EntitySpawnReason,
         group_data: Option<SpawnGroupData>,
     ) -> Option<SpawnGroupData> {
         finalize_spider_spawn(&self.mob_entity, world, group_data)

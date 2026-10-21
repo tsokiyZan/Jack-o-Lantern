@@ -393,7 +393,12 @@ impl Spell for EvokerSummonSpell {
                 &world,
                 Uuid::new_v4(),
             );
-            crate::entity::mob::spawn::finalize_spawn(&vex, &world, None);
+            crate::entity::mob::spawn::finalize_spawn(
+                &vex,
+                &world,
+                crate::entity::mob::spawn::EntitySpawnReason::MobSummoned,
+                None,
+            );
             if let Some(vex_mob) = vex
                 .get_mob()
                 .and_then(|vex| vex.cast_any().downcast_ref::<VexEntity>())

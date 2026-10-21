@@ -150,8 +150,9 @@ pub(crate) fn prepare_egg_mob(
     mob: &Arc<dyn EntityBase>,
     world: &Arc<World>,
     user: Option<&Player>,
+    reason: crate::entity::mob::spawn::EntitySpawnReason,
 ) {
-    finalize_spawn(mob, world, None);
+    finalize_spawn(mob, world, reason, None);
     apply_entity_variant(item, mob.as_ref(), user);
 }
 
@@ -188,7 +189,13 @@ impl ItemBehaviour for SpawnEggItem {
             } else {
                 player.inventory.off_hand_item()
             };
-            prepare_egg_mob(&stack, &mob, &world, Some(player));
+            prepare_egg_mob(
+                &stack,
+                &mob,
+                &world,
+                Some(player),
+                crate::entity::mob::spawn::EntitySpawnReason::SpawnItemUse,
+            );
             if !world.spawn_creature(
                 mob,
                 CreatureSpawnReason::SpawnerEgg,
@@ -273,7 +280,13 @@ impl ItemBehaviour for SpawnEggItem {
 
             mob.get_entity().set_rotation(yaw, 0.0);
 
-            prepare_egg_mob(item, &mob, &world, Some(player));
+            prepare_egg_mob(
+                item,
+                &mob,
+                &world,
+                Some(player),
+                crate::entity::mob::spawn::EntitySpawnReason::SpawnItemUse,
+            );
 
             if world.spawn_creature(
                 mob,

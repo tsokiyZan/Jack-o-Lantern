@@ -90,7 +90,12 @@ pub(crate) fn empty_sulfur_cube_bucket(
     let mob = from_type(&EntityType::SULFUR_CUBE, spawn_pos, world, Uuid::new_v4());
     mob.get_entity()
         .set_rotation(wrap_degrees(rand::random::<f32>() * 360.0), 0.0);
-    finalize_spawn(&mob, world, None);
+    finalize_spawn(
+        &mob,
+        world,
+        crate::entity::mob::spawn::EntitySpawnReason::Bucket,
+        None,
+    );
     if let Some(name) = bucket.get_data_component::<CustomNameImpl>() {
         mob.get_entity().set_custom_name(name.name.clone());
     }

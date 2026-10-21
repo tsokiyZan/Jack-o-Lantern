@@ -2034,6 +2034,7 @@ pub trait Mob: EntityBase + Send + Sync {
     fn finalize_spawn(
         &self,
         _world: &Arc<World>,
+        _reason: crate::entity::mob::spawn::EntitySpawnReason,
         group_data: Option<spawn::SpawnGroupData>,
     ) -> Option<spawn::SpawnGroupData> {
         self.get_mob_entity().finalize_spawn_base();

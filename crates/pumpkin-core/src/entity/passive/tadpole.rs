@@ -109,7 +109,11 @@ impl TadpoleEntity {
     fn age_up(&self) {
         let world = self.get_entity().world.load_full();
         convert_single(self, &EntityType::FROG, false, false, |frog| {
-            frog.finalize_spawn(&world, None);
+            frog.finalize_spawn(
+                &world,
+                crate::entity::mob::spawn::EntitySpawnReason::Conversion,
+                None,
+            );
             frog.get_mob_entity()
                 .persistence_required
                 .store(true, Ordering::Relaxed);

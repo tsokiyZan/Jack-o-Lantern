@@ -279,6 +279,7 @@ impl Mob for FrogEntity {
     fn finalize_spawn(
         &self,
         world: &Arc<World>,
+        _reason: crate::entity::mob::spawn::EntitySpawnReason,
         group_data: Option<SpawnGroupData>,
     ) -> Option<SpawnGroupData> {
         self.set_variant(select_variant_to_spawn(world, self.get_entity()));

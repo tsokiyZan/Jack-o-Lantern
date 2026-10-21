@@ -150,14 +150,53 @@ impl MobEntity {
     }
 }
 
+/// Vanilla `EntitySpawnReason`: why a mob is being finalized.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EntitySpawnReason {
+    Natural,
+    ChunkGeneration,
+    Spawner,
+    Structure,
+    Breeding,
+    MobSummoned,
+    Jockey,
+    Event,
+    Conversion,
+    Reinforcement,
+    Triggered,
+    Bucket,
+    SpawnItemUse,
+    Command,
+    Dispenser,
+    Patrol,
+    TrialSpawner,
+    Load,
+    DimensionTravel,
+}
+
+impl EntitySpawnReason {
+    /// Vanilla `EntitySpawnReason.isSpawner`.
+    #[must_use]
+    pub const fn is_spawner(self) -> bool {
+        matches!(self, Self::Spawner | Self::TrialSpawner)
+    }
+
+    /// Vanilla `EntitySpawnReason.ignoresLightRequirements`.
+    #[must_use]
+    pub const fn ignores_light_requirements(self) -> bool {
+        matches!(self, Self::TrialSpawner)
+    }
+}
+
 /// Finalizes `entity` if it is a mob, and returns the group data for the next mob of the group.
 pub fn finalize_spawn(
     entity: &Arc<dyn EntityBase>,
     world: &Arc<World>,
+    reason: EntitySpawnReason,
     group_data: Option<SpawnGroupData>,
 ) -> Option<SpawnGroupData> {
     match entity.get_mob() {
-        Some(mob) => mob.finalize_spawn(world, group_data),
+        Some(mob) => mob.finalize_spawn(world, reason, group_data),
         None => group_data,
     }
 }

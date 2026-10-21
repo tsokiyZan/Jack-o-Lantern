@@ -357,6 +357,7 @@ impl CreakingHeartBlockEntity {
         let spawned_creaking = try_spawn_mob(
             &EntityType::CREAKING,
             CreakingEntity::new,
+            crate::entity::mob::spawn::EntitySpawnReason::Spawner,
             world,
             &pos,
             ATTEMPTS_PER_SPAWN,

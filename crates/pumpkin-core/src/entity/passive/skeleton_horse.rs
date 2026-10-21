@@ -139,7 +139,12 @@ impl SkeletonHorseEntity {
             world,
             Uuid::new_v4(),
         );
-        crate::entity::mob::spawn::finalize_spawn(&horse, world, None);
+        crate::entity::mob::spawn::finalize_spawn(
+            &horse,
+            world,
+            crate::entity::mob::spawn::EntitySpawnReason::Triggered,
+            None,
+        );
         let entity = horse.get_entity();
         entity.set_pos(pos);
         if let Some(living) = horse.get_living_entity() {
@@ -165,7 +170,12 @@ impl SkeletonHorseEntity {
         let pos = horse.get_entity().pos.load();
         let skeleton =
             crate::entity::r#type::from_type(&EntityType::SKELETON, pos, world, Uuid::new_v4());
-        crate::entity::mob::spawn::finalize_spawn(&skeleton, world, None);
+        crate::entity::mob::spawn::finalize_spawn(
+            &skeleton,
+            world,
+            crate::entity::mob::spawn::EntitySpawnReason::Triggered,
+            None,
+        );
         skeleton.get_entity().set_pos(pos);
         if let Some(living) = skeleton.get_living_entity() {
             living.hurt_cooldown.store(60, Ordering::Relaxed);
