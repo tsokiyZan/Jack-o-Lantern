@@ -1083,11 +1083,14 @@ impl MobEntity {
             // (`MaceItem.hurtEnemy`), which Pumpkin only ports for players.
             EnchantmentHelper::do_post_attack_effects(&world, target, &damage_source);
             // `setLastHurtMob`.
-            if target.get_living_entity().is_some() {
-                living
-                    .last_attacking_id
-                    .store(target.get_entity().entity_id, Relaxed);
-            }
+            living.last_attacking_id.store(
+                if target.get_living_entity().is_some() {
+                    target.get_entity().entity_id
+                } else {
+                    0
+                },
+                Relaxed,
+            );
             living
                 .last_attack_time
                 .store(living.entity.tick_count.load(Relaxed), Relaxed);
@@ -3331,9 +3334,10 @@ pub fn convert_common(from: &dyn Mob, to: &dyn Mob, params: conversion::Conversi
         !old_entity.entity_type.fire_immune && old_entity.fire_ticks.load(Relaxed) > 0,
     );
     new_entity.set_invulnerable(old_entity.invulnerable.load(Relaxed));
-    new_living
-        .hurt_cooldown
-        .store(old_living.hurt_cooldown.load(Relaxed), Relaxed);
+    // `setInvulnerableTime(from.getInvulnerableTime())`.
+    new_entity
+        .invulnerable_time
+        .store(old_entity.invulnerable_time.load(Relaxed), Relaxed);
     new_entity.set_has_no_gravity(old_entity.has_no_gravity.load(Relaxed));
     new_entity
         .portal_cooldown

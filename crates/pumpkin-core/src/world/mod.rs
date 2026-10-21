@@ -700,7 +700,9 @@ impl World {
             let passenger = from_type(entity_type, Vector3::new(0.0, 0.0, 0.0), world, uuid);
             passenger.read_nbt_non_mut(passenger_nbt);
             passenger.init_data_tracker();
-            world.add_entity_silent(passenger.clone());
+            if !world.add_entity_silent(passenger.clone()) {
+                continue;
+            }
             vehicle
                 .get_entity()
                 .add_passenger_without_event(vehicle.clone(), passenger.clone());
@@ -1853,7 +1855,7 @@ impl World {
                         if !vehicle.is_removed() && vehicle.has_passenger(id) {
                             continue;
                         }
-                        vehicle.remove_passenger(id);
+                        vehicle.remove_passenger_on_removal(id);
                     }
 
                     // `tickNonPassenger`.
@@ -4719,8 +4721,9 @@ impl World {
 
                         // UUID-dedupes if another watcher already loaded this entity.
                         // Tracker owns pairing (spawn packets + vehicle restore).
-                        world.add_entity_silent(entity.clone());
-                        Self::load_passengers(&world, &entity, entity_nbt);
+                        if world.add_entity_silent(entity.clone()) {
+                            Self::load_passengers(&world, &entity, entity_nbt);
+                        }
                         if let Some(player) = &player {
                             player.try_restore_vehicle(&entity);
                         }
@@ -5481,7 +5484,8 @@ impl World {
     }
 
     #[expect(clippy::needless_pass_by_value)]
-    pub fn add_entity_silent(&self, entity: Arc<dyn EntityBase>) {
+    /// Returns `false` when an entity with the same UUID is already live.
+    pub fn add_entity_silent(&self, entity: Arc<dyn EntityBase>) -> bool {
         let base_entity = entity.get_entity();
 
         // Guard against duplicate entities with the same UUID.
@@ -5493,7 +5497,7 @@ impl World {
             .iter()
             .any(|e| e.get_entity().entity_uuid == base_entity.entity_uuid);
         if already_exists {
-            return;
+            return false;
         }
 
         // The entity stays live-only: it is written to its chunk's saved data on
@@ -5509,6 +5513,7 @@ impl World {
             new_entities
         });
         self.add_pending_riders(&entity);
+        true
     }
 
     pub fn remove_entity(&self, entity: &dyn EntityBase) {
@@ -5524,7 +5529,9 @@ impl World {
 
         // Vanilla `setRemoved`: a destroyed entity leaves its vehicle and its passengers get off.
         if let Some(vehicle) = base_entity.get_vehicle() {
-            vehicle.get_entity().remove_passenger(base_entity.entity_id);
+            vehicle
+                .get_entity()
+                .remove_passenger_on_removal(base_entity.entity_id);
         }
         let passengers = base_entity
             .passengers
@@ -5532,7 +5539,7 @@ impl World {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone();
         for passenger in passengers {
-            base_entity.remove_passenger(passenger.get_entity().entity_id);
+            base_entity.remove_passenger_on_removal(passenger.get_entity().entity_id);
         }
 
         self.spawn_state.load().remove_entity(self, entity);
@@ -5559,8 +5566,13 @@ impl World {
             entities_to_remove.clear();
             let mut new_entities = (**current_entities).clone();
             new_entities.retain(|entity| {
-                let base_entity = entity.get_entity();
-                let pos = base_entity.chunk_pos.load();
+                // Vanilla `processChunkUnload` unloads each root vehicle with all its
+                // passengers (`getPassengersAndSelf`), so a passenger goes with its root's
+                // chunk, not its own.
+                let pos = entity.get_entity().root_vehicle().map_or_else(
+                    || entity.get_entity().chunk_pos.load(),
+                    |root| root.get_entity().chunk_pos.load(),
+                );
                 if chunks_set.contains(&pos) {
                     entities_to_remove.push(entity.clone());
                     false

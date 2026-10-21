@@ -1501,6 +1501,9 @@ pub struct Entity {
     pub portal_cooldown: AtomicU32,
 
     pub portal_manager: std::sync::Mutex<Option<PortalProcessor>>,
+    /// A portal destination found off the tick, applied on the entity's next tick so the
+    /// copy into the new dimension never races the world tick.
+    pending_portal_transition: std::sync::Mutex<Option<TeleportTarget>>,
     /// Custom name for the entity
     pub custom_name: ArcSwap<Option<TextComponent>>,
     /// Indicates whether the entity's custom name is visible
@@ -1682,6 +1685,7 @@ impl Entity {
             last_biome_update_pos: AtomicCell::new(BlockPos::new(floor_x, floor_y, floor_z)),
             portal_cooldown: AtomicU32::new(0),
             portal_manager: std::sync::Mutex::new(None),
+            pending_portal_transition: std::sync::Mutex::new(None),
             custom_name: ArcSwap::new(Arc::new(None)),
             custom_name_visible: AtomicBool::new(false),
             silent: AtomicBool::new(false),
@@ -3508,6 +3512,17 @@ impl Entity {
         if self.portal_cooldown.load(Ordering::Relaxed) > 0 {
             self.portal_cooldown.fetch_sub(1, Ordering::Relaxed);
         }
+        let pending = self
+            .pending_portal_transition
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .take();
+        if let Some(target) = pending
+            && let Some(entity_arc) = self.world.load().get_entity_by_id(self.entity_id)
+        {
+            teleport_transition(&entity_arc, &target);
+            return;
+        }
         let Ok(mut manager_guard) = self.portal_manager.try_lock() else {
             return;
         };
@@ -3552,17 +3567,19 @@ impl Entity {
                             );
                         } else {
                             // Portals keep the entity's speed (`Relative.DELTA`).
-                            teleport_transition(
-                                &entity_arc,
-                                &TeleportTarget {
+                            *entity_arc
+                                .get_entity()
+                                .pending_portal_transition
+                                .lock()
+                                .unwrap_or_else(std::sync::PoisonError::into_inner) =
+                                Some(TeleportTarget {
                                     world: transition.new_world,
                                     position: transition.position,
                                     yaw: transition.yaw,
                                     pitch: transition.pitch,
                                     keep_velocity: true,
                                     as_passenger: false,
-                                },
-                            );
+                                });
                         }
                     }
                 });
@@ -5414,15 +5431,21 @@ impl Entity {
     }
 
     pub fn remove_passenger(&self, passenger_id: i32) {
-        self.remove_passenger_internal(passenger_id, true);
+        self.remove_passenger_internal(passenger_id, true, true);
     }
 
     pub fn remove_passenger_before_teleport(&self, passenger_id: i32) {
-        self.remove_passenger_internal(passenger_id, false);
+        self.remove_passenger_internal(passenger_id, false, true);
+    }
+
+    /// The dismount vanilla `setRemoved` forces: plugins are told but can't cancel it,
+    /// since a removed entity can't keep riding or carrying anything.
+    pub fn remove_passenger_on_removal(&self, passenger_id: i32) {
+        self.remove_passenger_internal(passenger_id, true, false);
     }
 
     #[allow(clippy::too_many_lines)]
-    fn remove_passenger_internal(&self, passenger_id: i32, reposition: bool) {
+    fn remove_passenger_internal(&self, passenger_id: i32, reposition: bool, cancellable: bool) {
         let mut dismount_event =
             crate::plugin::api::events::entity::entity_dismount::EntityDismountEvent::new(
                 passenger_id,
@@ -5441,7 +5464,7 @@ impl Entity {
                 .plugin_manager
                 .fire_blocking(&server, &mut vehicle_exit);
         }
-        if dismount_event.cancelled || vehicle_exit.cancelled {
+        if cancellable && (dismount_event.cancelled || vehicle_exit.cancelled) {
             return;
         }
 

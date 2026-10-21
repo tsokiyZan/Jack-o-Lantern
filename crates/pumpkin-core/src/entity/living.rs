@@ -4796,8 +4796,9 @@ impl EntityBase for LivingEntity {
         // Vanilla `LivingEntity.onAttributeUpdated` refreshes the dimensions when the
         // `scale` attribute changes. Attributes change from places that cannot reach the
         // owning entity here, so the change is picked up before the entity next moves.
-        // Vanilla `Entity.commonTick` lowers `invulnerableTime` before the entity ticks.
-        if self.hurt_cooldown.load(Relaxed) > 0 {
+        let is_player = self.entity.entity_type == &EntityType::PLAYER;
+        // `ServerPlayer.tick` lowers `damageCooldownTime` before `super.tick()`.
+        if is_player && self.hurt_cooldown.load(Relaxed) > 0 {
             self.hurt_cooldown.fetch_sub(1, Relaxed);
         }
         let scale = self.get_scale();
@@ -4814,7 +4815,6 @@ impl EntityBase for LivingEntity {
         crate::enchantment::EnchantmentHelper::tick_effects(caller, self);
         self.entity.tick(caller, server);
 
-        let is_player = self.entity.entity_type == &EntityType::PLAYER;
         let is_alive = !self.entity.removed.load(Relaxed) && self.health.load() > 0.0;
         if is_alive {
             if self.is_in_wall(caller) {
@@ -4832,6 +4832,9 @@ impl EntityBase for LivingEntity {
         }
         if self.hurt_time.load(Relaxed) > 0 {
             self.hurt_time.fetch_sub(1, Relaxed);
+        }
+        if !is_player && self.hurt_cooldown.load(Relaxed) > 0 {
+            self.hurt_cooldown.fetch_sub(1, Relaxed);
         }
         let own_tick_death = caller.get_mob().is_some_and(|mob| mob.tick_death(caller));
         // Vanilla `baseTick` runs `tickDeath`, so a corpse removed on its 20th tick never
@@ -5146,7 +5149,7 @@ impl LivingEntity {
             crate::item::items::spear::SpearItem::mob_use_tick(mob);
         }
         // `useOnRelease`: only a crossbow waits for its release.
-        if self.item_use_time.fetch_sub(1, Relaxed) - 1 == 0
+        if self.item_use_time.fetch_sub(1, Relaxed).wrapping_sub(1) == 0
             && hand_item.item.id != Item::CROSSBOW.id
         {
             self.complete_using_item(caller, hand);
