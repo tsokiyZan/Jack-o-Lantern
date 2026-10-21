@@ -882,23 +882,39 @@ impl MobEntity {
             && self.breeding_cooldown.load(Relaxed) <= 0
     }
 
+    /// Vanilla `Mob.isWithinMeleeAttackRange`: the active item's `attack_range` (scaled by its
+    /// `mob_factor`) or the default reach, against the target's hitbox.
     pub fn is_in_attack_range(&self, target: &dyn EntityBase) -> bool {
         // Vanilla `Math.sqrt(2.04F) - 0.6F`, with both literals rounded to float first.
         const DEFAULT_ATTACK_REACH: f64 = 0.828_285_648_512_600_4;
 
-        // TODO: Implement DataComponent lookup for ATTACK_RANGE when components are ready
-        let max_range = DEFAULT_ATTACK_REACH;
-        let min_range = 0.0;
+        let (max_range, min_range) = self
+            .active_item()
+            .get_data_component::<pumpkin_data::data_component_impl::AttackRangeImpl>()
+            .map_or((DEFAULT_ATTACK_REACH, 0.0), |range| {
+                // `effectiveMaxRange`/`effectiveMinRange` for a mob.
+                (
+                    f64::from(range.max_reach * range.mob_factor),
+                    f64::from(range.min_reach * range.mob_factor),
+                )
+            });
 
-        // TODO: vanilla `LivingEntity.getHitbox` raises minY to the vehicle's passenger riding
-        // position for a mounted target; Pumpkin has no passenger attachment points yet.
-        let target_hitbox = target.get_entity().bounding_box.load();
-
+        let target_hitbox = hitbox(target);
         if !self.get_attack_box(max_range).intersects(&target_hitbox) {
             return false;
         }
 
         min_range <= 0.0 || !self.get_attack_box(min_range).intersects(&target_hitbox)
+    }
+
+    /// Vanilla `LivingEntity.getActiveItem`: the item in use, else the main hand.
+    fn active_item(&self) -> ItemStack {
+        self.living_entity
+            .item_in_use
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+            .unwrap_or_else(|| self.get_item_slot(&EquipmentSlot::MAIN_HAND))
     }
 
     /// Vanilla `Monster.isDarkEnoughToSpawn`, drawing from the random `checkSpawnRules` is given.
@@ -998,31 +1014,30 @@ impl MobEntity {
         Self::check_surface_water_animal_spawn_rules(world, pos)
     }
 
+    /// Vanilla `Mob.doHurtTarget`.
     pub fn try_attack(&self, caller: &dyn EntityBase, target: &dyn EntityBase) -> bool {
-        if self.living_entity.dead.load(Relaxed) {
-            return false;
-        }
-
+        let living = &self.living_entity;
+        let world = living.entity.world.load_full();
+        let mut damage = living.get_attribute_value(&Attributes::ATTACK_DAMAGE) as f32;
+        let weapon = living.held_item(caller);
         let damage_source = DamageSource {
-            damage_type: caller
-                .get_mob()
-                .map_or(DamageType::MOB_ATTACK, Mob::melee_damage_type),
+            damage_type: weapon_damage_type(caller, &weapon),
             direct: Some(caller),
             causing: Some(caller),
         };
-        // Vanilla `Mob.doHurtTarget`: the weapon's enchantments against this target.
-        let world = self.living_entity.entity.world.load_full();
-        let attack_damage = EnchantmentHelper::modify_damage(
-            &world,
-            &self.living_entity.held_item(caller),
-            target,
-            &damage_source,
-            self.living_entity
-                .get_attribute_value(&Attributes::ATTACK_DAMAGE) as f32,
-        );
+        damage = EnchantmentHelper::modify_damage(&world, &weapon, target, &damage_source, damage);
+        // `getItem().getAttackDamageBonus`: only the mace has one.
+        if weapon.item == &Item::MACE {
+            damage += crate::item::items::mace::MaceItem::get_attack_damage_bonus(
+                living,
+                &weapon,
+                target,
+                &damage_source,
+            );
+        }
         let damaged = target.damage_with_context(
             target,
-            attack_damage,
+            damage,
             damage_source.damage_type,
             None,
             damage_source.direct,
@@ -1030,16 +1045,74 @@ impl MobEntity {
         );
 
         if damaged {
+            let knockback = self.get_knockback(&world, &weapon, target, &damage_source);
+            self.cause_extra_knockback(caller, target, knockback, damage);
+            // TODO: `weaponItem.hurtEnemy`, whose only effect for a mob is the mace's smash
+            // (`MaceItem.hurtEnemy`), which Pumpkin only ports for players.
             EnchantmentHelper::do_post_attack_effects(&world, target, &damage_source);
-            self.living_entity
-                .last_attacking_id
-                .store(target.get_entity().entity_id, Relaxed);
-            self.living_entity
+            // `setLastHurtMob`.
+            if target.get_living_entity().is_some() {
+                living
+                    .last_attacking_id
+                    .store(target.get_entity().entity_id, Relaxed);
+            }
+            living
                 .last_attack_time
-                .store(self.living_entity.entity.tick_count.load(Relaxed), Relaxed);
+                .store(living.entity.tick_count.load(Relaxed), Relaxed);
+            if let Some(mob) = caller.get_mob() {
+                mob.play_attack_sound();
+            }
         }
-
+        // TODO: `postPiercingAttack` runs `EnchantmentHelper.doPostPiercingAttackEffects`,
+        // which Pumpkin has no port of; no vanilla enchantment applies it to a melee hit.
         damaged
+    }
+
+    /// Vanilla `LivingEntity.getKnockback`: the `attack_knockback` attribute through the
+    /// weapon's enchantments, halved.
+    fn get_knockback(
+        &self,
+        world: &World,
+        weapon: &ItemStack,
+        target: &dyn EntityBase,
+        damage_source: &DamageSource<'_>,
+    ) -> f32 {
+        let knockback = self
+            .living_entity
+            .get_attribute_value(&Attributes::ATTACK_KNOCKBACK) as f32;
+        EnchantmentHelper::modify_knockback(world, weapon, target, damage_source, knockback) / 2.0
+    }
+
+    /// Vanilla `LivingEntity.causeExtraKnockback`: a living target is pushed along this mob's
+    /// facing, and the mob slows down.
+    fn cause_extra_knockback(
+        &self,
+        caller: &dyn EntityBase,
+        target: &dyn EntityBase,
+        knockback: f32,
+        damage: f32,
+    ) {
+        let Some(target_living) = target.get_living_entity() else {
+            return;
+        };
+        if knockback <= 0.0 {
+            return;
+        }
+        let entity = &self.living_entity.entity;
+        let yaw = entity.yaw.load() * (std::f32::consts::PI / 180.0);
+        if target.get_mob().is_none_or(Mob::takes_knockback) {
+            target_living.knockback(
+                target,
+                f64::from(knockback),
+                f64::from(pumpkin_util::math::sin(yaw)),
+                f64::from(-pumpkin_util::math::cos(yaw)),
+                Some(caller),
+                damage,
+                true,
+            );
+        }
+        let velocity = entity.velocity.load();
+        entity.velocity.store(velocity.multiply(0.6, 1.0, 0.6));
     }
 
     fn get_attack_box(&self, attack_range: f64) -> BoundingBox {
@@ -1764,6 +1837,9 @@ pub trait Mob: EntityBase + Send + Sync {
     }
 
     fn on_attack(&self, _target: &dyn EntityBase) {}
+
+    /// Vanilla `LivingEntity.playAttackSound`, which `Mob.doHurtTarget` plays on a hit.
+    fn play_attack_sound(&self) {}
 
     /// Vanilla `Mob.canHoldItem`.
     fn can_hold_item(&self, _stack: &ItemStack) -> bool {
@@ -2655,6 +2731,39 @@ fn drop_leash<M: Mob + ?Sized>(mob: &M, drop_lead: bool) {
     if drop_lead {
         entity.spawn_at_location(ItemStack::new(1, &Item::LEAD));
     }
+}
+
+/// Vanilla `ItemStack.getDamageSource(attacker)`: the weapon's `damage_type` component, the
+/// mace's smash while the attacker can smash, else the attacker's own melee source.
+fn weapon_damage_type(attacker: &dyn EntityBase, weapon: &ItemStack) -> DamageType {
+    if let Some(damage_type) =
+        weapon.get_data_component::<pumpkin_data::data_component_impl::DamageTypeImpl>()
+    {
+        return damage_type.damage_type;
+    }
+    if weapon.item == &Item::MACE
+        && attacker
+            .get_living_entity()
+            .is_some_and(crate::item::items::mace::MaceItem::can_smash_attack)
+    {
+        return DamageType::MACE_SMASH;
+    }
+    attacker
+        .get_mob()
+        .map_or(DamageType::MOB_ATTACK, Mob::melee_damage_type)
+}
+
+/// Vanilla `LivingEntity.getHitbox` for a target: a rider's box starts at its seat.
+fn hitbox(target: &dyn EntityBase) -> BoundingBox {
+    let entity = target.get_entity();
+    let mut hitbox = entity.bounding_box.load();
+    if target.get_living_entity().is_some()
+        && let Some(vehicle) = entity.get_vehicle()
+    {
+        let seat = crate::entity::passenger_riding_position(vehicle.as_ref(), target);
+        hitbox.min.y = seat.y.max(hitbox.min.y);
+    }
+    hitbox
 }
 
 /// Vanilla `TamableAnimal.isTame` for a target or avoid candidate.

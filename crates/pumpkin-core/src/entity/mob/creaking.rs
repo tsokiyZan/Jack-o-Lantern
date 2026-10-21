@@ -411,6 +411,11 @@ impl CustomSound for CreakingEntity {
 }
 
 impl Mob for CreakingEntity {
+    /// Vanilla `Creaking.playAttackSound`.
+    fn play_attack_sound(&self) {
+        self.make_sound(Sound::EntityCreakingAttack);
+    }
+
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
     }
@@ -564,12 +569,7 @@ impl Mob for CreakingEntity {
         tick.world
             .send_entity_status(self.get_entity(), EntityStatus::StartAttacking, None);
         let attacker: &dyn EntityBase = tick.mob;
-        let hurt = self.mob_entity.try_attack(attacker, target.as_ref());
-        if hurt {
-            // Vanilla `Mob.doHurtTarget`'s `playAttackSound`.
-            self.make_sound(Sound::EntityCreakingAttack);
-        }
-        hurt
+        self.mob_entity.try_attack(attacker, target.as_ref())
     }
 
     /// Vanilla `Creaking.push(x, y, z)`: a frozen creaking can't be pushed.

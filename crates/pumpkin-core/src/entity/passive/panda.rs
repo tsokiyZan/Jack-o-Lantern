@@ -970,8 +970,8 @@ impl Mob for PandaEntity {
         self.sit(false);
     }
 
-    /// Vanilla `Panda.playAttackSound`, which `Mob.doHurtTarget` plays on a hit.
-    fn on_attack(&self, _target: &dyn EntityBase) {
+    /// Vanilla `Panda.playAttackSound`.
+    fn play_attack_sound(&self) {
         self.play_sound_at_self(Sound::EntityPandaBite, 1.0, 1.0);
     }
 
