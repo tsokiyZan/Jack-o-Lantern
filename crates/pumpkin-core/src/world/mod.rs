@@ -1725,7 +1725,7 @@ impl World {
         let player_handle = handle.clone();
         players.par_iter().for_each(|player| {
             let _guard = player_handle.enter();
-            player.get_entity().tick_count.fetch_add(1, Relaxed);
+            player.get_entity().common_tick();
             player.tick(server);
         });
         // A player's passengers tick with it, as with any other vehicle.
@@ -1790,7 +1790,7 @@ impl World {
                     }
 
                     // `tickNonPassenger`.
-                    entity.get_entity().tick_count.fetch_add(1, Relaxed);
+                    entity.get_entity().common_tick();
                     entity.tick(entity.as_ref(), server_ref);
                     Self::touch_players(entity.as_ref(), *entity_chunk, &players_cache);
                     Self::tick_passengers(entity, server_ref, &players_cache);
@@ -5280,7 +5280,7 @@ impl World {
         }
         // `commonTick` and `rideTick`.
         if passenger.get_player().is_none() {
-            entity.tick_count.fetch_add(1, Relaxed);
+            entity.common_tick();
             entity.velocity.store(Vector3::default());
             passenger.tick(passenger.as_ref(), server);
         }

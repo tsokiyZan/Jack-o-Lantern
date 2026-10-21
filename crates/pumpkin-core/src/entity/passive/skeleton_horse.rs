@@ -147,9 +147,7 @@ impl SkeletonHorseEntity {
         );
         let entity = horse.get_entity();
         entity.set_pos(pos);
-        if let Some(living) = horse.get_living_entity() {
-            living.hurt_cooldown.store(60, Ordering::Relaxed);
-        }
+        entity.invulnerable_time.store(60, Ordering::Relaxed);
         if let Some(mob) = horse.get_mob() {
             mob.get_mob_entity()
                 .persistence_required
@@ -177,9 +175,10 @@ impl SkeletonHorseEntity {
             None,
         );
         skeleton.get_entity().set_pos(pos);
-        if let Some(living) = skeleton.get_living_entity() {
-            living.hurt_cooldown.store(60, Ordering::Relaxed);
-        }
+        skeleton
+            .get_entity()
+            .invulnerable_time
+            .store(60, Ordering::Relaxed);
         if let Some(mob) = skeleton.get_mob() {
             let mob_entity = mob.get_mob_entity();
             mob_entity

@@ -1239,6 +1239,10 @@ pub enum DelayedLeash {
     Knot(BlockPos),
 }
 
+/// The horizontal limit vanilla `Entity.load` clamps a saved position to.
+const MAX_HORIZONTAL_POSITION: f64 = 3.000_051_2E7;
+/// The vertical limit vanilla `Entity.load` clamps a saved position to.
+const MAX_VERTICAL_POSITION: f64 = 2.0E7;
 /// Vanilla `Entity.WATER_FLOW_SCALE`.
 const WATER_FLOW_SCALE: f64 = 0.014;
 /// Vanilla `Entity.LAVA_FAST_FLOW_SCALE`.
@@ -1402,8 +1406,11 @@ pub struct Entity {
     pub bounding_box: AtomicCell<BoundingBox>,
     ///The size (width and height) of the bounding box
     pub entity_dimension: AtomicCell<EntityDimensions>,
-    /// Whether this entity is invulnerable to all damage
+    /// Vanilla `permanentlyInvulnerable`, saved as `Invulnerable`.
     pub invulnerable: AtomicBool,
+    /// Vanilla `invulnerableTime`: ticks of full invulnerability left, counted down in
+    /// `commonTick` and saved as `invulnerable_time`.
+    pub invulnerable_time: AtomicI32,
     /// List of damage types this entity is immune to
     pub damage_immunities: std::sync::Mutex<Vec<DamageType>>,
     // Whether the entity is immune to fire (to disable visual fire and fire damage)
@@ -1598,6 +1605,7 @@ impl Entity {
             )),
             entity_dimension: AtomicCell::new(bounding_box_size),
             invulnerable: AtomicBool::new(false),
+            invulnerable_time: AtomicI32::new(0),
             damage_immunities: std::sync::Mutex::new(Vec::new()),
             data: AtomicI32::new(0),
             flags: std::sync::atomic::AtomicI8::new(0),
@@ -4338,6 +4346,23 @@ impl Entity {
         self.send_bedrock_actor_data(&bedrock_meta);
     }
 
+    /// Vanilla `Entity.isInvulnerable`: permanently or for a while.
+    #[must_use]
+    pub fn is_invulnerable(&self) -> bool {
+        self.invulnerable.load(Ordering::Relaxed)
+            || self.invulnerable_time.load(Ordering::Relaxed) > 0
+    }
+
+    /// Vanilla `Entity.commonTick`, which the world runs before each entity's tick.
+    pub fn common_tick(&self) {
+        let invulnerable_time = self.invulnerable_time.load(Ordering::Relaxed);
+        if invulnerable_time > 0 {
+            self.invulnerable_time
+                .store(invulnerable_time - 1, Ordering::Relaxed);
+        }
+        self.tick_count.fetch_add(1, Ordering::Relaxed);
+    }
+
     /// Vanilla `Entity.fireImmune`: the entity type.
     pub fn is_fire_immune(&self) -> bool {
         self.entity_type.fire_immune || self.fire_immune.load(Ordering::Relaxed)
@@ -4357,7 +4382,7 @@ impl Entity {
             .is_some_and(Player::is_creative);
 
         self.removed.load(Ordering::SeqCst)
-            || (self.invulnerable.load(Ordering::Relaxed) && !bypasses && !creative_cause)
+            || (self.is_invulnerable() && !bypasses && !creative_cause)
             || (damage_type.has_tag(&tag::DamageType::MINECRAFT_IS_FIRE) && self.is_fire_immune())
             || (damage_type.has_tag(&tag::DamageType::MINECRAFT_IS_FALL)
                 && self
@@ -5417,6 +5442,10 @@ impl Entity {
         nbt.put_short("Fire", self.fire_ticks.load(Relaxed) as i16);
         nbt.put_bool("OnGround", self.on_ground.load(Relaxed));
         nbt.put_bool("Invulnerable", self.invulnerable.load(Relaxed));
+        let invulnerable_time = self.invulnerable_time.load(Relaxed);
+        if invulnerable_time > 0 {
+            nbt.put_int("invulnerable_time", invulnerable_time);
+        }
         if self.is_silent() {
             nbt.put_bool("Silent", true);
         }
@@ -5435,17 +5464,11 @@ impl Entity {
             nbt.put_bool("Glowing", true);
         }
         if let Some(custom_name) = &**self.custom_name.load() {
-            let mut tag = custom_name
-                .to_nbt_tag_for_version(&pumpkin_util::version::JavaMinecraftVersion::V_26_3);
-            // A literal string starting with '{' would read back as legacy JSON, so keep it a compound.
-            if let NbtTag::String(text) = &tag
-                && text.starts_with('{')
-            {
-                let mut literal = NbtCompound::new();
-                literal.put_string("text", text.to_string());
-                tag = NbtTag::Compound(literal);
-            }
-            nbt.put("CustomName", tag);
+            nbt.put(
+                "CustomName",
+                custom_name
+                    .to_nbt_tag_for_version(&pumpkin_util::version::JavaMinecraftVersion::V_26_3),
+            );
         }
         if self.custom_name_visible.load(Relaxed) {
             nbt.put_bool("CustomNameVisible", true);
@@ -5501,39 +5524,79 @@ impl Entity {
         }
     }
 
-    pub fn read_nbt_non_mut(&self, nbt: &NbtCompound) {
+    /// The `Pos`, `Motion` and `Rotation` part of vanilla `Entity.load`: motion over 10 per
+    /// axis is dropped, the position clamped to the world limits, and the head and body take
+    /// the raw yaw before `setRot` wraps it.
+    fn read_position_and_rotation(&self, nbt: &NbtCompound) {
         if let Some(position) = nbt.get_list("Pos")
             && position.len() >= 3
         {
             let x = position[0].extract_double().unwrap_or(0.0);
             let y = position[1].extract_double().unwrap_or(0.0);
             let z = position[2].extract_double().unwrap_or(0.0);
-            let pos = Vector3::new(x, y, z);
+            let pos = Vector3::new(
+                x.clamp(-MAX_HORIZONTAL_POSITION, MAX_HORIZONTAL_POSITION),
+                y.clamp(-MAX_VERTICAL_POSITION, MAX_VERTICAL_POSITION),
+                z.clamp(-MAX_HORIZONTAL_POSITION, MAX_HORIZONTAL_POSITION),
+            );
             self.set_pos(pos);
             self.last_sent_pos.store(pos);
         }
         if let Some(velocity) = nbt.get_list("Motion")
             && velocity.len() >= 3
         {
-            let x = velocity[0].extract_double().unwrap_or(0.0);
-            let y = velocity[1].extract_double().unwrap_or(0.0);
-            let z = velocity[2].extract_double().unwrap_or(0.0);
-            self.velocity.store(Vector3::new(x, y, z));
+            let component = |tag: &NbtTag| {
+                let value = tag.extract_double().unwrap_or(0.0);
+                if value.abs() > 10.0 { 0.0 } else { value }
+            };
+            self.velocity.store(Vector3::new(
+                component(&velocity[0]),
+                component(&velocity[1]),
+                component(&velocity[2]),
+            ));
+            self.velocity_dirty.store(true, Ordering::Relaxed);
         }
         if let Some(rotation) = nbt.get_list("Rotation")
             && rotation.len() >= 2
         {
             let yaw = rotation[0].extract_float().unwrap_or(0.0);
             let pitch = rotation[1].extract_float().unwrap_or(0.0);
-            self.set_rotation(yaw, pitch);
-            // TODO: use `pumpkin_util::math::pack_degrees`.
-            let yaw_byte = (yaw * 256.0 / 360.0).rem_euclid(256.0) as u8;
-            let pitch_byte = (pitch * 256.0 / 360.0).rem_euclid(256.0) as u8;
+            if yaw.is_finite() {
+                self.head_yaw.store(yaw);
+                self.body_yaw.store(yaw);
+                // `setRot`: both wrap (keeping their sign), the pitch is then clamped.
+                self.yaw.store(yaw % 360.0);
+            }
+            self.set_pitch(pitch);
+            let yaw = self.yaw.load();
+            let yaw_byte = pack_degrees(yaw);
             self.last_sent_yaw.store(yaw_byte, Relaxed);
-            self.last_sent_pitch.store(pitch_byte, Relaxed);
-            self.head_yaw.store(yaw);
-            self.last_sent_head_yaw.store(yaw_byte, Relaxed);
+            self.last_sent_pitch
+                .store(pack_degrees(self.pitch.load()), Relaxed);
+            self.last_sent_head_yaw
+                .store(pack_degrees(self.head_yaw.load()), Relaxed);
         }
+    }
+
+    /// The `Team` part of vanilla `Entity.load`: joins the team under the entity's UUID.
+    fn read_team(&self, nbt: &NbtCompound) {
+        let Some(team_name) = nbt.get_string("Team") else {
+            return;
+        };
+        let world = self.world.load_full();
+        let mut scoreboard = world
+            .scoreboard
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if !scoreboard.add_player_to_team(&world, team_name, self.entity_uuid.to_string()) {
+            tracing::warn!(
+                "Unable to add entity to team \"{team_name}\" (that team probably doesn't exist)"
+            );
+        }
+    }
+
+    pub fn read_nbt_non_mut(&self, nbt: &NbtCompound) {
+        self.read_position_and_rotation(nbt);
         // Only keys present are applied, so partial NBT leaves the rest untouched.
         // `FallDistance` is the float from before 1.21.5.
         if let Some(fall_distance) = nbt
@@ -5550,6 +5613,9 @@ impl Entity {
         }
         if let Some(invulnerable) = nbt.get_bool("Invulnerable") {
             self.invulnerable.store(invulnerable, Relaxed);
+        }
+        if let Some(invulnerable_time) = nbt.get_int("invulnerable_time") {
+            self.invulnerable_time.store(invulnerable_time, Relaxed);
         }
         if let Some(silent) = nbt.get_bool("Silent") {
             self.set_silent(silent);
@@ -5568,18 +5634,8 @@ impl Entity {
         }
         self.read_glowing_and_custom_data(nbt);
         if let Some(name) = nbt.get("CustomName") {
-            // Vanilla stores a text component tag; a string is literal text. Older
-            // Pumpkin saves hold a JSON string (same data version, so it can't be told
-            // apart by version); the writer never emits a literal starting with '{'.
-            let component = match name {
-                NbtTag::String(json) if json.starts_with('{') => {
-                    pumpkin_util::serde_json::from_str(json)
-                        .unwrap_or_else(|_| TextComponent::from_nbt(name))
-                }
-                _ => TextComponent::from_nbt(name),
-            };
-            // set_custom_name also updates the synced tracked data
-            self.set_custom_name(component);
+            // `ComponentSerialization.CODEC`: a string is literal text.
+            self.set_custom_name(TextComponent::from_nbt(name));
         }
         if let Some(visible) = nbt.get_bool("CustomNameVisible") {
             self.set_custom_name_visible(visible);
@@ -5591,13 +5647,16 @@ impl Entity {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             tags.clear();
-            tags.extend(
-                tag_list
-                    .iter()
-                    .filter_map(|tag| tag.extract_string().map(str::to_owned))
-                    .take(MAX_SCOREBOARD_TAGS),
-            );
+            // `sizeLimitedListOf(1024)`: a longer list fails to read at all.
+            if tag_list.len() <= MAX_SCOREBOARD_TAGS {
+                tags.extend(
+                    tag_list
+                        .iter()
+                        .filter_map(|tag| tag.extract_string().map(str::to_owned)),
+                );
+            }
         }
+        self.read_team(nbt);
 
         if let Some(custom_data) = nbt
             .get_compound("PumpkinCustomData")
