@@ -101,15 +101,13 @@ impl BreathManager {
         self.air_supply.load(Ordering::Relaxed)
     }
 
-    /// The air part of vanilla `LivingEntity.baseTick`, then the mob's own
-    /// `handleAirSupply`, which vanilla runs right after `baseTick` with the air
-    /// from before it.
+    /// The air part of vanilla `LivingEntity.baseTick`. The mob's own `handleAirSupply`
+    /// runs after the whole `baseTick`.
     pub fn tick(&self, living: &LivingEntity, caller: &dyn EntityBase) {
         let entity = &living.entity;
         if !entity.is_alive() {
             return;
         }
-        let pre_tick_air = self.air();
         let max_air = Self::max_air_supply(caller);
 
         if Self::is_eye_in_water(entity) && !Self::is_eye_in_bubble_column(entity) {
@@ -148,12 +146,23 @@ impl BreathManager {
             } else if self.air() < max_air && Self::should_effects_refill_air_supply(living) {
                 self.set_air(caller, Self::increase_air_supply(caller, self.air()));
             }
+
+            let vehicle = entity
+                .vehicle
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .clone();
+            if let Some(vehicle) = vehicle
+                && vehicle
+                    .get_entity()
+                    .entity_type
+                    .has_tag(&tag::EntityType::MINECRAFT_DISMOUNTS_UNDERWATER)
+            {
+                // `stopRiding`.
+                vehicle.get_entity().remove_passenger(entity.entity_id);
+            }
         } else if self.air() < max_air {
             self.set_air(caller, Self::increase_air_supply(caller, self.air()));
-        }
-
-        if let Some(mob) = caller.get_mob() {
-            mob.handle_air_supply(pre_tick_air);
         }
     }
 

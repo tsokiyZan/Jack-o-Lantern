@@ -20,14 +20,7 @@ impl MobEffect for InfestedMobEffect {
         _damage_type: &DamageType,
         _damage_amount: f32,
     ) {
-        // Wither, ender dragon and silverfish are immune
-        if living.entity.entity_type == &EntityType::WITHER
-            || living.entity.entity_type == &EntityType::ENDER_DRAGON
-            || living.entity.entity_type == &EntityType::SILVERFISH
-        {
-            return;
-        }
-
+        // Immune types never get the effect (`#immune_to_infested` in `canBeAffected`).
         let world = living.entity.world.load();
 
         // 10% chance to spawn
@@ -42,11 +35,12 @@ impl MobEffect for InfestedMobEffect {
             }
         };
         if count > 0 {
-            let bbox = living.entity.bounding_box.load();
+            // `mob.getY() + mob.getBbHeight() / 2.0`.
+            let pos = living.entity.pos.load();
             let center = Vector3::new(
-                f64::midpoint(bbox.min.x, bbox.max.x),
-                f64::midpoint(bbox.min.y, bbox.max.y),
-                f64::midpoint(bbox.min.z, bbox.max.z),
+                pos.x,
+                pos.y + f64::from(living.entity.height()) / 2.0,
+                pos.z,
             );
 
             let rot = living.entity.rotation();
@@ -66,7 +60,15 @@ impl MobEffect for InfestedMobEffect {
 
                 let silver = from_type(&EntityType::SILVERFISH, center, &world, Uuid::new_v4());
                 let silver_entity = silver.get_entity();
+                // `snapTo(x, y, z, level.getRandom().nextFloat() * 360.0F, 0.0F)`.
+                let yaw = world
+                    .random
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .next_f32()
+                    * 360.0;
                 silver_entity.set_pos(center);
+                silver_entity.set_rotation(yaw, 0.0);
                 silver_entity.velocity.store(Vector3::new(
                     f64::from(rx),
                     f64::from(vy),
@@ -74,9 +76,9 @@ impl MobEffect for InfestedMobEffect {
                 ));
 
                 world.spawn_entity(silver);
+                // `silverfish.playSound(SILVERFISH_HURT)`, once per silverfish.
+                world.play_sound(Sound::EntitySilverfishHurt, SoundCategory::Hostile, &center);
             }
-
-            world.play_sound(Sound::EntitySilverfishHurt, SoundCategory::Hostile, &center);
         }
     }
 }

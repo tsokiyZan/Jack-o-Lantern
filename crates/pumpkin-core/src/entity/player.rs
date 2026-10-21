@@ -1470,6 +1470,9 @@ impl Player {
             damage *= 1.5;
         }
 
+        let old_living_entity_health = victim
+            .get_living_entity()
+            .map_or(0.0, |living| living.health.load());
         if !victim.damage_with_context(
             victim.as_ref(),
             damage as f32,
@@ -1580,6 +1583,31 @@ impl Player {
         );
 
         self.item_attack_interaction(victim.as_ref(), &item_stack, &damage_source);
+
+        // Vanilla `damageStatsAndHearts`.
+        if let Some(living) = victim.get_living_entity() {
+            let actual_damage = old_living_entity_health - living.health.load();
+            self.increment_stat(
+                statistics::StatisticCategory::Custom,
+                statistics::CustomStatistic::DamageDealt as i32,
+                (actual_damage * 10.0).round() as i32,
+            );
+            if actual_damage > 2.0 {
+                let count = (actual_damage * 0.5) as i32;
+                let pos = victim_entity.pos.load();
+                world.spawn_particle(
+                    Vector3::new(
+                        pos.x,
+                        pos.y + f64::from(victim_entity.height()) * 0.5,
+                        pos.z,
+                    ),
+                    Vector3::new(0.1, 0.0, 0.1),
+                    0.2,
+                    count,
+                    pumpkin_data::particle::Particle::DamageIndicator,
+                );
+            }
+        }
 
         // Vanilla `Player#attack` ends the successful-hit branch with
         // `causeFoodExhaustion(0.1F)`. Only landed hits exhaust; the miss/no-damage
@@ -4651,7 +4679,7 @@ impl Player {
         {
             return false;
         }
-        if self.living_entity.health.load() <= 0.0 {
+        if self.living_entity.is_dead_or_dying() {
             return false;
         }
         // TODO: `removeEntitiesOnShoulder`; shoulder parrots aren't ported.
@@ -5705,7 +5733,10 @@ impl Player {
             .active_effects
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        effects.values().cloned().collect()
+        effects
+            .values()
+            .map(|instance| instance.effect.clone())
+            .collect()
     }
 
     #[must_use]
@@ -5721,17 +5752,11 @@ impl Player {
         self.raid_omen_position.store(None);
     }
 
+    /// Vanilla `PlayerList.sendActivePlayerEffects`: every effect, without blending.
     pub fn send_active_effects(&self) {
-        let effects: Vec<_> = self
-            .living_entity
-            .active_effects
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .values()
-            .cloned()
-            .collect();
+        let effects = self.get_active_effects();
         for effect in &effects {
-            self.send_effect(effect);
+            self.send_effect_with_blend(effect, false);
         }
     }
 
@@ -5740,8 +5765,18 @@ impl Player {
      * It won't be tracked on the server.
      */
     pub fn send_effect(&self, effect: &Effect) {
-        let mut flag: i8 = 0;
+        self.send_effect_with_blend(effect, effect.blend);
+    }
 
+    /// Vanilla `ClientboundUpdateMobEffectPacket` about this player itself.
+    pub fn send_effect_with_blend(&self, effect: &Effect, blend: bool) {
+        self.send_effect_for(self.entity_id(), effect, blend);
+    }
+
+    /// Vanilla `ClientboundUpdateMobEffectPacket` about `entity_id`, as a rider gets its
+    /// mount's effects.
+    pub fn send_effect_for(&self, entity_id: i32, effect: &Effect, blend: bool) {
+        let mut flag: i8 = 0;
         if effect.ambient {
             flag |= 1;
         }
@@ -5751,13 +5786,13 @@ impl Player {
         if effect.show_icon {
             flag |= 4;
         }
-        if effect.blend {
+        if blend {
             flag |= 8;
         }
 
         let effect_id = VarInt(i32::from(effect.effect_type.id));
         self.try_send_client_packet(&CUpdateMobEffect::new(
-            self.entity_id().into(),
+            entity_id.into(),
             effect_id,
             effect.amplifier.into(),
             effect.duration.into(),
@@ -5766,48 +5801,11 @@ impl Player {
     }
 
     pub fn remove_effect(&self, effect_type: &'static StatusEffect) -> bool {
-        let effect_id = VarInt(i32::from(effect_type.id));
-        self.try_send_client_packet(
-            &pumpkin_protocol::java::client::play::CRemoveMobEffect::new(
-                self.entity_id().into(),
-                effect_id,
-            ),
-        );
-
         self.living_entity.remove_effect(effect_type)
-
-        // TODO broadcast metadata
     }
 
     pub fn remove_all_effects(&self) -> bool {
-        let mut succeeded = false;
-        let mut effect_list = vec![];
-        let effects: Vec<_> = self
-            .living_entity
-            .active_effects
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .keys()
-            .copied()
-            .collect();
-        for effect in effects {
-            effect_list.push(effect);
-            let effect_id = VarInt(i32::from(effect.id));
-            self.try_send_client_packet(
-                &pumpkin_protocol::java::client::play::CRemoveMobEffect::new(
-                    self.entity_id().into(),
-                    effect_id,
-                ),
-            );
-            succeeded = true;
-        }
-
-        // Need to remove effects afterward here because there would be a deadlock if this is done in the for loop.
-        for effect in effect_list {
-            self.living_entity.remove_effect(effect);
-        }
-
-        succeeded
+        self.living_entity.remove_all_effects()
     }
 
     /// Add experience levels to the player.
@@ -7369,8 +7367,9 @@ impl EntityBase for Player {
         }
     }
 
+    /// Vanilla `LivingEntity.isPushable`; `Player` doesn't override it.
     fn is_pushable(&self) -> bool {
-        self.gamemode.load() != GameMode::Spectator && self.gamemode.load() != GameMode::Creative
+        self.living_entity.is_pushable_for(self)
     }
 
     fn get_gravity(&self) -> f64 {
@@ -7707,8 +7706,11 @@ impl EntityBase for Player {
             .read_nbt(nbt);
     }
 
+    /// Vanilla `Player.getBaseExperienceReward`: nothing kept inventories or spectators.
     fn get_experience_reward(&self, _killer: Option<&dyn EntityBase>) -> u32 {
-        // vanilla: min(level * 7, 100)
+        if self.world().level_info.load().game_rules.keep_inventory || self.is_spectator() {
+            return 0;
+        }
         let level = self.experience_level.load(Ordering::Relaxed);
         (level * 7).min(100) as u32
     }

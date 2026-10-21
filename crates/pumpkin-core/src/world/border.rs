@@ -199,6 +199,18 @@ impl Worldborder {
         )
     }
 
+    /// Vanilla `WorldBorder.getDistanceToBorder(x, z)`: to the nearest side, negative
+    /// outside.
+    #[must_use]
+    pub fn distance_to_border(&self, x: f64, z: f64) -> f64 {
+        let half = self.new_diameter / 2.0;
+        let from_north = z - (self.center_z - half);
+        let from_south = self.center_z + half - z;
+        let from_west = x - (self.center_x - half);
+        let from_east = self.center_x + half - x;
+        from_west.min(from_east).min(from_north).min(from_south)
+    }
+
     /// Vanilla `WorldBorder.isWithinBounds(AABB)`.
     #[must_use]
     pub fn contains_box(&self, bounding_box: &BoundingBox) -> bool {

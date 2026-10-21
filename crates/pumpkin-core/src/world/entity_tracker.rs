@@ -1013,6 +1013,10 @@ impl EntityTracker {
 
         for entry in &self.entity_map {
             let tracked = entry.value();
+            // Vanilla `ServerEntity.sendChanges` starts with `updateDataBeforeSync`.
+            if let Some(living) = tracked.entity.get_living_entity() {
+                living.update_dirty_effects();
+            }
             if tracked.entity.get_player().is_none() {
                 tracked.send_changes(world);
             } else if tracked.entity.get_entity().synched_data.is_dirty() {

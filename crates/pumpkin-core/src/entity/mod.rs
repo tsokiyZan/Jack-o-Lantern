@@ -822,6 +822,12 @@ pub trait EntityBase: Send + Sync + std::any::Any {
 
     fn set_on_fire_for_ticks(&self, ticks: u32) {
         let entity = self.get_entity();
+        // `LivingEntity.igniteForTicks`: scaled by the `burning_time` attribute.
+        let ticks = self.get_living_entity().map_or(ticks, |living| {
+            (f64::from(ticks)
+                * living.get_attribute_value(&pumpkin_data::attributes::Attributes::BURNING_TIME))
+            .ceil() as u32
+        });
         let mut event = crate::plugin::api::events::entity::entity_combust::EntityCombustEvent::new(
             entity.entity_id,
             ticks as f32 / 20.0,

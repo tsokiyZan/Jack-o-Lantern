@@ -2643,7 +2643,8 @@ pub fn convert_common(from: &dyn Mob, to: &dyn Mob, params: conversion::Conversi
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .values()
-        .cloned()
+        // `new MobEffectInstance(effect)`: the copy leaves the hidden effect behind.
+        .map(|instance| instance.effect.clone())
         .collect();
     for effect in effects {
         new_living.add_effect(effect);
@@ -2825,7 +2826,7 @@ impl<T: Mob + Send + 'static> EntityBase for T {
     }
 
     fn is_pushable(&self) -> bool {
-        self.mob_is_pushable() && self.get_mob_entity().living_entity.is_pushable()
+        self.mob_is_pushable() && self.get_mob_entity().living_entity.is_pushable_for(self)
     }
 
     /// Vanilla `LivingEntity.push`: a sleeping entity is not pushed.

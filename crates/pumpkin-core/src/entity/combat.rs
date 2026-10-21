@@ -70,9 +70,10 @@ pub fn handle_knockback(
     damage: f32,
     comes_from_effect: bool,
 ) {
-    let yaw = attacker.yaw.load();
-    let xd = f64::from((yaw.to_radians()).sin());
-    let zd = f64::from(-(yaw.to_radians()).cos());
+    // `Mth.sin(yRot * (float) (Math.PI / 180.0))`: the lookup table, in float.
+    let yaw = attacker.yaw.load() * (std::f64::consts::PI / 180.0) as f32;
+    let xd = f64::from(pumpkin_util::math::sin(yaw));
+    let zd = f64::from(-pumpkin_util::math::cos(yaw));
     let handled = victim.get_mob().is_some_and(|mob| {
         mob.custom_knockback(
             strength * 0.5,
@@ -103,16 +104,18 @@ pub fn handle_knockback(
 }
 
 pub fn spawn_sweep_particle(attacker_entity: &Entity, world: &World, pos: &Vector3<f64>) {
-    let yaw = attacker_entity.yaw.load();
-    let d = -f64::from((yaw.to_radians()).sin());
-    let e = f64::from((yaw.to_radians()).cos());
+    // Vanilla `doSweepAttack`: `Mth.sin`/`Mth.cos` of the yaw, also sent as the particle's
+    // offset (a count of 0 makes it a direction).
+    let yaw = attacker_entity.yaw.load() * (std::f64::consts::PI / 180.0) as f32;
+    let d = -f64::from(pumpkin_util::math::sin(yaw));
+    let e = f64::from(pumpkin_util::math::cos(yaw));
 
     let scale = 0.5;
     let body_y = f64::from(attacker_entity.height()) * scale + pos.y;
 
     world.spawn_particle(
         Vector3::new(pos.x + d, body_y, pos.z + e),
-        Vector3::new(0.0, 0.0, 0.0),
+        Vector3::new(d as f32, 0.0, e as f32),
         0.0,
         0,
         Particle::SweepAttack,
@@ -187,6 +190,62 @@ impl CombatRules {
     pub fn get_damage_after_magic_absorb(damage: f32, total_magic_armor: f32) -> f32 {
         let real_armor = total_magic_armor.clamp(0.0, Self::MAX_ARMOR);
         damage * (1.0 - real_armor / Self::ARMOR_PROTECTION_DIVIDER)
+    }
+}
+
+/// Vanilla `HolderSet<DamageType>.contains` for a `BlocksAttacks` damage type set.
+#[must_use]
+pub fn damage_type_set_contains(
+    set: &pumpkin_data::data_component_impl::DamageTypeSet,
+    damage_type: &pumpkin_data::damage::DamageType,
+) -> bool {
+    use pumpkin_data::data_component_impl::DamageTypeSet;
+    match set {
+        DamageTypeSet::Tag(tag) => damage_type.is_tagged_with(tag) == Some(true),
+        DamageTypeSet::Entries(entries) => entries.iter().any(|entry| {
+            pumpkin_data::damage::DamageType::from_name(
+                entry.strip_prefix("minecraft:").unwrap_or(entry),
+            )
+            .is_some_and(|entry| entry.id == damage_type.id)
+        }),
+    }
+}
+
+/// Vanilla `BlocksAttacks.resolveBlockedDamage`, with `DamageReduction.resolve`.
+#[must_use]
+pub fn resolve_blocked_damage(
+    blocks_attacks: &pumpkin_data::data_component_impl::BlocksAttacksImpl,
+    damage_type: &pumpkin_data::damage::DamageType,
+    dealt_damage: f32,
+    angle: f64,
+) -> f32 {
+    let mut blocked_damage = 0.0f32;
+    for reduction in blocks_attacks.damage_reductions.iter() {
+        blocked_damage += if angle
+            > f64::from((std::f64::consts::PI / 180.0) as f32 * reduction.horizontal_blocking_angle)
+            || reduction
+                .r#type
+                .as_ref()
+                .is_some_and(|set| !damage_type_set_contains(set, damage_type))
+        {
+            0.0
+        } else {
+            (reduction.base + reduction.factor * dealt_damage).clamp(0.0, dealt_damage)
+        };
+    }
+    blocked_damage.clamp(0.0, dealt_damage)
+}
+
+/// Vanilla `BlocksAttacks.ItemDamageFunction.apply`: the durability a block costs.
+#[must_use]
+pub fn blocking_item_damage(
+    function: &pumpkin_data::data_component_impl::ItemDamageFunction,
+    dealt_damage: f32,
+) -> i32 {
+    if dealt_damage < function.threshold {
+        0
+    } else {
+        (function.base + function.factor * dealt_damage).floor() as i32
     }
 }
 
@@ -286,6 +345,7 @@ impl CombatTracker {
         Self::default()
     }
 
+    /// Vanilla `recordDamage`. Returns whether the entity entered combat (`onEnterCombat`).
     #[allow(clippy::too_many_arguments)]
     pub fn record_damage(
         &mut self,
@@ -297,7 +357,7 @@ impl CombatTracker {
         damage: f32,
         source: Option<&dyn EntityBase>,
         cause: Option<&dyn EntityBase>,
-    ) {
+    ) -> bool {
         self.recheck_status(current_tick, is_alive);
 
         let attacker = cause.or(source);
@@ -361,21 +421,27 @@ impl CombatTracker {
             self.in_combat = true;
             self.combat_start_time = current_tick;
             self.combat_end_time = self.combat_start_time;
+            return true;
         }
+        false
     }
 
-    pub fn recheck_status(&mut self, current_tick: i64, is_alive: bool) {
+    /// Vanilla `recheckStatus`. Returns whether the entity left combat (`onLeaveCombat`).
+    pub fn recheck_status(&mut self, current_tick: i64, is_alive: bool) -> bool {
         let reset = if self.in_combat {
             RESET_COMBAT_STATUS_TIME
         } else {
             RESET_DAMAGE_STATUS_TIME
         };
         if self.taking_damage && (!is_alive || current_tick - self.last_damage_time > reset) {
+            let was_in_combat = self.in_combat;
             self.taking_damage = false;
             self.in_combat = false;
             self.combat_end_time = current_tick;
             self.entries.clear();
+            return was_in_combat;
         }
+        false
     }
 
     #[must_use]
@@ -664,6 +730,42 @@ mod tests {
     fn partial_resistance_scales_strength() {
         // Ravager has KNOCKBACK_RESISTANCE == 0.75.
         assert!((knockback_after_resistance(0.4, 0.75) - 0.1).abs() < 1e-9);
+    }
+
+    #[test]
+    fn shield_wears_only_from_three_damage() {
+        // The shield's `item_damage`: threshold 3, base 1, factor 1.
+        let shield = pumpkin_data::data_component_impl::ItemDamageFunction {
+            threshold: 3.0,
+            base: 1.0,
+            factor: 1.0,
+        };
+        assert_eq!(blocking_item_damage(&shield, 2.9), 0);
+        assert_eq!(blocking_item_damage(&shield, 3.0), 4);
+        assert_eq!(blocking_item_damage(&shield, 7.5), 8);
+    }
+
+    #[test]
+    fn blocking_angle_limits_the_reduction() {
+        let shield = pumpkin_data::data_component_impl::BlocksAttacksImpl {
+            block_delay_seconds: 0.25,
+            disable_cooldown_scale: 1.0,
+            damage_reductions: std::borrow::Cow::Borrowed(
+                pumpkin_data::data_component_impl::BlocksAttacksImpl::DEFAULT_DAMAGE_REDUCTIONS,
+            ),
+            item_damage: pumpkin_data::data_component_impl::ItemDamageFunction::DEFAULT,
+            bypassed_by: None,
+            block_sound: None,
+            disabled_sound: None,
+        };
+        let damage_type = pumpkin_data::damage::DamageType::MOB_ATTACK;
+        assert_eq!(resolve_blocked_damage(&shield, &damage_type, 5.0, 0.3), 5.0);
+        // Exactly 90 degrees still blocks: the float limit is just above `PI / 2`.
+        assert_eq!(
+            resolve_blocked_damage(&shield, &damage_type, 5.0, std::f64::consts::FRAC_PI_2),
+            5.0
+        );
+        assert_eq!(resolve_blocked_damage(&shield, &damage_type, 5.0, 1.6), 0.0);
     }
 
     #[test]

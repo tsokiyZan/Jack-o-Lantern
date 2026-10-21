@@ -360,11 +360,15 @@ impl EntityBase for AreaEffectCloudEntity {
                 .lock()
                 .unwrap_or_else(PoisonError::into_inner)
                 .insert(id, tick_count + reapplication_delay);
+            // Every vanilla cloud source (lingering potions, creepers, dragon breath) sets a
+            // `potion_duration_scale` of 0.25. Clouds don't keep an owner here.
             crate::item::potion::PotionContents::apply_effects_to(
                 living,
                 effects.clone(),
-                1.0,
+                0.25,
                 crate::item::potion::PotionApplicationSource::AreaEffectCloud,
+                Some(self),
+                None,
             );
 
             let radius_on_use = *self
