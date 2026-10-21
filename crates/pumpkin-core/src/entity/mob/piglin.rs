@@ -621,7 +621,7 @@ impl Mob for PiglinEntity {
             });
             return true;
         }
-        self.mob_entity.mob_interact(player, item_stack)
+        false
     }
 
     fn make_brain(

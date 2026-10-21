@@ -316,31 +316,7 @@ impl NautilusEntity {
             .is_some_and(|passenger| passenger.get_mob().is_some())
     }
 
-    /// Vanilla `Nautilus.canBeLeashed` and `ZombieNautilus.canBeLeashed`.
-    fn can_be_leashed(&self) -> bool {
-        if self.is_zombie() {
-            !self.is_aggravated() && !self.is_mob_controlled()
-        } else {
-            !self.is_aggravated()
-        }
-    }
-
-    /// The lead handling of vanilla `Entity.interact`, which comes before `mobInteract`:
-    /// its holder takes the lead back, and a lead ties up a nautilus that may be leashed.
-    fn handles_lead(&self, player: &Player, item_stack: &ItemStack) -> bool {
-        let holder = self
-            .get_entity()
-            .leashed_to
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .as_ref()
-            .map(|holder| holder.get_entity().entity_id);
-        holder == Some(player.entity_id())
-            || (item_stack.get_item() == &Item::LEAD && holder.is_none() && self.can_be_leashed())
-    }
-
-    /// Vanilla `Animal.mobInteract`, the `super.mobInteract` of the nautilus's. Leads were
-    /// dealt with by `handles_lead`, so anything else is left alone.
+    /// Vanilla `Animal.mobInteract`, the `super.mobInteract` of the nautilus's.
     fn animal_mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
         self.is_food(item_stack) && self.animal_interact(player, item_stack, self.eat_sound())
     }
@@ -799,14 +775,24 @@ impl Mob for NautilusEntity {
         Some(group_data)
     }
 
-    /// Vanilla `AbstractNautilus.interact` and `mobInteract`.
-    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+    /// Vanilla `AbstractNautilus.interact`, before `super.interact`.
+    fn before_interact(&self) {
         self.mob_entity
             .persistence_required
             .store(true, Ordering::Relaxed);
-        if self.handles_lead(player, item_stack) {
-            return self.mob_entity.mob_interact(player, item_stack);
+    }
+
+    /// Vanilla `Nautilus.canBeLeashed` and `ZombieNautilus.canBeLeashed`.
+    fn can_be_leashed(&self) -> bool {
+        if self.is_zombie() {
+            !self.is_aggravated() && !self.is_mob_controlled()
+        } else {
+            !self.is_aggravated()
         }
+    }
+
+    /// Vanilla `AbstractNautilus.mobInteract`.
+    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
         if self.is_baby() {
             return self.animal_mob_interact(player, item_stack);
         }

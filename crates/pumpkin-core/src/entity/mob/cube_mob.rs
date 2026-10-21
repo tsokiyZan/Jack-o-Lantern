@@ -757,7 +757,13 @@ impl Mob for CubeMobEntity {
         if self.kind == CubeKind::SulfurCube {
             return self.sulfur_mob_interact(player, item_stack);
         }
-        self.mob_entity.mob_interact(player, item_stack)
+        false
+    }
+
+    /// Vanilla `SulfurCube.canBeLeashed`: only while it carries a body item. Slimes and
+    /// magma cubes are enemies.
+    fn can_be_leashed(&self) -> bool {
+        self.kind == CubeKind::SulfurCube && self.has_body_item()
     }
 
     fn do_push(&self, entity: &dyn EntityBase) {

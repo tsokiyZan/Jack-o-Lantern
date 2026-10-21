@@ -415,7 +415,7 @@ impl Mob for ParrotEntity {
                 self.set_ordered_to_sit(!self.is_ordered_to_sit());
                 return true;
             }
-            return self.mob_entity.mob_interact(player, item_stack);
+            return false;
         }
 
         self.eat_cookie(player, item_stack);

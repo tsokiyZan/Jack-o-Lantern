@@ -301,7 +301,12 @@ impl ItemBehaviour for SpawnEggItem {
         }
     }
 
-    fn use_on_entity(&self, item: &mut ItemStack, player: &Player, entity: Arc<dyn EntityBase>) {
+    fn use_on_entity(
+        &self,
+        item: &mut ItemStack,
+        player: &Player,
+        entity: Arc<dyn EntityBase>,
+    ) -> bool {
         if let Some(entity_type) = entity_from_egg(item.item.id)
             && entity.get_entity().entity_type.id == entity_type.id
         {
@@ -313,7 +318,7 @@ impl ItemBehaviour for SpawnEggItem {
                 .get_mob()
                 .is_some_and(crate::entity::mob::Mob::spawn_as_baby)
             {
-                return;
+                return false;
             }
             mob.get_entity()
                 .set_rotation(rand::random::<f32>() * 360.0, 0.0);
@@ -324,8 +329,10 @@ impl ItemBehaviour for SpawnEggItem {
                 world.get_player_by_uuid(player.gameprofile.id),
             ) {
                 item.decrement_unless_creative(player.gamemode.load(), 1);
+                return true;
             }
         }
+        false
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

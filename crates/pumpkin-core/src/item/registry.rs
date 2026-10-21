@@ -125,12 +125,13 @@ impl ItemRegistry {
         result
     }
 
+    /// Uses `stack` on `entity`, returning whether the item consumed the interaction.
     pub fn use_on_entity(
         &self,
         stack: &mut ItemStack,
         player: &Player,
         entity: Arc<dyn EntityBase>,
-    ) {
+    ) -> bool {
         let cooldown = stack.get_use_cooldown().cloned();
         let cooldown_group = cooldown
             .as_ref()
@@ -138,17 +139,17 @@ impl ItemRegistry {
             .unwrap_or_else(|| stack.item.registry_key.to_string());
 
         if player.is_on_cooldown(&cooldown_group) {
-            return;
+            return false;
         }
 
-        let pumpkin_item = self.get_pumpkin_item(stack.item.id);
-        if let Some(pumpkin_item) = pumpkin_item {
-            pumpkin_item.use_on_entity(stack, player, entity);
-        }
+        let used = self
+            .get_pumpkin_item(stack.item.id)
+            .is_some_and(|pumpkin_item| pumpkin_item.use_on_entity(stack, player, entity));
 
         if let Some(cooldown) = cooldown {
             player.start_cooldown(cooldown_group, (cooldown.seconds * 20.0) as i32);
         }
+        used
     }
 
     pub fn can_mine(&self, item: &Item, player: &Player) -> bool {

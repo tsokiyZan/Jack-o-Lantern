@@ -86,7 +86,15 @@ pub trait ItemBehaviour: Send + Sync {
         BlockActionResult::Pass
     }
 
-    fn use_on_entity(&self, _item: &mut ItemStack, _player: &Player, _entity: Arc<dyn EntityBase>) {
+    /// Vanilla `Item.interactLivingEntity`: whether using the item on `entity` consumed the
+    /// interaction.
+    fn use_on_entity(
+        &self,
+        _item: &mut ItemStack,
+        _player: &Player,
+        _entity: Arc<dyn EntityBase>,
+    ) -> bool {
+        false
     }
 
     fn on_stopped_using(&self, _stack: &ItemStack, _player: &Player) {}

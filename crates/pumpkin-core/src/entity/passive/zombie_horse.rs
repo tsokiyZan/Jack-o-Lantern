@@ -130,6 +130,22 @@ const BABY_DIMENSIONS: EntityDimensions =
     pumpkin_data::entity_dimensions::ZOMBIE_HORSE_BABY_DIMENSIONS;
 
 impl Mob for ZombieHorseEntity {
+    /// Vanilla `ZombieHorse.interact`, before `super.interact`.
+    fn before_interact(&self) {
+        self.get_mob_entity()
+            .persistence_required
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Vanilla `ZombieHorse.canBeLeashed`, with `isMobControlled`: a mob rides in front.
+    fn can_be_leashed(&self) -> bool {
+        self.is_tame()
+            || self
+                .get_entity()
+                .get_first_passenger()
+                .is_none_or(|passenger| passenger.get_mob().is_none())
+    }
+
     fn mob_passenger_attachment_point(
         &self,
         passenger: &dyn EntityBase,

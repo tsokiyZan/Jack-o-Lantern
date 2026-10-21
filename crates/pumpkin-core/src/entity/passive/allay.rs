@@ -615,10 +615,6 @@ impl Mob for AllayEntity {
 
     /// Vanilla `Allay.mobInteract`, after `Entity.interact`'s leash handling.
     fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
-        if self.mob_entity.mob_interact(player, item_stack) {
-            return true;
-        }
-
         let item_in_hand = self.main_hand_item();
         if self.is_dancing()
             && item_stack

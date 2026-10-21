@@ -493,7 +493,7 @@ impl Mob for ZombieVillagerEntity {
             }
             return true;
         }
-        self.mob_entity.mob_interact(player, item_stack)
+        false
     }
 
     /// Vanilla `ZombieVillager.tick` before `super.tick()`.

@@ -168,6 +168,24 @@ const BABY_DIMENSIONS: EntityDimensions =
     pumpkin_data::entity_dimensions::CAMEL_BABY_STANDING_DIMENSIONS;
 
 impl Mob for CamelEntity {
+    /// Vanilla `CamelHusk.interact`, before `super.interact`.
+    fn before_interact(&self) {
+        if self.get_entity().entity_type == &pumpkin_data::entity::EntityType::CAMEL_HUSK {
+            self.get_mob_entity()
+                .persistence_required
+                .store(true, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
+
+    /// Vanilla `CamelHusk.canBeLeashed`, with `isMobControlled`: a mob rides in front.
+    fn can_be_leashed(&self) -> bool {
+        self.get_entity().entity_type != &pumpkin_data::entity::EntityType::CAMEL_HUSK
+            || self
+                .get_entity()
+                .get_first_passenger()
+                .is_none_or(|passenger| passenger.get_mob().is_none())
+    }
+
     /// Vanilla `Camel.getPassengerAttachmentPoint`. Pumpkin's camel never sits, so the body
     /// anchor is always the standing one of `getBodyAnchorAnimationYOffset`.
     fn mob_passenger_attachment_point(

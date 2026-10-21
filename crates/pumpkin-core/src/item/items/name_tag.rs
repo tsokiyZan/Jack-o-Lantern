@@ -17,13 +17,22 @@ impl ItemMetadata for NameTagItem {
 
 impl ItemBehaviour for NameTagItem {
     /// Vanilla `NameTagItem.interactLivingEntity`.
-    fn use_on_entity(&self, item: &mut ItemStack, player: &Player, target: Arc<dyn EntityBase>) {
+    fn use_on_entity(
+        &self,
+        item: &mut ItemStack,
+        player: &Player,
+        target: Arc<dyn EntityBase>,
+    ) -> bool {
         let entity = target.get_entity();
-        if entity.entity_type.saveable
-            && let Some(name) = item.get_data_component::<CustomNameImpl>()
-            && target
-                .get_living_entity()
-                .is_some_and(crate::entity::living::LivingEntity::is_alive)
+        let Some(name) = item.get_data_component::<CustomNameImpl>() else {
+            return false;
+        };
+        if !entity.entity_type.saveable {
+            return false;
+        }
+        if target
+            .get_living_entity()
+            .is_some_and(crate::entity::living::LivingEntity::is_alive)
         {
             entity.set_custom_name(name.name.clone());
             if let Some(mob) = target.get_mob() {
@@ -33,6 +42,7 @@ impl ItemBehaviour for NameTagItem {
             }
             item.decrement_unless_creative(player.gamemode.load(), 1);
         }
+        true
     }
     fn as_any(&self) -> &dyn std::any::Any {
         self

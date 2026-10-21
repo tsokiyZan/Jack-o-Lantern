@@ -170,7 +170,12 @@ impl ItemBehaviour for BrushItem {
         BlockActionResult::Success
     }
 
-    fn use_on_entity(&self, _item: &mut ItemStack, player: &Player, entity: Arc<dyn EntityBase>) {
+    fn use_on_entity(
+        &self,
+        _item: &mut ItemStack,
+        player: &Player,
+        entity: Arc<dyn EntityBase>,
+    ) -> bool {
         let ent = entity.get_entity();
         if ent.entity_type == &EntityType::ARMADILLO {
             let world = player.world();
@@ -200,6 +205,8 @@ impl ItemBehaviour for BrushItem {
         player
             .living_entity
             .set_active_hand(pumpkin_util::Hand::Right, stack, Self::USE_DURATION);
+        // Vanilla `BrushItem` has no `interactLivingEntity`: the interaction passes.
+        false
     }
 
     fn get_use_duration(&self) -> i32 {

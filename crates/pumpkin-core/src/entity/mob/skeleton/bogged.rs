@@ -152,7 +152,7 @@ impl Mob for BoggedSkeletonEntity {
     /// Vanilla `Bogged.mobInteract`.
     fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
         if item_stack.item != &Item::SHEARS || !self.ready_for_shearing() {
-            return self.get_mob_entity().mob_interact(player, item_stack);
+            return false;
         }
         self.shear(SoundCategory::Players, item_stack);
         let entity = self.get_entity();

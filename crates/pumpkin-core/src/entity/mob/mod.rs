@@ -1083,40 +1083,9 @@ impl MobEntity {
             >= DAYLIGHT_BRIGHTNESS
     }
 
-    pub fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
-        let entity = &self.living_entity.entity;
-
-        // If already leashed to player, right-clicking unleashes the mob
-        let currently_leashed = entity
-            .leashed_to
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .is_some();
-
-        if currently_leashed {
-            entity.unleash();
-            let lead_item =
-                pumpkin_data::item_stack::ItemStack::new(1, &pumpkin_data::item::Item::LEAD);
-            entity.spawn_at_location(lead_item);
-            return true;
-        }
-
-        // If holding a lead, leash the mob to the player
-        if item_stack.item.registry_key == "lead"
-            || item_stack.item.registry_key == "minecraft:lead"
-        {
-            let diff = entity.pos.load() - player.get_entity().pos.load();
-            let dist_sq = diff.length_squared();
-            if dist_sq <= Entity::LEASH_SNAP_DISTANCE * Entity::LEASH_SNAP_DISTANCE {
-                entity.leash_to(player.clone() as Arc<dyn EntityBase>);
-                if player.gamemode.load() != pumpkin_util::GameMode::Creative {
-                    item_stack.decrement(1);
-                }
-                return true;
-            }
-        }
-
-        false
+    /// Vanilla `Mob.clearHome`.
+    pub fn clear_home(&self) {
+        self.position_target_range.store(-1, Relaxed);
     }
 
     /// Vanilla `Mob.checkDespawn`: Peaceful removes the types it doesn't allow; otherwise, with
@@ -2290,8 +2259,47 @@ pub trait Mob: EntityBase + Send + Sync {
         set_mob_target_base(self, target);
     }
 
-    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
-        self.get_mob_entity().mob_interact(player, item_stack)
+    /// Vanilla `Mob.mobInteract`, which runs after the name tag, the spawn egg and the leash
+    /// had their turn. Returns whether it consumed the interaction.
+    fn mob_interact(&self, _player: &Arc<Player>, _item_stack: &mut ItemStack) -> bool {
+        false
+    }
+
+    /// The start of a vanilla `interact` override before `super.interact`, which runs even on
+    /// a dead mob.
+    fn before_interact(&self) {}
+
+    /// Vanilla `Leashable.canBeLeashed`: `Mob`'s "anything but an `Enemy`", with the fixed
+    /// answers of `AmbientCreature`, `WaterAnimal`, `AbstractVillager`, `Turtle`, `Panda`,
+    /// `Hoglin` and `Zoglin`. Mobs whose answer changes override it.
+    fn can_be_leashed(&self) -> bool {
+        let entity_type = self.get_entity().entity_type;
+        if [
+            &EntityType::BAT,
+            &EntityType::COD,
+            &EntityType::SALMON,
+            &EntityType::PUFFERFISH,
+            &EntityType::TROPICAL_FISH,
+            &EntityType::TADPOLE,
+            &EntityType::VILLAGER,
+            &EntityType::WANDERING_TRADER,
+            &EntityType::TURTLE,
+            &EntityType::PANDA,
+        ]
+        .contains(&entity_type)
+        {
+            return false;
+        }
+        entity_type == &EntityType::HOGLIN
+            || entity_type == &EntityType::ZOGLIN
+            || !entity_type.is_enemy
+    }
+
+    /// Vanilla `Mob.onLeashRemoved`: losing the leash clears the home it gave.
+    fn on_leash_removed(&self) {
+        if !self.get_entity().is_leashed() {
+            self.get_mob_entity().clear_home();
+        }
     }
 
     fn tame(&self, player: &Arc<Player>) {
@@ -2514,6 +2522,138 @@ pub fn ai_step_looting(mob: &dyn Mob) {
         {
             mob.mob_pick_up_item(item);
         }
+    }
+}
+
+/// Vanilla `Mob.interact`: the name tag and spawn egg first, then `Entity.interact`'s leash
+/// handling, then `mobInteract`, with an `entity_interact` game event when either of the
+/// mob's own steps takes the click.
+pub fn mob_interact_entry<M: Mob + ?Sized>(
+    mob: &M,
+    player: &Arc<Player>,
+    item_stack: &mut ItemStack,
+) -> bool {
+    mob.before_interact();
+    if !mob.get_mob_entity().living_entity.is_alive() {
+        return false;
+    }
+    if check_and_handle_important_interactions(mob, player, item_stack) {
+        entity_interact_game_event(mob, player);
+        return true;
+    }
+    if leash_interact(mob, player, item_stack) {
+        return true;
+    }
+    if mob.mob_interact(player, item_stack) {
+        entity_interact_game_event(mob, player);
+        return true;
+    }
+    false
+}
+
+/// `this.gameEvent(GameEvent.ENTITY_INTERACT, player)`.
+fn entity_interact_game_event<M: Mob + ?Sized>(mob: &M, player: &Arc<Player>) {
+    let entity = mob.get_entity();
+    entity.world.load().game_event_from(
+        Some(player.as_ref()),
+        pumpkin_data::game_event::GameEvent::EntityInteract,
+        entity.pos.load(),
+    );
+}
+
+/// Vanilla `Mob.checkAndHandleImportantInteractions`: a name tag, then a spawn egg, used on
+/// the mob before anything else.
+fn check_and_handle_important_interactions<M: Mob + ?Sized>(
+    mob: &M,
+    player: &Arc<Player>,
+    item_stack: &mut ItemStack,
+) -> bool {
+    let is_name_tag = item_stack.item == &Item::NAME_TAG;
+    let is_spawn_egg = pumpkin_data::entity::entity_from_egg(item_stack.item.id).is_some();
+    if !is_name_tag && !is_spawn_egg {
+        return false;
+    }
+    let entity = mob.get_entity();
+    let world = entity.world.load();
+    let (Some(server), Some(target)) = (
+        world.server.upgrade(),
+        world.get_entity_by_id(entity.entity_id),
+    ) else {
+        return false;
+    };
+    // `itemStack.interactLivingEntity` for the name tag, `spawnOffspringFromSpawnEgg` for the
+    // egg; both pass when they did nothing.
+    server
+        .item_registry
+        .use_on_entity(item_stack, player, target)
+}
+
+/// The leash part of vanilla `Entity.interact`: the holder takes its lead back, and a lead ties
+/// up a mob that isn't held by a player and may be leashed from here.
+// TODO: the sneaking hand-over of leashed mobs to this one and the shears that cut leashes
+// or shear equipment off (`attemptToShearEquipment`) come first in vanilla.
+fn leash_interact<M: Mob + ?Sized>(
+    mob: &M,
+    player: &Arc<Player>,
+    item_stack: &mut ItemStack,
+) -> bool {
+    let entity = mob.get_entity();
+    let holder = entity
+        .leashed_to
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone();
+    if holder
+        .as_ref()
+        .is_some_and(|holder| holder.get_entity().entity_id == player.entity_id())
+    {
+        // `removeLeash` in creative, else `dropLeash`.
+        drop_leash(
+            mob,
+            player.gamemode.load() != pumpkin_util::GameMode::Creative,
+        );
+        entity_interact_game_event(mob, player);
+        mob.play_sound_at_self(Sound::ItemLeadUntied, 1.0, 1.0);
+        return true;
+    }
+    if item_stack.item != &Item::LEAD
+        || holder
+            .as_ref()
+            .is_some_and(|holder| holder.get_player().is_some())
+    {
+        return false;
+    }
+    // `canHaveALeashAttachedTo(player)`: box centres within the snap distance.
+    let leash_distance = player
+        .get_entity()
+        .bounding_box
+        .load()
+        .get_center()
+        .squared_distance_to_vec(&entity.bounding_box.load().get_center())
+        .sqrt();
+    if leash_distance > Entity::LEASH_SNAP_DISTANCE || !mob.can_be_leashed() {
+        return false;
+    }
+    if holder.is_some() {
+        drop_leash(mob, true);
+    }
+    entity.leash_to(player.clone());
+    // `setLeashedTo`: a leashed mob gets off what it rides.
+    if let Some(vehicle) = entity.get_vehicle() {
+        vehicle.get_entity().remove_passenger(entity.entity_id);
+    }
+    mob.play_sound_at_self(Sound::ItemLeadTied, 1.0, 1.0);
+    item_stack.decrement_unless_creative(player.gamemode.load(), 1);
+    true
+}
+
+/// Vanilla `Leashable.dropLeash` (`drop_lead`) and `removeLeash`.
+fn drop_leash<M: Mob + ?Sized>(mob: &M, drop_lead: bool) {
+    let entity = mob.get_entity();
+    entity.unleash();
+    mob.on_leash_removed();
+    if drop_lead {
+        entity.spawn_at_location(ItemStack::new(1, &Item::LEAD));
     }
 }
 
@@ -2991,7 +3131,7 @@ impl<T: Mob + Send + 'static> EntityBase for T {
     }
 
     fn interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
-        self.mob_interact(player, item_stack)
+        mob_interact_entry(self, player, item_stack)
     }
 
     fn on_player_collision(&self, player: &Arc<Player>) {

@@ -914,14 +914,6 @@ impl CubeMobEntity {
     /// Vanilla `SulfurCube.mobInteract`, after `Entity.interact`'s leash handling.
     pub(super) fn sulfur_mob_interact(&self, player: &Arc<Player>, stack: &mut ItemStack) -> bool {
         let entity = self.get_entity();
-        let holding_lead = stack.item == &Item::LEAD;
-        // `canBeLeashed` is `hasBodyItem`.
-        if (entity.is_leashed() || (holding_lead && self.has_body_item()))
-            && self.mob_entity.mob_interact(player, stack)
-        {
-            return true;
-        }
-
         let game_mode = player.gamemode.load();
         if self.is_baby() {
             if is_food(stack) && self.can_age_up() {
@@ -986,10 +978,7 @@ impl CubeMobEntity {
             return worked;
         }
 
-        if self.bucket_mob_pickup(player, stack) {
-            return true;
-        }
-        self.mob_entity.mob_interact(player, stack)
+        self.bucket_mob_pickup(player, stack)
     }
 
     /// Vanilla `Bucketable.bucketMobPickup`, for `canBePickedUpWithBucket`'s empty bucket.

@@ -231,6 +231,11 @@ impl NeutralMob for WolfEntity {
 const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::WOLF_BABY_DIMENSIONS;
 
 impl Mob for WolfEntity {
+    /// Vanilla `Wolf.canBeLeashed`.
+    fn can_be_leashed(&self) -> bool {
+        !self.is_angry()
+    }
+
     /// Vanilla `Wolf.actuallyHurt`: wolf armour takes the whole hit as durability, and cracks
     /// audibly as it wears.
     fn absorb_hurt(

@@ -18,10 +18,15 @@ impl ItemMetadata for SaddleItem {
 impl ItemBehaviour for SaddleItem {
     /// Vanilla `ItemStack.interactLivingEntity`: the saddle's `equippable` component puts it
     /// on any mob that takes one.
-    fn use_on_entity(&self, item: &mut ItemStack, player: &Player, entity: Arc<dyn EntityBase>) {
-        if let Some(mob) = entity.get_mob() {
-            mob.equip_on_target(player, item);
-        }
+    fn use_on_entity(
+        &self,
+        item: &mut ItemStack,
+        player: &Player,
+        entity: Arc<dyn EntityBase>,
+    ) -> bool {
+        entity
+            .get_mob()
+            .is_some_and(|mob| mob.equip_on_target(player, item))
     }
 
     fn as_any(&self) -> &dyn Any {
