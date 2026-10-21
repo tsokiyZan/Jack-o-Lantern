@@ -1068,16 +1068,20 @@ impl MobEntity {
         false
     }
 
-    /// Vanilla `Mob.checkDespawn`. With no player in the world nothing despawns, and a
-    /// player within the no-despawn distance resets the mob's `noActionTime`.
+    /// Vanilla `Mob.checkDespawn`: Peaceful removes the types it doesn't allow; otherwise, with
+    /// no player in the world nothing despawns, and a player within the no-despawn distance
+    /// resets the mob's `noActionTime`.
     pub fn check_despawn(&self, mob: &dyn Mob) {
         let entity = &self.living_entity.entity;
-        // Pumpkin also keeps named mobs, which vanilla does by making a name tag set
-        // persistence.
-        let is_persistent = self.persistence_required.load(Relaxed)
-            || mob.requires_custom_persistence()
-            || (**entity.custom_name.load()).is_some();
         let world = entity.world.load();
+        if world.level_info.load().difficulty == Difficulty::Peaceful
+            && !entity.entity_type.allowed_in_peaceful
+        {
+            entity.remove();
+            return;
+        }
+        let is_persistent =
+            self.persistence_required.load(Relaxed) || mob.requires_custom_persistence();
         let pos = entity.pos.load();
         let players = world.players.load();
         let Some(dist_sqr) = players
@@ -1095,12 +1099,10 @@ impl MobEntity {
             && mob.remove_when_far_away(dist_sqr)
         {
             entity.remove();
-            return;
         }
 
+        // Vanilla goes on after an instant despawn, so the `nextInt(800)` roll still draws.
         let no_despawn_distance = f64::from(NO_DESPAWN_DISTANCE);
-        // Persistence only stops the despawn: like any mob, a persistent one stops resetting
-        // `noActionTime` (and so stops strolling) once no player is near.
         if !is_persistent
             && self.living_entity.no_action_time.load(Relaxed) > 600
             && entity.random().next_bounded_i32(800) == 0
