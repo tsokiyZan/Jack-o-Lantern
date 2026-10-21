@@ -675,9 +675,12 @@ impl LivingEntity {
             }
         }
 
-        let chunk_pos = self.entity.chunk_pos.load();
-        self.entity.world.load().broadcast_to_chunk_editioned(
-            chunk_pos,
+        // Vanilla `take`: to the players tracking the picked-up entity, while it's still there.
+        if item.removed.load(Relaxed) {
+            return true;
+        }
+        self.entity.world.load().send_to_tracking_players_editioned(
+            item,
             &CTakeItemEntity::new(
                 item.entity_id.into(),
                 self.entity.entity_id.into(),
