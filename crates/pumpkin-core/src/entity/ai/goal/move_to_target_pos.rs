@@ -81,7 +81,11 @@ impl<M: MoveToTargetPos> MoveToTargetPosGoal<M> {
                                 self.move_to_target_pos
                                     .get()
                                     .is_some_and(|move_to_target_pos| {
-                                        move_to_target_pos.is_target_pos(world, block_pos_mut)
+                                        move_to_target_pos.is_target_pos_for(
+                                            mob,
+                                            world,
+                                            block_pos_mut,
+                                        )
                                     });
 
                             if mob
@@ -139,6 +143,11 @@ impl<M: MoveToTargetPos> MoveToTargetPosGoal<M> {
 pub trait MoveToTargetPos: Send + Sync {
     fn is_target_pos(&self, world: Arc<World>, block_pos: BlockPos) -> bool;
 
+    /// `is_target_pos` for goals whose vanilla `isValidTarget` reads the goal's mob.
+    fn is_target_pos_for(&self, _mob: &dyn Mob, world: Arc<World>, block_pos: BlockPos) -> bool {
+        self.is_target_pos(world, block_pos)
+    }
+
     fn get_desired_distance_to_target(&self) -> f64 {
         1.0
     }
@@ -181,7 +190,7 @@ impl<M: MoveToTargetPos> Goal for MoveToTargetPosGoal<M> {
             .move_to_target_pos
             .get()
             .is_some_and(|move_to_target_pos| {
-                move_to_target_pos.is_target_pos(world, self.target_pos)
+                move_to_target_pos.is_target_pos_for(mob, world, self.target_pos)
             });
         self.trying_time >= -self.safe_waiting_time
             && self.trying_time <= GIVE_UP_TICKS

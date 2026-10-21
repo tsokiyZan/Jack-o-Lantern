@@ -30,7 +30,7 @@ use crate::entity::mob::zombie::{
 };
 use crate::entity::projectile::arrow::ArrowPickup;
 use crate::entity::projectile::trident::TridentEntity;
-use crate::entity::spawn_util::is_face_full_up;
+use crate::entity::spawn_util::entity_can_stand_on;
 use crate::entity::{
     Entity, EntityBase,
     mob::{Mob, MobEntity, RangedAttackMob},
@@ -695,11 +695,17 @@ impl DrownedGoToBeachGoal {
 }
 
 impl MoveToTargetPos for DrownedGoToBeachGoal {
-    fn is_target_pos(&self, world: Arc<World>, block_pos: BlockPos) -> bool {
+    fn is_target_pos(&self, _world: Arc<World>, _block_pos: BlockPos) -> bool {
+        // Only reached through `is_target_pos_for`, which has the drowned.
+        false
+    }
+
+    /// Vanilla `DrownedGoToBeachGoal.isValidTarget`.
+    fn is_target_pos_for(&self, mob: &dyn Mob, world: Arc<World>, block_pos: BlockPos) -> bool {
         let above = block_pos.up();
         world.get_block_state(&above).is_air()
             && world.get_block_state(&above.up()).is_air()
-            && is_face_full_up(world.get_block_state(&block_pos))
+            && entity_can_stand_on(&world, &block_pos, mob)
     }
 }
 

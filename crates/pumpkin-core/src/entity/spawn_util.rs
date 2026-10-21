@@ -40,14 +40,64 @@ impl SpawnStrategy {
 
 /// Vanilla `Block.isFaceFull(collisionShape, Direction.UP)`.
 pub(crate) fn is_face_full_up(state: &BlockState) -> bool {
-    state.is_full_cube()
-        || state.get_block_collision_shapes().any(|shape| {
-            shape.max.y >= 1.0
-                && shape.min.x <= 0.0
-                && shape.min.z <= 0.0
-                && shape.max.x >= 1.0
-                && shape.max.z >= 1.0
+    is_face_full_up_shapes(state.get_block_collision_shapes())
+}
+
+/// Vanilla `Block.isFaceFull(shape, Direction.UP)`: the boxes of `getFaceShape(UP)`, the
+/// layer just below the top, together cover the whole face.
+pub(crate) fn is_face_full_up_shapes(shapes: impl IntoIterator<Item = BoundingBox>) -> bool {
+    const SLICE_Y: f64 = 1.0 - 1.0e-7;
+    let rects: Vec<[f64; 4]> = shapes
+        .into_iter()
+        .filter(|shape| shape.min.y <= SLICE_Y && shape.max.y > SLICE_Y)
+        .map(|shape| [shape.min.x, shape.min.z, shape.max.x, shape.max.z])
+        .collect();
+    let edges = |lo: usize, hi: usize| {
+        let mut edges: Vec<f64> = rects
+            .iter()
+            .flat_map(|rect| [rect[lo], rect[hi]])
+            .filter(|edge| (0.0..=1.0).contains(edge))
+            .chain([0.0, 1.0])
+            .collect();
+        edges.sort_by(f64::total_cmp);
+        edges.dedup();
+        edges
+    };
+    let (xs, zs) = (edges(0, 2), edges(1, 3));
+    // Every cell between the box edges has to lie inside some box.
+    xs.windows(2).all(|x| {
+        zs.windows(2).all(|z| {
+            let (mx, mz) = (f64::midpoint(x[0], x[1]), f64::midpoint(z[0], z[1]));
+            rects
+                .iter()
+                .any(|rect| rect[0] <= mx && mx <= rect[2] && rect[1] <= mz && mz <= rect[3])
         })
+    })
+}
+
+/// Vanilla `EntityCollisionContext.isAbove`: the entity's feet are above `shape_max_y` of the
+/// block at `pos`.
+pub(crate) fn is_above(entity: &Entity, pos: &BlockPos, shape_max_y: f64) -> bool {
+    entity.pos.load().y > f64::from(pos.0.y) + shape_max_y - f64::from(1.0e-5f32)
+}
+
+/// Vanilla `BlockState.entityCanStandOn`: the top face of the block's collision shape for
+/// `entity` is full. Powder snow and scaffolding are the blocks whose shape depends on it.
+pub(crate) fn entity_can_stand_on(world: &World, pos: &BlockPos, entity: &dyn EntityBase) -> bool {
+    let state = world.get_block_state(pos);
+    let block = Block::from_state_id(state.id);
+    if block == &Block::POWDER_SNOW {
+        return crate::block::blocks::powder_snow::collision_shape_for_entity(entity, pos)
+            .is_some_and(|shape| is_face_full_up_shapes([shape]));
+    }
+    if block == &Block::SCAFFOLDING {
+        // `SHAPE_STABLE` (full top) when above and not descending; otherwise the unstable
+        // bottom plate or nothing, neither with a full top.
+        let base = entity.get_entity();
+        return is_above(base, pos, 1.0)
+            && !crate::block::blocks::powder_snow::is_entity_descending(base);
+    }
+    is_face_full_up(state)
 }
 
 #[expect(clippy::too_many_arguments)]
@@ -165,4 +215,36 @@ fn move_to_possible_spawn_position(
     }
 
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_face_full_up_shapes;
+    use pumpkin_util::math::boundingbox::BoundingBox;
+
+    fn shape(min: [f64; 3], max: [f64; 3]) -> BoundingBox {
+        BoundingBox::new_array(min, max)
+    }
+
+    #[test]
+    fn face_full_up_is_the_union_of_the_top_layer() {
+        // Stone, a top slab and upside-down stairs are full on top; a bottom slab, a fence
+        // post and half a face are not. Two halves together cover it, as `isFaceFull` does.
+        assert!(is_face_full_up_shapes([shape([0.0; 3], [1.0; 3])]));
+        assert!(is_face_full_up_shapes([shape([0.0, 0.5, 0.0], [1.0; 3])]));
+        assert!(is_face_full_up_shapes([
+            shape([0.0, 0.5, 0.0], [1.0; 3]),
+            shape([0.0, 0.0, 0.0], [1.0, 0.5, 0.5]),
+        ]));
+        assert!(!is_face_full_up_shapes([shape([0.0; 3], [1.0, 0.5, 1.0])]));
+        assert!(!is_face_full_up_shapes([shape(
+            [0.375, 0.0, 0.375],
+            [0.625, 1.5, 0.625]
+        )]));
+        assert!(!is_face_full_up_shapes([shape([0.0; 3], [0.5, 1.0, 1.0])]));
+        assert!(is_face_full_up_shapes([
+            shape([0.0; 3], [0.5, 1.0, 1.0]),
+            shape([0.5, 0.0, 0.0], [1.0; 3]),
+        ]));
+    }
 }
