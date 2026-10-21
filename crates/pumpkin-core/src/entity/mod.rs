@@ -214,6 +214,7 @@ pub trait EntityBase: Send + Sync + std::any::Any {
             projectile.write_nbt(nbt);
         }
         self.write_custom_nbt(nbt);
+        self.get_entity().write_passengers_nbt(nbt);
     }
 
     /// Vanilla `NbtPredicate.getEntityTagToCompare`: the save without `id`, which `/data`
@@ -5605,6 +5606,48 @@ impl Entity {
         }
 
         // todo more...
+    }
+
+    /// The end of vanilla `Entity.saveWithoutId`: every passenger `saveAsPassenger` accepts,
+    /// each with its own passengers.
+    pub fn write_passengers_nbt(&self, nbt: &mut NbtCompound) {
+        let passengers = self
+            .passengers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        let list: Vec<NbtTag> = passengers
+            .iter()
+            .filter(|passenger| passenger.get_entity().should_save_as_passenger())
+            .map(|passenger| {
+                let mut passenger_nbt = NbtCompound::new();
+                passenger.write_nbt(&mut passenger_nbt);
+                NbtTag::Compound(passenger_nbt)
+            })
+            .collect();
+        if !list.is_empty() {
+            nbt.put("Passengers", NbtTag::List(list));
+        }
+    }
+
+    /// Vanilla `Entity.saveAsPassenger`'s checks: not removed for good, and a type that can
+    /// be saved (never a player).
+    #[must_use]
+    pub fn should_save_as_passenger(&self) -> bool {
+        self.removal_reason
+            .load()
+            .is_none_or(|reason| reason.should_save())
+            && self.entity_type != &EntityType::PLAYER
+    }
+
+    /// Vanilla `Entity.shouldBeSaved`, without the vehicle under exactly one player: Pumpkin
+    /// saves only that vehicle's UUID with the player and keeps the vehicle in its chunk.
+    #[must_use]
+    pub fn should_be_saved(&self) -> bool {
+        self.removal_reason
+            .load()
+            .is_none_or(|reason| reason.should_save())
+            && !self.has_vehicle()
     }
 
     /// Vanilla `Entity.load`'s `Glowing` and `data`.

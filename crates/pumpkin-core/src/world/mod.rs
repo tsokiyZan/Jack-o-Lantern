@@ -683,6 +683,31 @@ impl World {
         self.level.shutdown().await;
     }
 
+    /// The passenger part of vanilla `EntityType.loadEntityRecursive`: each saved passenger,
+    /// with its own passengers, rides `vehicle` again (`startRiding(vehicle, true, false)`).
+    fn load_passengers(world: &Arc<Self>, vehicle: &Arc<dyn EntityBase>, nbt: &NbtCompound) {
+        for passenger_nbt in nbt.get_list("Passengers").unwrap_or_default() {
+            let pumpkin_nbt::tag::NbtTag::Compound(passenger_nbt) = passenger_nbt else {
+                continue;
+            };
+            let Some(entity_type) = passenger_nbt
+                .get_string("id")
+                .and_then(|id| EntityType::from_name(id.strip_prefix("minecraft:").unwrap_or(id)))
+            else {
+                continue;
+            };
+            let uuid = passenger_nbt.get_uuid("UUID").unwrap_or_else(Uuid::new_v4);
+            let passenger = from_type(entity_type, Vector3::new(0.0, 0.0, 0.0), world, uuid);
+            passenger.read_nbt_non_mut(passenger_nbt);
+            passenger.init_data_tracker();
+            world.add_entity_silent(passenger.clone());
+            vehicle
+                .get_entity()
+                .add_passenger_without_event(vehicle.clone(), passenger.clone());
+            Self::load_passengers(world, &passenger, passenger_nbt);
+        }
+    }
+
     /// Writes `entities` into the saved data of the chunks they are in. A live chunk is
     /// rebuilt from scratch, so `snapshot_chunks` lists the live chunks that must be rewritten
     /// even when nothing is left in them; a chunk that never went live keeps its records.
@@ -694,7 +719,8 @@ impl World {
         let mut groups: FxHashMap<Vector2<i32>, Vec<NbtCompound>> = FxHashMap::default();
         for entity in entities {
             let base_entity = entity.get_entity();
-            if base_entity.is_removed() {
+            // A passenger is saved inside its vehicle's `Passengers`.
+            if base_entity.is_removed() || !base_entity.should_be_saved() {
                 continue;
             }
             let mut nbt = NbtCompound::new();
@@ -4631,6 +4657,7 @@ impl World {
                         // UUID-dedupes if another watcher already loaded this entity.
                         // Tracker owns pairing (spawn packets + vehicle restore).
                         world.add_entity_silent(entity.clone());
+                        Self::load_passengers(&world, &entity, entity_nbt);
                         if let Some(player) = &player {
                             player.try_restore_vehicle(&entity);
                         }
