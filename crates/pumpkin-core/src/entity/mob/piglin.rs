@@ -480,7 +480,7 @@ impl Mob for PiglinEntity {
         });
         let difficulty = RegionalDifficulty::at(world, self.get_entity().pos.load());
         self.populate_default_equipment_slots(world, &difficulty);
-        self.populate_default_equipment_enchantments(&difficulty);
+        self.populate_default_equipment_enchantments(world, &difficulty);
         // `super.finalizeSpawn`: `Mob.finalizeSpawn`.
         self.mob_entity.finalize_spawn_base();
         group_data

@@ -2125,99 +2125,60 @@ pub trait Mob: EntityBase + Send + Sync {
         group_data
     }
 
+    /// Vanilla `Mob.populateDefaultEquipmentSlots`, on the `level.getRandom()` that
+    /// `finalizeSpawn` passes down.
     fn populate_default_equipment_slots(
         &self,
-        _world: &Arc<World>,
+        world: &Arc<World>,
         difficulty: &crate::entity::mob::equipment::RegionalDifficulty,
     ) {
-        if rand::random::<f32>()
-            < MobEntity::MAX_WEARING_ARMOR_CHANCE * difficulty.special_multiplier
-        {
-            let mut armor_type = rand::random_range(0..3);
-            for _ in 1..=3 {
-                if rand::random::<f32>() < MobEntity::WEARING_ARMOR_UPGRADE_MATERIAL_CHANCE {
-                    armor_type += 1;
-                }
-            }
-
-            let partial_chance = if difficulty.base_difficulty == Difficulty::Hard {
-                0.1f32
-            } else {
-                0.25f32
-            };
-
-            let living = &self.get_mob_entity().living_entity;
-            let mut equipment = living
-                .entity_equipment
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            let mut first = true;
-
-            for slot in &MobEntity::EQUIPMENT_POPULATION_ORDER {
-                let current = equipment.get(slot);
-                if !first && rand::random::<f32>() < partial_chance {
-                    break;
-                }
-                first = false;
-                if current.is_empty()
-                    && let Some(item) = MobEntity::get_equipment_for_slot(slot, armor_type)
-                {
-                    equipment.put(slot, ItemStack::new(1, item));
-                }
-            }
-        }
+        populate_default_armor(self, world, difficulty);
     }
 
+    /// Vanilla `Mob.populateDefaultEquipmentEnchantments`: the weapon, then each armor slot in
+    /// `EquipmentSlot.VALUES` order (feet first).
     fn populate_default_equipment_enchantments(
         &self,
+        world: &Arc<World>,
         difficulty: &crate::entity::mob::equipment::RegionalDifficulty,
     ) {
-        self.enchant_spawned_weapon(difficulty);
-        for slot in &MobEntity::EQUIPMENT_POPULATION_ORDER {
-            self.enchant_spawned_armor(slot, difficulty);
+        self.enchant_spawned_weapon(world, difficulty);
+        for slot in &EquipmentSlot::VALUES {
+            if slot.slot_type() == pumpkin_data::data_component_impl::EquipmentType::HumanoidArmor {
+                self.enchant_spawned_armor(world, slot, difficulty);
+            }
         }
     }
 
+    /// Vanilla `Mob.enchantSpawnedWeapon`.
     fn enchant_spawned_weapon(
         &self,
+        world: &Arc<World>,
         difficulty: &crate::entity::mob::equipment::RegionalDifficulty,
     ) {
-        self.enchant_spawned_equipment(
+        enchant_spawned_equipment(
+            self,
+            world,
             &EquipmentSlot::MAIN_HAND,
             MobEntity::MAX_ENCHANTED_WEAPON_CHANCE,
             difficulty,
         );
     }
 
+    /// Vanilla `Mob.enchantSpawnedArmor`.
     fn enchant_spawned_armor(
         &self,
+        world: &Arc<World>,
         slot: &EquipmentSlot,
         difficulty: &crate::entity::mob::equipment::RegionalDifficulty,
     ) {
-        self.enchant_spawned_equipment(slot, MobEntity::MAX_ENCHANTED_ARMOR_CHANCE, difficulty);
-    }
-
-    fn enchant_spawned_equipment(
-        &self,
-        slot: &EquipmentSlot,
-        chance: f32,
-        difficulty: &crate::entity::mob::equipment::RegionalDifficulty,
-    ) {
-        let living = &self.get_mob_entity().living_entity;
-        let mut equipment = living
-            .entity_equipment
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        if let Some(stack) = equipment.equipment.get_mut(slot)
-            && !stack.is_empty()
-            && rand::random::<f32>() < chance * difficulty.special_multiplier
-        {
-            crate::entity::mob::equipment::apply_vanilla_enchantments(
-                stack,
-                slot,
-                difficulty.special_multiplier,
-            );
-        }
+        enchant_spawned_equipment(
+            self,
+            world,
+            slot,
+            MobEntity::MAX_ENCHANTED_ARMOR_CHANCE,
+            difficulty,
+        );
     }
 
     /// Runs after navigation and before the movement controls, where vanilla ticks a mob's brain.
@@ -2764,6 +2725,93 @@ fn hitbox(target: &dyn EntityBase) -> BoundingBox {
         hitbox.min.y = seat.y.max(hitbox.min.y);
     }
     hitbox
+}
+
+/// Vanilla `Mob.populateDefaultEquipmentSlots`, which overrides call as `super`.
+///
+/// Now and then a set of armor, its material rolled up from leather, often missing its lower
+/// pieces, drawn from `level.getRandom()`.
+pub fn populate_default_armor<M: Mob + ?Sized>(
+    mob: &M,
+    world: &World,
+    difficulty: &crate::entity::mob::equipment::RegionalDifficulty,
+) {
+    // One lock per draw: `level.getRandom()` is shared.
+    let random = || {
+        world
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    };
+    if random().next_f32() >= MobEntity::MAX_WEARING_ARMOR_CHANCE * difficulty.special_multiplier {
+        return;
+    }
+    let mut armor_type = random().next_bounded_i32(3);
+    let mut attempt = 1;
+    while attempt as f32 <= MobEntity::WEARING_ARMOR_UPGRADE_MATERIAL_ATTEMPTS {
+        if random().next_f32() < MobEntity::WEARING_ARMOR_UPGRADE_MATERIAL_CHANCE {
+            armor_type += 1;
+        }
+        attempt += 1;
+    }
+    let partial_chance = if world.level_info.load().difficulty == Difficulty::Hard {
+        0.1f32
+    } else {
+        0.25f32
+    };
+    let mob_entity = mob.get_mob_entity();
+    let mut first = true;
+    for slot in &MobEntity::EQUIPMENT_POPULATION_ORDER {
+        let current = mob_entity.get_item_slot(slot);
+        if !first && random().next_f32() < partial_chance {
+            break;
+        }
+        first = false;
+        if current.is_empty()
+            && let Some(item) = MobEntity::get_equipment_for_slot(slot, armor_type)
+        {
+            mob_entity
+                .living_entity
+                .entity_equipment
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .put(slot, ItemStack::new(1, item));
+        }
+    }
+}
+
+/// Vanilla `Mob.enchantSpawnedEquipment`: the `level.getRandom()` roll, then the
+/// `mob_spawn_equipment` enchantment provider.
+// TODO: the provider's own picks still come from Pumpkin's `EnchantmentProvider`, not
+// vanilla's `EnchantmentHelper.enchantItemFromProvider` on the level random.
+fn enchant_spawned_equipment<M: Mob + ?Sized>(
+    mob: &M,
+    world: &World,
+    slot: &EquipmentSlot,
+    chance: f32,
+    difficulty: &crate::entity::mob::equipment::RegionalDifficulty,
+) {
+    let mut equipment = mob
+        .get_mob_entity()
+        .living_entity
+        .entity_equipment
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if let Some(stack) = equipment.equipment.get_mut(slot)
+        && !stack.is_empty()
+        && world
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .next_f32()
+            < chance * difficulty.special_multiplier
+    {
+        crate::entity::mob::equipment::apply_vanilla_enchantments(
+            stack,
+            slot,
+            difficulty.special_multiplier,
+        );
+    }
 }
 
 /// Vanilla `TamableAnimal.isTame` for a target or avoid candidate.

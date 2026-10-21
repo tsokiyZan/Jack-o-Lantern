@@ -100,20 +100,6 @@ impl MobEntity {
             .next_f32()
             < 0.05;
         self.set_left_handed(left_handed);
-
-        // Spawn equipment and the loot-pickup roll belong to `finalizeSpawn`
-        // (`populateDefaultEquipmentSlots`, `setCanPickUpLoot`), so mobs loaded from disk or
-        // summoned with NBT keep what they had.
-        super::equipment::equip_mob_on_spawn(&self.living_entity, &world);
-        let entity = &self.living_entity.entity;
-        if let Some(def) =
-            super::equipment::EQUIPMENT_REGISTRY.get(entity.entity_type.resource_name)
-            && def.can_pick_up_loot
-        {
-            let difficulty = super::equipment::RegionalDifficulty::at(&world, entity.pos.load());
-            let pickup_chance = 0.55 * difficulty.special_multiplier;
-            self.set_can_pick_up_loot(rand::random::<f32>() < pickup_chance);
-        }
     }
 
     /// Queues a mob to be added and mounted onto this one when it enters the world.

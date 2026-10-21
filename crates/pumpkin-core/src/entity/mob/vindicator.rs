@@ -113,6 +113,37 @@ impl VindicatorEntity {
 }
 
 impl Mob for VindicatorEntity {
+    /// Vanilla `Vindicator.finalizeSpawn`: `super`, then the axe and its enchantments.
+    fn finalize_spawn(
+        &self,
+        world: &Arc<crate::world::World>,
+        _reason: crate::entity::mob::spawn::EntitySpawnReason,
+        group_data: Option<crate::entity::mob::spawn::SpawnGroupData>,
+    ) -> Option<crate::entity::mob::spawn::SpawnGroupData> {
+        self.mob_entity.finalize_spawn_base();
+        let difficulty = crate::entity::mob::equipment::RegionalDifficulty::at(
+            world,
+            self.get_entity().pos.load(),
+        );
+        self.populate_default_equipment_slots(world, &difficulty);
+        self.populate_default_equipment_enchantments(world, &difficulty);
+        group_data
+    }
+
+    /// Vanilla `Vindicator.populateDefaultEquipmentSlots`: an iron axe, outside a raid.
+    fn populate_default_equipment_slots(
+        &self,
+        _world: &Arc<crate::world::World>,
+        _difficulty: &crate::entity::mob::equipment::RegionalDifficulty,
+    ) {
+        if self.get_raider_data().raid_id.load().is_none() {
+            self.mob_entity.set_item_slot(
+                &pumpkin_data::data_component_impl::EquipmentSlot::MAIN_HAND,
+                pumpkin_data::item_stack::ItemStack::new(1, &pumpkin_data::item::Item::IRON_AXE),
+            );
+        }
+    }
+
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
     }

@@ -565,7 +565,7 @@ impl ZombieEntityBase {
             self.set_can_break_doors(can_break_doors, mob);
             if !conversion {
                 mob.populate_default_equipment_slots(world, &difficulty);
-                mob.populate_default_equipment_enchantments(&difficulty);
+                mob.populate_default_equipment_enchantments(world, &difficulty);
             }
         }
 
@@ -885,44 +885,7 @@ impl Mob for ZombieEntityBase {
         world: &Arc<World>,
         difficulty: &RegionalDifficulty,
     ) {
-        // Default armor slots (super.populateDefaultEquipmentSlots), on `level.getRandom()`.
-        if level_random(world).next_f32()
-            < MobEntity::MAX_WEARING_ARMOR_CHANCE * difficulty.special_multiplier
-        {
-            let mut armor_type = level_random(world).next_bounded_i32(3);
-            for _ in 1..=3 {
-                if level_random(world).next_f32() < MobEntity::WEARING_ARMOR_UPGRADE_MATERIAL_CHANCE
-                {
-                    armor_type += 1;
-                }
-            }
-
-            let partial_chance = if difficulty.base_difficulty == Difficulty::Hard {
-                0.1f32
-            } else {
-                0.25f32
-            };
-
-            let living = &self.mob_entity.living_entity;
-            let mut equipment = living
-                .entity_equipment
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            let mut first = true;
-
-            for slot in &MobEntity::EQUIPMENT_POPULATION_ORDER {
-                let current = equipment.get(slot);
-                if !first && level_random(world).next_f32() < partial_chance {
-                    break;
-                }
-                first = false;
-                if current.is_empty()
-                    && let Some(item) = MobEntity::get_equipment_for_slot(slot, armor_type)
-                {
-                    equipment.put(slot, ItemStack::new(1, item));
-                }
-            }
-        }
+        crate::entity::mob::populate_default_armor(self, world, difficulty);
 
         let weapon_chance = if difficulty.base_difficulty == Difficulty::Hard {
             0.05f32

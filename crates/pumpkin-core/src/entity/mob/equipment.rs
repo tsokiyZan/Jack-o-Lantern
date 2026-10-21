@@ -1,23 +1,8 @@
-//! Mob spawn equipment system.
-//!
-//! This module handles the automatic equipping of mobs when they spawn, matching
-//! vanilla Minecraft's `populateDefaultEquipmentSlots` and
-//! `populateDefaultEquipmentEnchantments` behaviour. It features:
-//!
-//! - A data-driven `EQUIPMENT_REGISTRY` mapping mob types to their weapon/armor
-//!   configurations.
-//! - Exact vanilla `RegionalDifficulty` computation (game time, chunk inhabited time,
-//!   moon phase).
-//! - Weighted enchantment selection with exclusive-set conflict resolution and
-//!   cost-based level determination.
-//! - Per-slot drop chances with looting bonus on death.
-//!
-//! Mobs not listed in the registry spawn with no equipment, matching vanilla
-//! (not all mob types have equipment definitions).
+//! Mob equipment: vanilla `DifficultyInstance` for spawn equipment, the spawn enchantment
+//! providers, and `Mob`'s equipment rules (`equipItemIfPossible`, `canReplaceCurrentItem`,
+//! `pickUpItem`).
 
-use std::collections::HashMap;
 use std::sync::Arc;
-use std::sync::LazyLock;
 use std::sync::atomic::Ordering::Relaxed;
 
 use pumpkin_data::Enchantment;
@@ -29,240 +14,16 @@ use pumpkin_data::data_component_impl::{
 use pumpkin_data::enchantment_provider::EnchantmentProvider;
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::game_event::GameEvent;
-use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::tag::{Tag, Taggable};
 use pumpkin_util::difficulty::Difficulty;
 use pumpkin_util::math::vector3::Vector3;
 use pumpkin_util::random::RandomImpl;
-use rand::RngExt;
 
-use crate::entity::living::LivingEntity;
 use crate::entity::mob::{Mob, MobEntity};
 
-// ══════════════════════════════════════════════════════════════════
-// Global constants extracted from vanilla Minecraft 26.2
-// Sources: Mob.java, DifficultyInstance.java, DropChances.java,
-// EnchantmentsByCostWithDifficulty.java
-// ══════════════════════════════════════════════════════════════════
-
-/// Base chance (before `specialMultiplier` scaling) that a mob will wear armor.
-/// From vanilla `Mob.MAX_WEARING_ARMOR_CHANCE`.
-pub const WEARING_ARMOR_CHANCE: f32 = 0.15;
-
-/// Chance per attempt to promote the armor tier to the next material.
-/// From vanilla `Mob.WEARING_ARMOR_UPGRADE_MATERIAL_CHANCE`.
-pub const ARMOR_UPGRADE_MATERIAL_CHANCE: f32 = 0.1087;
-
-/// Maximum number of upgrade attempts for armor tier selection.
-/// From vanilla `Mob.WEARING_ARMOR_UPGRADE_MATERIAL_ATTEMPTS`.
-pub const ARMOR_UPGRADE_MATERIAL_ATTEMPTS: f32 = 3.0;
-
-/// Default per-slot drop chance for equipment on mob death.
-/// From vanilla `Mob.DEFAULT_EQUIPMENT_DROP_CHANCE`.
+/// Vanilla `DropChances.DEFAULT_EQUIPMENT_DROP_CHANCE`.
 pub const DEFAULT_EQUIPMENT_DROP_CHANCE: f32 = 0.085;
-
-/// Base chance (before `specialMultiplier`) for weapon enchantments at spawn.
-/// From vanilla `Mob.MAX_ENCHANTED_WEAPON_CHANCE`.
-pub const WEAPON_ENCHANT_CHANCE: f32 = 0.25;
-
-/// Base chance (before `specialMultiplier`) for armor enchantments at spawn.
-/// From vanilla `Mob.MAX_ENCHANTED_ARMOR_CHANCE`.
-pub const ARMOR_ENCHANT_CHANCE: f32 = 0.5;
-
-/// Minimum enchantment cost for mob spawn equipment.
-/// From vanilla `mob_spawn_equipment.json`.
-pub const MOB_SPAWN_ENCHANT_MIN_COST: i32 = 5;
-
-/// Cost span added to the minimum, scaled by `specialMultiplier`.
-/// From vanilla `mob_spawn_equipment.json`.
-pub const MOB_SPAWN_ENCHANT_COST_SPAN: i32 = 17;
-
-// ══════════════════════════════════════════════════════════════════
-// Armor tiers — exact match to vanilla Mob.getEquipmentForSlot()
-// Vanilla approximation: armor type selection (base 0-2 + 3 upgrade
-// attempts at 10.87% per vanilla Mob.populateDefaultEquipmentSlots) and
-// partial armor chance (0.1 on Hard / 0.25 otherwise).
-// Type 0=Leather, 1=Copper, 2=Gold, 3=Chainmail, 4=Iron, 5=Diamond
-// Slot order: HEAD, CHEST, LEGS, FEET
-// ══════════════════════════════════════════════════════════════════
-
-static ARMOR_TIERS: LazyLock<[[&'static Item; 4]; 6]> = LazyLock::new(|| {
-    [
-        [
-            &Item::LEATHER_HELMET,
-            &Item::LEATHER_CHESTPLATE,
-            &Item::LEATHER_LEGGINGS,
-            &Item::LEATHER_BOOTS,
-        ],
-        [
-            &Item::COPPER_HELMET,
-            &Item::COPPER_CHESTPLATE,
-            &Item::COPPER_LEGGINGS,
-            &Item::COPPER_BOOTS,
-        ],
-        [
-            &Item::GOLDEN_HELMET,
-            &Item::GOLDEN_CHESTPLATE,
-            &Item::GOLDEN_LEGGINGS,
-            &Item::GOLDEN_BOOTS,
-        ],
-        [
-            &Item::CHAINMAIL_HELMET,
-            &Item::CHAINMAIL_CHESTPLATE,
-            &Item::CHAINMAIL_LEGGINGS,
-            &Item::CHAINMAIL_BOOTS,
-        ],
-        [
-            &Item::IRON_HELMET,
-            &Item::IRON_CHESTPLATE,
-            &Item::IRON_LEGGINGS,
-            &Item::IRON_BOOTS,
-        ],
-        [
-            &Item::DIAMOND_HELMET,
-            &Item::DIAMOND_CHESTPLATE,
-            &Item::DIAMOND_LEGGINGS,
-            &Item::DIAMOND_BOOTS,
-        ],
-    ]
-});
-
-static ARMOR_POPULATION_ORDER: [EquipmentSlot; 4] = [
-    EquipmentSlot::HEAD,
-    EquipmentSlot::CHEST,
-    EquipmentSlot::LEGS,
-    EquipmentSlot::FEET,
-];
-
-// ══════════════════════════════════════════════════════════════════
-// Equipment Table Registry
-// ══════════════════════════════════════════════════════════════════
-
-/// A weighted entry in a weapon selection table.
-/// Matches vanilla's weighted random selection in mob `populateDefaultEquipmentSlots`.
-#[derive(Clone, Copy)]
-pub struct WeaponEntry {
-    /// The item to potentially give.
-    pub item: &'static Item,
-    /// Relative weight in the selection pool.
-    pub weight: f32,
-}
-
-/// How a mob's main-hand weapon is selected on spawn.
-#[derive(Clone, Copy)]
-pub enum WeaponConfig {
-    /// Always give this exact item (e.g. skeleton → bow).
-    Always(&'static Item),
-    /// Always give one of the weighted items (e.g. piglin weapons).
-    AlwaysWeighted(&'static [WeaponEntry]),
-    /// Give a weighted weapon with a difficulty-dependent chance.
-    Chance {
-        /// Chance when the base difficulty is Hard.
-        on_hard: f32,
-        /// Chance on all other difficulties.
-        otherwise: f32,
-        /// Weighted item pool to select from.
-        items: &'static [WeaponEntry],
-    },
-    /// No weapon.
-    None,
-}
-
-/// A per-slot armor entry with an independent spawn chance.
-pub struct ArmorSlotEntry {
-    /// Which equipment slot this armor occupies.
-    pub slot: &'static EquipmentSlot,
-    /// The armor item.
-    pub item: &'static Item,
-    /// Independent chance this slot receives armor.
-    pub chance: f32,
-}
-
-/// How a mob's armor is selected on spawn.
-#[derive(Clone, Copy)]
-pub enum ArmorConfig {
-    /// Use the vanilla algorithm: random tier (0-2 base + 3 upgrade attempts at
-    /// 10.87% each), partial armor break chance (10% on Hard, 25% otherwise).
-    /// See [`select_vanilla_armor`].
-    Vanilla,
-    /// Custom per-slot entries with independent chances (e.g. piglin golden armor).
-    CustomPerSlot(&'static [ArmorSlotEntry]),
-    /// No armor.
-    None,
-}
-
-/// Equipment definition for a single mob type. All equipment is randomized at spawn
-/// using [`RegionalDifficulty`] to compute per-world/per-chunk scaling factors.
-pub struct MobEquipmentDef {
-    /// The entity resource name (e.g. `"zombie"`, `"skeleton"`).
-    pub entity_type: &'static str,
-    /// Main-hand weapon configuration.
-    pub weapon: WeaponConfig,
-    /// Armor configuration.
-    pub armor: ArmorConfig,
-    /// Whether spawn-time enchantments can be applied.
-    pub enchanted: bool,
-    /// Whether this mob can randomly pick up loot from the ground.
-    pub can_pick_up_loot: bool,
-}
-
-/// Registry of all mobs that receive equipment at spawn.
-///
-/// Maps entity resource names to their equipment definitions. Only mobs listed
-/// here will receive weapons, armor, enchantments, and drop-chance settings.
-/// Unlisted mobs spawn with no equipment (matching vanilla — not all mobs have
-/// equipment tables).
-pub static EQUIPMENT_REGISTRY: LazyLock<HashMap<&'static str, MobEquipmentDef>> =
-    LazyLock::new(|| {
-        let mut m = HashMap::new();
-
-        // ─── Pillager ───
-        m.insert(
-            "pillager",
-            MobEquipmentDef {
-                entity_type: "pillager",
-                weapon: WeaponConfig::Always(&Item::CROSSBOW),
-                armor: ArmorConfig::None,
-                enchanted: false,
-                can_pick_up_loot: false,
-            },
-        );
-
-        // ─── Vindicator ───
-        m.insert(
-            "illusioner",
-            MobEquipmentDef {
-                entity_type: "illusioner",
-                weapon: WeaponConfig::Always(&Item::BOW),
-                armor: ArmorConfig::None,
-                enchanted: false,
-                can_pick_up_loot: false,
-            },
-        );
-        m.insert(
-            "vex",
-            MobEquipmentDef {
-                entity_type: "vex",
-                weapon: WeaponConfig::Always(&Item::IRON_SWORD),
-                armor: ArmorConfig::None,
-                enchanted: true,
-                can_pick_up_loot: false,
-            },
-        );
-        m.insert(
-            "vindicator",
-            MobEquipmentDef {
-                entity_type: "vindicator",
-                weapon: WeaponConfig::Always(&Item::IRON_AXE),
-                armor: ArmorConfig::None,
-                enchanted: true,
-                can_pick_up_loot: false,
-            },
-        );
-
-        m
-    });
 
 // ══════════════════════════════════════════════════════════════════
 // Regional Difficulty — exact vanilla DifficultyInstance.java
@@ -367,16 +128,6 @@ impl RegionalDifficulty {
             special_multiplier,
         }
     }
-
-    /// Random check scaled by `special_multiplier`.
-    ///
-    /// Returns `true` with probability `base_chance * special_multiplier`. When
-    /// `special_multiplier` is `0.0` this always returns `false` (matching vanilla
-    /// behaviour on fresh Normal/Easy worlds).
-    #[must_use]
-    pub fn should_happen(&self, base_chance: f32) -> bool {
-        rand::random::<f32>() < base_chance * self.special_multiplier
-    }
 }
 
 /// Moon brightness factor for the given time of day (0.0 to 1.0).
@@ -427,240 +178,6 @@ pub fn apply_vindicator_weapon_enchantments(stack: &mut ItemStack, wave: Option<
         }
         None => {}
     }
-}
-
-// ══════════════════════════════════════════════════════════════════
-// Equipment population
-//
-// Mirrors mob-specific `finalizeSpawn` / `populateDefaultEquipmentSlots`
-// from Vanilla's Zombie, AbstractSkeleton, WitherSkeleton, Piglin,
-// Pillager, Vindicator, Drowned, and ZombifiedPiglin.
-// ══════════════════════════════════════════════════════════════════
-
-/// Weighted random selection from a table of weapon entries.
-#[must_use]
-fn weighted_select_item(items: &[WeaponEntry]) -> &'static Item {
-    let total: f32 = items.iter().map(|e| e.weight).sum();
-    let mut rng = rand::rng();
-    let mut roll: f32 = rng.random_range(0.0..total);
-    for entry in items {
-        roll -= entry.weight;
-        if roll <= 0.0 {
-            return entry.item;
-        }
-    }
-    items.last().map_or(&Item::AIR, |e| e.item)
-}
-
-/// Selects armor using the vanilla algorithm.
-///
-/// 1. Random base tier (0-2) with up to 3 upgrade attempts at 10.87% each.
-/// 2. Iterates HEAD→CHEST→LEGS→FEET, with a chance to stop early (10% Hard,
-///    25% otherwise) — higher difficulty produces fewer pieces.
-/// 3. Each piece gets the default equipment drop chance.
-#[must_use]
-fn select_vanilla_armor(difficulty: &RegionalDifficulty) -> Vec<(EquipmentSlot, ItemStack, f32)> {
-    let mut rng = rand::rng();
-
-    let mut armor_type = rng.random_range(0..3);
-    let mut i = 1;
-    while (i as f32) <= ARMOR_UPGRADE_MATERIAL_ATTEMPTS {
-        if rng.random::<f32>() < ARMOR_UPGRADE_MATERIAL_CHANCE {
-            armor_type += 1;
-        }
-        i += 1;
-    }
-    armor_type = armor_type.min(5);
-
-    let tier = &ARMOR_TIERS[armor_type];
-
-    let partial_chance = if difficulty.base_difficulty == Difficulty::Hard {
-        0.1f32
-    } else {
-        0.25f32
-    };
-
-    let mut pieces = Vec::new();
-    let mut first = true;
-    for (i, slot) in ARMOR_POPULATION_ORDER.iter().enumerate() {
-        if !first && rng.random::<f32>() < partial_chance {
-            break;
-        }
-        first = false;
-        pieces.push((
-            slot.clone(),
-            create_equipment_item(tier[i]),
-            DEFAULT_EQUIPMENT_DROP_CHANCE,
-        ));
-    }
-    pieces
-}
-
-/// Creates a fresh, full-durability `ItemStack` for mob equipment.
-/// Vanilla mobs always spawn with equipment at full durability.
-#[must_use]
-fn create_equipment_item(item: &'static Item) -> ItemStack {
-    ItemStack::new(1, item)
-}
-
-/// Generates the equipment items, slots, and drop chances for a mob definition.
-///
-/// Handles the full weapon + armor selection logic, including enchantment
-/// application when both `def.enchanted` is true and the difficulty-dependent
-/// random check passes.
-#[must_use]
-fn equip_mob_from_def(
-    def: &MobEquipmentDef,
-    difficulty: &RegionalDifficulty,
-) -> Vec<(EquipmentSlot, ItemStack, f32)> {
-    let mut changes: Vec<(EquipmentSlot, ItemStack, f32)> = Vec::new();
-
-    // ── Weapon ──
-    match def.weapon {
-        WeaponConfig::Always(item) => {
-            let mut stack = create_equipment_item(item);
-            if def.enchanted && difficulty.should_happen(WEAPON_ENCHANT_CHANCE) {
-                apply_vanilla_enchantments(
-                    &mut stack,
-                    &EquipmentSlot::MAIN_HAND,
-                    difficulty.special_multiplier,
-                );
-            }
-            changes.push((
-                EquipmentSlot::MAIN_HAND,
-                stack,
-                DEFAULT_EQUIPMENT_DROP_CHANCE,
-            ));
-        }
-        WeaponConfig::AlwaysWeighted(items) => {
-            let item = weighted_select_item(items);
-            let mut stack = create_equipment_item(item);
-            if def.enchanted && difficulty.should_happen(WEAPON_ENCHANT_CHANCE) {
-                apply_vanilla_enchantments(
-                    &mut stack,
-                    &EquipmentSlot::MAIN_HAND,
-                    difficulty.special_multiplier,
-                );
-            }
-            changes.push((
-                EquipmentSlot::MAIN_HAND,
-                stack,
-                DEFAULT_EQUIPMENT_DROP_CHANCE,
-            ));
-        }
-        WeaponConfig::Chance {
-            on_hard,
-            otherwise,
-            items,
-        } => {
-            let chance = if difficulty.base_difficulty == Difficulty::Hard {
-                on_hard
-            } else {
-                otherwise
-            };
-            if rand::random::<f32>() < chance {
-                let item = weighted_select_item(items);
-                let mut stack = create_equipment_item(item);
-                if def.enchanted && difficulty.should_happen(WEAPON_ENCHANT_CHANCE) {
-                    apply_vanilla_enchantments(
-                        &mut stack,
-                        &EquipmentSlot::MAIN_HAND,
-                        difficulty.special_multiplier,
-                    );
-                }
-                changes.push((
-                    EquipmentSlot::MAIN_HAND,
-                    stack,
-                    DEFAULT_EQUIPMENT_DROP_CHANCE,
-                ));
-            }
-        }
-        WeaponConfig::None => {}
-    }
-
-    // ── Armor ──
-    match def.armor {
-        ArmorConfig::Vanilla => {
-            if difficulty.should_happen(WEARING_ARMOR_CHANCE) {
-                let armor_pieces = select_vanilla_armor(difficulty);
-                for (slot, mut stack, drop_chance) in armor_pieces {
-                    if def.enchanted && difficulty.should_happen(ARMOR_ENCHANT_CHANCE) {
-                        apply_vanilla_enchantments(
-                            &mut stack,
-                            &slot,
-                            difficulty.special_multiplier,
-                        );
-                    }
-                    changes.push((slot, stack, drop_chance));
-                }
-            }
-        }
-        ArmorConfig::CustomPerSlot(entries) => {
-            for entry in entries {
-                if rand::random::<f32>() < entry.chance {
-                    let mut stack = create_equipment_item(entry.item);
-                    if def.enchanted && difficulty.should_happen(ARMOR_ENCHANT_CHANCE) {
-                        apply_vanilla_enchantments(
-                            &mut stack,
-                            entry.slot,
-                            difficulty.special_multiplier,
-                        );
-                    }
-                    changes.push((entry.slot.clone(), stack, DEFAULT_EQUIPMENT_DROP_CHANCE));
-                }
-            }
-        }
-        ArmorConfig::None => {}
-    }
-
-    changes
-}
-
-// ══════════════════════════════════════════════════════════════════
-// Public entry point
-// ══════════════════════════════════════════════════════════════════
-
-/// Equips a mob with weapons/armor/enchantments when it spawns.
-///
-/// Called from `MobEntity::finalize_spawn_base`, vanilla's `finalizeSpawn`. Looks up the mob's equipment definition in
-/// [`EQUIPMENT_REGISTRY`], computes [`RegionalDifficulty`] at the mob's
-/// position, generates equipment, stores it in the entity's equipment slots,
-/// and broadcasts the changes to nearby players.
-///
-/// Mobs not listed in the registry silently receive no equipment.
-pub fn equip_mob_on_spawn(living: &LivingEntity, world: &Arc<crate::world::World>) {
-    let entity_type = living.entity.entity_type;
-    let pos = living.entity.pos.load();
-    let difficulty = RegionalDifficulty::at(world, pos);
-
-    let entity_name = entity_type.resource_name;
-
-    let Some(def) = EQUIPMENT_REGISTRY.get(entity_name) else {
-        return;
-    };
-
-    let mut equipment = living
-        .entity_equipment
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
-    let mut drop_chances = living
-        .equipment_drop_chances
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
-    let changes_with_drops = equip_mob_from_def(def, &difficulty);
-
-    let mut equipment_changes: Vec<(EquipmentSlot, ItemStack)> = Vec::new();
-
-    for (slot, stack, drop_chance) in changes_with_drops {
-        equipment.put(&slot, stack.clone());
-        drop_chances.insert(slot.clone(), drop_chance);
-        equipment_changes.push((slot, stack));
-    }
-
-    drop(equipment);
-    drop(drop_chances);
-
-    living.send_equipment_changes(&equipment_changes);
 }
 
 #[must_use]
@@ -899,6 +416,41 @@ fn limit_for_slot(slot: &EquipmentSlot, stack: &mut ItemStack) -> ItemStack {
     }
 }
 
+/// Vanilla `Mob.pickUpItem`.
+pub fn pick_up_item<M: Mob + ?Sized>(mob: &M, item: &crate::entity::item::ItemEntity) {
+    let stack = item
+        .get_item_stack()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone();
+    let equipped = equip_item_if_possible(mob, stack);
+    if equipped.is_empty() {
+        return;
+    }
+    let count = equipped.item_count;
+    // `take` tells the clients before the item goes.
+    if !mob
+        .get_mob_entity()
+        .living_entity
+        .pickup(item.get_entity(), u32::from(count))
+    {
+        return;
+    }
+    let emptied = {
+        let mut item_stack = item
+            .get_item_stack()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        item_stack.decrement(count);
+        item_stack.is_empty()
+    };
+    if emptied {
+        item.get_entity().remove();
+    } else {
+        crate::entity::EntityBase::init_data_tracker(item);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::moon_brightness;
@@ -970,40 +522,5 @@ mod tests {
         let mut stack5 = ItemStack::new(1, &Item::IRON_AXE);
         super::apply_vindicator_weapon_enchantments(&mut stack5, Some(5));
         assert_eq!(stack5.get_enchantment_level(&Enchantment::SHARPNESS), 2);
-    }
-}
-
-/// Vanilla `Mob.pickUpItem`.
-pub fn pick_up_item<M: Mob + ?Sized>(mob: &M, item: &crate::entity::item::ItemEntity) {
-    let stack = item
-        .get_item_stack()
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .clone();
-    let equipped = equip_item_if_possible(mob, stack);
-    if equipped.is_empty() {
-        return;
-    }
-    let count = equipped.item_count;
-    // `take` tells the clients before the item goes.
-    if !mob
-        .get_mob_entity()
-        .living_entity
-        .pickup(item.get_entity(), u32::from(count))
-    {
-        return;
-    }
-    let emptied = {
-        let mut item_stack = item
-            .get_item_stack()
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        item_stack.decrement(count);
-        item_stack.is_empty()
-    };
-    if emptied {
-        item.get_entity().remove();
-    } else {
-        crate::entity::EntityBase::init_data_tracker(item);
     }
 }

@@ -111,6 +111,21 @@ impl IllusionerEntity {
 }
 
 impl Mob for IllusionerEntity {
+    /// Vanilla `Illusioner.finalizeSpawn`: a bow, then `super`.
+    fn finalize_spawn(
+        &self,
+        _world: &Arc<crate::world::World>,
+        _reason: crate::entity::mob::spawn::EntitySpawnReason,
+        group_data: Option<crate::entity::mob::spawn::SpawnGroupData>,
+    ) -> Option<crate::entity::mob::spawn::SpawnGroupData> {
+        self.mob_entity.set_item_slot(
+            &pumpkin_data::data_component_impl::EquipmentSlot::MAIN_HAND,
+            pumpkin_data::item_stack::ItemStack::new(1, &pumpkin_data::item::Item::BOW),
+        );
+        self.mob_entity.finalize_spawn_base();
+        group_data
+    }
+
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
     }

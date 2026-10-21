@@ -225,22 +225,39 @@ impl Mob for VexEntity {
         }
     }
 
+    /// Vanilla `Vex.finalizeSpawn`: its sword and the enchantments, before `super`.
     fn finalize_spawn(
         &self,
-        _world: &Arc<World>,
+        world: &Arc<World>,
         _reason: crate::entity::mob::spawn::EntitySpawnReason,
         group_data: Option<SpawnGroupData>,
     ) -> Option<SpawnGroupData> {
-        // `populateDefaultEquipmentSlots` (an iron sword that never drops) and
-        // `populateDefaultEquipmentEnchantments`.
+        let difficulty = crate::entity::mob::equipment::RegionalDifficulty::at(
+            world,
+            self.get_entity().pos.load(),
+        );
+        self.populate_default_equipment_slots(world, &difficulty);
+        self.populate_default_equipment_enchantments(world, &difficulty);
         self.mob_entity.finalize_spawn_base();
+        group_data
+    }
+
+    /// Vanilla `Vex.populateDefaultEquipmentSlots`: an iron sword that never drops.
+    fn populate_default_equipment_slots(
+        &self,
+        _world: &Arc<World>,
+        _difficulty: &crate::entity::mob::equipment::RegionalDifficulty,
+    ) {
+        self.mob_entity.set_item_slot(
+            &EquipmentSlot::MAIN_HAND,
+            pumpkin_data::item_stack::ItemStack::new(1, &pumpkin_data::item::Item::IRON_SWORD),
+        );
         self.mob_entity
             .living_entity
             .equipment_drop_chances
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .insert(EquipmentSlot::MAIN_HAND, 0.0);
-        group_data
     }
 
     fn mob_write_nbt(&self, nbt: &mut NbtCompound) {

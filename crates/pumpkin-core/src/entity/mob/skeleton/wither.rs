@@ -77,7 +77,12 @@ impl Mob for WitherSkeletonEntity {
             );
     }
 
-    fn populate_default_equipment_enchantments(&self, _difficulty: &RegionalDifficulty) {}
+    fn populate_default_equipment_enchantments(
+        &self,
+        _world: &Arc<World>,
+        _difficulty: &RegionalDifficulty,
+    ) {
+    }
 
     fn wants_to_pick_up(
         &self,

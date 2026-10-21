@@ -149,6 +149,73 @@ impl PillagerEntity {
 }
 
 impl Mob for PillagerEntity {
+    /// Vanilla `Pillager.finalizeSpawn`: its crossbow and the enchantments, before `super`.
+    fn finalize_spawn(
+        &self,
+        world: &Arc<crate::world::World>,
+        _reason: crate::entity::mob::spawn::EntitySpawnReason,
+        group_data: Option<crate::entity::mob::spawn::SpawnGroupData>,
+    ) -> Option<crate::entity::mob::spawn::SpawnGroupData> {
+        let difficulty = crate::entity::mob::equipment::RegionalDifficulty::at(
+            world,
+            self.get_entity().pos.load(),
+        );
+        self.populate_default_equipment_slots(world, &difficulty);
+        self.populate_default_equipment_enchantments(world, &difficulty);
+        self.mob_entity.finalize_spawn_base();
+        group_data
+    }
+
+    /// Vanilla `Pillager.populateDefaultEquipmentSlots`.
+    fn populate_default_equipment_slots(
+        &self,
+        _world: &Arc<crate::world::World>,
+        _difficulty: &crate::entity::mob::equipment::RegionalDifficulty,
+    ) {
+        self.mob_entity.set_item_slot(
+            &pumpkin_data::data_component_impl::EquipmentSlot::MAIN_HAND,
+            ItemStack::new(1, &pumpkin_data::item::Item::CROSSBOW),
+        );
+    }
+
+    /// Vanilla `Pillager.enchantSpawnedWeapon`: one crossbow in 300 also gets the
+    /// `pillager_spawn_crossbow` enchantments.
+    fn enchant_spawned_weapon(
+        &self,
+        world: &Arc<crate::world::World>,
+        difficulty: &crate::entity::mob::equipment::RegionalDifficulty,
+    ) {
+        crate::entity::mob::enchant_spawned_equipment(
+            self,
+            world,
+            &pumpkin_data::data_component_impl::EquipmentSlot::MAIN_HAND,
+            MobEntity::MAX_ENCHANTED_WEAPON_CHANCE,
+            difficulty,
+        );
+        let roll = pumpkin_util::random::RandomImpl::next_bounded_i32(
+            &mut *world
+                .random
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+            300,
+        );
+        if roll == 0 {
+            let mut equipment = self
+                .mob_entity
+                .living_entity
+                .entity_equipment
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            if let Some(weapon) = equipment
+                .equipment
+                .get_mut(&pumpkin_data::data_component_impl::EquipmentSlot::MAIN_HAND)
+                && weapon.item == &pumpkin_data::item::Item::CROSSBOW
+            {
+                crate::entity::mob::equipment::apply_pillager_crossbow_enchantments(weapon, None);
+            }
+        }
+    }
+
     /// Vanilla `Pillager.getWalkTargetValue`.
     fn get_walk_target_value(&self, _pos: &pumpkin_util::math::position::BlockPos) -> f32 {
         0.0
