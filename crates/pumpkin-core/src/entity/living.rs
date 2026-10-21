@@ -1954,7 +1954,7 @@ impl LivingEntity {
         let block_friction = if on_ground {
             Self::compute_modified_friction(
                 self.entity
-                    .get_block_with_y_offset(0.500_001)
+                    .get_block_with_y_offset(super::DELTA_AFFECTED_BY_BLOCKS_BELOW_0_5)
                     .1
                     .slipperiness,
                 self.get_attribute_value(&Attributes::FRICTION_MODIFIER) as f32,
@@ -3324,7 +3324,7 @@ impl LivingEntity {
     }
 
     pub fn can_take_damage(&self) -> bool {
-        !self.entity.invulnerable.load(Ordering::Relaxed) && self.is_part_of_game()
+        !self.entity.is_invulnerable() && self.is_part_of_game()
     }
 
     /// Vanilla `LivingEntity.canBeSeenByAnyone`, whose `isAlive` is health aware, unlike
@@ -3549,11 +3549,6 @@ impl LivingEntity {
         self.write_attributes_nbt(nbt);
         // Persist current absorption amount
         nbt.put("AbsorptionAmount", NbtTag::Float(self.absorption.load()));
-        // Vanilla `Entity.saveWithoutId`'s `invulnerable_time`, the hurt cooldown.
-        let invulnerable_time = self.hurt_cooldown.load(Relaxed);
-        if invulnerable_time > 0 {
-            nbt.put_int("invulnerable_time", invulnerable_time);
-        }
         nbt.put_int(
             "current_impulse_context_reset_grace_time",
             self.current_impulse_context_reset_grace_time.load(Relaxed),
@@ -3765,9 +3760,6 @@ impl LivingEntity {
             }
         }
 
-        if let Some(invulnerable_time) = nbt.get_int("invulnerable_time") {
-            self.hurt_cooldown.store(invulnerable_time, Relaxed);
-        }
         self.current_impulse_context_reset_grace_time.store(
             nbt.get_int("current_impulse_context_reset_grace_time")
                 .unwrap_or(0),
@@ -4903,40 +4895,6 @@ impl EntityBase for LivingEntity {
                 .fetch_sub(1, Relaxed);
         }
 
-        // Fetch supporting blocks for players or other entities
-        let supporting_pos = caller.get_player().map_or_else(
-            || self.entity.get_supporting_block_pos(),
-            super::player::Player::get_supporting_block_pos,
-        );
-
-        // Notify the block under the entity each tick if a supporting block position is found
-        if self.entity.is_affected_by_blocks()
-            && let Some(supporting) = supporting_pos
-        {
-            let world = self.entity.world.load_full();
-            let (block, state) = world.get_block_and_state(&supporting);
-
-            world
-                .block_registry
-                .on_entity_step(block, &world, caller, &supporting, state, false);
-
-            // Check slightly below supporting_pos for additional supporting blocks (blocks under carpets and the like)
-            if !block.is_solid() {
-                let below_supporting = supporting.down();
-                let (below_block, below_state) = world.get_block_and_state(&below_supporting);
-
-                // If block is not air, notify it as well
-                world.block_registry.on_entity_step(
-                    below_block,
-                    &world,
-                    caller,
-                    &below_supporting,
-                    below_state,
-                    true, // below supporting block
-                );
-            }
-        }
-
         if self.health.load() <= 0.0 && !own_tick_death && is_player {
             let time = self
                 .death_time
@@ -5532,9 +5490,9 @@ impl LivingEntity {
                     let Some(pos) = self.find_random_teleport_target(*diameter) else {
                         continue;
                     };
-                    let (yaw, pitch) = (self.entity.yaw.load(), self.entity.pitch.load());
                     let world = self.entity.world.load_full();
-                    caller.teleport(pos, Some(yaw), Some(pitch), world.clone());
+                    // `randomTeleport`'s `teleportTo(x, y, z)`.
+                    crate::entity::teleport_to(caller, pos);
 
                     let destination = self.entity.pos.load();
                     if destination != center {

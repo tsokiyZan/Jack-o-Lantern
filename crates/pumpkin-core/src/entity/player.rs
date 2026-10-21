@@ -3296,7 +3296,10 @@ impl Player {
         let supporting_block_pos = entity.supporting_block_pos.load();
         let on_ground_no_blocks = entity.on_ground_no_blocks.load(Ordering::Relaxed);
 
+        // Vanilla never moves a player here, so this move isn't one the block sweep sees.
+        let movements = entity.movement_this_tick();
         self.travel();
+        entity.set_movement_this_tick(movements);
 
         entity.set_pos(pos);
         entity.on_ground.store(on_ground, Ordering::Relaxed);
@@ -7355,16 +7358,20 @@ impl EntityBase for Player {
         Sound::EntityPlayerSplashHighSpeed
     }
 
-    fn set_on_fire_for_ticks(&self, ticks: u32) {
-        let entity = self.get_entity();
-        let ticks = if entity.invulnerable.load(Ordering::Relaxed) {
-            1
-        } else {
-            ticks
-        };
-        if entity.fire_ticks.load(Ordering::Relaxed) < ticks as i32 {
-            entity.fire_ticks.store(ticks as i32, Ordering::Relaxed);
-        }
+    /// Vanilla `Player.setRemainingFireTicks`.
+    fn set_remaining_fire_ticks(&self, ticks: i32) {
+        let invulnerable = self
+            .abilities
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .invulnerable;
+        let ticks = if invulnerable { ticks.min(1) } else { ticks };
+        self.get_entity().fire_ticks.store(ticks, Ordering::Relaxed);
+    }
+
+    /// Vanilla `Player.getFireImmuneTicks`.
+    fn fire_immune_ticks(&self) -> i32 {
+        20
     }
 
     /// Vanilla `LivingEntity.isPushable`; `Player` doesn't override it.

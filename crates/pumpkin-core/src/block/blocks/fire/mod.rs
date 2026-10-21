@@ -5,18 +5,18 @@ use pumpkin_data::tag::Taggable;
 use pumpkin_data::world::WorldEvent;
 use pumpkin_data::{Block, BlockDirection, BlockStateId, tag};
 use pumpkin_util::math::position::BlockPos;
-use pumpkin_util::random::RandomGenerator;
 use pumpkin_util::random::xoroshiro128::Xoroshiro;
+use pumpkin_util::random::{RandomGenerator, RandomImpl};
 use rand::RngExt;
 use soul_fire::SoulFireBlock;
 
 use crate::block::blocks::fire::fire::FireBlock;
 use crate::block::{BlockBehaviour, CanPlaceAtArgs, OnEntityCollisionArgs, PlacedArgs};
 use crate::entity::EntityBase;
+use crate::entity::inside_block_effect::InsideBlockEffectType;
 use crate::world::World;
 use crate::world::portal::nether::NetherPortal;
 use pumpkin_data::damage::DamageType;
-use pumpkin_data::entity::EntityType;
 use std::sync::atomic::Ordering;
 
 #[expect(clippy::module_inception)]
@@ -153,33 +153,39 @@ impl FireBlockBase {
         NetherPortal::get_new_portal(world, block_pos, dir).is_some()
     }
 
-    /// Shared fire collision behavior used by `fire` and `soul_fire`.
-    pub fn apply_fire_collision(args: &OnEntityCollisionArgs<'_>, extra_damage_for_living: bool) {
-        let base_entity = args.entity.get_entity();
-        if !base_entity.is_fire_immune() {
-            let ticks = base_entity.fire_ticks.load(Ordering::Relaxed);
+    /// Vanilla `BaseFireBlock.entityInside`, `fire_damage` being the block's own damage.
+    pub fn entity_inside(args: &OnEntityCollisionArgs<'_>, fire_damage: f32) {
+        args.effect_applier
+            .apply(InsideBlockEffectType::ClearFreeze);
+        args.effect_applier.apply(InsideBlockEffectType::FireIgnite);
+        args.effect_applier
+            .run_after(InsideBlockEffectType::FireIgnite, move |entity| {
+                entity.damage(entity, fire_damage, DamageType::IN_FIRE);
+            });
+    }
 
-            // Timer logic
-            if ticks < 0 {
-                base_entity.fire_ticks.store(ticks + 1, Ordering::Relaxed);
-            } else if base_entity.entity_type == &EntityType::PLAYER {
-                let rnd_ticks = rand::rng().random_range(1..3);
-                base_entity
-                    .fire_ticks
-                    .store(ticks + rnd_ticks, Ordering::Relaxed);
-            }
+    /// Vanilla `BaseFireBlock.fireIgnite`.
+    pub fn fire_ignite(caller: &dyn EntityBase) {
+        let entity = caller.get_entity();
+        if entity.is_fire_immune() {
+            return;
+        }
+        let ticks = entity.fire_ticks.load(Ordering::Relaxed);
+        if ticks < 0 {
+            caller.set_remaining_fire_ticks(ticks + 1);
+        } else if caller.get_player().is_some() {
+            let added_fire_ticks = entity
+                .world
+                .load()
+                .random
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .next_int_range(1, 3);
+            caller.set_remaining_fire_ticks(ticks + added_fire_ticks);
+        }
 
-            // Apply fire ticks
-            if base_entity.fire_ticks.load(Ordering::Relaxed) >= 0 {
-                args.entity.set_on_fire_for(8.0);
-            }
-
-            // Regular fire vs soul fire damage
-            if extra_damage_for_living {
-                base_entity.damage(args.entity, 2.0, DamageType::IN_FIRE);
-            } else {
-                base_entity.damage(args.entity, 1.0, DamageType::IN_FIRE);
-            }
+        if entity.fire_ticks.load(Ordering::Relaxed) >= 0 {
+            caller.set_on_fire_for(8.0);
         }
     }
 

@@ -20,6 +20,7 @@ pub mod viewer;
 
 use crate::block::registry::BlockActionResult;
 use crate::entity::EntityBase;
+use crate::entity::inside_block_effect::InsideBlockEffectApplier;
 use crate::server::Server;
 use pumpkin_data::BlockDirection;
 use pumpkin_data::block_rotation::{Mirror, Rotation};
@@ -291,6 +292,11 @@ pub struct OnEntityCollisionArgs<'a> {
     pub state: &'a BlockState,
     pub position: &'a BlockPos,
     pub entity: &'a dyn EntityBase,
+    /// Vanilla `InsideBlockEffectApplier`: where fire, lava, water and powder snow queue
+    /// their ordered effects.
+    pub effect_applier: &'a InsideBlockEffectApplier,
+    /// Vanilla `isPrecise`: the entity really ends the sweep inside this block.
+    pub is_precise: bool,
 }
 
 pub struct OnProjectileHitArgs<'a> {
@@ -309,7 +315,6 @@ pub struct OnEntityStepArgs<'a> {
     pub state: &'a BlockState,
     pub position: &'a BlockPos,
     pub entity: &'a dyn EntityBase,
-    pub below_supporting_block: bool,
 }
 
 pub struct SpawnAfterBreakArgs<'a> {

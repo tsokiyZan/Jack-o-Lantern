@@ -185,6 +185,63 @@ impl Worldborder {
         x >= min_x && x < max_x && z >= min_z && z < max_z
     }
 
+    /// Vanilla `WorldBorder.getDistanceToBorder(x, z)`: to the nearest side, negative outside.
+    #[must_use]
+    pub fn distance_to_border(&self, x: f64, z: f64) -> f64 {
+        let half = self.new_diameter / 2.0;
+        let from_north = z - (self.center_z - half);
+        let from_south = (self.center_z + half) - z;
+        let from_west = x - (self.center_x - half);
+        let from_east = (self.center_x + half) - x;
+        from_west.min(from_east).min(from_north).min(from_south)
+    }
+
+    /// Vanilla `WorldBorder.isInsideCloseToBorder`: the entity at `x`/`z` is inside the
+    /// border, and `bounding_box` could reach it.
+    #[must_use]
+    pub fn is_inside_close_to_border(&self, x: f64, z: f64, bounding_box: &BoundingBox) -> bool {
+        let size_x = bounding_box.max.x - bounding_box.min.x;
+        let size_z = bounding_box.max.z - bounding_box.min.z;
+        let bb_max = size_x.abs().max(size_z.abs()).max(1.0);
+        let half = self.new_diameter / 2.0;
+        // `isWithinBounds(x, z, bbMax)`.
+        let within = x >= self.center_x - half - bb_max
+            && x < self.center_x + half + bb_max
+            && z >= self.center_z - half - bb_max
+            && z < self.center_z + half + bb_max;
+        self.distance_to_border(x, z) < bb_max * 2.0 && within
+    }
+
+    /// Vanilla `WorldBorder.getCollisionShape`: everything outside the border, widened to
+    /// whole blocks, as four boxes.
+    #[must_use]
+    pub fn collision_shapes(&self) -> [BoundingBox; 4] {
+        let half = self.new_diameter / 2.0;
+        let min_x = (self.center_x - half).floor();
+        let max_x = (self.center_x + half).ceil();
+        let min_z = (self.center_z - half).floor();
+        let max_z = (self.center_z + half).ceil();
+        let (inf, neg_inf) = (f64::INFINITY, f64::NEG_INFINITY);
+        [
+            BoundingBox::new(
+                Vector3::new(neg_inf, neg_inf, neg_inf),
+                Vector3::new(min_x, inf, inf),
+            ),
+            BoundingBox::new(
+                Vector3::new(max_x, neg_inf, neg_inf),
+                Vector3::new(inf, inf, inf),
+            ),
+            BoundingBox::new(
+                Vector3::new(min_x, neg_inf, neg_inf),
+                Vector3::new(max_x, inf, min_z),
+            ),
+            BoundingBox::new(
+                Vector3::new(min_x, neg_inf, max_z),
+                Vector3::new(max_x, inf, inf),
+            ),
+        ]
+    }
+
     /// Vanilla `WorldBorder.clampVec3ToBound`.
     #[must_use]
     pub fn clamp_vec3_to_bound(&self, x: f64, y: f64, z: f64) -> Vector3<f64> {
@@ -197,18 +254,6 @@ impl Worldborder {
             y,
             clamp(z, self.center_z - half, self.center_z + half - inset),
         )
-    }
-
-    /// Vanilla `WorldBorder.getDistanceToBorder(x, z)`: to the nearest side, negative
-    /// outside.
-    #[must_use]
-    pub fn distance_to_border(&self, x: f64, z: f64) -> f64 {
-        let half = self.new_diameter / 2.0;
-        let from_north = z - (self.center_z - half);
-        let from_south = self.center_z + half - z;
-        let from_west = x - (self.center_x - half);
-        let from_east = self.center_x + half - x;
-        from_west.min(from_east).min(from_north).min(from_south)
     }
 
     /// Vanilla `WorldBorder.isWithinBounds(AABB)`.

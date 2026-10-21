@@ -31,6 +31,17 @@ pub enum Axis {
 }
 
 impl Axis {
+    /// Vanilla `Direction.axisStepOrder`: Y first, then the horizontal axis that moves more
+    /// (X on a tie).
+    #[must_use]
+    pub fn step_order(movement: Vector3<f64>) -> [Self; 3] {
+        if movement.x.abs() < movement.z.abs() {
+            [Self::Y, Self::Z, Self::X]
+        } else {
+            [Self::Y, Self::X, Self::Z]
+        }
+    }
+
     /// Returns all three axes `[Y, X, Z]`.
     #[must_use]
     pub const fn all() -> [Self; 3] {

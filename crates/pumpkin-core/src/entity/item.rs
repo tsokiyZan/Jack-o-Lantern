@@ -550,9 +550,8 @@ impl ItemEntity {
     fn mark_needs_sync(&self, caller: &dyn EntityBase, original_velo: Vector3<f64>) {
         let entity = &self.entity;
 
-        // Vanilla runs `updateFluidInteraction` again here, but the fluid damage only
-        // comes from the block effects, so it must not be applied a second time.
-        let in_fluid = !entity.update_fluid_interaction(caller).is_empty();
+        // Vanilla runs `updateFluidInteraction` again here, pushing by the current twice.
+        let in_fluid = entity.update_fluid_interaction(caller);
 
         if in_fluid || entity.velocity.load().sub(&original_velo).length_squared() > 0.01 {
             entity.velocity_dirty.store(true, Ordering::SeqCst);
@@ -592,6 +591,8 @@ impl EntityBase for ItemEntity {
 
         if self.should_tick_move(move_velo) {
             self.move_and_apply_friction(caller, move_velo);
+        } else {
+            entity.apply_effects_from_blocks_for_last_movements(caller);
         }
 
         if self.process_age_and_merge() {
@@ -741,6 +742,12 @@ impl EntityBase for ItemEntity {
                 self.on_count_changed();
             }
         }
+    }
+
+    /// Vanilla `ItemEntity.shouldPlayLavaHurtSound`.
+    fn should_play_lava_hurt_sound(&self) -> bool {
+        self.health.load(Ordering::Relaxed) <= 0.0
+            || self.entity.tick_count.load(Ordering::Relaxed) % 10 == 0
     }
 
     fn get_entity(&self) -> &Entity {

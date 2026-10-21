@@ -180,6 +180,7 @@ use crate::block::{
     OnEntityStepArgs, OnProjectileHitArgs, PathComputationType,
 };
 use crate::entity::EntityBase;
+use crate::entity::inside_block_effect::InsideBlockEffectApplier;
 use crate::entity::player::Player;
 use crate::server::Server;
 use crate::world::World;
@@ -884,6 +885,8 @@ impl BlockRegistry {
         false
     }
 
+    /// Vanilla `BlockState.entityInside`.
+    #[expect(clippy::too_many_arguments)]
     pub fn on_entity_collision(
         &self,
         block: &Block,
@@ -892,6 +895,8 @@ impl BlockRegistry {
         position: &BlockPos,
         state: &BlockState,
         server: &Server,
+        effect_applier: &InsideBlockEffectApplier,
+        is_precise: bool,
     ) {
         let pumpkin_block = self.get_pumpkin_block(block.id);
         if let Some(pumpkin_block) = pumpkin_block {
@@ -902,10 +907,13 @@ impl BlockRegistry {
                 state,
                 position,
                 entity,
+                effect_applier,
+                is_precise,
             });
         }
     }
 
+    /// Vanilla `Block.stepOn`.
     pub fn on_entity_step(
         &self,
         block: &Block,
@@ -913,7 +921,6 @@ impl BlockRegistry {
         entity: &dyn EntityBase,
         position: &BlockPos,
         state: &BlockState,
-        below_supporting_block: bool,
     ) {
         if let Some(pumpkin_block) = self.get_pumpkin_block(block.id) {
             pumpkin_block.on_entity_step(OnEntityStepArgs {
@@ -922,7 +929,6 @@ impl BlockRegistry {
                 state,
                 position,
                 entity,
-                below_supporting_block,
             });
         }
     }
@@ -951,10 +957,16 @@ impl BlockRegistry {
         }
     }
 
-    pub fn on_entity_collision_fluid(&self, fluid: &Fluid, entity: &dyn EntityBase) {
+    /// Vanilla `FluidState.entityInside`.
+    pub fn on_entity_collision_fluid(
+        &self,
+        fluid: &Fluid,
+        entity: &dyn EntityBase,
+        effect_applier: &InsideBlockEffectApplier,
+    ) {
         let pumpkin_fluid = self.get_pumpkin_fluid(fluid.id);
         if let Some(pumpkin_fluid) = pumpkin_fluid {
-            pumpkin_fluid.on_entity_collision(entity);
+            pumpkin_fluid.on_entity_collision(entity, effect_applier);
         }
     }
 

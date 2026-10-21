@@ -316,9 +316,15 @@ impl EntityBase for ArmorStandEntity {
         Some(&self.living_entity)
     }
 
-    fn kill(&self, _caller: &dyn EntityBase) {
-        self.get_entity().remove();
-        // TODO: emit GameEvent::ENTITY_DIE
+    /// Vanilla `ArmorStand.kill`.
+    fn kill(&self, caller: &dyn EntityBase) {
+        let entity = self.get_entity();
+        entity.remove();
+        entity.world.load().game_event_from(
+            Some(caller),
+            pumpkin_data::game_event::GameEvent::EntityDie,
+            entity.pos.load(),
+        );
     }
 
     fn damage_with_context(

@@ -146,8 +146,7 @@ impl HurtingProjectile {
 
         rotate_towards_movement(entity, 0.2);
         entity.set_pos(new_pos);
-        // `applyEffectsFromBlocks`.
-        Entity::check_block_collision(caller, server);
+        entity.apply_effects_from_blocks(caller);
         // `Projectile.tick`.
         self.thrown.projectile.tick(entity);
         EntityBase::tick(entity, caller, server);

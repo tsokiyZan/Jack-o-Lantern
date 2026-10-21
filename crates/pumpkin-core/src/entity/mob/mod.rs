@@ -2236,9 +2236,10 @@ pub trait Mob: EntityBase + Send + Sync {
         true
     }
 
-    /// Vanilla `Entity.updateSwimming`, run right after the fluid update. Only the
-    /// drowned's override is ported for mobs.
-    fn update_swimming(&self) {}
+    /// Vanilla `Entity.updateSwimming`, run right after the fluid update.
+    fn update_swimming(&self) {
+        self.get_entity().update_swimming_base();
+    }
 
     /// Builds this mob's brain from its saved memories; goal mobs keep the brain-dead default.
     fn make_brain(&self, _packed: &PackedMemories) -> Brain {
@@ -2908,8 +2909,8 @@ impl<T: Mob + Send + 'static> EntityBase for T {
         self.post_tick();
     }
 
-    fn is_collidable(&self, entity: Option<Box<dyn EntityBase>>) -> bool {
-        self.mob_can_be_collided_with(entity.as_deref())
+    fn is_collidable(&self, entity: Option<&dyn EntityBase>) -> bool {
+        self.mob_can_be_collided_with(entity)
     }
 
     fn kill(&self, caller: &dyn EntityBase) {

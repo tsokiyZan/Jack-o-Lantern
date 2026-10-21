@@ -27,7 +27,7 @@ impl EvokerFangsEntity {
     /// Vanilla `EvokerFangs.dealDamageTo`.
     fn deal_damage_to(&self, world: &Arc<World>, target: &dyn EntityBase) {
         let target_entity = target.get_entity();
-        if !target_entity.is_alive() || target_entity.invulnerable.load(Ordering::Relaxed) {
+        if !target_entity.is_alive() || target_entity.is_invulnerable() {
             return;
         }
         // `getOwner`, an `EntityReference<LivingEntity>`.

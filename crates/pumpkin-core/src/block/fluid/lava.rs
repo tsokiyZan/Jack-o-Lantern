@@ -1,18 +1,21 @@
 use super::flowing_trait::FlowingFluid;
 use crate::{
-    block::{FluidMetadata, blocks::fire::fire::FireBlock, fluid::FluidBehaviour},
-    entity::EntityBase,
+    block::{FluidMetadata, blocks::fire::FireBlockBase, fluid::FluidBehaviour},
+    entity::{
+        Entity, EntityBase,
+        inside_block_effect::{InsideBlockEffectApplier, InsideBlockEffectType},
+    },
     world::World,
 };
 use pumpkin_data::{
     Block, BlockDirection, BlockState, BlockStateId,
-    damage::DamageType,
     fluid::{Falling, Fluid, FluidProperties, Level},
-    tag::Taggable,
+    tag::{self, Taggable},
     world::WorldEvent,
 };
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 use pumpkin_world::{tick::TickPriority, world::BlockFlags};
 use std::sync::Arc;
 type FlowingFluidProperties = pumpkin_data::fluid::FlowingWaterLikeFluidProperties;
@@ -66,25 +69,6 @@ impl FlowingLava {
         BlockDirection::all()
             .iter()
             .any(|dir| Self::is_flammable(world, &pos.offset(dir.to_offset())))
-    }
-
-    fn can_resolve_fire_state_without_loading(world: &Arc<World>, pos: &BlockPos) -> bool {
-        if !world.is_loaded(pos) || !world.is_loaded(&pos.down()) {
-            return false;
-        }
-
-        BlockDirection::all()
-            .iter()
-            .all(|dir| world.is_loaded(&pos.offset(dir.to_offset())))
-    }
-
-    fn ignite_fire_if_possible(world: &Arc<World>, pos: &BlockPos) {
-        if !Self::can_resolve_fire_state_without_loading(world, pos) {
-            return;
-        }
-
-        let fire_state_id = FireBlock.get_state_for_position(world.as_ref(), &Block::FIRE, pos);
-        world.set_block_state(pos, fire_state_id, BlockFlags::NOTIFY_ALL);
     }
 
     fn receive_neighbor_fluids(world: &Arc<World>, block_pos: &BlockPos) -> bool {
@@ -178,66 +162,76 @@ impl FluidBehaviour for FlowingLava {
         }
     }
 
-    fn on_entity_collision(&self, entity: &dyn EntityBase) {
-        let base_entity = entity.get_entity();
-        if !base_entity.is_fire_immune() {
-            entity.set_on_fire_for(15.0);
-
-            // Also apply lava damage
-            base_entity.damage(entity, 4.0, DamageType::LAVA);
-        }
+    /// Vanilla `LavaFluid.entityInside`.
+    fn on_entity_collision(
+        &self,
+        _entity: &dyn EntityBase,
+        effect_applier: &InsideBlockEffectApplier,
+    ) {
+        effect_applier.apply(InsideBlockEffectType::ClearFreeze);
+        effect_applier.apply(InsideBlockEffectType::LavaIgnite);
+        effect_applier.run_after(InsideBlockEffectType::LavaIgnite, Entity::lava_hurt);
     }
 
+    /// Vanilla `LavaFluid.randomTick`, drawing from the level random like the chunk tick.
     fn random_tick(&self, _fluid: &Fluid, world: &Arc<World>, block_pos: &BlockPos) {
         if !Self::can_spread_fire_around(world, block_pos) {
             return;
         }
 
-        let passes = rand::random_range(0..3);
+        let random = || {
+            world
+                .random
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+        };
+        let passes = random().next_bounded_i32(3);
         if passes > 0 {
             let mut test_pos = *block_pos;
 
             for _ in 0..passes {
-                test_pos = test_pos.offset(Vector3::new(
-                    rand::random_range(-1..=1),
-                    1,
-                    rand::random_range(-1..=1),
-                ));
+                let x = random().next_bounded_i32(3) - 1;
+                let z = random().next_bounded_i32(3) - 1;
+                test_pos = test_pos.offset(Vector3::new(x, 1, z));
+                if !world.is_loaded(&test_pos) {
+                    return;
+                }
 
-                let (block, _) = world.get_block_and_state_id(&test_pos);
-
-                if block.id == Block::AIR.id {
+                let state = world.get_block_state(&test_pos);
+                if state.is_air() {
                     if Self::has_flammable_neighbours(world, &test_pos) {
                         world.set_block_state(
                             &test_pos,
-                            Block::FIRE.default_state.id,
+                            FireBlockBase::get_state(world, &test_pos),
                             BlockFlags::NOTIFY_ALL,
                         );
                         return;
                     }
-                } else if block.is_solid() {
+                } else if Block::from_state_id(state.id)
+                    .has_tag(&tag::Block::MINECRAFT_BLOCKS_LAVA_FIRE_SPREAD)
+                {
                     return;
                 }
             }
         } else {
             for _ in 0..3 {
-                let test_pos = block_pos.offset(Vector3::new(
-                    rand::random_range(-1..=1),
-                    0,
-                    rand::random_range(-1..=1),
-                ));
-
+                let x = random().next_bounded_i32(3) - 1;
+                let z = random().next_bounded_i32(3) - 1;
+                let test_pos = block_pos.offset(Vector3::new(x, 0, z));
                 if !world.is_loaded(&test_pos) {
                     return;
                 }
 
-                let above_pos = test_pos.up();
-                if world
-                    .get_block_state_if_loaded(&above_pos)
-                    .is_some_and(BlockState::is_air)
+                // `BaseFireBlock.getState(level, testPos)`: the state for `testPos`, not the
+                // fire's own position above it.
+                if world.get_block_state(&test_pos.up()).is_air()
                     && Self::is_flammable(world, &test_pos)
                 {
-                    Self::ignite_fire_if_possible(world, &above_pos);
+                    world.set_block_state(
+                        &test_pos.up(),
+                        FireBlockBase::get_state(world, &test_pos),
+                        BlockFlags::NOTIFY_ALL,
+                    );
                 }
             }
         }

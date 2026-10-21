@@ -5,7 +5,6 @@ use pumpkin_data::fluid::Fluid;
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_data::{Block, BlockId, BlockStateId};
 use pumpkin_util::math::position::BlockPos;
-use pumpkin_util::math::vector3::Vector3;
 use pumpkin_world::tick::TickPriority;
 use pumpkin_world::world::BlockFlags;
 
@@ -13,17 +12,11 @@ use crate::block::{
     BlockBehaviour, BlockMetadata, OnEntityCollisionArgs, OnNeighborUpdateArgs,
     OnScheduledTickArgs, PlacedArgs,
 };
+use crate::entity::Entity;
 use crate::world::World;
 
 const CREATE_DELAY_TICKS: i32 = 20;
 const REMOVE_DELAY_TICKS: i32 = 5;
-
-const UPWARD_ACCELERATION: f64 = 0.06;
-const UPWARD_MAX_SPEED: f64 = 0.7;
-const SURFACE_UPWARD_ACCELERATION: f64 = 0.1;
-const SURFACE_UPWARD_MAX_SPEED: f64 = 1.8;
-const DOWNWARD_ACCELERATION: f64 = -0.03;
-const DOWNWARD_MIN_SPEED: f64 = -0.3;
 
 pub struct BubbleColumnBlock;
 
@@ -130,51 +123,21 @@ fn schedule_reconcile(world: &Arc<World>, position: BlockPos, delay: i32) {
     world.schedule_block_tick(&Block::BUBBLE_COLUMN, position, delay, TickPriority::Normal);
 }
 
-fn bubble_column_vertical_velocity(
-    current_y: f64,
-    kind: BubbleColumnKind,
-    at_surface: bool,
-) -> f64 {
-    match (kind, at_surface) {
-        (BubbleColumnKind::Upward, true) => {
-            (current_y + SURFACE_UPWARD_ACCELERATION).min(SURFACE_UPWARD_MAX_SPEED)
-        }
-        (BubbleColumnKind::Upward, false) => {
-            (current_y + UPWARD_ACCELERATION).min(UPWARD_MAX_SPEED)
-        }
-        (BubbleColumnKind::Downward, _) => {
-            (current_y + DOWNWARD_ACCELERATION).max(DOWNWARD_MIN_SPEED)
-        }
-    }
-}
-
-fn bubble_column_velocity(
-    current: Vector3<f64>,
-    kind: BubbleColumnKind,
-    at_surface: bool,
-) -> Vector3<f64> {
-    Vector3::new(
-        current.x,
-        bubble_column_vertical_velocity(current.y, kind, at_surface),
-        current.z,
-    )
-}
-
 impl BlockBehaviour for BubbleColumnBlock {
+    /// Vanilla `BubbleColumnBlock.entityInside`.
     fn on_entity_collision(&self, args: OnEntityCollisionArgs<'_>) {
-        {
-            if args.block != &Block::BUBBLE_COLUMN {
-                return;
-            }
-
-            let kind = kind_from_state(args.state.id);
-            let at_surface = args.world.get_block(&args.position.up()) == &Block::AIR;
-            let entity = args.entity.get_entity();
-            entity.velocity.store(bubble_column_velocity(
-                entity.velocity.load(),
-                kind,
-                at_surface,
-            ));
+        if args.block != &Block::BUBBLE_COLUMN || !args.is_precise {
+            return;
+        }
+        let drag_down = kind_from_state(args.state.id) == BubbleColumnKind::Downward;
+        let above = args.position.up();
+        let state_above = args.world.get_block_state(&above);
+        let nothing_above = state_above.get_block_collision_shapes().next().is_none()
+            && args.world.get_fluid_and_fluid_state(&above).1.is_empty;
+        if nothing_above {
+            Entity::handle_on_above_bubble_column(args.entity, drag_down, *args.position);
+        } else {
+            Entity::handle_on_inside_bubble_column(args.entity, drag_down);
         }
     }
 

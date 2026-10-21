@@ -865,7 +865,7 @@ impl SpearItem {
         let entity = target.get_entity();
         if entity.entity_id == attacker.entity_id
             || entity.is_removed()
-            || entity.invulnerable.load(Ordering::Relaxed)
+            || entity.is_invulnerable()
             || target.is_spectator()
         {
             return false;

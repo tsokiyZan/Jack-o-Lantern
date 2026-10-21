@@ -43,10 +43,27 @@ impl BlockBehaviour for EndGatewayBlock {
         end_gateway.trigger_cooldown(args.world, *args.position);
 
         if let Some(destination) = end_gateway.get_portal_position(args.world, *args.position) {
-            let yaw = entity.yaw.load();
-            let pitch = entity.pitch.load();
-            args.entity
-                .teleport(destination, Some(yaw), Some(pitch), args.world.clone());
+            if args.entity.get_player().is_some() {
+                let yaw = entity.yaw.load();
+                let pitch = entity.pitch.load();
+                args.entity
+                    .teleport(destination, Some(yaw), Some(pitch), args.world.clone());
+            } else if let Some(this) = args.world.get_entity_by_id(entity.entity_id) {
+                // `EndGatewayBlock.getPortalDestination`: a pearl arrives still and facing
+                // 0/0, anything else keeps its speed and rotation.
+                let pearl = entity.entity_type == &pumpkin_data::entity::EntityType::ENDER_PEARL;
+                crate::entity::teleport_transition(
+                    &this,
+                    &crate::entity::TeleportTarget {
+                        world: args.world.clone(),
+                        position: destination,
+                        yaw: pearl.then_some(0.0),
+                        pitch: pearl.then_some(0.0),
+                        keep_velocity: !pearl,
+                        as_passenger: false,
+                    },
+                );
+            }
         }
     }
 

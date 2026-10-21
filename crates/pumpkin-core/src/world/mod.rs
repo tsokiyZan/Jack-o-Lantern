@@ -683,6 +683,31 @@ impl World {
         self.level.shutdown().await;
     }
 
+    /// The passenger part of vanilla `EntityType.loadEntityRecursive`: each saved passenger,
+    /// with its own passengers, rides `vehicle` again (`startRiding(vehicle, true, false)`).
+    fn load_passengers(world: &Arc<Self>, vehicle: &Arc<dyn EntityBase>, nbt: &NbtCompound) {
+        for passenger_nbt in nbt.get_list("Passengers").unwrap_or_default() {
+            let pumpkin_nbt::tag::NbtTag::Compound(passenger_nbt) = passenger_nbt else {
+                continue;
+            };
+            let Some(entity_type) = passenger_nbt
+                .get_string("id")
+                .and_then(|id| EntityType::from_name(id.strip_prefix("minecraft:").unwrap_or(id)))
+            else {
+                continue;
+            };
+            let uuid = passenger_nbt.get_uuid("UUID").unwrap_or_else(Uuid::new_v4);
+            let passenger = from_type(entity_type, Vector3::new(0.0, 0.0, 0.0), world, uuid);
+            passenger.read_nbt_non_mut(passenger_nbt);
+            passenger.init_data_tracker();
+            world.add_entity_silent(passenger.clone());
+            vehicle
+                .get_entity()
+                .add_passenger_without_event(vehicle.clone(), passenger.clone());
+            Self::load_passengers(world, &passenger, passenger_nbt);
+        }
+    }
+
     /// Writes `entities` into the saved data of the chunks they are in. A live chunk is
     /// rebuilt from scratch, so `snapshot_chunks` lists the live chunks that must be rewritten
     /// even when nothing is left in them; a chunk that never went live keeps its records.
@@ -694,7 +719,8 @@ impl World {
         let mut groups: FxHashMap<Vector2<i32>, Vec<NbtCompound>> = FxHashMap::default();
         for entity in entities {
             let base_entity = entity.get_entity();
-            if base_entity.is_removed() {
+            // A passenger is saved inside its vehicle's `Passengers`.
+            if base_entity.is_removed() || !base_entity.should_be_saved() {
                 continue;
             }
             let mut nbt = NbtCompound::new();
@@ -1753,7 +1779,7 @@ impl World {
         let player_handle = handle.clone();
         players.par_iter().for_each(|player| {
             let _guard = player_handle.enter();
-            player.get_entity().tick_count.fetch_add(1, Relaxed);
+            player.get_entity().common_tick();
             player.tick(server);
         });
         // A player's passengers tick with it, as with any other vehicle.
@@ -1818,7 +1844,7 @@ impl World {
                     }
 
                     // `tickNonPassenger`.
-                    entity.get_entity().tick_count.fetch_add(1, Relaxed);
+                    entity.get_entity().common_tick();
                     entity.tick(entity.as_ref(), server_ref);
                     Self::touch_players(entity.as_ref(), *entity_chunk, &players_cache);
                     Self::tick_passengers(entity, server_ref, &players_cache);
@@ -2567,6 +2593,28 @@ impl World {
     /// the box. Without a source entity vanilla skips the world-border check.
     pub fn no_collision(&self, bounding_box: BoundingBox) -> bool {
         self.is_space_empty(bounding_box) && self.no_entity_collision(&bounding_box)
+    }
+
+    /// Vanilla `CollisionGetter.getEntityCollisions(source, box)`: the boxes of the entities
+    /// `source` can't pass through.
+    pub fn get_entity_collisions(
+        &self,
+        source: &dyn EntityBase,
+        bounding_box: BoundingBox,
+    ) -> Vec<BoundingBox> {
+        if bounding_box.get_average_side_length() < 1.0E-7 {
+            return Vec::new();
+        }
+        let source_id = source.get_entity().entity_id;
+        self.get_all_at_box(&bounding_box.expand_all(1.0E-7))
+            .iter()
+            .filter(|entity| {
+                entity.get_entity().entity_id != source_id
+                    && !entity.is_spectator()
+                    && source.can_collide_with(source, entity.as_ref())
+            })
+            .map(|entity| entity.get_entity().bounding_box.load())
+            .collect()
     }
 
     /// Vanilla `getEntityCollisions(null, box).isEmpty()`.
@@ -4659,6 +4707,7 @@ impl World {
                         // UUID-dedupes if another watcher already loaded this entity.
                         // Tracker owns pairing (spawn packets + vehicle restore).
                         world.add_entity_silent(entity.clone());
+                        Self::load_passengers(&world, &entity, entity_nbt);
                         if let Some(player) = &player {
                             player.try_restore_vehicle(&entity);
                         }
@@ -5308,7 +5357,7 @@ impl World {
         }
         // `commonTick` and `rideTick`.
         if passenger.get_player().is_none() {
-            entity.tick_count.fetch_add(1, Relaxed);
+            entity.common_tick();
             entity.velocity.store(Vector3::default());
             passenger.tick(passenger.as_ref(), server);
         }
@@ -5459,6 +5508,19 @@ impl World {
             return;
         }
         base_entity.removed.store(true, Ordering::Release);
+
+        // Vanilla `setRemoved`: a destroyed entity leaves its vehicle and its passengers get off.
+        if let Some(vehicle) = base_entity.get_vehicle() {
+            vehicle.get_entity().remove_passenger(base_entity.entity_id);
+        }
+        let passengers = base_entity
+            .passengers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        for passenger in passengers {
+            base_entity.remove_passenger(passenger.get_entity().entity_id);
+        }
 
         self.spawn_state.load().remove_entity(self, entity);
         self.entity_tracker.remove_entity(entity, self);

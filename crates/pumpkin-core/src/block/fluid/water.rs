@@ -1,7 +1,10 @@
 use super::flowing_trait::FlowingFluid;
 use crate::{
     block::{FluidMetadata, fluid::FluidBehaviour},
-    entity::EntityBase,
+    entity::{
+        EntityBase,
+        inside_block_effect::{InsideBlockEffectApplier, InsideBlockEffectType},
+    },
     world::World,
 };
 use pumpkin_data::BlockStateId;
@@ -52,8 +55,13 @@ impl FluidBehaviour for FlowingWater {
         }
     }
 
-    fn on_entity_collision(&self, entity: &dyn EntityBase) {
-        entity.get_entity().extinguish();
+    /// Vanilla `WaterFluid.entityInside`.
+    fn on_entity_collision(
+        &self,
+        _entity: &dyn EntityBase,
+        effect_applier: &InsideBlockEffectApplier,
+    ) {
+        effect_applier.apply(InsideBlockEffectType::Extinguish);
     }
 }
 

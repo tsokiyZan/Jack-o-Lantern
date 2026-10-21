@@ -55,18 +55,21 @@ fn swim_pitch(entity: &Entity) -> f32 {
 impl Entity {
     /// Vanilla `Entity.applyMovementEmissionAndPlaySound`, called at the end of `Entity.move`
     /// with the collided movement.
+    /// `effect_pos` and `effect_state` are the block 0.2 under the feet, read before the
+    /// move's fall damage could change it.
     pub fn apply_movement_emission_and_play_sound(
         &self,
         caller: &dyn EntityBase,
         clipped_movement: Vector3<f64>,
+        effect_pos: BlockPos,
+        effect_state: &'static BlockState,
     ) {
         let emission = caller.movement_emission();
         if !emission.emits_anything() || caller.is_passenger() {
             return;
         }
         let world = self.world.load();
-        let (effect_pos, effect_block, effect_state) =
-            self.get_block_with_y_offset(f64::from(0.2f32));
+        let effect_block = Block::from_state_id(effect_state.id);
 
         let move_dist_scale = f64::from(0.6f32);
         let moved_distance = (clipped_movement.length() * move_dist_scale) as f32;
@@ -143,10 +146,12 @@ impl Entity {
             return false;
         }
         let is_climbable = is_state_climbable(block);
-        // Pumpkin has no minecarts on rails moving entities yet (`isOnRails`).
+        // `isCrouching` is the pose.
         if (self.on_ground.load(Relaxed)
             || is_climbable
-            || self.is_sneaking() && clipped_movement.y == 0.0)
+            || self.pose.load() == pumpkin_data::entity::EntityPose::Crouching
+                && clipped_movement.y == 0.0
+            || caller.is_on_rails())
             && !self.is_swimming()
         {
             if should_sound {

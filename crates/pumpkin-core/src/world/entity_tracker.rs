@@ -140,7 +140,13 @@ impl TrackedEntity {
     pub fn send_changes(&self, world: &World) {
         let entity = self.entity.get_entity();
         self.send_bedrock_move(entity, world);
-        let tick = self.tick_count.fetch_add(1, Relaxed);
+        let mut tick = self.tick_count.load(Relaxed);
+        // `syncPosition`: jump to the next update interval, so this tick sends.
+        if entity.sync_position.swap(false, Ordering::Relaxed) {
+            let period = self.update_interval.max(1);
+            tick = tick / period * period + period;
+        }
+        self.tick_count.store(tick + 1, Relaxed);
         let needs_sync = entity.velocity_dirty.swap(false, Ordering::SeqCst);
         // Head yaw stays live every tick, only position/rotation sync is throttled.
         if tick.is_multiple_of(self.update_interval.max(1))
