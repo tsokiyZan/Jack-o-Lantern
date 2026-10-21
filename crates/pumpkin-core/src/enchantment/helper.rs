@@ -10,7 +10,8 @@ use crate::entity::damage_source::DamageSource;
 use crate::entity::living::LivingEntity;
 use crate::entity::projectile::arrow::ArrowEntity;
 use crate::world::World;
-use pumpkin_data::data_component_impl::{EnchantmentsImpl, EquipmentSlot, Operation};
+use pumpkin_data::attributes::Attributes;
+use pumpkin_data::data_component_impl::{EnchantmentsImpl, EquipmentSlot};
 use pumpkin_data::enchantment::{
     ConditionalEffect, Enchantment, EnchantmentEntityEffect, EnchantmentTarget,
     EnchantmentValueEffect,
@@ -31,6 +32,29 @@ impl EnchantmentHelper {
                 visitor(enchantment, *level);
             }
         }
+    }
+
+    /// Vanilla `EnchantmentHelper.forEachModifier(ItemStack, EquipmentSlot, BiConsumer)`: the
+    /// `minecraft:attributes` modifiers of the enchantments active in `slot`.
+    pub fn for_each_modifier<F>(stack: &ItemStack, slot: &EquipmentSlot, mut f: F)
+    where
+        F: FnMut(&'static Attributes, Modifier),
+    {
+        Self::run_iteration_on_item(stack, |enchantment, level| {
+            if !enchantment.matching_slot(slot) {
+                return;
+            }
+            for effect in enchantment.effects.attributes {
+                f(
+                    effect.attribute,
+                    Modifier {
+                        id: attribute_effect_id(effect.id, slot),
+                        amount: f64::from(effect.amount.calculate(level)),
+                        operation: ModifierOperation::from_operation(effect.operation),
+                    },
+                );
+            }
+        });
     }
 
     /// Applies projectile-spawned enchantment effects (e.g. Flame ignites the projectile for 100s).
@@ -727,15 +751,10 @@ fn location_effect_changed_block(
             operation,
         } => {
             if became_active && let Some(slot) = &item.in_slot {
-                let operation = match operation {
-                    Operation::AddValue => ModifierOperation::Add,
-                    Operation::AddMultipliedBase => ModifierOperation::MultiplyBase,
-                    Operation::AddMultipliedTotal => ModifierOperation::MultiplyTotal,
-                };
                 let modifier = Modifier {
                     id: attribute_effect_id(id, slot),
                     amount: f64::from(amount.calculate(level)),
-                    operation,
+                    operation: ModifierOperation::from_operation(*operation),
                 };
                 living.update_attribute(attribute, |instance| {
                     instance.add_or_replace_modifier(modifier);
@@ -780,5 +799,37 @@ fn location_effect_deactivated(
             }
         }
         _ => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pumpkin_data::item::Item;
+    use std::borrow::Cow;
+
+    #[test]
+    fn for_each_modifier_yields_efficiency_for_the_main_hand_only() {
+        let mut stack = ItemStack::new(1, &Item::IRON_PICKAXE);
+        stack.set_data_component(EnchantmentsImpl {
+            enchantment: Cow::Owned(vec![(&Enchantment::EFFICIENCY, 5)]),
+        });
+
+        let mut found = Vec::new();
+        EnchantmentHelper::for_each_modifier(&stack, &EquipmentSlot::MAIN_HAND, |attribute, m| {
+            found.push((attribute.id, m));
+        });
+        assert_eq!(found.len(), 1);
+        let (attribute, modifier) = &found[0];
+        assert_eq!(*attribute, Attributes::MINING_EFFICIENCY.id);
+        assert_eq!(modifier.id, "minecraft:enchantment.efficiency/mainhand");
+        assert!((modifier.amount - 26.0).abs() < f64::EPSILON);
+        assert!(matches!(modifier.operation, ModifierOperation::Add));
+
+        let mut off_hand_count = 0;
+        EnchantmentHelper::for_each_modifier(&stack, &EquipmentSlot::OFF_HAND, |_, _| {
+            off_hand_count += 1;
+        });
+        assert_eq!(off_hand_count, 0);
     }
 }

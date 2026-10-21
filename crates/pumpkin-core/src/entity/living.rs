@@ -44,7 +44,6 @@ use pumpkin_data::BlockState;
 use pumpkin_data::attributes::Attributes;
 use pumpkin_data::block_sound_type::SoundType;
 use pumpkin_data::data_component_impl::IdOr;
-use pumpkin_data::data_component_impl::Operation;
 use pumpkin_data::data_component_impl::SwingAnimationImpl;
 use pumpkin_data::data_component_impl::food::{ConsumableImpl, ConsumeAnimation, ConsumeEffect};
 use pumpkin_data::data_component_impl::{
@@ -514,11 +513,7 @@ impl LivingEntity {
             target.push(Modifier {
                 id: modifier.id.to_string(),
                 amount: modifier.amount,
-                operation: match modifier.operation {
-                    Operation::AddValue => ModifierOperation::Add,
-                    Operation::AddMultipliedBase => ModifierOperation::MultiplyBase,
-                    Operation::AddMultipliedTotal => ModifierOperation::MultiplyTotal,
-                },
+                operation: ModifierOperation::from_operation(modifier.operation),
             });
         }
 
@@ -633,11 +628,7 @@ impl LivingEntity {
             if !attribute_modifier_slot_matches(&item_mod.slot, slot) {
                 continue;
             }
-            let operation = match item_mod.operation {
-                Operation::AddValue => ModifierOperation::Add,
-                Operation::AddMultipliedBase => ModifierOperation::MultiplyBase,
-                Operation::AddMultipliedTotal => ModifierOperation::MultiplyTotal,
-            };
+            let operation = ModifierOperation::from_operation(item_mod.operation);
             self.update_attribute(item_mod.r#type, |inst| {
                 inst.add_or_replace_modifier(Modifier {
                     id: item_mod.id.to_string(),
@@ -1241,11 +1232,7 @@ impl LivingEntity {
             if !self.get_attribute_instance(m.attribute) {
                 continue;
             }
-            let operation = match m.operation {
-                Operation::AddValue => ModifierOperation::Add,
-                Operation::AddMultipliedBase => ModifierOperation::MultiplyBase,
-                Operation::AddMultipliedTotal => ModifierOperation::MultiplyTotal,
-            };
+            let operation = ModifierOperation::from_operation(m.operation);
             // `AttributeTemplate.create`: `amount * (amplifier + 1)`.
             let modifier = Modifier {
                 id: m.id.to_string(),
@@ -5704,6 +5691,29 @@ fn push_unique_attribute(touched: &mut Vec<Attributes>, attr: &Attributes) {
     if !touched.iter().any(|existing| existing.id == attr.id) {
         touched.push(attr.clone());
     }
+}
+
+/// Vanilla `ItemStack.forEachModifier(EquipmentSlot, BiConsumer)`: the component modifiers
+/// for `slot`, then the enchantment ones.
+pub fn for_each_item_modifier<F>(stack: &ItemStack, slot: &EquipmentSlot, mut f: F)
+where
+    F: FnMut(&'static Attributes, Modifier),
+{
+    if let Some(modifiers) = stack.get_data_component::<AttributeModifiersImpl>() {
+        for item_mod in modifiers.attribute_modifiers.iter() {
+            if attribute_modifier_slot_matches(&item_mod.slot, slot) {
+                f(
+                    item_mod.r#type,
+                    Modifier {
+                        id: item_mod.id.to_string(),
+                        amount: item_mod.amount,
+                        operation: ModifierOperation::from_operation(item_mod.operation),
+                    },
+                );
+            }
+        }
+    }
+    crate::enchantment::EnchantmentHelper::for_each_modifier(stack, slot, f);
 }
 
 const fn attribute_modifier_slot_matches(

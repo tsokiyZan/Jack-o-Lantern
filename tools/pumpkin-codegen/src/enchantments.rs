@@ -750,47 +750,69 @@ fn parse_entity_effect(val: &serde_json::Value) -> TokenStream {
             }
             // A location-based effect only: `EnchantmentAttributeEffect`.
             "minecraft:attribute" => {
-                let id = obj
-                    .get("id")
-                    .and_then(|v| v.as_str())
-                    .expect("attribute effect has an id");
-                let attribute = obj
-                    .get("attribute")
-                    .and_then(|v| v.as_str())
-                    .expect("attribute effect has an attribute");
-                let attribute_ident = format_ident!(
-                    "{}",
-                    attribute
-                        .strip_prefix("minecraft:")
-                        .unwrap_or(attribute)
-                        .to_uppercase()
-                );
-                let amount =
-                    parse_level_based_value(obj.get("amount").unwrap_or(&serde_json::Value::Null));
-                let operation = match obj.get("operation").and_then(|v| v.as_str()) {
-                    Some("add_value") => quote! { crate::data_component_impl::Operation::AddValue },
-                    Some("add_multiplied_base") => {
-                        quote! { crate::data_component_impl::Operation::AddMultipliedBase }
-                    }
-                    Some("add_multiplied_total") => {
-                        quote! { crate::data_component_impl::Operation::AddMultipliedTotal }
-                    }
-                    other => panic!("unknown attribute operation {other:?}"),
-                };
-                quote! {
-                    EnchantmentEntityEffect::Attribute {
-                        id: #id,
-                        attribute: &crate::attributes::Attributes::#attribute_ident,
-                        amount: #amount,
-                        operation: #operation,
-                    }
-                }
+                let fields = parse_attribute_effect_fields(obj);
+                quote! { EnchantmentEntityEffect::Attribute { #fields } }
             }
             _ => quote! { EnchantmentEntityEffect::Other },
         }
     } else {
         quote! { EnchantmentEntityEffect::Other }
     }
+}
+
+/// The `id`, `attribute`, `amount` and `operation` fields shared by the location-based
+/// `minecraft:attribute` effect and the `minecraft:attributes` component entries.
+fn parse_attribute_effect_fields(obj: &serde_json::Map<String, serde_json::Value>) -> TokenStream {
+    let id = obj
+        .get("id")
+        .and_then(|v| v.as_str())
+        .expect("attribute effect has an id");
+    let attribute = obj
+        .get("attribute")
+        .and_then(|v| v.as_str())
+        .expect("attribute effect has an attribute");
+    let attribute_ident = format_ident!(
+        "{}",
+        attribute
+            .strip_prefix("minecraft:")
+            .unwrap_or(attribute)
+            .to_uppercase()
+    );
+    let amount = parse_level_based_value(obj.get("amount").unwrap_or(&serde_json::Value::Null));
+    let operation = match obj.get("operation").and_then(|v| v.as_str()) {
+        Some("add_value") => quote! { crate::data_component_impl::Operation::AddValue },
+        Some("add_multiplied_base") => {
+            quote! { crate::data_component_impl::Operation::AddMultipliedBase }
+        }
+        Some("add_multiplied_total") => {
+            quote! { crate::data_component_impl::Operation::AddMultipliedTotal }
+        }
+        other => panic!("unknown attribute operation {other:?}"),
+    };
+    quote! {
+        id: #id,
+        attribute: &crate::attributes::Attributes::#attribute_ident,
+        amount: #amount,
+        operation: #operation,
+    }
+}
+
+/// `minecraft:attributes`: the enchantment's `EnchantmentAttributeEffect` list.
+fn parse_attribute_effects(val: Option<&serde_json::Value>) -> TokenStream {
+    let effects: Vec<TokenStream> = val
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .map(|effect| {
+                    let fields = parse_attribute_effect_fields(
+                        effect.as_object().expect("attribute effect is an object"),
+                    );
+                    quote! { EnchantmentAttributeEffect { #fields } }
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    quote! { &[#(#effects),*] }
 }
 
 fn parse_value_effect(val: &serde_json::Value) -> TokenStream {
@@ -1613,6 +1635,7 @@ pub fn build() -> TokenStream {
         let damage_immunity =
             parse_conditional_unit_effects(effects_map.get("minecraft:damage_immunity"));
         let tick = parse_conditional_entity_effects(effects_map.get("minecraft:tick"));
+        let attributes = parse_attribute_effects(effects_map.get("minecraft:attributes"));
         let prevent_armor_change = effects_map.contains_key("minecraft:prevent_armor_change");
         let prevent_equipment_drop = effects_map.contains_key("minecraft:prevent_equipment_drop");
 
@@ -1642,6 +1665,7 @@ pub fn build() -> TokenStream {
                 crossbow_charge_time: #crossbow_charge_time,
                 location_changed: #location_changed,
                 tick: #tick,
+                attributes: #attributes,
                 damage_immunity: #damage_immunity,
                 prevent_armor_change: #prevent_armor_change,
                 prevent_equipment_drop: #prevent_equipment_drop,
@@ -1991,6 +2015,15 @@ pub fn build() -> TokenStream {
             AllOf(&'static [ReplaceDiskPredicate]),
         }
 
+        /// Vanilla `EnchantmentAttributeEffect`.
+        #[derive(Clone, Debug, PartialEq)]
+        pub struct EnchantmentAttributeEffect {
+            pub id: &'static str,
+            pub attribute: &'static crate::attributes::Attributes,
+            pub amount: LevelBasedValue,
+            pub operation: crate::data_component_impl::Operation,
+        }
+
         #[derive(Clone, Debug, PartialEq)]
         pub enum EnchantmentEntityEffect {
             Ignite {
@@ -2291,6 +2324,8 @@ pub fn build() -> TokenStream {
             pub location_changed: &'static [ConditionalEffect<EnchantmentEntityEffect>],
             /// `minecraft:tick`: entity effects run every tick on the wearer.
             pub tick: &'static [ConditionalEffect<EnchantmentEntityEffect>],
+            /// `minecraft:attributes`: modifiers applied while the item is in a matching slot.
+            pub attributes: &'static [EnchantmentAttributeEffect],
             /// `minecraft:damage_immunity`, whose effect carries no data.
             pub damage_immunity: &'static [ConditionalEffect<()>],
             pub prevent_armor_change: bool,

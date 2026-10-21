@@ -14,6 +14,17 @@ pub enum ModifierOperation {
 }
 
 impl ModifierOperation {
+    /// The item component and enchantment `Operation` as the runtime modifier operation.
+    #[must_use]
+    pub const fn from_operation(operation: pumpkin_data::data_component_impl::Operation) -> Self {
+        use pumpkin_data::data_component_impl::Operation;
+        match operation {
+            Operation::AddValue => Self::Add,
+            Operation::AddMultipliedBase => Self::MultiplyBase,
+            Operation::AddMultipliedTotal => Self::MultiplyTotal,
+        }
+    }
+
     /// Vanilla `AttributeModifier.Operation.getSerializedName`.
     #[must_use]
     pub const fn serialized_name(self) -> &'static str {
