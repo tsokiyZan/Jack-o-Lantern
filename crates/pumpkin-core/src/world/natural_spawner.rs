@@ -618,14 +618,20 @@ pub fn spawn_mobs_for_chunk_generation(
                         entity
                             .get_entity()
                             .set_rotation(rand::random::<f32>() * 360.0, 0.0);
-                        group_data = finalize_spawn(
-                            &entity,
-                            world,
-                            crate::entity::mob::spawn::EntitySpawnReason::ChunkGeneration,
-                            group_data,
-                        );
-                        world.spawn_entity_non_save(entity);
-                        success = true;
+                        // `mob.checkSpawnObstruction(level)`, after the spawn rules.
+                        if entity
+                            .get_mob()
+                            .is_none_or(|mob| mob.check_spawn_obstruction(world))
+                        {
+                            group_data = finalize_spawn(
+                                &entity,
+                                world,
+                                crate::entity::mob::spawn::EntitySpawnReason::ChunkGeneration,
+                                group_data,
+                            );
+                            world.spawn_entity_non_save(entity);
+                            success = true;
+                        }
                     }
                 }
 
@@ -822,8 +828,10 @@ pub fn spawn_category_for_position(
 
                     let is_valid_for_mob = entity.get_mob().is_none_or(|mob| {
                         let despawn_dist = f64::from(entity_type.category.despawn_distance);
+                        // Vanilla `isValidPositionForMob`: the spawn rules passed above.
                         !(player_distance_sq > despawn_dist * despawn_dist
                             && mob.remove_when_far_away(player_distance_sq))
+                            && mob.check_spawn_obstruction(world)
                     });
 
                     if is_valid_for_mob {
@@ -1102,6 +1110,25 @@ pub fn is_valid_empty_spawn_block(
         return false;
     }
     !is_block_dangerous(entity_type, state)
+}
+
+/// Vanilla `NaturalSpawner.isValidEmptySpawnBlock` with the fluid state it is given, which
+/// the iron golem's spawn check passes as empty for its own block.
+#[must_use]
+pub fn is_valid_empty_spawn_block_at(
+    world: &crate::world::World,
+    state: &'static BlockState,
+    fluid_empty: bool,
+    entity_type: &'static EntityType,
+) -> bool {
+    let block = Block::from_state_id(state.id);
+    !state.is_full_cube()
+        && !world
+            .block_registry
+            .emits_redstone_power(block, state, BlockDirection::Up)
+        && fluid_empty
+        && !block.has_tag(&MINECRAFT_PREVENT_MOB_SPAWNING_INSIDE)
+        && !is_block_dangerous(entity_type, state)
 }
 
 #[must_use]

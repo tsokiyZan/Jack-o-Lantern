@@ -153,6 +153,35 @@ impl NeutralMob for IronGolemEntity {
 }
 
 impl Mob for IronGolemEntity {
+    /// Vanilla `IronGolem.checkSpawnObstruction`.
+    fn check_spawn_obstruction(&self, world: &crate::world::World) -> bool {
+        let entity = self.get_entity();
+        let pos = entity.block_pos.load();
+        if !crate::entity::spawn_util::entity_can_stand_on(world, &pos.down(), self) {
+            return false;
+        }
+        for i in 1..3 {
+            let above = pos.up_height(i);
+            let state = world.get_block_state(&above);
+            let fluid_empty = world.get_fluid(&above) == &pumpkin_data::fluid::Fluid::EMPTY;
+            if !crate::world::natural_spawner::is_valid_empty_spawn_block_at(
+                world,
+                state,
+                fluid_empty,
+                &pumpkin_data::entity::EntityType::IRON_GOLEM,
+            ) {
+                return false;
+            }
+        }
+        // `Fluids.EMPTY.defaultFluidState()` at its own position.
+        crate::world::natural_spawner::is_valid_empty_spawn_block_at(
+            world,
+            world.get_block_state(&pos),
+            true,
+            &pumpkin_data::entity::EntityType::IRON_GOLEM,
+        ) && world.is_unobstructed(Some(entity), &entity.bounding_box.load())
+    }
+
     fn can_attack(&self, target: &dyn EntityBase) -> bool {
         let target_type = target.get_entity().entity_type;
         if self.is_player_created() && target_type == &EntityType::PLAYER {

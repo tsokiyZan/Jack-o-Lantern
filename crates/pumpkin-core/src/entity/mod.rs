@@ -5584,3 +5584,27 @@ fn collect_candidate_step_up_heights(
     candidates.sort_by(f32::total_cmp);
     candidates
 }
+
+/// Vanilla `Entity.blocksBuilding`: living entities (but marker armor stands), boats,
+/// minecarts, falling blocks, primed TNT and end crystals.
+#[must_use]
+pub fn blocks_building(entity: &dyn EntityBase) -> bool {
+    let entity_type = entity.get_entity().entity_type;
+    if let Some(armor_stand) = entity
+        .cast_any()
+        .downcast_ref::<decoration::armor_stand::ArmorStandEntity>()
+    {
+        return !armor_stand.is_marker();
+    }
+    let name = entity_type.resource_name;
+    entity.get_living_entity().is_some()
+        || name.ends_with("_boat")
+        || name.ends_with("_raft")
+        || name.contains("minecart")
+        || [
+            &EntityType::FALLING_BLOCK,
+            &EntityType::TNT,
+            &EntityType::END_CRYSTAL,
+        ]
+        .contains(&entity_type)
+}

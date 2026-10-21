@@ -148,6 +148,14 @@ const BABY_DIMENSIONS: EntityDimensions =
     pumpkin_data::entity_dimensions::ZOMBIFIED_PIGLIN_BABY_DIMENSIONS;
 
 impl Mob for ZombifiedPiglinEntity {
+    /// Vanilla `ZombifiedPiglin.checkSpawnObstruction`.
+    fn check_spawn_obstruction(&self, world: &crate::world::World) -> bool {
+        let entity = self.get_entity();
+        let bounding_box = entity.bounding_box.load();
+        world.is_unobstructed(Some(entity), &bounding_box)
+            && !world.contains_any_liquid(bounding_box)
+    }
+
     crate::impl_zombie_mob!(zombie);
 
     fn get_mob_entity(&self) -> &MobEntity {

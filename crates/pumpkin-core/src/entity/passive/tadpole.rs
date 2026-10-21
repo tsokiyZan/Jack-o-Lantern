@@ -183,6 +183,12 @@ impl TadpoleEntity {
 }
 
 impl Mob for TadpoleEntity {
+    /// Vanilla `WaterAnimal.checkSpawnObstruction`: water doesn't obstruct it.
+    fn check_spawn_obstruction(&self, world: &crate::world::World) -> bool {
+        let entity = self.get_entity();
+        world.is_unobstructed(Some(entity), &entity.bounding_box.load())
+    }
+
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
     }

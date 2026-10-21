@@ -234,6 +234,12 @@ impl AgeableMob for DolphinEntity {
 const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::DOLPHIN_BABY_DIMENSIONS;
 
 impl Mob for DolphinEntity {
+    /// Vanilla `AgeableWaterCreature.checkSpawnObstruction`: water doesn't obstruct it.
+    fn check_spawn_obstruction(&self, world: &crate::world::World) -> bool {
+        let entity = self.get_entity();
+        world.is_unobstructed(Some(entity), &entity.bounding_box.load())
+    }
+
     /// Vanilla `Dolphin.getDefaultDimensions`.
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
         let entity = self.get_entity();

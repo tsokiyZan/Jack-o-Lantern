@@ -4736,6 +4736,29 @@ impl World {
         found
     }
 
+    /// Vanilla `EntityGetter.isUnobstructed(source, Shapes.create(bounding_box))`: no entity
+    /// or player that blocks building, other than `source` and its fellow passengers,
+    /// overlaps the box.
+    pub fn is_unobstructed(&self, source: Option<&Entity>, bounding_box: &BoundingBox) -> bool {
+        let blocks = |entity: &dyn EntityBase| {
+            let base = entity.get_entity();
+            source.is_none_or(|source| {
+                source.entity_id != base.entity_id
+                    && source.root_vehicle_id() != base.root_vehicle_id()
+            }) && !base.is_removed()
+                && crate::entity::blocks_building(entity)
+                && base.bounding_box.load().intersects(bounding_box)
+        };
+        !self
+            .get_entities_at_box(bounding_box)
+            .iter()
+            .any(|entity| blocks(entity.as_ref()))
+            && !self
+                .get_players_at_box(bounding_box)
+                .iter()
+                .any(|player| blocks(player.as_ref()))
+    }
+
     // Gets all Player entities at a Box
     pub fn get_players_at_box(&self, aabb: &BoundingBox) -> Vec<Arc<Player>> {
         let players_guard = self.players.load();

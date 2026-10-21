@@ -210,6 +210,11 @@ impl RavagerEntity {
 }
 
 impl Mob for RavagerEntity {
+    /// Vanilla `Ravager.checkSpawnObstruction`: only liquid obstructs it.
+    fn check_spawn_obstruction(&self, world: &crate::world::World) -> bool {
+        !world.contains_any_liquid(self.get_entity().bounding_box.load())
+    }
+
     /// Vanilla `Ravager.aiStep` after `super.aiStep()`.
     fn ai_step_end(&self, _caller: &dyn EntityBase) {
         let living = &self.mob_entity.living_entity;

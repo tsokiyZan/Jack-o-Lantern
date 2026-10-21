@@ -1575,10 +1575,12 @@ pub trait Mob: EntityBase + Send + Sync {
         true
     }
 
+    /// Vanilla `Mob.checkSpawnObstruction`.
     fn check_spawn_obstruction(&self, world: &World) -> bool {
-        let bounding_box = self.get_entity().bounding_box.load();
+        let entity = self.get_entity();
+        let bounding_box = entity.bounding_box.load();
         !world.contains_any_liquid(bounding_box)
-            && world.get_entities_at_box(&bounding_box).is_empty()
+            && world.is_unobstructed(Some(entity), &bounding_box)
     }
 
     /// Per-mob tick hook called each tick before AI runs. Override for mob-specific logic.

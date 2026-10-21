@@ -174,6 +174,12 @@ impl Animal for StriderEntity {
 const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::STRIDER_BABY_DIMENSIONS;
 
 impl Mob for StriderEntity {
+    /// Vanilla `Strider.checkSpawnObstruction`: water doesn't obstruct it.
+    fn check_spawn_obstruction(&self, world: &crate::world::World) -> bool {
+        let entity = self.get_entity();
+        world.is_unobstructed(Some(entity), &entity.bounding_box.load())
+    }
+
     /// Vanilla `Strider.checkFallDamage`: lava ends a fall.
     fn mob_check_fall_damage(
         &self,

@@ -317,6 +317,12 @@ impl CustomSound for GuardianEntity {
 }
 
 impl Mob for GuardianEntity {
+    /// Vanilla `Guardian.checkSpawnObstruction`: water doesn't obstruct it.
+    fn check_spawn_obstruction(&self, world: &crate::world::World) -> bool {
+        let entity = self.get_entity();
+        world.is_unobstructed(Some(entity), &entity.bounding_box.load())
+    }
+
     /// Vanilla `Guardian.getAmbientSound`.
     fn ambient_sound(&self) -> Option<Sound> {
         Some(if self.get_entity().is_in_water() {

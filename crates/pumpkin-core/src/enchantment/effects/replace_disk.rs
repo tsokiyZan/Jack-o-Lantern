@@ -57,41 +57,11 @@ impl ReplaceDiskPredicateExt for ReplaceDiskPredicate {
                     min,
                     Vector3::new(min.x + 1.0, min.y + 1.0, min.z + 1.0),
                 );
-                let blocked = |entity: &dyn crate::entity::EntityBase| {
-                    let base = entity.get_entity();
-                    !base.is_removed()
-                        && blocks_building(entity)
-                        && base.bounding_box.load().intersects(&block_box)
-                };
-                !world
-                    .get_entities_at_box(&block_box)
-                    .iter()
-                    .any(|entity| blocked(entity.as_ref()))
-                    && !world
-                        .get_players_at_box(&block_box)
-                        .iter()
-                        .any(|player| blocked(player.as_ref()))
+                world.is_unobstructed(None, &block_box)
             }
             Self::AllOf(predicates) => predicates.iter().all(|p| p.test_world(world, pos)),
         }
     }
-}
-
-/// Vanilla `Entity.blocksBuilding`: living entities, boats, minecarts, falling blocks, primed
-/// TNT and end crystals.
-fn blocks_building(entity: &dyn crate::entity::EntityBase) -> bool {
-    let entity_type = entity.get_entity().entity_type;
-    let name = entity_type.resource_name;
-    entity.get_living_entity().is_some()
-        || name.ends_with("_boat")
-        || name.ends_with("_raft")
-        || name.contains("minecart")
-        || [
-            &pumpkin_data::entity::EntityType::FALLING_BLOCK,
-            &pumpkin_data::entity::EntityType::TNT,
-            &pumpkin_data::entity::EntityType::END_CRYSTAL,
-        ]
-        .contains(&entity_type)
 }
 
 impl ReplaceDisk {

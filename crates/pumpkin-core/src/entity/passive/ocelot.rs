@@ -156,6 +156,27 @@ impl Animal for OcelotEntity {
 const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::OCELOT_BABY_DIMENSIONS;
 
 impl Mob for OcelotEntity {
+    /// Vanilla `Ocelot.checkSpawnObstruction`: above sea level, on grass or leaves.
+    fn check_spawn_obstruction(&self, world: &crate::world::World) -> bool {
+        let entity = self.get_entity();
+        let bounding_box = entity.bounding_box.load();
+        if !world.is_unobstructed(Some(entity), &bounding_box)
+            || world.contains_any_liquid(bounding_box)
+        {
+            return false;
+        }
+        let pos = entity.block_pos.load();
+        if pos.0.y < world.sea_level {
+            return false;
+        }
+        let below = world.get_block(&pos.down());
+        below == &pumpkin_data::Block::GRASS_BLOCK
+            || pumpkin_data::tag::Taggable::has_tag(
+                below,
+                &pumpkin_data::tag::Block::MINECRAFT_LEAVES,
+            )
+    }
+
     /// Vanilla `Ocelot.getDefaultDimensions`.
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
         let entity = self.get_entity();

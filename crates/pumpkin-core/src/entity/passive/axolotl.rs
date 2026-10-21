@@ -219,6 +219,12 @@ impl Animal for AxolotlEntity {
 const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::AXOLOTL_BABY_DIMENSIONS;
 
 impl Mob for AxolotlEntity {
+    /// Vanilla `Axolotl.checkSpawnObstruction`: water doesn't obstruct it.
+    fn check_spawn_obstruction(&self, world: &crate::world::World) -> bool {
+        let entity = self.get_entity();
+        world.is_unobstructed(Some(entity), &entity.bounding_box.load())
+    }
+
     /// Vanilla `Axolotl.getAmbientSound`.
     fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
         Some(if self.get_entity().is_in_water() {

@@ -627,9 +627,8 @@ impl Mob for NautilusEntity {
 
     /// Vanilla `AbstractNautilus.checkSpawnObstruction`: water does not obstruct it.
     fn check_spawn_obstruction(&self, world: &World) -> bool {
-        world
-            .get_entities_at_box(&self.get_entity().bounding_box.load())
-            .is_empty()
+        let entity = self.get_entity();
+        world.is_unobstructed(Some(entity), &entity.bounding_box.load())
     }
 
     /// Vanilla `AbstractNautilus.requiresCustomPersistence`.

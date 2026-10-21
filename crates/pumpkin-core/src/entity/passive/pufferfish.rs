@@ -191,6 +191,12 @@ const fn poison(puff_state: i32) -> pumpkin_data::potion::Effect {
 }
 
 impl Mob for PufferfishEntity {
+    /// Vanilla `WaterAnimal.checkSpawnObstruction`: water doesn't obstruct it.
+    fn check_spawn_obstruction(&self, world: &crate::world::World) -> bool {
+        let entity = self.get_entity();
+        world.is_unobstructed(Some(entity), &entity.bounding_box.load())
+    }
+
     /// Vanilla `Pufferfish.getDefaultDimensions`: the puff state scales the fish.
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
         self.get_entity()

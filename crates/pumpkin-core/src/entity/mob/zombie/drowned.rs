@@ -208,6 +208,12 @@ const ZOMBIE_NAUTILUS_JOCKEY_CHANCE: f32 = 0.5;
 const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::DROWNED_BABY_DIMENSIONS;
 
 impl Mob for DrownedEntity {
+    /// Vanilla `Drowned.checkSpawnObstruction`: water doesn't obstruct it.
+    fn check_spawn_obstruction(&self, world: &crate::world::World) -> bool {
+        let entity = self.get_entity();
+        world.is_unobstructed(Some(entity), &entity.bounding_box.load())
+    }
+
     /// Vanilla `rideTick`.
     fn mob_after_ride_tick(&self) {
         crate::entity::mob::turn_body_with_controlled_vehicle(self);
