@@ -145,6 +145,14 @@ pub struct LivingEntity {
     /// Vanilla `currentImpulseImpactPos`: while set, falls are measured from this height.
     pub current_impulse_impact_pos: AtomicCell<Option<Vector3<f64>>>,
     pub active_effects: std::sync::Mutex<FxHashMap<&'static StatusEffect, MobEffectInstance>>,
+    /// Vanilla `fallFlyTicks`.
+    pub fall_fly_ticks: AtomicI32,
+    /// The synced `DATA_ARROW_COUNT_ID` and its countdown, `removeArrowTime`.
+    arrow_count: AtomicI32,
+    remove_arrow_time: AtomicI32,
+    /// The synced `DATA_STINGER_COUNT_ID` and its countdown, `removeStingerTime`.
+    stinger_count: AtomicI32,
+    remove_stinger_time: AtomicI32,
     /// Vanilla `effectsDirty`: the invisibility, glowing and particle data are refreshed
     /// before the next sync.
     effects_dirty: AtomicBool,
@@ -366,6 +374,11 @@ impl LivingEntity {
             livings_flags: AtomicU8::new(0),
             active_effects: std::sync::Mutex::new(FxHashMap::default()),
             effects_dirty: AtomicBool::new(false),
+            fall_fly_ticks: AtomicI32::new(0),
+            arrow_count: AtomicI32::new(0),
+            remove_arrow_time: AtomicI32::new(0),
+            stinger_count: AtomicI32::new(0),
+            remove_stinger_time: AtomicI32::new(0),
             attributes_to_update: std::sync::Mutex::new(Vec::new()),
             entity_equipment: Arc::new(std::sync::Mutex::new(EntityEquipment::new())),
             equipment_drop_chances: Arc::new(std::sync::Mutex::new(FxHashMap::default())),
@@ -1656,14 +1669,11 @@ impl LivingEntity {
             data: 0.0,
             swing_source: None,
         };
+        // The players tracking the entity, and its own player only when asked.
         if send_to_swinging_entity {
-            world.broadcast_editioned(&je_packet, &be_packet);
+            world.send_to_tracking_players_and_self_editioned(&self.entity, &je_packet, &be_packet);
         } else {
-            world.broadcast_packet_except_editioned(
-                &[self.entity.entity_uuid],
-                &je_packet,
-                &be_packet,
-            );
+            world.send_to_tracking_players_editioned(&self.entity, &je_packet, &be_packet);
         }
         true
     }
@@ -1694,7 +1704,7 @@ impl LivingEntity {
         self.apply_input();
         // Vanilla `isImmobile`, then `serverAiStep` for mobs with AI. It runs here, after
         // `baseTick` updated the fluid state, so goals see this tick's water height.
-        if self.health.load() <= 0.0
+        if self.is_dead_or_dying()
             || caller
                 .get_mob()
                 .is_some_and(super::mob::Mob::mob_is_immobile)
@@ -1742,6 +1752,10 @@ impl LivingEntity {
             self.jumping_cooldown.store(0, SeqCst);
         }
 
+        if self.entity.is_fall_flying() {
+            self.update_fall_flying(caller);
+        }
+
         if self.has_effect(&StatusEffect::SLOW_FALLING)
             || self.has_effect(&StatusEffect::LEVITATION)
         {
@@ -1774,26 +1788,23 @@ impl LivingEntity {
             .is_some_and(|mob| mob.custom_travel(caller))
         {
             // The mob moved itself.
-        } else if (touching_water || self.entity.touching_lava.load(SeqCst))
-            && should_swim_in_fluids
-            && self.entity.entity_type != &EntityType::STRIDER
-        {
+        } else if self.should_travel_in_fluid(caller) {
             self.travel_in_fluid(caller, touching_water);
             if let Some(mob) = caller.get_mob() {
                 mob.travel_in_fluid_end(touching_water);
             }
+        } else if self.entity.is_fall_flying() {
+            self.travel_fall_flying(caller);
         } else {
-            // TODO: Gliding
-
             self.travel_in_air(caller);
         }
 
-        let suffocating = self.entity.tick_block_collisions(caller);
+        // `applyEffectsFromBlocks`. The wall damage is `baseTick`'s.
+        let _ = self.entity.tick_block_collisions(caller);
 
-        // Vanilla `LivingEntity.isInWall`: a sleeping entity is never in a wall.
-        if suffocating && !caller.get_mob().is_some_and(super::mob::Mob::is_sleeping) {
-            caller.damage(caller, 1.0, DamageType::IN_WALL);
-        }
+        // The freezing part of `aiStep`, before the push.
+        self.entity.tick_frozen(caller);
+        self.update_frost();
 
         if caller
             .get_mob()
@@ -2005,16 +2016,36 @@ impl LivingEntity {
     /// which adds their own hooks.
     pub(crate) fn travel(&self, caller: &dyn EntityBase) {
         let touching_water = self.entity.touching_water.load(SeqCst);
-        // `shouldTravelInFluid`: a flying player is not affected by fluids.
-        if (touching_water || self.entity.touching_lava.load(SeqCst))
-            && caller.get_player().is_none_or(|player| !player.is_flying())
-        {
+        if self.should_travel_in_fluid(caller) {
             self.travel_in_fluid(caller, touching_water);
         } else if self.entity.is_fall_flying() {
             self.travel_fall_flying(caller);
         } else {
             self.travel_in_air(caller);
         }
+    }
+
+    /// Vanilla `shouldTravelInFluid` for the fluid at the block position: a flying player
+    /// isn't affected by fluids and a strider stands on lava (`canStandOnFluid`).
+    fn should_travel_in_fluid(&self, caller: &dyn EntityBase) -> bool {
+        if !(self.entity.touching_water.load(SeqCst) || self.entity.touching_lava.load(SeqCst))
+            || caller
+                .get_player()
+                .is_some_and(super::player::Player::is_flying)
+        {
+            return false;
+        }
+        if self.entity.entity_type == &EntityType::STRIDER {
+            let (fluid, _) = self
+                .entity
+                .world
+                .load()
+                .get_fluid_and_fluid_state(&self.entity.block_pos.load());
+            if fluid.id == Fluid::LAVA.id || fluid.id == Fluid::FLOWING_LAVA.id {
+                return false;
+            }
+        }
+        true
     }
 
     /// Vanilla `LivingEntity.travelFallFlying`.
@@ -4663,10 +4694,9 @@ impl EntityBase for LivingEntity {
         self.get_attribute_value(&Attributes::GRAVITY)
     }
 
-    /// Advances the living entity by one tick: base entity tick, movement and
-    /// physics while alive (still applied during the 20-tick death animation so
-    /// knockback lands), velocity coalescing, status effects, void damage, and
-    /// death-animation completion.
+    /// Vanilla `LivingEntity.tick`: `baseTick` (wall and border damage, air, effects), the
+    /// item in use, then `aiStep` while not removed (a corpse still moves so knockback
+    /// lands).
     #[allow(clippy::too_many_lines)]
     fn tick(&self, caller: &dyn EntityBase, server: &Server) {
         // Vanilla `LivingEntity.onAttributeUpdated` refreshes the dimensions when the
@@ -4680,66 +4710,114 @@ impl EntityBase for LivingEntity {
         if self.applied_scale.swap(scale) != scale {
             caller.refresh_dimensions();
         }
+        // `WaterAnimal.baseTick` and friends read the air before `super.baseTick()`.
+        let pre_tick_air = self.breath.air();
         // The start of vanilla `LivingEntity.baseTick`.
-        crate::enchantment::EnchantmentHelper::tick_effects(caller, self);
         self.swing_state
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .tick();
+        crate::enchantment::EnchantmentHelper::tick_effects(caller, self);
         self.entity.tick(caller, server);
 
-        // Only tick movement if the entity is alive. This prevents a dead "corpse"
-        // from continuing to be simulated (accumulating fall_distance/velocity).
-        // We allow movement during death animation (20 ticks) so knockback is applied.
-        let is_alive = !self.dead.load(Relaxed) && self.health.load() > 0.0;
+        let is_player = self.entity.entity_type == &EntityType::PLAYER;
+        let is_alive = !self.entity.removed.load(Relaxed) && self.health.load() > 0.0;
         if is_alive {
-            // The air part of vanilla `LivingEntity.baseTick`, which runs before movement.
+            if self.is_in_wall(caller) {
+                caller.damage(caller, 1.0, DamageType::IN_WALL);
+            } else if is_player {
+                self.hurt_outside_world_border(caller);
+            }
+            // The air part, which also dismounts riders of `#dismounts_underwater` vehicles.
             self.breath.tick(self, caller);
+            let current_block_pos = self.entity.block_pos.load();
+            if self.last_block_pos.load() != Some(current_block_pos) {
+                self.last_block_pos.store(Some(current_block_pos));
+                self.on_changed_block(caller, current_block_pos);
+            }
         }
-        // Also `baseTick`, so the AI step sees the count already lowered.
         if self.hurt_time.load(Relaxed) > 0 {
             self.hurt_time.fetch_sub(1, Relaxed);
         }
         let own_tick_death = caller.get_mob().is_some_and(|mob| mob.tick_death(caller));
-        let is_player = self.entity.entity_type == &EntityType::PLAYER;
-        // Vanilla `baseTick` ends with `tickDeath`, so a corpse removed on its 20th tick
-        // never reaches `aiStep` (`if (!this.isRemoved()) this.aiStep()`).
-        if self.health.load() <= 0.0 && !own_tick_death && !is_player {
+        // Vanilla `baseTick` runs `tickDeath`, so a corpse removed on its 20th tick never
+        // reaches `aiStep` (`if (!this.isRemoved()) this.aiStep()`).
+        if self.is_dead_or_dying() && !own_tick_death && !is_player {
             self.tick_death(caller);
         }
+        if self.last_hurt_by_player_memory_time.load(Relaxed) > 0 {
+            self.last_hurt_by_player_memory_time.fetch_sub(1, Relaxed);
+        } else {
+            self.last_hurt_by_player.store(None);
+        }
+        // `lastHurtMob` is forgotten once it dies.
+        let last_hurt_mob = self.last_attacking_id.load(Relaxed);
+        if last_hurt_mob != 0
+            && self
+                .entity
+                .world
+                .load()
+                .get_entity_by_id(last_hurt_mob)
+                .is_none_or(|mob| !mob.get_entity().is_alive())
+        {
+            self.last_attacking_id.store(0, Relaxed);
+        }
+        self.tick_last_hurt_by_mob();
+        self.tick_effects();
         // `Mob.baseTick` follows `super.baseTick()` with its ambient-sound roll.
         if let Some(mob) = caller.get_mob() {
             mob.mob_base_tick();
+            mob.handle_air_supply(pre_tick_air);
         }
-        let in_death_animation = self.health.load() <= 0.0 && !self.entity.removed.load(Relaxed);
-        if (is_alive || in_death_animation) && !is_player {
-            self.tick_movement(caller);
-            if let Some(mob) = caller.get_mob() {
-                mob.get_mob_entity()
-                    .body_rotation_control
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .client_tick(mob);
-                if mob.is_sleeping() {
-                    self.entity.set_pitch(0.0);
+
+        // Vanilla `LivingEntity.tick`.
+        self.updating_using_item(caller, server);
+        self.tick_arrows_and_stingers();
+        if self.entity.tick_count.load(Relaxed) % 20 == 0 {
+            self.combat_tracker
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .recheck_status(
+                    i64::from(self.entity.tick_count.load(Relaxed)),
+                    self.health.load() > 0.0 && !self.dead.load(Relaxed),
+                );
+        }
+        // TODO: `checkBedExists`: only players keep a bed, and the bed's own removal wakes them.
+
+        if !self.entity.removed.load(Relaxed) {
+            if is_player {
+                // A player travels in `Player::tick_server_travel`, after the other entities;
+                // the server's part of its `aiStep` is here.
+                if is_alive {
+                    if self.entity.is_fall_flying() {
+                        self.update_fall_flying(caller);
+                    }
+                    let _ = self.entity.tick_block_collisions(caller);
+                    self.entity.tick_frozen(caller);
+                    self.update_frost();
+                    self.push_entities(caller);
+                }
+            } else {
+                self.tick_movement(caller);
+                if let Some(mob) = caller.get_mob() {
+                    mob.get_mob_entity()
+                        .body_rotation_control
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner)
+                        .client_tick(mob);
+                    if mob.is_sleeping() {
+                        self.entity.set_pitch(0.0);
+                    }
                 }
             }
-            // Vanilla-like order: freeze logic runs after movement/collisions.
-            self.entity.tick_frozen(caller);
-            self.update_frost();
-        } else if is_alive {
-            // A player travels in `Player::tick_server_travel`, after the other entities.
-            let suffocating = self.entity.tick_block_collisions(caller);
-            if suffocating {
-                caller.damage(caller, 1.0, DamageType::IN_WALL);
-            }
-
-            // Players push other entities like any living entity.
-            self.push_entities(caller);
-
-            self.entity.tick_frozen(caller);
-            self.update_frost();
         }
+
+        if self.entity.is_fall_flying() {
+            self.fall_fly_ticks.fetch_add(1, Relaxed);
+        } else {
+            self.fall_fly_ticks.store(0, Relaxed);
+        }
+        self.refresh_dirty_attributes();
 
         // The end of vanilla `LivingEntity.tick`.
         if self.current_impulse_context_reset_grace_time.load(Relaxed) > 0 {
@@ -4781,21 +4859,214 @@ impl EntityBase for LivingEntity {
             }
         }
 
-        let current_block_pos = self.entity.block_pos.load();
-        if is_alive && self.last_block_pos.load() != Some(current_block_pos) {
-            self.last_block_pos.store(Some(current_block_pos));
-            self.on_changed_block(caller, current_block_pos);
+        if self.health.load() <= 0.0 && !own_tick_death && is_player {
+            let time = self
+                .death_time
+                .fetch_update(Relaxed, Relaxed, |time| Some(time.saturating_add(1)))
+                .unwrap_or_else(|time| time)
+                .saturating_add(1);
+            // Bedrock keeps a dead remote player actor in its death pose.
+            // Remove Java players after the animation so respawn can
+            // recreate a live, interactable actor with the same identity.
+            if time == 10 {
+                self.entity
+                    .world
+                    .load()
+                    .despawn_dead_java_player_for_bedrock(&self.entity);
+            }
+            // Players remain part of the world until their client requests a
+            // respawn. Removing one here breaks reconnecting while dead.
         }
+    }
 
-        // The `lastHurtByPlayer` part of vanilla `baseTick`.
-        if self.last_hurt_by_player_memory_time.load(Relaxed) > 0 {
-            self.last_hurt_by_player_memory_time.fetch_sub(1, Relaxed);
-        } else {
-            self.last_hurt_by_player.store(None);
+    fn get_entity(&self) -> &Entity {
+        &self.entity
+    }
+
+    fn get_living_entity(&self) -> Option<&LivingEntity> {
+        Some(self)
+    }
+
+    fn is_pushable(&self) -> bool {
+        self.is_pushable_for(self)
+    }
+
+    fn cast_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+
+/// Vanilla `LivingEntity.INPUT_FRICTION`.
+const INPUT_FRICTION: f32 = 0.98;
+/// The `hurtDuration` vanilla sets on every full-damage hit.
+const HURT_DURATION: i32 = 10;
+
+pub const SPEED_MODIFIER_SPRINTING_ID: &str = "minecraft:sprinting";
+pub const SPEED_MODIFIER_SPRINTING_AMOUNT: f64 = 0.300_000_011_920_928_96;
+
+impl LivingEntity {
+    /// Vanilla `LivingEntity.tickDeath` for anything but a player: the death animation runs
+    /// 20 ticks, then the corpse goes with the POOF (60) particle event. The death event (3)
+    /// was already broadcast in `on_death`; sending it again would restart the client-side
+    /// animation.
+    /// Vanilla `LivingEntity.isPushable`: alive, not a spectator and not on a ladder.
+    /// Pumpkin doesn't skip entities in chunks that aren't entity-ticking.
+    #[must_use]
+    pub fn is_pushable_for(&self, caller: &dyn EntityBase) -> bool {
+        self.is_alive() && !caller.is_spectator() && !self.on_climbable(caller)
+    }
+
+    /// Vanilla `LivingEntity.isInWall`: a sleeping entity is never in a wall.
+    fn is_in_wall(&self, caller: &dyn EntityBase) -> bool {
+        !Self::is_sleeping(caller) && self.entity.is_in_wall()
+    }
+
+    /// The world border part of vanilla `baseTick`, for players.
+    fn hurt_outside_world_border(&self, caller: &dyn EntityBase) {
+        let world = self.entity.world.load();
+        let damage = {
+            let border = world
+                .worldborder
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            if border.contains_box(&self.entity.bounding_box.load()) {
+                return;
+            }
+            let pos = self.entity.pos.load();
+            let dist = border.distance_to_border(pos.x, pos.z) + border.buffer;
+            if dist >= 0.0 || border.damage_per_block <= 0.0 {
+                return;
+            }
+            1.max((-dist * border.damage_per_block).floor() as i32)
+        };
+        caller.damage(caller, damage as f32, DamageType::OUTSIDE_BORDER);
+    }
+
+    /// Vanilla `getArrowCount`.
+    #[must_use]
+    pub fn get_arrow_count(&self) -> i32 {
+        self.arrow_count.load(Relaxed)
+    }
+
+    /// Vanilla `setArrowCount`, synced.
+    pub fn set_arrow_count(&self, count: i32) {
+        self.arrow_count.store(count, Relaxed);
+        self.entity.set_synced_data(
+            tracked_data::living_entity::DATA_ARROW_COUNT_ID,
+            VarInt(count),
+        );
+    }
+
+    /// Vanilla `getStingerCount`.
+    #[must_use]
+    pub fn get_stinger_count(&self) -> i32 {
+        self.stinger_count.load(Relaxed)
+    }
+
+    /// Vanilla `setStingerCount`, synced.
+    pub fn set_stinger_count(&self, count: i32) {
+        self.stinger_count.store(count, Relaxed);
+        self.entity.set_synced_data(
+            tracked_data::living_entity::DATA_STINGER_COUNT_ID,
+            VarInt(count),
+        );
+    }
+
+    /// The stuck arrows and stingers falling out, from vanilla `LivingEntity.tick`.
+    fn tick_arrows_and_stingers(&self) {
+        let arrow_count = self.get_arrow_count();
+        if arrow_count > 0 {
+            if self.remove_arrow_time.load(Relaxed) <= 0 {
+                self.remove_arrow_time
+                    .store(20 * (30 - arrow_count), Relaxed);
+            }
+            if self.remove_arrow_time.fetch_sub(1, Relaxed) - 1 <= 0 {
+                self.set_arrow_count(arrow_count - 1);
+            }
         }
-        self.tick_last_hurt_by_mob();
-        self.tick_effects();
+        let stinger_count = self.get_stinger_count();
+        if stinger_count > 0 {
+            if self.remove_stinger_time.load(Relaxed) <= 0 {
+                self.remove_stinger_time
+                    .store(20 * (30 - stinger_count), Relaxed);
+            }
+            if self.remove_stinger_time.fetch_sub(1, Relaxed) - 1 <= 0 {
+                self.set_stinger_count(stinger_count - 1);
+            }
+        }
+    }
 
+    /// Vanilla `canGlideUsing`: a glider worn in its own slot that won't break on the next
+    /// damage.
+    fn can_glide_using(stack: &ItemStack, slot: &EquipmentSlot) -> bool {
+        if stack
+            .get_data_component::<pumpkin_data::data_component_impl::GliderImpl>()
+            .is_none()
+        {
+            return false;
+        }
+        // `nextDamageWillBreak`.
+        let next_damage_will_break = stack.get_max_damage().is_some_and(|max_damage| {
+            !stack.is_unbreakable() && stack.get_damage() >= max_damage - 1
+        });
+        stack
+            .get_data_component::<EquippableImpl>()
+            .is_some_and(|equippable| equippable.slot == slot)
+            && !next_damage_will_break
+    }
+
+    /// Vanilla `canGlide`.
+    #[must_use]
+    pub fn can_glide(&self, caller: &dyn EntityBase) -> bool {
+        !self.entity.on_ground.load(Relaxed)
+            && !self.entity.has_vehicle()
+            && !self.has_effect(&StatusEffect::LEVITATION)
+            && EquipmentSlot::VALUES
+                .iter()
+                .any(|slot| Self::can_glide_using(&self.get_item_by_slot(caller, slot), slot))
+    }
+
+    /// Vanilla `updateFallFlying`: the glider wears every 20 ticks and the glide is a
+    /// vibration every 10.
+    fn update_fall_flying(&self, caller: &dyn EntityBase) {
+        self.entity.check_fall_distance_accumulation();
+        if !self.can_glide(caller) {
+            if self.entity.is_fall_flying() {
+                self.entity.set_fall_flying(false);
+            }
+            return;
+        }
+        let check_fall_fly_ticks = self.fall_fly_ticks.load(Relaxed) + 1;
+        if check_fall_fly_ticks % 10 == 0 {
+            let free_fall_interval = check_fall_fly_ticks / 10;
+            if free_fall_interval % 2 == 0 {
+                let slots_with_gliders: Vec<&EquipmentSlot> = EquipmentSlot::VALUES
+                    .iter()
+                    .filter(|slot| {
+                        Self::can_glide_using(&self.get_item_by_slot(caller, slot), slot)
+                    })
+                    .collect();
+                // `Util.getRandom(slotsWithGliders, random)`.
+                let index = self
+                    .entity
+                    .random()
+                    .next_bounded_i32(slots_with_gliders.len() as i32);
+                if let Some(slot) = slots_with_gliders.get(index as usize) {
+                    self.hurt_and_break_in_slot(caller, slot, 1);
+                }
+            }
+            self.entity.world.load().game_event_from(
+                Some(caller),
+                GameEvent::ElytraGlide,
+                self.entity.pos.load(),
+            );
+        }
+    }
+
+    /// Vanilla `updatingUsingItem`: the use tick, then completion once the time runs out.
+    /// TODO: completion is hand-rolled, not `ItemStack.finishUsingItem` with `use_remainder`.
+    #[expect(clippy::too_many_lines, reason = "the hand-rolled item consumption")]
+    fn updating_using_item(&self, caller: &dyn EntityBase, server: &Server) {
         if let Some(player) = caller.get_player() {
             let remaining_use_ticks = self.item_use_time.load(Ordering::Relaxed);
             if remaining_use_ticks > 0 {
@@ -4946,57 +5217,8 @@ impl EntityBase for LivingEntity {
                 self.clear_active_hand();
             }
         }
-
-        if self.health.load() <= 0.0 && !own_tick_death && is_player {
-            let time = self
-                .death_time
-                .fetch_update(Relaxed, Relaxed, |time| Some(time.saturating_add(1)))
-                .unwrap_or_else(|time| time)
-                .saturating_add(1);
-            // Bedrock keeps a dead remote player actor in its death pose.
-            // Remove Java players after the animation so respawn can
-            // recreate a live, interactable actor with the same identity.
-            if time == 10 {
-                self.entity
-                    .world
-                    .load()
-                    .despawn_dead_java_player_for_bedrock(&self.entity);
-            }
-            // Players remain part of the world until their client requests a
-            // respawn. Removing one here breaks reconnecting while dead.
-        }
     }
 
-    fn get_entity(&self) -> &Entity {
-        &self.entity
-    }
-
-    fn get_living_entity(&self) -> Option<&LivingEntity> {
-        Some(self)
-    }
-
-    fn is_pushable(&self) -> bool {
-        self.health.load() > 0.0 && !self.dead.load(Relaxed)
-    }
-
-    fn cast_any(&self) -> &dyn std::any::Any {
-        self
-    }
-}
-
-/// Vanilla `LivingEntity.INPUT_FRICTION`.
-const INPUT_FRICTION: f32 = 0.98;
-/// The `hurtDuration` vanilla sets on every full-damage hit.
-const HURT_DURATION: i32 = 10;
-
-pub const SPEED_MODIFIER_SPRINTING_ID: &str = "minecraft:sprinting";
-pub const SPEED_MODIFIER_SPRINTING_AMOUNT: f64 = 0.300_000_011_920_928_96;
-
-impl LivingEntity {
-    /// Vanilla `LivingEntity.tickDeath` for anything but a player: the death animation runs
-    /// 20 ticks, then the corpse goes with the POOF (60) particle event. The death event (3)
-    /// was already broadcast in `on_death`; sending it again would restart the client-side
-    /// animation.
     fn tick_death(&self, caller: &dyn EntityBase) {
         let time = self
             .death_time

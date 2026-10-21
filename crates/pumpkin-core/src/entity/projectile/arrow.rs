@@ -1053,6 +1053,10 @@ impl EntityBase for ArrowEntity {
 
                 if let Some(living) = target.get_living_entity() {
                     if damage_succeeded {
+                        // Vanilla `AbstractArrow.onHitEntity`: a non-piercing arrow sticks.
+                        if pierce == 0 {
+                            living.set_arrow_count(living.get_arrow_count() + 1);
+                        }
                         self.do_knockback(&world, target.as_ref(), living, &damage_source);
                         // The weapon is the arrow's own copy, so item damage never reaches the
                         // bow still held.

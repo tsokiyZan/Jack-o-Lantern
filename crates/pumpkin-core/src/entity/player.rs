@@ -7367,8 +7367,9 @@ impl EntityBase for Player {
         }
     }
 
+    /// Vanilla `LivingEntity.isPushable`; `Player` doesn't override it.
     fn is_pushable(&self) -> bool {
-        self.gamemode.load() != GameMode::Spectator && self.gamemode.load() != GameMode::Creative
+        self.living_entity.is_pushable_for(self)
     }
 
     fn get_gravity(&self) -> f64 {

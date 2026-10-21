@@ -579,6 +579,7 @@ impl Mob for BeeEntity {
     /// The part of vanilla `Bee.doHurtTarget` after the sting landed.
     fn on_attack(&self, target: &dyn EntityBase) {
         if let Some(living) = target.get_living_entity() {
+            living.set_stinger_count(living.get_stinger_count() + 1);
             let poison_time = match self.world().level_info.load().difficulty {
                 pumpkin_util::Difficulty::Normal => POISON_SECONDS_NORMAL,
                 pumpkin_util::Difficulty::Hard => POISON_SECONDS_HARD,

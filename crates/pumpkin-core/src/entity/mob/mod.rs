@@ -2826,7 +2826,7 @@ impl<T: Mob + Send + 'static> EntityBase for T {
     }
 
     fn is_pushable(&self) -> bool {
-        self.mob_is_pushable() && self.get_mob_entity().living_entity.is_pushable()
+        self.mob_is_pushable() && self.get_mob_entity().living_entity.is_pushable_for(self)
     }
 
     /// Vanilla `LivingEntity.push`: a sleeping entity is not pushed.
