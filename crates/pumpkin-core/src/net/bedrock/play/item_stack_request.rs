@@ -891,25 +891,19 @@ fn update_slot_stack(
         if is_player_screen {
             let current_stack =
                 screen_handler.get_behaviour().slots[screen_slot].get_cloned_stack();
-            if !current_stack.are_items_and_components_equal(&new_stack) {
-                if (5..9).contains(&screen_slot) {
-                    player.enqueue_equipment_change(
-                        &match screen_slot {
-                            5 => EquipmentSlot::HEAD,
-                            6 => EquipmentSlot::CHEST,
-                            7 => EquipmentSlot::LEGS,
-                            8 => EquipmentSlot::FEET,
-                            _ => unreachable!(),
-                        },
-                        &new_stack,
-                    );
-                } else if (36..45).contains(&screen_slot) {
-                    let hotbar_slot = screen_slot - 36;
-                    if player.inventory().get_selected_slot() == hotbar_slot as u8 {
-                        let equipment = &[(EquipmentSlot::MAIN_HAND, new_stack.clone())];
-                        player.living_entity.send_equipment_changes(equipment);
-                    }
-                }
+            if !current_stack.are_items_and_components_equal(&new_stack)
+                && (5..9).contains(&screen_slot)
+            {
+                player.enqueue_equipment_change(
+                    &match screen_slot {
+                        5 => EquipmentSlot::HEAD,
+                        6 => EquipmentSlot::CHEST,
+                        7 => EquipmentSlot::LEGS,
+                        8 => EquipmentSlot::FEET,
+                        _ => unreachable!(),
+                    },
+                    &new_stack,
+                );
             }
         }
 

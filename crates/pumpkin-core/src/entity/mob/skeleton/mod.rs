@@ -224,9 +224,6 @@ impl SkeletonEntityBase {
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
                 .insert(EquipmentSlot::HEAD, 0.0);
         }
-        // The spawn equipment is in place before the mob enters the world, so only its
-        // attribute modifiers still need applying.
-        living.apply_current_equipment_attribute_modifiers();
         group_data
     }
 }

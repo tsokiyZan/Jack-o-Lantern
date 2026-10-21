@@ -216,28 +216,6 @@ fn replace_entity_slots(
                         let stack_serializer = ItemStackSerializer::from(item_stack.clone());
                         let packet = CSetContainerSlot::new(0, 0, slot as i16, &stack_serializer);
                         player_arc.enqueue_slot_packet(&packet, None, 0);
-
-                        let eq_slot = if slot == 36 {
-                            Some(EquipmentSlot::FEET)
-                        } else if slot == 37 {
-                            Some(EquipmentSlot::LEGS)
-                        } else if slot == 38 {
-                            Some(EquipmentSlot::CHEST)
-                        } else if slot == 39 {
-                            Some(EquipmentSlot::HEAD)
-                        } else if slot == 40 {
-                            Some(EquipmentSlot::OFF_HAND)
-                        } else if slot == inventory.get_selected_slot() as usize {
-                            Some(EquipmentSlot::MAIN_HAND)
-                        } else {
-                            None
-                        };
-
-                        if let Some(eq) = eq_slot {
-                            player
-                                .living_entity
-                                .send_equipment_changes(&[(eq, item_stack.clone())]);
-                        }
                         used_items.push(item_stack);
                     }
                 }
@@ -277,7 +255,6 @@ fn replace_entity_slots(
                     .lock()
                     .unwrap_or_else(std::sync::PoisonError::into_inner)
                     .put(&eq, item_stack.clone());
-                living.send_equipment_changes(&[(eq, item_stack.clone())]);
                 used_items.push(item_stack);
             }
         }

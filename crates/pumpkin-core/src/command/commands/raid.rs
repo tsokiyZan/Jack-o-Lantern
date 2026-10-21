@@ -232,13 +232,11 @@ impl CommandExecutor for SpawnLeaderExecutor {
             raider.set_patrol_leader(true);
             let banner = create_ominous_banner();
             let living = &mob.get_mob_entity().living_entity;
-            let mut equipment = living
+            living
                 .entity_equipment
                 .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            equipment.put(&EquipmentSlot::HEAD, banner.clone());
-            drop(equipment);
-            living.send_equipment_changes(&[(EquipmentSlot::HEAD, banner)]);
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .put(&EquipmentSlot::HEAD, banner);
         }
         crate::entity::mob::spawn::finalize_spawn(
             &raider_entity,

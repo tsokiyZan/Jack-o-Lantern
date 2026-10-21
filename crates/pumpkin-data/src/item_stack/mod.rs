@@ -730,6 +730,20 @@ impl ItemStack {
         self.item_count == other.item_count && self.are_items_and_components_equal(other)
     }
 
+    /// Vanilla `ItemStack.matches`: both empty, or the same count, item and components.
+    #[must_use]
+    pub fn matches(a: &Self, b: &Self) -> bool {
+        (a.is_empty() && b.is_empty()) || a.are_equal(b)
+    }
+
+    /// Vanilla `ItemStack.isBroken`: a damageable stack worn down to its maximum damage.
+    #[must_use]
+    pub fn is_broken(&self) -> bool {
+        self.is_damageable()
+            && !self.is_unbreakable()
+            && self.get_damage() >= self.get_max_damage().unwrap_or(0)
+    }
+
     /// Determines the mining speed for a block based on tool rules.
     /// Direct matches return immediately, tagged blocks are checked separately.
     /// If no match is found, returns the tool's default mining speed or `1.0`.

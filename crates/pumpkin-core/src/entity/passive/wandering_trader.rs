@@ -1187,12 +1187,7 @@ impl Goal for WanderingTraderUseItemGoal {
             None => return,
         };
         if let Ok(mut equip) = trader.mob_entity.living_entity.entity_equipment.try_lock() {
-            equip.put(&EquipmentSlot::MAIN_HAND, stack.clone());
-            drop(equip);
-            trader
-                .mob_entity
-                .living_entity
-                .send_equipment_changes(&[(EquipmentSlot::MAIN_HAND, stack)]);
+            equip.put(&EquipmentSlot::MAIN_HAND, stack);
         }
     }
 
@@ -1266,16 +1261,10 @@ impl Goal for WanderingTraderUseItemGoal {
     }
 
     fn stop(&mut self, _mob: &dyn Mob) {
-        if let Some(trader) = self.trader.upgrade() {
-            let empty = ItemStack::EMPTY;
-            if let Ok(mut equip) = trader.mob_entity.living_entity.entity_equipment.try_lock() {
-                equip.put(&EquipmentSlot::MAIN_HAND, empty.clone());
-                drop(equip);
-                trader
-                    .mob_entity
-                    .living_entity
-                    .send_equipment_changes(&[(EquipmentSlot::MAIN_HAND, empty.clone())]);
-            }
+        if let Some(trader) = self.trader.upgrade()
+            && let Ok(mut equip) = trader.mob_entity.living_entity.entity_equipment.try_lock()
+        {
+            equip.put(&EquipmentSlot::MAIN_HAND, ItemStack::EMPTY.clone());
         }
         self.goal_type = None;
         self.timer = 0;

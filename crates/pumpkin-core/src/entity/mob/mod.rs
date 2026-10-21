@@ -600,17 +600,14 @@ impl MobEntity {
             .get(slot)
     }
 
-    /// Equips `stack` and tells tracking clients, returning what was in the slot.
+    /// Vanilla `setItemSlot`: equips `stack`, returning what was in the slot. Tracking clients
+    /// see it at the next `detect_equipment_updates`.
     pub fn set_item_slot(&self, slot: &EquipmentSlot, stack: ItemStack) -> ItemStack {
-        let previous = self
-            .living_entity
+        self.living_entity
             .entity_equipment
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .put(slot, stack.clone());
-        self.living_entity
-            .send_equipment_changes(&[(slot.clone(), stack)]);
-        previous
+            .put(slot, stack)
     }
 
     pub fn set_item_slot_and_drop_when_killed(&self, slot: &EquipmentSlot, stack: ItemStack) {
@@ -1682,6 +1679,20 @@ pub trait Mob: EntityBase + Send + Sync {
 
     /// The end of a vanilla `aiStep` override, after `super.aiStep()`.
     fn ai_step_end(&self, _caller: &dyn EntityBase) {}
+
+    /// Vanilla `LivingEntity.equipmentHasChanged`.
+    fn equipment_has_changed(&self, previous: &ItemStack, current: &ItemStack) -> bool {
+        !ItemStack::matches(previous, current)
+    }
+
+    /// The part of a vanilla `collectEquipmentChanges` override before
+    /// `super.collectEquipmentChanges`; the attributes it changes go in `touched`.
+    fn collect_equipment_changes_override(
+        &self,
+        _last: &[ItemStack; 8],
+        _touched: &mut Vec<Attributes>,
+    ) {
+    }
 
     /// A vanilla `aiStep` override that never calls `super.aiStep()`. Returns `true` when it
     /// ran in place of the shared one.

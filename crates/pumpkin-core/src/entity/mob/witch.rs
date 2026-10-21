@@ -288,10 +288,6 @@ impl Mob for WitchEntity {
                     let stack = equipment.get(&EquipmentSlot::MAIN_HAND);
                     equipment.put(&EquipmentSlot::MAIN_HAND, ItemStack::EMPTY.clone());
                     drop(equipment);
-                    living.send_equipment_changes(&[(
-                        EquipmentSlot::MAIN_HAND,
-                        ItemStack::EMPTY.clone(),
-                    )]);
 
                     let effects = crate::item::potion::PotionContents::read_potion_effects(&stack);
                     // `potion.forEachEffect(this::addEffect, durationScale)`.
@@ -340,13 +336,11 @@ impl Mob for WitchEntity {
                 let stack = create_potion_stack(&Item::POTION, potion);
                 if let Some(witch) = caller.cast_any().downcast_ref::<Self>() {
                     let living = &witch.mob_entity.living_entity;
-                    let mut equipment = living
+                    living
                         .entity_equipment
                         .lock()
-                        .unwrap_or_else(std::sync::PoisonError::into_inner);
-                    equipment.put(&EquipmentSlot::MAIN_HAND, stack.clone());
-                    drop(equipment);
-                    living.send_equipment_changes(&[(EquipmentSlot::MAIN_HAND, stack)]);
+                        .unwrap_or_else(std::sync::PoisonError::into_inner)
+                        .put(&EquipmentSlot::MAIN_HAND, stack);
                 }
 
                 self.using_time.store(32, Ordering::Relaxed);

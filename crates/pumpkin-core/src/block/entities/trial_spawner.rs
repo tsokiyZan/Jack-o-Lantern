@@ -1092,16 +1092,12 @@ impl TrialSpawner {
                 .entity_equipment
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
-            let mut equipment_changes = Vec::new();
             for item in items {
                 let slot = item
                     .get_data_component::<pumpkin_data::data_component_impl::EquippableImpl>()
                     .map_or(EquipmentSlot::MAIN_HAND, |eq| eq.slot.clone());
-                equipment.put(&slot, item.clone());
-                equipment_changes.push((slot, item));
+                equipment.put(&slot, item);
             }
-            drop(equipment);
-            living.send_equipment_changes(&equipment_changes);
         }
 
         let mut event =

@@ -76,11 +76,6 @@ impl BedrockClient {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .send_content_updates();
 
-        // Sync main hand equipment to other players
-        let stack_in_hand = player.inventory().held_item();
-        let equipment = &[(EquipmentSlot::MAIN_HAND, stack_in_hand)];
-        player.living_entity.send_equipment_changes(equipment);
-
         // Sync bedrock inventory updates
         let slots = player
             .inventory()

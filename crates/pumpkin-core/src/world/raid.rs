@@ -346,9 +346,8 @@ impl Raid {
                         let banner = create_ominous_banner();
                         let living = &mob.get_mob_entity().living_entity;
                         if let Ok(mut equipment) = living.entity_equipment.try_lock() {
-                            equipment.put(&EquipmentSlot::HEAD, banner.clone());
+                            equipment.put(&EquipmentSlot::HEAD, banner);
                         }
-                        living.send_equipment_changes(&[(EquipmentSlot::HEAD, banner)]);
                         self.group_to_leader_map.insert(group_number, uuid);
                         leader_set = true;
                     }

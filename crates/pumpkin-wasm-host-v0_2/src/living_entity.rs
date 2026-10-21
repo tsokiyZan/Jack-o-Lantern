@@ -369,18 +369,11 @@ impl HostLivingEntity for PluginHostState {
     fn clear_equipment(&mut self, this: Resource<WitLivingEntity>) -> wasmtime::Result<()> {
         let entity = self.get(&this)?;
         if let Some(living) = entity.get_living_entity() {
-            let mut equipment = living.entity_equipment.lock_ignore_poison();
-            let slots_to_clear: Vec<(
-                pumpkin_data::data_component_impl::EquipmentSlot,
-                pumpkin_data::item_stack::ItemStack,
-            )> = equipment
+            living
+                .entity_equipment
+                .lock_ignore_poison()
                 .equipment
-                .drain()
-                .map(|(slot, _)| (slot, pumpkin_data::item_stack::ItemStack::EMPTY.clone()))
-                .collect();
-            drop(equipment);
-
-            living.send_equipment_changes(&slots_to_clear);
+                .clear();
         }
         Ok(())
     }
@@ -436,12 +429,10 @@ impl HostLivingEntityWithStore<PluginHostState> for HasSelf<PluginHostState> {
         let entity = accessor.get_res(&this)?;
         if let Some(living) = entity.get_living_entity() {
             let slot = from_wit_equipment_slot(slot);
-            {
-                let mut equipment = living.entity_equipment.lock_ignore_poison();
-                equipment.put(&slot, item_stack.clone());
-            };
-
-            living.send_equipment_changes(&[(slot, item_stack)]);
+            living
+                .entity_equipment
+                .lock_ignore_poison()
+                .put(&slot, item_stack);
         }
         Ok(())
     }

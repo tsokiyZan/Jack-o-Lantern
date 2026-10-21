@@ -585,12 +585,12 @@ impl Mob for CubeMobEntity {
         }
     }
 
-    /// Vanilla `LivingEntity.detectEquipmentUpdates`, which runs just before `aiStep`.
-    fn ai_step(&self, _caller: &dyn EntityBase) {
-        if let Some(sulfur) = &self.sulfur {
-            let previous = sulfur.take_last_body_item(self.body_item());
-            self.collect_equipment_changes(&previous);
-        }
+    fn collect_equipment_changes_override(
+        &self,
+        last: &[ItemStack; 8],
+        touched: &mut Vec<Attributes>,
+    ) {
+        self.collect_body_equipment_changes(last, touched);
     }
 
     /// The end of vanilla `AgeableMob.aiStep`.

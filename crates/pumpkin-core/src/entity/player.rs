@@ -15,7 +15,6 @@ use std::sync::atomic::{AtomicBool, AtomicI8, AtomicI32, AtomicU8, AtomicU32, Or
 use std::sync::{Arc, Mutex, Weak};
 use std::time::{Duration, Instant};
 
-use crate::entity::attributes::{Modifier, ModifierOperation};
 use crate::plugin::api::events::enchantment::{EnchantItemEvent, PrepareItemEnchantEvent};
 use crate::world::scoreboard::{BedrockScoreboard, Scoreboard};
 use advancement::PlayerAdvancement;
@@ -240,7 +239,7 @@ impl BedrockPlayer<'_> {
 use pumpkin_data::attributes::Attributes;
 use pumpkin_data::block_properties::HorizontalFacing;
 use pumpkin_data::damage::DamageType;
-use pumpkin_data::data_component_impl::{AttributeModifiersImpl, EnchantmentsImpl, Operation};
+use pumpkin_data::data_component_impl::{AttributeModifiersImpl, Operation};
 use pumpkin_data::data_component_impl::{EquipmentSlot, EquippableImpl, ToolImpl, WeaponImpl};
 use pumpkin_data::effect::StatusEffect;
 use pumpkin_data::entity::{EntityPose, EntityStatus, EntityType};
@@ -468,9 +467,6 @@ pub struct Player {
     pub current_block_destroy_stage: AtomicI32,
     /// The per-tick block destruction progress last sent to Bedrock clients.
     pub current_block_breaking_speed: AtomicU32,
-    /// The held item's Efficiency level last synced to the client via the `mining_efficiency`
-    /// attribute. -1 means never synced
-    pub synced_mining_efficiency_level: AtomicI32,
     /// Indicates if the player is currently mining a block.
     pub mining: AtomicBool,
     pub start_mining_time: AtomicI32,
@@ -768,7 +764,6 @@ impl Player {
             hunger_manager: HungerManager::default(),
             current_block_destroy_stage: AtomicI32::new(-1),
             current_block_breaking_speed: AtomicU32::new(0),
-            synced_mining_efficiency_level: AtomicI32::new(-1),
             // Vanilla `Player.enchantmentSeed = 0`; a load without `XpSeed` draws one.
             enchantment_seed: AtomicI32::new(0),
             open_container: AtomicCell::new(None),
@@ -1519,14 +1514,12 @@ impl Player {
             if matches!(attack_type, AttackType::Sweeping) {
                 combat::spawn_sweep_particle(attacker_entity, &world, &pos);
 
-                let mut sweep_damage = 1.0;
-                if let Some(enchantments) = item_stack.get_data_component::<EnchantmentsImpl>() {
-                    for (enchantment, level) in enchantments.enchantment.iter() {
-                        if **enchantment == Enchantment::SWEEPING_EDGE {
-                            sweep_damage += damage as f32 * (*level as f32 / (*level as f32 + 1.0));
-                        }
-                    }
-                }
+                let sweep_damage = 1.0
+                    + self
+                        .living_entity
+                        .get_attribute_value(&Attributes::SWEEPING_DAMAGE_RATIO)
+                        as f32
+                        * damage as f32;
 
                 let search_box = BoundingBox::new(
                     Vector3::new(pos.x - 1.0, pos.y - 0.5, pos.z - 1.0),
@@ -1733,17 +1726,9 @@ impl Player {
     pub fn sync_hand_slot(&self, slot_index: usize, stack: ItemStack) {
         self.try_send_slot_set_packet(&CSetPlayerInventory::new(
             (slot_index as i32).into(),
-            &ItemStackSerializer::from(stack.clone()),
+            &ItemStackSerializer::from(stack),
         ));
         self.sync_inventory_to_client();
-
-        if slot_index == self.inventory.get_selected_slot() as usize {
-            self.living_entity
-                .send_equipment_changes(&[(EquipmentSlot::MAIN_HAND, stack)]);
-        } else if slot_index == PlayerInventory::OFF_HAND_SLOT {
-            self.living_entity
-                .send_equipment_changes(&[(EquipmentSlot::OFF_HAND, stack)]);
-        }
     }
 
     /// Applies `amount` durability damage to the item in `slot`.
@@ -1770,6 +1755,7 @@ impl Player {
         };
 
         let mut stack = self.inventory.get_slot(slot_index);
+        let original = stack.clone();
         let original_item = stack.item;
         let result = stack.hurt_and_break(&self.world(), amount);
         let updated = (result != pumpkin_data::item_stack::DamageResult::Untouched)
@@ -1802,21 +1788,14 @@ impl Player {
                     original_item.id as i32,
                     1,
                 );
-                self.world().send_entity_status(
-                    &self.living_entity.entity,
-                    super::equipment_break_status(slot),
-                    None,
-                );
+                self.living_entity.on_equipped_item_broken(&original, slot);
             }
 
             self.try_send_slot_set_packet(&CSetPlayerInventory::new(
                 (slot_index as i32).into(),
-                &ItemStackSerializer::from(updated_stack.clone()),
+                &ItemStackSerializer::from(updated_stack),
             ));
             self.sync_inventory_to_client();
-
-            self.living_entity
-                .send_equipment_changes(&[(slot.clone(), updated_stack)]);
 
             return true;
         }
@@ -5296,41 +5275,7 @@ impl Player {
         !state.tool_required() || self.inventory().held_item().is_correct_for_drops(block)
     }
 
-    /// The id under which Pumpkin will store it's `mining_efficiency` modifier value
-    const EFFICIENCY_ATTRIBUTE_MODIFIER_ID: &'static str = "minecraft:enchantment.efficiency";
-
-    fn sync_mining_efficiency(&self) {
-        let level = self
-            .inventory()
-            .held_item()
-            .get_enchantment_level(&Enchantment::EFFICIENCY);
-        if self
-            .synced_mining_efficiency_level
-            .swap(level, Ordering::Relaxed)
-            == level
-        {
-            return;
-        }
-        self.living_entity
-            .update_attribute(&Attributes::MINING_EFFICIENCY, |inst| {
-                if level > 0 {
-                    inst.add_or_replace_modifier(Modifier {
-                        id: Self::EFFICIENCY_ATTRIBUTE_MODIFIER_ID.to_string(),
-                        amount: f64::from(level * level + 1),
-                        operation: ModifierOperation::Add,
-                    });
-                } else {
-                    inst.remove_modifier(Self::EFFICIENCY_ATTRIBUTE_MODIFIER_ID);
-                }
-            });
-        crate::entity::attributes::send_attribute_updates_for_living(
-            &self.living_entity,
-            vec![Attributes::MINING_EFFICIENCY],
-        );
-    }
-
     pub fn get_mining_speed(&self, block: &'static Block) -> f32 {
-        self.sync_mining_efficiency();
         let held_item = self.inventory.held_item();
         let mut speed = held_item.get_speed(block);
         // Effi only gets applied if tool's break speed for block is alreadyabove 1 (meaning it's
@@ -5479,12 +5424,8 @@ impl Player {
                 return;
             }
         }
-        let (main_hand_item, off_hand_item) = self.inventory.swap_item();
-        let equipment = &[
-            (EquipmentSlot::MAIN_HAND, main_hand_item),
-            (EquipmentSlot::OFF_HAND, off_hand_item),
-        ];
-        self.living_entity.send_equipment_changes(equipment);
+        // Tracking clients see the swap (entity event 55) at the next `detect_equipment_updates`.
+        self.inventory.swap_item();
         // todo this.player.stopUsingItem();
     }
 
@@ -5865,14 +5806,11 @@ impl Player {
             return xp;
         }
 
-        let mut candidates: Vec<(usize, EquipmentSlot, ItemStack)> = Vec::new();
+        let mut candidates: Vec<(usize, ItemStack)> = Vec::new();
 
         // Vanilla `EnchantmentHelper.getRandomItemWith` walks `EquipmentSlot.VALUES` in order.
         let selected_slot = self.inventory.get_selected_slot() as usize;
-        let mut slot_pairs: Vec<(usize, EquipmentSlot)> = vec![
-            (selected_slot, EquipmentSlot::MAIN_HAND),
-            (PlayerInventory::OFF_HAND_SLOT, EquipmentSlot::OFF_HAND),
-        ];
+        let mut slot_indices = vec![selected_slot, PlayerInventory::OFF_HAND_SLOT];
         for slot in &EquipmentSlot::VALUES {
             if !slot.is_armor_slot() {
                 continue;
@@ -5883,14 +5821,14 @@ impl Player {
                 .iter()
                 .find(|(_, equipment_slot)| *equipment_slot == slot)
             {
-                slot_pairs.push((*slot_index, slot.clone()));
+                slot_indices.push(*slot_index);
             }
         }
 
-        for (slot_index, equipment_slot) in slot_pairs {
+        for slot_index in slot_indices {
             let stack = self.inventory.get_slot(slot_index);
             if stack.get_enchantment_level(&Enchantment::MENDING) > 0 && stack.get_damage() > 0 {
-                candidates.push((slot_index, equipment_slot, stack));
+                candidates.push((slot_index, stack));
             }
         }
 
@@ -5904,7 +5842,7 @@ impl Player {
             .entity
             .random()
             .next_bounded_i32(candidates.len() as i32) as usize;
-        let (slot_index, equipment_slot, mut stack) = candidates.swap_remove(idx);
+        let (slot_index, mut stack) = candidates.swap_remove(idx);
 
         let repaired = stack.repair_item(xp.saturating_mul(2));
         if repaired <= 0 {
@@ -5937,12 +5875,9 @@ impl Player {
 
         self.try_send_slot_set_packet(&CSetPlayerInventory::new(
             (slot_index as i32).into(),
-            &ItemStackSerializer::from(updated_stack.clone()),
+            &ItemStackSerializer::from(updated_stack),
         ));
         self.sync_inventory_to_client();
-
-        self.living_entity
-            .send_equipment_changes(&[(equipment_slot, updated_stack)]);
 
         xp
     }
@@ -7543,8 +7478,6 @@ impl EntityBase for Player {
     fn read_custom_nbt(&self, nbt: &NbtCompound) {
         self.inventory.read_nbt_non_mut(nbt);
         self.ender_chest_inventory.read_nbt_non_mut(nbt);
-        self.living_entity
-            .apply_current_equipment_attribute_modifiers();
 
         let xp_p = nbt.get_float("XpP").unwrap_or(0.0);
         let xp_level = nbt.get_int("XpLevel");
@@ -8382,10 +8315,9 @@ impl InventoryPlayer for Player {
         );
     }
 
-    fn enqueue_equipment_change(&self, slot: &EquipmentSlot, stack: &ItemStack) {
-        self.living_entity
-            .send_equipment_changes(&[(slot.clone(), stack.clone())]);
-
+    /// Only the equip sound: tracking clients see the stack at the next
+    /// `detect_equipment_updates`.
+    fn enqueue_equipment_change(&self, _slot: &EquipmentSlot, stack: &ItemStack) {
         if let Some(equippable) = stack.get_data_component::<EquippableImpl>() {
             self.world().play_sound_event(
                 &equippable.equip_sound,

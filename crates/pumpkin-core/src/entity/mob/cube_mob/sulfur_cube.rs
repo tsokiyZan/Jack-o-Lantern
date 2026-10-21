@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError, Weak};
 use pumpkin_data::attributes::Attributes;
 use pumpkin_data::damage::DamageType;
 use pumpkin_data::data_component_impl::{
-    BucketEntityDataImpl, EquipmentSlot, Operation, SulfurCubeContentImpl,
+    BucketEntityDataImpl, EquipmentSlot, SulfurCubeContentImpl,
 };
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::game_event::GameEvent;
@@ -36,7 +36,7 @@ use crate::entity::ageable::AgeableMob;
 use crate::entity::ai::goal::goal_selector::GoalSelector;
 use crate::entity::ai::goal::tempt::{TemptGoal, TemptNavigation};
 use crate::entity::ai::goal::{Controls, Goal};
-use crate::entity::attributes::{Modifier, ModifierOperation, send_attribute_updates_for_living};
+use crate::entity::attributes::{Modifier, ModifierOperation};
 use crate::entity::bucketable;
 use crate::entity::item::ItemEntity;
 use crate::entity::mob::Mob;
@@ -107,8 +107,6 @@ pub(super) struct SulfurCubeData {
     fuse: AtomicI32,
     /// Vanilla `FROM_BUCKET`.
     from_bucket: AtomicBool,
-    /// The body slot of vanilla's `lastEquipmentItems`.
-    last_body_item: Mutex<ItemStack>,
     archetype: Mutex<ArchetypeState>,
 }
 
@@ -119,7 +117,6 @@ impl Default for SulfurCubeData {
             push_sound_cooldown: AtomicI32::new(0),
             fuse: AtomicI32::new(-1),
             from_bucket: AtomicBool::new(false),
-            last_body_item: Mutex::new(ItemStack::EMPTY.clone()),
             archetype: Mutex::new(ArchetypeState::default()),
         }
     }
@@ -134,17 +131,6 @@ impl SulfurCubeData {
 
     fn is_primed(&self) -> bool {
         self.fuse.load(Relaxed) >= 0
-    }
-
-    /// Swaps in the body item this tick sees and returns the one the last tick saw.
-    pub(super) fn take_last_body_item(&self, current: ItemStack) -> ItemStack {
-        std::mem::replace(
-            &mut *self
-                .last_body_item
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner),
-            current,
-        )
     }
 
     /// Vanilla `SulfurCube.customServerAiStep`.
@@ -175,11 +161,6 @@ fn is_food(stack: &ItemStack) -> bool {
     stack.item.has_tag(&tag::Item::MINECRAFT_SULFUR_CUBE_FOOD)
 }
 
-/// Vanilla `ItemStack.matches`.
-fn stacks_match(a: &ItemStack, b: &ItemStack) -> bool {
-    (a.is_empty() && b.is_empty()) || a.are_equal(b)
-}
-
 /// Vanilla `SulfurCube.matchingArchetypes`.
 fn matching_archetypes(stack: &ItemStack) -> impl Iterator<Item = &'static SulfurCubeArchetype> {
     let empty = stack.is_empty();
@@ -188,14 +169,6 @@ fn matching_archetypes(stack: &ItemStack) -> impl Iterator<Item = &'static Sulfu
         .iter()
         .copied()
         .filter(move |archetype| !empty && item.has_tag(archetype.items))
-}
-
-const fn modifier_operation(operation: Operation) -> ModifierOperation {
-    match operation {
-        Operation::AddValue => ModifierOperation::Add,
-        Operation::AddMultipliedBase => ModifierOperation::MultiplyBase,
-        Operation::AddMultipliedTotal => ModifierOperation::MultiplyTotal,
-    }
 }
 
 /// Vanilla `Vec2.rotate`.
@@ -444,14 +417,19 @@ impl CubeMobEntity {
         true
     }
 
-    /// Vanilla `SulfurCube.collectEquipmentChanges` for the body slot, given what it held
-    /// before.
-    pub(super) fn collect_equipment_changes(&self, previous: &ItemStack) {
+    /// The part of vanilla `SulfurCube.collectEquipmentChanges` before
+    /// `super.collectEquipmentChanges`: a changed body item swaps the archetype.
+    pub(super) fn collect_body_equipment_changes(
+        &self,
+        last: &[ItemStack; 8],
+        touched: &mut Vec<Attributes>,
+    ) {
         let Some(sulfur) = &self.sulfur else {
             return;
         };
+        let previous = &last[EquipmentSlot::BODY.discriminant() as usize];
         let current = self.body_item();
-        if stacks_match(previous, &current) {
+        if !self.equipment_has_changed(previous, &current) {
             return;
         }
         if current.is_empty() {
@@ -471,7 +449,6 @@ impl CubeMobEntity {
         }
 
         let living = &self.mob_entity.living_entity;
-        let mut touched: Vec<Attributes> = Vec::new();
         let mut touch = |attribute: &Attributes| {
             if !touched.iter().any(|touched| touched.id == attribute.id) {
                 touched.push(attribute.clone());
@@ -479,10 +456,13 @@ impl CubeMobEntity {
         };
         for archetype in matching_archetypes(previous) {
             for entry in archetype.attribute_modifiers {
-                living.update_attribute(entry.attribute, |instance| {
+                if living.modify_supplied_attribute(entry.attribute, |instance| {
+                    let present = instance.get_modifier(entry.id).is_some();
                     instance.remove_modifier(entry.id);
-                });
-                touch(entry.attribute);
+                    present
+                }) {
+                    touch(entry.attribute);
+                }
             }
         }
 
@@ -500,21 +480,19 @@ impl CubeMobEntity {
             state.knockback_modifier = archetype.knockback_modifiers;
             state.sound_settings = archetype.sound_settings;
             for entry in archetype.attribute_modifiers {
-                living.update_attribute(entry.attribute, |instance| {
+                if living.modify_supplied_attribute(entry.attribute, |instance| {
                     instance.add_or_replace_modifier(Modifier {
                         id: entry.id.to_string(),
                         amount: entry.amount,
-                        operation: modifier_operation(entry.operation),
+                        operation: ModifierOperation::from_operation(entry.operation),
                     });
-                });
-                touch(entry.attribute);
+                    true
+                }) {
+                    touch(entry.attribute);
+                }
             }
         }
         *sulfur.archetype() = state;
-
-        if !touched.is_empty() {
-            send_attribute_updates_for_living(living, touched);
-        }
     }
 
     /// Vanilla `SulfurCube.equipItem`: swallows one of `held`, spitting out what it held.
@@ -532,7 +510,13 @@ impl CubeMobEntity {
         self.mob_entity
             .set_item_slot_and_drop_when_killed(&EquipmentSlot::BODY, held.copy_with_count(1));
         if !swallowed.is_empty() {
-            self.collect_equipment_changes(&swallowed);
+            let mut last: [ItemStack; 8] = std::array::from_fn(|_| ItemStack::EMPTY.clone());
+            last[EquipmentSlot::BODY.discriminant() as usize] = swallowed;
+            // Vanilla ignores the result, and the attributes sync with the next tick's
+            // `detect_equipment_updates`, which sees the same body change.
+            self.mob_entity
+                .living_entity
+                .collect_equipment_changes(self, &last, &mut Vec::new());
         }
         self.play_sound(Sound::EntitySulfurCubeAbsorb, 1.0, 1.0);
         true

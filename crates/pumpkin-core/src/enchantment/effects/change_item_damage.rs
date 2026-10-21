@@ -47,10 +47,14 @@ impl EnchantmentEntityEffectExt for ChangeItemDamage {
             {
                 return;
             }
-            let result = detached
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .hurt_and_break(&entity.get_entity().world.load(), change);
+            let (result, broken) = {
+                let mut detached = detached
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                let broken = detached.clone();
+                let result = detached.hurt_and_break(&entity.get_entity().world.load(), change);
+                (result, broken)
+            };
             if result == DamageResult::Broken {
                 if let Some(on_break) = item.on_break {
                     on_break();
@@ -58,7 +62,7 @@ impl EnchantmentEntityEffectExt for ChangeItemDamage {
                     item.owner.and_then(EntityBase::get_living_entity),
                     &item.in_slot,
                 ) {
-                    living.on_equipped_item_broken(slot);
+                    living.on_equipped_item_broken(&broken, slot);
                 }
             }
         } else if let (Some(owner), Some(slot)) = (item.owner, &item.in_slot)

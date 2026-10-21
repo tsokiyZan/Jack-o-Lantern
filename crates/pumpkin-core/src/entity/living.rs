@@ -62,7 +62,9 @@ use pumpkin_inventory::entity_equipment::EntityEquipment;
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_nbt::tag::NbtTag;
 use pumpkin_protocol::codec::var_int::VarInt;
-use pumpkin_protocol::java::client::play::{CHurtAnimation, CRemoveMobEffect, CTakeItemEntity};
+use pumpkin_protocol::java::client::play::{
+    CEntityStatus, CHurtAnimation, CRemoveMobEffect, CTakeItemEntity,
+};
 use pumpkin_protocol::{
     codec::item_stack_seralizer::ItemStackSerializer,
     java::client::play::{CSetEquipment, MetadataSerializer},
@@ -202,9 +204,9 @@ pub struct LivingEntity {
 
     /// The attributes of the entity
     pub attributes: RwLock<FxHashMap<u8, AttributeInstance>>,
-    /// Modifier ids applied from the current item in each equipment slot.
-    /// Used to remove them on unequip without the previous stack.
-    equipment_attribute_modifier_ids: std::sync::Mutex<FxHashMap<EquipmentSlot, Vec<(u8, String)>>>,
+    /// Vanilla `lastEquipmentItems`, in `EquipmentSlot::VALUES` order: the equipment as the
+    /// last `detect_equipment_updates` saw it.
+    last_equipment_items: std::sync::Mutex<[ItemStack; 8]>,
     /// Vanilla `activeLocationDependentEnchantments`: the location-changed effects active per
     /// slot, as the enchantment and the effect's index in its `location_changed` list.
     pub active_location_effects:
@@ -401,7 +403,9 @@ impl LivingEntity {
             movement_input: AtomicCell::new(Vector3::default()),
             water_movement_speed_multiplier,
             last_block_pos: AtomicCell::new(None),
-            equipment_attribute_modifier_ids: std::sync::Mutex::new(FxHashMap::default()),
+            last_equipment_items: std::sync::Mutex::new(std::array::from_fn(|_| {
+                ItemStack::EMPTY.clone()
+            })),
             active_location_effects: std::sync::Mutex::new(Vec::new()),
             breath: BreathManager::default(),
         };
@@ -434,13 +438,135 @@ impl LivingEntity {
         }
     }
 
-    pub fn send_equipment_changes(&self, equipment: &[(EquipmentSlot, ItemStack)]) {
-        if equipment.is_empty() {
+    /// Vanilla `detectEquipmentUpdates`: what changed in the equipment since the last tick
+    /// takes effect and goes to the tracking players.
+    pub fn detect_equipment_updates(&self, caller: &dyn EntityBase) {
+        let last = self
+            .last_equipment_items
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        let mut touched = Vec::new();
+        if let Some(mut changed) = self.collect_equipment_changes(caller, &last, &mut touched) {
+            self.handle_hand_swap(&mut changed);
+            if !changed.is_empty() {
+                self.handle_equipment_changes(&changed);
+            }
+        }
+        // Vanilla syncs the dirty attributes later in the tick (`sendDirtyEntityData`).
+        if !touched.is_empty() {
+            crate::entity::attributes::send_attribute_updates_for_living(self, touched);
+        }
+    }
+
+    /// Vanilla `collectEquipmentChanges`: the slots whose stack differs from `last`, in
+    /// `EquipmentSlot::VALUES` order. The previous stacks' modifiers and location effects stop
+    /// and the new stacks' start; the attributes this changes are added to `touched`.
+    pub fn collect_equipment_changes(
+        &self,
+        caller: &dyn EntityBase,
+        last: &[ItemStack; 8],
+        touched: &mut Vec<Attributes>,
+    ) -> Option<Vec<(EquipmentSlot, ItemStack)>> {
+        let mob = caller.get_mob();
+        if let Some(mob) = mob {
+            mob.collect_equipment_changes_override(last, touched);
+        }
+        let mut changed: Option<Vec<(EquipmentSlot, ItemStack)>> = None;
+        for (slot, previous) in EquipmentSlot::VALUES.iter().zip(last) {
+            let current = self.get_item_by_slot(caller, slot);
+            let has_changed = mob.map_or_else(
+                || !ItemStack::matches(previous, &current),
+                |mob| mob.equipment_has_changed(previous, &current),
+            );
+            if has_changed {
+                changed
+                    .get_or_insert_with(Vec::new)
+                    .push((slot.clone(), current));
+                if !previous.is_empty() {
+                    self.stop_location_based_effects(previous, slot, touched);
+                }
+            }
+        }
+
+        if let Some(changed) = &changed {
+            for (slot, current) in changed {
+                if current.is_empty() || current.is_broken() {
+                    continue;
+                }
+                for_each_item_modifier(current, slot, |attribute, modifier| {
+                    // `removeModifier` then `addTransientModifier`.
+                    if self.modify_supplied_attribute(attribute, |instance| {
+                        instance.remove_modifier(&modifier.id);
+                        instance.add_or_replace_modifier(modifier);
+                        true
+                    }) {
+                        push_unique_attribute(touched, attribute);
+                    }
+                });
+                EnchantmentHelper::run_location_changed_effects_in_slot(
+                    caller, self, current, slot,
+                );
+            }
+        }
+        changed
+    }
+
+    /// Vanilla `handleHandSwap`: hands that only traded places play the swap animation
+    /// instead of sending both stacks.
+    fn handle_hand_swap(&self, changed: &mut Vec<(EquipmentSlot, ItemStack)>) {
+        let stack_in = |changed: &[(EquipmentSlot, ItemStack)], slot: &EquipmentSlot| {
+            changed
+                .iter()
+                .find(|(changed_slot, _)| changed_slot == slot)
+                .map(|(_, stack)| stack.clone())
+        };
+        let (Some(main_hand), Some(off_hand)) = (
+            stack_in(changed, &EquipmentSlot::MAIN_HAND),
+            stack_in(changed, &EquipmentSlot::OFF_HAND),
+        ) else {
+            return;
+        };
+        let main_index = EquipmentSlot::MAIN_HAND.discriminant() as usize;
+        let off_index = EquipmentSlot::OFF_HAND.discriminant() as usize;
+        let mut last = self
+            .last_equipment_items
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if !ItemStack::matches(&main_hand, &last[off_index])
+            || !ItemStack::matches(&off_hand, &last[main_index])
+        {
             return;
         }
-        self.apply_and_send_equipment_attribute_modifiers(equipment);
+        self.entity.world.load().send_to_tracking_players(
+            &self.entity,
+            &CEntityStatus::new(self.entity.entity_id, EntityStatus::SwapHands as i8),
+        );
+        changed.retain(|(slot, _)| {
+            *slot != EquipmentSlot::MAIN_HAND && *slot != EquipmentSlot::OFF_HAND
+        });
+        last[main_index] = main_hand;
+        last[off_index] = off_hand;
+    }
 
-        let equipment_java: Vec<(i8, ItemStackSerializer)> = equipment
+    /// Vanilla `handleEquipmentChanges`: remembers the new stacks and sends them.
+    fn handle_equipment_changes(&self, changed: &[(EquipmentSlot, ItemStack)]) {
+        {
+            let mut last = self
+                .last_equipment_items
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            for (slot, stack) in changed {
+                last[slot.discriminant() as usize] = stack.clone();
+            }
+        }
+        self.update_players_with_new_equipment(changed);
+    }
+
+    /// Vanilla `updatePlayersWithNewEquipment`, with Bedrock's per-hand `MobEquipment`.
+    fn update_players_with_new_equipment(&self, items: &[(EquipmentSlot, ItemStack)]) {
+        let world = self.entity.world.load();
+        let equipment_java: Vec<(i8, ItemStackSerializer)> = items
             .iter()
             .map(|(slot, stack)| {
                 (
@@ -449,204 +575,79 @@ impl LivingEntity {
                 )
             })
             .collect();
-        let je_packet = CSetEquipment::new(self.entity_id().into(), equipment_java);
-
-        let mut sent_editioned = false;
-        for (slot, stack) in equipment {
-            if *slot == EquipmentSlot::MAIN_HAND {
-                self.update_weapon_attributes(stack);
-            }
-            if *slot == EquipmentSlot::MAIN_HAND || *slot == EquipmentSlot::OFF_HAND {
-                let window_id = if *slot == EquipmentSlot::OFF_HAND {
-                    120
-                } else {
-                    0
-                };
-
-                let be_packet = pumpkin_protocol::bedrock::client::CMobEquipment {
+        world.send_to_tracking_players(
+            &self.entity,
+            &CSetEquipment::new(self.entity_id().into(), equipment_java),
+        );
+        for (slot, stack) in items {
+            let container_id = match slot {
+                EquipmentSlot::MainHand(_) => 0,
+                EquipmentSlot::OffHand(_) => 120,
+                _ => continue,
+            };
+            world.send_to_tracking_players_bedrock(
+                &self.entity,
+                &pumpkin_protocol::bedrock::client::CMobEquipment {
                     target_runtime_id: (self.entity_id() as u64).into(),
                     item: pumpkin_protocol::bedrock::network_item::NetworkItemStackDescriptor::from(
                         stack,
                     ),
                     slot: 0,
                     selected_slot: 0,
-                    container_id: window_id,
-                };
-                self.entity.world.load().send_to_tracking_players_editioned(
-                    &self.entity,
-                    &je_packet,
-                    &be_packet,
-                );
-                sent_editioned = true;
-            }
-        }
-
-        if !sent_editioned {
-            self.entity
-                .world
-                .load()
-                .send_to_tracking_players(&self.entity, &je_packet);
+                    container_id,
+                },
+            );
         }
     }
 
-    /// Applies the held item's attack attribute modifiers to this entity's
-    /// attribute map and sends the changed attributes to clients. Without this
-    /// the client never sees the reduced attack speed and does not show the
-    /// crosshair attack indicator.
-    fn update_weapon_attributes(&self, stack: &ItemStack) {
-        let component = stack.get_data_component::<AttributeModifiersImpl>();
-
-        // Single pass over the item's modifiers, split by attribute.
-        let mut speed_modifiers: Vec<Modifier> = Vec::new();
-        let mut damage_modifiers: Vec<Modifier> = Vec::new();
-        for modifier in component
-            .into_iter()
-            .flat_map(|c| c.attribute_modifiers.iter())
-        {
-            let target = if modifier.r#type == &Attributes::ATTACK_SPEED {
-                &mut speed_modifiers
-            } else if modifier.r#type == &Attributes::ATTACK_DAMAGE {
-                &mut damage_modifiers
-            } else {
-                continue;
-            };
-            target.push(Modifier {
-                id: modifier.id.to_string(),
-                amount: modifier.amount,
-                operation: ModifierOperation::from_operation(modifier.operation),
-            });
-        }
-
-        let mut changed: Vec<Attributes> = Vec::new();
-        {
-            let mut attributes = self
-                .attributes
-                .write()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            for (attribute, modifiers) in [
-                (Attributes::ATTACK_SPEED, speed_modifiers),
-                (Attributes::ATTACK_DAMAGE, damage_modifiers),
-            ] {
-                // Vanilla only removes modifiers from an instance that exists, and makes one to
-                // add them to.
-                if modifiers.is_empty() && !attributes.contains_key(&attribute.id) {
-                    continue;
-                }
-                let instance = attributes.entry(attribute.id).or_insert_with(|| {
-                    AttributeInstance::new(
-                        self.supplier_base_value(&attribute)
-                            .unwrap_or(attribute.default_value),
-                    )
-                });
-                if instance.modifiers == modifiers {
-                    continue;
-                }
-                instance.modifiers = modifiers;
-                instance.dirty.store(true, Ordering::Relaxed);
-                changed.push(attribute);
-            }
-        }
-        if !changed.is_empty() {
-            crate::entity::attributes::send_attribute_updates_for_living(self, changed);
-        }
-    }
-
-    /// Applies item `attribute_modifiers` for the given slots and notifies clients.
-    ///
-    /// The local HUD armor bar is driven by `minecraft:armor` / `minecraft:armor_toughness`
-    /// on `UPDATE_ATTRIBUTES`, not by `SET_EQUIPMENT`.
-    pub fn apply_and_send_equipment_attribute_modifiers(
+    /// Vanilla `stopLocationBasedEffects(ItemStack, EquipmentSlot, AttributeMap)`: the stack
+    /// leaving `slot` takes its modifiers and location effects with it.
+    fn stop_location_based_effects(
         &self,
-        equipment: &[(EquipmentSlot, ItemStack)],
-    ) {
-        let mut touched = Vec::new();
-        for (slot, stack) in equipment {
-            self.apply_equipment_slot_attribute_modifiers(slot, stack, &mut touched);
-        }
-        if !touched.is_empty() {
-            crate::entity::attributes::send_attribute_updates_for_living(self, touched);
-        }
-    }
-
-    /// Re-applies modifiers from every currently equipped stack without notifying clients.
-    pub fn apply_current_equipment_attribute_modifiers(&self) {
-        let equipment = self.snapshot_equipped_stacks();
-        let mut touched = Vec::new();
-        for (slot, stack) in &equipment {
-            self.apply_equipment_slot_attribute_modifiers(slot, stack, &mut touched);
-        }
-    }
-
-    /// Re-applies modifiers from every currently equipped stack and sends updates.
-    pub fn send_current_equipment_attribute_modifiers(&self) {
-        self.apply_and_send_equipment_attribute_modifiers(&self.snapshot_equipped_stacks());
-    }
-
-    fn snapshot_equipped_stacks(&self) -> Vec<(EquipmentSlot, ItemStack)> {
-        let guard = self
-            .entity_equipment
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        guard
-            .equipment
-            .iter()
-            .map(|(slot, stack)| (slot.clone(), stack.clone()))
-            .collect()
-    }
-
-    fn apply_equipment_slot_attribute_modifiers(
-        &self,
+        previous: &ItemStack,
         slot: &EquipmentSlot,
-        stack: &ItemStack,
         touched: &mut Vec<Attributes>,
     ) {
-        // Vanilla `collectEquipmentChanges`: the previous stack's location effects stop.
-        crate::enchantment::EnchantmentHelper::stop_location_based_effects_in_slot(self, slot);
-        let previous = {
-            let mut map = self
-                .equipment_attribute_modifier_ids
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            map.remove(slot).unwrap_or_default()
-        };
-        for (attr_id, modifier_id) in previous {
-            if let Some(attr) = attributes_by_id(attr_id) {
-                self.update_attribute(attr, |inst| inst.remove_modifier(&modifier_id));
-                push_unique_attribute(touched, attr);
+        for_each_item_modifier(previous, slot, |attribute, modifier| {
+            if self.modify_supplied_attribute(attribute, |instance| {
+                let present = instance.get_modifier(&modifier.id).is_some();
+                instance.remove_modifier(&modifier.id);
+                present
+            }) {
+                push_unique_attribute(touched, attribute);
             }
-        }
+        });
+        EnchantmentHelper::stop_location_based_effects_in_slot(previous, self, slot);
+    }
 
-        if stack.is_empty() {
-            return;
-        }
-        let Some(modifiers) = stack.get_data_component::<AttributeModifiersImpl>() else {
-            return;
-        };
-
-        let mut applied = Vec::new();
-        for item_mod in modifiers.attribute_modifiers.iter() {
-            if !attribute_modifier_slot_matches(&item_mod.slot, slot) {
-                continue;
+    /// Vanilla `AttributeMap.getInstance` followed by a change to the instance: nothing when
+    /// the entity type has no such attribute. `f` says whether it changed anything (vanilla
+    /// `setDirty`); the result is whether it did.
+    pub fn modify_supplied_attribute(
+        &self,
+        attribute: &Attributes,
+        f: impl FnOnce(&mut AttributeInstance) -> bool,
+    ) -> bool {
+        let mut map = self
+            .attributes
+            .write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let instance = match map.entry(attribute.id) {
+            std::collections::hash_map::Entry::Occupied(entry) => entry.into_mut(),
+            std::collections::hash_map::Entry::Vacant(entry) => {
+                let Some(base) = self.supplier_base_value(attribute) else {
+                    return false;
+                };
+                entry.insert(AttributeInstance::new(base))
             }
-            let operation = ModifierOperation::from_operation(item_mod.operation);
-            self.update_attribute(item_mod.r#type, |inst| {
-                inst.add_or_replace_modifier(Modifier {
-                    id: item_mod.id.to_string(),
-                    amount: item_mod.amount,
-                    operation,
-                });
-            });
-            applied.push((item_mod.r#type.id, item_mod.id.to_string()));
-            push_unique_attribute(touched, item_mod.r#type);
+        };
+        if !f(instance) {
+            return false;
         }
-
-        if !applied.is_empty() {
-            let mut map = self
-                .equipment_attribute_modifier_ids
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            map.insert(slot.clone(), applied);
-        }
+        instance.dirty.store(true, Ordering::Relaxed);
+        drop(map);
+        self.mark_attribute_updated(attribute);
+        true
     }
 
     /// Picks up an Item entity or XP Orb
@@ -3231,34 +3232,37 @@ impl LivingEntity {
             player.damage_item_in_slot(slot, amount);
             return;
         }
-        let (result, stack) = {
+        let (result, broken) = {
             let mut equipment = self
                 .entity_equipment
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             let mut stack = equipment.get(slot);
+            let broken = stack.clone();
             let result = stack.hurt_and_break(&self.entity.world.load(), amount);
             if result != DamageResult::Untouched {
-                equipment.put(slot, stack.clone());
+                equipment.put(slot, stack);
             }
-            (result, stack)
+            (result, broken)
         };
-        if result == DamageResult::Untouched {
-            return;
-        }
-        self.send_equipment_changes(&[(slot.clone(), stack)]);
         if result == DamageResult::Broken {
-            self.on_equipped_item_broken(slot);
+            self.on_equipped_item_broken(&broken, slot);
         }
     }
 
     /// Vanilla `LivingEntity.onEquippedItemBroken`.
-    pub fn on_equipped_item_broken(&self, slot: &EquipmentSlot) {
+    pub fn on_equipped_item_broken(&self, broken: &ItemStack, slot: &EquipmentSlot) {
         self.entity.world.load().send_entity_status(
             &self.entity,
             super::equipment_break_status(slot),
             None,
         );
+        let mut touched = Vec::new();
+        self.stop_location_based_effects(broken, slot, &mut touched);
+        // Synced with the dirty attributes, like `detect_equipment_updates`.
+        if !touched.is_empty() {
+            crate::entity::attributes::send_attribute_updates_for_living(self, touched);
+        }
     }
 
     /// Vanilla `LivingEntity.getItemBySlot`; a player's main hand is its selected hotbar slot.
@@ -4583,8 +4587,7 @@ impl LivingEntity {
             self.entity_equipment
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .put(&slot, stack.clone());
-            self.send_equipment_changes(&[(slot, stack)]);
+                .put(&slot, stack);
         }
     }
 
@@ -4857,6 +4860,7 @@ impl EntityBase for LivingEntity {
         // Vanilla `LivingEntity.tick`.
         self.updating_using_item(caller, server);
         self.tick_arrows_and_stingers();
+        self.detect_equipment_updates(caller);
         if self.entity.tick_count.load(Relaxed) % 20 == 0 {
             self.recheck_combat_status();
         }
@@ -5824,6 +5828,153 @@ pub(crate) const fn bypasses_armor_durability(damage_type: &DamageType) -> bool 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── equipment detection ───────────────────────────────────────────
+
+    fn test_world() -> Arc<crate::world::World> {
+        let folder = tempfile::tempdir().unwrap().keep();
+        let level = pumpkin_world::dimension::into_level(
+            pumpkin_data::dimension::Dimension::OVERWORLD,
+            &pumpkin_config::world::LevelConfig::default(),
+            folder,
+            0,
+        );
+        let level_info = Arc::new(arc_swap::ArcSwap::from_pointee(
+            pumpkin_world::world_info::LevelData::default(pumpkin_util::world_seed::Seed(0)),
+        ));
+        Arc::new(crate::world::World::load(
+            level,
+            level_info,
+            pumpkin_data::dimension::Dimension::OVERWORLD,
+            crate::block::registry::default_registry(),
+            std::sync::Weak::new(),
+        ))
+    }
+
+    fn spawn(
+        world: &Arc<crate::world::World>,
+        entity_type: &'static EntityType,
+    ) -> Arc<dyn EntityBase> {
+        crate::entity::r#type::from_type(
+            entity_type,
+            Vector3::new(0.0, 100.0, 0.0),
+            world,
+            uuid::Uuid::new_v4(),
+        )
+    }
+
+    fn put(entity: &dyn EntityBase, slot: &EquipmentSlot, stack: ItemStack) {
+        entity
+            .get_living_entity()
+            .unwrap()
+            .entity_equipment
+            .lock()
+            .unwrap()
+            .put(slot, stack);
+    }
+
+    fn last(living: &LivingEntity) -> [ItemStack; 8] {
+        living.last_equipment_items.lock().unwrap().clone()
+    }
+
+    fn changes(entity: &dyn EntityBase) -> Option<Vec<(EquipmentSlot, ItemStack)>> {
+        let living = entity.get_living_entity().unwrap();
+        living.collect_equipment_changes(entity, &last(living), &mut Vec::new())
+    }
+
+    #[tokio::test]
+    async fn equipment_takes_effect_at_the_next_detection_only() {
+        let world = test_world();
+        let zombie = spawn(&world, &EntityType::ZOMBIE);
+        let living = zombie.get_living_entity().unwrap();
+        let head = EquipmentSlot::HEAD.discriminant() as usize;
+        let armor = living.get_attribute_value(&Attributes::ARMOR);
+
+        put(
+            zombie.as_ref(),
+            &EquipmentSlot::HEAD,
+            ItemStack::new(1, &Item::IRON_HELMET),
+        );
+        assert!(last(living)[head].is_empty());
+        assert_eq!(living.get_attribute_value(&Attributes::ARMOR), armor);
+
+        living.detect_equipment_updates(zombie.as_ref());
+        assert_eq!(last(living)[head].item, &Item::IRON_HELMET);
+        assert_eq!(living.get_attribute_value(&Attributes::ARMOR), armor + 2.0);
+        assert!(changes(zombie.as_ref()).is_none());
+
+        put(
+            zombie.as_ref(),
+            &EquipmentSlot::HEAD,
+            ItemStack::EMPTY.clone(),
+        );
+        living.detect_equipment_updates(zombie.as_ref());
+        assert_eq!(living.get_attribute_value(&Attributes::ARMOR), armor);
+    }
+
+    #[tokio::test]
+    async fn swapped_hands_leave_no_change_to_send() {
+        let world = test_world();
+        let zombie = spawn(&world, &EntityType::ZOMBIE);
+        let living = zombie.get_living_entity().unwrap();
+        let sword = ItemStack::new(1, &Item::IRON_SWORD);
+        let shield = ItemStack::new(1, &Item::SHIELD);
+        put(zombie.as_ref(), &EquipmentSlot::MAIN_HAND, sword.clone());
+        put(zombie.as_ref(), &EquipmentSlot::OFF_HAND, shield.clone());
+        living.detect_equipment_updates(zombie.as_ref());
+
+        put(zombie.as_ref(), &EquipmentSlot::MAIN_HAND, shield.clone());
+        put(zombie.as_ref(), &EquipmentSlot::OFF_HAND, sword.clone());
+        let mut changed = changes(zombie.as_ref()).unwrap();
+        assert_eq!(changed.len(), 2);
+        living.handle_hand_swap(&mut changed);
+        assert!(changed.is_empty());
+        let last = last(living);
+        assert!(ItemStack::matches(
+            &last[EquipmentSlot::MAIN_HAND.discriminant() as usize],
+            &shield
+        ));
+        assert!(ItemStack::matches(
+            &last[EquipmentSlot::OFF_HAND.discriminant() as usize],
+            &sword
+        ));
+    }
+
+    #[tokio::test]
+    async fn allay_ignores_a_count_change() {
+        let world = test_world();
+        let allay = spawn(&world, &EntityType::ALLAY);
+        let living = allay.get_living_entity().unwrap();
+        put(
+            allay.as_ref(),
+            &EquipmentSlot::MAIN_HAND,
+            ItemStack::new(1, &Item::DIAMOND),
+        );
+        living.detect_equipment_updates(allay.as_ref());
+
+        put(
+            allay.as_ref(),
+            &EquipmentSlot::MAIN_HAND,
+            ItemStack::new(2, &Item::DIAMOND),
+        );
+        assert!(changes(allay.as_ref()).is_none());
+        let zombie = spawn(&world, &EntityType::ZOMBIE);
+        put(
+            zombie.as_ref(),
+            &EquipmentSlot::MAIN_HAND,
+            ItemStack::new(1, &Item::DIAMOND),
+        );
+        zombie
+            .get_living_entity()
+            .unwrap()
+            .detect_equipment_updates(zombie.as_ref());
+        put(
+            zombie.as_ref(),
+            &EquipmentSlot::MAIN_HAND,
+            ItemStack::new(2, &Item::DIAMOND),
+        );
+        assert!(changes(zombie.as_ref()).is_some());
+    }
 
     // ── bypasses_armor_durability ─────────────────────────────────────
 

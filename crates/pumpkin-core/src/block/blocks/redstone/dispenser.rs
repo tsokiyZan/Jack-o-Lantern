@@ -1317,9 +1317,8 @@ impl DispenserBlock {
                 .entity_equipment
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .put(slot, stack.clone());
+                .put(slot, stack);
 
-            living.send_equipment_changes(&[(slot.clone(), stack)]);
             ctx.world.play_sound_event(
                 &equip_sound,
                 SoundCategory::Blocks,

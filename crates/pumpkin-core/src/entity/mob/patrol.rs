@@ -103,9 +103,7 @@ pub trait PatrollingMonster: Mob {
             let banner = create_ominous_banner();
             let living = &self.get_mob_entity().living_entity;
             if let Ok(mut equipment) = living.entity_equipment.try_lock() {
-                equipment.put(&EquipmentSlot::HEAD, banner.clone());
-                drop(equipment);
-                living.send_equipment_changes(&[(EquipmentSlot::HEAD, banner)]);
+                equipment.put(&EquipmentSlot::HEAD, banner);
             }
         }
 

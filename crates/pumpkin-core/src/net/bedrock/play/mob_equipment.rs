@@ -25,10 +25,6 @@ impl BedrockClient {
             return;
         }
 
-        let inv = player.inventory();
-        inv.set_selected_slot(slot);
-        let stack = inv.held_item();
-        let equipment = &[(EquipmentSlot::MAIN_HAND, stack)];
-        player.living_entity.send_equipment_changes(equipment);
+        player.inventory().set_selected_slot(slot);
     }
 }

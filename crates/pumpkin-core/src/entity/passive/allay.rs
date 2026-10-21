@@ -492,6 +492,11 @@ impl Mob for AllayEntity {
         allay_ai::ALLAY_PROVIDER.make_brain(self, packed)
     }
 
+    /// Vanilla `Allay.equipmentHasChanged`.
+    fn equipment_has_changed(&self, previous: &ItemStack, current: &ItemStack) -> bool {
+        !Self::allay_considers_item_equal(previous, current)
+    }
+
     /// The rest of vanilla `Allay.customServerAiStep`: the activity update.
     fn after_brain_tick(&self, tick: &mut BrainTick<'_>) {
         allay_ai::update_activity(tick);
