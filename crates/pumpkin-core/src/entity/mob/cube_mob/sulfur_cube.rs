@@ -36,7 +36,7 @@ use crate::entity::ageable::AgeableMob;
 use crate::entity::ai::goal::goal_selector::GoalSelector;
 use crate::entity::ai::goal::tempt::{TemptGoal, TemptNavigation};
 use crate::entity::ai::goal::{Controls, Goal};
-use crate::entity::attributes::{Modifier, ModifierOperation};
+use crate::entity::attributes::{Modifier, ModifierOperation, send_attribute_updates_for_living};
 use crate::entity::bucketable;
 use crate::entity::item::ItemEntity;
 use crate::entity::mob::Mob;
@@ -512,11 +512,13 @@ impl CubeMobEntity {
         if !swallowed.is_empty() {
             let mut last: [ItemStack; 8] = std::array::from_fn(|_| ItemStack::EMPTY.clone());
             last[EquipmentSlot::BODY.discriminant() as usize] = swallowed;
-            // Vanilla ignores the result, and the attributes sync with the next tick's
-            // `detect_equipment_updates`, which sees the same body change.
-            self.mob_entity
-                .living_entity
-                .collect_equipment_changes(self, &last, &mut Vec::new());
+            // Vanilla ignores the result; the attributes it touched sync as dirty ones.
+            let living = &self.mob_entity.living_entity;
+            let mut touched = Vec::new();
+            living.collect_equipment_changes(self, &last, &mut touched);
+            if !touched.is_empty() {
+                send_attribute_updates_for_living(living, touched);
+            }
         }
         self.play_sound(Sound::EntitySulfurCubeAbsorb, 1.0, 1.0);
         true

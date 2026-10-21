@@ -1429,23 +1429,10 @@ impl Player {
             damage_multiplier = attack_cooldown_progress.powi(2) * 0.8 + 0.2;
         }
 
-        // Modify the added damage based on the multiplier.
+        // Vanilla `baseDamage *= baseDamageScaleFactor()` and `magicBoost`. Strength and
+        // Weakness are already in `ATTACK_DAMAGE` through their attribute modifiers.
         let mut damage = base_damage * damage_multiplier;
-        damage += extra_ench_damage * attack_cooldown_progress;
-
-        if let Some(strength) = self
-            .living_entity
-            .get_effect(&pumpkin_data::effect::StatusEffect::STRENGTH)
-        {
-            damage += 3.0 * (f64::from(strength.amplifier) + 1.0);
-        }
-        if let Some(weakness) = self
-            .living_entity
-            .get_effect(&pumpkin_data::effect::StatusEffect::WEAKNESS)
-        {
-            damage -= 4.0 * (f64::from(weakness.amplifier) + 1.0);
-        }
-        damage = damage.max(0.0);
+        let magic_boost = extra_ench_damage * attack_cooldown_progress;
 
         let pos = victim_entity.pos.load();
         let attack_type = AttackType::new(self, attack_cooldown_progress as f32);
@@ -1461,16 +1448,18 @@ impl Player {
             ));
         }
 
+        // The critical hit multiplies `baseDamage` only, not `magicBoost`.
         if matches!(attack_type, AttackType::Critical) {
             damage *= 1.5;
         }
+        let total_damage = (damage + magic_boost).max(0.0);
 
         let old_living_entity_health = victim
             .get_living_entity()
             .map_or(0.0, |living| living.health.load());
         if !victim.damage_with_context(
             victim.as_ref(),
-            damage as f32,
+            total_damage as f32,
             damage_source.damage_type,
             None,
             damage_source.direct,
@@ -1484,7 +1473,7 @@ impl Player {
             return;
         }
 
-        if is_mace_smash && damage >= 100.0 {
+        if is_mace_smash && total_damage >= 100.0 {
             self.trigger_advancement(crate::entity::player::advancement::trigger::AdvancementTrigger::DealtOverkillDamage);
         }
 
@@ -1505,7 +1494,7 @@ impl Player {
                     attacker_entity,
                     victim.as_ref(),
                     knockback_strength,
-                    damage as f32,
+                    total_damage as f32,
                     true,
                 );
             }
@@ -1783,12 +1772,13 @@ impl Player {
                     );
                     server.plugin_manager.fire_blocking(&server, &mut event);
                 }
+                // `ServerPlayer.onEquippedItemBroken`: `super` first, then the stat.
+                self.living_entity.on_equipped_item_broken(&original, slot);
                 self.increment_stat(
                     statistics::StatisticCategory::Broken,
                     original_item.id as i32,
                     1,
                 );
-                self.living_entity.on_equipped_item_broken(&original, slot);
             }
 
             self.try_send_slot_set_packet(&CSetPlayerInventory::new(
@@ -4942,13 +4932,10 @@ impl Player {
     pub async fn respawn(self: &Arc<Self>) {
         // Vanilla `PlayerList.respawn` removes the dead player with `RemovalReason.KILLED`.
         self.living_entity.trigger_on_death_mob_effects();
+        // Vanilla makes a fresh `ServerPlayer` with an empty `lastEquipmentItems`, so the next
+        // tick sends the equipment and its attribute modifiers again.
+        self.living_entity.clear_last_equipment_items();
         self.world().respawn_player(self, false).await;
-        // The client rebuilt its attribute state on respawn, so send the held
-        // weapon modifiers again.
-        crate::entity::attributes::send_attribute_updates_for_living(
-            &self.living_entity,
-            vec![Attributes::ATTACK_SPEED, Attributes::ATTACK_DAMAGE],
-        );
     }
 
     pub fn ban(&self, server: &Server, reason: Option<TextComponent>) {

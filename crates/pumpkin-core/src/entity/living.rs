@@ -459,6 +459,16 @@ impl LivingEntity {
         }
     }
 
+    /// Forgets the equipment the last `detect_equipment_updates` saw, like the empty
+    /// `lastEquipmentItems` of a new entity.
+    pub fn clear_last_equipment_items(&self) {
+        *self
+            .last_equipment_items
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) =
+            std::array::from_fn(|_| ItemStack::EMPTY.clone());
+    }
+
     /// Vanilla `collectEquipmentChanges`: the slots whose stack differs from `last`, in
     /// `EquipmentSlot::VALUES` order. The previous stacks' modifiers and location effects stop
     /// and the new stacks' start; the attributes this changes are added to `touched`.
@@ -538,6 +548,9 @@ impl LivingEntity {
         {
             return;
         }
+        last[main_index] = main_hand;
+        last[off_index] = off_hand;
+        drop(last);
         self.entity.world.load().send_to_tracking_players(
             &self.entity,
             &CEntityStatus::new(self.entity.entity_id, EntityStatus::SwapHands as i8),
@@ -545,8 +558,6 @@ impl LivingEntity {
         changed.retain(|(slot, _)| {
             *slot != EquipmentSlot::MAIN_HAND && *slot != EquipmentSlot::OFF_HAND
         });
-        last[main_index] = main_hand;
-        last[off_index] = off_hand;
     }
 
     /// Vanilla `handleEquipmentChanges`: remembers the new stacks and sends them.
@@ -5831,24 +5842,26 @@ mod tests {
 
     // ── equipment detection ───────────────────────────────────────────
 
-    fn test_world() -> Arc<crate::world::World> {
-        let folder = tempfile::tempdir().unwrap().keep();
+    /// The world, and the folder it lives in, removed when the `TempDir` drops.
+    fn test_world() -> (tempfile::TempDir, Arc<crate::world::World>) {
+        let folder = tempfile::tempdir().unwrap();
         let level = pumpkin_world::dimension::into_level(
             pumpkin_data::dimension::Dimension::OVERWORLD,
             &pumpkin_config::world::LevelConfig::default(),
-            folder,
+            folder.path().to_path_buf(),
             0,
         );
         let level_info = Arc::new(arc_swap::ArcSwap::from_pointee(
             pumpkin_world::world_info::LevelData::default(pumpkin_util::world_seed::Seed(0)),
         ));
-        Arc::new(crate::world::World::load(
+        let world = Arc::new(crate::world::World::load(
             level,
             level_info,
             pumpkin_data::dimension::Dimension::OVERWORLD,
             crate::block::registry::default_registry(),
             std::sync::Weak::new(),
-        ))
+        ));
+        (folder, world)
     }
 
     fn spawn(
@@ -5884,7 +5897,7 @@ mod tests {
 
     #[tokio::test]
     async fn equipment_takes_effect_at_the_next_detection_only() {
-        let world = test_world();
+        let (_folder, world) = test_world();
         let zombie = spawn(&world, &EntityType::ZOMBIE);
         let living = zombie.get_living_entity().unwrap();
         let head = EquipmentSlot::HEAD.discriminant() as usize;
@@ -5914,7 +5927,7 @@ mod tests {
 
     #[tokio::test]
     async fn swapped_hands_leave_no_change_to_send() {
-        let world = test_world();
+        let (_folder, world) = test_world();
         let zombie = spawn(&world, &EntityType::ZOMBIE);
         let living = zombie.get_living_entity().unwrap();
         let sword = ItemStack::new(1, &Item::IRON_SWORD);
@@ -5942,7 +5955,7 @@ mod tests {
 
     #[tokio::test]
     async fn allay_ignores_a_count_change() {
-        let world = test_world();
+        let (_folder, world) = test_world();
         let allay = spawn(&world, &EntityType::ALLAY);
         let living = allay.get_living_entity().unwrap();
         put(
