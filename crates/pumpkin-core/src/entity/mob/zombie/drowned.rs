@@ -1,6 +1,7 @@
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::Sound;
+use pumpkin_data::tag::Taggable;
 use pumpkin_util::Hand;
 use pumpkin_util::math::boundingbox::EntityDimensions;
 use pumpkin_util::math::position::BlockPos;
@@ -23,7 +24,7 @@ use crate::entity::ai::pathfinder::{AmphibiousPathNavigation, Navigator, Navigat
 use crate::entity::ai::util::default_random_pos;
 use crate::entity::living::LivingEntity;
 use crate::entity::mob::equipment::RegionalDifficulty;
-use crate::entity::mob::spawn::SpawnGroupData;
+use crate::entity::mob::spawn::{EntitySpawnReason, SpawnGroupData};
 use crate::entity::mob::zombie::{
     ZombieEntityBase, baby_turtle_on_land_target, is_abstract_villager,
 };
@@ -200,6 +201,9 @@ fn ok_target(target: &LivingEntity, world: &World) -> bool {
 /// Vanilla `Drowned.NAUTILUS_SHELL_CHANCE`.
 const NAUTILUS_SHELL_CHANCE: f32 = 0.03;
 
+/// Vanilla `Drowned.ZOMBIE_NAUTILUS_JOCKEY_CHANCE`.
+const ZOMBIE_NAUTILUS_JOCKEY_CHANCE: f32 = 0.5;
+
 /// Vanilla `Drowned.BABY_DIMENSIONS`.
 const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::DROWNED_BABY_DIMENSIONS;
 
@@ -215,7 +219,7 @@ impl Mob for DrownedEntity {
     fn finalize_spawn(
         &self,
         world: &Arc<World>,
-        _reason: crate::entity::mob::spawn::EntitySpawnReason,
+        reason: EntitySpawnReason,
         group_data: Option<SpawnGroupData>,
     ) -> Option<SpawnGroupData> {
         let group_data = self
@@ -239,8 +243,46 @@ impl Mob for DrownedEntity {
             );
             mob_entity.set_guaranteed_drop(&EquipmentSlot::OFF_HAND);
         }
-        // TODO: the zombie nautilus jockey needs `ZombieNautilus` and the `NATURAL` and
-        // `STRUCTURE` spawn reasons.
+        let entity = self.get_entity();
+        if matches!(
+            reason,
+            EntitySpawnReason::Natural | EntitySpawnReason::Structure
+        ) && mob_entity.get_item_slot(&EquipmentSlot::MAIN_HAND).item.id == Item::TRIDENT.id
+            && world
+                .random
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .next_f32()
+                < ZOMBIE_NAUTILUS_JOCKEY_CHANCE
+            && !entity.is_baby()
+            && !world
+                .get_zoomed_biome(&entity.block_pos.load())
+                .has_tag(&pumpkin_data::tag::WorldgenBiome::MINECRAFT_MORE_FREQUENT_DROWNED_SPAWNS)
+        {
+            let nautilus = crate::entity::r#type::from_type(
+                &EntityType::ZOMBIE_NAUTILUS,
+                entity.pos.load(),
+                world,
+                uuid::Uuid::new_v4(),
+            );
+            if reason == EntitySpawnReason::Structure
+                && let Some(nautilus_mob) = nautilus.get_mob()
+            {
+                nautilus_mob
+                    .get_mob_entity()
+                    .persistence_required
+                    .store(true, Ordering::Relaxed);
+            }
+            nautilus.get_entity().set_rotation(entity.yaw.load(), 0.0);
+            crate::entity::mob::spawn::finalize_spawn(
+                &nautilus,
+                world,
+                EntitySpawnReason::Jockey,
+                None,
+            );
+            mob_entity.set_pending_vehicle(nautilus.clone());
+            world.spawn_entity(nautilus);
+        }
         group_data
     }
 
