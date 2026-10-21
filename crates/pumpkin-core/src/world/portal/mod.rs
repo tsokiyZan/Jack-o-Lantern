@@ -326,11 +326,13 @@ impl PortalProcessor {
         if self.inside_portal_this_tick {
             self.inside_portal_this_tick = false;
             if allowed_to_teleport {
+                // `portalTime++ >= transitionTime`: the time from before this tick counts.
+                let portal_time = self.portal_time;
                 self.portal_time += 1;
                 let transition_time = self
                     .portal_type
                     .get_portal_transition_time(current_world, entity);
-                self.portal_time >= transition_time
+                portal_time >= transition_time
             } else {
                 false
             }

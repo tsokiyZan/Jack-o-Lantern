@@ -45,8 +45,8 @@ use pumpkin_protocol::{
     codec::var_int::VarInt,
     codec::var_ulong::VarULong,
     java::client::play::{
-        CEntityPositionSync, CEntityVelocity, CPlayerPosition, CSetEntityMetadata, CSetPassengers,
-        CSpawnEntity, Metadata, MetadataSerializer,
+        CEntityVelocity, CPlayerPosition, CSetEntityMetadata, CSetPassengers, CSpawnEntity,
+        CTeleportEntity, Metadata, MetadataSerializer,
     },
 };
 use pumpkin_util::math::vector3::Axis;
@@ -327,7 +327,23 @@ pub trait EntityBase: Send + Sync + std::any::Any {
         pitch: Option<f32>,
         world: Arc<World>,
     ) {
-        self.get_entity().teleport(position, yaw, pitch, &world);
+        // Vanilla `Entity.teleport(TeleportTransition)`, which needs the shared entity.
+        let entity = self.get_entity();
+        if let Some(this) = entity.world.load().get_entity_by_id(entity.entity_id) {
+            teleport_transition(
+                &this,
+                &TeleportTarget {
+                    world,
+                    position,
+                    yaw,
+                    pitch,
+                    keep_velocity: false,
+                    as_passenger: false,
+                },
+            );
+        } else {
+            entity.teleport(position, yaw, pitch, &world);
+        }
     }
 
     fn is_pushed_by_fluids(&self) -> bool {
@@ -2043,8 +2059,13 @@ impl Entity {
         self.head_yaw.store(yaw);
     }
 
-    fn default_portal_cooldown(&self) -> u32 {
-        if self.entity_type == &EntityType::PLAYER {
+    /// Vanilla `getDimensionChangingDelay`: 10 for a player, and for a vehicle whose first
+    /// passenger is a player; 300 for anything else.
+    fn dimension_changing_delay(&self) -> u32 {
+        let player_first = self
+            .get_first_passenger()
+            .is_some_and(|passenger| passenger.get_player().is_some());
+        if self.entity_type == &EntityType::PLAYER || player_first {
             10
         } else {
             300
@@ -3307,6 +3328,8 @@ impl Entity {
         self.velocity.store(velo);
     }
 
+    /// Vanilla `Entity.handlePortal`. The destination is searched for off the tick, like
+    /// before; the entity then changes place with [`teleport_transition`].
     fn tick_portal(&self, caller: &dyn EntityBase) {
         if self.portal_cooldown.load(Ordering::Relaxed) > 0 {
             self.portal_cooldown.fetch_sub(1, Ordering::Relaxed);
@@ -3316,16 +3339,21 @@ impl Entity {
         };
         let mut should_remove = false;
         if let Some(portal_processor) = manager_guard.as_mut() {
-            if portal_processor.process_portal_teleportation(&self.world.load(), caller, true) {
+            // `canUsePortal(false)`: not a passenger, and alive.
+            let can_use_portal = !self.has_vehicle() && inside_block_effect::is_alive(caller);
+            if portal_processor.process_portal_teleportation(
+                &self.world.load(),
+                caller,
+                can_use_portal,
+            ) {
                 self.portal_cooldown
-                    .store(self.default_portal_cooldown(), Ordering::Relaxed);
+                    .store(self.dimension_changing_delay(), Ordering::Relaxed);
 
                 let world_clone = self.world.load_full();
                 let portal_type = portal_processor.portal_type;
                 let dest_world_opt = portal_processor.destination_world.clone();
                 let src_portal = portal_processor.source_portal.clone();
                 let entity_id = self.entity_id;
-                let yaw = self.yaw.load();
 
                 let rt_handle = world_clone.server.upgrade().map(|s| s.runtime.clone());
                 rayon::spawn(move || {
@@ -3341,22 +3369,27 @@ impl Entity {
                     );
 
                     if let Some(transition) = transition {
-                        let dest_world = transition.new_world.clone();
-                        let yaw_val = transition.yaw;
-                        let pitch = transition.pitch;
-                        let teleport_pos = transition.position;
-
-                        // Teleport the main entity
-                        entity_arc.teleport(teleport_pos, yaw_val, pitch, dest_world.clone());
-
-                        // Teleport all passengers recursively along with the vehicle
-                        let yaw_delta = yaw_val.map(|y| y - yaw);
-                        Self::teleport_passengers_recursive(
-                            entity_arc.get_entity(),
-                            teleport_pos,
-                            yaw_delta,
-                            &dest_world,
-                        );
+                        if entity_arc.get_player().is_some() {
+                            entity_arc.teleport(
+                                transition.position,
+                                transition.yaw,
+                                transition.pitch,
+                                transition.new_world,
+                            );
+                        } else {
+                            // Portals keep the entity's speed (`Relative.DELTA`).
+                            teleport_transition(
+                                &entity_arc,
+                                &TeleportTarget {
+                                    world: transition.new_world,
+                                    position: transition.position,
+                                    yaw: transition.yaw,
+                                    pitch: transition.pitch,
+                                    keep_velocity: true,
+                                    as_passenger: false,
+                                },
+                            );
+                        }
                     }
                 });
             } else if portal_processor.portal_time == 0 {
@@ -3365,43 +3398,6 @@ impl Entity {
         }
         if should_remove {
             *manager_guard = None;
-        }
-    }
-
-    /// Recursively teleports all passengers (and their passengers) to the destination
-    fn teleport_passengers_recursive(
-        entity: &Self,
-        position: Vector3<f64>,
-        yaw_delta: Option<f32>,
-        dest_world: &Arc<World>,
-    ) {
-        let passengers = entity
-            .passengers
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone();
-        for passenger in passengers {
-            let passenger_entity = passenger.get_entity();
-            let passenger_yaw = yaw_delta.map(|delta| passenger_entity.yaw.load() + delta);
-            passenger_entity.portal_cooldown.store(
-                passenger_entity.default_portal_cooldown(),
-                Ordering::Relaxed,
-            );
-
-            // Get nested passengers before teleporting
-            let nested_passengers = passenger_entity
-                .passengers
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .clone();
-
-            passenger.teleport(position, passenger_yaw, None, dest_world.clone());
-
-            // Recursively teleport nested passengers
-            for nested in nested_passengers {
-                let nested_entity = nested.get_entity();
-                Self::teleport_passengers_recursive(nested_entity, position, yaw_delta, dest_world);
-            }
         }
     }
 
@@ -3420,14 +3416,10 @@ impl Entity {
             return;
         }
 
-        // Passengers don't teleport independently - they wait for their vehicle
-        if self.has_vehicle() {
-            return;
-        }
-
+        // Vanilla `setAsInsidePortal`: a portal touched during the cooldown restarts it.
         if self.portal_cooldown.load(Ordering::Relaxed) > 0 {
             self.portal_cooldown
-                .store(self.default_portal_cooldown(), Ordering::Relaxed);
+                .store(self.dimension_changing_delay(), Ordering::Relaxed);
             return;
         }
 
@@ -3476,7 +3468,10 @@ impl Entity {
             }
 
             *manager = Some(new_manager);
-        } else if let Some(manager) = manager.as_mut() {
+        } else if let Some(manager) = manager.as_mut()
+            && !manager.inside_portal_this_tick
+        {
+            // The first portal block touched this tick is the entry.
             manager.entry_position = pos;
             manager.inside_portal_this_tick = true;
             if manager.source_portal.is_none() {
@@ -4463,6 +4458,8 @@ impl Entity {
         self.invulnerable.store(invulnerable, Relaxed);
     }
 
+    /// Vanilla `Entity.teleportTo(x, y, z)`: `snapTo` the position (with a new rotation where
+    /// given), then every rider follows (`teleportPassengers`). The tracker sends the move.
     pub fn teleport(
         &self,
         position: Vector3<f64>,
@@ -4470,39 +4467,138 @@ impl Entity {
         pitch: Option<f32>,
         world: &World,
     ) {
-        // Update server-side position and bounding box
-        self.set_pos(position);
-        if let Some(yaw) = yaw {
+        self.snap_to(position, yaw, pitch);
+        let Some(this) = world.get_entity_by_id(self.entity_id) else {
+            return;
+        };
+        let mut stack = vec![this];
+        while let Some(vehicle) = stack.pop() {
+            let passengers = vehicle
+                .get_entity()
+                .passengers
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .clone();
+            for passenger in passengers {
+                // `positionRider(passenger, Entity::snapTo)`.
+                vehicle.position_rider(vehicle.as_ref(), passenger.as_ref());
+                let passenger_entity = passenger.get_entity();
+                passenger_entity.last_pos.store(passenger_entity.pos.load());
+                stack.push(passenger);
+            }
+        }
+    }
+
+    /// Vanilla `Entity.snapTo`: the position and rotation, as the old position too.
+    pub fn snap_to(&self, position: Vector3<f64>, yaw: Option<f32>, pitch: Option<f32>) {
+        if let Some(yaw) = yaw
+            && yaw.is_finite()
+        {
             self.yaw.store(yaw);
         }
         if let Some(pitch) = pitch {
             self.set_pitch(pitch);
         }
-        // Update cache so we don't send rubberbanding deltas
-        self.last_sent_pos.store(position);
-        // TODO: use `pumpkin_util::math::pack_degrees`.
-        if let Some(yaw) = yaw {
-            self.last_sent_yaw
-                .store((yaw * 256.0 / 360.0).rem_euclid(256.0) as u8, Relaxed);
-            self.last_sent_head_yaw
-                .store((yaw * 256.0 / 360.0).rem_euclid(256.0) as u8, Relaxed);
+        self.set_pos(position);
+        self.last_pos.store(position);
+    }
+
+    /// Vanilla `Entity.teleportSetPosition`: the destination, with no move left to sweep.
+    pub fn teleport_set_position(&self, target: &TeleportTarget) {
+        let yaw = target.yaw.unwrap_or_else(|| self.yaw.load());
+        let pitch = target.pitch.unwrap_or_else(|| self.pitch.load());
+        self.set_pos(target.position);
+        // `setYRot` and `setYHeadRot` ignore a non-finite yaw, `setXRot` wraps and clamps.
+        if yaw.is_finite() {
+            self.yaw.store(yaw);
+            self.head_yaw.store(yaw);
         }
-        if let Some(pitch) = pitch {
-            self.last_sent_pitch
-                .store((pitch * 256.0 / 360.0).rem_euclid(256.0) as u8, Relaxed);
+        self.set_pitch(pitch);
+        self.last_pos.store(target.position);
+        if !target.keep_velocity {
+            self.velocity.store(Vector3::default());
         }
-        let chunk_pos = self.chunk_pos.load();
-        world.broadcast_to_chunk(
-            chunk_pos,
-            &CEntityPositionSync::new(
-                self.entity_id.into(),
-                position,
-                self.velocity.load(),
-                yaw.unwrap_or(self.yaw.load()),
-                pitch.unwrap_or(self.pitch.load()),
-                self.on_ground.load(Ordering::SeqCst),
-            ),
+        self.clear_movement_this_tick();
+    }
+
+    /// Vanilla `Entity.sendTeleportTransitionToPlayers`: the players riding along see the
+    /// teleport, and so does everyone tracking an entity without regular position updates.
+    fn send_teleport_transition_to_players(
+        &self,
+        caller: &dyn EntityBase,
+        world: &World,
+        target: &TeleportTarget,
+    ) {
+        let controller_id = caller
+            .controlling_passenger()
+            .map(|controller| controller.get_entity().entity_id);
+        let mut passengers = Vec::new();
+        self.collect_indirect_passengers(&mut passengers);
+        let on_ground = self.on_ground.load(Ordering::Relaxed);
+        let current = CTeleportEntity::new(
+            self.entity_id.into(),
+            self.pos.load(),
+            self.velocity.load(),
+            self.yaw.load(),
+            self.pitch.load(),
+            &[],
+            on_ground,
         );
+        let mut relatives = Vec::new();
+        if target.keep_velocity {
+            relatives.extend([
+                PositionFlag::DeltaX,
+                PositionFlag::DeltaY,
+                PositionFlag::DeltaZ,
+            ]);
+        }
+        if target.yaw.is_none() {
+            relatives.push(PositionFlag::YRot);
+        }
+        if target.pitch.is_none() {
+            relatives.push(PositionFlag::XRot);
+        }
+        let transition = CTeleportEntity::new(
+            self.entity_id.into(),
+            target.position,
+            Vector3::default(),
+            target.yaw.unwrap_or_default(),
+            target.pitch.unwrap_or_default(),
+            &relatives,
+            on_ground,
+        );
+        for passenger in &passengers {
+            if let Some(player) = passenger.get_player() {
+                if controller_id == Some(player.entity_id()) {
+                    player.try_send_client_packet(&transition);
+                } else {
+                    player.try_send_client_packet(&current);
+                }
+            }
+        }
+        // `!type.hasUpdateInterval()`.
+        if self.entity_type.update_interval == i32::MAX as u32 {
+            let passenger_ids: Vec<i32> = passengers
+                .iter()
+                .map(|passenger| passenger.get_entity().entity_id)
+                .collect();
+            world.send_to_tracking_players_filtered(self, &current, |player| {
+                !passenger_ids.contains(&player.entity_id())
+            });
+        }
+    }
+
+    /// Vanilla `getIndirectPassengersStream`: every passenger, then its own, depth first.
+    fn collect_indirect_passengers(&self, out: &mut Vec<Arc<dyn EntityBase>>) {
+        let passengers = self
+            .passengers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        for passenger in passengers {
+            out.push(passenger.clone());
+            passenger.get_entity().collect_indirect_passengers(out);
+        }
     }
 
     pub fn get_eye_pos(&self) -> Vector3<f64> {
@@ -6163,4 +6259,176 @@ pub fn blocks_building(entity: &dyn EntityBase) -> bool {
             &EntityType::END_CRYSTAL,
         ]
         .contains(&entity_type)
+}
+
+/// Vanilla `Entity.teleportTo(x, y, z)` and `ServerPlayer`'s override, which teleports the
+/// client like a command does.
+pub fn teleport_to(entity: &dyn EntityBase, position: Vector3<f64>) {
+    let base = entity.get_entity();
+    let world = base.world.load_full();
+    if entity.get_player().is_some() {
+        entity.teleport(position, None, None, world);
+    } else {
+        base.teleport(position, None, None, &world);
+    }
+}
+
+/// Vanilla `TeleportTransition`, as Pumpkin's teleports use it: an absolute position, and a
+/// rotation that stays the entity's own where it is `None`.
+pub struct TeleportTarget {
+    pub world: Arc<World>,
+    pub position: Vector3<f64>,
+    pub yaw: Option<f32>,
+    pub pitch: Option<f32>,
+    /// `Relative.DELTA`: keep the entity's speed instead of stopping it.
+    pub keep_velocity: bool,
+    /// Vanilla `asPassenger`: the entity keeps riding and nobody is sent the teleport.
+    pub as_passenger: bool,
+}
+
+/// Vanilla `Entity.teleport(TeleportTransition)` for an entity other than a player. Returns
+/// the entity at its destination: a new one after a change of dimension.
+pub fn teleport_transition(
+    entity: &Arc<dyn EntityBase>,
+    target: &TeleportTarget,
+) -> Option<Arc<dyn EntityBase>> {
+    let base = entity.get_entity();
+    if base.is_removed() {
+        return None;
+    }
+    let old_world = base.world.load_full();
+    if !target.as_passenger
+        && let Some(vehicle) = base.get_vehicle()
+    {
+        vehicle.get_entity().remove_passenger(base.entity_id);
+    }
+    if Arc::ptr_eq(&old_world, &target.world) {
+        teleport_same_dimension(entity, &old_world, target);
+        Some(entity.clone())
+    } else {
+        Some(teleport_cross_dimension(entity, &old_world, target))
+    }
+}
+
+/// Vanilla `Entity.calculatePassengerTransition`: the passenger keeps its offset from the
+/// vehicle, and its rotation relative to the vehicle's.
+fn passenger_transition(
+    vehicle: &Entity,
+    passenger: &Entity,
+    target: &TeleportTarget,
+) -> TeleportTarget {
+    let offset = passenger.pos.load() - vehicle.pos.load();
+    TeleportTarget {
+        world: target.world.clone(),
+        position: target.position + offset,
+        yaw: target
+            .yaw
+            .map(|yaw| yaw + (passenger.yaw.load() - vehicle.yaw.load())),
+        pitch: target
+            .pitch
+            .map(|pitch| pitch + (passenger.pitch.load() - vehicle.pitch.load())),
+        keep_velocity: target.keep_velocity,
+        as_passenger: true,
+    }
+}
+
+/// Vanilla `Entity.teleportSameDimension`.
+fn teleport_same_dimension(entity: &Arc<dyn EntityBase>, world: &World, target: &TeleportTarget) {
+    let base = entity.get_entity();
+    let passengers = base
+        .passengers
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone();
+    for passenger in passengers {
+        let transition = passenger_transition(base, passenger.get_entity(), target);
+        if passenger.get_player().is_some() {
+            // TODO: a player passenger rides along by `positionRider`; vanilla also moves it
+            // here as a passenger.
+            continue;
+        }
+        teleport_transition(&passenger, &transition);
+    }
+    base.teleport_set_position(target);
+    if !target.as_passenger {
+        base.send_teleport_transition_to_players(entity.as_ref(), world, target);
+    }
+}
+
+/// Vanilla `Entity.teleportCrossDimension`: a copy of the entity (`restoreFrom`) carries on
+/// in the new dimension and the passengers board it again.
+fn teleport_cross_dimension(
+    entity: &Arc<dyn EntityBase>,
+    old_world: &Arc<World>,
+    target: &TeleportTarget,
+) -> Arc<dyn EntityBase> {
+    let base = entity.get_entity();
+    let old_passengers = base
+        .passengers
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone();
+    // `ejectPassengers`, last first.
+    for passenger in old_passengers.iter().rev() {
+        base.remove_passenger(passenger.get_entity().entity_id);
+    }
+    let mut new_passengers = Vec::with_capacity(old_passengers.len());
+    for passenger in &old_passengers {
+        let transition = passenger_transition(base, passenger.get_entity(), target);
+        if passenger.get_player().is_some() {
+            // TODO: vanilla remounts a player passenger on the new vehicle too; the player's
+            // own dimension change can't hand the new player back here.
+            passenger.teleport(
+                transition.position,
+                transition.yaw,
+                transition.pitch,
+                transition.world,
+            );
+        } else if let Some(new_passenger) = teleport_transition(passenger, &transition) {
+            new_passengers.push(new_passenger);
+        }
+    }
+
+    // `restoreFrom`: everything the entity saves, its portal cooldown and portal state.
+    let new_entity = r#type::from_type(
+        base.entity_type,
+        base.pos.load(),
+        &target.world,
+        base.entity_uuid,
+    );
+    let mut nbt = NbtCompound::new();
+    entity.write_nbt(&mut nbt);
+    new_entity.read_nbt_non_mut(&nbt);
+    let new_base = new_entity.get_entity();
+    new_base.portal_cooldown.store(
+        base.portal_cooldown.load(Ordering::Relaxed),
+        Ordering::Relaxed,
+    );
+    *new_base
+        .portal_manager
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = base
+        .portal_manager
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .take();
+
+    // `removeAfterChangingDimensions`.
+    if base.is_leashed() {
+        base.unleash();
+    }
+    old_world.remove_entity(entity.as_ref());
+    base.removal_reason
+        .store(Some(RemovalReason::ChangedDimension));
+
+    new_base.velocity.store(base.velocity.load());
+    new_base.yaw.store(base.yaw.load());
+    new_base.pitch.store(base.pitch.load());
+    new_base.teleport_set_position(target);
+    new_entity.init_data_tracker();
+    target.world.add_entity_silent(new_entity.clone());
+    for new_passenger in new_passengers {
+        new_base.add_passenger_without_event(new_entity.clone(), new_passenger);
+    }
+    new_entity
 }

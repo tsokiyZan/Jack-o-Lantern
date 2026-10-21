@@ -4801,9 +4801,9 @@ impl LivingEntity {
                     let Some(pos) = self.find_random_teleport_target(*diameter) else {
                         continue;
                     };
-                    let (yaw, pitch) = (self.entity.yaw.load(), self.entity.pitch.load());
                     let world = self.entity.world.load_full();
-                    caller.teleport(pos, Some(yaw), Some(pitch), world.clone());
+                    // `randomTeleport`'s `teleportTo(x, y, z)`.
+                    crate::entity::teleport_to(caller, pos);
 
                     let destination = self.entity.pos.load();
                     if destination != center {

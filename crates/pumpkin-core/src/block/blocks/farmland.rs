@@ -162,12 +162,11 @@ pub fn turn_to_base_block(
         } else {
             -1.0
         };
+        // `teleportRelative`.
         let entity_pos = entity.get_entity().pos.load();
-        entity.teleport(
+        crate::entity::teleport_to(
+            entity.as_ref(),
             Vector3::new(entity_pos.x, entity_pos.y + 1.0 + offset, entity_pos.z),
-            None,
-            None,
-            world.clone(),
         );
     }
     world.set_block_state(pos, Block::DIRT.default_state.id, BlockFlags::NOTIFY_ALL);
