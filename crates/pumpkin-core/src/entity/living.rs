@@ -316,7 +316,7 @@ impl LivingEntity {
             0.8
         };
         let mut max_health: f32 = 20.0; // Overridden by attribute base below
-        Self {
+        let living = Self {
             // Vanilla `AttributeMap`: instances are made from the type's supplier on first use.
             attributes: {
                 for (attr, base) in entity.entity_type.attributes {
@@ -368,7 +368,12 @@ impl LivingEntity {
             equipment_attribute_modifier_ids: std::sync::Mutex::new(FxHashMap::default()),
             active_location_effects: std::sync::Mutex::new(Vec::new()),
             breath: BreathManager::default(),
-        }
+        };
+        // Vanilla's constructor `setHealth(getMaxHealth())`, so spawn data carries it.
+        living
+            .entity
+            .set_synced_data(tracked_data::living_entity::DATA_HEALTH_ID, max_health);
+        living
     }
 
     /// Vanilla `LivingEntity.getKillCredit`: the player that hurt it recently, otherwise
@@ -2817,7 +2822,7 @@ impl LivingEntity {
 
     /// Vanilla `LivingEntity.dropFromLootTable`: hands what `key` rolls to `consumer` and
     /// says whether anything dropped.
-    fn drop_from_loot_table(
+    pub fn drop_from_loot_table(
         &self,
         key: &str,
         params: &LootContextParameters,
@@ -3533,7 +3538,7 @@ impl LivingEntity {
         // Vanilla LivingEntity.readAdditionalSaveData defaults to the mob's own max health,
         // not a flat 20; a hoglin (40 max) or iron golem (100 max) with no saved Health would
         // otherwise be silently reset to 20 here.
-        self.health.store(
+        self.set_health(
             nbt.get_float("Health")
                 .unwrap_or_else(|| self.get_max_health()),
         );
