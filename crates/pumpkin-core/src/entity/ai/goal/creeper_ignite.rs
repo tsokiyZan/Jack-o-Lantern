@@ -4,6 +4,7 @@ use std::sync::atomic::Ordering;
 use super::{Controls, Goal};
 
 use crate::entity::EntityBase;
+use crate::entity::ai::brain::behavior::utils::is_dead_or_dying;
 use crate::entity::mob::Mob;
 use crate::entity::mob::creeper::CreeperEntity;
 
@@ -33,7 +34,7 @@ impl Goal for CreeperIgniteGoal {
         let Some(target) = mob.get_mob_entity().get_target() else {
             return false;
         };
-        target.get_entity().is_alive()
+        !is_dead_or_dying(target.as_ref())
             && mob
                 .get_entity()
                 .pos
@@ -56,7 +57,11 @@ impl Goal for CreeperIgniteGoal {
     }
 
     fn tick(&mut self, mob: &dyn Mob) {
-        let Some(target) = self.target.as_ref().filter(|t| t.get_entity().is_alive()) else {
+        let Some(target) = self
+            .target
+            .as_ref()
+            .filter(|t| !is_dead_or_dying(t.as_ref()))
+        else {
             self.creeper.set_fuse_speed(-1);
             return;
         };

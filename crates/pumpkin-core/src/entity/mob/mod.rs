@@ -1776,6 +1776,11 @@ pub trait Mob: EntityBase + Send + Sync {
 
     fn on_attack(&self, _target: &dyn EntityBase) {}
 
+    /// Vanilla `doHurtTarget` as `MeleeAttackGoal` calls it.
+    fn goal_do_hurt_target(&self, attacker: &dyn EntityBase, target: &dyn EntityBase) -> bool {
+        self.get_mob_entity().try_attack(attacker, target)
+    }
+
     /// Vanilla `doHurtTarget` as the brain's `MeleeAttack` calls it, with this mob's brain
     /// held in `tick`.
     fn do_hurt_target(&self, tick: &mut BrainTick<'_>, target: &Arc<dyn EntityBase>) -> bool {

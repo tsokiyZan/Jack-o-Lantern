@@ -283,7 +283,7 @@ impl Goal for MeleeAttackGoal {
             mob.get_mob_entity().living_entity.swing_hand();
             // The mob itself, not its bare `Entity`, so the victim knows who hurt it.
             let attacker: &dyn crate::entity::EntityBase = mob;
-            let damaged = mob.get_mob_entity().try_attack(attacker, target.as_ref());
+            let damaged = mob.goal_do_hurt_target(attacker, target.as_ref());
             if damaged {
                 mob.on_attack(target.as_ref());
             }

@@ -5,14 +5,11 @@ use std::sync::{
 
 use crate::enchantment::HurtAndBreak;
 use pumpkin_data::item_stack::ItemStack;
-use pumpkin_data::{
-    entity::EntityType,
-    item::Item,
-    sound::{Sound, SoundCategory},
-};
+use pumpkin_data::tag::Taggable;
+use pumpkin_data::{entity::EntityType, game_event::GameEvent, item::Item, sound::Sound, tag};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::codec::var_int::VarInt;
-use pumpkin_util::random::RandomImpl;
+use pumpkin_util::{GameMode, random::RandomImpl};
 
 use crate::entity::{
     Entity, EntityBase,
@@ -23,12 +20,15 @@ use crate::entity::{
         swim::SwimGoal, wander_around::WanderAroundGoal,
     },
     living::LivingEntity,
-    mob::{Mob, MobEntity},
+    mob::{Mob, MobEntity, set_mob_target_base},
     player::Player,
 };
+use crate::world::loot::LootContextParameters;
 
 const DEFAULT_FUSE_TIME: i32 = 30;
 const DEFAULT_EXPLOSION_RADIUS: i32 = 3;
+/// Vanilla `BuiltInLootTables.CHARGED_CREEPER`.
+const CHARGED_CREEPER_LOOT_TABLE: &str = "minecraft:charged_creeper/root";
 
 pub struct CreeperEntity {
     pub mob_entity: MobEntity,
@@ -39,6 +39,7 @@ pub struct CreeperEntity {
     pub explosion_radius: AtomicI32,
     pub ignited: AtomicBool,
     pub charged: AtomicBool,
+    dropped_skulls: AtomicBool,
 }
 
 impl CreeperEntity {
@@ -53,6 +54,7 @@ impl CreeperEntity {
             explosion_radius: AtomicI32::new(DEFAULT_EXPLOSION_RADIUS),
             ignited: AtomicBool::new(false),
             charged: AtomicBool::new(false),
+            dropped_skulls: AtomicBool::new(false),
         };
         let mob_arc = Arc::new(entity);
         let mob_weak: Weak<dyn Mob> = {
@@ -233,18 +235,18 @@ impl Mob for CreeperEntity {
     }
 
     fn mob_read_nbt(&self, nbt: &NbtCompound) {
-        if let Some(powered) = nbt.get_bool("powered") {
-            self.charged.store(powered, Ordering::Relaxed);
-        }
-        if let Some(fuse) = nbt.get_short("Fuse") {
-            self.fuse_time.store(i32::from(fuse), Ordering::Relaxed);
-        }
-        if let Some(radius) = nbt.get_byte("ExplosionRadius") {
-            self.explosion_radius
-                .store(i32::from(radius), Ordering::Relaxed);
-        }
-        if let Some(ignited) = nbt.get_bool("ignited") {
-            self.ignited.store(ignited, Ordering::Relaxed);
+        self.set_charged(nbt.get_bool("powered").unwrap_or(false));
+        self.fuse_time.store(
+            nbt.get_short("Fuse").map_or(DEFAULT_FUSE_TIME, i32::from),
+            Ordering::Relaxed,
+        );
+        self.explosion_radius.store(
+            nbt.get_byte("ExplosionRadius")
+                .map_or(DEFAULT_EXPLOSION_RADIUS, i32::from),
+            Ordering::Relaxed,
+        );
+        if nbt.get_bool("ignited").unwrap_or(false) {
+            self.set_ignited(true);
         }
     }
 
@@ -257,17 +259,13 @@ impl Mob for CreeperEntity {
         caller: &dyn EntityBase,
         lightning: &crate::entity::lightning::LightningBoltEntity,
     ) {
-        self.charged.store(true, Ordering::Relaxed);
-        self.mob_entity
-            .living_entity
-            .entity
-            .set_synced_data(pumpkin_data::tracked_data::creeper::CHARGED, true);
         self.mob_entity
             .living_entity
             .on_lightning_strike(caller, lightning);
+        self.set_charged(true);
     }
 
-    fn mob_tick(&self, _caller: &dyn EntityBase) {
+    fn mob_tick(&self, caller: &dyn EntityBase) {
         let entity = &self.mob_entity.living_entity.entity;
         if !entity.is_alive() {
             return;
@@ -286,13 +284,11 @@ impl Mob for CreeperEntity {
         let current = self.current_fuse_time.load(Ordering::Relaxed);
 
         if fuse_speed > 0 && current == 0 {
-            let world = entity.world.load();
-            world.play_sound_fine(
-                Sound::EntityCreeperPrimed,
-                SoundCategory::Hostile,
-                &entity.pos.load(),
-                1.0,
-                0.5,
+            caller.play_sound_at_self(Sound::EntityCreeperPrimed, 1.0, 0.5);
+            entity.world.load().game_event_from(
+                Some(caller),
+                GameEvent::PrimeFuse,
+                entity.pos.load(),
             );
         }
 
@@ -306,31 +302,86 @@ impl Mob for CreeperEntity {
         }
     }
 
+    /// Vanilla `Creeper.mobInteract`.
     fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
-        if item_stack.item.id != Item::FLINT_AND_STEEL.id {
+        if !item_stack
+            .item
+            .has_tag(&tag::Item::MINECRAFT_CREEPER_IGNITERS)
+        {
             return self.mob_entity.mob_interact(player, item_stack);
         }
 
+        let sound = if item_stack.item.id == Item::FIRE_CHARGE.id {
+            Sound::ItemFirechargeUse
+        } else {
+            Sound::ItemFlintandsteelUse
+        };
         let entity = &self.mob_entity.living_entity.entity;
         let world = entity.world.load();
-        let pos = entity.pos.load();
         let pitch = entity.random().next_f32() * 0.4 + 0.8;
-
-        world.play_sound_fine(
-            Sound::ItemFlintandsteelUse,
-            SoundCategory::Hostile,
-            &pos,
+        // `level.playSound(player, ...)`: the player plays its own copy.
+        world.play_sound_raw_expect(
+            player,
+            sound as u16,
+            self.sound_source(),
+            &entity.pos.load(),
             1.0,
             pitch,
         );
 
-        self.ignited.store(true, Ordering::Relaxed);
-        entity.set_synced_data(pumpkin_data::tracked_data::creeper::IS_IGNITED, true);
-
-        if player.gamemode.load() != pumpkin_util::GameMode::Creative {
-            let _ = item_stack.hurt_and_break(&entity.world.load(), 1);
+        self.set_ignited(true);
+        if !item_stack.is_damageable() {
+            item_stack.decrement(1);
+        } else if !matches!(player.gamemode.load(), GameMode::Creative) {
+            // `hurtAndBreak(1, player, slot)`; the interact handler applies a break.
+            let _ = item_stack.hurt_and_break(&world, 1);
         }
 
+        true
+    }
+
+    /// Vanilla `Creeper.setTarget`: creepers never target goats.
+    fn set_mob_target(&self, target: Option<Arc<dyn EntityBase>>) {
+        if target
+            .as_ref()
+            .is_some_and(|target| target.get_entity().entity_type == &EntityType::GOAT)
+        {
+            return;
+        }
+        set_mob_target_base(self, target);
+    }
+
+    /// Vanilla `Creeper.doHurtTarget`: a creeper's melee attack does nothing.
+    fn goal_do_hurt_target(&self, _attacker: &dyn EntityBase, _target: &dyn EntityBase) -> bool {
+        true
+    }
+
+    /// Vanilla `Creeper.killedEntity`: a charged creeper's first kill drops a skull.
+    fn killed_entity(&self, victim: &dyn EntityBase) -> bool {
+        let living = &self.mob_entity.living_entity;
+        let world = living.entity.world.load();
+        // `shouldDropLoot`.
+        if !living.entity.is_baby()
+            && world.level_info.load().game_rules.mob_drops
+            && self.is_charged()
+            && !self.dropped_skulls.load(Ordering::Relaxed)
+            && let Some(victim_living) = victim.get_living_entity()
+        {
+            victim_living.drop_from_loot_table(
+                CHARGED_CREEPER_LOOT_TABLE,
+                &LootContextParameters {
+                    this_entity: Some(victim.get_entity().entity_type),
+                    killer_entity: Some(living.entity.entity_type),
+                    direct_killer_entity: Some(living.entity.entity_type),
+                    position: Some(victim.get_entity().pos.load()),
+                    ..Default::default()
+                },
+                |stack| {
+                    victim.get_entity().spawn_at_location(stack);
+                    self.dropped_skulls.store(true, Ordering::Relaxed);
+                },
+            );
+        }
         true
     }
 }
