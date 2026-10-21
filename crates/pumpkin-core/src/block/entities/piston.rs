@@ -6,6 +6,7 @@ use pumpkin_data::{Block, BlockDirection, BlockState};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::math::{boundingbox::BoundingBox, position::BlockPos, vector3::Vector3};
 
+use crate::entity::EntityBase;
 use crate::world::{BlockFlags, World};
 
 use super::BlockEntity;
@@ -96,7 +97,7 @@ impl PistonBlockEntity {
                 continue;
             }
             let push_amount = intersection.min(delta) + 0.01;
-            Self::move_entity(e, motion_dir, push_amount);
+            Self::move_entity(entity.as_ref(), motion_dir, push_amount);
 
             // For a retracting head, vanilla also shoves the entity OUT of the
             // piston body cube. Without this, entities get pulled into the
@@ -104,7 +105,7 @@ impl PistonBlockEntity {
             // For a retract-head BE, `self.position` already IS the piston
             // block position (it replaces the piston during animation).
             if !self.extending && self.source {
-                Self::push_out_of_piston_body(e, &self.position, motion_dir, delta);
+                Self::push_out_of_piston_body(entity.as_ref(), &self.position, motion_dir, delta);
             }
         }
     }
@@ -126,22 +127,24 @@ impl PistonBlockEntity {
         }
     }
 
-    fn move_entity(entity: &crate::entity::Entity, dir: BlockDirection, distance: f64) {
-        let new_pos = entity.pos.load() + Self::dir_vec(dir, distance);
-        entity.set_pos(new_pos);
+    /// Vanilla `moveEntityByPiston`.
+    fn move_entity(entity: &dyn EntityBase, dir: BlockDirection, distance: f64) {
+        entity
+            .get_entity()
+            .move_by_piston(entity, Self::dir_vec(dir, distance));
     }
 
     /// Vanilla `push`: when a piston head retracts, shove entities that ended up
     /// inside the piston-body cube back out the opposite direction (slightly past
     /// the move they just got, so the net motion is essentially zero).
     fn push_out_of_piston_body(
-        entity: &crate::entity::Entity,
+        entity: &dyn EntityBase,
         piston_pos: &BlockPos,
         motion_dir: BlockDirection,
         amount: f64,
     ) {
         let body_aabb = BoundingBox::from_block(piston_pos);
-        let entity_aabb = entity.bounding_box.load();
+        let entity_aabb = entity.get_entity().bounding_box.load();
         if !body_aabb.intersects(&entity_aabb) {
             return;
         }

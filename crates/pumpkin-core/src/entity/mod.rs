@@ -1473,6 +1473,8 @@ pub struct Entity {
     pub tick_count: AtomicI32,
     /// Vanilla `Entity.firstTick`: cleared at the end of the first base tick.
     pub first_tick: AtomicBool,
+    /// Vanilla `pistonDeltas` and `pistonDeltasGameTime`.
+    piston_deltas: std::sync::Mutex<([f64; 3], i64)>,
     /// Vanilla `movementThisTick`: the moves made since the last block-effect sweep.
     movement_this_tick: std::sync::Mutex<Vec<EntityMovement>>,
     /// Vanilla `finalMovementsThisTick`: the moves the last sweep covered.
@@ -1661,6 +1663,7 @@ impl Entity {
             tick_count: AtomicI32::new(0),
             first_tick: AtomicBool::new(true),
             movement_this_tick: std::sync::Mutex::new(Vec::new()),
+            piston_deltas: std::sync::Mutex::new(([0.0; 3], 0)),
             final_movements_this_tick: std::sync::Mutex::new(Vec::new()),
             move_dist: AtomicCell::new(0.0),
             fly_dist: AtomicCell::new(0.0),
@@ -3185,7 +3188,68 @@ impl Entity {
     // Move by a delta, adjust for collisions, and send
 
     // Does not send movement. That must be done separately
-    pub fn move_entity(&self, caller: &dyn EntityBase, mut motion: Vector3<f64>) {
+    pub fn move_entity(&self, caller: &dyn EntityBase, motion: Vector3<f64>) {
+        self.move_with_type(caller, motion, false);
+    }
+
+    /// Vanilla `PistonMovingBlockEntity.moveEntityByPiston`: `move(MoverType.PISTON)`, then
+    /// the blocks along just that move.
+    pub fn move_by_piston(&self, caller: &dyn EntityBase, delta: Vector3<f64>) {
+        let previous_pos = self.pos.load();
+        self.move_with_type(caller, delta, true);
+        self.apply_effects_from_blocks_between(caller, previous_pos, self.pos.load());
+        self.remove_latest_movement_recording();
+    }
+
+    /// Vanilla `Entity.limitPistonMovement`: pistons move an entity at most 0.51 per axis
+    /// in a game tick, along one axis per move.
+    fn limit_piston_movement(&self, movement: Vector3<f64>) -> Vector3<f64> {
+        if movement.length_squared() <= 1.0E-7 {
+            return movement;
+        }
+        let game_time = self.world.load().get_world_age();
+        let mut piston = self
+            .piston_deltas
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if piston.1 != game_time {
+            *piston = ([0.0; 3], game_time);
+        }
+        let mut restrict = |index: usize, amount: f64| {
+            let min = (amount + piston.0[index]).clamp(-0.51, 0.51);
+            let amount = min - piston.0[index];
+            piston.0[index] = min;
+            amount
+        };
+        let threshold = f64::from(1.0E-5f32);
+        if movement.x != 0.0 {
+            let x = restrict(0, movement.x);
+            if x.abs() <= threshold {
+                Vector3::default()
+            } else {
+                Vector3::new(x, 0.0, 0.0)
+            }
+        } else if movement.y != 0.0 {
+            let y = restrict(1, movement.y);
+            if y.abs() <= threshold {
+                Vector3::default()
+            } else {
+                Vector3::new(0.0, y, 0.0)
+            }
+        } else if movement.z != 0.0 {
+            let z = restrict(2, movement.z);
+            if z.abs() <= threshold {
+                Vector3::default()
+            } else {
+                Vector3::new(0.0, 0.0, z)
+            }
+        } else {
+            Vector3::default()
+        }
+    }
+
+    /// Vanilla `Entity.move`; `piston` is `MoverType.PISTON`.
+    fn move_with_type(&self, caller: &dyn EntityBase, mut motion: Vector3<f64>, piston: bool) {
         // A player only moves here in the server's own copy of its travel, which
         // `Player::tick_server_travel` puts back where the client says the player is.
         let is_player = caller.get_player().is_some();
@@ -3199,14 +3263,24 @@ impl Entity {
             return;
         }
 
+        if piston {
+            motion = self.limit_piston_movement(motion);
+            if motion == Vector3::default() {
+                return;
+            }
+        }
+
         let movement_multiplier = self.movement_multiplier.swap(Vector3::default());
 
         if movement_multiplier.length_squared() > 1.0e-7 {
-            motion = motion.multiply(
-                movement_multiplier.x,
-                movement_multiplier.y,
-                movement_multiplier.z,
-            );
+            // A piston's push isn't slowed by cobwebs or powder snow.
+            if !piston {
+                motion = motion.multiply(
+                    movement_multiplier.x,
+                    movement_multiplier.y,
+                    movement_multiplier.z,
+                );
+            }
 
             self.velocity.store(Vector3::default());
         }
