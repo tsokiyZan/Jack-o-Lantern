@@ -2581,7 +2581,7 @@ impl LivingEntity {
                 }
                 // `shouldDropLoot`.
                 if !self.entity.is_baby() && world.level_info.load().game_rules.mob_drops {
-                    self.drop_loot(&params);
+                    self.drop_loot(dyn_self.get_mob(), &params);
                     if let Some(mob) = dyn_self.get_mob() {
                         self.drop_mob_equipment(
                             &DamageSource {
@@ -2809,15 +2809,28 @@ impl LivingEntity {
         }
     }
 
-    fn drop_loot(&self, params: &LootContextParameters) {
-        let resource_name = self.get_entity().entity_type.resource_name;
-        let key = format!("minecraft:entities/{resource_name}");
+    fn drop_loot(&self, mob: Option<&dyn super::mob::Mob>, params: &LootContextParameters) {
+        // Vanilla `Mob.getLootTable`/`getLootTableSeed`: a `DeathLootTable` wins.
+        let (death_loot_table, death_loot_table_seed) =
+            mob.map_or((None, 0), |mob| mob.get_mob_entity().death_loot_table());
+        let key = death_loot_table.unwrap_or_else(|| {
+            let resource_name = self.get_entity().entity_type.resource_name;
+            format!("minecraft:entities/{resource_name}")
+        });
         let world = self.entity.world.load();
         if let Some(loot_table) = world.get_loot_table(&key) {
-            let seed: i64 = rand::random();
+            let seed: i64 = if death_loot_table_seed == 0 {
+                rand::random()
+            } else {
+                death_loot_table_seed
+            };
             for stack in crate::world::loot::generate_loot_from_handle(&loot_table, seed, params) {
                 self.entity.spawn_at_location(stack);
             }
+        }
+        // Vanilla `Mob.dropFromLootTable`: the death loot table is used once.
+        if let Some(mob) = mob {
+            mob.get_mob_entity().clear_death_loot_table();
         }
     }
 

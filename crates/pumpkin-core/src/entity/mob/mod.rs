@@ -44,7 +44,7 @@ use pumpkin_util::random::RandomImpl;
 use pumpkin_util::version::JavaMinecraftVersion;
 use std::sync::Arc;
 use std::sync::atomic::Ordering::Relaxed;
-use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicI64, AtomicU8, Ordering};
 use uuid::Uuid;
 
 pub mod abstract_piglin;
@@ -126,6 +126,12 @@ pub struct MobEntity {
     pub ambient_sound_time: AtomicI32,
     pub breeder: AtomicCell<Option<Uuid>>,
     pub persistence_required: AtomicBool,
+    /// Vanilla `Mob.canPickUpLoot`, a plain field, not one of the synced mob flags.
+    can_pick_up_loot: AtomicBool,
+    /// Vanilla `Mob.lootTable`: a `DeathLootTable` that replaces the type's death loot.
+    death_loot_table: std::sync::Mutex<Option<String>>,
+    /// Vanilla `Mob.lootTableSeed`.
+    death_loot_table_seed: AtomicI64,
     pending_riders: std::sync::Mutex<Vec<Arc<dyn EntityBase>>>,
     pending_vehicle: std::sync::Mutex<Option<Arc<dyn EntityBase>>>,
     mob_flags: AtomicU8,
@@ -134,7 +140,6 @@ impl MobEntity {
     const AI_DISABLED_FLAG: u8 = 1;
     const LEFT_HANDED_FLAG: u8 = 2;
     const ATTACKING_FLAG: u8 = 4;
-    const CAN_PICK_UP_LOOT_FLAG: u8 = 8;
 
     pub const MAX_WEARING_ARMOR_CHANCE: f32 = 0.15;
     pub const WEARING_ARMOR_UPGRADE_MATERIAL_CHANCE: f32 = 0.1087;
@@ -262,6 +267,9 @@ impl MobEntity {
             ambient_sound_time: AtomicI32::new(0),
             breeder: AtomicCell::new(None),
             persistence_required: AtomicBool::new(false),
+            can_pick_up_loot: AtomicBool::new(false),
+            death_loot_table: std::sync::Mutex::new(None),
+            death_loot_table_seed: AtomicI64::new(0),
             pending_riders: std::sync::Mutex::new(Vec::new()),
             pending_vehicle: std::sync::Mutex::new(None),
             mob_flags: AtomicU8::new(0),
@@ -299,11 +307,31 @@ impl MobEntity {
     }
 
     pub fn can_pick_up_loot(&self) -> bool {
-        (self.mob_flags.load(Relaxed) & Self::CAN_PICK_UP_LOOT_FLAG) != 0
+        self.can_pick_up_loot.load(Relaxed)
     }
 
     pub fn set_can_pick_up_loot(&self, value: bool) {
-        self.set_mob_flag(Self::CAN_PICK_UP_LOOT_FLAG, value);
+        self.can_pick_up_loot.store(value, Relaxed);
+    }
+
+    /// Vanilla `Mob.getLootTable` and `getLootTableSeed`: a saved `DeathLootTable` and its
+    /// seed, if the mob has one.
+    pub fn death_loot_table(&self) -> (Option<String>, i64) {
+        (
+            self.death_loot_table
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .clone(),
+            self.death_loot_table_seed.load(Relaxed),
+        )
+    }
+
+    /// Vanilla `Mob.dropFromLootTable`: the death loot table is used once.
+    pub fn clear_death_loot_table(&self) {
+        *self
+            .death_loot_table
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
     }
 
     pub fn is_left_handed(&self) -> bool {
@@ -591,18 +619,23 @@ impl MobEntity {
         }
     }
 
+    /// Vanilla `DropChances.CODEC` through `ValueInput.read`: the saved map replaces the old
+    /// one, missing slots are the default, and entries the codec rejects (an unknown slot, a
+    /// negative chance) are left out.
     fn read_drop_chances(&self, nbt: &NbtCompound) {
-        let Some(compound) = nbt.get_compound("drop_chances") else {
-            return;
-        };
         let mut chances = self
             .living_entity
             .equipment_drop_chances
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
+        chances.clear();
+        let Some(compound) = nbt.get_compound("drop_chances") else {
+            return;
+        };
         for (name, tag) in &compound.child_tags {
             if let Some(slot) = EquipmentSlot::get_from_name(name)
-                && let Some(chance) = tag.extract_float()
+                && let Some(chance) = tag.as_numeric_float()
+                && chance >= 0.0
             {
                 chances.insert(slot.clone(), chance);
             }
@@ -708,9 +741,9 @@ impl MobEntity {
         f(&mut tick)
     }
 
-    /// `can_pick_up_loot` is the mob's `canPickUpLoot()`, which some mobs override.
+    /// Vanilla `Mob.addAdditionalSaveData`, after `LivingEntity`'s brain. `can_pick_up_loot` is
+    /// the mob's `canPickUpLoot()`, which some mobs override.
     pub fn write_mob_nbt(&self, nbt: &mut NbtCompound, can_pick_up_loot: bool) {
-        self.write_drop_chances(nbt);
         nbt.put_compound(
             "Brain",
             self.brain
@@ -719,16 +752,13 @@ impl MobEntity {
                 .pack()
                 .into_nbt(),
         );
-        if self.is_no_ai() {
-            nbt.put_bool("NoAI", true);
-        }
-        // Vanilla always writes these three, false included.
-        nbt.put_bool("LeftHanded", self.is_left_handed());
         nbt.put_bool("CanPickUpLoot", can_pick_up_loot);
         nbt.put_bool(
             "PersistenceRequired",
             self.persistence_required.load(Relaxed),
         );
+        self.write_drop_chances(nbt);
+        self.living_entity.entity.write_leash_nbt(nbt);
         if self.has_position_target() {
             let home = self.position_target.load();
             nbt.put_int("home_radius", self.position_target_range.load(Relaxed));
@@ -737,22 +767,27 @@ impl MobEntity {
                 pumpkin_nbt::tag::NbtTag::IntArray(vec![home.0.x, home.0.y, home.0.z]),
             );
         }
-        self.living_entity.entity.write_leash_nbt(nbt);
+        nbt.put_bool("LeftHanded", self.is_left_handed());
+        let (loot_table, loot_table_seed) = self.death_loot_table();
+        if let Some(loot_table) = loot_table {
+            nbt.put_string("DeathLootTable", loot_table);
+        }
+        if loot_table_seed != 0 {
+            nbt.put_long("DeathLootTableSeed", loot_table_seed);
+        }
+        if self.is_no_ai() {
+            nbt.put_bool("NoAI", true);
+        }
     }
 
+    /// Vanilla `Mob.readAdditionalSaveData`: every tag falls back to its default when missing.
     pub fn read_mob_nbt(&self, nbt: &NbtCompound) {
-        self.read_drop_chances(nbt);
-        // Vanilla getBooleanOr: `/data remove ... NoAI` turns the AI back on.
-        self.set_no_ai(nbt.get_bool("NoAI").unwrap_or(false));
-        if let Some(left_handed) = nbt.get_bool("LeftHanded") {
-            self.set_left_handed(left_handed);
-        }
-        // Vanilla getBooleanOr: a summoned mob only picks up loot when its NBT says so.
         self.set_can_pick_up_loot(nbt.get_bool("CanPickUpLoot").unwrap_or(false));
-        if let Some(persistence_required) = nbt.get_bool("PersistenceRequired") {
-            self.persistence_required
-                .store(persistence_required, Relaxed);
-        }
+        self.persistence_required.store(
+            nbt.get_bool("PersistenceRequired").unwrap_or(false),
+            Relaxed,
+        );
+        self.read_drop_chances(nbt);
         self.living_entity.entity.read_leash_nbt(nbt);
         // Vanilla `home_radius` (-1 for no home), then `home_pos` (the origin if missing).
         let radius = nbt.get_int("home_radius").unwrap_or(-1);
@@ -764,6 +799,22 @@ impl MobEntity {
             };
             self.position_target.store(home);
         }
+        self.set_left_handed(nbt.get_bool("LeftHanded").unwrap_or(false));
+        // `LootTable.KEY_CODEC`: an identifier, `minecraft` when it names no namespace.
+        *self
+            .death_loot_table
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) =
+            nbt.get_string("DeathLootTable").map(|key| {
+                if key.contains(':') {
+                    key.to_string()
+                } else {
+                    format!("minecraft:{key}")
+                }
+            });
+        self.death_loot_table_seed
+            .store(nbt.get_long("DeathLootTableSeed").unwrap_or(0), Relaxed);
+        self.set_no_ai(nbt.get_bool("NoAI").unwrap_or(false));
     }
 
     pub fn add_goal<G: crate::entity::ai::goal::Goal + 'static>(&self, priority: u8, goal: G) {
