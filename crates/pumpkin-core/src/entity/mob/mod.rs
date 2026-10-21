@@ -34,7 +34,7 @@ use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_data::tracked_data;
-use pumpkin_data::{Block, BlockDirection, BlockState};
+use pumpkin_data::{Block, BlockState};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::Difficulty;
 use pumpkin_util::math::boundingbox::{BoundingBox, EntityDimensions};
@@ -962,44 +962,58 @@ impl MobEntity {
         i32::from(brightness) <= dimension.monster_spawn_light_level.get(random)
     }
 
-    pub fn check_mob_spawn_rules(world: &World, pos: &BlockPos) -> bool {
-        let below = pos.down();
-        let state = world.get_block_state(&below);
-        state.is_side_solid(BlockDirection::Up)
+    /// Vanilla `Mob.checkMobSpawnRules`: a spawner ignores the floor, anything else needs one
+    /// that `BlockState.isValidSpawn` allows for `entity_type`.
+    pub fn check_mob_spawn_rules(
+        world: &World,
+        entity_type: &'static EntityType,
+        reason: spawn::EntitySpawnReason,
+        pos: &BlockPos,
+    ) -> bool {
+        reason.is_spawner()
+            || crate::world::natural_spawner::is_valid_spawn_floor(
+                world.get_block_state(&pos.down()),
+                entity_type,
+            )
     }
 
+    /// Vanilla `Monster.checkMonsterSpawnRules`: dark enough, unless a trial spawner ignores
+    /// the light, then `checkMobSpawnRules`.
     pub fn check_monster_spawn_rules(
         world: &World,
+        entity_type: &'static EntityType,
+        reason: spawn::EntitySpawnReason,
         pos: &BlockPos,
         is_thundering: bool,
         random: &mut pumpkin_util::random::legacy_rand::LegacyRand,
     ) -> bool {
-        if world.level_info.load().difficulty == Difficulty::Peaceful {
-            return false;
-        }
-
-        if !Self::is_dark_enough_to_spawn(world, pos, is_thundering, random) {
-            return false;
-        }
-
-        Self::check_mob_spawn_rules(world, pos)
+        (reason.ignores_light_requirements()
+            || Self::is_dark_enough_to_spawn(world, pos, is_thundering, random))
+            && Self::check_mob_spawn_rules(world, entity_type, reason, pos)
     }
 
-    pub fn check_any_light_monster_spawn_rules(world: &World, pos: &BlockPos) -> bool {
-        if world.level_info.load().difficulty == Difficulty::Peaceful {
-            return false;
-        }
-
-        Self::check_mob_spawn_rules(world, pos)
+    /// Vanilla `Monster.checkAnyLightMonsterSpawnRules`.
+    pub fn check_any_light_monster_spawn_rules(
+        world: &World,
+        entity_type: &'static EntityType,
+        reason: spawn::EntitySpawnReason,
+        pos: &BlockPos,
+    ) -> bool {
+        Self::check_mob_spawn_rules(world, entity_type, reason, pos)
     }
 
+    /// Vanilla `Monster.checkSurfaceMonstersSpawnRules`: also under open sky, unless spawned by
+    /// a spawner.
     pub fn check_surface_monsters_spawn_rules(
         world: &World,
+        entity_type: &'static EntityType,
+        reason: spawn::EntitySpawnReason,
         pos: &BlockPos,
         is_thundering: bool,
         random: &mut pumpkin_util::random::legacy_rand::LegacyRand,
     ) -> bool {
-        Self::check_monster_spawn_rules(world, pos, is_thundering, random) && world.can_see_sky(pos)
+        Self::check_monster_spawn_rules(world, entity_type, reason, pos, is_thundering, random)
+            && (reason.is_spawner() || world.can_see_sky(pos))
     }
 
     pub fn check_animal_spawn_rules(world: &World, pos: &BlockPos) -> bool {

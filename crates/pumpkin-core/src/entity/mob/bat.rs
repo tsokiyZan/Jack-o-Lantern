@@ -39,6 +39,7 @@ impl BatEntity {
     #[must_use]
     pub fn check_bat_spawn_rules(
         world: &World,
+        reason: crate::entity::mob::spawn::EntitySpawnReason,
         pos: &BlockPos,
         random: &mut pumpkin_util::random::legacy_rand::LegacyRand,
     ) -> bool {
@@ -59,7 +60,12 @@ impl BatEntity {
         {
             return false;
         }
-        crate::entity::mob::MobEntity::check_mob_spawn_rules(world, pos)
+        crate::entity::mob::MobEntity::check_mob_spawn_rules(
+            world,
+            &pumpkin_data::entity::EntityType::BAT,
+            reason,
+            pos,
+        )
     }
 
     #[must_use]
