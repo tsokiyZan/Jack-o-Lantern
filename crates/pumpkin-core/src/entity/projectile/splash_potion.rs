@@ -354,13 +354,21 @@ impl EntityBase for SplashPotionEntity {
             affected.retain(|(c, _)| event.affected_entities.contains(&c.get_entity().entity_id));
         }
 
+        let owner = self
+            .get_owner_id()
+            .and_then(|id| world.get_entity_by_id(id));
+        let duration_scale = stack
+            .get_data_component::<pumpkin_data::data_component_impl::PotionDurationScaleImpl>()
+            .map_or(1.0, |component| component.scale);
         for (cand, scale) in affected {
             if let Some(living) = cand.get_living_entity() {
                 crate::item::potion::PotionContents::apply_effects_to(
                     living,
                     effects.clone(),
-                    scale,
-                    crate::item::potion::PotionApplicationSource::Normal,
+                    duration_scale,
+                    crate::item::potion::PotionApplicationSource::Splash(f64::from(scale)),
+                    Some(self),
+                    owner.as_deref(),
                 );
             }
         }

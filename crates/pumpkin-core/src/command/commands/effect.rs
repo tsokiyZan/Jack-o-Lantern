@@ -59,9 +59,20 @@ impl CommandExecutor for GiveExecutor {
         let targets = EntityArgumentType::get_entities(context, "targets")?;
         let effect = ResourceArgument::get_mob_effect(context, "effect")?;
 
+        // Vanilla `computeDurationInTicks`: an instantaneous effect takes the count as ticks.
+        let instantaneous = crate::entity::effect::is_instantaneous(effect);
         let duration_ticks = match self.duration {
-            Duration::Default => 30 * 20,
-            Duration::Specified => IntegerArgumentType::get(context, "seconds")? * 20,
+            Duration::Default => {
+                if instantaneous {
+                    1
+                } else {
+                    30 * 20
+                }
+            }
+            Duration::Specified => {
+                let seconds = IntegerArgumentType::get(context, "seconds")?;
+                if instantaneous { seconds } else { seconds * 20 }
+            }
             Duration::Infinite => -1,
         };
 
@@ -83,21 +94,17 @@ impl CommandExecutor for GiveExecutor {
             let Some(living) = target.get_living_entity() else {
                 continue;
             };
-            let should_skip = !living.can_be_affected(effect)
-                || living
-                    .get_effect(effect)
-                    .is_some_and(|existing| existing.amplifier >= amplifier);
-
-            if !should_skip {
-                living.add_effect(Effect {
-                    effect_type: effect,
-                    duration: duration_ticks,
-                    amplifier,
-                    ambient: false,
-                    show_particles: !hide_particles,
-                    show_icon: true,
-                    blend: false,
-                });
+            // `new MobEffectInstance(effect, duration, amplifier, false, particles)`: the icon
+            // follows the particles.
+            if living.add_effect(Effect {
+                effect_type: effect,
+                duration: duration_ticks,
+                amplifier,
+                ambient: false,
+                show_particles: !hide_particles,
+                show_icon: !hide_particles,
+                blend: false,
+            }) {
                 successes += 1;
             }
         }

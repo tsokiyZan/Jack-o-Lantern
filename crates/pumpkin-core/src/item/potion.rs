@@ -1,37 +1,32 @@
 use crate::entity::EntityBase;
+use crate::entity::effect::MobEffectInstance;
 use crate::entity::living::LivingEntity;
 use pumpkin_data::effect::StatusEffect;
 use pumpkin_data::item_stack::ItemStack;
+use pumpkin_data::potion::Effect;
 
 /// Utilities for reading potion contents from an `ItemStack` and applying effects.
 pub struct PotionContents;
 
-/// Source context for applying potion effects (affects scaling rules).
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+/// How a potion's effects reach an entity: each vanilla caller treats instantaneous effects
+/// and durations its own way.
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum PotionApplicationSource {
-    /// Normal application (drinking / splash)
-    Normal,
-    /// `AreaEffectCloud` application (shorter durations and weaker instant potency)
+    /// `PotionContents.applyToLivingEntity`: drinking. Instant effects apply at full strength.
+    Drink,
+    /// `ThrownSplashPotion.onHitAsPotion`, with the distance `scale`.
+    Splash(f64),
+    /// `AreaEffectCloud.serverTick`: instant effects at half strength.
     AreaEffectCloud,
-    Arrow,
+    /// `Arrow.doPostHurtEffects` and `Witch.aiStep`: every effect goes through `addEffect`,
+    /// instant ones included.
+    AddEffect,
 }
 
-impl PotionApplicationSource {
-    const fn instant_scale(self, scale: f32) -> f32 {
-        match self {
-            Self::AreaEffectCloud => scale * 0.5,
-            Self::Arrow => 1.0,
-            Self::Normal => scale,
-        }
-    }
-
-    const fn duration_scale(self, scale: f32) -> f32 {
-        match self {
-            Self::AreaEffectCloud => scale * 0.25,
-            Self::Arrow | Self::Normal => scale,
-        }
-    }
-}
+/// Vanilla `AreaEffectCloud`'s scale for instantaneous effects.
+const AREA_EFFECT_CLOUD_INSTANT_SCALE: f64 = 0.5;
+/// Vanilla `ThrownSplashPotion`: a splashed effect shorter than this is dropped.
+const SPLASH_MIN_DURATION: i32 = 20;
 
 impl PotionContents {
     /// Read effects from an `ItemStack`'s `PotionContents` data component.
@@ -131,79 +126,98 @@ impl PotionContents {
         Vec::new()
     }
 
-    /// Apply instant or duration effects to a target living entity.
+    /// Applies `effects` to `target` the way `source` does. `duration_scale` is the item's or
+    /// cloud's `potion_duration_scale`; `potion_entity` and `owner` make the indirect magic of
+    /// instant damage.
     pub fn apply_effects_to(
         target: &LivingEntity,
         effects: Vec<(&'static StatusEffect, i32, u8, bool, bool, bool)>,
-        scale: f32,
+        duration_scale: f32,
         source: PotionApplicationSource,
+        potion_entity: Option<&dyn EntityBase>,
+        owner: Option<&dyn EntityBase>,
     ) {
         for (effect_type, duration, amplifier, ambient, show_particles, show_icon) in effects {
-            // Instant effects should apply immediately
-            let is_instant = effect_type.id
-                == pumpkin_data::effect::StatusEffect::INSTANT_HEALTH.id
-                || effect_type.id == pumpkin_data::effect::StatusEffect::INSTANT_DAMAGE.id;
-
-            if is_instant {
-                // Instant potency scaling
-                let instant_scale = source.instant_scale(scale);
-
-                // Apply instant effects logic directly as they don't tick
-                if effect_type.id == pumpkin_data::effect::StatusEffect::INSTANT_HEALTH.id {
-                    let amount = 4.0 * (1 << amplifier) as f32 * instant_scale;
-                    target.heal(amount);
-                } else if effect_type.id == pumpkin_data::effect::StatusEffect::INSTANT_DAMAGE.id {
-                    let amount = 6.0 * (1 << amplifier) as f32 * instant_scale;
-
-                    let _ = target.damage(
-                        target.get_entity(),
-                        amount,
-                        pumpkin_data::damage::DamageType::MAGIC,
-                    );
+            let effect = MobEffectInstance::from(Effect {
+                effect_type,
+                duration,
+                amplifier,
+                ambient,
+                show_particles,
+                show_icon,
+                blend: false,
+            });
+            let instant = crate::entity::effect::get_mob_effect(effect_type)
+                .filter(|mob_effect| mob_effect.is_instantaneous());
+            match source {
+                PotionApplicationSource::Drink => {
+                    let effect = effect.with_scaled_duration(duration_scale);
+                    if let Some(instant) = instant {
+                        // The drinker is both source and owner when it's a player.
+                        let player = target.is_player().then(|| {
+                            target
+                                .entity
+                                .world
+                                .load()
+                                .get_entity_by_id(target.entity.entity_id)
+                        });
+                        let player = player.flatten();
+                        instant.apply_instantaneous_effect(
+                            player.as_deref(),
+                            player.as_deref(),
+                            target,
+                            amplifier,
+                            1.0,
+                        );
+                    } else {
+                        target.add_effect(effect.effect);
+                    }
                 }
-
-                // Like vanilla, instant effects are applied once and never added to the active
-                // effects, where they would linger.
-            } else {
-                // Duration scaling
-                let duration_scale = source.duration_scale(scale);
-
-                let dur = ((duration as f32) * duration_scale).max(1.0) as i32;
-                let eff = pumpkin_data::potion::Effect {
-                    effect_type,
-                    duration: dur,
-                    amplifier,
-                    ambient,
-                    show_particles,
-                    show_icon,
-                    blend: false,
-                };
-                target.add_effect(eff);
+                PotionApplicationSource::Splash(scale) => {
+                    if let Some(instant) = instant {
+                        instant.apply_instantaneous_effect(
+                            potion_entity,
+                            owner,
+                            target,
+                            amplifier,
+                            scale,
+                        );
+                    } else {
+                        let duration = effect.map_duration(|duration| {
+                            (scale * f64::from(duration) * f64::from(duration_scale) + 0.5) as i32
+                        });
+                        // `new MobEffectInstance(effect, duration, amplifier, ambient, visible)`.
+                        let new_effect = MobEffectInstance::from(Effect {
+                            effect_type,
+                            duration,
+                            amplifier,
+                            ambient,
+                            show_particles,
+                            show_icon: show_particles,
+                            blend: false,
+                        });
+                        if !new_effect.ends_within(SPLASH_MIN_DURATION) {
+                            target.add_effect(new_effect.effect);
+                        }
+                    }
+                }
+                PotionApplicationSource::AreaEffectCloud => {
+                    if let Some(instant) = instant {
+                        instant.apply_instantaneous_effect(
+                            potion_entity,
+                            owner,
+                            target,
+                            amplifier,
+                            AREA_EFFECT_CLOUD_INSTANT_SCALE,
+                        );
+                    } else {
+                        target.add_effect(effect.with_scaled_duration(duration_scale).effect);
+                    }
+                }
+                PotionApplicationSource::AddEffect => {
+                    target.add_effect(effect.with_scaled_duration(duration_scale).effect);
+                }
             }
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::PotionApplicationSource;
-    use pumpkin_data::data_component_impl::PotionDurationScaleImpl;
-    use pumpkin_data::item::Item;
-    use pumpkin_data::item_stack::ItemStack;
-
-    #[test]
-    fn tipped_arrow_scale_shortens_duration_without_reducing_instant_potency() {
-        let tipped_arrow = ItemStack::new(1, &Item::TIPPED_ARROW);
-        let scale = tipped_arrow
-            .get_data_component::<PotionDurationScaleImpl>()
-            .expect("tipped arrows should define a potion duration scale")
-            .scale;
-
-        assert_eq!(PotionApplicationSource::Arrow.duration_scale(scale), 0.125);
-        assert_eq!(
-            (160.0 * PotionApplicationSource::Arrow.duration_scale(scale)) as i32,
-            20
-        );
-        assert_eq!(PotionApplicationSource::Arrow.instant_scale(scale), 1.0);
     }
 }

@@ -20,7 +20,6 @@ use std::sync::atomic::{
     AtomicBool, AtomicI32, AtomicU8,
     Ordering::{Relaxed, SeqCst},
 };
-use tracing::warn;
 
 use super::breath::BreathManager;
 use super::experience_orb::ExperienceOrbEntity;
@@ -33,6 +32,7 @@ use crate::entity::attributes::Modifier;
 use crate::entity::attributes::ModifierOperation;
 use crate::entity::combat::{CombatRules, CombatTracker, FallLocation, knockback_after_resistance};
 use crate::entity::damage_source::DamageSource;
+use crate::entity::effect::MobEffectInstance;
 use crate::entity::mob::equipment::DEFAULT_EQUIPMENT_DROP_CHANCE;
 use crate::entity::player::statistics::{CustomStatistic, StatisticCategory};
 use crate::server::Server;
@@ -63,7 +63,7 @@ use pumpkin_inventory::entity_equipment::EntityEquipment;
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_nbt::tag::NbtTag;
 use pumpkin_protocol::codec::var_int::VarInt;
-use pumpkin_protocol::java::client::play::{CHurtAnimation, CTakeItemEntity, CUpdateMobEffect};
+use pumpkin_protocol::java::client::play::{CHurtAnimation, CRemoveMobEffect, CTakeItemEntity};
 use pumpkin_protocol::{
     codec::item_stack_seralizer::ItemStackSerializer,
     java::client::play::{CSetEquipment, MetadataSerializer},
@@ -144,7 +144,13 @@ pub struct LivingEntity {
     pub current_impulse_context_reset_grace_time: AtomicI32,
     /// Vanilla `currentImpulseImpactPos`: while set, falls are measured from this height.
     pub current_impulse_impact_pos: AtomicCell<Option<Vector3<f64>>>,
-    pub active_effects: std::sync::Mutex<FxHashMap<&'static StatusEffect, Effect>>,
+    pub active_effects: std::sync::Mutex<FxHashMap<&'static StatusEffect, MobEffectInstance>>,
+    /// Vanilla `effectsDirty`: the invisibility, glowing and particle data are refreshed
+    /// before the next sync.
+    effects_dirty: AtomicBool,
+    /// Vanilla `AttributeMap.attributesToUpdate`: attribute ids changed since the last
+    /// `refreshDirtyAttributes`.
+    attributes_to_update: std::sync::Mutex<Vec<u8>>,
     pub entity_equipment: Arc<std::sync::Mutex<EntityEquipment>>,
     pub equipment_drop_chances: Arc<std::sync::Mutex<FxHashMap<EquipmentSlot, f32>>>,
     pub movement_input: AtomicCell<Vector3<f64>>,
@@ -198,7 +204,8 @@ pub struct LivingEntity {
 #[derive(Clone)]
 struct EffectParticle {
     particle_id: VarInt,
-    color: i32,
+    /// The `entity_effect` colour; the effects with their own particle have none.
+    color: Option<i32>,
 }
 
 #[derive(Clone)]
@@ -215,19 +222,30 @@ impl MetadataSerializer for EffectParticles {
         writer.write_var_int(&VarInt(count))?;
         for particle in &self.0 {
             writer.write_var_int(&particle.particle_id)?;
-            writer.write_i32(particle.color)?;
+            if let Some(color) = particle.color {
+                writer.write_i32(color)?;
+            }
         }
         Ok(())
     }
 }
 
 impl EffectParticle {
-    const fn from_effect(effect: &Effect) -> Self {
-        Self {
-            particle_id: VarInt(Particle::EntityEffect as i32),
-            color: (((if effect.ambient { 38 } else { 255 }) as u32) << 24
-                | effect.effect_type.color as u32) as i32,
-        }
+    /// Vanilla `MobEffectInstance.getParticleOptions`.
+    fn from_effect(effect: &Effect) -> Self {
+        crate::entity::effect::effect_particle(effect.effect_type).map_or_else(
+            || Self {
+                particle_id: VarInt(Particle::EntityEffect as i32),
+                color: Some(
+                    (((if effect.ambient { 38 } else { 255 }) as u32) << 24
+                        | effect.effect_type.color as u32) as i32,
+                ),
+            },
+            |particle| Self {
+                particle_id: VarInt(particle as i32),
+                color: None,
+            },
+        )
     }
 }
 
@@ -347,6 +365,8 @@ impl LivingEntity {
             swing_state: std::sync::Mutex::new(SwingState::default()),
             livings_flags: AtomicU8::new(0),
             active_effects: std::sync::Mutex::new(FxHashMap::default()),
+            effects_dirty: AtomicBool::new(false),
+            attributes_to_update: std::sync::Mutex::new(Vec::new()),
             entity_equipment: Arc::new(std::sync::Mutex::new(EntityEquipment::new())),
             equipment_drop_chances: Arc::new(std::sync::Mutex::new(FxHashMap::default())),
             equipment_slots: Arc::new(build_equipment_slots()),
@@ -776,8 +796,8 @@ impl LivingEntity {
         false
     }
 
+    /// Vanilla `LivingEntity.heal`.
     pub fn heal(&self, additional_health: f32) {
-        assert!(additional_health > 0.0);
         let mut event =
             crate::plugin::api::events::entity::entity_regain_health::EntityRegainHealthEvent::new(
                 self.entity.entity_id,
@@ -840,22 +860,19 @@ impl LivingEntity {
         self.absorption.load()
     }
 
-    /// Sets the current absorption amount for this entity (yellow hearts)
+    /// Vanilla `getMaxAbsorption`.
+    pub fn get_max_absorption(&self) -> f32 {
+        self.get_attribute_value(&Attributes::MAX_ABSORPTION) as f32
+    }
+
+    /// Vanilla `setAbsorptionAmount`: clamped to `[0, max_absorption]`.
     pub fn set_absorption(&self, new_abs: f32) {
-        // Must be at least 0
-        let new_abs = new_abs.max(0.0);
+        self.internal_set_absorption(new_abs.clamp(0.0, self.get_max_absorption()));
+    }
 
-        // Set local state
+    /// Vanilla `internalSetAbsorptionAmount`, which `Player` also syncs (yellow hearts).
+    pub fn internal_set_absorption(&self, new_abs: f32) {
         self.absorption.store(new_abs);
-
-        // Broadcast attribute update for max_absorption so clients receive
-        // the updated absorption value via the attribute packet.
-        crate::entity::attributes::send_attribute_updates_for_living(
-            self,
-            vec![Attributes::MAX_ABSORPTION],
-        );
-
-        // Send absorption metadata for players (visual yellow hearts)
         if self.entity.entity_type == &EntityType::PLAYER {
             self.entity
                 .set_synced_data(tracked_data::player::DATA_PLAYER_ABSORPTION_ID, new_abs);
@@ -889,6 +906,8 @@ impl LivingEntity {
 
         f(inst);
         inst.dirty.store(true, Ordering::Relaxed);
+        drop(map);
+        self.mark_attribute_updated(attribute);
     }
 
     /// Vanilla `AttributeMap.getValue`: the instance's value, or the type's base value for an
@@ -987,6 +1006,7 @@ impl LivingEntity {
         {
             instance.base_value = base;
             instance.dirty.store(true, Ordering::Relaxed);
+            self.mark_attribute_updated(attribute);
         }
         true
     }
@@ -1057,6 +1077,8 @@ impl LivingEntity {
             ai.dirty.store(true, Ordering::Relaxed);
             map.insert(attribute.id, ai);
         }
+        drop(map);
+        self.mark_attribute_updated(attribute);
     }
 
     pub fn reset_effects_and_attributes(&self) {
@@ -1110,10 +1132,12 @@ impl LivingEntity {
         }
     }
 
-    #[expect(clippy::too_many_lines)]
-    pub fn add_effect(&self, effect: Effect) {
+    /// Vanilla `LivingEntity.addEffect`: merges into the active effect of the same type
+    /// (`MobEffectInstance.update`), then always runs `onEffectStarted`. Returns whether the
+    /// active effects changed.
+    pub fn add_effect(&self, effect: Effect) -> bool {
         if !self.can_be_affected(effect.effect_type) {
-            return;
+            return false;
         }
         let mut effect_event =
             crate::plugin::api::events::entity::entity_potion_effect::EntityPotionEffectEvent::new(
@@ -1128,232 +1152,308 @@ impl LivingEntity {
                 .fire_blocking(&server, &mut effect_event);
         }
         if effect_event.cancelled {
-            return;
+            return false;
         }
 
-        // Apply instant effects immediately before storing
-        if effect.effect_type == &StatusEffect::INSTANT_HEALTH {
-            let heal_amount = 4.0 * (1 << effect.amplifier) as f32;
-            self.heal(heal_amount);
-            // Like vanilla, instant effects are never sent or stored as active effects.
-            return;
-        } else if effect.effect_type == &StatusEffect::INSTANT_DAMAGE {
-            let damage_amount = 6.0 * (1 << effect.amplifier) as f32;
-            let dyn_self = self
-                .entity
-                .world
-                .load()
-                .get_entity_by_id(self.entity.entity_id);
-            if let Some(dyn_self) = dyn_self {
-                let _ = dyn_self.damage(&*dyn_self, damage_amount, DamageType::MAGIC);
+        let new_effect = MobEffectInstance::from(effect);
+        let effect_type = new_effect.effect_type;
+        let amplifier = new_effect.amplifier;
+        let mut effects = self
+            .active_effects
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let changed = if let Some(existing) = effects.get_mut(&effect_type) {
+            if existing.update(&new_effect) {
+                let updated = existing.effect.clone();
+                drop(effects);
+                self.on_effect_updated(&updated, true);
+                true
+            } else {
+                drop(effects);
+                false
             }
-            return;
+        } else {
+            effects.insert(effect_type, new_effect.clone());
+            drop(effects);
+            self.on_effect_added(&new_effect.effect);
+            // `MobEffectInstance.onEffectAdded`: the effect's sound, if it has one.
+            if let Some(sound) = crate::entity::effect::sound_on_added(effect_type) {
+                self.entity.world.load().play_sound_raw(
+                    sound as u16,
+                    self.sound_source(),
+                    &self.entity.pos.load(),
+                    1.0,
+                    1.0,
+                );
+            }
+            true
+        };
+        if let Some(mob_effect) = crate::entity::effect::get_mob_effect(effect_type) {
+            mob_effect.on_effect_started(self, amplifier);
         }
+        changed
+    }
 
-        // Apply non-instant effects
+    /// Vanilla `getSoundSource`, with `Player`'s override.
+    fn sound_source(&self) -> SoundCategory {
+        if self.is_player() {
+            SoundCategory::Players
+        } else {
+            crate::entity::mob::sounds::sound_source(self.entity.entity_type)
+        }
+    }
 
-        // Effects that modify attributes (ex. speed) should also update the
-        // entity's attribute instances (server-side) and then notify clients.
-        if !effect.effect_type.attribute_modifiers.is_empty() {
-            // Apply each attribute modifier into the local AttributeInstance
-            for m in effect.effect_type.attribute_modifiers {
-                let id = m.id.to_string();
-                let op = match m.operation {
-                    Operation::AddValue => ModifierOperation::Add,
-                    Operation::AddMultipliedBase => ModifierOperation::MultiplyBase,
-                    Operation::AddMultipliedTotal => ModifierOperation::MultiplyTotal,
-                };
-                let scaled_amount = m.base_value * (f64::from(effect.amplifier) + 1.);
-                let mod_inst = Modifier {
-                    id,
-                    amount: scaled_amount,
-                    operation: op,
-                };
+    /// Vanilla `LivingEntity.isInvertedHealAndHarm`.
+    #[must_use]
+    pub fn is_inverted_heal_and_harm(&self) -> bool {
+        self.entity
+            .entity_type
+            .has_tag(&tag::EntityType::MINECRAFT_INVERTED_HEALING_AND_HARM)
+    }
 
-                self.update_attribute(m.attribute, |inst| {
-                    inst.add_or_replace_modifier(mod_inst.clone());
-                });
+    /// Vanilla `MobEffect.addAttributeModifiers`: permanent modifiers, so they are saved.
+    fn add_effect_attribute_modifiers(&self, effect_type: &'static StatusEffect, amplifier: u8) {
+        for m in effect_type.attribute_modifiers {
+            if !self.get_attribute_instance(m.attribute) {
+                continue;
             }
+            let operation = match m.operation {
+                Operation::AddValue => ModifierOperation::Add,
+                Operation::AddMultipliedBase => ModifierOperation::MultiplyBase,
+                Operation::AddMultipliedTotal => ModifierOperation::MultiplyTotal,
+            };
+            // `AttributeTemplate.create`: `amount * (amplifier + 1)`.
+            let modifier = Modifier {
+                id: m.id.to_string(),
+                amount: m.base_value * f64::from(i32::from(amplifier) + 1),
+                operation,
+            };
+            self.update_attribute(m.attribute, |inst| {
+                inst.add_or_replace_permanent_modifier(modifier);
+            });
+        }
+        self.send_effect_attribute_updates(effect_type);
+    }
 
-            // Recompute packet modifiers from active effects for each affected attribute
-            let mut touched_attrs: Vec<pumpkin_data::attributes::Attributes> = Vec::new();
-            for m in effect.effect_type.attribute_modifiers {
-                if !touched_attrs.iter().any(|a| a.id == m.attribute.id) {
-                    touched_attrs.push(m.attribute.clone());
+    /// Vanilla `MobEffect.removeAttributeModifiers`.
+    fn remove_effect_attribute_modifiers(&self, effect_type: &'static StatusEffect) {
+        for m in effect_type.attribute_modifiers {
+            let mut map = self
+                .attributes
+                .write()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            if let Some(inst) = map.get_mut(&m.attribute.id) {
+                inst.remove_modifier(m.id);
+                drop(map);
+                self.mark_attribute_updated(m.attribute);
+            }
+        }
+        self.send_effect_attribute_updates(effect_type);
+    }
+
+    fn send_effect_attribute_updates(&self, effect_type: &'static StatusEffect) {
+        let mut touched: Vec<Attributes> = Vec::new();
+        for m in effect_type.attribute_modifiers {
+            push_unique_attribute(&mut touched, m.attribute);
+        }
+        if !touched.is_empty() {
+            crate::entity::attributes::send_attribute_updates_for_living(self, touched);
+        }
+    }
+
+    /// Vanilla `onEffectAdded`, with `ServerPlayer`'s override sending the effect to the player.
+    fn on_effect_added(&self, effect: &Effect) {
+        self.effects_dirty.store(true, Relaxed);
+        self.add_effect_attribute_modifiers(effect.effect_type, effect.amplifier);
+        self.send_effect_to_passengers(effect);
+        if let Some(player) = self.self_player() {
+            player.send_effect_with_blend(effect, true);
+        }
+        self.send_bedrock_effect(effect);
+    }
+
+    /// Vanilla `onEffectUpdated`.
+    fn on_effect_updated(&self, effect: &Effect, do_refresh_attributes: bool) {
+        self.effects_dirty.store(true, Relaxed);
+        if do_refresh_attributes {
+            self.remove_effect_attribute_modifiers(effect.effect_type);
+            self.add_effect_attribute_modifiers(effect.effect_type, effect.amplifier);
+            self.refresh_dirty_attributes();
+        }
+        self.send_effect_to_passengers(effect);
+        if let Some(player) = self.self_player() {
+            player.send_effect_with_blend(effect, false);
+        }
+        self.send_bedrock_effect(effect);
+    }
+
+    /// Vanilla `onEffectsRemoved`.
+    fn on_effects_removed(&self, effects: &[&'static StatusEffect]) {
+        self.effects_dirty.store(true, Relaxed);
+        for &effect_type in effects {
+            self.remove_effect_attribute_modifiers(effect_type);
+            let packet = CRemoveMobEffect::new(
+                self.entity.entity_id.into(),
+                VarInt(i32::from(effect_type.id)),
+            );
+            for passenger in self.passenger_players() {
+                if let Some(player) = passenger.get_player() {
+                    player.try_send_client_packet(&packet);
                 }
             }
-
-            if !touched_attrs.is_empty() {
-                crate::entity::attributes::send_attribute_updates_for_living(self, touched_attrs);
+        }
+        self.refresh_dirty_attributes();
+        if let Some(player) = self.self_player() {
+            for &effect_type in effects {
+                player.try_send_client_packet(&CRemoveMobEffect::new(
+                    self.entity.entity_id.into(),
+                    VarInt(i32::from(effect_type.id)),
+                ));
             }
         }
+        let world = self.entity.world.load();
+        for &effect_type in effects {
+            world.send_to_tracking_players_bedrock(
+                &self.entity,
+                &pumpkin_protocol::bedrock::client::CMobEffect {
+                    target_runtime_id: VarULong(self.entity.entity_id as u64),
+                    event_id: pumpkin_protocol::bedrock::client::CMobEffect::EVENT_REMOVE,
+                    effect_id: VarInt(effect_type.to_bedrock_id()),
+                    effect_amplifier: VarInt(0),
+                    show_particles: false,
+                    effect_duration_ticks: VarInt(0),
+                    tick: VarULong(0),
+                    ambient: false,
+                },
+            );
+        }
+    }
 
-        // Apply absorption effect (+4 absorption per level)
-        if effect.effect_type == &StatusEffect::ABSORPTION {
-            let added = 4.0 * (effect.amplifier as f32 + 1.0);
-            let max_abs = self.get_attribute_value(&Attributes::MAX_ABSORPTION) as f32;
-            let new_abs = (self.absorption.load() + added).min(max_abs);
-            self.set_absorption(new_abs);
-        }
-
-        // Apply invisible effect
-        if effect.effect_type == &StatusEffect::INVISIBILITY {
-            self.entity.set_invisible(true);
-        }
-
-        // Apply glowing effect
-        if effect.effect_type == &StatusEffect::GLOWING {
-            self.entity.set_glowing(true);
-        }
-
-        // Broadcast effect to nearby players
-        let mut flag: i8 = 0;
-        if effect.ambient {
-            flag |= 1;
-        }
-        if effect.show_particles {
-            flag |= 2;
-        }
-        if effect.show_icon {
-            flag |= 4;
-        }
-        if effect.blend {
-            flag |= 8;
-        }
-
-        let je_packet = CUpdateMobEffect::new(
-            self.entity.entity_id.into(),
-            VarInt(i32::from(effect.effect_type.id)),
-            effect.amplifier.into(),
-            effect.duration.into(),
-            flag,
+    /// Bedrock clients draw other entities' effects from `MobEffect` packets.
+    fn send_bedrock_effect(&self, effect: &Effect) {
+        self.entity.world.load().send_to_tracking_players_bedrock(
+            &self.entity,
+            &pumpkin_protocol::bedrock::client::CMobEffect {
+                target_runtime_id: VarULong(self.entity.entity_id as u64),
+                event_id: pumpkin_protocol::bedrock::client::CMobEffect::EVENT_ADD,
+                effect_id: VarInt(effect.effect_type.to_bedrock_id()),
+                effect_amplifier: VarInt(i32::from(effect.amplifier)),
+                show_particles: effect.show_particles,
+                effect_duration_ticks: VarInt(effect.duration),
+                tick: VarULong(0),
+                ambient: effect.ambient,
+            },
         );
+    }
 
-        let be_packet = pumpkin_protocol::bedrock::client::CMobEffect {
-            target_runtime_id: VarULong(self.entity.entity_id as u64),
-            event_id: pumpkin_protocol::bedrock::client::CMobEffect::EVENT_ADD,
-            effect_id: VarInt(effect.effect_type.to_bedrock_id()),
-            effect_amplifier: VarInt(i32::from(effect.amplifier)),
-            show_particles: effect.show_particles,
-            effect_duration_ticks: VarInt(effect.duration),
-            tick: VarULong(0),
-            ambient: effect.ambient,
-        };
-
-        let chunk_pos = self.entity.chunk_pos.load();
+    /// This entity as a player, for the `ServerPlayer` overrides.
+    fn self_player(&self) -> Option<Arc<crate::entity::player::Player>> {
+        if !self.is_player() {
+            return None;
+        }
         self.entity
             .world
             .load()
-            .broadcast_to_chunk_editioned(chunk_pos, &je_packet, &be_packet);
-        if effect.effect_type != &StatusEffect::INSTANT_HEALTH
-            && effect.effect_type != &StatusEffect::INSTANT_DAMAGE
-        {
-            self.active_effects
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .insert(effect.effect_type, effect);
-        }
-        self.sync_effect_particles();
+            .get_player_by_uuid(self.entity.entity_uuid)
     }
 
-    fn sync_effect_particles(&self) {
+    /// The players riding this entity.
+    fn passenger_players(&self) -> Vec<Arc<dyn EntityBase>> {
+        self.entity
+            .passengers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .iter()
+            .filter(|passenger| passenger.get_player().is_some())
+            .cloned()
+            .collect()
+    }
+
+    /// Vanilla `sendEffectToPassengers`.
+    fn send_effect_to_passengers(&self, effect: &Effect) {
+        for passenger in self.passenger_players() {
+            if let Some(player) = passenger.get_player() {
+                player.send_effect_for(self.entity.entity_id, effect, false);
+            }
+        }
+    }
+
+    /// Vanilla `updateDirtyEffects`, run before the entity's data is synced.
+    pub fn update_dirty_effects(&self) {
+        if self.effects_dirty.swap(false, Relaxed) {
+            self.update_invisibility_status();
+            // `updateGlowingStatus`: the glowing tag or, on the server, the effect.
+            self.entity.set_glowing(
+                self.entity.has_glowing_tag.load(Relaxed)
+                    || self.has_effect(&StatusEffect::GLOWING),
+            );
+        }
+    }
+
+    /// Vanilla `updateInvisibilityStatus`, with `updateSynchronizedMobEffectParticles`.
+    fn update_invisibility_status(&self) {
         let effects = self
             .active_effects
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let has_effects = !effects.is_empty();
+        if effects.is_empty() {
+            drop(effects);
+            // `removeEffectParticles`.
+            self.entity.set_synced_data(
+                tracked_data::living_entity::EFFECT_PARTICLES,
+                EffectParticles(Vec::new()),
+            );
+            self.entity.set_invisible(false);
+            return;
+        }
+        let invisible = effects.contains_key(&StatusEffect::INVISIBILITY);
         let particles = EffectParticles(
             effects
                 .values()
                 .filter(|effect| effect.show_particles)
-                .map(EffectParticle::from_effect)
+                .map(|effect| EffectParticle::from_effect(effect))
                 .collect(),
         );
+        // `areAllEffectsAmbient`.
         let ambient = effects
             .values()
-            .filter(|effect| effect.show_particles)
-            .all(|effect| effect.ambient);
+            .all(|effect| !effect.show_particles || effect.ambient);
         drop(effects);
-
+        self.entity.set_invisible(invisible);
         self.entity
             .set_synced_data(tracked_data::living_entity::EFFECT_PARTICLES, particles);
-        if has_effects {
-            self.entity
-                .set_synced_data(tracked_data::living_entity::EFFECT_AMBIENCE_ID, ambient);
-        }
+        self.entity
+            .set_synced_data(tracked_data::living_entity::EFFECT_AMBIENCE_ID, ambient);
     }
 
+    /// Vanilla `removeEffect`.
     pub fn remove_effect(&self, effect_type: &'static StatusEffect) -> bool {
-        // Remove the effect
-        let succeeded = self
+        let removed = self
             .active_effects
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .remove(&effect_type)
             .is_some();
-
-        // Broadcast effect removal
-        self.entity
-            .world
-            .load()
-            .send_remove_mob_effect(&self.entity, effect_type);
-
-        // Remove attribute modifiers, if any
-        if !effect_type.attribute_modifiers.is_empty() {
-            let mut touched_attrs = Vec::new();
-
-            for m in effect_type.attribute_modifiers {
-                let id = m.id.to_string();
-
-                // Clean local server state
-                self.update_attribute(m.attribute, |inst| {
-                    inst.remove_modifier(&id);
-                });
-
-                // Track unique attributes for the packet update
-                if !touched_attrs
-                    .iter()
-                    .any(|a: &Attributes| a.id == m.attribute.id)
-                {
-                    touched_attrs.push(m.attribute.clone());
-                }
-            }
-
-            // Sync the clean state to the client
-            if !touched_attrs.is_empty() {
-                crate::entity::attributes::send_attribute_updates_for_living(self, touched_attrs);
-            }
+        if removed {
+            self.on_effects_removed(&[effect_type]);
         }
+        removed
+    }
 
-        // If absorption effect removed, clear current absorption amount and notify clients
-        if effect_type == &StatusEffect::ABSORPTION {
-            self.set_absorption(0.0);
+    /// Vanilla `removeAllEffects`.
+    pub fn remove_all_effects(&self) -> bool {
+        let removed: Vec<&'static StatusEffect> = self
+            .active_effects
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .drain()
+            .map(|(effect_type, _)| effect_type)
+            .collect();
+        if removed.is_empty() {
+            return false;
         }
-
-        // If health boost effect removed, clamp current health to new max and notify clients
-        if effect_type == &StatusEffect::HEALTH_BOOST {
-            let new_max = self.get_max_health();
-            if self.health.load() > new_max {
-                // Update local health and send both health and absorption metadata together
-                self.set_health(new_max.max(0.0));
-            }
-        }
-
-        // If invisible effect removed, disable invisibility
-        if effect_type == &StatusEffect::INVISIBILITY {
-            self.entity.set_invisible(false);
-        }
-
-        // If glowing effect removed, disable glowing
-        if effect_type == &StatusEffect::GLOWING {
-            self.entity.set_glowing(false);
-        }
-
-        if succeeded {
-            self.sync_effect_particles();
-        }
-
-        succeeded
+        self.on_effects_removed(&removed);
+        true
     }
 
     pub fn has_effect(&self, effect: &'static StatusEffect) -> bool {
@@ -1368,7 +1468,50 @@ impl LivingEntity {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .get(&effect)
-            .cloned()
+            .map(|instance| instance.effect.clone())
+    }
+
+    /// Vanilla `refreshDirtyAttributes`: `onAttributeUpdated` for each attribute changed since.
+    pub fn refresh_dirty_attributes(&self) {
+        let updated: Vec<u8> = std::mem::take(
+            &mut *self
+                .attributes_to_update
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+        );
+        for id in updated {
+            self.on_attribute_updated(id);
+        }
+    }
+
+    /// Records an attribute change for the next `refresh_dirty_attributes`, as vanilla's
+    /// `AttributeMap.onAttributeModified` does.
+    fn mark_attribute_updated(&self, attribute: &Attributes) {
+        let mut updated = self
+            .attributes_to_update
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if !updated.contains(&attribute.id) {
+            updated.push(attribute.id);
+        }
+    }
+
+    /// Vanilla `onAttributeUpdated`.
+    fn on_attribute_updated(&self, attribute_id: u8) {
+        if attribute_id == Attributes::MAX_HEALTH.id {
+            let max_health = self.get_max_health();
+            if self.health.load() > max_health {
+                self.set_health(max_health);
+            }
+        } else if attribute_id == Attributes::MAX_ABSORPTION.id {
+            let max_absorption = self.get_max_absorption();
+            if self.get_absorption() > max_absorption {
+                self.set_absorption(max_absorption);
+            }
+        }
+        // `SCALE` refreshes the dimensions, which needs the full entity: the tick picks the
+        // change up from `applied_scale`.
+        // TODO: `WAYPOINT_TRANSMIT_RANGE` tracking; the waypoint manager isn't ported.
     }
 
     // Check if the entity is in water
@@ -2873,46 +3016,87 @@ impl LivingEntity {
         )
     }
 
+    /// Vanilla `tickEffects` on the server, each effect through `MobEffectInstance.tickServer`.
     fn tick_effects(&self) {
-        let mut effects_to_remove = Vec::new();
-        let mut effects_to_apply = Vec::new();
+        let effect_types: Vec<&'static StatusEffect> = self
+            .active_effects
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .keys()
+            .copied()
+            .collect();
+        for effect_type in effect_types {
+            self.tick_effect(effect_type);
+        }
+    }
 
-        {
-            let Ok(mut effects) = self.active_effects.try_lock() else {
-                return;
-            };
-            let tick_count = self.entity.tick_count.load(Relaxed);
-            for effect in effects.values_mut() {
-                if effect.duration == 0 {
-                    effects_to_remove.push(effect.effect_type);
-                    continue;
-                }
-
-                let tick_duration = if effect.duration == -1 {
-                    tick_count
+    fn tick_effect(&self, effect_type: &'static StatusEffect) {
+        let Some((has_remaining, tick_count, amplifier)) = self
+            .active_effects
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get(&effect_type)
+            .map(|effect| {
+                let tick_count = if effect.is_infinite_duration() {
+                    self.entity.tick_count.load(Relaxed)
                 } else {
                     effect.duration
                 };
-
-                if let Some(mob_effect) = crate::entity::effect::get_mob_effect(effect.effect_type)
-                    && mob_effect.should_apply_effect_tick(tick_duration, effect.amplifier)
-                {
-                    effects_to_apply.push((mob_effect, effect.amplifier));
-                }
-
-                if effect.duration != -1 {
-                    effect.duration -= 1;
+                (
+                    effect.has_remaining_duration(),
+                    tick_count,
+                    effect.amplifier,
+                )
+            })
+        else {
+            return;
+        };
+        let mut keep = has_remaining;
+        if keep
+            && let Some(mob_effect) = crate::entity::effect::get_mob_effect(effect_type)
+            && mob_effect.should_apply_effect_tick(tick_count, amplifier)
+            && !mob_effect.apply_effect_tick(self, amplifier)
+        {
+            keep = false;
+        }
+        let snapshot = if keep {
+            let mut effects = self
+                .active_effects
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let Some(instance) = effects.get_mut(&effect_type) else {
+                return;
+            };
+            instance.tick_down_duration();
+            let downgraded = instance.downgrade_to_hidden_effect();
+            keep = instance.has_remaining_duration();
+            let effect = instance.effect.clone();
+            drop(effects);
+            if downgraded {
+                self.on_effect_updated(&effect, true);
+            }
+            Some(effect)
+        } else {
+            None
+        };
+        match snapshot {
+            Some(effect) if keep => {
+                // Every 600 ticks the effect is resent so the client's timer doesn't drift.
+                if effect.duration % 600 == 0 {
+                    self.on_effect_updated(&effect, false);
                 }
             }
-        }
-
-        // Call the central removal function for each expired effect
-        for effect_type in effects_to_remove {
-            self.remove_effect(effect_type);
-        }
-
-        for (mob_effect, amplifier) in effects_to_apply {
-            mob_effect.apply_effect_tick(self, amplifier);
+            _ => {
+                if self
+                    .active_effects
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .remove(&effect_type)
+                    .is_some()
+                {
+                    self.on_effects_removed(&[effect_type]);
+                }
+            }
         }
     }
 
@@ -3407,21 +3591,19 @@ impl LivingEntity {
         nbt.put_bool("FallFlying", self.entity.is_fall_flying());
         self.breath.write_nbt(nbt);
         {
-            let effects_vec: Vec<pumpkin_data::potion::Effect> = {
-                let effects = self
-                    .active_effects
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner);
-                effects.values().cloned().collect()
-            };
-            if !effects_vec.is_empty() {
-                // Iterate effects and create Box<[NbtTag]>
-                let mut effects_list = Vec::with_capacity(effects_vec.len());
-                for effect in effects_vec {
-                    let mut effect_nbt = pumpkin_nbt::compound::NbtCompound::new();
-                    effect.write_nbt(&mut effect_nbt);
-                    effects_list.push(NbtTag::Compound(effect_nbt));
-                }
+            let effects = self
+                .active_effects
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            if !effects.is_empty() {
+                let effects_list = effects
+                    .values()
+                    .map(|effect| {
+                        let mut effect_nbt = NbtCompound::new();
+                        effect.write_nbt(&mut effect_nbt);
+                        NbtTag::Compound(effect_nbt)
+                    })
+                    .collect();
                 nbt.put("active_effects", NbtTag::List(effects_list));
             }
         }
@@ -3529,12 +3711,36 @@ impl LivingEntity {
     }
 
     pub fn read_living_nbt_non_mut(&self, nbt: &NbtCompound) {
+        // `internalSetAbsorptionAmount`: unclamped, before the attributes are read.
+        self.internal_set_absorption(nbt.get_float("AbsorptionAmount").unwrap_or(0.0));
         self.set_last_hurt_by_player(
             nbt.get_uuid("last_hurt_by_player"),
             nbt.get_int("last_hurt_by_player_memory_time").unwrap_or(0),
         );
         // Vanilla reads `attributes` before `Health`, so a raised max health holds.
         self.read_attributes_nbt(nbt);
+        {
+            let effects: Vec<MobEffectInstance> = nbt
+                .get_list("active_effects")
+                .map(|list| {
+                    list.iter()
+                        .filter_map(NbtTag::extract_compound)
+                        .filter_map(|effect| {
+                            MobEffectInstance::create_from_nbt(&mut effect.clone())
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            let mut active_effects = self
+                .active_effects
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            active_effects.clear();
+            for effect in effects {
+                active_effects.insert(effect.effect_type, effect);
+                self.effects_dirty.store(true, Relaxed);
+            }
+        }
         // Vanilla LivingEntity.readAdditionalSaveData defaults to the mob's own max health,
         // not a flat 20; a hoglin (40 max) or iron golem (100 max) with no saved Health would
         // otherwise be silently reset to 20 here.
@@ -3557,12 +3763,6 @@ impl LivingEntity {
                 }
             }
         }
-
-        // Clamp any persisted absorption to the entity's configured max
-        let raw_abs = nbt.get_float("AbsorptionAmount").unwrap_or(0.0);
-        let max_abs = self.get_attribute_value(&Attributes::MAX_ABSORPTION) as f32;
-        let clamped_abs = raw_abs.max(0.0).min(max_abs);
-        self.absorption.store(clamped_abs);
 
         if let Some(invulnerable_time) = nbt.get_int("invulnerable_time") {
             self.hurt_cooldown.store(invulnerable_time, Relaxed);
@@ -3589,31 +3789,6 @@ impl LivingEntity {
         self.entity
             .fall_flying
             .store(nbt.get_bool("FallFlying").unwrap_or(false), Relaxed);
-        {
-            let nbt_effects = nbt.get_list("active_effects");
-            if let Some(nbt_effects) = nbt_effects {
-                let mut read_effects = Vec::new();
-                for effect in nbt_effects {
-                    if let NbtTag::Compound(effect_nbt) = effect {
-                        if let Some(mut effect) = Effect::create_from_nbt(&mut effect_nbt.clone()) {
-                            effect.blend = true; // TODO: change, is taken from effect give command
-                            read_effects.push(effect);
-                        } else {
-                            warn!("Unable to read effect from nbt");
-                        }
-                    }
-                }
-                if !read_effects.is_empty() {
-                    let mut active_effects = self
-                        .active_effects
-                        .lock()
-                        .unwrap_or_else(std::sync::PoisonError::into_inner);
-                    for effect in read_effects {
-                        active_effects.insert(effect.effect_type, effect);
-                    }
-                }
-            }
-        }
         // todo more...
     }
 
@@ -4521,11 +4696,16 @@ impl EntityBase for LivingEntity {
                     .is_some()
                 {
                     let effects = crate::item::potion::PotionContents::read_potion_effects(item);
+                    let duration_scale = item
+                        .get_data_component::<pumpkin_data::data_component_impl::PotionDurationScaleImpl>()
+                        .map_or(1.0, |component| component.scale);
                     crate::item::potion::PotionContents::apply_effects_to(
                         self,
                         effects,
-                        1.0,
-                        crate::item::potion::PotionApplicationSource::Normal,
+                        duration_scale,
+                        crate::item::potion::PotionApplicationSource::Drink,
+                        None,
+                        None,
                     );
                     is_potion = true;
                 }

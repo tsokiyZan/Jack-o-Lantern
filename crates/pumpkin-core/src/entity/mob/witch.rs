@@ -294,11 +294,17 @@ impl Mob for WitchEntity {
                     )]);
 
                     let effects = crate::item::potion::PotionContents::read_potion_effects(&stack);
+                    // `potion.forEachEffect(this::addEffect, durationScale)`.
+                    let duration_scale = stack
+                        .get_data_component::<pumpkin_data::data_component_impl::PotionDurationScaleImpl>()
+                        .map_or(1.0, |component| component.scale);
                     crate::item::potion::PotionContents::apply_effects_to(
                         living,
                         effects,
-                        1.0,
-                        crate::item::potion::PotionApplicationSource::Normal,
+                        duration_scale,
+                        crate::item::potion::PotionApplicationSource::AddEffect,
+                        None,
+                        None,
                     );
                 }
             }

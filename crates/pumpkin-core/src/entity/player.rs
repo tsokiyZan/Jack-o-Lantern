@@ -5705,7 +5705,10 @@ impl Player {
             .active_effects
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        effects.values().cloned().collect()
+        effects
+            .values()
+            .map(|instance| instance.effect.clone())
+            .collect()
     }
 
     #[must_use]
@@ -5721,17 +5724,11 @@ impl Player {
         self.raid_omen_position.store(None);
     }
 
+    /// Vanilla `PlayerList.sendActivePlayerEffects`: every effect, without blending.
     pub fn send_active_effects(&self) {
-        let effects: Vec<_> = self
-            .living_entity
-            .active_effects
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .values()
-            .cloned()
-            .collect();
+        let effects = self.get_active_effects();
         for effect in &effects {
-            self.send_effect(effect);
+            self.send_effect_with_blend(effect, false);
         }
     }
 
@@ -5740,8 +5737,18 @@ impl Player {
      * It won't be tracked on the server.
      */
     pub fn send_effect(&self, effect: &Effect) {
-        let mut flag: i8 = 0;
+        self.send_effect_with_blend(effect, effect.blend);
+    }
 
+    /// Vanilla `ClientboundUpdateMobEffectPacket` about this player itself.
+    pub fn send_effect_with_blend(&self, effect: &Effect, blend: bool) {
+        self.send_effect_for(self.entity_id(), effect, blend);
+    }
+
+    /// Vanilla `ClientboundUpdateMobEffectPacket` about `entity_id`, as a rider gets its
+    /// mount's effects.
+    pub fn send_effect_for(&self, entity_id: i32, effect: &Effect, blend: bool) {
+        let mut flag: i8 = 0;
         if effect.ambient {
             flag |= 1;
         }
@@ -5751,13 +5758,13 @@ impl Player {
         if effect.show_icon {
             flag |= 4;
         }
-        if effect.blend {
+        if blend {
             flag |= 8;
         }
 
         let effect_id = VarInt(i32::from(effect.effect_type.id));
         self.try_send_client_packet(&CUpdateMobEffect::new(
-            self.entity_id().into(),
+            entity_id.into(),
             effect_id,
             effect.amplifier.into(),
             effect.duration.into(),
@@ -5766,48 +5773,11 @@ impl Player {
     }
 
     pub fn remove_effect(&self, effect_type: &'static StatusEffect) -> bool {
-        let effect_id = VarInt(i32::from(effect_type.id));
-        self.try_send_client_packet(
-            &pumpkin_protocol::java::client::play::CRemoveMobEffect::new(
-                self.entity_id().into(),
-                effect_id,
-            ),
-        );
-
         self.living_entity.remove_effect(effect_type)
-
-        // TODO broadcast metadata
     }
 
     pub fn remove_all_effects(&self) -> bool {
-        let mut succeeded = false;
-        let mut effect_list = vec![];
-        let effects: Vec<_> = self
-            .living_entity
-            .active_effects
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .keys()
-            .copied()
-            .collect();
-        for effect in effects {
-            effect_list.push(effect);
-            let effect_id = VarInt(i32::from(effect.id));
-            self.try_send_client_packet(
-                &pumpkin_protocol::java::client::play::CRemoveMobEffect::new(
-                    self.entity_id().into(),
-                    effect_id,
-                ),
-            );
-            succeeded = true;
-        }
-
-        // Need to remove effects afterward here because there would be a deadlock if this is done in the for loop.
-        for effect in effect_list {
-            self.living_entity.remove_effect(effect);
-        }
-
-        succeeded
+        self.living_entity.remove_all_effects()
     }
 
     /// Add experience levels to the player.
