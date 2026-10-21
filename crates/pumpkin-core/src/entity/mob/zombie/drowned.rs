@@ -292,12 +292,7 @@ impl Mob for DrownedEntity {
                     .store(true, Ordering::Relaxed);
             }
             nautilus.get_entity().set_rotation(entity.yaw.load(), 0.0);
-            crate::entity::mob::spawn::finalize_spawn(
-                &nautilus,
-                world,
-                EntitySpawnReason::Jockey,
-                None,
-            );
+            crate::entity::mob::spawn::finalize_spawn(&nautilus, world, reason, None);
             mob_entity.set_pending_vehicle(nautilus.clone());
             world.spawn_entity(nautilus);
         }

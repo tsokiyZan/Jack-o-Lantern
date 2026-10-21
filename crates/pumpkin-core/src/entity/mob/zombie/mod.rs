@@ -420,6 +420,11 @@ impl ZombieEntityBase {
                     &world,
                     &spawn_pos,
                     world.is_thundering(),
+                    crate::entity::mob::spawn::EntitySpawnReason::Reinforcement,
+                    &mut world
+                        .random
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner),
                 )
             {
                 continue;
@@ -429,7 +434,7 @@ impl ZombieEntityBase {
             reinforcement_entity.set_pos(spawn_pos);
             let bounding_box = reinforcement_entity.bounding_box.load();
             if world.has_nearby_alive_player(spawn_pos, 7.0)
-                || !world.get_entities_at_box(&bounding_box).is_empty()
+                || !world.is_unobstructed(Some(reinforcement_entity), &bounding_box)
                 || !world.is_space_empty(bounding_box)
                 || (!self.can_spawn_in_liquids() && world.contains_any_liquid(bounding_box))
             {

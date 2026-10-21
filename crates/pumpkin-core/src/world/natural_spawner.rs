@@ -612,17 +612,26 @@ pub fn spawn_mobs_for_chunk_generation(
                         fx,
                         f64::from(pos.0.y),
                         fz,
-                    )) && check_spawn_rules(entity_type, world, &check_pos, false)
-                    {
+                    )) && check_spawn_rules(
+                        entity_type,
+                        world,
+                        &check_pos,
+                        false,
+                        crate::entity::mob::spawn::EntitySpawnReason::ChunkGeneration,
+                        // Vanilla passes `WorldGenRegion.getRandom()`; like the rest of this
+                        // function's draws, that region random isn't ported.
+                        &mut pumpkin_util::random::legacy_rand::LegacyRand::from_seed(
+                            rand::random(),
+                        ),
+                    ) {
                         let entity = from_type(entity_type, spawn_pos_f64, world, Uuid::new_v4());
                         entity
                             .get_entity()
                             .set_rotation(rand::random::<f32>() * 360.0, 0.0);
-                        // `mob.checkSpawnObstruction(level)`, after the spawn rules.
-                        if entity
-                            .get_mob()
-                            .is_none_or(|mob| mob.check_spawn_obstruction(world))
-                        {
+                        // `mob.checkSpawnRules(level, CHUNK_GENERATION) && mob.checkSpawnObstruction(level)`.
+                        if entity.get_mob().is_none_or(|mob| {
+                            mob_check_spawn_rules(mob) && mob.check_spawn_obstruction(world)
+                        }) {
                             group_data = finalize_spawn(
                                 &entity,
                                 world,
@@ -828,9 +837,10 @@ pub fn spawn_category_for_position(
 
                     let is_valid_for_mob = entity.get_mob().is_none_or(|mob| {
                         let despawn_dist = f64::from(entity_type.category.despawn_distance);
-                        // Vanilla `isValidPositionForMob`: the spawn rules passed above.
+                        // Vanilla `isValidPositionForMob`.
                         !(player_distance_sq > despawn_dist * despawn_dist
                             && mob.remove_when_far_away(player_distance_sq))
+                            && mob_check_spawn_rules(mob)
                             && mob.check_spawn_obstruction(world)
                     });
 
@@ -998,7 +1008,17 @@ pub fn is_valid_spawn_position_for_type(
     if !is_spawn_position_ok(world, block_pos, entity_type) {
         return false;
     }
-    if !check_spawn_rules(entity_type, world, block_pos, is_thundering) {
+    if !check_spawn_rules(
+        entity_type,
+        world,
+        block_pos,
+        is_thundering,
+        crate::entity::mob::spawn::EntitySpawnReason::Natural,
+        &mut world
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
+    ) {
         return false;
     }
     if !world.is_space_empty(entity_type.get_spawn_bounding_box(
@@ -1110,6 +1130,13 @@ pub fn is_valid_empty_spawn_block(
         return false;
     }
     !is_block_dangerous(entity_type, state)
+}
+
+/// Vanilla `Mob.checkSpawnRules`, which `PathfinderMob` makes "the walk target value of its
+/// block isn't negative".
+fn mob_check_spawn_rules(mob: &dyn crate::entity::mob::Mob) -> bool {
+    !crate::entity::mob::is_pathfinder_mob(mob)
+        || mob.get_walk_target_value(&mob.get_entity().block_pos.load()) >= 0.0
 }
 
 /// Vanilla `NaturalSpawner.isValidEmptySpawnBlock` with the fluid state it is given, which

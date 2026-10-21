@@ -4746,6 +4746,7 @@ impl World {
                 source.entity_id != base.entity_id
                     && source.root_vehicle_id() != base.root_vehicle_id()
             }) && !base.is_removed()
+                && !entity.is_spectator()
                 && crate::entity::blocks_building(entity)
                 && base.bounding_box.load().intersects(bounding_box)
         };

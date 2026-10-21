@@ -892,39 +892,31 @@ impl MobEntity {
         min_range <= 0.0 || !self.get_attack_box(min_range).intersects(&target_hitbox)
     }
 
-    pub fn is_dark_enough_to_spawn(world: &World, pos: &BlockPos, is_thundering: bool) -> bool {
-        let sky_light = world.get_sky_light_level(pos);
-        // `level.random`, passed to `checkSpawnRules`.
-        let sky_roll = world
-            .random
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .next_bounded_i32(32);
-        if i32::from(sky_light) > sky_roll {
+    /// Vanilla `Monster.isDarkEnoughToSpawn`, drawing from the random `checkSpawnRules` is given.
+    pub fn is_dark_enough_to_spawn(
+        world: &World,
+        pos: &BlockPos,
+        is_thundering: bool,
+        random: &mut pumpkin_util::random::legacy_rand::LegacyRand,
+    ) -> bool {
+        if i32::from(world.get_sky_light_level(pos)) > random.next_bounded_i32(32) {
             return false;
         }
 
         let dimension = &world.dimension;
         let block_light_limit = dimension.monster_spawn_block_light_limit;
-
         let block_light = world.get_block_light_level(pos).unwrap_or(0);
         if block_light_limit < 15 && block_light > block_light_limit {
             return false;
         }
 
-        let current_brightness = if is_thundering {
-            (sky_light - 10).max(block_light)
+        // `getMaxLocalRawBrightness(pos, 10)` in a thunderstorm, else with the sky darkening.
+        let brightness = if is_thundering {
+            world.get_raw_brightness(pos, 10)
         } else {
-            sky_light.max(block_light)
+            world.get_max_local_raw_brightness(pos)
         };
-
-        let light_limit = dimension.monster_spawn_light_level.get(
-            &mut *world
-                .random
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner),
-        );
-        i32::from(current_brightness) <= light_limit
+        i32::from(brightness) <= dimension.monster_spawn_light_level.get(random)
     }
 
     pub fn check_mob_spawn_rules(world: &World, pos: &BlockPos) -> bool {
@@ -933,12 +925,17 @@ impl MobEntity {
         state.is_side_solid(BlockDirection::Up)
     }
 
-    pub fn check_monster_spawn_rules(world: &World, pos: &BlockPos, is_thundering: bool) -> bool {
+    pub fn check_monster_spawn_rules(
+        world: &World,
+        pos: &BlockPos,
+        is_thundering: bool,
+        random: &mut pumpkin_util::random::legacy_rand::LegacyRand,
+    ) -> bool {
         if world.level_info.load().difficulty == Difficulty::Peaceful {
             return false;
         }
 
-        if !Self::is_dark_enough_to_spawn(world, pos, is_thundering) {
+        if !Self::is_dark_enough_to_spawn(world, pos, is_thundering, random) {
             return false;
         }
 
@@ -957,8 +954,9 @@ impl MobEntity {
         world: &World,
         pos: &BlockPos,
         is_thundering: bool,
+        random: &mut pumpkin_util::random::legacy_rand::LegacyRand,
     ) -> bool {
-        Self::check_monster_spawn_rules(world, pos, is_thundering) && world.can_see_sky(pos)
+        Self::check_monster_spawn_rules(world, pos, is_thundering, random) && world.can_see_sky(pos)
     }
 
     pub fn check_animal_spawn_rules(world: &World, pos: &BlockPos) -> bool {

@@ -37,26 +37,19 @@ impl BatEntity {
     }
 
     #[must_use]
-    pub fn check_bat_spawn_rules(world: &World, pos: &BlockPos) -> bool {
+    pub fn check_bat_spawn_rules(
+        world: &World,
+        pos: &BlockPos,
+        random: &mut pumpkin_util::random::legacy_rand::LegacyRand,
+    ) -> bool {
         if pos.0.y >= world.get_heightmap_height(ChunkHeightmapType::WorldSurface, pos.0.x, pos.0.z)
         {
             return false;
         }
-        // `level.random`, passed to `checkSpawnRules`.
-        if world
-            .random
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .next_bool()
-        {
+        if random.next_bool() {
             return false;
         }
-        let light_roll = world
-            .random
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .next_bounded_i32(4);
-        if i32::from(world.get_max_local_raw_brightness(pos)) > light_roll {
+        if i32::from(world.get_max_local_raw_brightness(pos)) > random.next_bounded_i32(4) {
             return false;
         }
         let below_pos = BlockPos::new(pos.0.x, pos.0.y - 1, pos.0.z);
