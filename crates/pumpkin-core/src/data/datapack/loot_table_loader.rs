@@ -279,19 +279,7 @@ fn parse_condition(val: &Value) -> DynamicLootCondition {
                 DynamicLootCondition::None
             }
         }
-        "entity_properties" => {
-            let on_fire = val
-                .get("predicate")
-                .and_then(|p| p.get("flags"))
-                .and_then(|f| f.get("is_on_fire"))
-                .and_then(Value::as_bool)
-                .unwrap_or(false);
-            if on_fire {
-                DynamicLootCondition::EntityOnFire
-            } else {
-                DynamicLootCondition::None
-            }
-        }
+        "entity_properties" => parse_entity_properties(val),
         "weather_check" => {
             let raining = val.get("raining").and_then(Value::as_bool);
             let thundering = val.get("thundering").and_then(Value::as_bool);
@@ -301,6 +289,29 @@ fn parse_condition(val: &Value) -> DynamicLootCondition {
             }
         }
         _ => DynamicLootCondition::None,
+    }
+}
+
+fn parse_entity_properties(val: &Value) -> DynamicLootCondition {
+    if val.get("entity").and_then(Value::as_str) == Some("this")
+        && let Some(entity_type) = val
+            .get("predicate")
+            .and_then(|p| p.get("minecraft:entity_type"))
+            .and_then(Value::as_str)
+            .filter(|entity_type| !entity_type.starts_with('#'))
+    {
+        return DynamicLootCondition::ThisEntityType(entity_type.to_string());
+    }
+    let on_fire = val
+        .get("predicate")
+        .and_then(|p| p.get("flags"))
+        .and_then(|f| f.get("is_on_fire"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    if on_fire {
+        DynamicLootCondition::EntityOnFire
+    } else {
+        DynamicLootCondition::None
     }
 }
 

@@ -54,6 +54,16 @@ fn damage_source_entity_matches(
         && frog_variant.is_none_or(|variant| params.damage_source_frog_variant == Some(variant))
 }
 
+/// Vanilla `EntityTypePredicate` on `this`.
+fn this_entity_type_matches(params: &LootContextParameters, entity_type: &str) -> bool {
+    let entity_type = entity_type
+        .strip_prefix("minecraft:")
+        .unwrap_or(entity_type);
+    params
+        .this_entity
+        .is_some_and(|this| this.resource_name == entity_type)
+}
+
 /// Vanilla `CubeMobPredicate`'s size range.
 fn this_cube_mob_size_matches(params: &LootContextParameters, min: i32, max: i32) -> bool {
     params
@@ -157,6 +167,9 @@ fn check_dynamic_condition(
         DynamicLootCondition::ThisCubeMobSize { min, max } => {
             this_cube_mob_size_matches(params, *min, *max)
         }
+        DynamicLootCondition::ThisEntityType(entity_type) => {
+            this_entity_type_matches(params, entity_type)
+        }
         DynamicLootCondition::WeatherCheck {
             raining,
             thundering,
@@ -230,6 +243,7 @@ fn check_condition(
             frog_variant,
         } => damage_source_entity_matches(params, entity_type, frog_variant),
         LootCondition::ThisCubeMobSize { min, max } => this_cube_mob_size_matches(params, min, max),
+        LootCondition::ThisEntityType(entity_type) => this_entity_type_matches(params, entity_type),
         LootCondition::Inverted(cond) => !check_condition(
             *cond,
             has_silk_touch,

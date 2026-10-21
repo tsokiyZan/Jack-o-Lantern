@@ -84,6 +84,8 @@ struct PredicateStruct {
     source_entity: Option<serde_json::Value>,
     #[serde(rename = "minecraft:type_specific/cube_mob", default)]
     cube_mob: Option<serde_json::Value>,
+    #[serde(rename = "minecraft:entity_type", default)]
+    entity_type: Option<serde_json::Value>,
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -311,6 +313,15 @@ fn parse_entity_properties(cond: &ConditionStruct) -> LootCondition {
                     .map_or(i32::MAX, |max| max as i32),
             },
         };
+    }
+    if cond.entity.as_deref() == Some("this")
+        && let Some(entity_type) = predicate
+            .entity_type
+            .as_ref()
+            .and_then(serde_json::Value::as_str)
+            .filter(|entity_type| !entity_type.starts_with('#'))
+    {
+        return LootCondition::ThisEntityType(Box::leak(entity_type.into()));
     }
     match cond.entity.as_deref() {
         Some("this")
@@ -788,6 +799,9 @@ fn condition_to_tokens(cond: LootCondition) -> TokenStream {
         }
         LootCondition::ThisCubeMobSize { min, max } => {
             quote! { LootCondition::ThisCubeMobSize { min: #min, max: #max } }
+        }
+        LootCondition::ThisEntityType(entity_type) => {
+            quote! { LootCondition::ThisEntityType(#entity_type) }
         }
         LootCondition::Inverted(inner) => {
             let inner = condition_to_tokens(*inner);

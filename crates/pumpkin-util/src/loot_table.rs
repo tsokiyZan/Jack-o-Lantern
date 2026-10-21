@@ -37,6 +37,8 @@ pub enum LootCondition {
         min: i32,
         max: i32,
     },
+    /// `entity_properties` on `this` naming its entity type.
+    ThisEntityType(&'static str),
     /// `inverted` around a condition that has no dedicated inverse.
     Inverted(&'static Self),
 }
@@ -130,6 +132,7 @@ pub enum DynamicLootCondition {
         min: i32,
         max: i32,
     },
+    ThisEntityType(String),
     WeatherCheck {
         raining: Option<bool>,
         thundering: Option<bool>,
@@ -178,6 +181,9 @@ impl From<LootCondition> for DynamicLootCondition {
                 frog_variant: frog_variant.map(str::to_string),
             },
             LootCondition::ThisCubeMobSize { min, max } => Self::ThisCubeMobSize { min, max },
+            LootCondition::ThisEntityType(entity_type) => {
+                Self::ThisEntityType(entity_type.to_string())
+            }
             LootCondition::Inverted(cond) => Self::Inverted(Box::new(Self::from(*cond))),
         }
     }
