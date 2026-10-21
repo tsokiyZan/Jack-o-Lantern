@@ -175,6 +175,9 @@ pub struct LivingEntity {
     pub last_attacker_id: AtomicI32,
     /// The tick at which this entity was last attacked (entity age).
     pub last_attacked_time: AtomicI32,
+    /// The UUID behind `last_attacker_id`: vanilla keeps `lastHurtByMob` as an entity
+    /// reference, saved and resolved again after a reload.
+    last_hurt_by_mob_uuid: AtomicCell<Option<uuid::Uuid>>,
     last_damage_type: std::sync::Mutex<Option<DamageType>>,
     last_damage_stamp: std::sync::atomic::AtomicI64,
 
@@ -388,6 +391,7 @@ impl LivingEntity {
             climbing_pos: AtomicCell::new(None),
             last_attacker_id: AtomicI32::new(0),
             last_attacked_time: AtomicI32::new(0),
+            last_hurt_by_mob_uuid: AtomicCell::new(None),
             last_damage_type: std::sync::Mutex::new(None),
             last_damage_stamp: std::sync::atomic::AtomicI64::new(0),
             last_attacking_id: AtomicI32::new(0),
@@ -3518,6 +3522,13 @@ impl LivingEntity {
                 self.last_hurt_by_player_memory_time.load(Relaxed),
             );
         }
+        if let Some(hurt_by) = self.last_hurt_by_mob_uuid.load() {
+            nbt.put_uuid("last_hurt_by_mob", hurt_by);
+            nbt.put_int(
+                "ticks_since_last_hurt_by_mob",
+                self.entity.tick_count.load(Relaxed) - self.last_attacked_time.load(Relaxed),
+            );
+        }
         self.write_attributes_nbt(nbt);
         // Persist current absorption amount
         nbt.put("AbsorptionAmount", NbtTag::Float(self.absorption.load()));
@@ -3543,6 +3554,16 @@ impl LivingEntity {
         nbt.put_short("HurtTime", self.hurt_time.load(Relaxed) as i16);
         nbt.put_short("DeathTime", i16::from(self.death_time.load(Relaxed)));
         nbt.put_bool("FallFlying", self.entity.is_fall_flying());
+        // `sleeping_pos`: only players keep the bed they sleep in.
+        if let Some(sleeping_pos) = self
+            .self_player()
+            .and_then(|player| player.sleeping_bed_pos.load())
+        {
+            nbt.put(
+                "sleeping_pos",
+                NbtTag::IntArray(vec![sleeping_pos.0.x, sleeping_pos.0.y, sleeping_pos.0.z]),
+            );
+        }
         self.breath.write_nbt(nbt);
         {
             let effects = self
@@ -3665,6 +3686,15 @@ impl LivingEntity {
     }
 
     pub fn read_living_nbt_non_mut(&self, nbt: &NbtCompound) {
+        // `lastHurtByMob` as a reference, with its timestamp relative to the tick count.
+        self.last_attacker_id.store(0, Relaxed);
+        self.last_hurt_by_mob_uuid
+            .store(nbt.get_uuid("last_hurt_by_mob"));
+        self.last_attacked_time.store(
+            self.entity.tick_count.load(Relaxed)
+                - nbt.get_int("ticks_since_last_hurt_by_mob").unwrap_or(0),
+            Relaxed,
+        );
         // `internalSetAbsorptionAmount`: unclamped, before the attributes are read.
         self.internal_set_absorption(nbt.get_float("AbsorptionAmount").unwrap_or(0.0));
         self.set_last_hurt_by_player(
@@ -4526,15 +4556,31 @@ impl LivingEntity {
     /// Vanilla `LivingEntity.getLastHurtByMob`, which is gone once its entity is.
     pub fn get_last_hurt_by_mob(&self) -> Option<Arc<dyn EntityBase>> {
         let id = self.last_attacker_id.load(Relaxed);
-        if id == 0 {
-            return None;
+        let world = self.entity.world.load();
+        if id != 0
+            && let Some(hurt_by) = world.get_entity_by_id(id)
+        {
+            return Some(hurt_by);
         }
-        self.entity.world.load().get_entity_by_id(id)
+        // Like an `EntityReference`, it resolves by UUID once its entity is loaded (again).
+        let hurt_by = world.get_entity_by_uuid(self.last_hurt_by_mob_uuid.load()?)?;
+        self.last_attacker_id
+            .store(hurt_by.get_entity().entity_id, Relaxed);
+        Some(hurt_by)
     }
 
     /// Vanilla `LivingEntity.setLastHurtByMob`, kept in `last_attacker_id` (0 for none).
     pub fn set_last_hurt_by_mob(&self, hurt_by_id: i32) {
         self.last_attacker_id.store(hurt_by_id, Relaxed);
+        self.last_hurt_by_mob_uuid.store(if hurt_by_id == 0 {
+            None
+        } else {
+            self.entity
+                .world
+                .load()
+                .get_entity_by_id(hurt_by_id)
+                .map(|hurt_by| hurt_by.get_entity().entity_uuid)
+        });
         self.last_attacked_time
             .store(self.entity.tick_count.load(Relaxed), Relaxed);
     }
@@ -4649,11 +4695,7 @@ impl LivingEntity {
     /// The `lastHurtByMob` part of vanilla `LivingEntity.baseTick`: forgotten once the
     /// attacker dies or 100 ticks pass.
     fn tick_last_hurt_by_mob(&self) {
-        let hurt_by_id = self.last_attacker_id.load(Relaxed);
-        if hurt_by_id == 0 {
-            return;
-        }
-        let Some(hurt_by) = self.entity.world.load().get_entity_by_id(hurt_by_id) else {
+        let Some(hurt_by) = self.get_last_hurt_by_mob() else {
             return;
         };
         let Some(hurt_by) = hurt_by.get_living_entity() else {
