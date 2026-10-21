@@ -3310,6 +3310,21 @@ impl LivingEntity {
         }
     }
 
+    /// The equipment `ServerEntity.sendPairingData` sends: every non-empty slot, in
+    /// `EquipmentSlot::VALUES` order.
+    pub fn pairing_equipment(
+        &self,
+        caller: &dyn EntityBase,
+    ) -> Vec<(i8, ItemStackSerializer<'static>)> {
+        EquipmentSlot::VALUES
+            .iter()
+            .filter_map(|slot| {
+                let stack = self.get_item_by_slot(caller, slot);
+                (!stack.is_empty()).then(|| (slot.discriminant(), ItemStackSerializer::from(stack)))
+            })
+            .collect()
+    }
+
     pub fn held_item(&self, caller: &dyn EntityBase) -> ItemStack {
         if let Some(player) = caller.get_player() {
             return player.inventory.held_item();

@@ -69,7 +69,6 @@ pub use explosion::{
 use pumpkin_config::BasicConfiguration;
 use pumpkin_data::block_properties::{blocks_movement, is_air};
 use pumpkin_data::block_rotation::{Mirror, Rotation};
-use pumpkin_data::data_component_impl::EquipmentSlot;
 use pumpkin_data::dimension::Dimension;
 use pumpkin_data::entity::MobCategory;
 use pumpkin_data::fluid::FluidState;
@@ -96,6 +95,9 @@ use pumpkin_inventory::{Clearable, Inventory};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::bedrock::client::set_actor_data::{CSetActorData, PropertySyncData};
 use pumpkin_protocol::bedrock::client::start_game::{CStartGame, ServerTelemetryData};
+use pumpkin_protocol::java::client::play::{
+    CBlockEvent, CParticle, CRemoveMobEffect, CSetEquipment, CUpdateMobEffect,
+};
 use pumpkin_protocol::java::client::play::{
     CBlockUpdate, CDisguisedChatMessage, CExplosion, CRespawn, CSetBlockDestroyStage, CWorldEvent,
     PlayerSpawnData,
@@ -135,12 +137,6 @@ use pumpkin_protocol::{
             PlayerInfoFlags,
         },
         server::play::SChatMessage,
-    },
-};
-use pumpkin_protocol::{
-    codec::item_stack_seralizer::ItemStackSerializer,
-    java::client::play::{
-        CBlockEvent, CParticle, CRemoveMobEffect, CSetEquipment, CUpdateMobEffect,
     },
 };
 use pumpkin_util::resource_location::ResourceLocation;
@@ -3876,27 +3872,9 @@ impl World {
 
             {
                 let held_item = existing_player.inventory.held_item();
-                let equipment_list = {
-                    let mut equipment_list =
-                        vec![(EquipmentSlot::MAIN_HAND.discriminant(), held_item.clone())];
-
-                    let equipment_guard = existing_player
-                        .inventory
-                        .entity_equipment
-                        .lock()
-                        .unwrap_or_else(std::sync::PoisonError::into_inner);
-                    for (slot, item_stack) in &equipment_guard.equipment {
-                        equipment_list.push((slot.discriminant(), item_stack.clone()));
-                    }
-                    equipment_list
-                };
-
-                let equipment: Vec<(i8, ItemStackSerializer)> = equipment_list
-                    .iter()
-                    .map(|(slot, stack)| (*slot, ItemStackSerializer::from(stack.clone())))
-                    .collect();
-
-                let je_packet = CSetEquipment::new(existing_player.entity_id().into(), equipment);
+                let equipment = existing_player
+                    .living_entity
+                    .pairing_equipment(existing_player.as_ref());
 
                 let be_mob_equipment = pumpkin_protocol::bedrock::client::CMobEquipment {
                     target_runtime_id: (existing_player.entity_id() as u64).into(),
@@ -3906,10 +3884,18 @@ impl World {
                     container_id: 0,
                 };
 
-                player
-                    .client
-                    .enqueue_packet_editioned(&je_packet, &be_mob_equipment)
-                    .await;
+                if equipment.is_empty() {
+                    if let ClientPlatform::Bedrock(client) = player.client.as_ref() {
+                        client.enqueue_client_packet(&be_mob_equipment).await;
+                    }
+                } else {
+                    let je_packet =
+                        CSetEquipment::new(existing_player.entity_id().into(), equipment);
+                    player
+                        .client
+                        .enqueue_packet_editioned(&je_packet, &be_mob_equipment)
+                        .await;
+                }
             }
         }
         player.send_client_information();
@@ -4061,23 +4047,7 @@ impl World {
 
     fn send_player_equipment(&self, from: &Player) {
         let held_item = from.inventory.held_item();
-        let mut equipment_list = vec![(EquipmentSlot::MAIN_HAND.discriminant(), held_item.clone())];
-
-        let equipment_guard = from
-            .inventory
-            .entity_equipment
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        for (slot, item_stack) in &equipment_guard.equipment {
-            equipment_list.push((slot.discriminant(), item_stack.clone()));
-        }
-        drop(equipment_guard);
-
-        let equipment: Vec<(i8, ItemStackSerializer)> = equipment_list
-            .iter()
-            .map(|(slot, stack)| (*slot, ItemStackSerializer::from(stack.clone())))
-            .collect();
-        let je_packet = CSetEquipment::new(from.entity_id().into(), equipment);
+        let equipment = from.living_entity.pairing_equipment(from);
 
         let be_mob_equipment = pumpkin_protocol::bedrock::client::CMobEquipment {
             target_runtime_id: (from.entity_id() as u64).into(),
@@ -4087,7 +4057,16 @@ impl World {
             container_id: 0,
         };
 
-        self.send_to_tracking_players_editioned(from.get_entity(), &je_packet, &be_mob_equipment);
+        if equipment.is_empty() {
+            self.send_to_tracking_players_bedrock(from.get_entity(), &be_mob_equipment);
+        } else {
+            let je_packet = CSetEquipment::new(from.entity_id().into(), equipment);
+            self.send_to_tracking_players_editioned(
+                from.get_entity(),
+                &je_packet,
+                &be_mob_equipment,
+            );
+        }
     }
 
     pub fn send_world_info(&self, player: &Arc<Player>) {

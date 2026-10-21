@@ -17,7 +17,6 @@ use pumpkin_protocol::bedrock::client::move_actor_delta::{
     MOVE_ACTOR_DELTA_FLAG_HAS_Z, MOVE_ACTOR_DELTA_FLAG_ON_GROUND,
 };
 use pumpkin_protocol::bedrock::client::remove_actor::CRemoveActor;
-use pumpkin_protocol::codec::item_stack_seralizer::ItemStackSerializer;
 use pumpkin_protocol::codec::var_int::VarInt;
 use pumpkin_protocol::codec::var_long::VarLong;
 use pumpkin_protocol::codec::var_ulong::VarULong;
@@ -570,20 +569,9 @@ impl TrackedEntity {
             }
         }
 
-        if let Some(living) = self.entity.get_living_entity()
-            && let Ok(equipment_guard) = living.entity_equipment.try_lock()
-        {
-            let mut equipment_list = Vec::new();
-            for (slot, item_stack) in &equipment_guard.equipment {
-                if !item_stack.is_empty() {
-                    equipment_list.push((slot.discriminant(), item_stack.clone()));
-                }
-            }
-            if !equipment_list.is_empty() {
-                let equipment: Vec<(i8, ItemStackSerializer)> = equipment_list
-                    .iter()
-                    .map(|(slot, stack)| (*slot, ItemStackSerializer::from(stack.clone())))
-                    .collect();
+        if let Some(living) = self.entity.get_living_entity() {
+            let equipment = living.pairing_equipment(self.entity.as_ref());
+            if !equipment.is_empty() {
                 let packet = CSetEquipment::new(self.entity_id.into(), equipment);
                 if let ClientPlatform::Java(client) = player.client.as_ref()
                     && let Ok(data) = client.serialize_packet(&packet)
