@@ -681,41 +681,8 @@ impl PandaEntity {
         }
     }
 
-    /// The looting part of vanilla `Mob.aiStep`, with `Panda.pickUpItem`.
-    fn pick_up_loot(&self) {
-        let entity = self.get_entity();
-        if !self.mob_entity.can_pick_up_loot()
-            || !entity.is_alive()
-            || self.mob_entity.living_entity.dead.load(Ordering::Relaxed)
-        {
-            return;
-        }
-        let world = entity.world.load();
-        if !world.level_info.load().game_rules.mob_griefing {
-            return;
-        }
-        // Vanilla `Mob.ITEM_PICKUP_REACH`.
-        let reach = entity.bounding_box.load().expand(1.0, 0.0, 1.0);
-        for candidate in world.get_entities_at_box(&reach) {
-            let Some(item) = candidate.get_item_entity() else {
-                continue;
-            };
-            let empty = item
-                .get_item_stack()
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner)
-                .is_empty();
-            if !item.get_entity().removed.load(Ordering::Relaxed)
-                && !empty
-                && item.get_pickup_delay() == 0
-            {
-                self.pick_up_item(item);
-            }
-        }
-    }
-
     /// Vanilla `Panda.pickUpItem`: an empty paw takes the whole stack, if it is food.
-    fn pick_up_item(&self, item: &ItemEntity) {
+    fn panda_pick_up_item(&self, item: &ItemEntity) {
         if !self.main_hand().is_empty() || !can_pick_up_and_eat(item) {
             return;
         }
@@ -732,8 +699,9 @@ impl PandaEntity {
         {
             return;
         }
+        self.set_item_slot_and_notify(&EquipmentSlot::MAIN_HAND, stack);
         self.mob_entity
-            .set_item_slot_and_drop_when_killed(&EquipmentSlot::MAIN_HAND, stack);
+            .set_guaranteed_drop(&EquipmentSlot::MAIN_HAND);
         item.get_entity().remove();
     }
 
@@ -983,9 +951,12 @@ impl Mob for PandaEntity {
     }
 
     fn post_tick(&self) {
-        // `Mob.aiStep` loots at the end of the AI step, before `Panda.tick` goes on.
-        self.pick_up_loot();
         self.panda_tick();
+    }
+
+    /// Vanilla `Panda.pickUpItem`.
+    fn mob_pick_up_item(&self, item: &ItemEntity) {
+        self.panda_pick_up_item(item);
     }
 
     /// Vanilla `Panda.hurtServer`: being hurt makes a panda stand up.

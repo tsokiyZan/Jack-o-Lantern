@@ -209,7 +209,11 @@ const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::DROWN
 
 impl Mob for DrownedEntity {
     /// Vanilla `Drowned.wantsToPickUp`: never spears.
-    fn mob_wants_to_pick_up(&self, stack: &ItemStack) -> bool {
+    fn wants_to_pick_up(
+        &self,
+        _brain: &crate::entity::ai::brain::Brain,
+        stack: &pumpkin_data::item_stack::ItemStack,
+    ) -> bool {
         !stack
             .item
             .has_tag(&pumpkin_data::tag::Item::MINECRAFT_SPEARS)

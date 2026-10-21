@@ -185,7 +185,7 @@ impl DolphinEntity {
     }
 
     /// Vanilla `Dolphin.pickUpItem`: an empty mouth takes the whole stack.
-    fn pick_up_item(&self, item: &ItemEntity) {
+    fn dolphin_pick_up_item(&self, item: &ItemEntity) {
         if !self.main_hand().is_empty() {
             return;
         }
@@ -194,6 +194,9 @@ impl DolphinEntity {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .clone();
+        if !self.can_hold_item(&stack) {
+            return;
+        }
         // `take` tells the clients before the item goes.
         if !self
             .mob_entity
@@ -202,8 +205,9 @@ impl DolphinEntity {
         {
             return;
         }
+        self.set_item_slot_and_notify(&EquipmentSlot::MAIN_HAND, stack);
         self.mob_entity
-            .set_item_slot_and_drop_when_killed(&EquipmentSlot::MAIN_HAND, stack);
+            .set_guaranteed_drop(&EquipmentSlot::MAIN_HAND);
         item.get_entity().remove();
     }
 
@@ -318,12 +322,14 @@ impl Mob for DolphinEntity {
         self.ageable_ai_step();
     }
 
-    /// The looting part of vanilla `Mob.aiStep`, which runs after the move; then the rest of
-    /// vanilla `Dolphin.tick` after `super.tick()` (Dolphin.java:237-256): drying out on
-    /// land, and flopping about there.
+    /// Vanilla `Dolphin.pickUpItem`.
+    fn mob_pick_up_item(&self, item: &ItemEntity) {
+        self.dolphin_pick_up_item(item);
+    }
+
+    /// The rest of vanilla `Dolphin.tick` after `super.tick()` (Dolphin.java:237-256):
+    /// drying out on land, and flopping about there.
     fn post_tick(&self) {
-        self.mob_entity
-            .for_each_item_in_pickup_reach(|item| self.pick_up_item(item));
         let living = &self.mob_entity.living_entity;
         let entity = &living.entity;
         if self.mob_entity.is_no_ai() {

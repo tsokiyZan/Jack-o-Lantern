@@ -166,6 +166,23 @@ impl Mob for PillagerEntity {
         Some(self)
     }
 
+    /// Vanilla `Pillager.pickUpItem`: banners go through `Raider.pickUpItem`, nothing else.
+    /// Its inventory branch only wants white banners, which the banner branch takes first.
+    fn mob_pick_up_item(&self, item: &crate::entity::item::ItemEntity) {
+        let banner_item = item
+            .get_item_stack()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .item;
+        let is_banner = pumpkin_data::tag::Taggable::has_tag(
+            banner_item,
+            &pumpkin_data::tag::Item::MINECRAFT_BANNERS,
+        );
+        if is_banner {
+            crate::entity::mob::raider::pick_up_item(self, item);
+        }
+    }
+
     fn as_crossbow_attack_mob(&self) -> Option<&dyn CrossbowAttackMob> {
         Some(self)
     }
@@ -176,7 +193,6 @@ impl Mob for PillagerEntity {
 
     fn mob_write_nbt(&self, nbt: &mut NbtCompound) {
         self.write_raider_nbt(nbt);
-        nbt.put_bool("CanPickUpLoot", true);
 
         let inv = self
             .inventory
@@ -199,6 +215,8 @@ impl Mob for PillagerEntity {
 
     fn mob_read_nbt(&self, nbt: &NbtCompound) {
         self.read_raider_nbt(nbt);
+        // Vanilla `Pillager.readAdditionalSaveData`: a loaded pillager always picks up loot.
+        self.mob_entity.set_can_pick_up_loot(true);
 
         if let Some(inv_list) = nbt.get_list("Inventory") {
             let mut inv = self

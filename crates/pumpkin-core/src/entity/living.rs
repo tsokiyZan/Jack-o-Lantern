@@ -1677,9 +1677,10 @@ impl LivingEntity {
             caller.damage(caller, 1.0, DamageType::DROWN);
         }
 
-        // Vanilla `Mob.aiStep` burns undead right after `super.aiStep()`.
+        // Vanilla `Mob.aiStep` burns undead right after `super.aiStep()`, then loots.
         if let Some(mob) = caller.get_mob() {
             super::mob::sun_burn::tick(mob);
+            super::mob::ai_step_looting(mob);
             mob.ai_step_end(caller);
         }
     }

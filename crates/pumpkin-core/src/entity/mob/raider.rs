@@ -380,8 +380,9 @@ impl Goal for ObtainRaidLeaderBannerGoal {
                 .load()
                 .squared_distance_to_vec(&mob.get_entity().pos.load())
                 < 1.414 * 1.414
+            && let Some(item) = banner.get_item_entity()
         {
-            pick_up_banner(mob, banner.as_ref());
+            mob.mob_pick_up_item(item);
         }
     }
 
@@ -390,56 +391,61 @@ impl Goal for ObtainRaidLeaderBannerGoal {
     }
 }
 
-/// The banner branch of vanilla `Raider.pickUpItem`: the raider wears it and leads its wave.
-fn pick_up_banner(mob: &dyn Mob, banner: &dyn EntityBase) {
-    let Some(raider) = mob.as_raider() else {
-        return;
-    };
-    let Some(raid_id) = raider.get_raider_data().raid_id.load() else {
-        return;
-    };
-    let Some(item) = banner.cast_any().downcast_ref::<ItemEntity>() else {
-        return;
-    };
-    let mob_entity = mob.get_mob_entity();
-    let entity = mob.get_entity();
+/// Vanilla `Raider.pickUpItem`: in an active raid whose wave has no leader, an ominous banner
+/// makes this raider the leader; anything else goes through `Mob.pickUpItem`.
+pub fn pick_up_item<M: Mob + ?Sized>(mob: &M, item: &ItemEntity) {
     let stack = item
         .get_item_stack()
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .clone();
-    if !is_ominous_banner(&stack) {
+    let Some(raider) = mob.as_raider() else {
+        crate::entity::mob::equipment::pick_up_item(mob, item);
+        return;
+    };
+    let entity = mob.get_entity();
+    let world = entity.world.load();
+    let leads = raider
+        .get_raider_data()
+        .raid_id
+        .load()
+        .is_some_and(|raid_id| {
+            world
+                .raids
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .get(raid_id)
+                .is_some_and(|raid| {
+                    raid.is_active() && !raid.group_to_leader_map.contains_key(&raider.get_wave())
+                })
+        });
+    if !leads || !is_ominous_banner(&stack) {
+        crate::entity::mob::equipment::pick_up_item(mob, item);
         return;
     }
-    let world = entity.world.load();
-    {
-        let mut raids = world
-            .raids
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let Some(raid) = raids.get_mut(raid_id).filter(|raid| raid.is_active()) else {
-            return;
-        };
-        if raid.group_to_leader_map.contains_key(&raider.get_wave()) {
-            return;
-        }
-        raid.group_to_leader_map
-            .insert(raider.get_wave(), entity.entity_uuid)
-    };
-    let current = mob_entity
-        .living_entity
-        .entity_equipment
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .get(&EquipmentSlot::HEAD);
+    let mob_entity = mob.get_mob_entity();
+    let current = mob_entity.get_item_slot(&EquipmentSlot::HEAD);
     let drop_chance = mob_entity.drop_chance(&EquipmentSlot::HEAD);
     if !current.is_empty() && (entity.random().next_f32() - 0.1).max(0.0) < drop_chance {
         entity.spawn_at_location(current);
     }
-    let count = u32::from(stack.item_count);
-    mob_entity.set_item_slot(&EquipmentSlot::HEAD, stack);
-    mob_entity.living_entity.pickup(item.get_entity(), count);
+    mob.set_item_slot_and_notify(&EquipmentSlot::HEAD, stack.clone());
+    mob_entity
+        .living_entity
+        .pickup(item.get_entity(), u32::from(stack.item_count));
     item.get_entity().remove();
+    // Vanilla `Raid.setLeader`, whose banner is the one just worn.
+    if let Some(raid_id) = raider.get_raider_data().raid_id.load()
+        && let Some(raid) = world
+            .raids
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get_mut(raid_id)
+    {
+        raid.group_to_leader_map
+            .insert(raider.get_wave(), entity.entity_uuid);
+    }
+    mob_entity.set_guaranteed_drop(&EquipmentSlot::HEAD);
     raider.set_patrol_leader(true);
 }
 

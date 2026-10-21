@@ -389,7 +389,7 @@ impl AllayEntity {
     }
 
     /// Vanilla `Allay.pickUpItem`, which is `InventoryCarrier.pickUpItem`.
-    fn pick_up_item(&self, item_entity: &ItemEntity) {
+    fn allay_pick_up_item(&self, item_entity: &ItemEntity) {
         let stack = item_entity
             .get_item_stack()
             .lock()
@@ -573,26 +573,18 @@ impl Mob for AllayEntity {
         self.wants_to_pick_up_item(stack)
     }
 
-    /// The looting at the end of vanilla `Mob.aiStep`, then the rest of `Allay.aiStep`.
-    fn ai_step_end(&self, _caller: &dyn EntityBase) {
-        if self
-            .mob_entity
-            .with_brain(self, |tick| self.can_pick_up_loot(tick.brain))
-        {
-            self.mob_entity
-                .for_each_item_in_reach(ITEM_PICKUP_REACH, |item_entity| {
-                    let wanted = self.wants_to_pick_up_item(
-                        &item_entity
-                            .get_item_stack()
-                            .lock()
-                            .unwrap_or_else(PoisonError::into_inner),
-                    );
-                    if wanted {
-                        self.pick_up_item(item_entity);
-                    }
-                });
-        }
+    /// Vanilla `Allay.getPickupReach`.
+    fn pickup_reach(&self) -> Vector3<i32> {
+        ITEM_PICKUP_REACH
+    }
 
+    /// Vanilla `Allay.pickUpItem`.
+    fn mob_pick_up_item(&self, item: &ItemEntity) {
+        self.allay_pick_up_item(item);
+    }
+
+    /// The rest of vanilla `Allay.aiStep` after `super.aiStep()`.
+    fn ai_step_end(&self, _caller: &dyn EntityBase) {
         let tick_count = self.get_entity().tick_count.load(Ordering::Relaxed);
         if is_alive(self) && tick_count % HEAL_INTERVAL == 0 {
             self.mob_entity.living_entity.heal(1.0);
@@ -706,11 +698,6 @@ impl Mob for AllayEntity {
     }
 
     fn mob_write_nbt(&self, nbt: &mut NbtCompound) {
-        // Vanilla `Mob` saves the overridden `canPickUpLoot`, not the stored flag.
-        let can_pick_up_loot = self
-            .mob_entity
-            .with_brain(self, |tick| self.can_pick_up_loot(tick.brain));
-        nbt.put_bool("CanPickUpLoot", can_pick_up_loot);
         self.inventory.write_inventory_to_tag(nbt);
         nbt.put_compound(
             VibrationData::NBT_TAG_KEY,

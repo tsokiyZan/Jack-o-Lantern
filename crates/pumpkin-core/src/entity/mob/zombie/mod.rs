@@ -88,20 +88,6 @@ const DROWNED_CONVERSION_TIME: i32 = 300;
 const NOT_CONVERTING: i32 = -1;
 
 impl ZombieEntityBase {
-    /// The looting part of vanilla `Mob.aiStep`, which every zombie runs after its own.
-    pub fn pick_up_loot(&self, mob: &dyn Mob) {
-        self.mob_entity.for_each_item_in_pickup_reach(|item| {
-            let stack = item
-                .get_item_stack()
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .clone();
-            if mob.mob_wants_to_pick_up(&stack) {
-                crate::entity::mob::equipment::pick_up_item(mob, item, stack);
-            }
-        });
-    }
-
     /// Vanilla `Zombie.canHoldItem`: a baby riding something won't take eggs.
     #[must_use]
     pub fn can_hold_item(&self, stack: &ItemStack) -> bool {
@@ -1032,10 +1018,6 @@ macro_rules! impl_zombie_mob {
 
         fn can_hold_item(&self, stack: &pumpkin_data::item_stack::ItemStack) -> bool {
             self.$field.can_hold_item(stack)
-        }
-
-        fn ai_step_end(&self, _caller: &dyn $crate::entity::EntityBase) {
-            self.$field.pick_up_loot(self);
         }
     };
 }

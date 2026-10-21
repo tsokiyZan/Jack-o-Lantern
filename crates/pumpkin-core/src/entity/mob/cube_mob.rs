@@ -593,14 +593,33 @@ impl Mob for CubeMobEntity {
         }
     }
 
-    /// The end of vanilla `Mob.aiStep` (looting) and `AgeableMob.aiStep`.
+    /// The end of vanilla `AgeableMob.aiStep`.
     fn ai_step_end(&self, _caller: &dyn EntityBase) {
         if self.kind == CubeKind::SulfurCube {
-            // `SulfurCube.canPickUpLoot` answers from the body slot, not the saved flag.
-            self.mob_entity.set_can_pick_up_loot(!self.has_body_item());
-            self.mob_entity
-                .for_each_item_in_pickup_reach(|item| self.pick_up_item(item));
             self.ageable_ai_step();
+        }
+    }
+
+    /// Vanilla `SulfurCube.canPickUpLoot`: an empty body, whatever the saved flag says.
+    fn can_pick_up_loot(&self, _brain: &crate::entity::ai::brain::Brain) -> bool {
+        if self.kind == CubeKind::SulfurCube {
+            !self.has_body_item()
+        } else {
+            self.mob_entity.can_pick_up_loot()
+        }
+    }
+
+    /// Vanilla `SulfurCube.canHoldItem`.
+    fn can_hold_item(&self, stack: &ItemStack) -> bool {
+        self.kind != CubeKind::SulfurCube || self.sulfur_can_hold_item(stack)
+    }
+
+    /// Vanilla `SulfurCube.pickUpItem`.
+    fn mob_pick_up_item(&self, item: &crate::entity::item::ItemEntity) {
+        if self.kind == CubeKind::SulfurCube {
+            self.sulfur_pick_up_item(item);
+        } else {
+            crate::entity::mob::equipment::pick_up_item(self, item);
         }
     }
 

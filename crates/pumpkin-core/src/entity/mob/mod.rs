@@ -153,49 +153,6 @@ impl MobEntity {
     /// Vanilla `Mob.ITEM_PICKUP_REACH`.
     pub const ITEM_PICKUP_REACH: Vector3<i32> = Vector3::new(1, 0, 1);
 
-    /// The looting part of vanilla `Mob.aiStep`: runs `pick_up` on every item in reach that
-    /// can be picked up, while this mob picks up loot and `mobGriefing` is on.
-    pub fn for_each_item_in_pickup_reach(&self, pick_up: impl FnMut(&ItemEntity)) {
-        if self.can_pick_up_loot() {
-            self.for_each_item_in_reach(Self::ITEM_PICKUP_REACH, pick_up);
-        }
-    }
-
-    /// `for_each_item_in_pickup_reach` for a mob that overrides `getPickupReach` and
-    /// `canPickUpLoot`; the caller has already checked the latter.
-    pub fn for_each_item_in_reach(
-        &self,
-        pickup_reach: Vector3<i32>,
-        mut pick_up: impl FnMut(&ItemEntity),
-    ) {
-        let entity = &self.living_entity.entity;
-        if !entity.is_alive() || self.living_entity.dead.load(Relaxed) {
-            return;
-        }
-        let world = entity.world.load();
-        if !world.level_info.load().game_rules.mob_griefing {
-            return;
-        }
-        let reach = entity.bounding_box.load().expand(
-            f64::from(pickup_reach.x),
-            f64::from(pickup_reach.y),
-            f64::from(pickup_reach.z),
-        );
-        for candidate in world.get_entities_at_box(&reach) {
-            let Some(item) = candidate.get_item_entity() else {
-                continue;
-            };
-            let empty = item
-                .get_item_stack()
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .is_empty();
-            if !item.get_entity().removed.load(Relaxed) && !empty && item.get_pickup_delay() == 0 {
-                pick_up(item);
-            }
-        }
-    }
-
     /// Vanilla `Mob.setSpeed`: the speed travel uses, also set as the forward input.
     pub fn set_speed(&self, speed: f32) {
         let living = &self.living_entity;
@@ -751,7 +708,8 @@ impl MobEntity {
         f(&mut tick)
     }
 
-    pub fn write_mob_nbt(&self, nbt: &mut NbtCompound) {
+    /// `can_pick_up_loot` is the mob's `canPickUpLoot()`, which some mobs override.
+    pub fn write_mob_nbt(&self, nbt: &mut NbtCompound, can_pick_up_loot: bool) {
         self.write_drop_chances(nbt);
         nbt.put_compound(
             "Brain",
@@ -766,7 +724,7 @@ impl MobEntity {
         }
         // Vanilla always writes these three, false included.
         nbt.put_bool("LeftHanded", self.is_left_handed());
-        nbt.put_bool("CanPickUpLoot", self.can_pick_up_loot());
+        nbt.put_bool("CanPickUpLoot", can_pick_up_loot);
         nbt.put_bool(
             "PersistenceRequired",
             self.persistence_required.load(Relaxed),
@@ -1790,9 +1748,18 @@ pub trait Mob: EntityBase + Send + Sync {
         true
     }
 
-    /// Vanilla `Mob.wantsToPickUp`, for the loot pickup in `Mob.aiStep`.
-    fn mob_wants_to_pick_up(&self, stack: &ItemStack) -> bool {
-        self.can_hold_item(stack)
+    /// Vanilla `Mob.getPickupReach`: how far past its box the mob picks up items.
+    fn pickup_reach(&self) -> Vector3<i32> {
+        MobEntity::ITEM_PICKUP_REACH
+    }
+
+    /// Vanilla `Mob.pickUpItem`, with `Raider`'s override for every raider.
+    fn mob_pick_up_item(&self, item: &ItemEntity) {
+        if self.as_raider().is_some() {
+            raider::pick_up_item(self, item);
+        } else {
+            equipment::pick_up_item(self, item);
+        }
     }
 
     /// Vanilla `doHurtTarget` as `MeleeAttackGoal` calls it.
@@ -2158,11 +2125,11 @@ pub trait Mob: EntityBase + Send + Sync {
     /// Runs after navigation and before the movement controls, where vanilla ticks a mob's brain.
     fn custom_server_ai_step(&self, _caller: &dyn EntityBase) {}
 
-    /// Vanilla `Mob.wantsToPickUp`, which a plain mob answers with `canHoldItem`, always true.
-    /// Takes the brain because the nearest item sensor asks from inside the brain tick, where
-    /// locking it again would deadlock.
-    fn wants_to_pick_up(&self, _brain: &Brain, _stack: &ItemStack) -> bool {
-        true
+    /// Vanilla `Mob.wantsToPickUp`, which a plain mob answers with `canHoldItem`. Takes the
+    /// brain because the nearest item sensor asks from inside the brain tick, where locking it
+    /// again would deadlock.
+    fn wants_to_pick_up(&self, _brain: &Brain, stack: &ItemStack) -> bool {
+        self.can_hold_item(stack)
     }
 
     /// Vanilla `Mob.canPickUpLoot`, which a plain mob answers from its saved flag. Takes the
@@ -2458,6 +2425,45 @@ pub trait Mob: EntityBase + Send + Sync {
             .on_lightning_strike(caller, lightning);
     }
 }
+/// The looting part of vanilla `Mob.aiStep`, right after the sun burn: every item in reach
+/// that the mob wants, while it picks up loot and `mobGriefing` is on.
+pub fn ai_step_looting(mob: &dyn Mob) {
+    let mob_entity = mob.get_mob_entity();
+    let living = &mob_entity.living_entity;
+    let entity = &living.entity;
+    let world = entity.world.load_full();
+    if !living.is_alive()
+        || living.dead.load(Relaxed)
+        || !world.level_info.load().game_rules.mob_griefing
+        || !mob_entity.with_brain(mob, |tick| mob.can_pick_up_loot(tick.brain))
+    {
+        return;
+    }
+    let reach = mob.pickup_reach();
+    let pickup_box = entity.bounding_box.load().expand(
+        f64::from(reach.x),
+        f64::from(reach.y),
+        f64::from(reach.z),
+    );
+    for candidate in world.get_entities_at_box(&pickup_box) {
+        let Some(item) = candidate.get_item_entity() else {
+            continue;
+        };
+        let stack = item
+            .get_item_stack()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        if !item.get_entity().removed.load(Relaxed)
+            && !stack.is_empty()
+            && item.get_pickup_delay() == 0
+            && mob_entity.with_brain(mob, |tick| mob.wants_to_pick_up(tick.brain, &stack))
+        {
+            mob.mob_pick_up_item(item);
+        }
+    }
+}
+
 /// Vanilla `TamableAnimal.isTame` for a target or avoid candidate.
 #[must_use]
 pub fn is_tame(target: &crate::entity::living::LivingEntity) -> bool {
@@ -3039,7 +3045,10 @@ impl<T: Mob + Send + 'static> EntityBase for T {
     }
 
     fn write_custom_nbt(&self, nbt: &mut NbtCompound) {
-        self.get_mob_entity().write_mob_nbt(nbt);
+        let mob_entity = self.get_mob_entity();
+        let can_pick_up_loot =
+            mob_entity.with_brain(self, |tick| self.can_pick_up_loot(tick.brain));
+        mob_entity.write_mob_nbt(nbt, can_pick_up_loot);
         if let Some(ageable) = self.as_ageable() {
             ageable.write_ageable_nbt(nbt);
         }

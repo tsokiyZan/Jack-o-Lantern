@@ -229,34 +229,11 @@ impl SkeletonEntityBase {
         living.apply_current_equipment_attribute_modifiers();
         group_data
     }
-
-    /// The looting part of vanilla `Mob.aiStep`, with `AbstractSkeleton.wantsToPickUp`.
-    pub fn pick_up_loot(&self, mob: &dyn Mob) {
-        let entity_type = self.mob_entity.living_entity.entity.entity_type;
-        self.mob_entity.for_each_item_in_pickup_reach(|item| {
-            let stack = item
-                .get_item_stack()
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .clone();
-            if wants_to_pick_up(entity_type, &stack) {
-                crate::entity::mob::equipment::pick_up_item(mob, item, stack);
-            }
-        });
-    }
 }
 
 /// Vanilla `AbstractSkeleton.wantsToPickUp`: anything but spears that the mob can hold.
-fn wants_to_pick_up(entity_type: &EntityType, stack: &ItemStack) -> bool {
-    !stack.item.has_tag(&tag::Item::MINECRAFT_SPEARS) && can_hold_item(entity_type, stack)
-}
-
-/// Vanilla `Mob.canHoldItem`, which `WitherSkeleton` narrows to the weapons it likes.
-fn can_hold_item(entity_type: &EntityType, stack: &ItemStack) -> bool {
-    entity_type != &EntityType::WITHER_SKELETON
-        || !stack
-            .item
-            .has_tag(&tag::Item::MINECRAFT_WITHER_SKELETON_DISLIKED_WEAPONS)
+pub fn wants_to_pick_up(mob: &dyn Mob, stack: &ItemStack) -> bool {
+    !stack.item.has_tag(&tag::Item::MINECRAFT_SPEARS) && mob.can_hold_item(stack)
 }
 
 /// Vanilla `AbstractSkeleton.getHardAttackInterval`, which bogged and parched raise.

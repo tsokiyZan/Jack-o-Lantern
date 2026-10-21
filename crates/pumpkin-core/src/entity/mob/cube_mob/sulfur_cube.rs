@@ -601,13 +601,13 @@ impl CubeMobEntity {
     }
 
     /// Vanilla `SulfurCube.canHoldItem`.
-    fn can_hold_item(&self, stack: &ItemStack) -> bool {
+    pub(super) fn sulfur_can_hold_item(&self, stack: &ItemStack) -> bool {
         self.body_item().is_empty() && is_swallowable_item(stack) && !self.is_baby()
     }
 
     /// Vanilla `SulfurCube.pickUpItem`, which runs while `canPickUpLoot` (an empty body)
     /// and `wantsToPickUp` (`canHoldItem`) allow it.
-    pub(super) fn pick_up_item(&self, item: &ItemEntity) {
+    pub(super) fn sulfur_pick_up_item(&self, item: &ItemEntity) {
         let Some(sulfur) = &self.sulfur else {
             return;
         };
@@ -619,7 +619,7 @@ impl CubeMobEntity {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .clone();
-        if !self.can_hold_item(&stack) || sulfur.pickup_timer.load(Relaxed) > 0 {
+        if !self.sulfur_can_hold_item(&stack) || sulfur.pickup_timer.load(Relaxed) > 0 {
             return;
         }
         // `take` tells the clients before the item goes.
@@ -641,8 +641,7 @@ impl CubeMobEntity {
         } else {
             item.init_data_tracker();
         }
-        self.mob_entity
-            .set_item_slot(&EquipmentSlot::BODY, swallowed);
+        self.set_item_slot_and_notify(&EquipmentSlot::BODY, swallowed);
         self.play_sound(Sound::EntitySulfurCubeAbsorb, 1.0, 1.0);
         self.mob_entity.set_guaranteed_drop(&EquipmentSlot::BODY);
     }
@@ -664,8 +663,6 @@ impl CubeMobEntity {
         nbt.put_int("pickup_timer", sulfur.pickup_timer.load(Relaxed));
         nbt.put_bool("from_bucket", sulfur.from_bucket.load(Relaxed));
         nbt.put_int("fuse", sulfur.fuse.load(Relaxed));
-        // `Mob` saves `canPickUpLoot()`, which `SulfurCube` answers from its body slot.
-        nbt.put_bool("CanPickUpLoot", !self.has_body_item());
     }
 
     /// Vanilla `SulfurCube.readAdditionalSaveData`, before its `super` call.

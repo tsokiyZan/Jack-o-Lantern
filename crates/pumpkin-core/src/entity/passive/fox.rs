@@ -558,7 +558,7 @@ impl FoxEntity {
     }
 
     /// Vanilla `Fox.canHoldItem`.
-    fn can_hold_item(&self, stack: &ItemStack) -> bool {
+    fn fox_can_hold_item(&self, stack: &ItemStack) -> bool {
         let held = self.main_hand();
         held.is_empty()
             || self.ticks_since_eaten.load(Ordering::Relaxed) > 0
@@ -603,13 +603,13 @@ impl FoxEntity {
     }
 
     /// Vanilla `Fox.pickUpItem`.
-    fn pick_up_item(&self, item_entity: &ItemEntity) {
+    fn fox_pick_up_item(&self, item_entity: &ItemEntity) {
         let mut item_stack = item_entity
             .get_item_stack()
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone();
-        if !self.can_hold_item(&item_stack) {
+        if !self.fox_can_hold_item(&item_stack) {
             return;
         }
         let count = item_stack.item_count;
@@ -618,8 +618,7 @@ impl FoxEntity {
         }
         self.spit_out_item(self.main_hand());
         let held = item_stack.split(1);
-        self.mob_entity
-            .set_item_slot(&EquipmentSlot::MAIN_HAND, held);
+        self.set_item_slot_and_notify(&EquipmentSlot::MAIN_HAND, held);
         self.mob_entity
             .set_guaranteed_drop(&EquipmentSlot::MAIN_HAND);
         // Vanilla takes the count left after the split: none.
@@ -933,16 +932,6 @@ impl Mob for FoxEntity {
 
     /// The rest of vanilla `Fox.aiStep` after `super.aiStep()`, then the end of `Fox.tick`.
     fn post_tick(&self) {
-        self.mob_entity.for_each_item_in_pickup_reach(|item| {
-            let stack = item
-                .get_item_stack()
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .clone();
-            if self.can_hold_item(&stack) {
-                self.pick_up_item(item);
-            }
-        });
         if self.is_defending() && self.get_entity().random().next_f32() < 0.05 {
             self.play_sound_at_self(Sound::EntityFoxAggro, 1.0, 1.0);
         }
@@ -1042,13 +1031,14 @@ impl Mob for FoxEntity {
         set_mob_target_base(self, target);
     }
 
-    /// Vanilla `Fox.wantsToPickUp`, through `Mob.wantsToPickUp`: `canHoldItem`.
-    fn wants_to_pick_up(
-        &self,
-        _brain: &crate::entity::ai::brain::Brain,
-        stack: &ItemStack,
-    ) -> bool {
-        self.can_hold_item(stack)
+    /// Vanilla `Fox.canHoldItem`.
+    fn can_hold_item(&self, stack: &ItemStack) -> bool {
+        self.fox_can_hold_item(stack)
+    }
+
+    /// Vanilla `Fox.pickUpItem`.
+    fn mob_pick_up_item(&self, item: &ItemEntity) {
+        self.fox_pick_up_item(item);
     }
 
     /// Vanilla `Fox.dropAllDeathLoot`: whatever is in the fox's mouth always drops.

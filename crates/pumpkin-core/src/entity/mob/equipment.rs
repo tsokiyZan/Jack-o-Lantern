@@ -18,12 +18,13 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::LazyLock;
+use std::sync::atomic::Ordering::Relaxed;
 
 use pumpkin_data::Enchantment;
 use pumpkin_data::attributes::Attributes;
 use pumpkin_data::data_component_impl::{
     AttributeModifiersImpl, CustomNameImpl, EnchantmentsImpl, EquipmentSlot, EquipmentType,
-    EquippableImpl, IDSet, Operation,
+    EquippableImpl, IDSet, IdOr, Operation,
 };
 use pumpkin_data::enchantment_provider::EnchantmentProvider;
 use pumpkin_data::entity::EntityType;
@@ -683,10 +684,13 @@ pub fn is_equippable_in_slot(
     )
 }
 
+/// Vanilla `LivingEntity.getEquipmentSlotForItem`: the item's equippable slot when the mob
+/// can use it, else the main hand.
 #[must_use]
-pub fn get_equipment_slot_for_item(stack: &ItemStack) -> EquipmentSlot {
+pub fn get_equipment_slot_for_item<M: Mob + ?Sized>(mob: &M, stack: &ItemStack) -> EquipmentSlot {
     stack
         .get_data_component::<EquippableImpl>()
+        .filter(|equippable| mob.can_use_slot(equippable.slot))
         .map_or(EquipmentSlot::MAIN_HAND, |equippable| {
             equippable.slot.clone()
         })
@@ -810,32 +814,24 @@ pub fn can_replace_equal_item(new_item: &ItemStack, current_item: &ItemStack) ->
             .is_none()
 }
 
+/// Vanilla `Mob.equipItemIfPossible`: equips `stack` if it beats what is worn, returning
+/// what got equipped.
 #[must_use]
-/// Equips `stack` if it beats what is worn, returning what got equipped.
-pub fn equip_item_if_possible(mob: &dyn Mob, stack: ItemStack) -> ItemStack {
+pub fn equip_item_if_possible<M: Mob + ?Sized>(mob: &M, stack: ItemStack) -> ItemStack {
     let mob_entity = mob.get_mob_entity();
-    let entity = &mob_entity.living_entity.entity;
-    let mut slot = get_equipment_slot_for_item(&stack);
-    if !is_equippable_in_slot(entity.entity_type, &stack, &slot) {
+    let mut slot = get_equipment_slot_for_item(mob, &stack);
+    if !mob.is_equippable_in_slot(&stack, &slot) {
         return ItemStack::EMPTY.clone();
     }
 
-    let item_in = |slot: &EquipmentSlot| {
-        mob_entity
-            .living_entity
-            .entity_equipment
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .get(slot)
-    };
-    let mut current = item_in(&slot);
+    let mut current = mob_entity.get_item_slot(&slot);
     let mut can_replace = mob.can_replace_current_item(&stack, &current, &slot);
     if slot.is_armor_slot() && !can_replace {
         slot = EquipmentSlot::MAIN_HAND;
-        current = item_in(&slot);
+        current = mob_entity.get_item_slot(&slot);
         can_replace = current.is_empty();
     }
-    if !can_replace {
+    if !can_replace || !mob.can_hold_item(&stack) {
         return ItemStack::EMPTY.clone();
     }
 
@@ -848,8 +844,9 @@ pub fn equip_item_if_possible(mob: &dyn Mob, stack: ItemStack) -> ItemStack {
 
     let mut stack = stack;
     let to_equip = limit_for_slot(&slot, &mut stack);
-    mob_entity.set_item_slot_and_drop_when_killed(&slot, to_equip.clone());
-    mob.on_equip_item(&slot);
+    // Vanilla `setItemSlotAndDropWhenKilled`, through `setItemSlot` and so `onEquipItem`.
+    mob.set_item_slot_and_notify(&slot, to_equip.clone());
+    mob_entity.set_guaranteed_drop(&slot);
     mob_entity
         .persistence_required
         .store(true, std::sync::atomic::Ordering::Relaxed);
@@ -864,10 +861,11 @@ pub fn notify_equip<M: Mob + ?Sized>(
     old: &ItemStack,
     new: &ItemStack,
 ) {
-    if old.are_items_and_components_equal(new) {
+    let entity = mob.get_entity();
+    // Vanilla `firstTick`: nothing sounds before the entity's first tick.
+    if old.are_items_and_components_equal(new) || entity.tick_count.load(Relaxed) == 0 {
         return;
     }
-    let entity = mob.get_entity();
     let world = entity.world.load();
     let pos = entity.pos.load();
     let equippable = new.get_data_component::<EquippableImpl>();
@@ -875,11 +873,12 @@ pub fn notify_equip<M: Mob + ?Sized>(
         && !entity.is_silent()
         && equippable.slot == slot
     {
-        if let Some(sound) = mob.equip_sound(slot) {
-            world.play_sound_fine(sound, mob.sound_source(), &pos, 1.0, 1.0);
-        } else {
-            world.play_sound_event(&equippable.equip_sound, mob.sound_source(), &pos);
-        }
+        let sound = mob
+            .equip_sound(slot)
+            .map_or_else(|| equippable.equip_sound.clone(), IdOr::Id);
+        // `playSeededSound` with `this.random.nextLong()`.
+        let seed = entity.random().next_i64();
+        world.play_seeded_sound_event(&sound, mob.sound_source(), &pos, seed);
     }
     let event = if equippable.is_some() {
         GameEvent::Equip
@@ -975,7 +974,12 @@ mod tests {
 }
 
 /// Vanilla `Mob.pickUpItem`.
-pub fn pick_up_item(mob: &dyn Mob, item: &crate::entity::item::ItemEntity, stack: ItemStack) {
+pub fn pick_up_item<M: Mob + ?Sized>(mob: &M, item: &crate::entity::item::ItemEntity) {
+    let stack = item
+        .get_item_stack()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone();
     let equipped = equip_item_if_possible(mob, stack);
     if equipped.is_empty() {
         return;
