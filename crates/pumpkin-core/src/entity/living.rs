@@ -2584,6 +2584,7 @@ impl LivingEntity {
                     self.drop_loot(dyn_self.get_mob(), &params);
                     if let Some(mob) = dyn_self.get_mob() {
                         self.drop_mob_equipment(
+                            mob,
                             &DamageSource {
                                 damage_type,
                                 direct: source,
@@ -2636,7 +2637,12 @@ impl LivingEntity {
     /// Vanilla `Mob.dropCustomDeathLoot`: each slot's equipment drops by its chance (Looting
     /// raising it), but only for a kill a player had a hand in unless the chance marks the
     /// item as preserved. A dropped item that isn't preserved comes out worn.
-    fn drop_mob_equipment(&self, killing_blow: &DamageSource<'_>, killed_by_player: bool) {
+    fn drop_mob_equipment(
+        &self,
+        mob: &dyn super::mob::Mob,
+        killing_blow: &DamageSource<'_>,
+        killed_by_player: bool,
+    ) {
         let world = self.entity.world.load();
         for slot in &EquipmentSlot::VALUES {
             let mut chance = self
@@ -2684,10 +2690,8 @@ impl LivingEntity {
                 item.set_damage(max_damage - outer);
             }
             self.entity.spawn_at_location(item);
-            self.entity_equipment
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .put(slot, ItemStack::EMPTY.clone());
+            // `setItemSlot`: the clients see the slot empty, with an `unequip` game event.
+            mob.set_item_slot_and_notify(slot, ItemStack::EMPTY.clone());
         }
     }
 

@@ -2814,6 +2814,40 @@ fn enchant_spawned_equipment<M: Mob + ?Sized>(
     }
 }
 
+/// Vanilla `canDispenserEquipIntoSlot` for a mob.
+///
+/// `Mob` answers with `canPickUpLoot`; the saddled and armored mounts, the happy ghast, the
+/// sulfur cube and the mobs that only carry an item in their mouth or hand override it.
+#[must_use]
+pub fn can_dispenser_equip_into_slot(mob: &dyn Mob, slot: &EquipmentSlot) -> bool {
+    let entity_type = mob.get_entity().entity_type;
+    let mob_entity = mob.get_mob_entity();
+    let can_pick_up_loot = || mob_entity.with_brain(mob, |tick| mob.can_pick_up_loot(tick.brain));
+    let is_body_or_saddle = *slot == EquipmentSlot::BODY || *slot == EquipmentSlot::SADDLE;
+    if entity_type == &EntityType::SULFUR_CUBE || entity_type == &EntityType::HAPPY_GHAST {
+        *slot == EquipmentSlot::BODY
+    } else if entity_type == &EntityType::ALLAY {
+        false
+    } else if entity_type == &EntityType::DOLPHIN
+        || entity_type == &EntityType::FOX
+        || entity_type == &EntityType::PANDA
+    {
+        *slot == EquipmentSlot::MAIN_HAND && can_pick_up_loot()
+    } else if entity_type == &EntityType::PIG || entity_type == &EntityType::STRIDER {
+        *slot == EquipmentSlot::SADDLE || can_pick_up_loot()
+    } else if entity_type == &EntityType::NAUTILUS || entity_type == &EntityType::ZOMBIE_NAUTILUS {
+        is_body_or_saddle || can_pick_up_loot()
+    } else if let Some(horse) = mob.as_abstract_horse() {
+        // `AbstractHorse`: body armor and saddles once tamed.
+        is_body_or_saddle && horse.is_horse_tamed() || can_pick_up_loot()
+    } else if entity_type == &EntityType::CAMEL || entity_type == &EntityType::CAMEL_HUSK {
+        // `Camel.isTamed` is always true.
+        is_body_or_saddle || can_pick_up_loot()
+    } else {
+        can_pick_up_loot()
+    }
+}
+
 /// Vanilla `TamableAnimal.isTame` for a target or avoid candidate.
 #[must_use]
 pub fn is_tame(target: &crate::entity::living::LivingEntity) -> bool {

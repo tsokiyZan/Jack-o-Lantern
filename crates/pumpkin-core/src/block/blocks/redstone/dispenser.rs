@@ -1280,26 +1280,44 @@ impl DispenserBlock {
             let Some(living) = entity.get_living_entity() else {
                 continue;
             };
-            // `SulfurCube.canDispenserEquipIntoSlot` only allows the body slot, and no body
-            // equipment is a block it can swallow.
+            // Vanilla `LivingEntity.canEquipWithDispenser`.
+            let mob = entity.get_mob();
             if !living.is_part_of_game()
+                || !mob.is_none_or(|mob| mob.can_use_slot(slot))
                 || !is_allowed_entity(allowed_entities.as_ref(), entity.get_entity().entity_type)
-                || entity.get_entity().entity_type == &EntityType::SULFUR_CUBE
+                || !living
+                    .entity_equipment
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .get(slot)
+                    .is_empty()
+                || !mob
+                    .is_none_or(|mob| crate::entity::mob::can_dispenser_equip_into_slot(mob, slot))
             {
                 continue;
             }
 
-            let mut equipment = living
-                .entity_equipment
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            if !equipment.get(slot).is_empty() {
-                continue;
+            if let Some(mob) = mob {
+                // `EquipmentDispenseItemBehavior.dispenseEquipment` for a mob: through
+                // `setItemSlot`, always dropped, and kept from despawning.
+                let target_slot =
+                    crate::entity::mob::equipment::get_equipment_slot_for_item(mob, item);
+                let equip = item.split(1);
+                mob.set_item_slot_and_notify(&target_slot, equip);
+                let mob_entity = mob.get_mob_entity();
+                mob_entity.set_guaranteed_drop(&target_slot);
+                mob_entity
+                    .persistence_required
+                    .store(true, std::sync::atomic::Ordering::Relaxed);
+                return true;
             }
 
             let stack = item.split(1);
-            equipment.put(slot, stack.clone());
-            drop(equipment);
+            living
+                .entity_equipment
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .put(slot, stack.clone());
 
             living.send_equipment_changes(&[(slot.clone(), stack)]);
             ctx.world.play_sound_event(
