@@ -49,10 +49,12 @@ enum TeamColor {
 
 /// Vanilla `ServerWaypointManager`.
 ///
-/// Lock order: the manager's mutex is taken first, and while it is held a connection may take
-/// a player's custom scoreboard and the world scoreboard (`getTeam`, for the icon's team
-/// colour). So nothing may take the manager while holding a scoreboard lock: the scoreboard
-/// queues its waypoint work and `World::lock_scoreboard`'s guard runs it after unlocking.
+/// Lock order: apply -> scoreboard -> manager; the manager may take the scoreboard, never the
+/// reverse. While the manager's mutex is held a connection may take a player's custom
+/// scoreboard and the world scoreboard (`getTeam`, for the icon's team colour), so nothing may
+/// take the manager while holding a scoreboard lock: the scoreboard queues its waypoint work
+/// and `World::lock_scoreboard`'s guard runs it after unlocking the scoreboard, still holding
+/// the world's apply lock (taken before the scoreboard, so a waiting change never holds it).
 #[derive(Default)]
 pub struct WaypointManager {
     inner: std::sync::Mutex<Inner>,
@@ -388,6 +390,11 @@ pub fn apply_scoreboard_events(
     events: Vec<super::scoreboard::ScoreboardEvent>,
 ) {
     use super::scoreboard::ScoreboardEvent;
+    // Tests: stand in for a remake reaching the manager (the test world has no players).
+    #[cfg(test)]
+    if tests::APPLY_TAKES_MANAGER.load(Ordering::SeqCst) {
+        drop(world.waypoint_manager.lock());
+    }
     let server = world.server.upgrade();
     for event in events {
         match event {
@@ -422,8 +429,11 @@ pub fn apply_scoreboard_events(
 }
 
 /// [`World::lock_scoreboard`]'s guard.
+///
+/// Holds the world's apply lock (taken before the scoreboard) until the queued events are sent.
 pub struct ScoreboardGuard<'a> {
     pub(super) world: &'a super::World,
+    pub(super) apply: Option<std::sync::MutexGuard<'a, ()>>,
     pub(super) guard: Option<std::sync::MutexGuard<'a, super::scoreboard::Scoreboard>>,
 }
 
@@ -445,29 +455,85 @@ impl std::ops::DerefMut for ScoreboardGuard<'_> {
 
 impl Drop for ScoreboardGuard<'_> {
     fn drop(&mut self) {
+        let apply = self.apply.take();
         let Some(mut guard) = self.guard.take() else {
             return;
         };
         let events = guard.take_events();
-        if events.is_empty() {
-            return;
-        }
-        // Scoreboard, then the apply lock, then (in the remakes) the manager.
-        let apply = self
-            .world
-            .scoreboard_apply
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        // Apply, then the scoreboard (released here), then (in the remakes) the manager.
         drop(guard);
-        apply_scoreboard_events(self.world, events);
+        if !events.is_empty() {
+            apply_scoreboard_events(self.world, events);
+        }
         drop(apply);
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::mpsc;
     use std::time::Duration;
+
+    /// Makes `apply_scoreboard_events` take the manager, as a remake for an online player does.
+    pub(super) static APPLY_TAKES_MANAGER: AtomicBool = AtomicBool::new(false);
+
+    /// Two overlapping team changes while a connection (holding the manager) asks for a team
+    /// colour (the scoreboard) must all finish: the apply lock is taken before the scoreboard,
+    /// so no change waits for it while holding the scoreboard.
+    #[tokio::test]
+    async fn overlapping_team_changes_and_a_colour_lookup_all_finish() {
+        let (_folder, world) = crate::world::test_support::test_world();
+        APPLY_TAKES_MANAGER.store(true, Ordering::SeqCst);
+        let (done, finished) = mpsc::channel();
+        let (held, manager_held) = mpsc::channel();
+        let (go, lookup) = mpsc::channel::<()>();
+        // A connection being made: the manager, then `getTeam`'s scoreboard.
+        let mover = {
+            let (world, done) = (world.clone(), done.clone());
+            std::thread::spawn(move || {
+                let manager = world.waypoint_manager.lock();
+                held.send(()).unwrap();
+                lookup.recv().unwrap();
+                drop(
+                    world
+                        .scoreboard
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner),
+                );
+                drop(manager);
+                done.send("mover").unwrap();
+            })
+        };
+        manager_held.recv().unwrap();
+        let change = |name: &'static str| {
+            let (world, done) = (world.clone(), done.clone());
+            std::thread::spawn(move || {
+                let mut scoreboard = world.lock_scoreboard();
+                scoreboard.add_team(&NoTarget, Team::new(name.to_string()));
+                drop(scoreboard);
+                done.send(name).unwrap();
+            })
+        };
+        // The first change applies (and waits for the manager), the second queues behind it,
+        // then the connection asks for the scoreboard.
+        let _first = change("a");
+        std::thread::sleep(Duration::from_millis(200));
+        let _second = change("b");
+        std::thread::sleep(Duration::from_millis(200));
+        go.send(()).unwrap();
+        let mut finished_names = Vec::new();
+        for _ in 0..3 {
+            match finished.recv_timeout(Duration::from_secs(5)) {
+                Ok(name) => finished_names.push(name),
+                Err(_) => break,
+            }
+        }
+        APPLY_TAKES_MANAGER.store(false, Ordering::SeqCst);
+        finished_names.sort_unstable();
+        assert_eq!(finished_names, ["a", "b", "mover"], "deadlocked");
+        mover.join().unwrap();
+    }
 
     use pumpkin_util::text::color::NamedColor;
 

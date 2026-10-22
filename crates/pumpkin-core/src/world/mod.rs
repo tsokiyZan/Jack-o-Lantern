@@ -267,9 +267,10 @@ pub struct World {
     pub entities: ArcSwap<Vec<Arc<dyn EntityBase>>>,
     /// The world's scoreboard, used for tracking scores, objectives, and display information.
     pub scoreboard: std::sync::Mutex<Scoreboard>,
-    /// Held from just before a `lock_scoreboard` guard unlocks the scoreboard until its queued
-    /// team packets and waypoint remakes are sent, so two changes apply in the order they were
-    /// made. Lock order: scoreboard, then this, then the waypoint manager.
+    /// Taken by `lock_scoreboard` before the scoreboard and held until the change's queued team
+    /// packets and waypoint remakes are sent, so changes apply in the order they were made.
+    /// Lock order: apply -> scoreboard -> manager; the manager may take the scoreboard, never
+    /// the reverse.
     pub(crate) scoreboard_apply: std::sync::Mutex<()>,
     /// The world's worldborder, defining the playable area and controlling its expansion or contraction.
     pub worldborder: std::sync::Mutex<Worldborder>,
@@ -5145,16 +5146,22 @@ impl World {
         }
     }
 
-    /// Gets a `Player` by an entity id
     /// Locks the world scoreboard; use it for any team change. The guard sends what the change
     /// queued (team packets, and `ServerScoreboard`'s `updatePlayerWaypoint` /
-    /// `updateTeamWaypoints` right after each) once the lock is released: the waypoint
+    /// `updateTeamWaypoints` right after each) once the scoreboard is released: the waypoint
     /// manager reads the scoreboard under its own lock, so it must never be entered with the
-    /// scoreboard held. A team change made through a plain `scoreboard.lock()` stays queued
-    /// until the next guard.
+    /// scoreboard held. Lock order: apply -> scoreboard -> manager; the manager may take the
+    /// scoreboard, never the reverse. The apply lock is taken first and held until the queue
+    /// is sent, so changes apply in order. A team change made through a plain
+    /// `scoreboard.lock()` stays queued until the next guard.
     pub fn lock_scoreboard(&self) -> waypoint_manager::ScoreboardGuard<'_> {
+        let apply = self
+            .scoreboard_apply
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         waypoint_manager::ScoreboardGuard {
             world: self,
+            apply: Some(apply),
             guard: Some(
                 self.scoreboard
                     .lock()
@@ -5163,6 +5170,7 @@ impl World {
         }
     }
 
+    /// Gets a `Player` by an entity id
     pub fn get_player_by_id(&self, id: i32) -> Option<Arc<Player>> {
         for player in self.players.load().iter() {
             if player.entity_id() == id {
