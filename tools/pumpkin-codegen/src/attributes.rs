@@ -15,11 +15,13 @@ struct Attributes {
     default_value: f64,
 }
 
-/// `RangedAttribute` bounds from `attribute_ranges.json` (`tools/vanilla-dump/AttributeRanges.java`).
+/// `RangedAttribute` bounds and `isClientSyncable` from `attribute_ranges.json`
+/// (`tools/vanilla-dump/AttributeRanges.java`).
 #[derive(Deserialize)]
 struct AttributeRange {
     min_value: f64,
     max_value: f64,
+    syncable: bool,
 }
 
 /// Generates the `TokenStream` for the `Attributes` struct and its associated constants.
@@ -49,6 +51,7 @@ pub fn build() -> TokenStream {
             .unwrap_or_else(|| panic!("No range for attribute {raw_name}"));
         let min_value_lit = range.min_value;
         let max_value_lit = range.max_value;
+        let syncable = range.syncable;
 
         constant_defs.push(quote!(
             pub const #constant_ident: Self = Self {
@@ -56,6 +59,7 @@ pub fn build() -> TokenStream {
                 default_value: #default_value_lit,
                 min_value: #min_value_lit,
                 max_value: #max_value_lit,
+                syncable: #syncable,
                 name: #name_str,
             };
         ));
@@ -72,6 +76,8 @@ pub fn build() -> TokenStream {
             pub min_value: f64,
             /// Vanilla `RangedAttribute.maxValue`.
             pub max_value: f64,
+            /// Vanilla `Attribute.isClientSyncable`.
+            pub syncable: bool,
             pub name: &'static str,
         }
         impl PartialEq for Attributes {

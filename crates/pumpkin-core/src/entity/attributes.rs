@@ -152,7 +152,8 @@ impl AttributeInstance {
     }
 }
 
-/// Send updates for multiple attributes in a single packet for the given living entity.
+/// Vanilla `ServerEntity.sendDirtyEntityData`'s attribute sync: the client syncable ones of
+/// `attributes` in one packet, to the tracking players and the entity itself (`broadcastAndSend`).
 pub fn send_attribute_updates_for_living(
     living: &crate::entity::living::LivingEntity,
     attributes: Vec<Attributes>,
@@ -190,12 +191,14 @@ pub fn send_attribute_updates_for_living(
             }
         }
 
-        // Move modifiers into the property
-        je_properties.push(JeProperty::new(
-            VarInt(i32::from(attribute.id)),
-            base_value,
-            modifiers,
-        ));
+        // `AttributeMap.getAttributesToSync` only collects `isClientSyncable` attributes.
+        if attribute.syncable {
+            je_properties.push(JeProperty::new(
+                VarInt(i32::from(attribute.id)),
+                base_value,
+                modifiers,
+            ));
+        }
 
         let name = match attribute.id {
             id if id == Attributes::MOVEMENT_SPEED.id => "minecraft:movement".to_string(),
@@ -228,21 +231,26 @@ pub fn send_attribute_updates_for_living(
         be_attributes.push(be_attribute);
     }
 
-    let je_packet = JePacket::new(living.entity.entity_id.into(), je_properties);
     let world = living.entity.world.load();
+    if !je_properties.is_empty() {
+        let je_packet = JePacket::new(living.entity.entity_id.into(), je_properties);
+        world.send_to_tracking_players_and_self(&living.entity, &je_packet);
+    }
     if be_attributes.is_empty() {
-        world.broadcast_packet_all(&je_packet);
         return;
     }
-
-    let runtime_id = living.entity.entity_id as u64;
     let be_packet = BePacket {
-        target_runtime_id: VarULong(runtime_id),
+        target_runtime_id: VarULong(living.entity.entity_id as u64),
         attribute_list: be_attributes,
         tick: VarULong(0),
     };
-
-    world.broadcast_editioned(&je_packet, &be_packet);
+    world.send_to_tracking_players_bedrock(&living.entity, &be_packet);
+    if let Some(player) = living.self_player()
+        && let crate::net::ClientPlatform::Bedrock(client) = player.client.as_ref()
+        && let Ok(data) = client.serialize_packet(&be_packet)
+    {
+        client.try_enqueue_packet(data);
+    }
 }
 
 impl Clone for AttributeInstance {

@@ -1,5 +1,6 @@
 // Dumps the RangedAttribute min and max of every attribute from a real vanilla server, for
-// AttributeInstance's sanitizeValue.
+// AttributeInstance's sanitizeValue, and whether the attribute is client syncable
+// (Attribute.isClientSyncable, for the attribute sync).
 // Run from testing/vanilla-test (needs its versions/ and libraries/):
 //   CP=$(find versions libraries -name '*.jar' | tr '\n' ':')
 //   java -cp "$CP" AttributeRanges.java out.json
@@ -20,7 +21,8 @@ public class AttributeRanges {
         for (Attribute attribute : BuiltInRegistries.ATTRIBUTE) {
             if (attribute instanceof RangedAttribute ranged) {
                 ranges.put(BuiltInRegistries.ATTRIBUTE.getKey(attribute).getPath(),
-                    "{\"min_value\": " + ranged.getMinValue() + ", \"max_value\": " + ranged.getMaxValue() + "}");
+                    "{\"min_value\": " + ranged.getMinValue() + ", \"max_value\": " + ranged.getMaxValue()
+                    + ", \"syncable\": " + ranged.isClientSyncable() + "}");
             }
         }
         StringBuilder out = new StringBuilder("{\n");

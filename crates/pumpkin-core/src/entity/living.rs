@@ -1391,7 +1391,7 @@ impl LivingEntity {
     }
 
     /// This entity as a player, for the `ServerPlayer` overrides.
-    fn self_player(&self) -> Option<Arc<crate::entity::player::Player>> {
+    pub(crate) fn self_player(&self) -> Option<Arc<crate::entity::player::Player>> {
         if !self.is_player() {
             return None;
         }
