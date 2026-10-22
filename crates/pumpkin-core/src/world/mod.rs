@@ -1402,7 +1402,8 @@ impl World {
     }
 
     /// Vanilla `ServerLevel.sendParticles` with a speed per axis and a randomization type
-    /// (26.3): `count` particles of `particle` (options `data`) spread by `offset`.
+    /// (26.3): `count` particles of `particle` (options `data`) spread by `offset`, to the
+    /// players within 32 blocks.
     #[expect(clippy::too_many_arguments)]
     pub fn send_particles_with_axis_speed(
         &self,
@@ -1414,21 +1415,23 @@ impl World {
         speed: Vector3<f32>,
         randomization: i32,
     ) {
-        let packet = pumpkin_protocol::java::client::play::CParticle::new(
-            false,
-            false,
-            position,
-            offset,
-            speed.x,
-            count,
-            pumpkin_protocol::VarInt(particle as i32),
-            data,
-        )
-        .with_axis_speed(speed, randomization);
-        // `sendParticles(player, ...)`: players within 32 blocks.
+        let packet = AxisSpeedParticles {
+            particle: pumpkin_protocol::java::client::play::CParticle::new(
+                false,
+                false,
+                position,
+                offset,
+                speed.x,
+                count,
+                pumpkin_protocol::VarInt(particle as i32),
+                data,
+            ),
+            speed,
+            randomization,
+        };
         for player in self.players.load().iter() {
             if player.position().squared_distance_to_vec(&position) < 32.0 * 32.0 {
-                player.send_particle_packet(&packet);
+                player.send_java_packet(&packet);
             }
         }
     }
@@ -8544,5 +8547,50 @@ const fn legacy_world_border(
         size: level_data.border_size,
         lerp_time: level_data.border_size_lerp_time,
         lerp_target: level_data.border_size_lerp_target,
+    }
+}
+
+/// `ClientboundLevelParticlesPacket` with the 26.3 per-axis speed and randomization type,
+/// which `CParticle` (whose shape the plugin API mirrors) doesn't carry. Older clients get the
+/// plain `CParticle` with the x speed.
+struct AxisSpeedParticles<'a> {
+    particle: pumpkin_protocol::java::client::play::CParticle<'a>,
+    speed: Vector3<f32>,
+    randomization: i32,
+}
+
+impl pumpkin_protocol::packet::MultiVersionJavaPacket for AxisSpeedParticles<'_> {
+    fn to_id(version: pumpkin_util::version::JavaMinecraftVersion) -> i32 {
+        <pumpkin_protocol::java::client::play::CParticle<'_> as pumpkin_protocol::packet::MultiVersionJavaPacket>::to_id(version)
+    }
+}
+
+impl pumpkin_protocol::ClientPacket for AxisSpeedParticles<'_> {
+    fn write_packet_data(
+        &self,
+        mut write: impl std::io::Write,
+        version: &pumpkin_util::version::JavaMinecraftVersion,
+    ) -> Result<(), pumpkin_protocol::ser::WritingError> {
+        use pumpkin_protocol::ser::NetworkWriteExt;
+        if *version < pumpkin_util::version::JavaMinecraftVersion::V_26_3 {
+            return self.particle.write_packet_data(write, version);
+        }
+        let particle = &self.particle;
+        write.write_var_int(&particle.particle_id)?;
+        write.write_slice(particle.data)?;
+        write.write_bool(particle.important)?;
+        write.write_bool(particle.force_spawn)?;
+        write.write_f64_be(particle.position.x)?;
+        write.write_f64_be(particle.position.y)?;
+        write.write_f64_be(particle.position.z)?;
+        write.write_f32_be(particle.offset.x)?;
+        write.write_f32_be(particle.offset.y)?;
+        write.write_f32_be(particle.offset.z)?;
+        write.write_f32_be(self.speed.x)?;
+        write.write_f32_be(self.speed.y)?;
+        write.write_f32_be(self.speed.z)?;
+        write.write_var_int(&pumpkin_protocol::VarInt(particle.particle_count))?;
+        write.write_var_int(&pumpkin_protocol::VarInt(self.randomization))?;
+        Ok(())
     }
 }

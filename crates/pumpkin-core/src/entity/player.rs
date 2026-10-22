@@ -2603,8 +2603,8 @@ impl Player {
 
     /// Like [`Self::spawn_particle`], for particles whose type carries options.
     /// `data` is those options in vanilla's stream encoding.
-    /// Sends `packet`, a particle packet, to this player.
-    pub fn send_particle_packet(&self, packet: &CParticle<'_>) {
+    /// Sends `packet` to this Java player (Bedrock players get nothing).
+    pub fn send_java_packet<P: pumpkin_protocol::ClientPacket>(&self, packet: &P) {
         if let ClientPlatform::Java(client) = self.client.as_ref()
             && let Ok(data) = client.serialize_packet(packet)
         {
