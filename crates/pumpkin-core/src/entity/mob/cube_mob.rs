@@ -682,6 +682,12 @@ impl Mob for CubeMobEntity {
             || 2 + self.get_entity().random().next_bounded_i32(3),
             sulfur_cube::SulfurCubeData::split_count,
         );
+        // Read once: the first child's conversion takes the parent off its team.
+        let params = crate::entity::mob::conversion::ConversionParams {
+            keep_equipment: false,
+            preserve_can_pick_up_loot: false,
+            team: self.get_team_name(),
+        };
         for i in 0..count {
             let xd = ((i % 2) as f32 - 0.5) * xz_cube_spawn_offset;
             let zd = ((i / 2) as f32 - 0.5) * xz_cube_spawn_offset;
@@ -695,17 +701,13 @@ impl Mob for CubeMobEntity {
             let Some(cube) = child.cast_any().downcast_ref::<Self>() else {
                 continue;
             };
-            // `SPLIT_ON_DEATH.convert`: a leashed parent drops its leash (a no-op after the
-            // first child).
+            // `SPLIT_ON_DEATH.convert`: the first passenger stops riding and a leashed parent
+            // drops its leash (both no-ops after the first child).
+            if let Some(rider) = entity.get_first_passenger() {
+                entity.remove_passenger(rider.get_entity().entity_id);
+            }
             crate::entity::leashable::drop_leash(self, true, true);
-            convert_common(
-                self,
-                cube,
-                crate::entity::mob::conversion::ConversionParams {
-                    keep_equipment: false,
-                    preserve_can_pick_up_loot: false,
-                },
-            );
+            convert_common(self, cube, &params);
             // `setUpSplitCube`.
             cube.set_size(half_size, true);
             let child_entity = cube.get_entity();

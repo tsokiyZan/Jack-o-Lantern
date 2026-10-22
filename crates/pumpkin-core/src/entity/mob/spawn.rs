@@ -117,6 +117,22 @@ impl MobEntity {
         )
     }
 
+    /// Queues an entity already in the world to mount this mob when it enters the world, as
+    /// `ConversionType.SINGLE`'s `rootPassenger.startRiding(to)` does.
+    pub fn add_pending_existing_rider(&self, rider: Arc<dyn EntityBase>) {
+        *self
+            .pending_existing_rider
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(rider);
+    }
+
+    pub(crate) fn take_pending_existing_rider(&self) -> Option<Arc<dyn EntityBase>> {
+        self.pending_existing_rider
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .take()
+    }
+
     /// Queues an entity already in the world for this mob to mount when it enters the world,
     /// as a vanilla `startRiding` during `finalizeSpawn` does.
     pub fn set_pending_vehicle(&self, vehicle: Arc<dyn EntityBase>) {

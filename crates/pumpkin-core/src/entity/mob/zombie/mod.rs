@@ -333,10 +333,7 @@ impl ZombieEntityBase {
         convert_to(
             mob,
             self.converts_to_when_drowning(),
-            ConversionParams {
-                keep_equipment: true,
-                preserve_can_pick_up_loot: true,
-            },
+            &ConversionParams::single(mob, true, true),
             |converted| {
                 let entity = converted.get_entity();
                 let world = entity.world.load_full();
@@ -500,10 +497,7 @@ impl ZombieEntityBase {
         convert_to(
             villager,
             &EntityType::ZOMBIE_VILLAGER,
-            ConversionParams {
-                keep_equipment: true,
-                preserve_can_pick_up_loot: true,
-            },
+            &ConversionParams::single(villager, true, true),
             |converted| {
                 let Some(zombie_villager) = converted
                     .cast_any()

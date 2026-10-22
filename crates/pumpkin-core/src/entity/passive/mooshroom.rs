@@ -414,10 +414,7 @@ impl MooshroomEntity {
         crate::entity::mob::conversion::convert_to(
             self,
             &EntityType::COW,
-            crate::entity::mob::conversion::ConversionParams {
-                keep_equipment: false,
-                preserve_can_pick_up_loot: false,
-            },
+            &crate::entity::mob::conversion::ConversionParams::single(self, false, false),
             |_cow| {
                 world.spawn_particle(
                     pos + Vector3::new(0.0, height * 0.5, 0.0),

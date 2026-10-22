@@ -5822,17 +5822,39 @@ impl World {
         let Some(mob) = vehicle.get_mob() else {
             return;
         };
+        // `startRiding(vehicle, false, false)` in `finalizeSpawn`: no game event.
         for rider in mob.get_mob_entity().take_pending_riders() {
             rider.init_data_tracker();
             self.add_entity_silent(rider.clone());
-            vehicle.get_entity().add_passenger(vehicle.clone(), rider);
+            vehicle
+                .get_entity()
+                .add_passenger_without_event(vehicle.clone(), rider);
         }
+        // A converted mob's rider is already in the world, so it is only mounted, by
+        // `rootPassenger.startRiding(to)`: `canRide` (not sneaking, no boarding cooldown) and
+        // `canAddPassenger` (no passenger yet), with the game event.
+        if let Some(rider) = mob.get_mob_entity().take_pending_existing_rider() {
+            let rider_entity = rider.get_entity();
+            if !rider_entity.is_removed()
+                && !rider_entity.is_sneaking()
+                && rider_entity.riding_cooldown.load(Ordering::Relaxed) <= 0
+                && vehicle
+                    .get_entity()
+                    .passengers
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .is_empty()
+            {
+                vehicle.get_entity().add_passenger(vehicle.clone(), rider);
+            }
+        }
+        // `to.startRiding(vehicle, false, false)` in a conversion, or `finalizeSpawn`'s.
         if let Some(mount) = mob.get_mob_entity().take_pending_vehicle()
             && !mount.get_entity().is_removed()
         {
             mount
                 .get_entity()
-                .add_passenger(mount.clone(), vehicle.clone());
+                .add_passenger_without_event(mount.clone(), vehicle.clone());
         }
     }
 

@@ -4,7 +4,6 @@ use std::sync::{
 };
 
 use pumpkin_data::Block;
-use pumpkin_data::entity::EntityType;
 use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_data::tracked_data;
 use pumpkin_nbt::compound::NbtCompound;
@@ -86,53 +85,6 @@ impl PiglinBruteEntity {
         let state = world.get_block_state(&below);
         state.id != Block::NETHER_WART_BLOCK.default_state.id
     }
-
-    fn convert_to_zombified(&self) {
-        let entity = &self.mob_entity.living_entity.entity;
-        let world = entity.world.load();
-        let pos = entity.pos.load();
-
-        let zombified = crate::entity::r#type::from_type(
-            &EntityType::ZOMBIFIED_PIGLIN,
-            pos,
-            &world,
-            uuid::Uuid::new_v4(),
-        );
-
-        let zombified_base = zombified.get_entity();
-        zombified_base.set_rotation(entity.yaw.load(), entity.pitch.load());
-        zombified_base.head_yaw.store(entity.head_yaw.load());
-        zombified_base.velocity.store(entity.velocity.load());
-
-        if let Some(living) = zombified.get_living_entity() {
-            living.set_health(self.mob_entity.living_entity.health.load());
-        }
-
-        if let Some(custom_name) = &**entity.custom_name.load() {
-            zombified_base.set_custom_name(custom_name.clone());
-        }
-
-        {
-            let src_equip = self
-                .mob_entity
-                .living_entity
-                .entity_equipment
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            if let Some(living) = zombified.get_living_entity() {
-                let mut dst_equip = living
-                    .entity_equipment
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner);
-                for (slot, item) in &src_equip.equipment {
-                    dst_equip.put(slot, item.clone());
-                }
-            }
-        }
-
-        world.spawn_entity(zombified);
-        entity.remove();
-    }
 }
 
 impl abstract_piglin::AbstractPiglin for PiglinBruteEntity {
@@ -174,7 +126,7 @@ impl abstract_piglin::AbstractPiglin for PiglinBruteEntity {
     }
 
     fn finish_conversion(&self) {
-        self.convert_to_zombified();
+        abstract_piglin::finish_conversion(self);
     }
 }
 

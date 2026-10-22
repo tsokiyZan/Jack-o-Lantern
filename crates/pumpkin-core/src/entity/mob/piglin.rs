@@ -8,7 +8,7 @@ use std::sync::{
 use pumpkin_data::Block;
 use pumpkin_data::Enchantment;
 use pumpkin_data::data_component_impl::EquipmentSlot;
-use pumpkin_data::entity::{EntityPose, EntityType};
+use pumpkin_data::entity::EntityPose;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::Sound;
@@ -307,15 +307,9 @@ impl PiglinEntity {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner),
         );
-        let entity = &self.mob_entity.living_entity.entity;
-        let world = entity.world.load();
-        let pos = entity.pos.load();
+        // `inventory.removeAllItems().forEach(spawnAtLocation)`.
         for item in items {
-            if !item.is_empty() {
-                let item_entity =
-                    ItemEntity::new(Entity::new(world.clone(), pos, &EntityType::ITEM), item);
-                world.spawn_entity(Arc::new(item_entity));
-            }
+            self.mob_entity.living_entity.entity.spawn_at_location(item);
         }
     }
 
@@ -324,55 +318,6 @@ impl PiglinEntity {
         let below = BlockPos::new(pos.0.x, pos.0.y - 1, pos.0.z);
         let state = world.get_block_state(&below);
         state.id != Block::NETHER_WART_BLOCK.default_state.id
-    }
-
-    fn convert_to_zombified(&self) {
-        let entity = &self.mob_entity.living_entity.entity;
-        let world = entity.world.load();
-        let pos = entity.pos.load();
-
-        self.drop_inventory();
-
-        let zombified = crate::entity::r#type::from_type(
-            &EntityType::ZOMBIFIED_PIGLIN,
-            pos,
-            &world,
-            uuid::Uuid::new_v4(),
-        );
-
-        let zombified_base = zombified.get_entity();
-        zombified_base.set_rotation(entity.yaw.load(), entity.pitch.load());
-        zombified_base.head_yaw.store(entity.head_yaw.load());
-        zombified_base.velocity.store(entity.velocity.load());
-
-        if let Some(living) = zombified.get_living_entity() {
-            living.set_health(self.mob_entity.living_entity.health.load());
-        }
-
-        if let Some(custom_name) = &**entity.custom_name.load() {
-            zombified_base.set_custom_name(custom_name.clone());
-        }
-
-        {
-            let src_equip = self
-                .mob_entity
-                .living_entity
-                .entity_equipment
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            if let Some(living) = zombified.get_living_entity() {
-                let mut dst_equip = living
-                    .entity_equipment
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner);
-                for (slot, item) in &src_equip.equipment {
-                    dst_equip.put(slot, item.clone());
-                }
-            }
-        }
-
-        world.spawn_entity(zombified);
-        entity.remove();
     }
 }
 
@@ -429,7 +374,8 @@ impl abstract_piglin::AbstractPiglin for PiglinEntity {
     fn finish_conversion(&self) {
         self.mob_entity
             .with_brain(self, |tick| piglin_ai::cancel_admiring(tick, self));
-        self.convert_to_zombified();
+        self.drop_inventory();
+        abstract_piglin::finish_conversion(self);
     }
 }
 

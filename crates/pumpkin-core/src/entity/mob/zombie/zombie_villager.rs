@@ -255,10 +255,7 @@ impl ZombieVillagerEntity {
         convert_to(
             self,
             &EntityType::VILLAGER,
-            ConversionParams {
-                keep_equipment: false,
-                preserve_can_pick_up_loot: false,
-            },
+            &ConversionParams::single(self, false, false),
             |converted| {
                 self.drop_preserved_equipment();
                 let Some(villager) = converted.cast_any().downcast_ref::<VillagerEntity>() else {
