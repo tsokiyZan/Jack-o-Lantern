@@ -615,6 +615,19 @@ pub fn generate_loot_from_handle(
         .evaluate(random, params))
 }
 
+/// `inner`'s pools rolled on the random of `outer`'s context.
+///
+/// That is a `minecraft:loot_table` entry of `outer` picking `inner`, as vanilla's shearing
+/// tables do by an entity-properties alternative Pumpkin's loot data can't express.
+pub fn generate_nested_loot(
+    outer: &LootTableHandle,
+    inner: &LootTableHandle,
+    world: &World,
+    params: &LootContextParameters,
+) -> Vec<ItemStack> {
+    with_loot_random!(outer, world, 0, |random| inner.evaluate(random, params))
+}
+
 /// Vanilla `LootTable.fill`: the slot shuffle and stack splitting draw from the random the
 /// items were rolled on.
 pub fn fill_chest_inventory_handle(

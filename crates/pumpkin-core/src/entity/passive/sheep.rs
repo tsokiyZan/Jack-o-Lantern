@@ -6,10 +6,12 @@ use std::sync::{
 };
 
 use pumpkin_data::entity::EntityPose;
+use pumpkin_data::sound::SoundCategory;
 use pumpkin_data::{entity::EntityType, item::Item};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::math::boundingbox::EntityDimensions;
-use rand::RngExt;
+use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::{
     Entity, EntityBase,
@@ -100,6 +102,70 @@ impl SheepEntity {
         self.set_packed_and_sync(byte);
     }
 
+    /// Vanilla `Sheep.readyForShearing`.
+    #[must_use]
+    pub fn ready_for_shearing(&self) -> bool {
+        !self.is_sheared() && !self.is_baby()
+    }
+
+    /// Vanilla `Sheep.shear`: the snip from the sheep, its color's wool from the shearing loot
+    /// one item entity at a time a block up with a random nudge, then sheared.
+    pub fn shear(&self, source: SoundCategory, tool: &ItemStack) {
+        const COLORS: [&str; 16] = [
+            "white",
+            "orange",
+            "magenta",
+            "light_blue",
+            "yellow",
+            "lime",
+            "pink",
+            "gray",
+            "light_gray",
+            "cyan",
+            "purple",
+            "blue",
+            "brown",
+            "green",
+            "red",
+            "black",
+        ];
+        let entity = self.get_entity();
+        let world = entity.world.load_full();
+        world.play_sound_from_entity(entity, Sound::EntitySheepShear, source, 1.0, 1.0);
+        let color = COLORS[usize::from(self.get_color()).min(15)];
+        self.mob_entity
+            .living_entity
+            .drop_from_nested_shearing_loot_table(
+                "minecraft:shearing/sheep",
+                &format!("minecraft:shearing/sheep/{color}"),
+                tool,
+                |drop| {
+                    for _ in 0..drop.item_count {
+                        // `spawnAtLocation(level, drop.copyWithCount(1), 1.0F)`.
+                        let item = crate::entity::item::ItemEntity::new(
+                            Entity::new(
+                                world.clone(),
+                                entity.pos.load() + Vector3::new(0.0, 1.0, 0.0),
+                                &EntityType::ITEM,
+                            ),
+                            drop.copy_with_count(1),
+                        );
+                        let nudge = {
+                            let mut random = entity.random();
+                            let x = (random.next_f32() - random.next_f32()) * 0.1;
+                            let y = random.next_f32() * 0.05;
+                            let z = (random.next_f32() - random.next_f32()) * 0.1;
+                            Vector3::new(f64::from(x), f64::from(y), f64::from(z))
+                        };
+                        let velocity = item.get_entity().velocity.load();
+                        item.get_entity().velocity.store(velocity + nudge);
+                        world.spawn_entity(Arc::new(item));
+                    }
+                },
+            );
+        self.set_sheared(true);
+    }
+
     pub fn set_sheared(&self, sheared: bool) {
         let byte = if sheared {
             self.get_packed_byte() | 0x10
@@ -182,7 +248,7 @@ impl Mob for SheepEntity {
         hand: Hand,
         item_stack: &mut ItemStack,
     ) -> InteractionResult {
-        use super::animal::{Animal, get_wool_item_for_color};
+        use super::animal::Animal;
         let item = item_stack.get_item();
 
         if item == &Item::SHEARS {
@@ -194,25 +260,14 @@ impl Mob for SheepEntity {
             {
                 return InteractionResult::PASS;
             }
-            self.set_sheared(true);
+            self.shear(SoundCategory::Players, item_stack);
             let entity = self.get_entity();
-            let world = entity.world.load();
-            let pos = entity.pos.load();
-            world.play_sound(
-                Sound::EntitySheepShear,
-                pumpkin_data::sound::SoundCategory::Players,
-                &pos,
+            entity.world.load().game_event_from(
+                Some(player.as_ref()),
+                pumpkin_data::game_event::GameEvent::Shear,
+                entity.pos.load(),
             );
-
-            let wool_item = get_wool_item_for_color(self.get_color());
-            let mut rng = rand::rng();
-            let count = rng.random_range(1..=3);
-            let item_entity = Arc::new(crate::entity::item::ItemEntity::new(
-                Entity::new(world.clone(), pos, &EntityType::ITEM),
-                ItemStack::new(count, wool_item),
-            ));
-            world.spawn_entity(item_entity);
-            player.damage_item_in_hand(hand, 1);
+            player.hurt_and_break_in_hand(item_stack, hand, 1);
             return InteractionResult::SUCCESS_SERVER;
         }
 

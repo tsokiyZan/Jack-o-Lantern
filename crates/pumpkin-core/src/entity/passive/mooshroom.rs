@@ -368,7 +368,7 @@ impl Mob for MooshroomEntity {
             {
                 return InteractionResult::PASS;
             }
-            self.shear(item_stack);
+            self.shear(SoundCategory::Players, item_stack);
             let entity = self.get_entity();
             entity.world.load().game_event_from(
                 Some(player.as_ref()),
@@ -391,17 +391,19 @@ impl Mob for MooshroomEntity {
 }
 
 impl MooshroomEntity {
+    /// Vanilla `MushroomCow.readyForShearing`: not a baby.
+    #[must_use]
+    pub fn ready_for_shearing(&self) -> bool {
+        !self.is_baby()
+    }
+
     /// Vanilla `MushroomCow.shear`: the snip, then the mooshroom turns into a cow
     /// (`convertTo(COW)`), leaving an explosion puff and its `shearing/mooshroom` loot, one
     /// item entity per item, at its top.
-    fn shear(&self, tool: &ItemStack) {
+    pub fn shear(&self, source: SoundCategory, tool: &ItemStack) {
         let entity = self.get_entity();
         let world = entity.world.load_full();
-        world.play_sound(
-            Sound::EntityMooshroomShear,
-            SoundCategory::Players,
-            &entity.pos.load(),
-        );
+        world.play_sound_from_entity(entity, Sound::EntityMooshroomShear, source, 1.0, 1.0);
         let pos = entity.pos.load();
         let height = f64::from(entity.height());
         crate::entity::mob::conversion::convert_to(
@@ -420,8 +422,6 @@ impl MooshroomEntity {
                     Particle::Explosion,
                 );
                 let drop_pos = pos + Vector3::new(0.0, height, 0.0);
-                // `shearing/mooshroom` picks its variant's table by an entity-properties
-                // alternative (no random draws); Pumpkin's loot data can't express it.
                 let table = if self.get_variant() == MooshroomVariant::Brown {
                     "minecraft:shearing/mooshroom/brown"
                 } else {
@@ -429,14 +429,19 @@ impl MooshroomEntity {
                 };
                 self.mob_entity
                     .living_entity
-                    .drop_from_shearing_loot_table(table, tool, |drop| {
-                        for _ in 0..drop.item_count {
-                            world.spawn_entity(Arc::new(ItemEntity::new(
-                                Entity::new(world.clone(), drop_pos, &EntityType::ITEM),
-                                drop.copy_with_count(1),
-                            )));
-                        }
-                    });
+                    .drop_from_nested_shearing_loot_table(
+                        "minecraft:shearing/mooshroom",
+                        table,
+                        tool,
+                        |drop| {
+                            for _ in 0..drop.item_count {
+                                world.spawn_entity(Arc::new(ItemEntity::new(
+                                    Entity::new(world.clone(), drop_pos, &EntityType::ITEM),
+                                    drop.copy_with_count(1),
+                                )));
+                            }
+                        },
+                    );
             },
         );
     }

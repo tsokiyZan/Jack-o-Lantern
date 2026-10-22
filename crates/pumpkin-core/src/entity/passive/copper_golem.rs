@@ -207,6 +207,31 @@ impl CustomSound for CopperGolemEntity {
     }
 }
 
+impl CopperGolemEntity {
+    /// Vanilla `CopperGolem.readyForShearing`: a poppy on the antenna (the saddle slot).
+    #[must_use]
+    pub fn ready_for_shearing(&self) -> bool {
+        self.mob_entity
+            .get_item_slot(&pumpkin_data::data_component_impl::EquipmentSlot::SADDLE)
+            .item
+            .has_tag(&tag::Item::MINECRAFT_SHEARABLE_FROM_COPPER_GOLEM)
+    }
+
+    /// Vanilla `CopperGolem.shear`: the snip from the golem, and the antenna item off and
+    /// dropped 1.5 blocks up.
+    pub fn shear(&self, source: SoundCategory) {
+        use pumpkin_data::data_component_impl::EquipmentSlot;
+        let entity = self.get_entity();
+        let world = entity.world.load_full();
+        world.play_sound_from_entity(entity, Sound::EntityCopperGolemShear, source, 1.0, 1.0);
+        let antenna = self.mob_entity.get_item_slot(&EquipmentSlot::SADDLE);
+        self.set_item_slot_and_notify(&EquipmentSlot::SADDLE, ItemStack::EMPTY.clone());
+        if !antenna.is_empty() {
+            world.spawn_item_at(entity.pos.load() + Vector3::new(0.0, 1.5, 0.0), antenna);
+        }
+    }
+}
+
 impl Mob for CopperGolemEntity {
     /// Vanilla `CopperGolem.playStepSound`.
     fn play_step_sound(
@@ -296,28 +321,11 @@ impl Mob for CopperGolemEntity {
             }
         }
 
-        // `readyForShearing`: a poppy on the antenna (the saddle slot).
-        if item_stack.item == &Item::SHEARS
-            && self
-                .mob_entity
-                .get_item_slot(&EquipmentSlot::SADDLE)
-                .item
-                .has_tag(&tag::Item::MINECRAFT_SHEARABLE_FROM_COPPER_GOLEM)
-        {
+        if item_stack.item == &Item::SHEARS && self.ready_for_shearing() {
             if crate::entity::mob::shear_event_cancelled(player, entity.entity_id, hand) {
                 return InteractionResult::PASS;
             }
-            // `shear`.
-            world.play_sound(
-                Sound::EntityCopperGolemShear,
-                SoundCategory::Players,
-                &entity.pos.load(),
-            );
-            let antenna = self.mob_entity.get_item_slot(&EquipmentSlot::SADDLE);
-            self.set_item_slot_and_notify(&EquipmentSlot::SADDLE, ItemStack::EMPTY.clone());
-            if !antenna.is_empty() {
-                world.spawn_item_at(entity.pos.load() + Vector3::new(0.0, 1.5, 0.0), antenna);
-            }
+            self.shear(SoundCategory::Players);
             world.game_event_from(
                 Some(player.as_ref()),
                 pumpkin_data::game_event::GameEvent::Shear,

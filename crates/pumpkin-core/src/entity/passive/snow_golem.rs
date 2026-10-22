@@ -16,7 +16,6 @@ use crate::entity::{
         look_at_entity::LookAtEntityGoal, ranged_attack::RangedAttackGoal,
         wander_around::WanderAroundGoal,
     },
-    item::ItemEntity,
     mob::{Mob, MobEntity, RangedAttackMob},
     player::Player,
     projectile::snowball::SnowballEntity,
@@ -84,6 +83,22 @@ impl SnowGolemEntity {
         };
 
         mob_arc
+    }
+
+    /// Vanilla `SnowGolem.shear`: the snip from the golem, the pumpkin off, and its
+    /// shearing loot at eye height.
+    pub fn shear(&self, source: SoundCategory, tool: &ItemStack) {
+        let entity = self.get_entity();
+        let world = entity.world.load_full();
+        world.play_sound_from_entity(entity, Sound::EntitySnowGolemShear, source, 1.0, 1.0);
+        self.set_has_pumpkin(false);
+        let drop_pos = entity.pos.load()
+            + pumpkin_util::math::vector3::Vector3::new(0.0, entity.get_eye_height(), 0.0);
+        self.mob_entity.living_entity.drop_from_shearing_loot_table(
+            "minecraft:shearing/snow_golem",
+            tool,
+            |drop| world.spawn_item_at(drop_pos, drop),
+        );
     }
 
     #[must_use]
@@ -169,17 +184,14 @@ impl Mob for SnowGolemEntity {
             {
                 return InteractionResult::PASS;
             }
-            self.set_has_pumpkin(false);
+            self.shear(SoundCategory::Players, item_stack);
             let entity = self.get_entity();
-            let world = entity.world.load();
-            let pos = entity.pos.load();
-            world.play_sound(Sound::EntitySnowGolemShear, SoundCategory::Players, &pos);
-            let item_entity = Arc::new(ItemEntity::new(
-                Entity::new(world.clone(), pos, &EntityType::ITEM),
-                ItemStack::new(1, &Item::CARVED_PUMPKIN),
-            ));
-            world.spawn_entity(item_entity);
-            player.damage_item_in_hand(hand, 1);
+            entity.world.load().game_event_from(
+                Some(player.as_ref()),
+                pumpkin_data::game_event::GameEvent::Shear,
+                entity.pos.load(),
+            );
+            player.hurt_and_break_in_hand(item_stack, hand, 1);
             return InteractionResult::SUCCESS;
         }
         InteractionResult::PASS

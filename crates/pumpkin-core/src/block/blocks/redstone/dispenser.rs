@@ -13,7 +13,6 @@ use crate::block::{
     BlockBehaviour, GetComparatorOutputArgs, GetScreenHandlerFactoryArgs, NormalUseArgs,
     OnNeighborUpdateArgs, OnPlaceArgs, OnScheduledTickArgs, PlacedArgs,
 };
-use crate::entity::ageable::AgeableMob;
 use crate::entity::decoration::armor_stand::ArmorStandEntity;
 use crate::entity::item::ItemEntity;
 use crate::entity::mob::cube_mob::CubeMobEntity;
@@ -161,27 +160,6 @@ fn is_allowed_entity(
         None => true,
         Some(IDSet::Tag(tag)) => entity_type.is_tagged_with(tag).unwrap_or(false),
         Some(IDSet::IDs(types)) => types.contains(&entity_type),
-    }
-}
-
-const fn wool_of_color(color: u8) -> &'static Item {
-    match color {
-        1 => &Item::ORANGE_WOOL,
-        2 => &Item::MAGENTA_WOOL,
-        3 => &Item::LIGHT_BLUE_WOOL,
-        4 => &Item::YELLOW_WOOL,
-        5 => &Item::LIME_WOOL,
-        6 => &Item::PINK_WOOL,
-        7 => &Item::GRAY_WOOL,
-        8 => &Item::LIGHT_GRAY_WOOL,
-        9 => &Item::CYAN_WOOL,
-        10 => &Item::PURPLE_WOOL,
-        11 => &Item::BLUE_WOOL,
-        12 => &Item::BROWN_WOOL,
-        13 => &Item::GREEN_WOOL,
-        14 => &Item::RED_WOOL,
-        15 => &Item::BLACK_WOOL,
-        _ => &Item::WHITE_WOOL,
     }
 }
 
@@ -1040,47 +1018,73 @@ impl DispenserBlock {
         true
     }
 
+    /// Vanilla `ShearsDispenseItemBehavior.tryShearEntity`: the first live `Shearable` in
+    /// front that is ready is sheared with the `blocks` sound source, with a `shear` game
+    /// event at the target.
     fn shear_entity_in_front(ctx: &DispenseContext<'_>, tool: &ItemStack) -> bool {
-        let target_box = BoundingBox::from_block(&Self::target_position(ctx));
+        let target = Self::target_position(ctx);
+        let target_box = BoundingBox::from_block(&target);
 
         for entity in ctx.world.get_entities_at_box(&target_box) {
-            if let Some(bogged) = entity.cast_any().downcast_ref::<BoggedSkeletonEntity>() {
-                if !bogged.ready_for_shearing() || !entity.get_entity().is_alive() {
-                    continue;
-                }
-                bogged.shear(SoundCategory::Blocks, tool);
-                return true;
-            }
-            if let Some(cube) = entity.cast_any().downcast_ref::<CubeMobEntity>() {
-                if !cube.ready_for_shearing() || !entity.get_entity().is_alive() {
-                    continue;
-                }
-                cube.shear();
-                return true;
-            }
-            let Some(sheep) = entity.cast_any().downcast_ref::<SheepEntity>() else {
-                continue;
-            };
-            if sheep.is_sheared() || sheep.is_baby() || !entity.get_entity().is_alive() {
+            if !entity.get_entity().is_alive() {
                 continue;
             }
-
-            let position = entity.get_entity().pos.load();
-            sheep.set_sheared(true);
-            ctx.world
-                .play_sound(Sound::EntitySheepShear, SoundCategory::Blocks, &position);
-
-            let count = rng().random_range(1..=3);
-            Self::drop_at(
-                ctx.world,
-                position,
-                ItemStack::new(count, wool_of_color(sheep.get_color())),
-            );
-
-            return true;
+            let sheared = Self::shear_shearable(entity.as_ref(), tool);
+            if sheared {
+                ctx.world.game_event_from(
+                    None,
+                    pumpkin_data::game_event::GameEvent::Shear,
+                    target.to_centered_f64(),
+                );
+                return true;
+            }
         }
 
         false
+    }
+
+    /// Vanilla `Shearable.readyForShearing` and `shear(level, BLOCKS, tool)` for `entity`:
+    /// whether it was a ready shearable and got sheared.
+    fn shear_shearable(entity: &dyn EntityBase, tool: &ItemStack) -> bool {
+        use crate::entity::passive::{
+            copper_golem::CopperGolemEntity, mooshroom::MooshroomEntity,
+            snow_golem::SnowGolemEntity,
+        };
+        let any = entity.cast_any();
+        if let Some(bogged) = any.downcast_ref::<BoggedSkeletonEntity>() {
+            if !bogged.ready_for_shearing() {
+                return false;
+            }
+            bogged.shear(SoundCategory::Blocks, tool);
+        } else if let Some(cube) = any.downcast_ref::<CubeMobEntity>() {
+            if !cube.ready_for_shearing() {
+                return false;
+            }
+            cube.shear();
+        } else if let Some(sheep) = any.downcast_ref::<SheepEntity>() {
+            if !sheep.ready_for_shearing() {
+                return false;
+            }
+            sheep.shear(SoundCategory::Blocks, tool);
+        } else if let Some(golem) = any.downcast_ref::<SnowGolemEntity>() {
+            if !golem.has_pumpkin() {
+                return false;
+            }
+            golem.shear(SoundCategory::Blocks, tool);
+        } else if let Some(mooshroom) = any.downcast_ref::<MooshroomEntity>() {
+            if !mooshroom.ready_for_shearing() {
+                return false;
+            }
+            mooshroom.shear(SoundCategory::Blocks, tool);
+        } else if let Some(golem) = any.downcast_ref::<CopperGolemEntity>() {
+            if !golem.ready_for_shearing() {
+                return false;
+            }
+            golem.shear(SoundCategory::Blocks);
+        } else {
+            return false;
+        }
+        true
     }
 
     /// Vanilla `SulfurCubeBlockDispenseItemBehavior.dispenseBlock`: the first sulfur cube in

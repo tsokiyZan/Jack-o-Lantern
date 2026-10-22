@@ -3283,6 +3283,31 @@ impl LivingEntity {
         )
     }
 
+    /// [`Self::drop_from_shearing_loot_table`] for a shearing table (`outer`) that only
+    /// forwards to the table for this mob's variant (`inner`).
+    pub fn drop_from_nested_shearing_loot_table(
+        &self,
+        outer: &str,
+        inner: &str,
+        tool: &ItemStack,
+        consumer: impl FnMut(ItemStack),
+    ) {
+        let world = self.entity.world.load();
+        let (Some(outer), Some(inner)) = (world.get_loot_table(outer), world.get_loot_table(inner))
+        else {
+            return;
+        };
+        let params = LootContextParameters {
+            this_entity: Some(self.entity.entity_type),
+            position: Some(self.entity.pos.load()),
+            tool: Some(tool.clone()),
+            ..Default::default()
+        };
+        crate::world::loot::generate_nested_loot(&outer, &inner, &world, &params)
+            .into_iter()
+            .for_each(consumer);
+    }
+
     /// Vanilla `LivingEntity.dropFromEntityInteractLootTable`.
     pub fn drop_from_entity_interact_loot_table(&self, key: &str, tool: &ItemStack) -> bool {
         self.drop_from_loot_table(
