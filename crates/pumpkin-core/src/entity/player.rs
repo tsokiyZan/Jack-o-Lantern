@@ -301,7 +301,6 @@ use pumpkin_world::biome;
 use pumpkin_world::cylindrical_chunk_iterator::Cylindrical;
 
 use crate::block;
-use crate::block::blocks::straw_bed::StrawBedBlock;
 use crate::command::context::command_source::CommandSource;
 use crate::command::node::dispatcher::CommandDispatcher;
 use crate::command::{CommandSender, client_suggestions};
@@ -461,12 +460,8 @@ pub struct Player {
     pub camera_target_id: AtomicCell<Option<i32>>,
     /// The player's spawnpoint
     pub respawn_point: std::sync::Mutex<Option<RespawnPoint>>,
-    /// Whether the player is sleeping in a bed.
-    pub sleeping: AtomicBool,
     /// Vanilla `sleepCounter`: counts up to 100 while asleep, and from 100 to 110 after waking.
     pub sleep_counter: AtomicI32,
-    /// Head position of the bed the player is currently sleeping in.
-    pub sleeping_bed_pos: AtomicCell<Option<BlockPos>>,
     /// Manages the player's hunger level.
     pub hunger_manager: HungerManager,
     /// The ID of the currently open container (if any).
@@ -811,9 +806,7 @@ impl Player {
             current_explosion_cause: AtomicCell::new(None),
             // TODO: Send the CPlayerSpawnPosition packet when the client connects with proper values
             respawn_point: std::sync::Mutex::new(None),
-            sleeping: AtomicBool::new(false),
             sleep_counter: AtomicI32::new(0),
-            sleeping_bed_pos: AtomicCell::new(None),
             // We want this to be an impossible watched section so that `chunker::update_position`
             // will mark chunks as watched for a new join rather than a respawn.
             // (We left shift by one so we can search around that chunk)
@@ -2546,24 +2539,22 @@ impl Player {
         Some(spawn_pos)
     }
 
-    pub fn sleep(&self, bed_head_pos: BlockPos) {
-        // TODO: Stop riding
-
-        self.set_pose(EntityPose::Sleeping);
-        self.living_entity
-            .entity
-            .set_pos(bed_head_pos.to_f64().add_raw(0.5, 0.6875, 0.5));
-        self.living_entity.set_sleeping_pos(bed_head_pos);
-        self.get_entity().set_velocity(Vector3::default());
-
-        self.sleeping.store(true, Ordering::Relaxed);
-        self.sleep_counter.store(0, Ordering::Relaxed);
-        self.sleeping_bed_pos.store(Some(bed_head_pos));
+    /// Vanilla `Player.startSleepInBed`'s sleeping part, with `ServerPlayer.startSleeping`:
+    /// lies down in the bed at `bed` (its head), resets `TIME_SINCE_REST` and teleports the
+    /// client into the bed. The bed's checks are the caller's.
+    pub fn start_sleep_in_bed(&self, bed: BlockPos) -> bool {
+        if !self.living_entity.start_sleeping(self, bed) {
+            return false;
+        }
         self.set_stat(
             statistics::StatisticCategory::Custom,
             statistics::CustomStatistic::TimeSinceRest as i32,
             0,
         );
+        let entity = &self.living_entity.entity;
+        self.request_teleport(entity.pos.load(), entity.yaw.load(), entity.pitch.load());
+        self.sleep_counter.store(0, Ordering::Relaxed);
+        true
     }
 
     pub fn get_off_ground_speed(&self) -> f64 {
@@ -2596,11 +2587,10 @@ impl Player {
         self.living_entity.get_block_speed_factor()
     }
 
-    /// Vanilla `LivingEntity.isSleeping` for a player.
+    /// Vanilla `LivingEntity.isSleeping` for a player: a sleeping position.
     #[must_use]
     pub fn is_sleeping(&self) -> bool {
-        // TODO: Track sleeping position state explicitly (vanilla checks sleepingPosition.isPresent()).
-        self.sleeping.load(Ordering::Relaxed)
+        self.living_entity.get_sleeping_pos().is_some()
     }
 
     #[must_use]
@@ -2686,66 +2676,39 @@ impl Player {
         self.set_pose(actual_pose);
     }
 
-    /// The sleep-state part of vanilla `stopSleepInBed(false, _)`, which every caller of
-    /// `wake_up` uses.
-    fn stop_sleep_in_bed(&self) {
-        self.sleeping.store(false, Ordering::Relaxed);
-        self.sleep_counter.store(100, Ordering::Relaxed);
-    }
-
     /// Vanilla `Player.isSleepingLongEnough`.
     #[must_use]
     pub fn is_sleeping_long_enough(&self) -> bool {
         self.is_sleeping() && self.sleep_counter.load(Ordering::Relaxed) >= 100
     }
 
-    pub fn wake_up(&self) {
+    /// Vanilla `ServerPlayer.stopSleepInBed` with `Player`'s: the wake-up animation while
+    /// sleeping, `LivingEntity.stopSleeping` (out of the bed to its stand-up position), the
+    /// sleep counter, then the client is teleported there.
+    pub fn stop_sleep_in_bed(&self, forceful_wake_up: bool, _update_level_list: bool) {
         let world = self.world();
-        let Some(bed_pos) = self.sleeping_bed_pos.load() else {
-            self.set_pose(EntityPose::Standing);
-            if self.is_sleeping() {
-                self.stop_sleep_in_bed();
-            }
-            return;
-        };
-
-        if let Some(server) = world.server.upgrade()
-            && let Some(player_arc) = world.get_player_by_uuid(self.gameprofile.id)
-        {
-            let mut event =
-                crate::plugin::api::events::player::player_bed::PlayerBedLeaveEvent::new(
-                    player_arc, bed_pos,
-                );
-            server.plugin_manager.fire_blocking(&server, &mut event);
-        }
-
-        let (bed, bed_state) = world.get_block_and_state_id(&bed_pos);
-        if bed == &Block::STRAW_BED {
-            StrawBedBlock::destroy_after_use(&world, bed_pos);
-        } else if bed.has_tag(&tag::Block::MINECRAFT_BEDS) {
-            crate::block::blocks::bed::BedBlock::set_occupied(
-                false, &world, bed, &bed_pos, bed_state,
+        if let Some(bed_pos) = self.living_entity.get_sleeping_pos() {
+            world.send_to_tracking_players_and_self(
+                &self.living_entity.entity,
+                &CEntityAnimation::new(self.entity_id().into(), Animation::LeaveBed),
             );
+            if let Some(server) = world.server.upgrade()
+                && let Some(player_arc) = world.get_player_by_uuid(self.gameprofile.id)
+            {
+                let mut event =
+                    crate::plugin::api::events::player::player_bed::PlayerBedLeaveEvent::new(
+                        player_arc, bed_pos,
+                    );
+                server.plugin_manager.fire_blocking(&server, &mut event);
+            }
         }
-
-        self.set_pose(EntityPose::Standing);
-        self.living_entity.entity.set_pos(self.position());
-        self.living_entity.clear_sleeping_pos();
-
-        self.set_stat(
-            statistics::StatisticCategory::Custom,
-            statistics::CustomStatistic::TimeSinceRest as i32,
-            0,
-        );
-
-        let chunk_pos = self.living_entity.entity.chunk_pos.load();
-        world.broadcast_to_chunk(
-            chunk_pos,
-            &CEntityAnimation::new(self.entity_id().into(), Animation::LeaveBed),
-        );
-
-        self.stop_sleep_in_bed();
-        self.sleeping_bed_pos.store(None);
+        self.living_entity.living_stop_sleeping(self);
+        // `updateLevelList`: `ServerLevel.updateSleepingPlayerList`; Pumpkin has no sleep
+        // status announcements, and `should_skip_night` counts the sleepers each tick.
+        self.sleep_counter
+            .store(if forceful_wake_up { 0 } else { 100 }, Ordering::Relaxed);
+        let entity = &self.living_entity.entity;
+        self.request_teleport(entity.pos.load(), entity.yaw.load(), entity.pitch.load());
     }
 
     pub fn show_title(&self, text: &TextComponent, mode: &TitleMode) {
@@ -3397,11 +3360,19 @@ impl Player {
             }
         }
         self.tick_counter.fetch_add(1, Ordering::Relaxed);
-        // Vanilla `Player.tick`'s sleep counter.
+        // Vanilla `Player.tick`'s sleep counter, and the wake when the bed under the
+        // player may no longer be slept in (morning).
         if self.is_sleeping() {
             let counter = self.sleep_counter.load(Ordering::Relaxed) + 1;
             self.sleep_counter
                 .store(counter.min(100), Ordering::Relaxed);
+            let world = self.world();
+            let feet = world.get_block(&self.living_entity.entity.block_pos.load());
+            if crate::block::blocks::bed::is_abstract_bed(feet)
+                && !world.dimension.bed_rule.can_sleep(world.is_dark_outside())
+            {
+                self.stop_sleep_in_bed(false, true);
+            }
         } else {
             let counter = self.sleep_counter.load(Ordering::Relaxed);
             if counter > 0 {
@@ -8017,6 +7988,12 @@ impl EntityBase for Player {
             nbt.get_bool("seenCredits").unwrap_or(false),
             Ordering::Relaxed,
         );
+        // `ServerPlayer.readAdditionalSaveData`: a player saved asleep wakes on load,
+        // `stopSleepInBed(true, true)` before the connection exists, so with no packets.
+        if self.is_sleeping() {
+            self.living_entity.living_stop_sleeping(self);
+            self.sleep_counter.store(0, Ordering::Relaxed);
+        }
         self.current_explosion_impact_pos.store(
             nbt.get_list("last_explosion_impact_pos")
                 .and_then(|list| match list {

@@ -4716,7 +4716,7 @@ impl LivingEntity {
     /// `Player.stopSleepInBed(true, true)`. `caller` is this entity.
     pub fn stop_sleeping(&self, caller: &dyn EntityBase) {
         if let Some(player) = caller.get_player() {
-            player.wake_up();
+            player.stop_sleep_in_bed(true, true);
             return;
         }
         self.living_stop_sleeping(caller);

@@ -216,6 +216,11 @@ impl BedBlock {
             return BlockActionResult::SuccessServer;
         }
 
+        // `ServerPlayer.startSleepInBed`: asleep already or dead, `OTHER_PROBLEM` (no message).
+        if player.is_sleeping() || !crate::entity::inside_block_effect::is_alive(player.as_ref()) {
+            return BlockActionResult::SuccessServer;
+        }
+
         let is_dark = world.is_dark_outside();
         let can_sleep = world.dimension.bed_rule.can_sleep(is_dark);
         let can_set_spawn = world.dimension.bed_rule.can_set_spawn(is_dark);
@@ -338,16 +343,21 @@ impl BedBlock {
             }
         }
 
-        player.sleep(bed_head_pos);
-        player.trigger_advancement(
-            crate::entity::player::advancement::trigger::AdvancementTrigger::SleptInBed,
-        );
+        // `startSleepInBed`: `startSleeping` occupies the bed; the stat and trigger follow
+        // only when the player lay down.
+        if !player.start_sleep_in_bed(bed_head_pos) {
+            return BlockActionResult::SuccessServer;
+        }
         player.increment_stat(
             pumpkin_data::statistic::StatisticCategory::Custom,
             pumpkin_data::statistic::CustomStatistic::SleepInBed as i32,
             1,
         );
-        Self::set_occupied(true, world, block, position, state_id);
+        if can_set_spawn {
+            player.trigger_advancement(
+                crate::entity::player::advancement::trigger::AdvancementTrigger::SleptInBed,
+            );
+        }
 
         BlockActionResult::SuccessServer
     }

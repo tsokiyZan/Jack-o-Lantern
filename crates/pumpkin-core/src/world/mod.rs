@@ -2443,7 +2443,7 @@ impl World {
                 .iter()
                 .filter(|player| player.is_sleeping())
             {
-                player.wake_up();
+                player.stop_sleep_in_bed(false, false);
             }
 
             if weather_cycle_enabled && should_reset_weather {

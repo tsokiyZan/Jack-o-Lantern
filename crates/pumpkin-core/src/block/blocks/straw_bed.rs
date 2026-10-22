@@ -156,7 +156,7 @@ impl BlockBehaviour for StrawBedBlock {
     }
 
     fn normal_use(&self, args: NormalUseArgs<'_>) -> BlockActionResult {
-        Self::use_bed(args.world, args.player, args.block, args.position)
+        Self::use_bed(args.world, args.player, args.position)
     }
 
     fn is_pathfindable(&self, _state: &BlockState, _computation_type: PathComputationType) -> bool {
@@ -262,12 +262,7 @@ impl StrawBedBlock {
         None
     }
 
-    fn use_bed(
-        world: &Arc<World>,
-        player: &Arc<Player>,
-        block: &Block,
-        position: &BlockPos,
-    ) -> BlockActionResult {
+    fn use_bed(world: &Arc<World>, player: &Arc<Player>, position: &BlockPos) -> BlockActionResult {
         let state_id = world.get_block_state_id(position);
         let bed_props = BedProperties::from_state_id(state_id);
 
@@ -284,6 +279,10 @@ impl StrawBedBlock {
         // (`destroy_on_use` in the same dimensions where beds explode).
         if world.dimension.bed_rule.explodes {
             Self::destroy_after_use(world, bed_head_pos);
+            return BlockActionResult::SuccessServer;
+        }
+        // `ServerPlayer.startSleepInBed`: asleep already or dead, `OTHER_PROBLEM` (no message).
+        if player.is_sleeping() || !crate::entity::inside_block_effect::is_alive(player.as_ref()) {
             return BlockActionResult::SuccessServer;
         }
 
@@ -310,16 +309,16 @@ impl StrawBedBlock {
             }
         }
 
-        player.sleep(bed_head_pos);
-        player.trigger_advancement(
-            crate::entity::player::advancement::trigger::AdvancementTrigger::SleptInBed,
-        );
+        if !player.start_sleep_in_bed(bed_head_pos) {
+            return BlockActionResult::SuccessServer;
+        }
+        // `SLEPT_IN_BED` fires only where the bed sets the spawn; `STRAW_BED_RULE`
+        // (`DESTROY_ON_LEAVE`) never does.
         player.increment_stat(
             pumpkin_data::statistic::StatisticCategory::Custom,
             pumpkin_data::statistic::CustomStatistic::SleepInStrawBed as i32,
             1,
         );
-        crate::block::blocks::bed::BedBlock::set_occupied(true, world, block, position, state_id);
 
         BlockActionResult::SuccessServer
     }
