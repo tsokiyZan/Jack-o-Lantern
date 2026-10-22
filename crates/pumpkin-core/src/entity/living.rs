@@ -5487,6 +5487,36 @@ impl LivingEntity {
         }
     }
 
+    /// Vanilla `LivingEntity.releaseUsingItem`: while the used hand still holds the same item
+    /// (`ItemStack.isSameItem`), that stack is released (`releaseUsing`) and, for an item used
+    /// on release (the crossbow), updated once more (`updatingUsingItem`); then the use stops.
+    pub fn release_using_item(&self, caller: &dyn EntityBase, server: &Server) {
+        let use_item = self
+            .item_in_use
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        if let Some(use_item) = use_item
+            && !use_item.is_empty()
+        {
+            let hand_item = self.get_stack_in_hand(caller, self.used_item_hand());
+            if ItemStack::is_same_item(&hand_item, &use_item) {
+                *self
+                    .item_in_use
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(hand_item.clone());
+                if let Some(player) = caller.get_player() {
+                    server.item_registry.on_stopped_using(&hand_item, player);
+                }
+                // `useOnRelease`: only the crossbow.
+                if hand_item.item.id == Item::CROSSBOW.id {
+                    self.updating_using_item(caller, server);
+                }
+            }
+        }
+        self.clear_active_hand();
+    }
+
     /// Vanilla `updatingUsingItem`: the item in use follows the hand while it is the same
     /// item, ticks (`updateUsingItem`) and completes once the time runs out.
     fn updating_using_item(&self, caller: &dyn EntityBase, server: &Server) {

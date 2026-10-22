@@ -233,17 +233,9 @@ impl JavaClient {
                     }
                 }
                 Status::ReleaseItemInUse => {
-                    let item_in_use = player
+                    player
                         .living_entity
-                        .item_in_use
-                        .lock()
-                        .unwrap_or_else(std::sync::PoisonError::into_inner)
-                        .clone();
-                    if let Some(stack) = item_in_use {
-                        server.item_registry.on_stopped_using(&stack, player);
-                    }
-
-                    player.living_entity.clear_active_hand();
+                        .release_using_item(player.as_ref(), server);
                 }
                 Status::SwapItem => {
                     player.swap_item();
