@@ -6,11 +6,12 @@ impl JavaClient {
         // A movement packet was received this tick — tracked for SClientTickEnd zeroing.
         self.received_movement_this_tick
             .store(true, Ordering::Relaxed);
-        player
-            .living_entity
-            .entity
-            .on_ground
-            .store(ground.on_ground, Ordering::Relaxed);
+        // `setOnGroundWithMovement` with the client's flags.
+        let entity = &player.living_entity.entity;
+        entity.on_ground.store(ground.on_ground, Ordering::Relaxed);
+        entity
+            .horizontal_collision
+            .store(ground.horizontal_collision, Ordering::Relaxed);
         // Vanilla `handleMovePlayer` for a packet without a position: no move, but the fall
         // still ends on the ground. Like a move, not before the client has loaded or while a
         // teleport waits for its confirmation.

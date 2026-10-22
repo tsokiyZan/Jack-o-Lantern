@@ -22,7 +22,7 @@ impl ItemMetadata for WindChargeItem {
 const POWER: f32 = 1.5;
 
 impl ItemBehaviour for WindChargeItem {
-    fn normal_use(&self, _block: &Item, player: &Player) {
+    fn normal_use(&self, item: &Item, player: &Player) {
         let world = player.world();
         let position = player.position();
 
@@ -36,7 +36,7 @@ impl ItemBehaviour for WindChargeItem {
 
         let wind_charge = ThrownItemEntity::new(entity, player.get_entity(), WIND_CHARGE_GRAVITY);
         let (yaw, pitch) = player.rotation();
-        wind_charge.set_velocity_from(pitch, yaw, 0.0, POWER, 1.0);
+        wind_charge.set_velocity_from(player, pitch, yaw, 0.0, POWER, 1.0);
 
         world.spawn_entity(Arc::new(WindChargeEntity::new_normal(wind_charge)));
 
@@ -58,6 +58,7 @@ impl ItemBehaviour for WindChargeItem {
                     .set_stack_in_hand(pumpkin_util::Hand::Left, off_hand);
             }
         }
+        player.award_item_used(item);
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

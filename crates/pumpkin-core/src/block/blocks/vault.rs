@@ -62,6 +62,8 @@ impl BlockBehaviour for VaultBlock {
             }
 
             vault_entity.mark_rewarded(player_uuid);
+            // Vanilla awards it once the vault has loot to eject.
+            args.player.award_item_used(args.item_stack.item);
 
             args.item_stack
                 .decrement_unless_creative(args.player.gamemode.load(), 1);

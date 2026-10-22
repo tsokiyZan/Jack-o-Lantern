@@ -122,6 +122,7 @@ impl BlockBehaviour for CakeBlock {
                     SoundCategory::Blocks,
                     &args.position.to_f64(),
                 );
+                args.player.award_item_used(item);
                 BlockActionResult::Consume
             }
             _ => Self::consume_if_hungry(

@@ -132,6 +132,15 @@ impl PlayerInventory {
         }
     }
 
+    /// The inventory slot of the specified hand.
+    #[must_use]
+    pub fn slot_for_hand(&self, hand: Hand) -> usize {
+        match hand {
+            Hand::Right => self.get_selected_slot() as usize,
+            Hand::Left => Self::OFF_HAND_SLOT,
+        }
+    }
+
     /// Gets the item in the specified hand.
     ///
     /// # Arguments

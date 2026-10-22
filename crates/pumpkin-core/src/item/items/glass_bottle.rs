@@ -75,6 +75,8 @@ impl ItemBehaviour for GlassBottleItem {
                     }
                 }
 
+                // `turnBottleIntoItem`.
+                player.award_item_used(&Item::GLASS_BOTTLE);
                 if held.item_count == 1
                     && player.gamemode.load() != pumpkin_util::GameMode::Creative
                 {

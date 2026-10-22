@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use crate::enchantment::EnchantmentHelper;
 use crate::entity::projectile::arrow::{ArrowEntity, ArrowPickup};
+use crate::entity::projectile::rotation_shot_vector;
 use crate::entity::{Entity, EntityBase};
 use crate::world::World;
 use pumpkin_data::item::Item;
@@ -122,14 +123,16 @@ impl ProjectileWeaponItem {
     #[allow(clippy::too_many_arguments)]
     pub fn shoot_projectiles(
         world: &Arc<World>,
-        shooter: &Entity,
+        shooter: &dyn EntityBase,
         weapon: &ItemStack,
         projectiles: &[ItemStack],
         power: f32,
         uncertainty: f32,
         is_crit: bool,
         is_creative: bool,
+        from_rotation: bool,
     ) {
+        let shooter_entity = shooter.get_entity();
         if projectiles.is_empty() {
             return;
         }
@@ -143,7 +146,7 @@ impl ProjectileWeaponItem {
         let angle_offset = ((projectiles.len() - 1) % 2) as f32 * angle_step / 2.0;
         let mut direction = 1.0f32;
 
-        let (yaw, pitch) = (shooter.yaw.load(), shooter.pitch.load());
+        let (yaw, pitch) = (shooter_entity.yaw.load(), shooter_entity.pitch.load());
 
         for (i, projectile) in projectiles.iter().enumerate() {
             if projectile.item_count == 0 {
@@ -155,13 +158,34 @@ impl ProjectileWeaponItem {
 
             let arrow = Self::create_projectile(
                 world.clone(),
-                shooter,
+                shooter_entity,
                 weapon,
                 projectile,
                 is_crit,
                 is_creative,
             );
-            arrow.set_velocity_from_rotation(pitch, yaw + angle, 0.0, power, uncertainty);
+            if from_rotation {
+                // `BowItem.shootProjectile`.
+                arrow.set_velocity_from_rotation(
+                    shooter,
+                    pitch,
+                    yaw + angle,
+                    0.0,
+                    power,
+                    uncertainty,
+                );
+            } else {
+                // TODO: vanilla `CrossbowItem.shootProjectile` shoots along the view vector turned
+                // about the up vector, or at a target.
+                let direction = rotation_shot_vector(pitch, yaw + angle, 0.0);
+                arrow.set_velocity(
+                    direction.x,
+                    direction.y,
+                    direction.z,
+                    f64::from(power),
+                    f64::from(uncertainty),
+                );
+            }
             let arrow_arc: Arc<dyn EntityBase> = Arc::new(arrow);
             world.spawn_entity(arrow_arc);
         }

@@ -71,7 +71,8 @@ fn give_stack_or_drop(
 impl BlockBehaviour for CauldronBlock {
     #[allow(clippy::too_many_lines)]
     fn use_with_item(&self, args: UseWithItemArgs<'_>) -> BlockActionResult {
-        let item_id = args.item_stack.item.id;
+        let used_item = args.item_stack.item;
+        let item_id = used_item.id;
         let block_id = args.block.id;
         let gamemode = args.player.gamemode.load();
 
@@ -104,6 +105,7 @@ impl BlockBehaviour for CauldronBlock {
                     pumpkin_data::statistic::CustomStatistic::FillCauldron as i32,
                     1,
                 );
+                args.player.award_item_used(used_item);
                 return BlockActionResult::Success;
             } else if item_id == Item::LAVA_BUCKET.id {
                 args.world.set_block_state(
@@ -123,6 +125,7 @@ impl BlockBehaviour for CauldronBlock {
                     pumpkin_data::statistic::CustomStatistic::FillCauldron as i32,
                     1,
                 );
+                args.player.award_item_used(used_item);
                 return BlockActionResult::Success;
             } else if item_id == Item::POWDER_SNOW_BUCKET.id {
                 let state_id = Block::POWDER_SNOW_CAULDRON
@@ -142,6 +145,7 @@ impl BlockBehaviour for CauldronBlock {
                     pumpkin_data::statistic::CustomStatistic::FillCauldron as i32,
                     1,
                 );
+                args.player.award_item_used(used_item);
                 return BlockActionResult::Success;
             } else if item_id == Item::POTION.id {
                 let state_id = Block::WATER_CAULDRON
@@ -161,6 +165,7 @@ impl BlockBehaviour for CauldronBlock {
                     pumpkin_data::statistic::CustomStatistic::UseCauldron as i32,
                     1,
                 );
+                args.player.award_item_used(used_item);
                 return BlockActionResult::Success;
             }
         }
@@ -205,6 +210,7 @@ impl BlockBehaviour for CauldronBlock {
                     pumpkin_data::statistic::CustomStatistic::UseCauldron as i32,
                     1,
                 );
+                args.player.award_item_used(used_item);
                 return BlockActionResult::Success;
             }
         }
@@ -232,6 +238,7 @@ impl BlockBehaviour for CauldronBlock {
                         pumpkin_data::statistic::CustomStatistic::UseCauldron as i32,
                         1,
                     );
+                    args.player.award_item_used(used_item);
                     return BlockActionResult::Success;
                 }
 
@@ -269,6 +276,7 @@ impl BlockBehaviour for CauldronBlock {
                         pumpkin_data::statistic::CustomStatistic::UseCauldron as i32,
                         1,
                     );
+                    args.player.award_item_used(used_item);
                     return BlockActionResult::Success;
                 }
 

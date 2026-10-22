@@ -19,7 +19,7 @@ impl ItemMetadata for FishingRodItem {
 }
 
 impl ItemBehaviour for FishingRodItem {
-    fn normal_use(&self, _item: &Item, player: &Player) {
+    fn normal_use(&self, item: &Item, player: &Player) {
         let world = player.world();
         let bobber_id = player.fishing_bobber.load(Ordering::Relaxed);
 
@@ -67,6 +67,7 @@ impl ItemBehaviour for FishingRodItem {
                 &player.position(),
             );
         }
+        player.award_item_used(item);
     }
 
     fn as_any(&self) -> &dyn Any {

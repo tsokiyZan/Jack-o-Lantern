@@ -107,8 +107,6 @@ impl JavaClient {
                                 if can_harvest {
                                     player.add_exhaustion(MINE_BLOCK_EXHAUSTION);
                                 }
-                                let item_id = player.inventory().held_item().item.id;
-                                player.increment_stat(StatisticCategory::Used, item_id as i32, 1);
                                 player.increment_stat(
                                     StatisticCategory::Mined,
                                     block.id.as_u16() as i32,
@@ -213,8 +211,6 @@ impl JavaClient {
                         if block_drop {
                             player.add_exhaustion(MINE_BLOCK_EXHAUSTION);
                         }
-                        let item_id = player.inventory().held_item().item.id;
-                        player.increment_stat(StatisticCategory::Used, item_id as i32, 1);
                         player.increment_stat(
                             StatisticCategory::Mined,
                             block.id.as_u16() as i32,

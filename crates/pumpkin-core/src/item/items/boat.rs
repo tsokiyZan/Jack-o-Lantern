@@ -173,6 +173,8 @@ impl ItemBehaviour for BoatItem {
                     .set_stack_in_hand(pumpkin_util::Hand::Left, off_hand);
             }
         }
+
+        player.award_item_used(item);
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

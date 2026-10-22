@@ -222,6 +222,7 @@ impl ItemBehaviour for SpawnEggItem {
                         .set_stack_in_hand(pumpkin_util::Hand::Left, off_hand);
                 }
             }
+            player.award_item_used(item);
         }
     }
 

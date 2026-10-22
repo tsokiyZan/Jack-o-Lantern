@@ -43,9 +43,7 @@ impl JavaClient {
             return;
         }
 
-        let (item_id, _item) = (item_in_hand.item.id, item_in_hand.item);
-        player.increment_stat(StatisticCategory::Used, item_id as i32, 1);
-
+        // Vanilla's `ITEM_USED` is awarded by each item's `use`, not here.
         let hit = player.world().clip(&pumpkin_world::clip::ClipContext::new(
             player.eye_position(),
             player.eye_position().add(
@@ -126,6 +124,8 @@ impl JavaClient {
             if current_equipped.are_items_and_components_equal(held) {
                 return;
             }
+            // `Equippable.swapWithEquipmentSlot`.
+            player.award_item_used(held.item);
 
             player.enqueue_equipment_change(&slot, held);
 

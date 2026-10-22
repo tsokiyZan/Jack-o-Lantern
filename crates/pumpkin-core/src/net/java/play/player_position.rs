@@ -59,6 +59,7 @@ impl JavaClient {
         last_pos: Vector3<f64>,
         pos: Vector3<f64>,
         on_ground: bool,
+        horizontal_collision: bool,
     ) {
         let entity = player.get_entity();
         let caller: &dyn EntityBase = player.as_ref();
@@ -81,6 +82,10 @@ impl JavaClient {
             );
             Self::apply_move_speed_factor(player);
         }
+        // `setOnGroundWithMovement` with the client's flags.
+        entity
+            .horizontal_collision
+            .store(horizontal_collision, Ordering::Relaxed);
         entity.check_supporting_block(caller, on_ground, Some(movement));
     }
 
@@ -195,7 +200,13 @@ impl JavaClient {
 
                 let new_on_ground = packet.collision & FLAG_ON_GROUND != 0;
                 entity.on_ground.store(new_on_ground, Ordering::Relaxed);
-                Self::apply_player_move(player, last_pos, pos, new_on_ground);
+                Self::apply_player_move(
+                    player,
+                    last_pos,
+                    pos,
+                    new_on_ground,
+                    packet.collision & FLAG_HORIZONTAL_COLLISION != 0,
+                );
                 if new_on_ground && entity.is_fall_flying() {
                     entity.set_fall_flying(false);
                 }
@@ -336,7 +347,13 @@ impl JavaClient {
                 entity
                     .on_ground
                     .store((packet.collision & FLAG_ON_GROUND) != 0, Ordering::Relaxed);
-                Self::apply_player_move(player, last_pos, pos, (packet.collision & FLAG_ON_GROUND) != 0);
+                Self::apply_player_move(
+                    player,
+                    last_pos,
+                    pos,
+                    (packet.collision & FLAG_ON_GROUND) != 0,
+                    (packet.collision & FLAG_HORIZONTAL_COLLISION) != 0,
+                );
 
                 entity.set_rotation(wrap_degrees(packet.yaw) % 360.0, wrap_degrees(packet.pitch));
 

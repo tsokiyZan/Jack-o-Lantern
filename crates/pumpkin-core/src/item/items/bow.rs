@@ -114,6 +114,7 @@ impl BowItem {
 
         // Damage bow
         player.damage_held_item(1);
+        player.award_item_used(&Item::BOW);
     }
 
     /// Check if player has arrows in their inventory
@@ -170,13 +171,14 @@ impl BowItem {
 
         ProjectileWeaponItem::shoot_projectiles(
             &world,
-            player.get_entity(),
+            player,
             weapon,
             projectiles,
             speed,
             uncertainty,
             is_crit,
             is_creative,
+            true,
         );
 
         let sound_pitch = 1.0 / (rand::random::<f32>() * 0.4 + 1.2) + power * 0.5;

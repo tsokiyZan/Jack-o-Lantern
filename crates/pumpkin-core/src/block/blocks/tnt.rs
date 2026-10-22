@@ -138,7 +138,8 @@ impl TNTBlock {
 
 impl BlockBehaviour for TNTBlock {
     fn use_with_item(&self, args: UseWithItemArgs<'_>) -> BlockActionResult {
-        let item_id = args.item_stack.item.id;
+        let used_item = args.item_stack.item;
+        let item_id = used_item.id;
         if item_id != Item::FLINT_AND_STEEL.id && item_id != Item::FIRE_CHARGE.id {
             return BlockActionResult::PassToDefaultBlockAction;
         }
@@ -152,6 +153,7 @@ impl BlockBehaviour for TNTBlock {
                     args.item_stack.decrement(1);
                 }
             }
+            args.player.award_item_used(used_item);
             BlockActionResult::Success
         } else if !args.world.level_info.load().game_rules.tnt_explodes {
             args.player.send_system_message_raw(

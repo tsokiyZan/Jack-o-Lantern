@@ -67,6 +67,7 @@ impl ItemBehaviour for MapItem {
                         .drop_stack(&player.position().to_block_pos(), stack_to_give);
                 }
             }
+            player.award_item_used(&Item::MAP);
         }
     }
 

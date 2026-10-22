@@ -39,6 +39,7 @@ impl ItemBehaviour for GoatHornItem {
             stack,
             instrument.use_duration_ticks() as i32,
         );
+        player.award_item_used(&Item::GOAT_HORN);
     }
 
     fn get_use_duration(&self) -> i32 {

@@ -146,6 +146,7 @@ impl ItemBehaviour for SulfurCubeBucketItem {
             place_pos,
             Some(player as &dyn EntityBase),
         );
+        player.award_item_used(item);
         // `ItemUtils.createFilledResult` with the creative stack limit.
         give_player_bucket_item(player, &Item::BUCKET);
     }
@@ -426,6 +427,7 @@ impl ItemBehaviour for EmptyBucketItem {
             }
         }
 
+        player.award_item_used(&Item::BUCKET);
         world.play_sound(
             get_fill_sound(item),
             SoundCategory::Blocks,
@@ -562,6 +564,7 @@ impl ItemBehaviour for FilledBucketItem {
             world.spawn_entity(mob);
         }
 
+        player.award_item_used(item);
         if player.gamemode.load() != GameMode::Creative {
             let item_stack = ItemStack::new(1, &Item::BUCKET);
             player

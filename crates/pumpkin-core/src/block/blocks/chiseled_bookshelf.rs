@@ -126,7 +126,7 @@ impl ChiseledBookshelfBlock {
         slot: i8,
         item: &mut ItemStack,
     ) {
-        // TODO: Increment used stats for chiseled bookshelf on the player
+        player.award_item_used(item.item);
 
         let sound = if item.get_item() == &Item::ENCHANTED_BOOK {
             Sound::BlockChiseledBookshelfPickupEnchanted

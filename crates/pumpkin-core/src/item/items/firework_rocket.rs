@@ -77,6 +77,7 @@ impl ItemBehaviour for FireworkRocketItem {
                     .inventory()
                     .set_stack_in_hand(pumpkin_util::Hand::Left, held);
             }
+            player.award_item_used(&Item::FIREWORK_ROCKET);
         }
     }
 

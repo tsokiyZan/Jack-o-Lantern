@@ -17,7 +17,7 @@ impl ItemMetadata for CarrotOnAStickItem {
 }
 
 impl ItemBehaviour for CarrotOnAStickItem {
-    fn normal_use(&self, _item: &Item, player: &Player) {
+    fn normal_use(&self, item: &Item, player: &Player) {
         let vehicle_opt = player
             .get_entity()
             .vehicle
@@ -36,6 +36,9 @@ impl ItemBehaviour for CarrotOnAStickItem {
                     .inventory
                     .set_held_item(ItemStack::new(1, &Item::FISHING_ROD));
             }
+        } else {
+            // Vanilla awards the stat only for a use that doesn't boost.
+            player.award_item_used(item);
         }
     }
 
@@ -51,7 +54,7 @@ impl ItemMetadata for WarpedFungusOnAStickItem {
 }
 
 impl ItemBehaviour for WarpedFungusOnAStickItem {
-    fn normal_use(&self, _item: &Item, player: &Player) {
+    fn normal_use(&self, item: &Item, player: &Player) {
         let vehicle_opt = player
             .get_entity()
             .vehicle
@@ -70,6 +73,9 @@ impl ItemBehaviour for WarpedFungusOnAStickItem {
                     .inventory
                     .set_held_item(ItemStack::new(1, &Item::FISHING_ROD));
             }
+        } else {
+            // Vanilla awards the stat only for a use that doesn't boost.
+            player.award_item_used(item);
         }
     }
 

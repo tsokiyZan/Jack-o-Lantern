@@ -26,7 +26,9 @@ impl ItemBehaviour for KnowledgeBookItem {
             }
         }
 
-        let _recipes = held.get_data_component::<RecipesImpl>();
+        let has_recipes = held
+            .get_data_component::<RecipesImpl>()
+            .is_some_and(|recipes| !recipes.recipes.is_empty());
 
         held.decrement_unless_creative(player.gamemode.load(), 1);
         if matched_main {
@@ -35,6 +37,10 @@ impl ItemBehaviour for KnowledgeBookItem {
             player
                 .inventory()
                 .set_stack_in_hand(pumpkin_util::Hand::Left, held);
+        }
+        // TODO: `awardRecipes`; vanilla also fails on a recipe it doesn't know.
+        if has_recipes {
+            player.award_item_used(&Item::KNOWLEDGE_BOOK);
         }
     }
 

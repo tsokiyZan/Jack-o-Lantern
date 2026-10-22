@@ -1470,11 +1470,12 @@ impl Player {
             self.living_entity
                 .get_attribute_value(&Attributes::ATTACK_DAMAGE)
         };
-        // Vanilla `getWeaponItem`, and the hand it is in for its wear.
-        let (item_stack, weapon_hand) = self
-            .living_entity
-            .auto_spin_attack_item()
-            .unwrap_or_else(|| (self.inventory().held_item(), Hand::Right));
+        // Vanilla `getWeaponItem`, and the slot it is worn in: the riptide stack's while spinning.
+        let spin = self.living_entity.auto_spin_attack_item();
+        let item_stack = spin
+            .as_ref()
+            .map_or_else(|| self.inventory().held_item(), |(stack, _)| stack.clone());
+        let spin_slot = spin.map(|(_, slot)| slot);
         let mut damage_multiplier = 1.0;
 
         // Vanilla `createAttackSource`: the mace's while it can smash.
@@ -1646,7 +1647,7 @@ impl Player {
                 self.item_attack_interaction(
                     victim.as_ref(),
                     &item_stack,
-                    weapon_hand,
+                    spin_slot,
                     &damage_source,
                 );
 
@@ -1699,7 +1700,7 @@ impl Player {
         &self,
         victim: &dyn EntityBase,
         item_stack: &ItemStack,
-        weapon_hand: Hand,
+        spin_slot: Option<usize>,
         damage_source: &DamageSource<'_>,
     ) {
         let is_mace = item_stack.item.id == pumpkin_data::item::Item::MACE.id;
@@ -1718,11 +1719,18 @@ impl Player {
             if is_mace {
                 MaceItem::post_hurt_enemy(&self.living_entity);
             }
-            let slot = match weapon_hand {
-                Hand::Right => EquipmentSlot::MAIN_HAND,
-                Hand::Left => EquipmentSlot::OFF_HAND,
-            };
-            self.damage_item_in_slot(&slot, Self::combat_weapon_durability_cost(item_stack));
+            // `hurtAndBreak(..., MAINHAND)` on the weapon stack itself.
+            let cost = Self::combat_weapon_durability_cost(item_stack);
+            match spin_slot {
+                None => {
+                    self.damage_held_item(cost);
+                }
+                // The riptide stack wears only while its slot still holds it.
+                Some(slot) if self.inventory.get_slot(slot).are_equal(item_stack) => {
+                    self.damage_item_at_index(slot, &EquipmentSlot::MAIN_HAND, cost);
+                }
+                Some(_) => {}
+            }
         }
     }
 
@@ -1827,6 +1835,23 @@ impl Player {
             // these are only used by non-player entities (e.g. horses).
             EquipmentSlot::Body(_) | EquipmentSlot::Saddle(_) => return false,
         };
+        self.damage_item_at_index(slot_index, slot, amount)
+    }
+
+    /// Applies `amount` durability damage to the stack at inventory `slot_index`, which breaks
+    /// as if it were in `slot` (vanilla `hurtAndBreak(amount, owner, slot)` on any stack).
+    pub fn damage_item_at_index(
+        &self,
+        slot_index: usize,
+        slot: &EquipmentSlot,
+        amount: i32,
+    ) -> bool {
+        if matches!(
+            self.gamemode.load(),
+            GameMode::Creative | GameMode::Spectator
+        ) {
+            return false;
+        }
 
         let mut stack = self.inventory.get_slot(slot_index);
         let original = stack.clone();
@@ -1883,6 +1908,8 @@ impl Player {
         self.damage_item_in_slot(&EquipmentSlot::MAIN_HAND, amount)
     }
 
+    /// Vanilla `ItemStack.mineBlock` for the main hand, which `preventsBlockDrops` skips: a
+    /// tool wears and counts as used.
     pub fn apply_tool_damage_for_block_break(&self, state: &BlockState) {
         if matches!(
             self.gamemode.load(),
@@ -1891,19 +1918,15 @@ impl Player {
             return;
         }
 
-        if state.hardness <= 0.0 {
+        let held = self.inventory().held_item();
+        let Some(tool) = held.get_data_component::<ToolImpl>() else {
             return;
-        }
-
-        let damage = self
-            .inventory()
-            .held_item()
-            .get_data_component::<ToolImpl>()
-            .map_or(0, |tool| tool.damage_per_block as i32);
-
-        if damage > 0 {
+        };
+        let damage = tool.damage_per_block as i32;
+        if state.hardness > 0.0 && damage > 0 {
             self.damage_held_item(damage);
         }
+        self.award_item_used(held.item);
     }
 
     pub fn set_respawn_point(
@@ -3181,8 +3204,6 @@ impl Player {
                         if can_harvest {
                             p.add_exhaustion(MINE_BLOCK_EXHAUSTION);
                         }
-                        let item_id = p.inventory().held_item().item.id;
-                        p.increment_stat(StatisticCategory::Used, item_id as i32, 1);
                         p.increment_stat(StatisticCategory::Mined, state.id.as_u16() as i32, 1);
                     }
                 }
@@ -3785,6 +3806,11 @@ impl Player {
                 java.try_enqueue_packet(data);
             }
         }
+    }
+
+    /// Vanilla `awardStat(Stats.ITEM_USED.get(item))`.
+    pub fn award_item_used(&self, item: &pumpkin_data::item::Item) {
+        self.increment_stat(statistics::StatisticCategory::Used, i32::from(item.id), 1);
     }
 
     pub fn increment_stat(&self, category: statistics::StatisticCategory, stat: i32, amount: i32) {
@@ -6791,8 +6817,8 @@ impl Player {
         self.using_hand.store(Some(hand));
     }
 
-    /// Vanilla `Player.startAutoSpinAttack`; `hand` holds `stack`.
-    pub fn start_auto_spin_attack(&self, ticks: i32, dmg: f32, stack: ItemStack, hand: Hand) {
+    /// Vanilla `Player.startAutoSpinAttack`; inventory `slot` holds `stack`.
+    pub fn start_auto_spin_attack(&self, ticks: i32, dmg: f32, stack: ItemStack, slot: usize) {
         let living = &self.living_entity;
         living
             .auto_spin_attack_ticks
@@ -6801,7 +6827,7 @@ impl Player {
         *living
             .auto_spin_attack_item
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some((stack, hand));
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some((stack, slot));
         // TODO: `removeEntitiesOnShoulder`; shoulder parrots aren't ported.
         living.set_living_flag(LivingEntity::AUTO_SPIN_ATTACK_FLAG, true);
     }

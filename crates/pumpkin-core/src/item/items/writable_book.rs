@@ -36,6 +36,7 @@ impl ItemBehaviour for WritableBookItem {
             SoundCategory::Players,
             &player.position(),
         );
+        player.award_item_used(item);
     }
 
     fn as_any(&self) -> &dyn Any {

@@ -136,20 +136,17 @@ impl JavaClient {
                                     event.target.get_entity().pos.load(),
                                 );
                             }
-                            if !stack.are_equal(&before) {
-                                player.increment_stat(StatisticCategory::Used, item_id as i32, 1);
-                                if before.is_damageable() && stack.is_empty() {
-                                    player.increment_stat(
-                                        StatisticCategory::Broken,
-                                        item_id as i32,
-                                        1,
-                                    );
-                                    player.world().send_entity_status(
-                                        player.get_entity(),
-                                        equipment_break_status(&EquipmentSlot::MAIN_HAND),
-                                        None,
-                                    );
-                                }
+                            if !stack.are_equal(&before) && before.is_damageable() && stack.is_empty() {
+                                player.increment_stat(
+                                    StatisticCategory::Broken,
+                                    item_id as i32,
+                                    1,
+                                );
+                                player.world().send_entity_status(
+                                    player.get_entity(),
+                                    equipment_break_status(&EquipmentSlot::MAIN_HAND),
+                                    None,
+                                );
                             }
                             player.inventory().set_held_item(stack);
                         }

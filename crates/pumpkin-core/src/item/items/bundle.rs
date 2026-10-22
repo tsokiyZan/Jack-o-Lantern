@@ -34,6 +34,7 @@ impl ItemBehaviour for BundleItem {
 
                 player.drop_item(extracted_stack);
                 player.sync_hand_slot(used_slot_index, updated_bundle);
+                player.award_item_used(held_item.item);
             }
         }
 
@@ -55,6 +56,7 @@ impl ItemBehaviour for BundleItem {
 
                     player.drop_item(extracted_stack);
                     player.sync_hand_slot(used_slot_index, updated_bundle);
+                    player.award_item_used(off_hand_item.item);
                 }
             }
         }

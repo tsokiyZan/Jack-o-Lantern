@@ -24,6 +24,7 @@ impl ItemBehaviour for SpyglassItem {
         player
             .living_entity
             .set_active_hand(pumpkin_util::Hand::Right, stack, Self::USE_DURATION);
+        player.award_item_used(&Item::SPYGLASS);
     }
 
     fn on_stopped_using(&self, _stack: &pumpkin_data::item_stack::ItemStack, player: &Player) {

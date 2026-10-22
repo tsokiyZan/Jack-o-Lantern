@@ -18,7 +18,11 @@ impl JavaClient {
             return;
         }
         let entity = &player.get_entity();
+        // `setOnGroundWithMovement` with the client's flags.
         entity.on_ground.store(rotation.ground, Ordering::Relaxed);
+        entity
+            .horizontal_collision
+            .store(rotation.horizontal_collision, Ordering::Relaxed);
         // Vanilla `handleMovePlayer` for a packet without a position: no move, but the fall
         // still ends on the ground.
         if player

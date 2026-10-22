@@ -52,6 +52,7 @@ impl BlockBehaviour for ComposterBlock {
                 return BlockActionResult::Pass;
             };
             let chance = compostable.chance();
+            let used_item = item_stack.item;
 
             // Consume one item from the stack (if in survival mode)
             if !args.player.has_infinite_materials() {
@@ -69,6 +70,11 @@ impl BlockBehaviour for ComposterBlock {
                 );
                 args.world
                     .sync_world_event(WorldEvent::ComposterFill, *args.position, 1);
+            }
+
+            // Vanilla awards it with `addLayer`, which a composter at level 7 skips.
+            if level < 7 {
+                args.player.award_item_used(used_item);
             }
 
             // Consume the item

@@ -15,7 +15,7 @@ impl ItemMetadata for ExperienceBottleItem {
 }
 
 impl ItemBehaviour for ExperienceBottleItem {
-    fn normal_use(&self, _item: &Item, player: &Player) {
+    fn normal_use(&self, item: &Item, player: &Player) {
         let world = player.world();
         let pos = player.eye_position();
         world.play_sound(
@@ -30,6 +30,7 @@ impl ItemBehaviour for ExperienceBottleItem {
         let mut held = player.inventory().held_item();
         held.decrement_unless_creative(player.gamemode.load(), 1);
         player.inventory().set_held_item(held);
+        player.award_item_used(item);
     }
 
     fn as_any(&self) -> &dyn Any {

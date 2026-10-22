@@ -25,7 +25,7 @@ const DIVERGENCE: f32 = 1.0;
 const THROW_SOUND_VOLUME: f32 = 0.5;
 
 impl ItemBehaviour for EnderPearlItem {
-    fn normal_use(&self, _item: &Item, player: &Player) {
+    fn normal_use(&self, item: &Item, player: &Player) {
         let position = player.position();
         let world = player.world();
         world.play_sound_fine(
@@ -41,7 +41,7 @@ impl ItemBehaviour for EnderPearlItem {
         let (yaw, pitch) = player.rotation();
         pearl
             .thrown
-            .set_velocity_from(pitch, yaw, ROLL, POWER, DIVERGENCE);
+            .set_velocity_from(player, pitch, yaw, ROLL, POWER, DIVERGENCE);
         world.spawn_entity(Arc::new(pearl));
 
         // Consume item
@@ -63,6 +63,7 @@ impl ItemBehaviour for EnderPearlItem {
                     .set_stack_in_hand(pumpkin_util::Hand::Left, off_hand);
             }
         }
+        player.award_item_used(item);
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

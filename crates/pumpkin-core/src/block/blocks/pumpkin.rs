@@ -42,6 +42,7 @@ impl crate::block::BlockBehaviour for PumpkinBlock {
         ));
         args.world.spawn_entity(item_entity);
         args.player.damage_item_in_slot(args.equipment_slot, 1);
+        args.player.award_item_used(&Item::SHEARS);
         BlockActionResult::Consume
     }
 }

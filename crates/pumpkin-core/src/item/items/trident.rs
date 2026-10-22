@@ -12,8 +12,6 @@ use pumpkin_data::entity::EntityType;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::{Sound, SoundCategory};
-use pumpkin_data::statistic::StatisticCategory;
-use pumpkin_inventory::player::player_inventory::PlayerInventory;
 use pumpkin_inventory::screen_handler::InventoryPlayer;
 use pumpkin_util::math::vector3::Vector3;
 use pumpkin_util::math::{DEG_TO_RAD, cos, sin};
@@ -34,14 +32,9 @@ impl TridentItem {
         EnchantmentHelper::modify_trident_spin_attack_strength(stack, 0.0)
     }
 
-    /// Writes the used hand's stack back and sends it to the player.
-    fn set_hand_stack(player: &Player, hand: Hand, stack: ItemStack) {
-        let inventory = player.inventory();
-        let slot = match hand {
-            Hand::Right => inventory.get_selected_slot() as usize,
-            Hand::Left => PlayerInventory::OFF_HAND_SLOT,
-        };
-        inventory.set_slot(slot, stack.clone());
+    /// Writes the used stack back to its slot and sends it to the player.
+    fn set_slot_stack(player: &Player, slot: usize, stack: ItemStack) {
+        player.inventory().set_slot(slot, stack.clone());
         player.sync_hand_slot(slot, stack);
     }
 }
@@ -77,6 +70,10 @@ impl ItemBehaviour for TridentItem {
     }
 
     /// Vanilla `TridentItem.releaseUsing`.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "mirrors vanilla TridentItem.releaseUsing"
+    )]
     fn on_stopped_using(&self, _stack: &ItemStack, player: &Player) {
         let living = &player.living_entity;
         let entity = &living.entity;
@@ -90,7 +87,8 @@ impl ItemBehaviour for TridentItem {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .unwrap_or(Hand::Right);
         // Vanilla's stack is the one in the hand, which the wear below changes.
-        let mut stack = player.inventory().get_stack_in_hand(hand);
+        let slot = player.inventory().slot_for_hand(hand);
+        let mut stack = player.inventory().get_slot(slot);
 
         let riptide_strength = Self::spin_attack_strength(&stack);
         if riptide_strength > 0.0 && (!entity.is_in_water_or_rain() || entity.has_vehicle()) {
@@ -100,10 +98,26 @@ impl ItemBehaviour for TridentItem {
             return;
         }
 
+        let world = player.world();
+        if riptide_strength > 0.0
+            && let Some(player_arc) = world.get_player_by_uuid(player.gameprofile.id)
+            && let Some(server) = world.server.upgrade()
+        {
+            let mut event =
+                crate::plugin::api::events::player::player_riptide::PlayerRiptideEvent {
+                    player: player_arc,
+                    item_name: "trident".to_string(),
+                    cancelled: false,
+                };
+            server.plugin_manager.fire_blocking(&server, &mut event);
+            if event.cancelled {
+                return;
+            }
+        }
+
         let sound = EnchantmentHelper::pick_highest_level_trident_sound(&stack)
             .unwrap_or(Sound::ItemTridentThrow);
-        player.increment_stat(StatisticCategory::Used, i32::from(Item::TRIDENT.id), 1);
-        let world = player.world();
+        player.award_item_used(&Item::TRIDENT);
         let (old_damage, old_count) = (stack.get_damage(), stack.item_count);
         stack.hurt_without_breaking(&world, 1, player);
 
@@ -114,7 +128,7 @@ impl ItemBehaviour for TridentItem {
                 stack.decrement(1);
             }
             if stack.get_damage() != old_damage || stack.item_count != old_count {
-                Self::set_hand_stack(player, hand, stack);
+                Self::set_slot_stack(player, slot, stack);
             }
 
             // `spawnProjectileFromRotation(..., 0.0, 2.5, 1.0)`.
@@ -132,7 +146,14 @@ impl ItemBehaviour for TridentItem {
                 thrown.clone(),
                 pickup,
             );
-            trident.set_velocity_from_rotation(pitch, yaw, 0.0, Self::PROJECTILE_SHOOT_POWER, 1.0);
+            trident.set_velocity_from_rotation(
+                player,
+                pitch,
+                yaw,
+                0.0,
+                Self::PROJECTILE_SHOOT_POWER,
+                1.0,
+            );
             let trident = Arc::new(trident);
             world.spawn_entity(trident.clone());
             trident.apply_on_projectile_spawned(&thrown);
@@ -147,22 +168,7 @@ impl ItemBehaviour for TridentItem {
             return;
         }
         if stack.get_damage() != old_damage {
-            Self::set_hand_stack(player, hand, stack.clone());
-        }
-
-        if let Some(player_arc) = world.get_player_by_uuid(player.gameprofile.id)
-            && let Some(server) = world.server.upgrade()
-        {
-            let mut event =
-                crate::plugin::api::events::player::player_riptide::PlayerRiptideEvent {
-                    player: player_arc,
-                    item_name: "trident".to_string(),
-                    cancelled: false,
-                };
-            server.plugin_manager.fire_blocking(&server, &mut event);
-            if event.cancelled {
-                return;
-            }
+            Self::set_slot_stack(player, slot, stack.clone());
         }
 
         let (yaw, pitch) = player.rotation();
@@ -180,7 +186,7 @@ impl ItemBehaviour for TridentItem {
             Self::SPIN_ATTACK_TICKS,
             Self::SPIN_ATTACK_DAMAGE,
             stack,
-            hand,
+            slot,
         );
         if entity.on_ground.load(Ordering::Relaxed) {
             entity.move_entity(

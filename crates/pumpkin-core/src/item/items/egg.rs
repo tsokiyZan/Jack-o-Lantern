@@ -21,7 +21,7 @@ impl ItemMetadata for EggItem {
 const POWER: f32 = 1.5;
 
 impl ItemBehaviour for EggItem {
-    fn normal_use(&self, _block: &Item, player: &Player) {
+    fn normal_use(&self, item: &Item, player: &Player) {
         let position = player.position();
         let world = player.world();
         world.play_sound(
@@ -40,7 +40,8 @@ impl ItemBehaviour for EggItem {
         egg.set_item_stack(item_stack);
 
         let (yaw, pitch) = player.rotation();
-        egg.thrown.set_velocity_from(pitch, yaw, 0.0, POWER, 1.0);
+        egg.thrown
+            .set_velocity_from(player, pitch, yaw, 0.0, POWER, 1.0);
         world.spawn_entity(Arc::new(egg));
 
         // Consume item
@@ -62,6 +63,7 @@ impl ItemBehaviour for EggItem {
                     .set_stack_in_hand(pumpkin_util::Hand::Left, off_hand);
             }
         }
+        player.award_item_used(item);
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

@@ -124,6 +124,7 @@ impl ItemBehaviour for EnderEyeItem {
         let mut stack = player.inventory.held_item();
         stack.decrement_unless_creative(player.gamemode.load(), 1);
         player.inventory.set_held_item(stack);
+        player.award_item_used(&Item::ENDER_EYE);
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

@@ -1,7 +1,6 @@
 use std::any::Any;
 use std::sync::atomic::Ordering;
 
-use crate::entity::EntityBase;
 use crate::entity::player::Player;
 use crate::item::items::projectile_weapon::ProjectileWeaponItem;
 use crate::item::{ItemBehaviour, ItemMetadata};
@@ -138,19 +137,21 @@ impl CrossbowItem {
                 let is_creative = player.gamemode.load() == GameMode::Creative;
                 ProjectileWeaponItem::shoot_projectiles(
                     &world,
-                    player.get_entity(),
+                    player,
                     &held,
                     &projectiles,
                     Self::ARROW_POWER,
                     1.0,
                     false,
                     is_creative,
+                    false,
                 );
 
                 held.patch
                     .retain(|(id, _)| *id != DataComponent::ChargedProjectiles);
                 player.inventory().set_held_item(held);
                 player.damage_held_item(1);
+                player.award_item_used(&Item::CROSSBOW);
             }
         }
     }

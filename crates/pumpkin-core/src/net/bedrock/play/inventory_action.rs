@@ -241,11 +241,6 @@ impl BedrockClient {
                     if !stack.is_empty() {
                         let item_id = stack.item.id;
                         let before = stack.clone();
-                        player.increment_stat(
-                            pumpkin_data::statistic::StatisticCategory::Used,
-                            item_id as i32,
-                            1,
-                        );
                         let item_result = server.item_registry.use_on_block(
                             &mut stack,
                             player,
@@ -256,6 +251,8 @@ impl BedrockClient {
                             &server,
                         );
 
+                        // `ItemStack.useOn`: an item interaction that succeeded.
+                        let mut item_used = item_result.consumes_action();
                         if should_try_block_placement(&item_result) {
                             let item_id = stack.item.id;
                             if let Some(placed_block) = pumpkin_data::Block::from_item_id(item_id) {
@@ -277,11 +274,16 @@ impl BedrockClient {
                                     &dummy_use_item_on,
                                     data.block_position,
                                     face,
-                                ) && player.gamemode.load() != GameMode::Creative
-                                {
-                                    stack.decrement(1);
+                                ) {
+                                    item_used = true;
+                                    if player.gamemode.load() != GameMode::Creative {
+                                        stack.decrement(1);
+                                    }
                                 }
                             }
+                        }
+                        if item_used {
+                            player.award_item_used(before.item);
                         }
                         if before.is_damageable() && stack.is_empty() {
                             player.increment_stat(
@@ -312,13 +314,7 @@ impl BedrockClient {
                         held = client_stack;
                         player.inventory().set_stack_in_hand(hand, held.clone());
                     }
-                    if !held.is_empty() {
-                        player.increment_stat(
-                            pumpkin_data::statistic::StatisticCategory::Used,
-                            held.item.id as i32,
-                            1,
-                        );
-                    }
+                    // Vanilla's `ITEM_USED` is awarded by each item's `use`, not here.
 
                     let event = PlayerInteractEvent::new(
                         player,
@@ -459,11 +455,6 @@ impl BedrockClient {
                                 .use_on_entity(&mut stack, player, event.target);
                         }
                         if !stack.are_equal(&before) {
-                            player.increment_stat(
-                                pumpkin_data::statistic::StatisticCategory::Used,
-                                item_id as i32,
-                                1,
-                            );
                             if before.is_damageable() && stack.is_empty() {
                                 player.increment_stat(
                                     pumpkin_data::statistic::StatisticCategory::Broken,

@@ -137,9 +137,9 @@ pub struct LivingEntity {
     /// Vanilla `autoSpinAttackTicks`: the riptide spin's ticks left.
     pub auto_spin_attack_ticks: AtomicI32,
     pub auto_spin_attack_dmg: AtomicCell<f32>,
-    /// Vanilla `autoSpinAttackItemStack`, with the hand it is in: Pumpkin's stacks are copies,
-    /// so the hand stands in for vanilla's identity checks.
-    pub auto_spin_attack_item: std::sync::Mutex<Option<(ItemStack, Hand)>>,
+    /// Vanilla `autoSpinAttackItemStack`, with the inventory slot it was used from: Pumpkin's
+    /// stacks are copies, so the slot stands in for vanilla's object identity.
+    pub auto_spin_attack_item: std::sync::Mutex<Option<(ItemStack, usize)>>,
     pub recent_kinetic_enemies: std::sync::Mutex<FxHashMap<i32, i32>>,
     swing_state: std::sync::Mutex<SwingState>,
     pub death_time: AtomicU8,
@@ -312,6 +312,18 @@ fn is_allowed_by_team_rules(
 
     (own_rule != CollisionRule::PushOtherTeams && their_rule != CollisionRule::PushOtherTeams)
         || same_team
+}
+
+/// Whether the riptide stack used from `spin_slot` is the active item in `active_slot`. Vanilla
+/// compares the objects; Pumpkin's stacks are copies, so the slots must match and the slot must
+/// still hold an equal stack.
+pub(crate) fn spin_stack_is_active(
+    spin_stack: &ItemStack,
+    spin_slot: usize,
+    active_stack: &ItemStack,
+    active_slot: usize,
+) -> bool {
+    spin_slot == active_slot && spin_stack.are_equal(active_stack)
 }
 
 impl LivingEntity {
@@ -1945,13 +1957,14 @@ impl LivingEntity {
         old: BoundingBox,
         current: BoundingBox,
     ) {
-        // `getEntities(this, minmax)`: `NO_SPECTATORS`.
-        let entities: Vec<Arc<dyn EntityBase>> = self
-            .entity
-            .world
-            .load()
-            .get_all_at_box(&old.minmax(&current))
+        // `getEntities(this, minmax)`: `NO_SPECTATORS`, then the dragon parts, which aren't
+        // living but still keep the spin off the wall check.
+        let world = self.entity.world.load();
+        let area = old.minmax(&current);
+        let entities: Vec<Arc<dyn EntityBase>> = world
+            .get_all_at_box(&area)
             .into_iter()
+            .chain(super::boss::ender_dragon::parts_at_box(&world, &area))
             .filter(|entity| {
                 entity.get_entity().entity_id != self.entity.entity_id && !entity.is_spectator()
             })
@@ -1989,7 +2002,7 @@ impl LivingEntity {
     }
 
     /// The riptide stack while auto-spinning, for vanilla `Player.getWeaponItem`.
-    pub fn auto_spin_attack_item(&self) -> Option<(ItemStack, Hand)> {
+    pub fn auto_spin_attack_item(&self) -> Option<(ItemStack, usize)> {
         if !self.is_auto_spin_attack() {
             return None;
         }
@@ -4714,20 +4727,33 @@ impl LivingEntity {
         {
             return seconds;
         }
-        // `weaponItem == getActiveItem()`: the weapon is the riptide stack while spinning, else
-        // the main-hand stack; the active item is the used hand's stack, else the main hand's.
-        // A spectator's active item is empty.
-        let spin = self.auto_spin_attack_item();
-        let weapon_hand = spin.as_ref().map_or(Hand::Right, |(_, hand)| *hand);
+        // `weaponItem == getActiveItem()`: the active item is the used hand's stack, else the
+        // main hand's; a spectator's is empty.
+        if caller.is_spectator() {
+            return 0.0;
+        }
         let active_hand = self
             .active_hand
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .unwrap_or(Hand::Right);
-        if caller.is_spectator() || weapon_hand != active_hand {
-            return 0.0;
-        }
-        spin.map_or_else(|| self.held_item(caller), |(stack, _)| stack)
+        // `Player.getWeaponItem`: the riptide stack while spinning.
+        let weapon = if let Some(player) = caller.get_player()
+            && let Some((spin_stack, spin_slot)) = self.auto_spin_attack_item()
+        {
+            let active_slot = player.inventory.slot_for_hand(active_hand);
+            let active_stack = player.inventory.get_slot(active_slot);
+            if !spin_stack_is_active(&spin_stack, spin_slot, &active_stack, active_slot) {
+                return 0.0;
+            }
+            spin_stack
+        } else {
+            if active_hand != Hand::Right {
+                return 0.0;
+            }
+            self.held_item(caller)
+        };
+        weapon
             .get_data_component::<WeaponImpl>()
             .map_or(0.0, |weapon| weapon.disable_blocking_for_seconds)
     }
@@ -5019,12 +5045,9 @@ impl LivingEntity {
 }
 
 impl EntityBase for LivingEntity {
-    /// Vanilla `LivingEntity.getWeaponItem`, with `Player`'s riptide stack.
+    /// Vanilla `LivingEntity.getWeaponItem`.
     fn get_weapon_item(&self) -> Option<ItemStack> {
-        Some(
-            self.auto_spin_attack_item()
-                .map_or_else(|| self.held_item(self), |(stack, _)| stack),
-        )
+        Some(self.held_item(self))
     }
 
     fn damage_with_context(
@@ -6099,6 +6122,26 @@ pub(crate) const fn bypasses_armor_durability(damage_type: &DamageType) -> bool 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn spin_stack_is_active_only_while_its_slot_still_holds_it() {
+        let mut spin = ItemStack::new(1, &Item::TRIDENT);
+        spin.set_damage(3);
+        // The slot it was used from, still holding it.
+        assert!(spin_stack_is_active(&spin, 2, &spin.clone(), 2));
+        // Another slot is active (the player switched slots or uses the off hand).
+        assert!(!spin_stack_is_active(&spin, 2, &spin.clone(), 40));
+        // The slot holds something else now, or the same trident worn further.
+        let mut worn = spin.clone();
+        worn.set_damage(4);
+        assert!(!spin_stack_is_active(&spin, 2, &worn, 2));
+        assert!(!spin_stack_is_active(
+            &spin,
+            2,
+            &ItemStack::EMPTY.clone(),
+            2
+        ));
+    }
 
     // ── equipment detection ───────────────────────────────────────────
 

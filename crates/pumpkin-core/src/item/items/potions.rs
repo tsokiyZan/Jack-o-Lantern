@@ -47,7 +47,7 @@ impl ItemBehaviour for PotionItem {
 }
 
 impl ItemBehaviour for SplashPotionItem {
-    fn normal_use(&self, _item: &Item, player: &Player) {
+    fn normal_use(&self, item: &Item, player: &Player) {
         let position = player.position();
         let world = player.world();
         world.play_sound(
@@ -75,7 +75,9 @@ impl ItemBehaviour for SplashPotionItem {
         splash.set_item_stack(stack);
 
         let (yaw, pitch) = player.rotation();
-        splash.thrown.set_velocity_from(pitch, yaw, 0.0, POWER, 1.0);
+        splash
+            .thrown
+            .set_velocity_from(player, pitch, yaw, 0.0, POWER, 1.0);
 
         world.spawn_entity(Arc::new(splash));
 
@@ -91,6 +93,7 @@ impl ItemBehaviour for SplashPotionItem {
                 .inventory
                 .set_stack_in_hand(pumpkin_util::Hand::Left, s);
         }
+        player.award_item_used(item);
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
@@ -99,7 +102,7 @@ impl ItemBehaviour for SplashPotionItem {
 }
 
 impl ItemBehaviour for LingeringPotionItem {
-    fn normal_use(&self, _item: &Item, player: &Player) {
+    fn normal_use(&self, item: &Item, player: &Player) {
         let position = player.position();
         let world = player.world();
         world.play_sound(
@@ -127,7 +130,8 @@ impl ItemBehaviour for LingeringPotionItem {
         ling.set_item_stack(stack);
 
         let (yaw, pitch) = player.rotation();
-        ling.thrown.set_velocity_from(pitch, yaw, 0.0, POWER, 1.0);
+        ling.thrown
+            .set_velocity_from(player, pitch, yaw, 0.0, POWER, 1.0);
 
         world.spawn_entity(Arc::new(ling));
 
@@ -143,6 +147,7 @@ impl ItemBehaviour for LingeringPotionItem {
                 .inventory
                 .set_stack_in_hand(pumpkin_util::Hand::Left, s);
         }
+        player.award_item_used(item);
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

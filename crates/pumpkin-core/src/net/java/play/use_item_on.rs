@@ -78,8 +78,6 @@ impl JavaClient {
 
         let mut item = inventory.get_stack_in_hand(hand);
         let swing_animation = item.get_interact_animation();
-        let item_id = item.item.id;
-        player.increment_stat(StatisticCategory::Used, item_id as i32, 1);
 
         let entity = &player.get_entity();
         let world = entity.world.load_full();
@@ -173,6 +171,11 @@ impl JavaClient {
             if player.gamemode.load() != GameMode::Creative {
                 item.decrement(1);
             }
+        }
+
+        // `ItemStack.useOn`: an item interaction that succeeded.
+        if item_result.consumes_action() {
+            player.award_item_used(before.item);
         }
 
         let after = item.clone();

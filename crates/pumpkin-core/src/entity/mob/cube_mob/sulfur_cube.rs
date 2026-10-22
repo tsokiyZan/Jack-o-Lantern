@@ -933,6 +933,7 @@ impl CubeMobEntity {
                     stack.decrement(1);
                 }
             }
+            player.award_item_used(stack.item);
             return true;
         }
 

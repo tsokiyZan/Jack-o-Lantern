@@ -9,12 +9,80 @@ use pumpkin_data::game_event::GameEvent;
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::java::client::play::CEntityVelocity;
 use pumpkin_util::math::boundingbox::BoundingBox;
-use pumpkin_util::math::{position::BlockPos, vector3::Vector3};
+use pumpkin_util::math::{DEG_TO_RAD, cos, position::BlockPos, sin, vector3::Vector3};
 use pumpkin_util::random::RandomImpl;
 use std::{
     sync::Arc,
     sync::atomic::{AtomicBool, Ordering},
 };
+/// Vanilla `Projectile.shoot`: the movement from `getMovementToShoot`, with its three
+/// `random.triangle`s from the projectile's random, and the rotation facing along it.
+pub fn shoot(entity: &Entity, x: f64, y: f64, z: f64, power: f64, uncertainty: f64) {
+    let (dx, dy, dz) = {
+        let mut random = entity.random();
+        let dx = random.next_triangular(0.0, 0.017_227_5 * uncertainty);
+        let dy = random.next_triangular(0.0, 0.017_227_5 * uncertainty);
+        let dz = random.next_triangular(0.0, 0.017_227_5 * uncertainty);
+        (dx, dy, dz)
+    };
+    let velocity = Vector3::new(x, y, z)
+        .normalize()
+        .add_raw(dx, dy, dz)
+        .multiply(power, power, power);
+
+    entity.velocity.store(velocity);
+    // `(float)(Mth.atan2(..) * 180.0F / (float)Math.PI)`.
+    let to_degrees = |radians: f64| (radians * 180.0 / f64::from(std::f32::consts::PI)) as f32;
+    entity.set_rotation(
+        to_degrees(velocity.x.atan2(velocity.z)),
+        to_degrees(velocity.y.atan2(velocity.horizontal_length())),
+    );
+}
+
+/// The direction `Projectile.shootFromRotation` shoots along, in `Mth` table trig.
+#[must_use]
+pub fn rotation_shot_vector(x_rot: f32, y_rot: f32, y_offset: f32) -> Vector3<f64> {
+    let xd = -sin(y_rot * DEG_TO_RAD) * cos(x_rot * DEG_TO_RAD);
+    let yd = -sin((x_rot + y_offset) * DEG_TO_RAD);
+    let zd = cos(y_rot * DEG_TO_RAD) * cos(x_rot * DEG_TO_RAD);
+    Vector3::new(f64::from(xd), f64::from(yd), f64::from(zd))
+}
+
+/// Vanilla `Projectile.shootFromRotation`: `shoot` along the rotation with `Mth` table trig,
+/// then the source's known movement on top (its vertical part only off the ground).
+pub fn shoot_from_rotation(
+    entity: &Entity,
+    source: &dyn EntityBase,
+    x_rot: f32,
+    y_rot: f32,
+    y_offset: f32,
+    power: f32,
+    uncertainty: f32,
+) {
+    let direction = rotation_shot_vector(x_rot, y_rot, y_offset);
+    shoot(
+        entity,
+        direction.x,
+        direction.y,
+        direction.z,
+        f64::from(power),
+        f64::from(uncertainty),
+    );
+    let source_movement = source.get_known_movement();
+    let source_y = if source
+        .get_entity()
+        .on_ground
+        .load(std::sync::atomic::Ordering::Relaxed)
+    {
+        0.0
+    } else {
+        source_movement.y
+    };
+    entity.velocity.store(
+        entity.velocity.load() + Vector3::new(source_movement.x, source_y, source_movement.z),
+    );
+}
+
 pub mod arrow;
 pub mod dragon_fireball;
 pub mod egg;
@@ -300,45 +368,22 @@ impl ThrownItemEntity {
         }
     }
 
-    pub fn set_velocity_from(&self, pitch: f32, yaw: f32, roll: f32, speed: f32, divergence: f32) {
-        let yaw_rad = yaw.to_radians();
-        let pitch_rad = pitch.to_radians();
-        let roll_rad = (pitch + roll).to_radians();
-
-        let x = -yaw_rad.sin() * pitch_rad.cos();
-        let y = -roll_rad.sin();
-        let z = yaw_rad.cos() * pitch_rad.cos();
-
-        self.set_velocity(
-            f64::from(x),
-            f64::from(y),
-            f64::from(z),
-            f64::from(speed),
-            f64::from(divergence),
-        );
+    /// Vanilla `Projectile.shootFromRotation`.
+    pub fn set_velocity_from(
+        &self,
+        source: &dyn EntityBase,
+        pitch: f32,
+        yaw: f32,
+        roll: f32,
+        speed: f32,
+        divergence: f32,
+    ) {
+        shoot_from_rotation(&self.entity, source, pitch, yaw, roll, speed, divergence);
     }
 
+    /// Vanilla `Projectile.shoot`.
     pub fn set_velocity(&self, x: f64, y: f64, z: f64, power: f64, uncertainty: f64) {
-        // Vanilla `Projectile.getMovementToShoot`: three `random.triangle`s from the
-        // projectile's random.
-        let (dx, dy, dz) = {
-            let mut random = self.entity.random();
-            let dx = random.next_triangular(0.0, 0.017_227_5 * uncertainty);
-            let dy = random.next_triangular(0.0, 0.017_227_5 * uncertainty);
-            let dz = random.next_triangular(0.0, 0.017_227_5 * uncertainty);
-            (dx, dy, dz)
-        };
-        let velocity = Vector3::new(x, y, z)
-            .normalize()
-            .add_raw(dx, dy, dz)
-            .multiply(power, power, power);
-
-        self.entity.velocity.store(velocity);
-        let len = velocity.horizontal_length();
-        self.entity.set_rotation(
-            velocity.x.atan2(velocity.z) as f32 * 57.295_776,
-            velocity.y.atan2(len) as f32 * 57.295_776,
-        );
+        shoot(&self.entity, x, y, z, power, uncertainty);
     }
 }
 

@@ -343,51 +343,22 @@ impl ArrowEntity {
         );
     }
 
+    /// Vanilla `Projectile.shootFromRotation`.
     pub fn set_velocity_from_rotation(
         &self,
+        source: &dyn EntityBase,
         pitch: f32,
         yaw: f32,
         roll: f32,
         speed: f32,
         divergence: f32,
     ) {
-        let yaw_rad = yaw.to_radians();
-        let pitch_rad = pitch.to_radians();
-        let roll_rad = (pitch + roll).to_radians();
-
-        let x = -yaw_rad.sin() * pitch_rad.cos();
-        let y = -roll_rad.sin();
-        let z = yaw_rad.cos() * pitch_rad.cos();
-
-        self.set_velocity(
-            f64::from(x),
-            f64::from(y),
-            f64::from(z),
-            f64::from(speed),
-            f64::from(divergence),
-        );
+        super::shoot_from_rotation(&self.entity, source, pitch, yaw, roll, speed, divergence);
     }
 
+    /// Vanilla `Projectile.shoot`.
     pub fn set_velocity(&self, x: f64, y: f64, z: f64, power: f64, uncertainty: f64) {
-        // Vanilla `Projectile.getMovementToShoot`: three `random.triangle`s from the arrow's random.
-        let (dx, dy, dz) = {
-            let mut random = self.entity.random();
-            let dx = random.next_triangular(0.0, 0.017_227_5 * uncertainty);
-            let dy = random.next_triangular(0.0, 0.017_227_5 * uncertainty);
-            let dz = random.next_triangular(0.0, 0.017_227_5 * uncertainty);
-            (dx, dy, dz)
-        };
-        let velocity = Vector3::new(x, y, z)
-            .normalize()
-            .add_raw(dx, dy, dz)
-            .multiply(power, power, power);
-
-        self.entity.velocity.store(velocity);
-        let len = velocity.horizontal_length();
-        self.entity.set_rotation(
-            velocity.x.atan2(velocity.z) as f32 * 57.295_776,
-            velocity.y.atan2(len) as f32 * 57.295_776,
-        );
+        super::shoot(&self.entity, x, y, z, power, uncertainty);
     }
 
     fn get_flags(&self) -> u8 {
