@@ -2119,22 +2119,28 @@ impl World {
             .worldborder
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        block_entities.retain(|be| {
-            let pos = be.get_position();
-            border.contains_block(pos.0.x, pos.0.z)
-        });
+        let ticking: Vec<Arc<dyn BlockEntity>> = block_entities
+            .iter()
+            .filter(|be| {
+                let pos = be.get_position();
+                border.contains_block(pos.0.x, pos.0.z)
+            })
+            .cloned()
+            .collect();
         drop(border);
-        let block_entity_count = block_entities.len();
+        let block_entity_count = ticking.len();
 
         let t_be = std::time::Instant::now();
         let be_handle = handle;
-        block_entities.par_chunks(16).for_each(|batch| {
+        ticking.par_chunks(16).for_each(|batch| {
             let _guard = be_handle.enter();
             for be in batch {
                 be.tick(self);
             }
         });
-        // Drained after all ticks, so changes (hopper -> chest) land in the same tick.
+        // Drained after all ticks, so changes (hopper -> chest) land in the same tick. Vanilla's
+        // `setChanged` sends the update whether or not the block entity ticks, so drain the
+        // unfiltered list.
         let guard = be_handle.enter();
         self.flush_comparator_updates(&block_entities);
         drop(guard);
