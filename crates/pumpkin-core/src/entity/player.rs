@@ -320,7 +320,7 @@ use crate::server::Server;
 use crate::world::{BlockBreakingProgress, World};
 use bytes::Bytes;
 
-use super::combat::{self, AttackType, player_attack_sound};
+use super::decoration::armor_stand::ArmorStandEntity;
 use super::hunger::HungerManager;
 use super::item::ItemEntity;
 use super::living::LivingEntity;
@@ -1470,11 +1470,11 @@ impl Player {
         let attacker_entity = &self.living_entity.entity;
         let config = &server.advanced_config.pvp;
 
-        let base_damage = if self.living_entity.is_auto_spin_attack() {
-            f64::from(self.living_entity.auto_spin_attack_dmg.load())
+        let mut base_damage = if self.living_entity.is_auto_spin_attack() {
+            self.living_entity.auto_spin_attack_dmg.load()
         } else {
             self.living_entity
-                .get_attribute_value(&Attributes::ATTACK_DAMAGE)
+                .get_attribute_value(&Attributes::ATTACK_DAMAGE) as f32
         };
         // Vanilla `getWeaponItem`, and the slot it is worn in: the riptide stack's while spinning.
         let spin = self.living_entity.auto_spin_attack_item();
@@ -1482,7 +1482,6 @@ impl Player {
             .as_ref()
             .map_or_else(|| self.inventory().held_item(), |(stack, _)| stack.clone());
         let spin_slot = spin.map(|(_, slot)| slot);
-        let mut damage_multiplier = 1.0;
 
         // Vanilla `createAttackSource`: the mace's while it can smash.
         let is_mace_smash = item_stack.item.id == pumpkin_data::item::Item::MACE.id
@@ -1496,56 +1495,56 @@ impl Player {
             direct: Some(self),
             causing: Some(self),
         };
+
+        let is_bedrock = matches!(self.client.as_ref(), ClientPlatform::Bedrock(_));
+        let attack_strength_scale = if is_bedrock {
+            1.0
+        } else {
+            self.get_attack_strength_scale(0.5)
+        };
         // Vanilla `getEnchantedDamage`, against this target.
-        let extra_ench_damage = f64::from(
-            EnchantmentHelper::modify_damage(
+        let magic_boost = attack_strength_scale
+            * (EnchantmentHelper::modify_damage(
                 &world,
                 &item_stack,
                 victim.as_ref(),
                 &damage_source,
-                base_damage as f32,
-            ) - base_damage as f32,
-        );
-
-        let is_bedrock = matches!(self.client.as_ref(), ClientPlatform::Bedrock(_));
-        let attack_cooldown_progress = if is_bedrock {
-            1.0
-        } else {
-            f64::from(self.get_attack_strength_scale(0.5))
-        };
+                base_damage,
+            ) - base_damage);
+        // Vanilla `baseDamageScaleFactor`. Strength and Weakness are already in
+        // `ATTACK_DAMAGE` through their attribute modifiers.
+        base_damage *= 0.2 + attack_strength_scale * attack_strength_scale * 0.8;
         // Vanilla `onAttack` (`resetOnlyAttackStrengthTicker`).
         self.reset_attack_strength_ticker();
 
-        // Vanilla `baseDamageScaleFactor`.
-        if attack_cooldown_progress < 1.0 {
-            damage_multiplier = attack_cooldown_progress.powi(2) * 0.8 + 0.2;
-        }
-
-        // Vanilla `baseDamage *= baseDamageScaleFactor()` and `magicBoost`. Strength and
-        // Weakness are already in `ATTACK_DAMAGE` through their attribute modifiers.
-        let mut damage = base_damage * damage_multiplier;
-        let magic_boost = extra_ench_damage * attack_cooldown_progress;
         // Vanilla `baseDamage > 0.0F || magicBoost > 0.0F`; `postPiercingAttack` runs either way.
-        if damage > 0.0 || magic_boost > 0.0 {
-            let pos = victim_entity.pos.load();
-            let attack_type = AttackType::new(self, attack_cooldown_progress as f32);
+        if base_damage > 0.0 || magic_boost > 0.0 {
+            let full_strength_attack = attack_strength_scale > 0.9;
+            let knockback_attack = attacker_entity.is_sprinting() && full_strength_attack;
+            if knockback_attack {
+                self.play_server_side_sound(Sound::EntityPlayerAttackKnockback);
+            }
 
             // Vanilla `Item.getAttackDamageBonus`, before the critical hit multiplies it; only the
             // mace has one. Its damage source is `mace` while it can smash.
             if is_mace_smash {
-                damage += f64::from(MaceItem::get_attack_damage_bonus(
+                base_damage += MaceItem::get_attack_damage_bonus(
                     &self.living_entity,
                     &item_stack,
                     victim.as_ref(),
                     &damage_source,
-                ));
+                );
             }
 
+            let critical_attack = full_strength_attack && self.can_critical_attack(victim.as_ref());
             // The critical hit multiplies `baseDamage` only, not `magicBoost`.
-            if matches!(attack_type, AttackType::Critical) {
-                damage *= 1.5;
+            if critical_attack {
+                base_damage *= 1.5;
             }
-            let total_damage = damage + magic_boost;
+            let total_damage = base_damage + magic_boost;
+            // Bedrock clients have no sweep attack.
+            let sweep_attack = !is_bedrock
+                && self.is_sweep_attack(full_strength_attack, critical_attack, knockback_attack);
 
             let old_living_entity_health = victim
                 .get_living_entity()
@@ -1553,7 +1552,7 @@ impl Player {
             let old_movement = victim_entity.velocity.load();
             if victim.damage_with_context(
                 victim.as_ref(),
-                total_damage as f32,
+                total_damage,
                 damage_source.damage_type,
                 None,
                 damage_source.direct,
@@ -1567,76 +1566,31 @@ impl Player {
                 let knockback = if config.knockback {
                     self.living_entity
                         .get_knockback(self, &world, victim.as_ref(), &damage_source)
-                        + if matches!(attack_type, AttackType::Knockback) {
-                            0.5
-                        } else {
-                            0.0
-                        }
+                        + if knockback_attack { 0.5 } else { 0.0 }
                 } else {
                     0.0
                 };
-                self.cause_extra_knockback(
-                    victim.as_ref(),
-                    knockback,
-                    old_movement,
-                    total_damage as f32,
+                self.cause_extra_knockback(victim.as_ref(), knockback, old_movement, total_damage);
+
+                if sweep_attack {
+                    self.do_sweep_attack(
+                        &world,
+                        victim.as_ref(),
+                        &item_stack,
+                        base_damage,
+                        &damage_source,
+                        attack_strength_scale,
+                    );
+                }
+
+                self.attack_visual_effects(
+                    &world,
+                    victim_entity,
+                    critical_attack,
+                    sweep_attack,
+                    full_strength_attack,
+                    magic_boost,
                 );
-
-                // Vanilla `doSweepAttack`, after the extra knockback. It reuses the attack's
-                // damage source.
-                if matches!(attack_type, AttackType::Sweeping) {
-                    combat::spawn_sweep_particle(attacker_entity, &world, &pos);
-
-                    let sweep_damage = 1.0
-                        + self
-                            .living_entity
-                            .get_attribute_value(&Attributes::SWEEPING_DAMAGE_RATIO)
-                            as f32
-                            * damage as f32;
-
-                    let search_box = BoundingBox::new(
-                        Vector3::new(pos.x - 1.0, pos.y - 0.5, pos.z - 1.0),
-                        Vector3::new(pos.x + 1.0, pos.y + 0.5, pos.z + 1.0),
-                    );
-                    let victims = world.get_all_at_box(&search_box);
-                    for other_victim in victims {
-                        if other_victim.get_entity().entity_id != victim_entity.entity_id
-                            && other_victim.get_entity().entity_id != attacker_entity.entity_id
-                            && other_victim.damage_with_context(
-                                other_victim.as_ref(),
-                                sweep_damage,
-                                damage_source.damage_type,
-                                None,
-                                damage_source.direct,
-                                damage_source.causing,
-                            )
-                        {
-                            EnchantmentHelper::do_post_attack_effects(
-                                &world,
-                                other_victim.as_ref(),
-                                &damage_source,
-                            );
-                        }
-                    }
-                }
-
-                // Vanilla `attackVisualEffects`.
-                player_attack_sound(&self.living_entity.entity.pos.load(), &world, attack_type);
-
-                if matches!(attack_type, AttackType::Critical) {
-                    let je_packet = CEntityAnimation::new(
-                        victim_entity.entity_id.into(),
-                        Animation::CriticalEffect,
-                    );
-                    let be_packet = pumpkin_protocol::bedrock::server::animate::SAnimate {
-                        action:
-                            pumpkin_protocol::bedrock::server::animate::AnimateAction::CriticalHit,
-                        target_actor_runtime_id: VarULong(victim_entity.entity_id as u64),
-                        data: 0.0,
-                        swing_source: None,
-                    };
-                    world.broadcast_editioned(&je_packet, &be_packet);
-                }
 
                 self.living_entity.last_attacking_id.store(
                     victim_entity.entity_id,
@@ -1686,17 +1640,209 @@ impl Player {
                 // `causeFoodExhaustion(0.1F)`. Only landed hits exhaust.
                 self.add_exhaustion(0.1);
             } else {
-                world.play_sound(
-                    Sound::EntityPlayerAttackNodamage,
-                    SoundCategory::Players,
-                    &self.living_entity.entity.pos.load(),
-                );
+                self.play_server_side_sound(Sound::EntityPlayerAttackNodamage);
             }
         }
 
         self.living_entity.post_piercing_attack(self);
 
         if config.swing {}
+    }
+
+    /// Vanilla `Player.playServerSideSound`.
+    fn play_server_side_sound(&self, sound: Sound) {
+        self.world().play_sound(
+            sound,
+            SoundCategory::Players,
+            &self.living_entity.entity.pos.load(),
+        );
+    }
+
+    /// Vanilla `Player.canCriticalAttack`.
+    fn can_critical_attack(&self, target: &dyn EntityBase) -> bool {
+        let entity = &self.living_entity.entity;
+        entity.fall_distance.load() > 0.0
+            && !entity.on_ground.load(Ordering::Relaxed)
+            && !self.living_entity.on_climbable(self)
+            && !entity.is_in_water()
+            // `Player.isMobilityRestricted`.
+            && !self.has_effect(&StatusEffect::BLINDNESS)
+            && !EntityBase::is_passenger(self)
+            && target.get_living_entity().is_some()
+            && !entity.is_sprinting()
+    }
+
+    /// Vanilla `Player.isSweepAttack`.
+    fn is_sweep_attack(
+        &self,
+        full_strength_attack: bool,
+        critical_attack: bool,
+        knockback_attack: bool,
+    ) -> bool {
+        if full_strength_attack
+            && !critical_attack
+            && !knockback_attack
+            && self.living_entity.entity.on_ground.load(Ordering::Relaxed)
+        {
+            let approximate_speed_sq = self.get_known_movement().horizontal_length_squared();
+            // `Player.getSpeed`, a float.
+            let max_speed_for_sweep_attack = f64::from(
+                self.living_entity
+                    .get_attribute_value(&Attributes::MOVEMENT_SPEED) as f32,
+            ) * 2.5;
+            if approximate_speed_sq < max_speed_for_sweep_attack * max_speed_for_sweep_attack {
+                return self.inventory().held_item().is_sword();
+            }
+        }
+        false
+    }
+
+    /// Vanilla `Player.doSweepAttack`.
+    fn do_sweep_attack(
+        &self,
+        world: &Arc<World>,
+        target: &dyn EntityBase,
+        weapon: &ItemStack,
+        base_damage: f32,
+        damage_source: &DamageSource<'_>,
+        attack_strength_scale: f32,
+    ) {
+        self.play_server_side_sound(Sound::EntityPlayerAttackSweep);
+        let entity = &self.living_entity.entity;
+        let sweep_damage = 1.0
+            + self
+                .living_entity
+                .get_attribute_value(&Attributes::SWEEPING_DAMAGE_RATIO) as f32
+                * base_damage;
+        // `Mth.sin(yRot * (float) (Math.PI / 180.0))`: the lookup table, in float.
+        let yaw = entity.yaw.load() * (std::f64::consts::PI / 180.0) as f32;
+        let sin = pumpkin_util::math::sin(yaw);
+        let cos = pumpkin_util::math::cos(yaw);
+
+        let player_pos = entity.pos.load();
+        let target_id = target.get_entity().entity_id;
+        let search_box = target
+            .get_entity()
+            .bounding_box
+            .load()
+            .expand(1.0, 0.25, 1.0);
+        // `getEntitiesOfClass(LivingEntity.class, ...)`, which skips spectators.
+        for nearby in world.get_all_at_box(&search_box) {
+            if nearby.get_living_entity().is_none() || nearby.is_spectator() {
+                continue;
+            }
+            let nearby_entity = nearby.get_entity();
+            if nearby_entity.entity_id != entity.entity_id
+                && nearby_entity.entity_id != target_id
+                && !(self as &dyn EntityBase).is_allied_to(nearby.as_ref())
+                && nearby
+                    .cast_any()
+                    .downcast_ref::<ArmorStandEntity>()
+                    .is_none_or(|armor_stand| !armor_stand.is_marker())
+                && player_pos.squared_distance_to_vec(&nearby_entity.pos.load()) < 9.0
+            {
+                // `getEnchantedDamage`, with the weapon's enchantments against this entity.
+                let enchanted_damage = EnchantmentHelper::modify_damage(
+                    world,
+                    weapon,
+                    nearby.as_ref(),
+                    damage_source,
+                    sweep_damage,
+                ) * attack_strength_scale;
+                if nearby.damage_with_context(
+                    nearby.as_ref(),
+                    enchanted_damage,
+                    damage_source.damage_type,
+                    None,
+                    damage_source.direct,
+                    damage_source.causing,
+                ) {
+                    if let Some(nearby_living) = nearby.get_living_entity()
+                        && nearby
+                            .get_mob()
+                            .is_none_or(super::mob::Mob::takes_knockback)
+                    {
+                        nearby_living.knockback(
+                            nearby.as_ref(),
+                            // `0.4F` widened to the double parameter.
+                            f64::from(0.4f32),
+                            f64::from(sin),
+                            f64::from(-cos),
+                            Some(self),
+                            enchanted_damage,
+                            false,
+                        );
+                    }
+                    EnchantmentHelper::do_post_attack_effects(
+                        world,
+                        nearby.as_ref(),
+                        damage_source,
+                    );
+                }
+            }
+        }
+
+        let dx = -f64::from(sin);
+        let dz = f64::from(cos);
+        world.spawn_particle(
+            Vector3::new(
+                player_pos.x + dx,
+                player_pos.y + f64::from(entity.height()) * 0.5,
+                player_pos.z + dz,
+            ),
+            Vector3::new(dx as f32, 0.0, dz as f32),
+            0.0,
+            0,
+            Particle::SweepAttack,
+        );
+    }
+
+    /// Vanilla `Player.attackVisualEffects` of a melee hit (never a stab here).
+    fn attack_visual_effects(
+        &self,
+        world: &Arc<World>,
+        target: &Entity,
+        critical_attack: bool,
+        sweep_attack: bool,
+        full_strength_attack: bool,
+        magic_boost: f32,
+    ) {
+        if critical_attack {
+            self.play_server_side_sound(Sound::EntityPlayerAttackCrit);
+            self.send_attack_animation(world, target, Animation::CriticalEffect);
+        }
+        if !critical_attack && !sweep_attack {
+            self.play_server_side_sound(if full_strength_attack {
+                Sound::EntityPlayerAttackStrong
+            } else {
+                Sound::EntityPlayerAttackWeak
+            });
+        }
+        if magic_boost > 0.0 {
+            self.send_attack_animation(world, target, Animation::MagicCriticaleffect);
+        }
+    }
+
+    /// Vanilla `ServerPlayer.crit` and `magicCrit`: the target's animation, sent to this player
+    /// and everyone tracking it.
+    fn send_attack_animation(&self, world: &World, target: &Entity, animation: Animation) {
+        let action = if matches!(animation, Animation::CriticalEffect) {
+            pumpkin_protocol::bedrock::server::animate::AnimateAction::CriticalHit
+        } else {
+            pumpkin_protocol::bedrock::server::animate::AnimateAction::MagicCriticalHit
+        };
+        let je_packet = CEntityAnimation::new(target.entity_id.into(), animation);
+        let be_packet = pumpkin_protocol::bedrock::server::animate::SAnimate {
+            action,
+            target_actor_runtime_id: VarULong(target.entity_id as u64),
+            data: 0.0,
+            swing_source: None,
+        };
+        world.send_to_tracking_players_and_self_editioned(
+            &self.living_entity.entity,
+            &je_packet,
+            &be_packet,
+        );
     }
 
     /// Vanilla `Player.itemAttackInteraction` after a hit that landed: the weapon's

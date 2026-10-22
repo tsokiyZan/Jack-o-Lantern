@@ -4601,9 +4601,10 @@ impl World {
         // Vanilla respawns a fresh `ServerPlayer` with an empty `lastEquipmentItems`: after
         // `CRespawn` and the re-add, the next tick sends its equipment and modifiers again.
         player.living_entity.clear_last_equipment_items();
-        // The fresh `ServerPlayer` also starts its attack strength ticker and
-        // `lastItemInMainHand` over; `restoreFrom` copies neither.
+        // The fresh `ServerPlayer` also starts its attack strength ticker, `lastItemInMainHand`
+        // and swing state over; `restoreFrom` copies none of them.
         player.clear_attack_strength_for_respawn();
+        player.living_entity.clear_swing_state();
 
         // Load chunks and send world info FIRST (before teleport packet)
         target_world.send_world_info(player);

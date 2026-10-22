@@ -1121,6 +1121,14 @@ impl LivingEntity {
         }
     }
 
+    /// The swing state of a freshly constructed vanilla `LivingEntity`: no swing in progress.
+    pub fn clear_swing_state(&self) {
+        *self
+            .swing_state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = SwingState::default();
+    }
+
     /// Vanilla `LivingEntity.getScale`: the `scale` attribute.
     #[must_use]
     pub fn get_scale(&self) -> f32 {
