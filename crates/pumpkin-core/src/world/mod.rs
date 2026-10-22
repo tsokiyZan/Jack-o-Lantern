@@ -6002,7 +6002,10 @@ impl World {
                 }
             }
 
-            if !flags.intersects(BlockFlags::MOVED | BlockFlags::UPDATE_KNOWN_SHAPE) {
+            // Only `UPDATE_KNOWN_SHAPE` (vanilla 16) skips the shape updates; a piston's
+            // `MOVED` (vanilla 64) still sends them.
+            if !flags.contains(BlockFlags::UPDATE_KNOWN_SHAPE) {
+                // Vanilla `updateFlags & -34`: without `UPDATE_NEIGHBORS` and `UPDATE_SUPPRESS_DROPS`.
                 let mut neighbour_update_flags = flags;
                 neighbour_update_flags.remove(BlockFlags::NOTIFY_NEIGHBORS);
                 neighbour_update_flags.remove(BlockFlags::SKIP_DROPS);

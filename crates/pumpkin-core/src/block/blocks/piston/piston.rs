@@ -401,10 +401,11 @@ fn move_piston(
 
     for &broken_block_pos in broken_blocks.iter().rev() {
         let block_state = world.get_block_state(&broken_block_pos);
+        // `setBlock(air, 18)`.
         world.break_block(
             &broken_block_pos,
             None,
-            BlockFlags::NOTIFY_LISTENERS | BlockFlags::FORCE_STATE,
+            BlockFlags::NOTIFY_LISTENERS | BlockFlags::UPDATE_KNOWN_SHAPE,
         );
         affected_block_states.push(block_state);
     }
@@ -418,10 +419,12 @@ fn move_piston(
         props.facing = dir.to_facing();
         let state = props.to_state_id(&Block::MOVING_PISTON);
 
+        // `setBlock(movingPiston, 324)`: no client update, the client runs the move itself
+        // from the block event (`UPDATE_INVISIBLE` has no Pumpkin flag).
         world.set_block_state(
             &target_pos,
             state,
-            BlockFlags::NOTIFY_LISTENERS | BlockFlags::MOVED,
+            BlockFlags::MOVED | BlockFlags::SKIP_BLOCK_ENTITY_REPLACED_CALLBACK,
         );
 
         if let Some(moved_state) = moved_block_states.get(moved_blocks.len() - 1 - index) {
@@ -446,10 +449,11 @@ fn move_piston(
         props.facing = dir.to_facing();
         props.r#type = pistion_type;
         moved_blocks_map.remove(&extended_pos);
+        // `setBlock(movingPiston, 324)`.
         world.set_block_state(
             &extended_pos,
             props.to_state_id(&Block::MOVING_PISTON),
-            BlockFlags::NOTIFY_LISTENERS | BlockFlags::MOVED,
+            BlockFlags::MOVED | BlockFlags::SKIP_BLOCK_ENTITY_REPLACED_CALLBACK,
         );
         let mut props = PistonHeadLikeProperties::default(&Block::PISTON_HEAD);
         props.facing = dir.to_facing();
@@ -468,7 +472,8 @@ fn move_piston(
         world.set_block_state(
             &pos,
             air_state,
-            BlockFlags::NOTIFY_LISTENERS | BlockFlags::FORCE_STATE | BlockFlags::MOVED,
+            // `setBlock(air, 82)`.
+            BlockFlags::NOTIFY_LISTENERS | BlockFlags::UPDATE_KNOWN_SHAPE | BlockFlags::MOVED,
         );
     }
 
