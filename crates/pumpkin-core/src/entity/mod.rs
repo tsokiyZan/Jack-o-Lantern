@@ -940,6 +940,15 @@ pub trait EntityBase: Send + Sync + std::any::Any {
     /// Called when a player collides with an entity
     fn on_player_collision(&self, _player: &Arc<Player>) {}
 
+    /// The part of a vanilla `addPassenger` override before `super.addPassenger`.
+    fn before_add_passenger(&self) {}
+
+    /// The part of a vanilla `addPassenger` override after `super.addPassenger`.
+    fn after_add_passenger(&self) {}
+
+    /// The part of a vanilla `removePassenger` override after `super.removePassenger`.
+    fn after_remove_passenger(&self) {}
+
     fn is_passenger(&self) -> bool {
         self.get_entity().has_vehicle()
     }
@@ -5384,6 +5393,8 @@ impl Entity {
         if mount_event.cancelled || vehicle_enter.cancelled {
             return;
         }
+        vehicle.before_add_passenger();
+        let vehicle_hooks = Arc::clone(&vehicle);
 
         passenger.set_pose(EntityPose::Standing);
         let passenger_entity = passenger.get_entity();
@@ -5427,6 +5438,7 @@ impl Entity {
                 self.pos.load(),
             );
         }
+        vehicle_hooks.after_add_passenger();
     }
 
     pub(crate) fn remove_passenger_on_disconnect(&self, passenger_id: i32) {
@@ -5567,6 +5579,10 @@ impl Entity {
                     pumpkin_data::game_event::GameEvent::EntityDismount,
                     self.pos.load(),
                 );
+            }
+
+            if let Some(vehicle) = self.world.load().get_entity_by_id(self.entity_id) {
+                vehicle.after_remove_passenger();
             }
 
             // Send CSetPassengers directly to the dismounting player before broadcasting it.

@@ -2020,6 +2020,15 @@ pub trait Mob: EntityBase + Send + Sync {
     /// What a vanilla `positionRider` override does after placing the passenger.
     fn mob_after_position_rider(&self, _passenger: &dyn EntityBase) {}
 
+    /// The part of a vanilla `addPassenger` override before `super.addPassenger`.
+    fn mob_before_add_passenger(&self) {}
+
+    /// The part of a vanilla `addPassenger` override after `super.addPassenger`.
+    fn mob_after_add_passenger(&self) {}
+
+    /// The part of a vanilla `removePassenger` override after `super.removePassenger`.
+    fn mob_after_remove_passenger(&self) {}
+
     /// What a vanilla `rideTick` override does after `LivingEntity.rideTick`.
     fn mob_after_ride_tick(&self) {}
 
@@ -3514,6 +3523,18 @@ impl<T: Mob + Send + 'static> EntityBase for T {
 
     fn controlling_passenger(&self) -> Option<Arc<dyn EntityBase>> {
         self.get_controlling_passenger()
+    }
+
+    fn before_add_passenger(&self) {
+        self.mob_before_add_passenger();
+    }
+
+    fn after_add_passenger(&self) {
+        self.mob_after_add_passenger();
+    }
+
+    fn after_remove_passenger(&self) {
+        self.mob_after_remove_passenger();
     }
 
     fn passenger_attachment_point(

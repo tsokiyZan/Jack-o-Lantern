@@ -234,8 +234,7 @@ impl HappyGhastEntity {
     }
 
     /// Vanilla `HappyGhast.doPlayerRide`: `player.startRiding(this)`, which `canAddPassenger`
-    /// allows for up to four riders; the first one pulls the harness goggles down
-    /// (`addPassenger`).
+    /// allows for up to four riders.
     fn do_player_ride(&self, player: &Arc<Player>) {
         let entity = self.get_entity();
         let passengers = entity
@@ -259,9 +258,6 @@ impl HappyGhastEntity {
             current
                 .get_entity()
                 .remove_passenger(player.get_entity().entity_id);
-        }
-        if passengers == 0 {
-            self.play_sound_at_self(Sound::EntityHappyGhastHarnessGogglesDown, 1.0, 1.0);
         }
         entity.add_passenger(vehicle, player.clone());
     }
@@ -570,6 +566,33 @@ impl Mob for HappyGhastEntity {
             pumpkin_data::tracked_data::happy_ghast::STAYS_STILL,
             self.stays_still.load(Ordering::Relaxed),
         );
+    }
+
+    /// Vanilla `HappyGhast.addPassenger`: the first rider pulls the harness goggles down.
+    fn mob_before_add_passenger(&self) {
+        if !self.get_entity().has_passengers() {
+            self.play_sound_at_self(Sound::EntityHappyGhastHarnessGogglesDown, 1.0, 1.0);
+        }
+    }
+
+    /// Vanilla `HappyGhast.addPassenger`, after `super`: stay still for at most ten more
+    /// ticks, or not at all unless a player stands on top.
+    fn mob_after_add_passenger(&self) {
+        if !self.scan_player_above_ghast() {
+            self.set_server_still_timeout(0);
+        } else if self.server_still_timeout.load(Ordering::Relaxed) > 10 {
+            self.set_server_still_timeout(10);
+        }
+    }
+
+    /// Vanilla `HappyGhast.removePassenger`: still for ten ticks; the last rider leaving
+    /// clears its home and pushes the goggles up.
+    fn mob_after_remove_passenger(&self) {
+        self.set_server_still_timeout(10);
+        if !self.get_entity().has_passengers() {
+            self.mob_entity.clear_home();
+            self.play_sound_at_self(Sound::EntityHappyGhastHarnessGogglesUp, 1.0, 1.0);
+        }
     }
 
     fn mob_interact(
