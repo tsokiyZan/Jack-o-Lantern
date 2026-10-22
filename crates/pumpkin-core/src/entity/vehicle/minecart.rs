@@ -141,13 +141,14 @@ impl MinecartEntity {
         }
     }
 
-    const fn drop_item(&self) -> Option<&'static Item> {
+    /// Vanilla `getDropItem`: spawner and command block minecarts drop a plain minecart.
+    const fn drop_item(&self) -> &'static Item {
         match &self.kind {
-            MinecartKind::Chest(_) => Some(&Item::CHEST_MINECART),
-            MinecartKind::Furnace(_) => Some(&Item::FURNACE_MINECART),
-            MinecartKind::Hopper(_) => Some(&Item::HOPPER_MINECART),
-            MinecartKind::Tnt(_) => Some(&Item::TNT_MINECART),
-            _ => None,
+            MinecartKind::Chest(_) => &Item::CHEST_MINECART,
+            MinecartKind::Furnace(_) => &Item::FURNACE_MINECART,
+            MinecartKind::Hopper(_) => &Item::HOPPER_MINECART,
+            MinecartKind::Tnt(_) => &Item::TNT_MINECART,
+            MinecartKind::Rideable(_) | MinecartKind::Other => &Item::MINECART,
         }
     }
 }
@@ -888,7 +889,9 @@ impl EntityBase for MinecartEntity {
             }
         }
 
-        let damaged = self.vehicle.damage_with_context(amount, source);
+        let damaged = self
+            .vehicle
+            .damage_with_context(amount, source, self.drop_item());
 
         if will_break && !creative && self.vehicle.entity.is_removed() {
             let world = self.vehicle.entity.world.load();
@@ -900,9 +903,6 @@ impl EntityBase for MinecartEntity {
                     container.unpack_loot(&world, self.vehicle.entity.pos.load(), None);
                     let inventory: Arc<dyn Inventory> = container.clone();
                     world.scatter_inventory(&position, &inventory);
-                }
-                if let Some(item) = self.drop_item() {
-                    world.drop_stack(&position, ItemStack::new(1, item));
                 }
             }
         }

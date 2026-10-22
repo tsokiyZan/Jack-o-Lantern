@@ -235,7 +235,13 @@ impl EntityBase for BoatEntity {
         source: Option<&dyn EntityBase>,
         _cause: Option<&dyn EntityBase>,
     ) -> bool {
-        self.vehicle.damage_with_context(amount, source)
+        // `AbstractBoat.getDropItem`: each boat and raft drops the item of its own name.
+        let Some(drop_item) = pumpkin_data::item::Item::from_registry_key(
+            self.vehicle.entity.entity_type.resource_name,
+        ) else {
+            return false;
+        };
+        self.vehicle.damage_with_context(amount, source, drop_item)
     }
 
     fn interact(&self, player: &Arc<Player>, _item_stack: &mut ItemStack) -> bool {

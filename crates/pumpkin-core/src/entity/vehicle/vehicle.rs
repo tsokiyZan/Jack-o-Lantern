@@ -5,6 +5,10 @@ use crate::entity::Entity;
 use pumpkin_protocol::java::client::play::Metadata;
 
 use crate::entity::EntityBase;
+use pumpkin_data::data_component::DataComponent;
+use pumpkin_data::data_component_impl::{CustomNameImpl, DataComponentImpl};
+use pumpkin_data::item::Item;
+use pumpkin_data::item_stack::ItemStack;
 use pumpkin_protocol::codec::var_int::VarInt;
 use pumpkin_util::GameMode;
 
@@ -167,30 +171,30 @@ impl VehicleEntity {
         );
     }
 
-    pub fn kill_and_drop_self(&self) {
-        let world = self.entity.world.load();
-        let entity_drops = world.level_info.load().game_rules.entity_drops;
-
-        if entity_drops {
-            let resource_name = self.entity.entity_type.resource_name;
-            let key = format!("minecraft:entities/{resource_name}");
-            if let Some(loot_table) = pumpkin_data::loot_table::get_loot_table(&key) {
-                let pos = self.entity.block_pos.load();
-                for stack in crate::world::loot::generate_loot_from_handle(
-                    &loot_table.into(),
-                    &world,
-                    0,
-                    &crate::world::loot::LootContextParameters::default(),
-                ) {
-                    world.drop_stack(&pos, stack);
-                }
-            }
-        }
-
+    /// Vanilla `VehicleEntity.destroy(level, dropItem)`: the vehicle dies and, with
+    /// `entityDrops`, drops its item carrying its custom name.
+    pub fn destroy(&self, drop_item: &'static Item) {
         self.entity.remove();
+        let world = self.entity.world.load();
+        if world.level_info.load().game_rules.entity_drops {
+            let mut stack = ItemStack::new(1, drop_item);
+            if let Some(name) = self.entity.custom_name.load().as_ref() {
+                stack.patch.push((
+                    DataComponent::CustomName,
+                    Some(CustomNameImpl { name: name.clone() }.to_dyn()),
+                ));
+            }
+            self.entity.spawn_at_location(stack);
+        }
     }
 
-    pub fn damage_with_context(&self, amount: f32, source: Option<&dyn EntityBase>) -> bool {
+    /// Vanilla `VehicleEntity.hurtServer`; `drop_item` is the vehicle's `getDropItem`.
+    pub fn damage_with_context(
+        &self,
+        amount: f32,
+        source: Option<&dyn EntityBase>,
+        drop_item: &'static Item,
+    ) -> bool {
         if !self.entity.is_alive() {
             return true;
         }
@@ -235,7 +239,7 @@ impl VehicleEntity {
             if is_creative {
                 self.entity.remove();
             } else {
-                self.kill_and_drop_self();
+                self.destroy(drop_item);
             }
         }
 
@@ -261,6 +265,10 @@ impl VehicleEntity {
 
 #[cfg(test)]
 mod tests {
+    use pumpkin_data::data_component::DataComponent;
+    use pumpkin_data::data_component_impl::{CustomNameImpl, DataComponentImpl};
+    use pumpkin_data::item::Item;
+    use pumpkin_data::item_stack::ItemStack;
     use pumpkin_protocol::codec::var_int::VarInt;
     use pumpkin_protocol::java::client::play::Metadata;
     use pumpkin_util::version::JavaMinecraftVersion;
