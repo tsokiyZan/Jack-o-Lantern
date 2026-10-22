@@ -291,7 +291,9 @@ pub struct World {
     /// block events, cleared before entities and block entities tick.
     handling_tick: std::sync::atomic::AtomicBool,
     /// A map of unsent block changes, keyed by block position.
-    unsent_block_changes: std::sync::Mutex<HashMap<BlockPos, BlockStateId>>,
+    /// Vanilla `ChunkHolder.changedBlocksPerSection`: positions only; the state sent is the
+    /// one the block holds when the changes are broadcast.
+    unsent_block_changes: std::sync::Mutex<FxHashSet<BlockPos>>,
     /// Persisted vanilla POI storage for portal and villager lookups.
     pub portal_poi: std::sync::Mutex<portal::PortalPoiStorage>,
     /// Villager job sites and their current owners.
@@ -451,7 +453,7 @@ impl World {
             min_y: i32::from(generation_settings.shape.min_y),
             synced_block_event_queue: std::sync::Mutex::new(indexmap::IndexSet::new()),
             handling_tick: std::sync::atomic::AtomicBool::new(false),
-            unsent_block_changes: std::sync::Mutex::new(HashMap::new()),
+            unsent_block_changes: std::sync::Mutex::new(FxHashSet::default()),
             portal_poi: std::sync::Mutex::new(portal_poi),
             villager_poi: std::sync::Mutex::new(villager_poi::VillagerPoiStorage::default()),
             raids: std::sync::Mutex::new(raid::Raids::default()),
@@ -2089,14 +2091,17 @@ impl World {
         }
     }
 
-    pub fn register_block_change(&self, position: BlockPos, block_state_id: BlockStateId) {
+    /// Vanilla `ChunkHolder.blockChanged`: the block at `position` is sent with the next
+    /// [`flush_block_updates`](Self::flush_block_updates), as it is then.
+    pub fn register_block_change(&self, position: BlockPos) {
         self.unsent_block_changes
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .insert(position, block_state_id);
+            .insert(position);
     }
 
-    /// Queues block state changes for broadcast to nearby players.
+    /// Queues the changed positions for broadcast to nearby players; the states are read
+    /// again when they are sent.
     ///
     /// Call [`flush_block_updates`](Self::flush_block_updates) afterward to send the packets.
     pub fn queue_block_updates(&self, changes: &[(BlockPos, BlockStateId)]) {
@@ -2104,8 +2109,8 @@ impl World {
             .unsent_block_changes
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        for (pos, state_id) in changes {
-            guard.insert(*pos, *state_id);
+        for (pos, _) in changes {
+            guard.insert(*pos);
         }
     }
 
@@ -2122,7 +2127,13 @@ impl World {
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             std::mem::take(&mut *guard)
         };
-        for (position, block_state_id) in changes {
+        // Vanilla `ChunkHolder.broadcastChanges` reads each changed block when it sends, so a
+        // cell written several times (a piston's 18 then its 324, which doesn't notify) goes
+        // out as it is now, not as it was at the last notifying write.
+        for position in changes {
+            let Some(block_state_id) = self.get_block_state_id_if_loaded(&position) else {
+                continue;
+            };
             let chunk_section = chunk_section_from_pos(&position);
             block_state_updates_by_chunk_section
                 .entry(chunk_section)
@@ -6003,10 +6014,7 @@ impl World {
         // Level.java setBlock
         if self.get_block_state_id(position) == block_state_id {
             if flags.contains(BlockFlags::NOTIFY_LISTENERS) {
-                self.unsent_block_changes
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .insert(*position, block_state_id);
+                self.register_block_change(*position);
             }
 
             if flags.contains(BlockFlags::NOTIFY_NEIGHBORS) {
