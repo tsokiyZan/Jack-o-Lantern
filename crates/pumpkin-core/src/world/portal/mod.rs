@@ -60,14 +60,33 @@ impl PortalType {
         }
     }
 
+    /// Vanilla `Portal.getPortalDestination` of the nether and end portal blocks: the target
+    /// level follows from the level the entity is in now (`NETHER ? OVERWORLD : NETHER`,
+    /// `END ? OVERWORLD : END`), and there is none if the server lacks it.
     #[expect(clippy::too_many_lines)]
     pub fn get_portal_destination(
         &self,
         current_level: &World,
-        dest_world: Arc<World>,
         caller: &dyn crate::entity::EntityBase,
         source_portal: Option<&SourcePortalInfo>,
     ) -> Option<TeleportTransition> {
+        let (own_dimension, other) = match self {
+            Self::Nether => (Dimension::THE_NETHER, Dimension::THE_NETHER),
+            Self::End => (Dimension::THE_END, Dimension::THE_END),
+        };
+        let new_dimension = if current_level.dimension == own_dimension {
+            Dimension::OVERWORLD
+        } else {
+            other
+        };
+        let dest_world = current_level
+            .server
+            .upgrade()?
+            .worlds
+            .load()
+            .iter()
+            .find(|world| world.dimension == new_dimension)
+            .cloned()?;
         match self {
             Self::End => {
                 let is_end_portal = dest_world.dimension == Dimension::THE_END
@@ -236,27 +255,23 @@ pub struct TeleportTransition {
     pub pitch: Option<f32>,
 }
 
+#[derive(Clone)]
 pub struct PortalProcessor {
     pub portal_type: PortalType,
     pub entry_position: BlockPos,
     pub portal_time: u32,
     pub inside_portal_this_tick: bool,
-    pub destination_world: Arc<World>,
     pub source_portal: Option<SourcePortalInfo>,
 }
 
 impl PortalProcessor {
-    pub const fn new(
-        portal_type: PortalType,
-        entry_position: BlockPos,
-        destination_world: Arc<World>,
-    ) -> Self {
+    #[must_use]
+    pub const fn new(portal_type: PortalType, entry_position: BlockPos) -> Self {
         Self {
             portal_type,
             entry_position,
             portal_time: 0,
             inside_portal_this_tick: true,
-            destination_world,
             source_portal: None,
         }
     }
@@ -278,12 +293,8 @@ impl PortalProcessor {
         world: &World,
         entity: &dyn crate::entity::EntityBase,
     ) -> Option<TeleportTransition> {
-        self.portal_type.get_portal_destination(
-            world,
-            self.destination_world.clone(),
-            entity,
-            self.source_portal.as_ref(),
-        )
+        self.portal_type
+            .get_portal_destination(world, entity, self.source_portal.as_ref())
     }
 
     pub fn process_portal_teleportation(

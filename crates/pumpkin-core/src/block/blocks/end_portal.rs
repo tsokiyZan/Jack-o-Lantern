@@ -28,7 +28,7 @@ impl BlockBehaviour for EndPortalBlock {
         args.entity.get_entity().try_use_portal(
             args.entity,
             PortalType::End,
-            target_world,
+            &target_world,
             *args.position,
         );
     }

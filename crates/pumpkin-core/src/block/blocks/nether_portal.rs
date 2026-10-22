@@ -156,7 +156,7 @@ impl BlockBehaviour for NetherPortalBlock {
         args.entity.get_entity().try_use_portal(
             args.entity,
             PortalType::Nether,
-            target_world,
+            &target_world,
             *args.position,
         );
     }

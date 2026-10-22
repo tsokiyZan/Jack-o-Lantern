@@ -3656,6 +3656,9 @@ impl Entity {
             self.portal_cooldown.fetch_sub(1, Ordering::Relaxed);
         }
         let world = self.world.load_full();
+        // Never held across the destination search: its chunk wait (`block_on_tick`) runs other
+        // pool jobs on this thread, and any of them locking this mutex (a teleport of this
+        // entity, a tick of it as a new passenger) would deadlock on this very thread.
         let mut guard = self
             .portal_manager
             .lock()
@@ -3667,9 +3670,11 @@ impl Entity {
             // `setPortalCooldown`.
             self.portal_cooldown
                 .store(caller.dimension_changing_delay(), Ordering::Relaxed);
-            let transition = processor.get_portal_destination(&world, caller);
-            // `restoreFrom` moves the processor to the entity in the new dimension.
+            // Vanilla reads `portalProcess` once and acts on it: the search runs on this tick's
+            // copy, so nothing touched while it waits changes where the entity goes.
+            let processor = processor.clone();
             drop(guard);
+            let transition = processor.get_portal_destination(&world, caller);
             if let Some(transition) = transition
                 && let Some(this) = world.get_entity_by_id(self.entity_id)
             {
@@ -3685,7 +3690,7 @@ impl Entity {
         &self,
         caller: &dyn EntityBase,
         portal: PortalType,
-        portal_world: Arc<World>,
+        portal_world: &World,
         pos: BlockPos,
     ) {
         let mut portal_event =
@@ -3729,7 +3734,7 @@ impl Entity {
             .as_ref()
             .is_none_or(|manager| !manager.is_same_portal(portal))
         {
-            let mut new_manager = PortalProcessor::new(portal, pos, portal_world);
+            let mut new_manager = PortalProcessor::new(portal, pos);
 
             let (block, state) = world.get_block_and_state(&pos);
             let source_axis = (block == &pumpkin_data::Block::NETHER_PORTAL).then(|| {
