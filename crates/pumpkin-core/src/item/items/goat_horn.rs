@@ -52,8 +52,11 @@ impl ItemBehaviour for GoatHornItem {
         InteractionResult::CONSUME
     }
 
-    fn get_use_duration(&self) -> i32 {
-        Instrument::PonderGoatHorn.use_duration_ticks() as i32
+    /// Vanilla `InstrumentItem.getUseDuration`: the instrument's, or 0 without one.
+    fn get_use_duration(&self, stack: &ItemStack) -> i32 {
+        Self::instrument(stack).map_or(0, |instrument| {
+            (instrument.use_duration * 20.0).floor() as i32
+        })
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -61,9 +64,6 @@ impl ItemBehaviour for GoatHornItem {
     }
 }
 
-impl GoatHornItem {
-    pub const USE_DURATION: i32 = Instrument::PonderGoatHorn.use_duration_ticks() as i32;
-}
 
 /// What `InstrumentItem` reads from an instrument.
 struct InstrumentValues {

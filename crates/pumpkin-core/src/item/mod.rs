@@ -252,7 +252,7 @@ pub trait ItemBehaviour: Send + Sync {
 
     /// Returns the maximum number of ticks this item can be used for.
     /// Return 0 if the item does not have a behaviour-driven use duration.
-    fn get_use_duration(&self) -> i32 {
+    fn get_use_duration(&self, _stack: &ItemStack) -> i32 {
         0
     }
 

@@ -37,7 +37,7 @@ impl ItemBehaviour for SpyglassItem {
         );
     }
 
-    fn get_use_duration(&self) -> i32 {
+    fn get_use_duration(&self, _stack: &pumpkin_data::item_stack::ItemStack) -> i32 {
         Self::USE_DURATION
     }
 

@@ -550,7 +550,7 @@ impl ItemBehaviour for FilledBucketItem {
 }
 
 impl ItemBehaviour for MilkBucketItem {
-    fn get_use_duration(&self) -> i32 {
+    fn get_use_duration(&self, _stack: &ItemStack) -> i32 {
         32
     }
 

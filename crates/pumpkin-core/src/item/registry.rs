@@ -76,7 +76,7 @@ impl ItemRegistry {
     /// 72000 for a shield or a kinetic weapon.
     #[must_use]
     pub fn stack_use_duration(&self, stack: &ItemStack) -> i32 {
-        if let Some(duration) = self.get_use_duration(stack.item.id) {
+        if let Some(duration) = self.get_use_duration(stack) {
             return duration;
         }
         if stack.get_data_component::<KineticWeaponImpl>().is_some() {
@@ -135,9 +135,9 @@ impl ItemRegistry {
     /// Returns the item's use duration in ticks, as defined by its registered behaviour.
     /// Returns `None` if the item has no registered behaviour or its duration is 0.
     #[must_use]
-    pub fn get_use_duration(&self, item_id: u16) -> Option<i32> {
-        self.get_pumpkin_item(item_id)
-            .map(|b| b.get_use_duration())
+    pub fn get_use_duration(&self, stack: &ItemStack) -> Option<i32> {
+        self.get_pumpkin_item(stack.item.id)
+            .map(|b| b.get_use_duration(stack))
             .filter(|&d| d > 0)
     }
 

@@ -588,7 +588,7 @@ impl MobEntity {
             .load()
             .server
             .upgrade()
-            .and_then(|server| server.item_registry.get_use_duration(stack.item.id))
+            .and_then(|server| server.item_registry.get_use_duration(&stack))
             .unwrap_or(0);
         living.set_active_hand(hand, stack, duration);
     }
