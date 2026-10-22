@@ -5825,6 +5825,17 @@ impl Player {
         self.drop_item(item_stack, thrown_from_hand);
     }
 
+    /// Vanilla `ServerPlayer.take`: the take packet, then the open container's changes at once.
+    pub fn take(&self, item: &Entity, amount: u32) {
+        self.living_entity.take(item, amount);
+        self.current_screen_handler
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .send_content_updates();
+    }
+
     /// The drop half of vanilla `ServerPlayer.drop`: the item entity, then the `Dropped` and
     /// `Drop` stats only for an item thrown from the hand.
     pub fn drop_item(&self, item_stack: ItemStack, thrown_from_hand: bool) {

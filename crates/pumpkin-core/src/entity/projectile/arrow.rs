@@ -1162,7 +1162,7 @@ impl EntityBase for ArrowEntity {
                 stack.item.id as i32,
                 1,
             );
-            player.living_entity.take(&self.entity, 1);
+            player.take(&self.entity, 1);
 
             // Remove arrow entity after pickup
             self.get_entity().remove();

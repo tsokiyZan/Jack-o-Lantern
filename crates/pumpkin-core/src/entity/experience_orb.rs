@@ -341,7 +341,7 @@ impl EntityBase for ExperienceOrbEntity {
                 false
             };
             if can_pickup {
-                player.living_entity.take(&self.entity, 1);
+                player.take(&self.entity, 1);
                 let remaining = player.apply_mending_from_xp(self.get_value());
                 if remaining > 0 {
                     player.add_experience_points(remaining);

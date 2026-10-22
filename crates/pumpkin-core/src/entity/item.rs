@@ -764,7 +764,7 @@ impl EntityBase for ItemEntity {
         }
 
         player.inventory_changed.store(true, Ordering::Relaxed);
-        living.take(&self.entity, org_count.into());
+        player.take(&self.entity, org_count.into());
         if is_empty {
             self.entity.remove();
             // As vanilla, so `onItemPickup` sees what was picked up.
@@ -779,14 +779,6 @@ impl EntityBase for ItemEntity {
             i32::from(org_count),
         );
         living.on_item_pickup(self);
-
-        player
-            .current_screen_handler
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .send_content_updates();
     }
 
     /// Vanilla `ItemEntity.shouldPlayLavaHurtSound`.

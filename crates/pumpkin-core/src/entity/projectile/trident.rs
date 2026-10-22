@@ -447,7 +447,7 @@ impl EntityBase for TridentEntity {
                 stack.item.id as i32,
                 1,
             );
-            player.living_entity.take(&self.entity, 1);
+            player.take(&self.entity, 1);
             self.get_entity().remove();
         }
     }
