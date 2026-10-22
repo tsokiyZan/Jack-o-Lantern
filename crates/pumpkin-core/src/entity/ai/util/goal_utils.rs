@@ -117,7 +117,9 @@ pub fn is_restricted(restrict: bool, mob: &dyn Mob, pos: &BlockPos) -> bool {
 /// Nowhere the mob's navigation can settle, which for a walker means nothing
 /// solid to stand on and for a swimmer means inside a block.
 ///
-/// Takes the navigation lock, so callers must not already hold it.
+/// Asks `getNavigation()` through `with_navigation`, so it locks the controlled vehicle's
+/// navigation while the mob steers one, else its own. Callers must not already hold that
+/// lock: never call this inside a `with_navigation` closure.
 #[must_use]
 pub fn is_not_stable(mob: &dyn Mob, world: &World, pos: &BlockPos) -> bool {
     !mob.get_mob_entity()

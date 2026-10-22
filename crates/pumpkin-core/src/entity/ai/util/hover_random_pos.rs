@@ -1,3 +1,10 @@
+//! Random target positions for goals.
+//!
+//! Locking: every helper here checks `goal_utils::has_malus` (and the land/default ones
+//! `goal_utils::is_not_stable`), which lock the navigation `with_navigation` hands out (the
+//! controlled vehicle's while riding one; for malus, the lending vehicle's). Never call them
+//! inside a `with_navigation` closure: draw the position first, then enter the closure.
+
 use pumpkin_util::math::vector3::Vector3;
 use pumpkin_util::random::RandomImpl;
 

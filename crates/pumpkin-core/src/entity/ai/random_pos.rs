@@ -1,3 +1,9 @@
+//! Random target positions for goals.
+//!
+//! Locking: these helpers check malus through `MobEntity::get_pathfinding_malus`, which locks
+//! the navigation holding the malus map (the lending vehicle's while the mob inherits). Never
+//! call them inside a `with_navigation` closure: draw the position first, then enter it.
+
 use pumpkin_data::fluid::Fluid;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
@@ -143,6 +149,8 @@ fn move_pos_up_out_of_solid(mob: &dyn Mob, pos: BlockPos) -> Option<BlockPos> {
     (!is_water && !has_malus(mob, &pos)).then_some(pos)
 }
 
+/// `GoalUtils.hasMalus`. Locks the navigation holding the malus map (the lending vehicle's
+/// while the mob inherits), so never call it inside a `with_navigation` closure.
 fn has_malus(mob: &dyn Mob, pos: &BlockPos) -> bool {
     let mob_entity = mob.get_mob_entity();
     let entity = &mob_entity.living_entity.entity;

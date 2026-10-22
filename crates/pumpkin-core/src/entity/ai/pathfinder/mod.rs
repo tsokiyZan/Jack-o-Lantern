@@ -506,6 +506,11 @@ impl PathNavigation {
     }
 
     /// What the node evaluators read from `entity`, vanilla's `Mob` getters.
+    ///
+    /// Runs with this navigation locked. When `entity` inherits malus from a controlled vehicle,
+    /// `inherited_malus_overrides` locks that vehicle's navigation as well. Through
+    /// `with_navigation` the owner never inherits, so this takes no second lock. Called on a
+    /// rider's own navigation while the vehicle's lock is held, it would deadlock.
     fn mob_data(&self, entity: &LivingEntity, world: &World) -> MobData {
         let mob = world.get_entity_by_id(entity.entity.entity_id);
         let mut mob_data = MobData::new(
