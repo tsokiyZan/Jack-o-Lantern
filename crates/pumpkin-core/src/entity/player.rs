@@ -1005,11 +1005,7 @@ impl Player {
             return;
         };
         // Vanilla's use item is the hand's stack, so a shield this hit broke blocks nothing.
-        let hand = living
-            .active_hand
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .unwrap_or(Hand::Right);
+        let hand = living.used_item_hand();
         if living.get_stack_in_hand(self, hand).is_empty() {
             return;
         }

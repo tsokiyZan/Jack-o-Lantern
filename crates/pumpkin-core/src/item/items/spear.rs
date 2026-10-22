@@ -333,11 +333,7 @@ impl SpearItem {
         if use_item.get_data_component::<KineticWeaponImpl>().is_none() {
             return;
         }
-        let hand = living
-            .active_hand
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .unwrap_or(Hand::Right);
+        let hand = living.used_item_hand();
         let slot = if hand == Hand::Right {
             EquipmentSlot::MAIN_HAND
         } else {

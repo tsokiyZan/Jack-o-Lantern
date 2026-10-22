@@ -4718,11 +4718,7 @@ impl LivingEntity {
                 damage_blocked,
             );
             if item_damage > 0 {
-                let hand = self
-                    .active_hand
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .unwrap_or(Hand::Right);
+                let hand = self.used_item_hand();
                 let slot = match hand {
                     Hand::Right => EquipmentSlot::MAIN_HAND,
                     Hand::Left => EquipmentSlot::OFF_HAND,
@@ -4796,11 +4792,7 @@ impl LivingEntity {
         if caller.is_spectator() {
             return 0.0;
         }
-        let active_hand = self
-            .active_hand
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .unwrap_or(Hand::Right);
+        let active_hand = self.used_item_hand();
         // `Player.getWeaponItem`: the riptide stack while spinning.
         let weapon = if let Some(player) = caller.get_player()
             && let Some((spin_stack, spin_slot)) = self.auto_spin_attack_item()

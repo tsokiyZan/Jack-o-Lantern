@@ -55,7 +55,6 @@ impl BundleItem {
         let hand = player.living_entity.used_item_hand();
         let mut bundle = player.inventory.get_stack_in_hand(hand);
         // `removeOneItemFromBundle`.
-        // TODO: vanilla removes the selected item, not always the first.
         let Some(removed) = bundle
             .get_data_component_mut::<BundleContentsImpl>()
             .and_then(BundleContentsImpl::try_extract)
