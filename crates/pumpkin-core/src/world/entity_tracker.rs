@@ -1025,6 +1025,9 @@ impl EntityTracker {
         }
     }
 
+    /// Vanilla `ChunkMap.tick`'s entity part: per entity, a section change re-pairs it with
+    /// every player, then its `sendChanges`; players that changed section are re-paired with
+    /// every entity only after all of them sent.
     pub fn update_all(&self, world: &World) {
         let players = world.players.load();
         let mut moved_players = Vec::new();
@@ -1047,16 +1050,7 @@ impl EntityTracker {
                 }
                 tracked.last_section_pos.store(new_pos);
             }
-        }
 
-        if !moved_players.is_empty() {
-            for entry in &self.entity_map {
-                entry.value().update_players(&moved_players, world);
-            }
-        }
-
-        for entry in &self.entity_map {
-            let tracked = entry.value();
             // Vanilla `ServerEntity.sendChanges` starts with `updateDataBeforeSync`.
             if let Some(living) = tracked.entity.get_living_entity() {
                 living.update_dirty_effects();
@@ -1066,6 +1060,12 @@ impl EntityTracker {
                 tracked.send_changes(world);
             } else if tracked.entity.get_entity().synched_data.is_dirty() {
                 tracked.entity.get_entity().send_dirty_entity_data();
+            }
+        }
+
+        if !moved_players.is_empty() {
+            for entry in &self.entity_map {
+                entry.value().update_players(&moved_players, world);
             }
         }
     }

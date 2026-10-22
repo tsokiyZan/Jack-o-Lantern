@@ -567,6 +567,10 @@ pub struct Player {
     /// The player file's `RootVehicle` between loading and `load_and_spawn_parent_vehicle`,
     /// so a save in between still carries it.
     saved_root_vehicle: std::sync::Mutex<Option<NbtCompound>>,
+    /// Set by an arrival or respawn: the entities in the centre chunk (sent out of band
+    /// before the teleport) are paired with the player on its next tick
+    /// (`World::pair_center_chunk`).
+    pub pending_center_pairing: AtomicBool,
     pub chat_session: Arc<Mutex<ChatSession>>,
     pub signature_cache: Mutex<MessageCache>,
     pub player_screen_handler: Arc<std::sync::Mutex<PlayerScreenHandler>>,
@@ -883,6 +887,7 @@ impl Player {
             subscribed_debug_sample: AtomicBool::new(false),
             has_played_before: AtomicBool::new(false),
             saved_root_vehicle: std::sync::Mutex::new(None),
+            pending_center_pairing: AtomicBool::new(false),
             chat_session: Arc::new(Mutex::new(ChatSession::default())), // Placeholder value until the player actually sets their session id
             signature_cache: Mutex::new(MessageCache::default()),
             player_screen_handler: player_screen_handler.clone(),
@@ -1323,6 +1328,10 @@ impl Player {
             self.on_handled_screen_closed();
         }
 
+        // Vanilla `ServerPlayer.disconnect` first: the player's own passengers get off, so
+        // the file doesn't carry them. (Its `stopSleepInBed` comes with master's sleeping
+        // model at the merge.)
+        self.living_entity.entity.eject_passengers();
         // Vanilla `PlayerList.remove`: the stat, the player file (still riding, so `Pos` is
         // the seat and `RootVehicle` the stack), then the mount.
         self.stats
@@ -5202,6 +5211,7 @@ impl Player {
                     as_passenger: target.as_passenger,
                 });
                 player.arrived_as_passenger();
+                player.pending_center_pairing.store(true, Ordering::Relaxed);
 
                 let mut changed_world_event = crate::plugin::api::events::player::player_changed_world::PlayerChangedWorldEvent {
                     player: player.clone(),

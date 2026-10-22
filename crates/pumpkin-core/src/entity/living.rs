@@ -5928,17 +5928,12 @@ impl LivingEntity {
                     }
                 }
                 ConsumeEffect::TeleportRandomly { diameter, .. } => {
-                    // Java Edition dismounts the consumer before random teleport attempts.
-                    let vehicle = caller
-                        .get_entity()
-                        .vehicle
-                        .lock()
-                        .unwrap_or_else(std::sync::PoisonError::into_inner)
-                        .clone();
-                    if let Some(vehicle) = vehicle {
+                    // `TeleportRandomlyConsumeEffect`: a passenger stops riding first (vanilla
+                    // `stopRiding`, the full dismount); a plugin that cancels it keeps it seated.
+                    if let Some(vehicle) = caller.get_entity().get_vehicle() {
                         vehicle
                             .get_entity()
-                            .remove_passenger_sync(caller.get_entity().entity_id);
+                            .remove_passenger(caller.get_entity().entity_id);
                         if caller.get_entity().has_vehicle() {
                             continue;
                         }

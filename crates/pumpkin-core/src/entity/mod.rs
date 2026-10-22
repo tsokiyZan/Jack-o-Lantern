@@ -1046,6 +1046,12 @@ pub trait EntityBase: Send + Sync + std::any::Any {
         self.get_entity().has_passengers()
     }
 
+    /// The forward direction this vehicle places dismounting passengers by, where it isn't its
+    /// facing (`AbstractMinecart.getDismountLocationForPassenger` uses `getMotionDirection`).
+    fn dismount_forward(&self) -> Option<BlockDirection> {
+        None
+    }
+
     fn has_passenger(&self, other: &dyn EntityBase) -> bool {
         self.get_entity()
             .has_passenger(other.get_entity().entity_id)
@@ -5407,42 +5413,12 @@ impl Entity {
         }
     }
 
-    pub(crate) fn remove_passenger_on_disconnect(&self, passenger_id: i32) {
-        let mut removed = false;
-        let mut passengers = self
-            .passengers
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        if let Some(index) = passengers
-            .iter()
-            .position(|passenger| passenger.get_entity().entity_id == passenger_id)
-        {
-            let passenger = passengers.remove(index);
-            *passenger
-                .get_entity()
-                .vehicle
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
-            removed = true;
-        }
-
-        drop(passengers);
-        if removed {
-            self.after_remove_passenger_hook();
-        }
-        // The watchers get the new list from the vehicle's tracker.
-    }
-
     /// The vehicle's `removePassenger` override (`EntityBase::after_remove_passenger`), run
     /// on every dismount path.
     fn after_remove_passenger_hook(&self) {
         if let Some(vehicle) = self.world.load().get_entity_by_id(self.entity_id) {
             vehicle.after_remove_passenger();
         }
-    }
-
-    pub fn remove_passenger_sync(&self, passenger_id: i32) {
-        self.remove_passenger_on_disconnect(passenger_id);
     }
 
     pub fn remove_passenger(&self, passenger_id: i32) {
@@ -5515,8 +5491,12 @@ impl Entity {
             // Pre-allocate teleport ID and block movement packets BEFORE sending
             // CSetPassengers. This prevents a race condition where the client receives
             // the dismount packet, sends stale position packets from the old riding
-            // position, and the server processes them before the teleport arrives.
-            let teleport_id = if reposition && let Some(player) = passenger.get_player() {
+            // position, and the server processes them before the teleport arrives. A removed
+            // passenger isn't placed (below), so it gets no teleport id either.
+            let teleport_id = if reposition
+                && !passenger_entity.is_removed()
+                && let Some(player) = passenger.get_player()
+            {
                 let id = player
                     .teleport_id_count
                     .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
@@ -5590,19 +5570,13 @@ impl Entity {
                 return;
             }
 
-            // Calculate dismount directions and offsets (vanilla DismountHelper)
-            let vehicle_yaw = self.yaw.load();
-            // Wrap yaw to 0..360 range
-            let wrapped_yaw = (vehicle_yaw % 360.0 + 360.0) % 360.0;
-            let forward_dir = if !(45.0..315.0).contains(&wrapped_yaw) {
-                BlockDirection::South
-            } else if (45.0..135.0).contains(&wrapped_yaw) {
-                BlockDirection::West
-            } else if (135.0..225.0).contains(&wrapped_yaw) {
-                BlockDirection::North
-            } else {
-                BlockDirection::East
-            };
+            // Calculate dismount directions and offsets (vanilla DismountHelper): forward is
+            // the vehicle's facing (`getDirection`), or its `getMotionDirection` where its
+            // `getDismountLocationForPassenger` uses that (minecarts).
+            let forward_dir = world
+                .get_entity_by_id(self.entity_id)
+                .and_then(|vehicle| vehicle.dismount_forward())
+                .unwrap_or_else(|| direction_from_yaw(self.yaw.load()));
 
             let get_step = |dir: BlockDirection| -> (i32, i32) {
                 match dir {
@@ -6643,6 +6617,21 @@ pub fn teleport_to(entity: &dyn EntityBase, position: Vector3<f64>) {
         });
     } else {
         base.teleport(position, None, None, &world);
+    }
+}
+
+/// Vanilla `Direction.fromYRot` (`Entity.getDirection`): the horizontal direction a yaw faces.
+#[must_use]
+pub fn direction_from_yaw(yaw: f32) -> BlockDirection {
+    let wrapped_yaw = (yaw % 360.0 + 360.0) % 360.0;
+    if !(45.0..315.0).contains(&wrapped_yaw) {
+        BlockDirection::South
+    } else if (45.0..135.0).contains(&wrapped_yaw) {
+        BlockDirection::West
+    } else if (135.0..225.0).contains(&wrapped_yaw) {
+        BlockDirection::North
+    } else {
+        BlockDirection::East
     }
 }
 

@@ -1909,6 +1909,9 @@ impl World {
             let _guard = player_handle.enter();
             player.get_entity().common_tick();
             player.tick(server);
+            if player.pending_center_pairing.swap(false, Ordering::Relaxed) {
+                player.world().pair_center_chunk(player);
+            }
         });
         for player in players.iter() {
             if player.get_entity().has_passengers() {
@@ -1993,6 +1996,9 @@ impl World {
             let _guard = player_handle.enter();
             player.get_entity().common_tick();
             player.tick(server);
+            if player.pending_center_pairing.swap(false, Ordering::Relaxed) {
+                player.world().pair_center_chunk(player);
+            }
         });
         // A player's passengers tick with it, as with any other vehicle.
         for player in players.iter() {
@@ -4759,6 +4765,7 @@ impl World {
 
         // Send teleport packet after at least the center chunk was delivered
         player.request_teleport(position, yaw, pitch);
+        player.pending_center_pairing.store(true, Ordering::Relaxed);
 
         target_world.refresh_java_player_for_bedrock(player).await;
     }
@@ -5377,10 +5384,7 @@ impl World {
             .add_entity(&(player.clone() as Arc<dyn EntityBase>), self);
     }
 
-    /// Sends the centre chunk ahead of the teleport and records it as held, then pairs the
-    /// player with the entities in it (vanilla `ChunkMap.markChunkPendingToSend` →
-    /// `playerLoadedChunk`): a player arriving from another dimension sees what already
-    /// stands there, such as the vehicle it is about to ride again.
+    /// Sends the centre chunk ahead of the teleport and records it as held.
     pub async fn send_center_chunk(&self, player: &Arc<Player>) {
         let ClientPlatform::Java(java_client) = player.client.as_ref() else {
             return;
@@ -5396,6 +5400,17 @@ impl World {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .mark_sent_out_of_band(center_chunk);
+    }
+
+    /// Pairs a player that just arrived or respawned with the entities in its centre chunk, on
+    /// its first tick there. Vanilla pairs such a player in `ChunkMap.move` on its tick
+    /// (`TrackedEntity.updatePlayer`, gated by `isChunkTracked`), after `connection.teleport`
+    /// and after that tick's `ChunkMap.tick` (`sendChanges`). Pumpkin pairs per sent chunk,
+    /// and the centre chunk went out of band before the teleport, so its entities are paired
+    /// here. A player back from another dimension so sees what already stands there, such as
+    /// the vehicle it rides again.
+    pub fn pair_center_chunk(&self, player: &Arc<Player>) {
+        let center_chunk = player.get_entity().chunk_pos.load();
         self.entity_tracker
             .update_player_chunks(player, self, &[center_chunk]);
     }
