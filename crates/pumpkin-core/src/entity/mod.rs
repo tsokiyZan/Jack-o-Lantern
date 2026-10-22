@@ -6073,14 +6073,39 @@ impl Entity {
             && self.entity_type != &EntityType::PLAYER
     }
 
-    /// Vanilla `Entity.shouldBeSaved`, without the vehicle under exactly one player: Pumpkin
-    /// saves only that vehicle's UUID with the player and keeps the vehicle in its chunk.
+    /// Vanilla `Entity.shouldBeSaved`: not removed for good, not a passenger (saved in its
+    /// vehicle's `Passengers`), and not a vehicle carrying exactly one player (saved with that
+    /// player, `ServerPlayer.saveParentVehicle`).
     #[must_use]
     pub fn should_be_saved(&self) -> bool {
         self.removal_reason
             .load()
             .is_none_or(|reason| reason.should_save())
             && !self.has_vehicle()
+            && (!self.has_passengers() || !self.has_exactly_one_player_passenger())
+    }
+
+    /// Vanilla `Entity.getIndirectPassengers`: every passenger, then its own, depth first.
+    #[must_use]
+    pub fn indirect_passengers(&self) -> Vec<Arc<dyn EntityBase>> {
+        let mut passengers = Vec::new();
+        self.collect_indirect_passengers(&mut passengers);
+        passengers
+    }
+
+    /// Vanilla `Entity.countPlayerPassengers`: the indirect passengers that are players.
+    #[must_use]
+    pub fn count_player_passengers(&self) -> usize {
+        self.indirect_passengers()
+            .iter()
+            .filter(|passenger| passenger.get_player().is_some())
+            .count()
+    }
+
+    /// Vanilla `Entity.hasExactlyOnePlayerPassenger`.
+    #[must_use]
+    pub fn has_exactly_one_player_passenger(&self) -> bool {
+        self.count_player_passengers() == 1
     }
 
     /// Vanilla `Entity.load`'s `Glowing` and `data`.

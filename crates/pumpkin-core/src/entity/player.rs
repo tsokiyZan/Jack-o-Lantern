@@ -332,23 +332,16 @@ use pumpkin_data::potion::Effect;
 const MAX_CACHED_SIGNATURES: u8 = 128; // Vanilla: 128
 const MAX_PREVIOUS_MESSAGES: u8 = 20; // Vanilla: 20
 
-fn write_root_vehicle(nbt: &mut NbtCompound, uuid: Uuid) {
-    let value = uuid.as_u128();
+/// Vanilla `saveParentVehicle`'s tag: `RootVehicle { Attach: <vehicle UUID>, Entity: <root> }`.
+fn write_root_vehicle(nbt: &mut NbtCompound, attach: Uuid, entity: NbtCompound) {
     let mut root_vehicle = NbtCompound::new();
-    root_vehicle.put(
-        "Attach",
-        NbtTag::IntArray(vec![
-            (value >> 96) as i32,
-            (value >> 64) as i32,
-            (value >> 32) as i32,
-            value as i32,
-        ]),
-    );
+    root_vehicle.put_uuid("Attach", attach);
+    root_vehicle.put_compound("Entity", entity);
     nbt.put("RootVehicle", NbtTag::Compound(root_vehicle));
 }
 
-fn read_root_vehicle(nbt: &NbtCompound) -> Option<Uuid> {
-    let root_vehicle = nbt.get_compound("RootVehicle")?;
+/// `RootVehicle.Attach` (`UUIDUtil.CODEC`: an int array, or a list of four ints).
+fn read_root_vehicle_attach(root_vehicle: &NbtCompound) -> Option<Uuid> {
     let uuid = if let Some([most, more, less, least]) = root_vehicle.get_int_array("Attach") {
         [*most, *more, *less, *least]
     } else {
@@ -571,7 +564,10 @@ pub struct Player {
     pub held_chunk_tickets: Mutex<Option<HeldChunkTickets>>,
     pub chunk_send_epoch: AtomicU32,
     pub has_played_before: AtomicBool,
-    root_vehicle_uuid: AtomicCell<Option<Uuid>>,
+    /// The player file's `RootVehicle` between loading and `load_and_spawn_parent_vehicle`,
+    /// and the one `remove` captures before its vehicle leaves the level, so a save while not
+    /// riding still carries it.
+    saved_root_vehicle: std::sync::Mutex<Option<NbtCompound>>,
     pub chat_session: Arc<Mutex<ChatSession>>,
     pub signature_cache: Mutex<MessageCache>,
     pub player_screen_handler: Arc<std::sync::Mutex<PlayerScreenHandler>>,
@@ -887,7 +883,7 @@ impl Player {
             last_food_saturation: AtomicBool::new(true),
             subscribed_debug_sample: AtomicBool::new(false),
             has_played_before: AtomicBool::new(false),
-            root_vehicle_uuid: AtomicCell::new(None),
+            saved_root_vehicle: std::sync::Mutex::new(None),
             chat_session: Arc::new(Mutex::new(ChatSession::default())), // Placeholder value until the player actually sets their session id
             signature_cache: Mutex::new(MessageCache::default()),
             player_screen_handler: player_screen_handler.clone(),
@@ -1328,20 +1324,7 @@ impl Player {
             self.on_handled_screen_closed();
         }
 
-        let vehicle = self
-            .living_entity
-            .entity
-            .vehicle
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone();
-        if let Some(vehicle) = vehicle {
-            self.root_vehicle_uuid
-                .store(Some(vehicle.get_entity().entity_uuid));
-            vehicle
-                .get_entity()
-                .remove_passenger_on_disconnect(self.entity_id());
-        }
+        self.remove_mount_on_disconnect();
 
         self.stats
             .lock()
@@ -1392,21 +1375,148 @@ impl Player {
         //self.world().level.list_cached();
     }
 
-    pub(crate) fn try_restore_vehicle(self: &Arc<Self>, vehicle: &Arc<dyn EntityBase>) {
-        // Claim the UUID atomically, otherwise blank it
-        // between a non-matching swap and restore.
-        if self
-            .root_vehicle_uuid
-            .compare_exchange(Some(vehicle.get_entity().entity_uuid), None)
-            .is_err()
-        {
-            return;
+    /// Vanilla `PlayerList.remove`'s mount handling. The player file is written after
+    /// `remove` in Pumpkin (vanilla saves first), so the vehicle tag `save` would write is
+    /// captured here, before the mount leaves the level. Then a root vehicle carrying only
+    /// this player stops being ridden and leaves with it (`UNLOADED_WITH_PLAYER`, every
+    /// passenger before the root), and the player gets off whatever it still rides
+    /// (`unRide`).
+    fn remove_mount_on_disconnect(&self) {
+        let mut captured = NbtCompound::new();
+        self.save_parent_vehicle(&mut captured);
+        if let Some(root_vehicle) = captured.get_compound("RootVehicle") {
+            *self
+                .saved_root_vehicle
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(root_vehicle.clone());
         }
 
-        // Vanilla `loadAndSpawnParentVehicle`: `startRiding(vehicle, true, false)`, no game event.
-        vehicle
+        let entity = &self.living_entity.entity;
+        if let Some(root) = entity.root_vehicle()
+            && root.get_entity().has_exactly_one_player_passenger()
+        {
+            debug!("Removing player mount");
+            self.stop_riding_on_disconnect();
+            let world = root.get_entity().world.load_full();
+            // `getPassengersAndSelf`: each passenger's stack, then the root.
+            let mut stack = Vec::new();
+            Self::collect_passengers_and_self(&root, &mut stack);
+            for removed in stack {
+                world.remove_entity_with_reason(
+                    removed.as_ref(),
+                    crate::entity::RemovalReason::UnloadedWithPlayer,
+                );
+            }
+        }
+
+        // `unRide`: the passengers off, the last first, then off the vehicle. A leaving
+        // player can't stay mounted, so plugins are told but can't cancel it.
+        entity.eject_passengers();
+        self.stop_riding_on_disconnect();
+    }
+
+    /// `stopRiding` for a disconnecting player: forced, as `setRemoved` does.
+    fn stop_riding_on_disconnect(&self) {
+        if let Some(vehicle) = self.living_entity.entity.get_vehicle() {
+            vehicle
+                .get_entity()
+                .remove_passenger_on_removal(self.entity_id());
+        }
+    }
+
+    /// Vanilla `Entity.getPassengersAndSelf`.
+    fn collect_passengers_and_self(
+        entity: &Arc<dyn EntityBase>,
+        out: &mut Vec<Arc<dyn EntityBase>>,
+    ) {
+        let passengers = entity
             .get_entity()
-            .add_passenger_without_event(vehicle.clone(), self.clone());
+            .passengers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        for passenger in &passengers {
+            Self::collect_passengers_and_self(passenger, out);
+        }
+        out.push(entity.clone());
+    }
+
+    /// Vanilla `ServerPlayer.saveParentVehicle`: riding a stack whose root carries exactly one
+    /// player, the player file keeps the vehicle it sits on (`Attach`) and the whole root
+    /// stack (`Entity`, players left out of its `Passengers`). Not riding, the tag loaded
+    /// from the file (not spawned yet) or captured on disconnect is written back.
+    pub fn save_parent_vehicle(&self, nbt: &mut NbtCompound) {
+        let entity = &self.living_entity.entity;
+        if let Some(vehicle) = entity.get_vehicle() {
+            if let Some(root) = entity.root_vehicle()
+                && root.get_entity().has_exactly_one_player_passenger()
+            {
+                // `rootVehicle.save(vehicleWrapper.child("Entity"))`: the child exists even
+                // when the root refuses to save.
+                let mut root_nbt = NbtCompound::new();
+                if root.get_entity().should_save_as_passenger() {
+                    root.write_nbt(&mut root_nbt);
+                }
+                write_root_vehicle(nbt, vehicle.get_entity().entity_uuid, root_nbt);
+            }
+            return;
+        }
+        if let Some(saved) = self
+            .saved_root_vehicle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+        {
+            nbt.put_compound("RootVehicle", saved);
+        }
+    }
+
+    /// Vanilla `ServerPlayer.loadAndSpawnParentVehicle`, right after the player is placed in
+    /// its level: the saved root stack comes back under its saved UUIDs and the player rides
+    /// the entity it was attached to (`startRiding(vehicle, true, false)`, no game event). If
+    /// that entity is not in the stack, the whole stack is discarded. A tag without `Entity`
+    /// (older Pumpkin saves) loads nothing.
+    pub fn load_and_spawn_parent_vehicle(self: &Arc<Self>) {
+        let Some(root_tag) = self
+            .saved_root_vehicle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .take()
+        else {
+            return;
+        };
+        let world = self.world();
+        let Some(vehicle) = root_tag
+            .get_compound("Entity")
+            .and_then(|entity| world.load_entity_recursive(entity))
+        else {
+            return;
+        };
+        let attach_to = read_root_vehicle_attach(&root_tag);
+        let target = if Some(vehicle.get_entity().entity_uuid) == attach_to {
+            Some(vehicle.clone())
+        } else {
+            vehicle
+                .get_entity()
+                .indirect_passengers()
+                .into_iter()
+                .find(|entity| Some(entity.get_entity().entity_uuid) == attach_to)
+        };
+        if let Some(target) = target {
+            target
+                .get_entity()
+                .add_passenger_without_event(target.clone(), self.clone());
+        }
+
+        if !self.living_entity.entity.has_vehicle() {
+            warn!("Couldn't reattach entity to player");
+            world.remove_entity(vehicle.as_ref());
+            // As in vanilla, the passengers are read after `discard` made them get off, so
+            // the list is empty and they stay in the level.
+            for entity in vehicle.get_entity().indirect_passengers() {
+                world.remove_entity(entity.as_ref());
+            }
+        }
     }
 
     pub fn clean_up_chunk_tickets(&self, level: &Arc<pumpkin_world::level::Level>) {
@@ -5345,8 +5455,15 @@ impl Player {
     /// and chunk map (its tickets dropped, its chunks forgotten), and the server holds it in
     /// no level ([`Server::levelless_players`]).
     fn remove_from_level(self: &Arc<Self>, world: &Arc<World>) {
-        // Only a player still in the level moves out of it; one a disconnect already took
-        // out stays gone.
+        // The two lists are separate `ArcSwap`s, so the move can't be one atomic step. The
+        // player joins the level-less list first: a lookup in between sees it twice at worst,
+        // never not at all. A disconnect racing this takes it off both lists
+        // (`World::remove_player`); only a player still in the level moves out of it, and
+        // one a disconnect already took out stays gone.
+        let server = world.server.upgrade();
+        if let Some(server) = &server {
+            server.add_levelless_player(self);
+        }
         let mut removed = false;
         world.players.rcu(|current| {
             let mut list = (**current).clone();
@@ -5356,15 +5473,15 @@ impl Player {
             list
         });
         if !removed {
+            if let Some(server) = &server {
+                server.take_levelless_player(self.gameprofile.id);
+            }
             return;
         }
         let entity = &self.living_entity.entity;
         entity
             .removal_reason
             .store(Some(crate::entity::RemovalReason::ChangedDimension));
-        if let Some(server) = world.server.upgrade() {
-            server.add_levelless_player(self);
-        }
         world
             .entity_tracker
             .remove_entity(self.as_ref() as &dyn EntityBase, world);
@@ -8182,7 +8299,12 @@ impl EntityBase for Player {
         pitch: Option<f32>,
         world: Arc<World>,
     ) {
-        // Commands and plugins: vanilla `teleport(TeleportTransition)`, which dismounts.
+        // Commands and plugins: vanilla `ServerPlayer.teleportTo`, which wakes a sleeping
+        // player (`stopSleepInBed(true, true)`), then `teleport(TeleportTransition)`, which
+        // dismounts.
+        if self.is_sleeping() {
+            self.wake_up();
+        }
         if let Some(player) = self.world().get_player_by_id(self.entity_id()) {
             player.teleport_transition(&TeleportTarget {
                 world,
@@ -8469,18 +8591,7 @@ impl EntityBase for Player {
             nbt.put_compound("respawn", respawn_compound);
         }
 
-        let vehicle_uuid = self
-            .living_entity
-            .entity
-            .vehicle
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .as_ref()
-            .map(|vehicle| vehicle.get_entity().entity_uuid)
-            .or_else(|| self.root_vehicle_uuid.load());
-        if let Some(vehicle_uuid) = vehicle_uuid {
-            write_root_vehicle(nbt, vehicle_uuid);
-        }
+        self.save_parent_vehicle(nbt);
         self.stats
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -8653,7 +8764,11 @@ impl EntityBase for Player {
                 force,
             });
         }
-        self.root_vehicle_uuid.store(read_root_vehicle(nbt));
+        *self
+            .saved_root_vehicle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) =
+            nbt.get_compound("RootVehicle").cloned();
         self.stats
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -9507,7 +9622,7 @@ impl InventoryPlayer for Player {
 
 #[cfg(test)]
 mod tests {
-    use super::{bedrock_inventory_slot, read_root_vehicle, write_root_vehicle};
+    use super::{bedrock_inventory_slot, read_root_vehicle_attach, write_root_vehicle};
     use pumpkin_nbt::{compound::NbtCompound, tag::NbtTag};
     use uuid::Uuid;
 
@@ -9522,22 +9637,26 @@ mod tests {
     }
 
     #[test]
-    fn root_vehicle_uuid_round_trips_with_vanilla_shape() {
+    fn root_vehicle_round_trips_with_vanilla_shape() {
         let expected = Uuid::from_u128(0xFEDC_BA98_7654_3210_89AB_CDEF_0123_4567);
+        let mut entity = NbtCompound::new();
+        entity.put_string("id", "minecraft:oak_boat".to_string());
         let mut nbt = NbtCompound::new();
 
-        write_root_vehicle(&mut nbt, expected);
+        write_root_vehicle(&mut nbt, expected, entity);
 
-        assert_eq!(read_root_vehicle(&nbt), Some(expected));
-        assert!(
-            nbt.get_compound("RootVehicle")
-                .and_then(|root| root.get_int_array("Attach"))
-                .is_some()
+        let root = nbt.get_compound("RootVehicle").expect("RootVehicle");
+        assert_eq!(read_root_vehicle_attach(root), Some(expected));
+        assert!(root.get_int_array("Attach").is_some());
+        assert_eq!(
+            root.get_compound("Entity")
+                .and_then(|entity| entity.get_string("id")),
+            Some("minecraft:oak_boat")
         );
     }
 
     #[test]
-    fn root_vehicle_uuid_accepts_integer_lists() {
+    fn root_vehicle_attach_accepts_integer_lists() {
         let expected = Uuid::from_u128(0xFEDC_BA98_7654_3210_89AB_CDEF_0123_4567);
         let value = expected.as_u128();
         let mut root_vehicle = NbtCompound::new();
@@ -9550,10 +9669,8 @@ mod tests {
                 NbtTag::Int(value as i32),
             ]),
         );
-        let mut nbt = NbtCompound::new();
-        nbt.put("RootVehicle", NbtTag::Compound(root_vehicle));
 
-        assert_eq!(read_root_vehicle(&nbt), Some(expected));
+        assert_eq!(read_root_vehicle_attach(&root_vehicle), Some(expected));
     }
 
     #[test]

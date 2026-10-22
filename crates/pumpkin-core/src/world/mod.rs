@@ -694,6 +694,28 @@ impl World {
         self.level.shutdown().await;
     }
 
+    /// Vanilla `EntityType.loadEntityRecursive(tag, level, LOAD, e -> addWithUUID(e) ? e : null)`:
+    /// the entity from its `id`, added to the level under its saved UUID, then each saved
+    /// passenger with its own passengers riding it. `None` when the tag names no known type or
+    /// the UUID is already in the level.
+    pub fn load_entity_recursive(
+        self: &Arc<Self>,
+        nbt: &NbtCompound,
+    ) -> Option<Arc<dyn EntityBase>> {
+        let entity_type = nbt
+            .get_string("id")
+            .and_then(|id| EntityType::from_name(id.strip_prefix("minecraft:").unwrap_or(id)))?;
+        let uuid = nbt.get_uuid("UUID").unwrap_or_else(Uuid::new_v4);
+        let entity = from_type(entity_type, Vector3::new(0.0, 0.0, 0.0), self, uuid);
+        entity.read_nbt_non_mut(nbt);
+        entity.init_data_tracker();
+        if !self.add_entity_silent(entity.clone()) {
+            return None;
+        }
+        Self::load_passengers(self, &entity, nbt);
+        Some(entity)
+    }
+
     /// The passenger part of vanilla `EntityType.loadEntityRecursive`: each saved passenger,
     /// with its own passengers, rides `vehicle` again (`startRiding(vehicle, true, false)`).
     fn load_passengers(world: &Arc<Self>, vehicle: &Arc<dyn EntityBase>, nbt: &NbtCompound) {
@@ -701,23 +723,13 @@ impl World {
             let pumpkin_nbt::tag::NbtTag::Compound(passenger_nbt) = passenger_nbt else {
                 continue;
             };
-            let Some(entity_type) = passenger_nbt
-                .get_string("id")
-                .and_then(|id| EntityType::from_name(id.strip_prefix("minecraft:").unwrap_or(id)))
-            else {
+            let Some(passenger) = world.load_entity_recursive(passenger_nbt) else {
                 continue;
             };
-            let uuid = passenger_nbt.get_uuid("UUID").unwrap_or_else(Uuid::new_v4);
-            let passenger = from_type(entity_type, Vector3::new(0.0, 0.0, 0.0), world, uuid);
-            passenger.read_nbt_non_mut(passenger_nbt);
-            passenger.init_data_tracker();
-            if !world.add_entity_silent(passenger.clone()) {
-                continue;
-            }
+            // `loadPassengersRecursive`: the passenger rides once its own stack is loaded.
             vehicle
                 .get_entity()
-                .add_passenger_without_event(vehicle.clone(), passenger.clone());
-            Self::load_passengers(world, &passenger, passenger_nbt);
+                .add_passenger_without_event(vehicle.clone(), passenger);
         }
     }
 
@@ -1884,23 +1896,6 @@ impl World {
             .collect()
     }
 
-    /// Vanilla `Entity.countPlayerPassengers`: the players among all of the entity's
-    /// passengers, however deep.
-    fn count_player_passengers(entity: &dyn EntityBase) -> usize {
-        entity
-            .get_entity()
-            .passengers
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone()
-            .iter()
-            .map(|passenger| {
-                usize::from(passenger.get_player().is_some())
-                    + Self::count_player_passengers(passenger.as_ref())
-            })
-            .sum()
-    }
-
     /// The entity half of vanilla `ServerLevel.tick` while the tick is frozen:
     /// `TickRateManager.isEntityFrozen` never freezes a player or an entity that carries one,
     /// so they tick as in `tick`, and the players then move (`ServerPlayer.doTick`, from the
@@ -1926,7 +1921,7 @@ impl World {
         let guard = handle.enter();
         for entity in self.entities.load().iter() {
             if entity.get_entity().has_vehicle()
-                || Self::count_player_passengers(entity.as_ref()) == 0
+                || entity.get_entity().count_player_passengers() == 0
             {
                 continue;
             }
@@ -3684,6 +3679,9 @@ impl World {
                 false,
             );
         }
+
+        // `PrepareSpawnTask.spawn`, after `placeNewPlayer`.
+        player.load_and_spawn_parent_vehicle();
     }
 
     /// Finishes the Java login.
@@ -4236,6 +4234,9 @@ impl World {
                 false,
             );
         }
+
+        // `PrepareSpawnTask.spawn`, after `placeNewPlayer`.
+        player.load_and_spawn_parent_vehicle();
     }
 
     /// Bedrock trackers' `MobEquipment` for a joining player's held item. Java trackers get
@@ -4897,9 +4898,6 @@ impl World {
                         if world.add_entity_silent(entity.clone()) {
                             Self::load_passengers(&world, &entity, entity_nbt);
                         }
-                        if let Some(player) = &player {
-                            player.try_restore_vehicle(&entity);
-                        }
                     }
                 } else if let Some(player) = &player {
                     // Already live for other watchers: pair this player now so
@@ -5441,12 +5439,15 @@ impl World {
             new_list
         });
         // A player of this level watching the End credits is in no level's list: the server
-        // holds it (`PlayerList`), and it leaves from there.
-        if removed_player.is_none()
-            && player.world().uuid == self.uuid
-            && let Some(server) = self.server.upgrade()
-        {
-            removed_player = server.take_levelless_player(player.gameprofile.id);
+        // holds it (`PlayerList`), and it leaves from there. One found here may be halfway
+        // through `Player::remove_from_level` (already on the level-less list), so it is
+        // taken off that list too.
+        if let Some(server) = self.server.upgrade() {
+            if removed_player.is_some() {
+                server.take_levelless_player(player.gameprofile.id);
+            } else if player.world().uuid == self.uuid {
+                removed_player = server.take_levelless_player(player.gameprofile.id);
+            }
         }
         if let Some(ref player) = removed_player {
             self.entity_tracker
@@ -5715,18 +5716,21 @@ impl World {
     }
 
     pub fn remove_entity(&self, entity: &dyn EntityBase) {
+        self.remove_entity_with_reason(entity, RemovalReason::Discarded);
+    }
+
+    /// Vanilla `Entity.setRemoved(reason)`: the entity leaves its vehicle only when the
+    /// reason destroys it, its passengers always get off, and it leaves the level.
+    pub fn remove_entity_with_reason(&self, entity: &dyn EntityBase, reason: RemovalReason) {
         let base_entity = entity.get_entity();
-        if base_entity
-            .removal_reason
-            .swap(Some(RemovalReason::Discarded))
-            .is_some()
-        {
+        if base_entity.removal_reason.swap(Some(reason)).is_some() {
             return;
         }
         base_entity.removed.store(true, Ordering::Release);
 
-        // Vanilla `setRemoved`: a destroyed entity leaves its vehicle and its passengers get off.
-        if let Some(vehicle) = base_entity.get_vehicle() {
+        if reason.should_destroy()
+            && let Some(vehicle) = base_entity.get_vehicle()
+        {
             vehicle
                 .get_entity()
                 .remove_passenger_on_removal(base_entity.entity_id);
