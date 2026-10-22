@@ -295,6 +295,10 @@ fn apply_bonus_formula<R: RandomImpl>(
     params: &LootContextParameters,
     rng: &mut R,
 ) -> i32 {
+    // Vanilla `ApplyBonusCount.run`: no `TOOL`, no formula. A block's loot always has one.
+    if params.tool.is_none() && !matches!(bonus, LootBonusFormula::EnchantedCountIncrease { .. }) {
+        return count;
+    }
     match bonus {
         LootBonusFormula::OreDrops => {
             if fortune_level > 0 {
@@ -304,14 +308,9 @@ fn apply_bonus_formula<R: RandomImpl>(
                 count
             }
         }
+        // Draws `nextInt(1)` even at level 0.
         LootBonusFormula::UniformBonusCount(bonus_multiplier) => {
-            let max_bonus = fortune_level * bonus_multiplier;
-            let extra = if max_bonus > 0 {
-                rng.next_bounded_i32(max_bonus + 1)
-            } else {
-                0
-            };
-            count + extra
+            count + rng.next_bounded_i32(bonus_multiplier * fortune_level + 1)
         }
         LootBonusFormula::BinomialWithBonusCount { extra, probability } => {
             let n = fortune_level + extra;
@@ -356,28 +355,24 @@ fn pick_entry<'a, E, R: RandomImpl>(
     })
 }
 
-/// Vanilla `LootTable.createStackSplitter`: a stack at or over its max size goes out in
-/// max-size pieces.
-fn split_stack(stack: ItemStack, output: &mut Vec<ItemStack>) {
-    if stack.is_empty() {
+/// Vanilla `LootTable.createStackSplitter`: `count` of `stack`'s item, in max-size pieces when
+/// it reaches the max size.
+fn split_stack(stack: &ItemStack, count: i32, output: &mut Vec<ItemStack>) {
+    if count <= 0 || stack.is_empty() {
         return;
     }
-    let max = stack.get_max_stack_size();
-    if stack.item_count < max {
-        output.push(stack);
-        return;
-    }
-    let mut count = stack.item_count;
+    let max = i32::from(stack.get_max_stack_size());
+    let mut count = count;
     while count > 0 {
-        let piece = stack.copy_with_count(count.min(max));
-        count -= piece.item_count;
-        output.push(piece);
+        let piece = count.min(max);
+        output.push(stack.copy_with_count(piece as u8));
+        count -= piece;
     }
 }
 
-/// The item an entry names with its `set_count` and bonus count applied, before any
+/// The item an entry names and its count after `set_count` and the bonus count, before any
 /// `furnace_smelt`.
-fn roll_item_stack<R: RandomImpl>(
+fn roll_item_count<R: RandomImpl>(
     item: &str,
     min_count: i32,
     max_count: i32,
@@ -385,14 +380,14 @@ fn roll_item_stack<R: RandomImpl>(
     fortune_level: i32,
     params: &LootContextParameters,
     random: &mut R,
-) -> Option<ItemStack> {
+) -> Option<(&'static Item, i32)> {
     // `set_count`: `Mth.nextInt`, no draw for a constant.
     let mut count = random.next_inbetween_i32(min_count, max_count);
     if let Some(bonus) = bonus_formula {
         count = apply_bonus_formula(count, bonus, fortune_level, params, random);
     }
     let item = Item::from_registry_key(item.strip_prefix("minecraft:").unwrap_or(item))?;
-    (count > 0).then(|| ItemStack::new(u8::try_from(count).unwrap_or(u8::MAX), item))
+    Some((item, count))
 }
 
 fn evaluate_static<R: RandomImpl>(
@@ -437,7 +432,7 @@ fn evaluate_static<R: RandomImpl>(
             let Some(item) = entry.item else {
                 continue;
             };
-            let Some(stack) = roll_item_stack(
+            let Some((item, count)) = roll_item_count(
                 item,
                 entry.min_count,
                 entry.max_count,
@@ -448,11 +443,18 @@ fn evaluate_static<R: RandomImpl>(
             ) else {
                 continue;
             };
+            // The smelt condition is tested even on an empty stack; `SmeltItemFunction` then
+            // skips it, and caps its result at the max size, so the cap below loses nothing.
             let smelts = entry.furnace_smelt.is_some_and(|c| check(c, random));
-            split_stack(
-                if smelts { smelt(stack) } else { stack },
-                &mut items_to_place,
-            );
+            if count <= 0 {
+                continue;
+            }
+            if smelts {
+                let smelted = smelt(ItemStack::new(u8::try_from(count).unwrap_or(u8::MAX), item));
+                split_stack(&smelted, i32::from(smelted.item_count), &mut items_to_place);
+            } else {
+                split_stack(&ItemStack::new(1, item), count, &mut items_to_place);
+            }
         }
     }
 
@@ -497,7 +499,7 @@ fn evaluate_dynamic<R: RandomImpl>(
             let Some(item) = &entry.item else {
                 continue;
             };
-            if let Some(stack) = roll_item_stack(
+            if let Some((item, count)) = roll_item_count(
                 item,
                 entry.min_count,
                 entry.max_count,
@@ -506,7 +508,7 @@ fn evaluate_dynamic<R: RandomImpl>(
                 params,
                 random,
             ) {
-                split_stack(stack, &mut items_to_place);
+                split_stack(&ItemStack::new(1, item), count, &mut items_to_place);
             }
         }
     }
@@ -725,7 +727,8 @@ mod tests {
 
     use pumpkin_data::entity::EntityType;
     use pumpkin_data::item::Item;
-    use pumpkin_data::loot_table::{ENTITIES_MAGMA_CUBE, ENTITIES_SKELETON};
+    use pumpkin_data::item_stack::ItemStack;
+    use pumpkin_data::loot_table::{BLOCKS_MELON, ENTITIES_MAGMA_CUBE, ENTITIES_SKELETON};
     use pumpkin_inventory::{Inventory, SimpleInventory};
     use pumpkin_util::loot_table::{LootCondition, LootEntry, LootPool, LootTable};
     use pumpkin_util::random::RandomImpl;
@@ -813,6 +816,25 @@ mod tests {
                 Draw::NextIntBounded(3),
                 Draw::NextFloat,
             ]
+        );
+    }
+
+    /// `ApplyBonusCount.UniformBonusCount` draws `nextInt(multiplier * level + 1)` even without
+    /// Fortune, as long as there is a `TOOL` (an empty hand is `ItemStack.EMPTY`).
+    #[test]
+    fn a_melon_broken_by_hand_draws_its_uniform_bonus() {
+        let mut random = TraceRandom::from_seed(0);
+        evaluate_static(
+            &BLOCKS_MELON,
+            &mut random,
+            &LootContextParameters {
+                tool: Some(ItemStack::EMPTY.clone()),
+                ..Default::default()
+            },
+        );
+        assert_eq!(
+            random.draws,
+            [Draw::NextIntBounded(5), Draw::NextIntBounded(1)]
         );
     }
 

@@ -335,7 +335,7 @@ impl CommandExecutor for LootExecutor {
 
                 let pos = BlockPosArgumentType::get_block_pos(context, "fish_pos")?;
                 let tool_stack = match tool {
-                    ToolSource::None => None,
+                    ToolSource::None => Some(ItemStack::EMPTY.clone()),
                     ToolSource::Item => Some(ItemStackArgumentType::get(context, "tool")?),
                     ToolSource::MainHand => get_hand_item(context, true)?,
                     ToolSource::OffHand => get_hand_item(context, false)?,
@@ -398,13 +398,19 @@ impl CommandExecutor for LootExecutor {
                 });
                 let params = LootContextParameters {
                     killed_by_player: Some(killer.is_some()),
-                    attacking_entity_looting_level: killer.as_ref().map_or(0, |killer| {
-                        EnchantmentHelper::get_enchantment_level(
-                            &Enchantment::LOOTING,
-                            killer.as_ref(),
-                            &killer.living_entity,
-                        )
-                    }),
+                    // Vanilla `LootCommand.dropKillLoot`: `ATTACKING_ENTITY` is the source entity.
+                    attacking_entity_looting_level: context.source.entity.as_ref().map_or(
+                        0,
+                        |source| {
+                            source.get_living_entity().map_or(0, |living| {
+                                EnchantmentHelper::get_enchantment_level(
+                                    &Enchantment::LOOTING,
+                                    source.as_ref(),
+                                    living,
+                                )
+                            })
+                        },
+                    ),
                     tool: killer_tool,
                     position: killer.as_ref().map(|p| p.position()),
                     ..Default::default()
@@ -455,7 +461,7 @@ impl CommandExecutor for LootExecutor {
                     })?;
 
                 let tool_stack = match tool {
-                    ToolSource::None => None,
+                    ToolSource::None => Some(ItemStack::EMPTY.clone()),
                     ToolSource::Item => Some(ItemStackArgumentType::get(context, "tool")?),
                     ToolSource::MainHand => get_hand_item(context, true)?,
                     ToolSource::OffHand => get_hand_item(context, false)?,

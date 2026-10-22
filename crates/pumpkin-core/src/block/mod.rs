@@ -541,6 +541,18 @@ pub fn block_loot_stacks(
     let Some(loot_table) = block.loot_table.and_then(|key| world.get_loot_table(key)) else {
         return Vec::new();
     };
+    // Vanilla's block loot always has `TOOL`, `ItemStack.EMPTY` for an empty hand, an explosion
+    // or no breaker.
+    let with_tool;
+    let params = if params.tool.is_some() {
+        params
+    } else {
+        with_tool = LootContextParameters {
+            tool: Some(ItemStack::EMPTY.clone()),
+            ..params.clone()
+        };
+        &with_tool
+    };
     // Vanilla `BlockBehaviour.getDrops`: `getRandomItems(params)`, no seed.
     let items = crate::world::loot::generate_loot_from_handle(&loot_table, world, 0, params);
     if items.is_empty() {
