@@ -5382,14 +5382,10 @@ impl Entity {
         drop(passengers);
 
         let world = self.world.load();
-        let chunk_pos = self.chunk_pos.load();
         let passengers_packet = CSetPassengers::new(VarInt(self.entity_id), &passenger_ids);
         let rider = event_source.get_player();
-        // Everyone else learns of the mount from the vehicle's tracker (here the chunk
-        // broadcast); a riding player only after `ServerPlayer.startRiding`'s own packets.
-        if rider.is_none() {
-            world.broadcast_to_chunk(chunk_pos, &passengers_packet);
-        }
+        // Everyone watching the vehicle, the rider too, learns of the mount from the
+        // vehicle's tracker (`ServerEntity.sendChanges`, `TrackedEntity::send_passengers`).
         // The end of `addPassenger`, before `startRiding`'s `entity_mount` game event.
         vehicle_hooks.after_add_passenger();
         if send_event {
@@ -5405,10 +5401,9 @@ impl Entity {
             leashable::drop_leash(event_source.as_ref(), true, true);
         }
         if let Some(player) = rider {
-            // `ServerPlayer.startRiding`: the rider is placed and told, then the tracker's
-            // passenger list reaches everyone watching the vehicle, the rider again too.
+            // `ServerPlayer.startRiding`: the rider is placed and told; the tracker's
+            // passenger list follows for everyone watching the vehicle, the rider again too.
             player.start_riding_packets(&vehicle_hooks, &passengers_packet);
-            world.broadcast_to_chunk(chunk_pos, &passengers_packet);
         }
     }
 
@@ -5431,19 +5426,11 @@ impl Entity {
             removed = true;
         }
 
-        let passenger_ids: Vec<VarInt> = passengers
-            .iter()
-            .map(|passenger| VarInt(passenger.get_entity().entity_id))
-            .collect();
         drop(passengers);
         if removed {
             self.after_remove_passenger_hook();
         }
-
-        self.world.load().broadcast_to_chunk(
-            self.chunk_pos.load(),
-            &CSetPassengers::new(VarInt(self.entity_id), &passenger_ids),
-        );
+        // The watchers get the new list from the vehicle's tracker.
     }
 
     /// The vehicle's `removePassenger` override (`EntityBase::after_remove_passenger`), run
@@ -5521,8 +5508,6 @@ impl Entity {
             (removed_passenger, passenger_ids)
         };
 
-        let chunk_pos = self.chunk_pos.load();
-
         if let Some(passenger) = removed_passenger {
             let vehicle_box = self.bounding_box.load();
             let passenger_entity = passenger.get_entity();
@@ -5573,7 +5558,8 @@ impl Entity {
                 );
             }
 
-            // Send CSetPassengers directly to the dismounting player before broadcasting it.
+            // `ServerPlayer.removeVehicle` tells the dismounting player directly; everyone
+            // watching the vehicle, the player too, gets the list from the vehicle's tracker.
             let world = self.world.load();
             let passengers_packet = CSetPassengers::new(VarInt(self.entity_id), &passenger_ids);
             if let Some(player) = passenger.get_player() {
@@ -5597,16 +5583,10 @@ impl Entity {
                     }
                 }
                 player.try_send_client_packet(&passengers_packet);
-                world.broadcast_to_chunk_except(
-                    chunk_pos,
-                    &[player.get_entity().entity_uuid],
-                    &passengers_packet,
-                );
-            } else {
-                world.broadcast_to_chunk(chunk_pos, &passengers_packet);
             }
 
-            if !reposition {
+            // `LivingEntity.dismountVehicle`: a removed entity stays where it is.
+            if !reposition || passenger_entity.is_removed() {
                 return;
             }
 
@@ -5821,13 +5801,6 @@ impl Entity {
             } else {
                 passenger_entity.set_pos(dismount_pos);
             }
-        } else {
-            // No passenger was removed, still need to broadcast the passenger list
-            let world = self.world.load();
-            world.broadcast_to_chunk(
-                chunk_pos,
-                &CSetPassengers::new(VarInt(self.entity_id), &passenger_ids),
-            );
         }
     }
 
@@ -6671,6 +6644,25 @@ pub fn teleport_to(entity: &dyn EntityBase, position: Vector3<f64>) {
     } else {
         base.teleport(position, None, None, &world);
     }
+}
+
+/// Vanilla `Entity.teleportTo(level, ...)`, as `/tp` and `/spreadplayers` use it.
+///
+/// A sleeping player wakes first (`ServerPlayer.teleportTo`: `stopSleepInBed(true, true)`),
+/// then the teleport. Other teleports (pearls, gateways, plugins) don't wake.
+pub fn command_teleport(
+    entity: &dyn EntityBase,
+    position: Vector3<f64>,
+    yaw: Option<f32>,
+    pitch: Option<f32>,
+    world: Arc<World>,
+) {
+    if let Some(player) = entity.get_player()
+        && player.is_sleeping()
+    {
+        player.wake_up();
+    }
+    entity.teleport(position, yaw, pitch, world);
 }
 
 /// Vanilla `TeleportTransition`, as Pumpkin's teleports use it: an absolute position, and a

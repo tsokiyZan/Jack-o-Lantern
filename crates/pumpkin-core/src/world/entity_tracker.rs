@@ -81,6 +81,8 @@ pub struct TrackedEntity {
     bedrock_pos: AtomicCell<Vector3<f64>>,
     /// Packed pitch, yaw, head yaw.
     bedrock_rot: AtomicCell<[u8; 3]>,
+    /// Vanilla `ServerEntity.lastPassengers`: the passenger ids last sent to the watchers.
+    last_passengers: std::sync::Mutex<Vec<i32>>,
 }
 
 impl TrackedEntity {
@@ -127,12 +129,39 @@ impl TrackedEntity {
             was_riding: AtomicBool::new(false),
             bedrock_pos: AtomicCell::new(bedrock_pos),
             bedrock_rot: AtomicCell::new(rot),
+            last_passengers: std::sync::Mutex::new(Vec::new()),
         }
     }
 
     #[must_use]
     pub fn has_bedrock_watchers(&self) -> bool {
         self.bedrock_watchers.load(Relaxed) > 0
+    }
+
+    /// The start of vanilla `ServerEntity.sendChanges`, for every entity: a changed passenger
+    /// list goes to everyone watching it.
+    pub fn send_passengers(&self, world: &World) {
+        let passengers: Vec<i32> = self
+            .entity
+            .get_entity()
+            .passengers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .iter()
+            .map(|passenger| passenger.get_entity().entity_id)
+            .collect();
+        let mut last = self
+            .last_passengers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if *last != passengers {
+            let ids: Vec<VarInt> = passengers.iter().copied().map(VarInt).collect();
+            self.send_to_tracking_players(
+                &CSetPassengers::new(VarInt(self.entity_id), &ids),
+                world,
+            );
+            *last = passengers;
+        }
     }
 
     /// Vanilla `ServerEntity.sendChanges`. Non-player entities only.
@@ -1032,6 +1061,7 @@ impl EntityTracker {
             if let Some(living) = tracked.entity.get_living_entity() {
                 living.update_dirty_effects();
             }
+            tracked.send_passengers(world);
             if tracked.entity.get_player().is_none() {
                 tracked.send_changes(world);
             } else if tracked.entity.get_entity().synched_data.is_dirty() {

@@ -56,7 +56,7 @@ use pumpkin_util::translation::Locale;
 use pumpkin_util::version::JavaMinecraftVersion;
 use pumpkin_world::chunk::ChunkData;
 use tokio::task::JoinHandle;
-use tracing::{debug, warn};
+use tracing::{debug, error, warn};
 use uuid::Uuid;
 
 #[derive(Clone, Debug)]
@@ -565,8 +565,7 @@ pub struct Player {
     pub chunk_send_epoch: AtomicU32,
     pub has_played_before: AtomicBool,
     /// The player file's `RootVehicle` between loading and `load_and_spawn_parent_vehicle`,
-    /// and the one `remove` captures before its vehicle leaves the level, so a save while not
-    /// riding still carries it.
+    /// so a save in between still carries it.
     saved_root_vehicle: std::sync::Mutex<Option<NbtCompound>>,
     pub chat_session: Arc<Mutex<ChatSession>>,
     pub signature_cache: Mutex<MessageCache>,
@@ -1324,12 +1323,19 @@ impl Player {
             self.on_handled_screen_closed();
         }
 
-        self.remove_mount_on_disconnect();
-
+        // Vanilla `PlayerList.remove`: the stat, the player file (still riding, so `Pos` is
+        // the seat and `RootVehicle` the stack), then the mount.
         self.stats
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .increment_custom(statistics::CustomStatistic::LeaveGame, 1);
+        if let Some(server) = self.world().server.upgrade()
+            && let Err(e) = server.player_data_storage.handle_player_leave(self)
+        {
+            error!("Failed to save player data on disconnect: {e}");
+        }
+        self.remove_mount_on_disconnect();
+
         let world = self.world();
         world.remove_player(self, true).await;
 
@@ -1375,22 +1381,11 @@ impl Player {
         //self.world().level.list_cached();
     }
 
-    /// Vanilla `PlayerList.remove`'s mount handling. The player file is written after
-    /// `remove` in Pumpkin (vanilla saves first), so the vehicle tag `save` would write is
-    /// captured here, before the mount leaves the level. Then a root vehicle carrying only
-    /// this player stops being ridden and leaves with it (`UNLOADED_WITH_PLAYER`, every
-    /// passenger before the root), and the player gets off whatever it still rides
-    /// (`unRide`).
+    /// Vanilla `PlayerList.remove`'s mount handling, after the player file is saved: a root
+    /// vehicle carrying only this player stops being ridden and leaves with it
+    /// (`UNLOADED_WITH_PLAYER`, every passenger before the root), and the player gets off
+    /// whatever it still rides (`unRide`).
     fn remove_mount_on_disconnect(&self) {
-        let mut captured = NbtCompound::new();
-        self.save_parent_vehicle(&mut captured);
-        if let Some(root_vehicle) = captured.get_compound("RootVehicle") {
-            *self
-                .saved_root_vehicle
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(root_vehicle.clone());
-        }
-
         let entity = &self.living_entity.entity;
         if let Some(root) = entity.root_vehicle()
             && root.get_entity().has_exactly_one_player_passenger()
@@ -1409,8 +1404,9 @@ impl Player {
             }
         }
 
-        // `unRide`: the passengers off, the last first, then off the vehicle. A leaving
-        // player can't stay mounted, so plugins are told but can't cancel it.
+        // `unRide`: the passengers off, the last first, then off the vehicle. The player's
+        // own dismount is forced (plugins are told but can't cancel it), so a leaving player
+        // never stays mounted.
         entity.eject_passengers();
         self.stop_riding_on_disconnect();
     }
@@ -1443,8 +1439,8 @@ impl Player {
 
     /// Vanilla `ServerPlayer.saveParentVehicle`: riding a stack whose root carries exactly one
     /// player, the player file keeps the vehicle it sits on (`Attach`) and the whole root
-    /// stack (`Entity`, players left out of its `Passengers`). Not riding, the tag loaded
-    /// from the file (not spawned yet) or captured on disconnect is written back.
+    /// stack (`Entity`, players left out of its `Passengers`). Not riding, a tag loaded from
+    /// the file and not spawned yet is written back.
     pub fn save_parent_vehicle(&self, nbt: &mut NbtCompound) {
         let entity = &self.living_entity.entity;
         if let Some(vehicle) = entity.get_vehicle() {
@@ -8299,12 +8295,8 @@ impl EntityBase for Player {
         pitch: Option<f32>,
         world: Arc<World>,
     ) {
-        // Commands and plugins: vanilla `ServerPlayer.teleportTo`, which wakes a sleeping
-        // player (`stopSleepInBed(true, true)`), then `teleport(TeleportTransition)`, which
-        // dismounts.
-        if self.is_sleeping() {
-            self.wake_up();
-        }
+        // Vanilla `teleport(TeleportTransition)`, which dismounts. Commands wake a sleeping
+        // player first (`entity::command_teleport`, vanilla `ServerPlayer.teleportTo`).
         if let Some(player) = self.world().get_player_by_id(self.entity_id()) {
             player.teleport_transition(&TeleportTarget {
                 world,

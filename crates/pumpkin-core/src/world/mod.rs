@@ -4894,14 +4894,14 @@ impl World {
                         base_entity.velocity.store(Vector3::default());
 
                         // UUID-dedupes if another watcher already loaded this entity.
-                        // Tracker owns pairing (spawn packets + vehicle restore).
+                        // Tracker owns pairing (spawn packets).
                         if world.add_entity_silent(entity.clone()) {
                             Self::load_passengers(&world, &entity, entity_nbt);
                         }
                     }
                 } else if let Some(player) = &player {
                     // Already live for other watchers: pair this player now so
-                    // spawn packets and vehicle restore do not wait on a tracker tick.
+                    // spawn packets do not wait on a tracker tick.
                     world
                         .entity_tracker
                         .update_player_chunks(player, &world, &[position]);
@@ -5377,8 +5377,11 @@ impl World {
             .add_entity(&(player.clone() as Arc<dyn EntityBase>), self);
     }
 
-    /// Sends the centre chunk ahead of the teleport and records it as held.
-    pub async fn send_center_chunk(&self, player: &Player) {
+    /// Sends the centre chunk ahead of the teleport and records it as held, then pairs the
+    /// player with the entities in it (vanilla `ChunkMap.markChunkPendingToSend` →
+    /// `playerLoadedChunk`): a player arriving from another dimension sees what already
+    /// stands there, such as the vehicle it is about to ride again.
+    pub async fn send_center_chunk(&self, player: &Arc<Player>) {
         let ClientPlatform::Java(java_client) = player.client.as_ref() else {
             return;
         };
@@ -5393,6 +5396,8 @@ impl World {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .mark_sent_out_of_band(center_chunk);
+        self.entity_tracker
+            .update_player_chunks(player, self, &[center_chunk]);
     }
 
     /// Must only be called after the player's own `CLogin` packet has been sent.

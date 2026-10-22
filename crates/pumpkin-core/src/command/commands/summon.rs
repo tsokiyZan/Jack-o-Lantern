@@ -129,6 +129,12 @@ type Loaded = (Arc<dyn EntityBase>, Option<Arc<dyn EntityBase>>);
 /// Vanilla `EntityType.loadEntityRecursive` with `SummonCommand`'s post-load step (every entity is
 /// snapped to the summon position): the entity and, depth first, the `Passengers` it carries.
 /// `loaded` gets each entity with the vehicle it rides, vehicles first.
+///
+/// Not `World::load_entity_recursive`: that one is `loadEntityRecursive` with `addWithUUID` as
+/// the post-load step (the entity enters the level as it loads). Summon's post-load step only
+/// snaps, and the whole stack enters the level afterwards, after its duplicate-UUID check
+/// (`tryAddFreshEntityWithPassengers`); Pumpkin mounts only entities already in the level, so
+/// the mounts are collected here and made after the spawn.
 fn load_entity_recursive(
     entity_type: &'static EntityType,
     nbt: &NbtCompound,
