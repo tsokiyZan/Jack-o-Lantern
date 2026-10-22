@@ -265,10 +265,6 @@ impl VehicleEntity {
 
 #[cfg(test)]
 mod tests {
-    use pumpkin_data::data_component::DataComponent;
-    use pumpkin_data::data_component_impl::{CustomNameImpl, DataComponentImpl};
-    use pumpkin_data::item::Item;
-    use pumpkin_data::item_stack::ItemStack;
     use pumpkin_protocol::codec::var_int::VarInt;
     use pumpkin_protocol::java::client::play::Metadata;
     use pumpkin_util::version::JavaMinecraftVersion;
