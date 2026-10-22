@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::block::registry::BlockActionResult;
 use crate::entity::decoration::leash_knot::LeashKnotEntity;
 use crate::entity::player::Player;
@@ -64,22 +62,24 @@ pub fn bind_player_mobs(player: &Player, pos: BlockPos) -> BlockActionResult {
 
     let existing_knot = LeashKnotEntity::get_knot(&world, pos);
     let created = existing_knot.is_none();
-    let active_knot = existing_knot.unwrap_or_else(|| LeashKnotEntity::create_knot(&world, pos));
+    // A plugin may cancel the new knot's spawn: then nothing is tied.
+    let Some(active_knot) = existing_knot.or_else(|| LeashKnotEntity::create_knot(&world, pos))
+    else {
+        return BlockActionResult::Pass;
+    };
     let mut any_leashed = false;
 
     for leashable in entities_to_leash {
         if leashable::can_have_a_leash_attached_to(leashable.as_ref(), active_knot.get_entity()) {
-            leashable::set_leashed_to(
-                leashable.as_ref(),
-                active_knot.clone() as Arc<dyn EntityBase>,
-                true,
-            );
+            leashable::set_leashed_to(leashable.as_ref(), active_knot.clone(), true);
             any_leashed = true;
         }
     }
 
     if any_leashed {
-        active_knot.play_placement_sound();
+        if let Some(knot) = active_knot.cast_any().downcast_ref::<LeashKnotEntity>() {
+            knot.play_placement_sound();
+        }
         let player_base: &dyn EntityBase = player;
         world.game_event_from(
             Some(player_base),

@@ -37,16 +37,15 @@ impl LeashKnotEntity {
         self.pos
     }
 
-    pub fn get_or_create(world: &Arc<World>, pos: BlockPos) -> Arc<Self> {
-        if let Some(existing) = Self::get_knot(world, pos) {
-            return existing;
-        }
-        Self::create_knot(world, pos)
+    /// Vanilla `LeashFenceKnotEntity.getOrCreateKnot`; `None` when a plugin cancels the new
+    /// knot's spawn.
+    pub fn get_or_create(world: &Arc<World>, pos: BlockPos) -> Option<Arc<dyn EntityBase>> {
+        Self::get_knot(world, pos).or_else(|| Self::create_knot(world, pos))
     }
 
     /// Vanilla `LeashFenceKnotEntity.getKnot`: the knots touching the box `pos ± 1` whose block is
     /// `pos`.
-    pub fn get_knot(world: &Arc<World>, pos: BlockPos) -> Option<Arc<Self>> {
+    pub fn get_knot(world: &Arc<World>, pos: BlockPos) -> Option<Arc<dyn EntityBase>> {
         let x = f64::from(pos.0.x);
         let y = f64::from(pos.0.y);
         let z = f64::from(pos.0.z);
@@ -54,21 +53,20 @@ impl LeashKnotEntity {
             Vector3::new(x - 1.0, y - 1.0, z - 1.0),
             Vector3::new(x + 1.0, y + 1.0, z + 1.0),
         );
-        let entities = world.get_entities_at_box(&search_box);
-
-        for entity_base in entities {
-            if entity_base.get_entity().entity_type == &EntityType::LEASH_KNOT
-                && let Some(knot) = entity_base.cast_any().downcast_ref::<Arc<Self>>()
-                && knot.pos == pos
-            {
-                return Some(knot.clone());
-            }
-        }
-        None
+        world
+            .get_entities_at_box(&search_box)
+            .into_iter()
+            .find(|entity_base| {
+                entity_base
+                    .cast_any()
+                    .downcast_ref::<Self>()
+                    .is_some_and(|knot| knot.pos == pos)
+            })
     }
 
-    /// Vanilla `LeashFenceKnotEntity.createKnot`: `addFreshEntity`, silently.
-    pub fn create_knot(world: &Arc<World>, pos: BlockPos) -> Arc<Self> {
+    /// Vanilla `LeashFenceKnotEntity.createKnot`: `addFreshEntity`, silently. `None` when a plugin
+    /// cancels the spawn (vanilla has no cancel), so nothing is tied to a knot outside the world.
+    pub fn create_knot(world: &Arc<World>, pos: BlockPos) -> Option<Arc<dyn EntityBase>> {
         let raw_pos = Vector3::new(
             f64::from(pos.0.x) + 0.5,
             f64::from(pos.0.y) + Self::OFFSET_Y,
@@ -76,9 +74,8 @@ impl LeashKnotEntity {
         );
 
         let entity = Entity::new(world.clone(), raw_pos, &EntityType::LEASH_KNOT);
-        let knot = Arc::new(Self::new(entity, pos));
-        world.spawn_entity(knot.clone() as Arc<dyn EntityBase>);
-        knot
+        let knot: Arc<dyn EntityBase> = Arc::new(Self::new(entity, pos));
+        world.spawn_entity(knot.clone()).then_some(knot)
     }
 
     /// Vanilla `LeashFenceKnotEntity.playPlacementSound`.

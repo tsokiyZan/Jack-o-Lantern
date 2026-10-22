@@ -596,7 +596,7 @@ pub fn restore_leash_from_save(entity: &dyn EntityBase) {
     let holder: Option<Arc<dyn EntityBase>> = match delayed {
         DelayedLeash::Holder(uuid) => world.get_entity_by_uuid(uuid),
         DelayedLeash::Knot(pos) => {
-            Some(crate::entity::decoration::leash_knot::LeashKnotEntity::get_or_create(&world, pos))
+            crate::entity::decoration::leash_knot::LeashKnotEntity::get_or_create(&world, pos)
         }
     };
     if let Some(holder) = holder {
