@@ -723,7 +723,7 @@ impl EntityBase for ArrowEntity {
         if in_water {
             for i in 0..4 {
                 let factor = 0.25 * f64::from(i);
-                world.spawn_particle(
+                world.spawn_client_particle(
                     Vector3::new(
                         new_pos.x - velocity.x * factor,
                         new_pos.y - velocity.y * factor,
@@ -738,7 +738,7 @@ impl EntityBase for ArrowEntity {
         }
 
         if is_on_fire {
-            world.spawn_particle(
+            world.spawn_client_particle(
                 entity.pos.load(),
                 Vector3::new(0.0f32, 0.0f32, 0.0f32),
                 0.0,
@@ -750,7 +750,7 @@ impl EntityBase for ArrowEntity {
         if self.is_critical.load(Ordering::Relaxed) {
             for i in 0..4 {
                 let factor = f64::from(i) / 4.0;
-                world.spawn_particle(
+                world.spawn_client_particle(
                     Vector3::new(
                         start_pos.x + velocity.x * factor,
                         start_pos.y + velocity.y * factor,

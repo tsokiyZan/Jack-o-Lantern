@@ -11,8 +11,8 @@ use crossbeam::atomic::AtomicCell;
 use pumpkin_data::{
     damage::DamageType,
     data_component_impl::EquipmentSlot,
+    entity::EntityStatus,
     entity::EntityType,
-    particle::Particle,
     sound::{Sound, SoundCategory},
     tag,
     tag::Taggable,
@@ -216,13 +216,6 @@ impl EndermanEntity {
         let new_pos = Vector3::new(x, target_y, z);
 
         for pos in &[origin, new_pos] {
-            world.spawn_particle(
-                *pos,
-                Vector3::new(0.0, 0.0, 0.0),
-                0.0,
-                128,
-                Particle::Portal,
-            );
             world.play_sound(Sound::EntityEndermanTeleport, SoundCategory::Hostile, pos);
         }
 
@@ -240,6 +233,9 @@ impl EndermanEntity {
         }
 
         entity.teleport(new_pos, None, None, &world);
+        // `randomTeleport(.., showParticles = true)`: entity event 46, whose portal particles
+        // every tracking client draws.
+        world.send_entity_status(entity, EntityStatus::Teleport, None);
 
         self.mob_entity
             .with_navigation(|navigation, _| navigation.stop());

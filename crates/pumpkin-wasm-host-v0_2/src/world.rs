@@ -802,7 +802,7 @@ impl pumpkin::plugin::world::HostWorld for PluginHostState {
                 wasmtime::Error::msg(format!("Unknown particle ID: {}", particle as u16))
             })?;
 
-        world_ref.spawn_particle(
+        world_ref.spawn_client_particle(
             pumpkin_util::math::vector3::Vector3::new(pos.0, pos.1, pos.2),
             pumpkin_util::math::vector3::Vector3::new(
                 offset.0 as f32,

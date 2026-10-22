@@ -48,7 +48,7 @@ impl FurnaceMinecart {
         } else if entity.random().next_bounded_i32(4) == 0 {
             let mut pos = entity.pos.load();
             pos.y += 0.8;
-            entity.world.load().spawn_particle(
+            entity.world.load().spawn_client_particle(
                 pos,
                 Vector3::new(0.0, 0.0, 0.0),
                 0.0,

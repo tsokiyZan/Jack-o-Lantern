@@ -151,25 +151,21 @@ pub trait TamableAnimal: Animal {
         self.get_mob_entity().living_entity.heal(heal);
     }
 
+    /// `broadcastEntityEvent(this, 7)` on a successful taming, 6 on a failed one: the client's
+    /// `TamableAnimal.spawnTamingParticles` draws the hearts or smoke.
     fn spawn_taming_particles(&self, success: bool) {
-        use pumpkin_data::particle::Particle;
-        use pumpkin_util::math::vector3::Vector3;
-        let mob_entity = self.get_mob_entity();
-        let entity = &mob_entity.living_entity.entity;
-        let world = entity.world.load();
-        let pos = entity.pos.load();
-        let particle = if success {
-            Particle::Heart
+        use pumpkin_data::entity::EntityStatus;
+        use pumpkin_protocol::bedrock::server::actor_event::ActorEventID;
+        let entity = &self.get_mob_entity().living_entity.entity;
+        let (status, bedrock) = if success {
+            (EntityStatus::TamingSucceeded, ActorEventID::TamingSucceeded)
         } else {
-            Particle::Smoke
+            (EntityStatus::TamingFailed, ActorEventID::TamingFailed)
         };
-        world.spawn_particle(
-            pos + Vector3::new(0.0, f64::from(entity.height()) * 0.5, 0.0),
-            Vector3::new(0.5, 0.5, 0.5),
-            0.02,
-            7,
-            particle,
-        );
+        entity
+            .world
+            .load()
+            .send_entity_status(entity, status, Some(bedrock));
     }
 
     fn write_tamable_nbt(&self, nbt: &mut NbtCompound) {

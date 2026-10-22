@@ -1429,6 +1429,23 @@ impl World {
         );
     }
 
+    /// Particles with no vanilla `sendParticles` behind them, sent to every Java player in the
+    /// world with no range check: stand-ins for what a vanilla client draws itself
+    /// (`addParticle` on the client, a level or entity event), and the plugin API's
+    /// `world.spawn_particle`.
+    pub fn spawn_client_particle(
+        &self,
+        position: Vector3<f64>,
+        offset: Vector3<f32>,
+        max_speed: f32,
+        particle_count: i32,
+        particle: Particle,
+    ) {
+        for player in self.players.load().iter() {
+            player.spawn_particle(position, offset, max_speed, particle_count, particle);
+        }
+    }
+
     /// Vanilla `ServerLevel.sendParticles` (the 14-argument overload every other one ends in):
     /// one `ClientboundLevelParticlesPacket` with vanilla's float casts, sent to each player of
     /// this world in `players` order whose block centre is closer than 32 blocks to `pos`
@@ -8524,7 +8541,7 @@ mod tests {
         let packet = super::LevelParticles::new(
             pumpkin_data::particle::Particle::Snowflake,
             &[],
-            false,
+            true,
             false,
             Vector3::new(1.0, 2.0, 3.0),
             1,
@@ -8542,9 +8559,10 @@ mod tests {
         tail.extend_from_slice(&(-0.5f32).to_be_bytes());
         tail.extend_from_slice(&[1, 1]);
         assert!(bytes.ends_with(&tail), "{bytes:?}");
-        // Particle id, no options, important (overrideLimiter), then force (alwaysShow).
+        // Particle id, no options, important (overrideLimiter, set here), then force
+        // (alwaysShow).
         let id = pumpkin_data::particle::Particle::Snowflake as u8;
-        assert_eq!(&bytes[..3], &[id, 0, 0]);
+        assert_eq!(&bytes[..3], &[id, 1, 0]);
         assert_eq!(bytes.len(), 3 + 3 * 8 + 6 * 4 + 2);
     }
 

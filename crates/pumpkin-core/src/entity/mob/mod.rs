@@ -3691,7 +3691,9 @@ impl<T: Mob + Send + 'static> EntityBase for T {
                 let entity = &mob_entity.living_entity.entity;
                 let pos = entity.pos.load();
                 let world = entity.world.load();
-                world.spawn_particle(
+                // Vanilla `Animal.aiStep`'s hearts are a client-side `addParticle` the server
+                // never sends (and the client's `inLove` isn't synced).
+                world.spawn_client_particle(
                     pos + Vector3::new(0.0, f64::from(entity.height()) + 0.5, 0.0),
                     Vector3::new(0.5, 0.5, 0.5),
                     1.0,
