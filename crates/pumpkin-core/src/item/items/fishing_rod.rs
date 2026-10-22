@@ -22,7 +22,7 @@ impl ItemMetadata for FishingRodItem {
 
 impl ItemBehaviour for FishingRodItem {
     /// Vanilla `FishingRodItem.use`: `SUCCESS` whether it casts or reels in.
-    fn normal_use(&self, item: &Item, player: &Player, _hand: Hand) -> InteractionResult {
+    fn normal_use(&self, item: &Item, player: &Player, hand: Hand) -> InteractionResult {
         let world = player.world();
         let bobber_id = player.fishing_bobber.load(Ordering::Relaxed);
 
@@ -58,7 +58,11 @@ impl ItemBehaviour for FishingRodItem {
             // Reel in
             if let Some(bobber_base) = world.get_entity_by_id(bobber_id) {
                 if let Some(bobber) = bobber_base.cast_any().downcast_ref::<FishingBobberEntity>() {
-                    let _result = bobber.reel_in(player);
+                    // `itemStack.hurtAndBreak(retrieve(itemStack), player, hand)`.
+                    let damage = bobber.reel_in(player);
+                    if damage > 0 {
+                        player.damage_item_in_hand(hand, damage);
+                    }
                     // TODO: give items
                 }
                 bobber_base.get_entity().remove();
