@@ -1129,6 +1129,18 @@ impl LivingEntity {
             .unwrap_or_else(std::sync::PoisonError::into_inner) = SwingState::default();
     }
 
+    /// The riptide spin of a freshly constructed vanilla `ServerPlayer`: `autoSpinAttackTicks`,
+    /// `autoSpinAttackDmg` and `autoSpinAttackItemStack` start empty and flag 4 unset.
+    pub fn clear_auto_spin_attack_for_respawn(&self) {
+        self.auto_spin_attack_ticks.store(0, Relaxed);
+        self.auto_spin_attack_dmg.store(0.0);
+        *self
+            .auto_spin_attack_item
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
+        self.set_living_flag(Self::AUTO_SPIN_ATTACK_FLAG, false);
+    }
+
     /// Vanilla `LivingEntity.getScale`: the `scale` attribute.
     #[must_use]
     pub fn get_scale(&self) -> f32 {
@@ -6205,6 +6217,32 @@ mod tests {
             &ItemStack::EMPTY.clone(),
             2
         ));
+    }
+
+    /// A fresh `ServerPlayer` (respawn) starts with no riptide spin: `restoreFrom` copies none
+    /// of `autoSpinAttackTicks`, `autoSpinAttackDmg`, `autoSpinAttackItemStack` or flag 4.
+    #[tokio::test]
+    async fn clearing_the_spin_for_respawn_resets_every_part_of_it() {
+        let (_folder, world) = crate::world::test_support::test_world();
+        let zombie = crate::entity::r#type::from_type(
+            &EntityType::ZOMBIE,
+            Vector3::new(0.0, 100.0, 0.0),
+            &world,
+            uuid::Uuid::new_v4(),
+        );
+        let living = zombie.get_living_entity().unwrap();
+        living.auto_spin_attack_ticks.store(20, Relaxed);
+        living.auto_spin_attack_dmg.store(8.0);
+        *living.auto_spin_attack_item.lock().unwrap() =
+            Some((ItemStack::new(1, &Item::TRIDENT), 0));
+        living.set_living_flag(LivingEntity::AUTO_SPIN_ATTACK_FLAG, true);
+
+        living.clear_auto_spin_attack_for_respawn();
+
+        assert_eq!(living.auto_spin_attack_ticks.load(Relaxed), 0);
+        assert_eq!(living.auto_spin_attack_dmg.load(), 0.0);
+        assert!(living.auto_spin_attack_item.lock().unwrap().is_none());
+        assert!(!living.is_auto_spin_attack());
     }
 
     // ── equipment detection ───────────────────────────────────────────

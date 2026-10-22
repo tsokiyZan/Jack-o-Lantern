@@ -4602,9 +4602,10 @@ impl World {
         // `CRespawn` and the re-add, the next tick sends its equipment and modifiers again.
         player.living_entity.clear_last_equipment_items();
         // The fresh `ServerPlayer` also starts its attack strength ticker, `lastItemInMainHand`
-        // and swing state over; `restoreFrom` copies none of them.
+        // swing state and riptide spin over; `restoreFrom` copies none of them.
         player.clear_attack_strength_for_respawn();
         player.living_entity.clear_swing_state();
+        player.living_entity.clear_auto_spin_attack_for_respawn();
 
         // Load chunks and send world info FIRST (before teleport packet)
         target_world.send_world_info(player);
