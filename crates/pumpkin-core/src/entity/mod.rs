@@ -866,6 +866,12 @@ pub trait EntityBase: Send + Sync + std::any::Any {
         false
     }
 
+    /// A living entity's own vanilla `pushEntities` in place of `LivingEntity`'s, run when it
+    /// returns `true` (the armor stand's).
+    fn push_entities_override(&self, _caller: &dyn EntityBase) -> bool {
+        false
+    }
+
     /// Vanilla `Entity.isAttackable`: whether a player's attack reaches this entity at all.
     fn is_attackable(&self) -> bool {
         true

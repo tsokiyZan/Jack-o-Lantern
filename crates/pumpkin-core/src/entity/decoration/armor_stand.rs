@@ -155,6 +155,10 @@ impl ArmorStandEntity {
             current & !(bit_field as u8)
         };
         self.armor_stand_flags.store(new_value, Ordering::Relaxed);
+        // `onSyncedDataUpdated(DATA_CLIENT_FLAGS)`: `refreshDimensions`.
+        if new_value != current {
+            self.refresh_dimensions();
+        }
     }
 
     pub fn can_use_slot(&self, slot: &EquipmentSlot) -> bool {
@@ -373,6 +377,49 @@ impl ArmorStandEntity {
 }
 
 impl EntityBase for ArmorStandEntity {
+    /// Vanilla `ArmorStand.getDefaultDimensions` (scaled by `LivingEntity.getDimensions`): a
+    /// marker's fixed 0 x 0 box, a small stand's `BABY_DIMENSIONS`, else the type's.
+    fn dimensions_for_pose(
+        &self,
+        pose: pumpkin_data::entity::EntityPose,
+    ) -> pumpkin_util::math::boundingbox::EntityDimensions {
+        if self.is_marker() {
+            // `MARKER_DIMENSIONS`, `fixed(0, 0)`: the scale doesn't apply.
+            return pumpkin_util::math::boundingbox::EntityDimensions::new(0.0, 0.0, 0.0);
+        }
+        let entity = &self.living_entity.entity;
+        if pose == pumpkin_data::entity::EntityPose::Sleeping {
+            return entity.get_dimensions(pose);
+        }
+        let dimensions = if self.is_small() {
+            entity
+                .get_dimensions(pose)
+                .scale(0.5)
+                .with_eye_height(0.9875)
+        } else {
+            entity.get_dimensions(pose)
+        };
+        dimensions.scale(self.living_entity.get_scale())
+    }
+
+    /// Vanilla `ArmorStand.pushEntities`: only a rideable minecart within 0.2 blocks squared
+    /// of the stand is pushed (`doPush` does nothing and the stand isn't pushable).
+    fn push_entities_override(&self, caller: &dyn EntityBase) -> bool {
+        let entity = &self.living_entity.entity;
+        let world = entity.world.load();
+        let pos = entity.pos.load();
+        for other in world.get_entities_at_box(&entity.bounding_box.load()) {
+            let other_entity = other.get_entity();
+            if other_entity.entity_id != entity.entity_id
+                && other_entity.entity_type == &pumpkin_data::entity::EntityType::MINECART
+                && pos.squared_distance_to_vec(&other_entity.pos.load()) <= 0.2
+            {
+                other.push(caller);
+            }
+        }
+        true
+    }
+
     /// Vanilla `ArmorStand.skipAttackInteraction`: a player who may not interact here.
     fn skip_attack_interaction(&self, source: &dyn EntityBase) -> bool {
         let entity = &self.living_entity.entity;
@@ -491,6 +538,7 @@ impl EntityBase for ArmorStandEntity {
         }
 
         self.armor_stand_flags.store(flags, Ordering::Relaxed);
+        self.refresh_dimensions();
 
         if let Some(pose_tag) = nbt.get("Pose") {
             let packed: PackedRotation = pose_tag.clone().into();
