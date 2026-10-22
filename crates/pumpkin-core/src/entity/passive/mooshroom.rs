@@ -289,35 +289,20 @@ impl Mob for MooshroomEntity {
             return InteractionResult::SUCCESS;
         }
 
+        // `readyForShearing`: not a baby.
         if item == &Item::SHEARS && !self.is_baby() {
-            let entity = self.get_entity();
-            let world = entity.world.load();
-            let pos = entity.pos.load();
-            world.play_sound(Sound::EntityMooshroomShear, SoundCategory::Players, &pos);
-
-            let mushroom_item = if self.get_variant() == MooshroomVariant::Brown {
-                &Item::BROWN_MUSHROOM
-            } else {
-                &Item::RED_MUSHROOM
-            };
-
-            for _ in 0..5 {
-                let item_entity = Arc::new(ItemEntity::new(
-                    Entity::new(world.clone(), pos, &EntityType::ITEM),
-                    ItemStack::new(1, mushroom_item),
-                ));
-                world.spawn_entity(item_entity);
+            if crate::entity::mob::shear_event_cancelled(player, self.get_entity().entity_id, hand)
+            {
+                return InteractionResult::PASS;
             }
-
-            world.spawn_particle(
-                pos + Vector3::new(0.0, 0.5, 0.0),
-                Vector3::new(0.5, 0.5, 0.5),
-                0.0,
-                1,
-                Particle::Explosion,
+            self.shear(item_stack);
+            let entity = self.get_entity();
+            entity.world.load().game_event_from(
+                Some(player.as_ref()),
+                pumpkin_data::game_event::GameEvent::Shear,
+                entity.pos.load(),
             );
-
-            player.damage_item_in_hand(hand, 1);
+            player.hurt_and_break_in_hand(item_stack, hand, 1);
             return InteractionResult::SUCCESS;
         }
 
@@ -352,6 +337,58 @@ impl Mob for MooshroomEntity {
         }
 
         self.animal_interact(player, item_stack, Sound::EntityCowAmbient)
+    }
+}
+
+impl MooshroomEntity {
+    /// Vanilla `MushroomCow.shear`: the snip, then the mooshroom turns into a cow
+    /// (`convertTo(COW)`), leaving an explosion puff and its `shearing/mooshroom` loot, one
+    /// item entity per item, at its top.
+    fn shear(&self, tool: &ItemStack) {
+        let entity = self.get_entity();
+        let world = entity.world.load_full();
+        world.play_sound(
+            Sound::EntityMooshroomShear,
+            SoundCategory::Players,
+            &entity.pos.load(),
+        );
+        let pos = entity.pos.load();
+        let height = f64::from(entity.height());
+        crate::entity::mob::conversion::convert_to(
+            self,
+            &EntityType::COW,
+            crate::entity::mob::conversion::ConversionParams {
+                keep_equipment: false,
+                preserve_can_pick_up_loot: false,
+            },
+            |_cow| {
+                world.spawn_particle(
+                    pos + Vector3::new(0.0, height * 0.5, 0.0),
+                    Vector3::new(0.0, 0.0, 0.0),
+                    0.0,
+                    1,
+                    Particle::Explosion,
+                );
+                let drop_pos = pos + Vector3::new(0.0, height, 0.0);
+                // `shearing/mooshroom` picks its variant's table by an entity-properties
+                // alternative (no random draws); Pumpkin's loot data can't express it.
+                let table = if self.get_variant() == MooshroomVariant::Brown {
+                    "minecraft:shearing/mooshroom/brown"
+                } else {
+                    "minecraft:shearing/mooshroom/red"
+                };
+                self.mob_entity
+                    .living_entity
+                    .drop_from_shearing_loot_table(table, tool, |drop| {
+                        for _ in 0..drop.item_count {
+                            world.spawn_entity(Arc::new(ItemEntity::new(
+                                Entity::new(world.clone(), drop_pos, &EntityType::ITEM),
+                                drop.copy_with_count(1),
+                            )));
+                        }
+                    });
+            },
+        );
     }
 }
 

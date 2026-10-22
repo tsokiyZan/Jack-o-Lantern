@@ -165,6 +165,10 @@ impl Mob for SnowGolemEntity {
         item_stack: &mut ItemStack,
     ) -> InteractionResult {
         if item_stack.get_item() == &Item::SHEARS && self.has_pumpkin() {
+            if crate::entity::mob::shear_event_cancelled(player, self.get_entity().entity_id, hand)
+            {
+                return InteractionResult::PASS;
+            }
             self.set_has_pumpkin(false);
             let entity = self.get_entity();
             let world = entity.world.load();

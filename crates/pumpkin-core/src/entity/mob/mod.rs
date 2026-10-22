@@ -2653,6 +2653,23 @@ pub fn mob_interact_entry<M: Mob + ?Sized>(
     InteractionResult::PASS
 }
 
+/// Pumpkin's `PlayerShearEntityEvent` for `player` shearing the entity `entity_id` with the
+/// shears in `hand`: whether a plugin cancelled the shearing.
+pub fn shear_event_cancelled(player: &Arc<Player>, entity_id: i32, hand: Hand) -> bool {
+    let Some(server) = player.world().server.upgrade() else {
+        return false;
+    };
+    let mut event =
+        crate::plugin::api::events::player::player_shear_entity::PlayerShearEntityEvent {
+            player: player.clone(),
+            entity_id,
+            hand: u8::from(hand == Hand::Left),
+            cancelled: false,
+        };
+    server.plugin_manager.fire_blocking(&server, &mut event);
+    event.cancelled
+}
+
 /// `this.gameEvent(GameEvent.ENTITY_INTERACT, player)`.
 fn entity_interact_game_event<M: Mob + ?Sized>(mob: &M, player: &Arc<Player>) {
     let entity = mob.get_entity();
@@ -2746,7 +2763,7 @@ fn entity_interact<M: Mob + ?Sized>(
         }
     }
 
-    if item_stack.item == &Item::SHEARS && shear_off_all_leash_connections(mob, player) {
+    if item_stack.item == &Item::SHEARS && shear_off_all_leash_connections(mob, player, hand) {
         player.damage_item_in_hand(hand, 1);
         return InteractionResult::SUCCESS;
     }
@@ -2845,10 +2862,20 @@ fn can_have_a_leash_attached_to(leashable: &dyn EntityBase, holder: &Entity) -> 
 
 /// Vanilla `Entity.shearOffAllLeashConnections` through `dropAllLeashConnections`: every leash
 /// held by this mob and its own drop, with a `shear` game event and the snip sound.
-fn shear_off_all_leash_connections<M: Mob + ?Sized>(mob: &M, player: &Arc<Player>) -> bool {
+fn shear_off_all_leash_connections<M: Mob + ?Sized>(
+    mob: &M,
+    player: &Arc<Player>,
+    hand: Hand,
+) -> bool {
     let entity = mob.get_entity();
     let world = entity.world.load_full();
     let leashed = leashed_in_area(&world, entity, entity.entity_id);
+    // Something to cut: the plugin event may still call the shearing off.
+    if (entity.is_leashed() || !leashed.is_empty())
+        && shear_event_cancelled(player, entity.entity_id, hand)
+    {
+        return false;
+    }
     let dropped = if entity.is_leashed() {
         drop_leash(mob, true);
         true
@@ -2896,6 +2923,9 @@ fn attempt_to_shear_equipment<M: Mob + ?Sized>(mob: &M, player: &Arc<Player>, ha
             || (held_on && player.gamemode.load() != pumpkin_util::GameMode::Creative)
         {
             continue;
+        }
+        if shear_event_cancelled(player, mob.get_entity().entity_id, hand) {
+            return false;
         }
         let shearing_sound = equippable.shearing_sound.clone();
         shear_item(mob, player, hand, slot, stack.clone());

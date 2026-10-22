@@ -3264,6 +3264,25 @@ impl LivingEntity {
         )
     }
 
+    /// Vanilla `LivingEntity.dropFromShearingLootTable`.
+    pub fn drop_from_shearing_loot_table(
+        &self,
+        key: &str,
+        tool: &ItemStack,
+        consumer: impl FnMut(ItemStack),
+    ) -> bool {
+        self.drop_from_loot_table(
+            key,
+            &LootContextParameters {
+                this_entity: Some(self.entity.entity_type),
+                position: Some(self.entity.pos.load()),
+                tool: Some(tool.clone()),
+                ..Default::default()
+            },
+            consumer,
+        )
+    }
+
     /// Vanilla `LivingEntity.dropFromEntityInteractLootTable`.
     pub fn drop_from_entity_interact_loot_table(&self, key: &str, tool: &ItemStack) -> bool {
         self.drop_from_loot_table(

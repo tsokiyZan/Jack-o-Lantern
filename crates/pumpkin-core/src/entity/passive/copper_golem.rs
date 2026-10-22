@@ -303,6 +303,9 @@ impl Mob for CopperGolemEntity {
                 .item
                 .has_tag(&tag::Item::MINECRAFT_SHEARABLE_FROM_COPPER_GOLEM)
         {
+            if crate::entity::mob::shear_event_cancelled(player, entity.entity_id, hand) {
+                return InteractionResult::PASS;
+            }
             // `shear`.
             world.play_sound(
                 Sound::EntityCopperGolemShear,

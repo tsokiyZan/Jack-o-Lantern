@@ -157,6 +157,9 @@ impl Mob for BoggedSkeletonEntity {
         if item_stack.item != &Item::SHEARS || !self.ready_for_shearing() {
             return InteractionResult::PASS;
         }
+        if crate::entity::mob::shear_event_cancelled(player, self.get_entity().entity_id, hand) {
+            return InteractionResult::PASS;
+        }
         self.shear(SoundCategory::Players, item_stack);
         let entity = self.get_entity();
         entity.world.load().game_event_from(

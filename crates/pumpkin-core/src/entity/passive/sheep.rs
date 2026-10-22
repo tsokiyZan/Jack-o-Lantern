@@ -190,6 +190,10 @@ impl Mob for SheepEntity {
             if !self.get_entity().is_alive() || self.is_sheared() || self.is_baby() {
                 return InteractionResult::CONSUME;
             }
+            if crate::entity::mob::shear_event_cancelled(player, self.get_entity().entity_id, hand)
+            {
+                return InteractionResult::PASS;
+            }
             self.set_sheared(true);
             let entity = self.get_entity();
             let world = entity.world.load();

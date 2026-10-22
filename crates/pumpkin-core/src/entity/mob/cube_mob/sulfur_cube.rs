@@ -940,6 +940,9 @@ impl CubeMobEntity {
         }
 
         if stack.item == &Item::SHEARS && self.ready_for_shearing() {
+            if crate::entity::mob::shear_event_cancelled(player, entity.entity_id, hand) {
+                return InteractionResult::PASS;
+            }
             self.shear();
             entity.world.load().game_event_from(
                 Some(player.as_ref()),
