@@ -26,36 +26,29 @@ impl ItemMetadata for BrushItem {
         Box::new([Item::BRUSH.id])
     }
 }
-fn get_archaeology_loot(is_sand: bool, location: BlockPos, world: &World) -> ItemStack {
-    if let Some(block_entity) = world.get_block_entity(&location)
+/// Vanilla `BrushableBlockEntity.unpackLootTable`, for the brushable block at `location`.
+fn unpack_loot_table(world: &World, location: &BlockPos, player: &Player, brush: &ItemStack) {
+    if let Some(block_entity) = world.get_block_entity(location)
         && let Some(brushable) = block_entity
             .as_any()
             .downcast_ref::<BrushableBlockBlockEntity>()
-        && let Ok(mut item_guard) = brushable.item.lock()
-        && let Some(item) = item_guard.take()
     {
-        return item;
+        brushable.unpack_loot_table(world, &player.living_entity, brush);
     }
+}
 
-    let loot_key = if is_sand {
-        "minecraft:archaeology/desert_pyramid"
-    } else {
-        "minecraft:archaeology/trail_ruins_common"
-    };
-
-    if let Some(table) = world.get_loot_table(loot_key) {
-        let items = crate::world::loot::generate_loot_from_handle(
-            &table,
-            world,
-            0,
-            &crate::world::loot::LootContextParameters::default(),
-        );
-        if let Some(first) = items.into_iter().next() {
-            return first;
-        }
-    }
-
-    ItemStack::new(1, &Item::SNORT_POTTERY_SHERD)
+/// The item `dropContent` drops: the unpacked loot, if any.
+fn take_brushed_item(world: &World, location: &BlockPos) -> Option<ItemStack> {
+    let block_entity = world.get_block_entity(location)?;
+    let brushable = block_entity
+        .as_any()
+        .downcast_ref::<BrushableBlockBlockEntity>()?;
+    brushable
+        .item
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .take()
+        .filter(|item| !item.is_empty())
 }
 
 impl ItemBehaviour for BrushItem {
@@ -116,6 +109,10 @@ impl ItemBehaviour for BrushItem {
             }
         }
 
+        // `BrushableBlockEntity.brush` unpacks the loot table on every brush.
+        let brush = player.inventory().held_item();
+        unpack_loot_table(&world, &location, player, &brush);
+
         let current_state_id = world.get_block_state_id(&location);
         let mut props = SuspiciousSandLikeProperties::from_state_id(current_state_id);
 
@@ -134,6 +131,8 @@ impl ItemBehaviour for BrushItem {
                 &block_center,
             );
         } else {
+            // `brushingCompleted` drops the content before the block turns into sand or gravel.
+            let loot_item = take_brushed_item(&world, &location);
             let replacement_state_id = if is_sand {
                 Block::SAND.default_state.id
             } else {
@@ -152,17 +151,18 @@ impl ItemBehaviour for BrushItem {
                 &block_center,
             );
 
-            let loot_item = get_archaeology_loot(is_sand, location, &world);
-            let spawn_pos = Vector3::new(
-                f64::from(location.0.x) + 0.5,
-                f64::from(location.0.y) + 1.0,
-                f64::from(location.0.z) + 0.5,
-            );
-            let item_entity = Arc::new(ItemEntity::new(
-                Entity::new(world.clone(), spawn_pos, &EntityType::ITEM),
-                loot_item,
-            ));
-            world.spawn_entity(item_entity);
+            if let Some(loot_item) = loot_item {
+                let spawn_pos = Vector3::new(
+                    f64::from(location.0.x) + 0.5,
+                    f64::from(location.0.y) + 1.0,
+                    f64::from(location.0.z) + 0.5,
+                );
+                let item_entity = Arc::new(ItemEntity::new(
+                    Entity::new(world.clone(), spawn_pos, &EntityType::ITEM),
+                    loot_item,
+                ));
+                world.spawn_entity(item_entity);
+            }
         }
 
         player.damage_held_item(1);
