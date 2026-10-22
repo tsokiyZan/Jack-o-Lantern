@@ -49,9 +49,9 @@ impl ExperienceOrbEntity {
         }
     }
 
-    /// Vanilla `ExperienceOrb(level, pos, roughly, value)` with no rough direction: turned
-    /// and thrown at random.
-    fn new_awarded(entity: Entity, value: i32) -> Self {
+    /// Vanilla `ExperienceOrb(level, pos, roughly, value)`: turned and thrown at random, the
+    /// throw flipped to lean along `roughly` and the orb moved half its size that way.
+    fn new_awarded(entity: Entity, roughly: Vector3<f64>, value: i32) -> Self {
         let (yaw, random_movement) = {
             let mut random = entity.random();
             let yaw = random.next_f32() * 360.0;
@@ -60,6 +60,18 @@ impl ExperienceOrbEntity {
             let z = (random.next_f64() * 0.2 - 0.1) * 2.0;
             (yaw, Vector3::new(x, y, z))
         };
+        let mut random_movement = random_movement;
+        if roughly.length_squared() > 0.0 && roughly.dot(&random_movement) < 0.0 {
+            random_movement = random_movement * -1.0;
+        }
+        // `Vec3.normalize`: too short a vector normalizes to zero.
+        let length = roughly.length();
+        if length >= 1.0E-5 {
+            let size = entity.bounding_box.load().get_average_side_length();
+            let pos = entity.pos.load();
+            let normal = Vector3::new(roughly.x / length, roughly.y / length, roughly.z / length);
+            entity.set_pos(pos.add(&(normal * (size * 0.5))));
+        }
         entity.yaw.store(yaw);
         entity.velocity.store(random_movement);
         // TODO: vanilla `unstuckIfPossible` when spawned inside a block; it needs
@@ -72,13 +84,23 @@ impl ExperienceOrbEntity {
     /// Vanilla `ExperienceOrb.award`: orbs worth `amount` in all, each one merged into a
     /// matching orb nearby when one exists.
     pub fn spawn(world: &Arc<World>, position: Vector3<f64>, amount: u32) {
+        Self::spawn_with_direction(world, position, Vector3::new(0.0, 0.0, 0.0), amount);
+    }
+
+    /// Vanilla `ExperienceOrb.awardWithDirection`.
+    pub fn spawn_with_direction(
+        world: &Arc<World>,
+        position: Vector3<f64>,
+        rough_direction: Vector3<f64>,
+        amount: u32,
+    ) {
         let mut amount = amount as i32;
         while amount > 0 {
             let value = Self::get_experience_value(amount);
             amount -= value;
             if !Self::try_merge_to_existing(world, position, value) {
                 let entity = Entity::new(world.clone(), position, &EntityType::EXPERIENCE_ORB);
-                world.spawn_entity(Arc::new(Self::new_awarded(entity, value)));
+                world.spawn_entity(Arc::new(Self::new_awarded(entity, rough_direction, value)));
             }
         }
     }

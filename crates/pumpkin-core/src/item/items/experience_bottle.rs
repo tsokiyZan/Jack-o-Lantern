@@ -1,12 +1,16 @@
-use crate::item::interaction_result::InteractionResult;
-use pumpkin_util::Hand;
 use std::any::Any;
+use std::sync::Arc;
 
-use crate::entity::experience_orb::ExperienceOrbEntity;
 use crate::entity::player::Player;
+use crate::entity::projectile::experience_bottle::ExperienceBottleEntity;
+use crate::entity::{Entity, EntityBase};
+use crate::item::interaction_result::InteractionResult;
 use crate::item::{ItemBehaviour, ItemMetadata};
+use pumpkin_data::entity::EntityType;
 use pumpkin_data::item::Item;
 use pumpkin_data::sound::{Sound, SoundCategory};
+use pumpkin_util::Hand;
+use rand::{RngExt, rng};
 
 pub struct ExperienceBottleItem;
 
@@ -17,17 +21,26 @@ impl ItemMetadata for ExperienceBottleItem {
 }
 
 impl ItemBehaviour for ExperienceBottleItem {
+    /// Vanilla `ExperienceBottleItem.use`: thrown like a potion, the experience comes out
+    /// where it lands.
     fn normal_use(&self, item: &Item, player: &Player, hand: Hand) -> InteractionResult {
         let world = player.world();
-        let pos = player.eye_position();
-        world.play_sound(
+        let position = player.position();
+        world.play_sound_fine(
             Sound::EntityExperienceBottleThrow,
-            SoundCategory::Players,
-            &pos,
+            SoundCategory::Neutral,
+            &position,
+            0.5,
+            0.4 / (rng().random::<f32>() * 0.4 + 0.8),
         );
 
-        let amount = (rand::random::<u32>() % 9 + 3) as u32; // 3..=11 exp
-        ExperienceOrbEntity::spawn(&world, pos, amount);
+        let entity = Entity::new(world.clone(), position, &EntityType::EXPERIENCE_BOTTLE);
+        let bottle = ExperienceBottleEntity::new_shot(entity, player.get_entity());
+        let (yaw, pitch) = player.rotation();
+        bottle
+            .thrown
+            .set_velocity_from(player, pitch, yaw, -20.0, 0.7, 1.0);
+        world.spawn_entity(Arc::new(bottle));
 
         player.award_item_used(item);
         crate::item::consume_in_hand(player, hand);
