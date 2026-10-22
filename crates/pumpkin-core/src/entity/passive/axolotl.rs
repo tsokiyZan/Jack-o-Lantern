@@ -269,6 +269,17 @@ impl Mob for AxolotlEntity {
         Self::set_from_bucket(self, from_bucket);
     }
 
+    /// Vanilla `Axolotl.requiresCustomPersistence`: `Mob`'s riding and leash, or from a bucket.
+    fn requires_custom_persistence(&self) -> bool {
+        let entity = self.get_entity();
+        entity.has_vehicle() || entity.is_leashed() || self.is_from_bucket()
+    }
+
+    /// Vanilla `Axolotl.removeWhenFarAway`: not from a bucket nor named.
+    fn remove_when_far_away(&self, _distance_sq: f64) -> bool {
+        !self.is_from_bucket() && self.get_entity().custom_name.load().is_none()
+    }
+
     fn mob_set_variant_name(&self, name: &str) {
         let name = name.strip_prefix("minecraft:").unwrap_or(name);
         if let Some(id) = pumpkin_data::data_component_impl::AXOLOTL_VARIANTS

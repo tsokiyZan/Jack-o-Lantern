@@ -36,6 +36,7 @@ pub struct PufferfishEntity {
     puff_state: AtomicI32,
     inflate_counter: AtomicI32,
     deflate_timer: AtomicI32,
+    pub from_bucket: fish::FromBucket,
 }
 
 impl PufferfishEntity {
@@ -52,6 +53,7 @@ impl PufferfishEntity {
             puff_state: AtomicI32::new(STATE_SMALL),
             inflate_counter: AtomicI32::new(0),
             deflate_timer: AtomicI32::new(0),
+            from_bucket: fish::FromBucket::default(),
         };
         pufferfish.refresh_dimensions();
         Arc::new(pufferfish)
@@ -205,6 +207,18 @@ impl Mob for PufferfishEntity {
             .scale(Self::get_scale(self.get_puff_state()))
     }
 
+    fn set_from_bucket(&self, from_bucket: bool) {
+        self.from_bucket.set(self, from_bucket);
+    }
+
+    fn requires_custom_persistence(&self) -> bool {
+        self.from_bucket.requires_custom_persistence(self)
+    }
+
+    fn remove_when_far_away(&self, _distance_sq: f64) -> bool {
+        self.from_bucket.remove_when_far_away(self)
+    }
+
     /// Vanilla `AbstractFish.loadFromBucketTag`.
     fn load_from_bucket_tag(&self, tag: &pumpkin_nbt::compound::NbtCompound) {
         crate::entity::bucketable::load_default_data_from_bucket_tag(self, tag);
@@ -270,10 +284,12 @@ impl Mob for PufferfishEntity {
     }
 
     fn mob_write_nbt(&self, nbt: &mut NbtCompound) {
+        self.from_bucket.write_nbt(nbt);
         nbt.put_int("PuffState", self.get_puff_state());
     }
 
     fn mob_read_nbt(&self, nbt: &NbtCompound) {
+        self.from_bucket.read_nbt(self, nbt);
         self.set_puff_state(
             nbt.get_int("PuffState")
                 .unwrap_or(STATE_SMALL)

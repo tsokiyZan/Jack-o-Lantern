@@ -143,3 +143,48 @@ pub fn flop(mob: &dyn Mob, sound: Sound) {
     entity.velocity_dirty.store(true, Ordering::SeqCst);
     entity.play_sound(sound);
 }
+
+/// Vanilla `AbstractFish.fromBucket`: a fish poured out of a bucket stays (it neither
+/// despawns nor counts as removable far away).
+#[derive(Default)]
+pub struct FromBucket(std::sync::atomic::AtomicBool);
+
+impl FromBucket {
+    #[must_use]
+    pub fn get(&self) -> bool {
+        self.0.load(Ordering::Relaxed)
+    }
+
+    /// Vanilla `AbstractFish.setFromBucket`, synced as `FROM_BUCKET`.
+    pub fn set(&self, mob: &dyn Mob, from_bucket: bool) {
+        self.0.store(from_bucket, Ordering::Relaxed);
+        mob.get_entity().set_synced_data(
+            pumpkin_data::tracked_data::abstract_fish::FROM_BUCKET,
+            from_bucket,
+        );
+    }
+
+    /// Vanilla `AbstractFish.requiresCustomPersistence`: `Mob`'s riding and leash, or from a
+    /// bucket.
+    #[must_use]
+    pub fn requires_custom_persistence(&self, mob: &dyn Mob) -> bool {
+        let entity = mob.get_entity();
+        entity.has_vehicle() || entity.is_leashed() || self.get()
+    }
+
+    /// Vanilla `AbstractFish.removeWhenFarAway`: not from a bucket nor named.
+    #[must_use]
+    pub fn remove_when_far_away(&self, mob: &dyn Mob) -> bool {
+        !self.get() && mob.get_entity().custom_name.load().is_none()
+    }
+
+    /// `AbstractFish.addAdditionalSaveData`.
+    pub fn write_nbt(&self, nbt: &mut pumpkin_nbt::compound::NbtCompound) {
+        nbt.put_bool("FromBucket", self.get());
+    }
+
+    /// `AbstractFish.readAdditionalSaveData`.
+    pub fn read_nbt(&self, mob: &dyn Mob, nbt: &pumpkin_nbt::compound::NbtCompound) {
+        self.set(mob, nbt.get_bool("FromBucket").unwrap_or(false));
+    }
+}

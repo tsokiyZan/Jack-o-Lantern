@@ -22,6 +22,7 @@ const MAX_SCHOOL_SIZE: i32 = 5;
 pub struct SalmonEntity {
     pub mob_entity: MobEntity,
     pub school: SchoolingFish,
+    pub from_bucket: fish::FromBucket,
 }
 
 impl SalmonEntity {
@@ -32,6 +33,7 @@ impl SalmonEntity {
         Arc::new(Self {
             mob_entity,
             school: SchoolingFish::new(MAX_SCHOOL_SIZE),
+            from_bucket: fish::FromBucket::default(),
         })
     }
 }
@@ -41,6 +43,26 @@ impl Mob for SalmonEntity {
     fn check_spawn_obstruction(&self, world: &crate::world::World) -> bool {
         let entity = self.get_entity();
         world.is_unobstructed(Some(entity), &entity.bounding_box.load())
+    }
+
+    fn set_from_bucket(&self, from_bucket: bool) {
+        self.from_bucket.set(self, from_bucket);
+    }
+
+    fn requires_custom_persistence(&self) -> bool {
+        self.from_bucket.requires_custom_persistence(self)
+    }
+
+    fn remove_when_far_away(&self, _distance_sq: f64) -> bool {
+        self.from_bucket.remove_when_far_away(self)
+    }
+
+    fn mob_write_nbt(&self, nbt: &mut pumpkin_nbt::compound::NbtCompound) {
+        self.from_bucket.write_nbt(nbt);
+    }
+
+    fn mob_read_nbt(&self, nbt: &pumpkin_nbt::compound::NbtCompound) {
+        self.from_bucket.read_nbt(self, nbt);
     }
 
     /// Vanilla `AbstractFish.loadFromBucketTag`.
