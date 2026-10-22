@@ -3,10 +3,11 @@ use crate::item::interaction_result::InteractionResult;
 use crate::item::{ItemBehaviour, ItemMetadata};
 use pumpkin_data::data_component_impl::BundleContentsImpl;
 use pumpkin_data::item::Item;
-use pumpkin_data::sound::Sound;
+use pumpkin_data::item_stack::ItemStack;
+use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_data::tag;
-use pumpkin_inventory::player::player_inventory::PlayerInventory;
 use pumpkin_util::Hand;
+use pumpkin_util::random::RandomImpl;
 
 pub struct BundleItem;
 
@@ -17,32 +18,87 @@ impl ItemMetadata for BundleItem {
 }
 
 impl ItemBehaviour for BundleItem {
-    /// Vanilla `BundleItem.use` returns `SUCCESS` whatever the bundle holds.
+    /// Vanilla `BundleItem.use`: the bundle is used, and drops its contents as it is
+    /// (`onUseTick`).
     fn normal_use(&self, _item: &Item, player: &Player, hand: Hand) -> InteractionResult {
-        // TODO: vanilla starts using the bundle and drops its contents over the use
-        // (`onUseTick`), not one stack at once.
-        let mut bundle = player.inventory.get_stack_in_hand(hand);
-        if let Some(bundle_contents) = bundle.get_data_component_mut::<BundleContentsImpl>()
-            && let Some(extracted_stack) = bundle_contents.try_extract()
-        {
-            player.world().play_sound(
-                Sound::ItemBundleRemoveOne,
-                pumpkin_data::sound::SoundCategory::Players,
-                &player.position(),
-            );
-            player.inventory.set_stack_in_hand(hand, bundle.clone());
-            player.drop_item(extracted_stack);
-            let slot_index = match hand {
-                Hand::Right => player.inventory.get_selected_slot() as usize,
-                Hand::Left => PlayerInventory::OFF_HAND_SLOT,
-            };
-            player.award_item_used(bundle.item);
-            player.sync_hand_slot(slot_index, bundle);
-        }
+        let stack = player.inventory.get_stack_in_hand(hand);
+        crate::item::start_using_item(player, hand, stack, Self::USE_DURATION);
         InteractionResult::SUCCESS
+    }
+
+    /// Vanilla `BundleItem.onUseTick`: one stack on the first tick, then one every other tick
+    /// after the first ten.
+    fn on_use_tick(&self, _stack: &ItemStack, player: &Player, remaining_use_ticks: i32) {
+        let first_tick = remaining_use_ticks == Self::USE_DURATION;
+        if first_tick
+            || (remaining_use_ticks < Self::USE_DURATION - 10 && remaining_use_ticks % 2 == 0)
+        {
+            Self::drop_content(player);
+        }
+    }
+
+    fn get_use_duration(&self) -> i32 {
+        Self::USE_DURATION
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
         self
+    }
+}
+
+impl BundleItem {
+    /// Vanilla `BundleItem.getUseDuration`.
+    pub const USE_DURATION: i32 = 200;
+
+    /// Vanilla `BundleItem.dropContent` for the bundle in use.
+    fn drop_content(player: &Player) {
+        let hand = crate::item::used_item_hand(player);
+        let mut bundle = player.inventory.get_stack_in_hand(hand);
+        // `removeOneItemFromBundle`.
+        // TODO: vanilla removes the selected item, not always the first.
+        let Some(removed) = bundle
+            .get_data_component_mut::<BundleContentsImpl>()
+            .and_then(BundleContentsImpl::try_extract)
+        else {
+            return;
+        };
+        let world = player.world();
+        // `playRemoveOneSound`: the player's own `playSound`, which it doesn't hear itself.
+        let pitch = 0.8 + Self::world_random_f32(player) * 0.4;
+        world.play_sound_raw_expect(
+            player,
+            Sound::ItemBundleRemoveOne as u16,
+            SoundCategory::Players,
+            &player.position(),
+            0.8,
+            pitch,
+        );
+        player.inventory.set_stack_in_hand(hand, bundle.clone());
+        player.drop_item(removed);
+        // `playDropContentsSound`.
+        let pitch = 0.8 + Self::world_random_f32(player) * 0.4;
+        world.play_sound_fine(
+            Sound::ItemBundleDropContents,
+            SoundCategory::Players,
+            &player
+                .living_entity
+                .entity
+                .block_pos
+                .load()
+                .to_centered_f64(),
+            0.8,
+            pitch,
+        );
+        player.award_item_used(bundle.item);
+    }
+
+    /// `level.getRandom().nextFloat()`.
+    fn world_random_f32(player: &Player) -> f32 {
+        player
+            .world()
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .next_f32()
     }
 }
