@@ -85,9 +85,26 @@ impl DataComponentImpl for BucketEntityDataImpl {
 pub struct ContainerImpl {
     pub items: Vec<(u8, crate::item_stack::ItemStack)>,
 }
+/// Vanilla `ItemContainerContents.equals`: the same stacks in the same slots.
 impl PartialEq for ContainerImpl {
-    fn eq(&self, _other: &Self) -> bool {
-        false
+    fn eq(&self, other: &Self) -> bool {
+        fn filled(contents: &ContainerImpl) -> Vec<&(u8, crate::item_stack::ItemStack)> {
+            let mut items = contents
+                .items
+                .iter()
+                .filter(|(_, stack)| !stack.is_empty())
+                .collect::<Vec<_>>();
+            items.sort_by_key(|(slot, _)| *slot);
+            items
+        }
+        let (mine, theirs) = (filled(self), filled(other));
+        mine.len() == theirs.len()
+            && mine
+                .iter()
+                .zip(&theirs)
+                .all(|((slot, stack), (other_slot, other_stack))| {
+                    slot == other_slot && stack.are_equal(other_stack)
+                })
     }
 }
 impl Eq for ContainerImpl {}

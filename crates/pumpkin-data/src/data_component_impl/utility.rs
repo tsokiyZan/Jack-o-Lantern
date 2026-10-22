@@ -588,9 +588,16 @@ pub struct BundleContentsImpl {
     /// tooltip, -1 for none. Neither saved nor sent, nor part of equality.
     pub selected_item: i32,
 }
+/// Vanilla `BundleContents.equals`: the same stacks in the same order; the selection
+/// doesn't count.
 impl PartialEq for BundleContentsImpl {
-    fn eq(&self, _other: &Self) -> bool {
-        false
+    fn eq(&self, other: &Self) -> bool {
+        self.items.len() == other.items.len()
+            && self
+                .items
+                .iter()
+                .zip(&other.items)
+                .all(|(stack, other_stack)| stack.are_equal(other_stack))
     }
 }
 impl Eq for BundleContentsImpl {}
