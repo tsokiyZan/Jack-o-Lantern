@@ -4861,6 +4861,14 @@ impl World {
     }
 
     /// Gets an entity by an entity id
+    /// `level.getRandom().nextFloat()`.
+    pub fn random_f32(&self) -> f32 {
+        self.random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .next_f32()
+    }
+
     /// Vanilla `ServerLevel.mayInteract` for a player: inside the world border. Pumpkin has no
     /// spawn protection.
     pub fn may_interact(&self, pos: &BlockPos) -> bool {

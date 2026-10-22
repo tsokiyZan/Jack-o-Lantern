@@ -90,8 +90,9 @@ pub(crate) fn empty_sulfur_cube_bucket(
         f64::from(pos.0.z) + 0.5,
     );
     let mob = from_type(&EntityType::SULFUR_CUBE, spawn_pos, world, Uuid::new_v4());
+    // `EntityType.create`: `wrapDegrees(level.getRandom().nextFloat() * 360)`.
     mob.get_entity()
-        .set_rotation(wrap_degrees(rand::random::<f32>() * 360.0), 0.0);
+        .set_rotation(wrap_degrees(world.random_f32() * 360.0), 0.0);
     finalize_spawn(
         &mob,
         world,
@@ -293,14 +294,21 @@ pub(crate) const fn should_evaporate_in_nether(item: &Item, world: &World) -> bo
         && world.dimension.water_evaporates
 }
 
-pub(crate) fn play_bucket_evaporation(world: &Arc<World>, position: &Vector3<f64>) {
-    world.play_sound_raw(
-        Sound::BlockFireExtinguish as u16,
-        SoundCategory::Blocks,
-        position,
-        0.5,
-        (rand::random::<f32>() - rand::random::<f32>()) * 0.8 + 2.6,
-    );
+/// `level.playSound(user, pos, FIRE_EXTINGUISH, BLOCKS, 0.5, 2.6 + (r - r) * 0.8)` with the
+/// level's random: everyone near but the user.
+pub(crate) fn play_bucket_evaporation(
+    world: &Arc<World>,
+    user: Option<&Player>,
+    position: &Vector3<f64>,
+) {
+    let first = world.random_f32();
+    let pitch = 2.6 + (first - world.random_f32()) * 0.8;
+    let sound = Sound::BlockFireExtinguish as u16;
+    if let Some(user) = user {
+        world.play_sound_raw_expect(user, sound, SoundCategory::Blocks, position, 0.5, pitch);
+    } else {
+        world.play_sound_raw(sound, SoundCategory::Blocks, position, 0.5, pitch);
+    }
 }
 
 fn try_place_powder_snow(world: &Arc<World>, pos: BlockPos, direction: BlockDirection) -> bool {
@@ -455,7 +463,7 @@ impl ItemBehaviour for FilledBucketItem {
         // TODO: the evaporation's large smoke particles.
         let evaporated = should_evaporate_in_nether(item, &world);
         if evaporated {
-            play_bucket_evaporation(&world, &player.position());
+            play_bucket_evaporation(&world, Some(player), &player.position());
         } else if !try_place_filled_bucket(&world, item, pos, direction) {
             return InteractionResult::FAIL;
         }
@@ -505,7 +513,7 @@ impl ItemBehaviour for FilledBucketItem {
             let mob = from_type(entity_type, spawn_coord, &world, Uuid::new_v4());
             // `EntityType.create`: a random yaw, then `finalizeSpawn(BUCKET)`.
             mob.get_entity()
-                .set_rotation(wrap_degrees(rand::random::<f32>() * 360.0), 0.0);
+                .set_rotation(wrap_degrees(world.random_f32() * 360.0), 0.0);
             finalize_spawn(
                 &mob,
                 &world,

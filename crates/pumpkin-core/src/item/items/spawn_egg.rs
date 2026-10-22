@@ -189,7 +189,8 @@ impl ItemBehaviour for SpawnEggItem {
             f64::from(hit_pos.0.y),
             f64::from(hit_pos.0.z) + 0.5,
         );
-        let yaw = wrap_degrees(rand::random::<f32>() * 360.0) % 360.0;
+        // `EntityType.create`: `wrapDegrees(level.getRandom().nextFloat() * 360)`.
+        let yaw = wrap_degrees(world.random_f32() * 360.0);
         let mob = from_type(entity_type, pos, &world, Uuid::new_v4());
         mob.get_entity().set_rotation(yaw, 0.0);
 
@@ -264,7 +265,8 @@ impl ItemBehaviour for SpawnEggItem {
                 f64::from(spawn_block_pos.0.y),
                 f64::from(spawn_block_pos.0.z) + 0.5,
             );
-            let yaw = wrap_degrees(rand::random::<f32>() * 360.0) % 360.0;
+            // `EntityType.create`: `wrapDegrees(level.getRandom().nextFloat() * 360)`.
+            let yaw = wrap_degrees(world.random_f32() * 360.0);
 
             let mob = from_type(entity_type, pos, &world, Uuid::new_v4());
 
@@ -319,8 +321,8 @@ pub fn spawn_offspring_from_spawn_egg(
         {
             return false;
         }
-        mob.get_entity()
-            .set_rotation(rand::random::<f32>() * 360.0, 0.0);
+        // `offspring.snapTo(pos, 0, 0)`.
+        mob.get_entity().set_rotation(0.0, 0.0);
         apply_entity_variant(item, mob.as_ref(), Some(player));
         if world.spawn_creature(
             mob,
