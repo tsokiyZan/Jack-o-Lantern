@@ -861,6 +861,9 @@ pub trait EntityBase: Send + Sync + std::any::Any {
         leash::entity_interact_by_id(self.get_entity(), player, hand, item_stack)
     }
 
+    /// Vanilla `Entity.notifyLeasheeRemoved`: a leashable this entity held let go of it.
+    fn notify_leashee_removed(&self) {}
+
     /// Whether this entity is a vanilla `Leashable` (mobs and boats).
     fn is_leashable(&self) -> bool {
         false
@@ -5081,10 +5084,17 @@ impl Entity {
             }
         }
 
-        *self
+        let old_holder = self
             .leashed_to
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(holder);
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .replace(holder);
+        // `Leashable.setLeashedTo`: the old holder learns it lost this leashee.
+        if let Some(old_holder) = old_holder
+            && old_holder.get_entity().entity_id != holder_entity_id
+        {
+            old_holder.notify_leashee_removed();
+        }
 
         let je_packet = pumpkin_protocol::java::client::play::CSetEntityLink::new(
             self.entity_id,
@@ -5165,6 +5175,10 @@ impl Entity {
             &je_packet,
             &be_packet,
         );
+        // `Leashable.dropLeash`: `leashHolder.notifyLeasheeRemoved(entity)`.
+        if let Some(holder) = old_holder {
+            holder.notify_leashee_removed();
+        }
     }
 
     /// Vanilla `Leashable.restoreLeashFromSave`: attaches a saved leash once its holder is

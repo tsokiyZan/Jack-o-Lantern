@@ -83,6 +83,15 @@ impl LeashKnotEntity {
 use crate::server::Server;
 
 impl EntityBase for LeashKnotEntity {
+    /// Vanilla `LeashFenceKnotEntity.notifyLeasheeRemoved`: a knot that holds nothing more is
+    /// discarded.
+    fn notify_leashee_removed(&self) {
+        let world = self.entity.world.load_full();
+        if leash::leashable_leashed_to(&world, &self.entity).is_empty() {
+            self.entity.remove();
+        }
+    }
+
     /// Vanilla `BlockAttachedEntity.skipAttackInteraction`.
     fn skip_attack_interaction(&self, source: &dyn EntityBase) -> bool {
         super::block_attached_skip_attack_interaction(self, source)
