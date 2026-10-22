@@ -1633,8 +1633,21 @@ impl LivingEntity {
         }
     }
 
-    /// Vanilla `onAttributeUpdated`.
+    /// Vanilla `onAttributeUpdated`, with `ServerPlayer`'s override first.
     fn on_attribute_updated(&self, attribute_id: u8) {
+        let world = self.entity.world.load();
+        // `ServerPlayer.onAttributeUpdated`: the receive range adds or removes the player from
+        // the waypoint manager, before the living handling.
+        if attribute_id == Attributes::WAYPOINT_RECEIVE_RANGE.id
+            && self.entity.entity_type == &EntityType::PLAYER
+            && let Some(player) = world.get_player_by_id(self.entity.entity_id)
+        {
+            if self.get_attribute_value(&Attributes::WAYPOINT_RECEIVE_RANGE) > 0.0 {
+                world.waypoint_manager.add_player(&player);
+            } else {
+                world.waypoint_manager.remove_player(&player);
+            }
+        }
         if attribute_id == Attributes::MAX_HEALTH.id {
             let max_health = self.get_max_health();
             if self.health.load() > max_health {
@@ -1648,7 +1661,17 @@ impl LivingEntity {
         }
         // `SCALE` refreshes the dimensions, which needs the full entity: the tick picks the
         // change up from `applied_scale`.
-        // TODO: `WAYPOINT_TRANSMIT_RANGE` tracking; the waypoint manager isn't ported.
+        else if attribute_id == Attributes::WAYPOINT_TRANSMIT_RANGE.id {
+            if self.get_attribute_value(&Attributes::WAYPOINT_TRANSMIT_RANGE) > 0.0 {
+                if let Some(entity) = world.get_entity_by_id(self.entity.entity_id) {
+                    world.waypoint_manager.track_waypoint(&entity);
+                }
+            } else {
+                world
+                    .waypoint_manager
+                    .untrack_waypoint(self.entity.entity_id);
+            }
+        }
     }
 
     // Check if the entity is in water

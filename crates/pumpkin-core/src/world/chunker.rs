@@ -39,8 +39,18 @@ pub fn is_within_chebyshev_distance(
     (target.x - center.x).abs().max((target.y - center.y).abs()) <= distance
 }
 
-#[allow(clippy::too_many_lines)]
+/// Vanilla `ServerChunkCache.move`: `ChunkMap.move`, then the waypoint manager's
+/// `updatePlayer` for a receiving player that isn't removed.
 pub fn update_position(player: &Arc<Player>) {
+    update_chunk_tracking(player);
+    if !player.get_entity().is_removed() && crate::entity::waypoint::is_receiving_waypoints(player)
+    {
+        player.world().waypoint_manager.update_player(player);
+    }
+}
+
+#[allow(clippy::too_many_lines)]
+fn update_chunk_tracking(player: &Arc<Player>) {
     let entity = &player.get_entity();
     let new_chunk_center = entity.chunk_pos.load();
     let old_cylindrical = player.watched_section.load();

@@ -39,6 +39,7 @@ pub mod stopwatches;
 pub(crate) mod test_support;
 pub mod time;
 pub mod villager_poi;
+pub mod waypoint_manager;
 
 use crate::block::RandomTickArgs;
 use crate::world::chunker::is_within_chebyshev_distance;
@@ -318,6 +319,8 @@ pub struct World {
     pub custom_block_entity_data: DashMap<BlockPos, NbtCompound>,
     /// Entity tracker responsible for tracking entity visibility and sending delta/status packets to watchers.
     pub entity_tracker: entity_tracker::EntityTracker,
+    /// Vanilla `ServerLevel.waypointManager`.
+    pub waypoint_manager: waypoint_manager::WaypointManager,
 }
 
 #[derive(Clone, Copy)]
@@ -470,6 +473,7 @@ impl World {
             custom_data: std::sync::Mutex::new(custom_data),
             custom_block_entity_data: DashMap::new(),
             entity_tracker: entity_tracker::EntityTracker::new(),
+            waypoint_manager: waypoint_manager::WaypointManager::default(),
         }
     }
 
@@ -3923,6 +3927,8 @@ impl World {
                 false,
             );
         }
+        // `onTrackingStart`: Bedrock gets no waypoint packets, but Java players see it.
+        self.waypoint_manager.on_player_tracking_start(&player);
     }
 
     /// Finishes the Java login.
@@ -4431,6 +4437,11 @@ impl World {
 
         player.has_played_before.store(true, Ordering::Relaxed);
         player.on_screen_handler_opened(&player.player_screen_handler);
+
+        // `level.addNewPlayer`'s `onTrackingStart`, which vanilla's `placeNewPlayer` runs after
+        // `sendLevelInfo` and before `sendActivePlayerEffects`. `World::add_player` runs
+        // before the login packet, too early to send waypoints.
+        self.waypoint_manager.on_player_tracking_start(player);
 
         player.send_active_effects();
         player
@@ -5583,6 +5594,8 @@ impl World {
 
         self.entity_tracker
             .add_entity(&(player.clone() as Arc<dyn EntityBase>), self);
+        // `onTrackingStart` (`addDuringTeleport` / `addRespawnedPlayer`).
+        self.waypoint_manager.on_player_tracking_start(player);
     }
 
     /// Sends the centre chunk ahead of the teleport and records it as held.
@@ -5653,7 +5666,9 @@ impl World {
         if let Some(ref player) = removed_player {
             self.entity_tracker
                 .remove_entity(player.as_ref() as &dyn EntityBase, self);
-            // `onTrackingEnd`.
+            // `onTrackingEnd`: `players.remove`, the waypoint manager's `removePlayer`, then
+            // the sleeping list.
+            self.waypoint_manager.remove_player(player);
             self.update_sleeping_player_list();
             let uuid = player.gameprofile.id;
             let entity_id = player.entity_id();
@@ -5803,6 +5818,8 @@ impl World {
     pub fn spawn_entity_non_save(&self, entity: Arc<dyn EntityBase>) {
         let _base_entity = entity.get_entity();
         self.entity_tracker.add_entity(&entity, self);
+        // `onCreated` / `onTrackingStart`.
+        self.waypoint_manager.on_entity_added(&entity);
         self.spawn_state.load().add_entity(self, entity.as_ref());
         entity
             .get_entity()
@@ -5929,6 +5946,8 @@ impl World {
         // serialized at once (which would double it on the next reload).
         self.spawn_state.load().add_entity(self, entity.as_ref());
         self.entity_tracker.add_entity(&entity, self);
+        // `onCreated` / `onTrackingStart`.
+        self.waypoint_manager.on_entity_added(&entity);
         base_entity.update_dynamic_game_event_listener(|listener| listener.add(self));
 
         self.entities.rcu(|current_entities| {
@@ -5968,6 +5987,9 @@ impl World {
 
         self.spawn_state.load().remove_entity(self, entity);
         self.entity_tracker.remove_entity(entity, self);
+        // `onDestroyed` and `LivingEntity.onRemoval`.
+        self.waypoint_manager
+            .untrack_waypoint(base_entity.entity_id);
         base_entity.update_dynamic_game_event_listener(|listener| listener.remove(self));
         self.entities.rcu(|current_entities| {
             let mut new_entities = (**current_entities).clone();
@@ -6021,6 +6043,9 @@ impl World {
                 .get_entity()
                 .update_dynamic_game_event_listener(|listener| listener.remove(self));
             self.entity_tracker.remove_entity(entity.as_ref(), self);
+            // `LivingEntity.onRemoval` (`setRemoved(UNLOADED_TO_CHUNK)`).
+            self.waypoint_manager
+                .untrack_waypoint(entity.get_entity().entity_id);
             self.spawn_state.load().remove_entity(self, entity.as_ref());
         }
 

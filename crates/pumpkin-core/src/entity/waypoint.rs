@@ -250,9 +250,9 @@ impl WaypointConnection {
         receiver.try_send_client_packet(&packet);
     }
 
-    /// Vanilla `Connection.disconnect`.
-    pub fn disconnect(&self, source: &Entity, receiver: &Player) {
-        receiver.try_send_client_packet(&CWaypoint::remove_waypoint(source.entity_uuid));
+    /// Vanilla `Connection.disconnect`: untrack the source's UUID.
+    pub fn disconnect(&self, source_uuid: uuid::Uuid, receiver: &Player) {
+        receiver.try_send_client_packet(&CWaypoint::remove_waypoint(source_uuid));
     }
 
     /// Vanilla `Connection.update`: send the new place once it differs from the last one sent.

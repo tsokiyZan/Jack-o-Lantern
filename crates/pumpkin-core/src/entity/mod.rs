@@ -2231,6 +2231,14 @@ impl Entity {
                     ));
                 }
             }
+
+            // The end of vanilla `setPosRaw`: on any position change, once past the first tick
+            // and not removed, `updateWaypoint` for a transmitter and `updatePlayer` for a
+            // receiving player.
+            if !self.first_tick.load(Ordering::Relaxed) && !self.is_removed() {
+                let world = self.world.load();
+                world.waypoint_manager.on_entity_moved(&world, self);
+            }
         }
     }
 

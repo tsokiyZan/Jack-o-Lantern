@@ -2992,6 +2992,35 @@ impl Player {
 
     /// Vanilla `ServerPlayer.trackStartFallingPosition`: a fall starts, and one that starts
     /// no lower than an explosion pushed the player counts for `fall_after_explosion`.
+    /// The waypoint part of vanilla `ServerPlayer.updatePlayerAttributes`: a crouching player's
+    /// transmit range is cut to nothing. Like `addOrUpdateTransientModifier` /
+    /// `removeModifier`, only a real change marks the attribute updated.
+    fn update_player_attributes(&self) {
+        const CROUCH_MODIFIER_ID: &str = "minecraft:waypoint_transmit_range_crouch";
+        let living = &self.living_entity;
+        let attribute = &Attributes::WAYPOINT_TRANSMIT_RANGE;
+        let crouching = self.get_entity().pose.load() == EntityPose::Crouching;
+        let has_modifier = living
+            .attributes
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get(&attribute.id)
+            .is_some_and(|instance| instance.get_modifier(CROUCH_MODIFIER_ID).is_some());
+        if crouching && !has_modifier {
+            living.update_attribute(attribute, |instance| {
+                instance.add_or_replace_modifier(crate::entity::attributes::Modifier {
+                    id: CROUCH_MODIFIER_ID.to_string(),
+                    amount: -1.0,
+                    operation: crate::entity::attributes::ModifierOperation::MultiplyTotal,
+                });
+            });
+        } else if !crouching && has_modifier {
+            living.update_attribute(attribute, |instance| {
+                instance.remove_modifier(CROUCH_MODIFIER_ID);
+            });
+        }
+    }
+
     pub fn track_start_falling_position(&self) {
         let entity = &self.living_entity.entity;
         if entity.fall_distance.load() > 0.0 && self.starting_to_fall_position.load().is_none() {
@@ -3501,6 +3530,7 @@ impl Player {
         self.update_player_pose();
         self.check_inventory_advancements();
         self.track_start_falling_position();
+        self.update_player_attributes();
         if let Ok(mut adv) = self.advancements.try_lock() {
             adv.flush_dirty(self, true);
         }

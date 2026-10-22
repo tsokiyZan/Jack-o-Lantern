@@ -88,6 +88,19 @@ impl CommandExecutor for SetBoolExecutor {
 
         context.server().level_info.store(Arc::new(new_info));
 
+        // `MinecraftServer.onGameRuleChanged` for `locator_bar`, in every level.
+        if self.0 == GameRule::LocatorBar {
+            for world in context.server().worlds.load().iter() {
+                if arg_value {
+                    for player in world.players.load().iter() {
+                        world.waypoint_manager.update_player(player);
+                    }
+                } else {
+                    world.waypoint_manager.break_all_connections();
+                }
+            }
+        }
+
         if self.0 == GameRule::SpectatorsGenerateChunks {
             let server = context.server();
             for world in server.worlds.load().iter() {

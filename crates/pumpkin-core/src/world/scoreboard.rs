@@ -28,6 +28,13 @@ pub trait ScoreboardTarget: Send + Sync {
         be_packet: &B,
     );
     fn send_je<J: ClientPacket + Sync>(&self, je_packet: &J);
+
+    /// Vanilla `ServerScoreboard.updatePlayerWaypoint`: the online player of that name remakes
+    /// its waypoint connections. `team_color` is its team's colour now.
+    fn update_player_waypoint(&self, _player: &str, _team_color: Option<NamedColor>) {}
+
+    /// Vanilla `ServerScoreboard.updateTeamWaypoints`.
+    fn update_team_waypoints(&self, _players: &[String], _team_color: Option<NamedColor>) {}
 }
 
 impl ScoreboardTarget for World {
@@ -41,6 +48,14 @@ impl ScoreboardTarget for World {
 
     fn send_je<J: ClientPacket + Sync>(&self, je_packet: &J) {
         self.broadcast_packet_all(je_packet);
+    }
+
+    fn update_player_waypoint(&self, player: &str, team_color: Option<NamedColor>) {
+        crate::world::waypoint_manager::update_player_waypoint(self, player, team_color);
+    }
+
+    fn update_team_waypoints(&self, players: &[String], team_color: Option<NamedColor>) {
+        crate::world::waypoint_manager::update_team_waypoints(self, players, team_color);
     }
 }
 
@@ -56,6 +71,14 @@ impl<T: ScoreboardTarget + ?Sized> ScoreboardTarget for &T {
     fn send_je<J: ClientPacket + Sync>(&self, je_packet: &J) {
         (*self).send_je(je_packet);
     }
+
+    fn update_player_waypoint(&self, player: &str, team_color: Option<NamedColor>) {
+        (*self).update_player_waypoint(player, team_color);
+    }
+
+    fn update_team_waypoints(&self, players: &[String], team_color: Option<NamedColor>) {
+        (*self).update_team_waypoints(players, team_color);
+    }
 }
 
 impl ScoreboardTarget for std::sync::Arc<World> {
@@ -69,6 +92,14 @@ impl ScoreboardTarget for std::sync::Arc<World> {
 
     fn send_je<J: ClientPacket + Sync>(&self, je_packet: &J) {
         self.broadcast_packet_all(je_packet);
+    }
+
+    fn update_player_waypoint(&self, player: &str, team_color: Option<NamedColor>) {
+        crate::world::waypoint_manager::update_player_waypoint(self, player, team_color);
+    }
+
+    fn update_team_waypoints(&self, players: &[String], team_color: Option<NamedColor>) {
+        crate::world::waypoint_manager::update_team_waypoints(self, players, team_color);
     }
 }
 
@@ -557,7 +588,10 @@ impl Scoreboard {
             players: Box::new([]),
         });
 
+        // `onTeamChanged`: the packet, then `updateTeamWaypoints`.
+        let (players, color) = (team.players.clone(), team.color);
         self.teams.insert(team.name.clone(), team);
+        target.update_team_waypoints(&players, color);
     }
 
     pub fn remove_team(&mut self, target: &impl ScoreboardTarget, name: &str) {
@@ -574,7 +608,11 @@ impl Scoreboard {
         });
 
         self.team_names.remove(name);
-        self.teams.remove(name);
+        // `onTeamRemoved`: the packet, then `updateTeamWaypoints` with the players no longer
+        // on any team.
+        if let Some(team) = self.teams.remove(name) {
+            target.update_team_waypoints(&team.players, None);
+        }
     }
 
     /// Vanilla `Scoreboard.addPlayerToTeam`: the player leaves its current team first. Returns
@@ -602,7 +640,10 @@ impl Scoreboard {
             players: vec![player.clone()].into(),
         });
 
+        // `ServerScoreboard.addPlayerToTeam`: the packet, then `updatePlayerWaypoint` (which
+        // is handed the team's colour, so the order against the push doesn't matter).
         if let Some(team) = self.teams.get_mut(team_name) {
+            target.update_player_waypoint(&player, team.color);
             team.players.push(player);
         }
         true
@@ -647,6 +688,8 @@ impl Scoreboard {
         });
 
         team.players.retain(|p| p != player);
+        // `ServerScoreboard.removePlayerFromTeam`: the packet, then `updatePlayerWaypoint`.
+        target.update_player_waypoint(player, None);
     }
 
     pub fn clear_team_players(&mut self, target: &impl ScoreboardTarget, team_name: &str) {
@@ -667,10 +710,13 @@ impl Scoreboard {
             team_name: team_name.to_string(),
             method: TeamMethod::RemovePlayers,
             parameters: None,
-            players: players_to_remove.into(),
+            players: players_to_remove.clone().into(),
         });
 
         team.players.clear();
+        for player in &players_to_remove {
+            target.update_player_waypoint(player, None);
+        }
     }
 
     pub fn send_to_player(&self, player: &Player) {
