@@ -172,6 +172,11 @@ impl WardenEntity {
 }
 
 impl Mob for WardenEntity {
+    /// Vanilla `Warden` runs on a brain and leaves its goal selector empty, so
+    /// `Mob.updateControlFlags` gates nothing; the goals standing in for that brain here must
+    /// not be gated either.
+    fn update_control_flags(&self) {}
+
     /// Vanilla `Warden.getWalkTargetValue`.
     fn get_walk_target_value(&self, _pos: &pumpkin_util::math::position::BlockPos) -> f32 {
         0.0

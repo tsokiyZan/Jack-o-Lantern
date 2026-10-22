@@ -181,6 +181,12 @@ impl GoalSelector {
         self.disabled_controls.set(control, !enabled);
     }
 
+    #[cfg(test)]
+    #[must_use]
+    pub const fn is_control_disabled(&self, control: Controls) -> bool {
+        self.disabled_controls.get(control)
+    }
+
     fn get_goal_by_control(&mut self, control: Controls) -> Option<&mut PrioritizedGoal> {
         let i = self.goals_by_control[control.idx()];
         self.goals.get_mut(i)

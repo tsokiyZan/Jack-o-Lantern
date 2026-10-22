@@ -226,6 +226,11 @@ const BABY_DIMENSIONS: EntityDimensions =
     pumpkin_data::entity_dimensions::CAMEL_BABY_STANDING_DIMENSIONS;
 
 impl Mob for CamelEntity {
+    /// Vanilla `Camel` (and `CamelHusk`) runs on a brain and leaves its goal selector empty, so
+    /// `Mob.updateControlFlags` gates nothing; the goals standing in for that brain here must
+    /// not be gated either.
+    fn update_control_flags(&self) {}
+
     /// Vanilla `CamelHusk.interact`, before `super.interact`.
     fn before_interact(&self) {
         if self.get_entity().entity_type == &pumpkin_data::entity::EntityType::CAMEL_HUSK {
@@ -485,6 +490,48 @@ impl Mob for CamelEntity {
             self.animal_interact(player, item_stack, Sound::EntityCamelAmbient)
         } else {
             InteractionResult::FAIL
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::entity::ai::goal::Controls;
+    use pumpkin_data::entity::EntityType;
+    use pumpkin_util::math::vector3::Vector3;
+
+    /// A husk riding a camel (vanilla `Husk.finalizeSpawn`'s camel-husk jockey) steers it, but
+    /// the camel's brain stand-in goals keep every control. A zombie mount loses them.
+    #[tokio::test]
+    async fn husk_rider_leaves_camel_goals_enabled() {
+        let (_folder, world) = crate::world::test_support::test_world();
+        let spawn = |entity_type| {
+            crate::entity::r#type::from_type(
+                entity_type,
+                Vector3::new(0.0, 100.0, 0.0),
+                &world,
+                uuid::Uuid::new_v4(),
+            )
+        };
+        for (mount_type, gated) in [(&EntityType::CAMEL, false), (&EntityType::ZOMBIE, true)] {
+            let mount = spawn(mount_type);
+            let husk = spawn(&EntityType::HUSK);
+            mount
+                .get_entity()
+                .add_passenger_without_event(mount.clone(), husk);
+            let mob = mount.get_mob().unwrap();
+            assert!(mob.get_controlling_passenger().is_some());
+
+            mob.update_control_flags();
+            let goals = mob.get_mob_entity().goals_selector.lock().unwrap();
+            for control in [Controls::MOVE, Controls::JUMP, Controls::LOOK] {
+                assert_eq!(
+                    goals.is_control_disabled(control),
+                    gated,
+                    "{}",
+                    mount_type.resource_name
+                );
+            }
         }
     }
 }

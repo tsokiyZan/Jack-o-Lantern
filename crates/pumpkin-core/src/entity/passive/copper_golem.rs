@@ -233,6 +233,11 @@ impl CopperGolemEntity {
 }
 
 impl Mob for CopperGolemEntity {
+    /// Vanilla `CopperGolem` runs on a brain and leaves its goal selector empty, so
+    /// `Mob.updateControlFlags` gates nothing; the goals standing in for that brain here must
+    /// not be gated either.
+    fn update_control_flags(&self) {}
+
     /// Vanilla `CopperGolem.playStepSound`.
     fn play_step_sound(
         &self,

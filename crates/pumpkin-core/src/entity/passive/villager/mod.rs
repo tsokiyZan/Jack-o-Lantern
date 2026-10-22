@@ -1910,6 +1910,11 @@ impl VillagerEntity {
 const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::VILLAGER_BABY_DIMENSIONS;
 
 impl Mob for VillagerEntity {
+    /// Vanilla `Villager` runs on a brain and leaves its goal selector empty, so
+    /// `Mob.updateControlFlags` gates nothing; the goals standing in for that brain here must
+    /// not be gated either.
+    fn update_control_flags(&self) {}
+
     /// Vanilla `Villager.getAmbientSound`.
     fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
         if self.get_entity().pose.load() == EntityPose::Sleeping {
