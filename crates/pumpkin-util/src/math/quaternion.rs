@@ -97,7 +97,8 @@ impl Quaternionf {
         }
     }
 
-    /// JOML `transform(double, double, double, Vector3d)`.
+    /// JOML `transform(double, double, double, Vector3d)`. JOML's `Math.fma` is a plain multiply
+    /// and add unless `joml.useMathFma` is set, which vanilla doesn't.
     #[must_use]
     pub fn transform(self, v: Vector3<f64>) -> Vector3<f64> {
         let (xx, yy, zz, ww) = (
@@ -111,18 +112,12 @@ impl Quaternionf {
         let k = 1.0 / (xx + yy + zz + ww);
         let f = f64::from;
         Vector3::new(
-            f((xx - yy - zz + ww) * k).mul_add(
-                v.x,
-                f(2.0 * (xy - zw) * k).mul_add(v.y, f(2.0 * (xz + yw) * k) * v.z),
-            ),
-            f(2.0 * (xy + zw) * k).mul_add(
-                v.x,
-                f((yy - xx - zz + ww) * k).mul_add(v.y, f(2.0 * (yz - xw) * k) * v.z),
-            ),
-            f(2.0 * (xz - yw) * k).mul_add(
-                v.x,
-                f(2.0 * (yz + xw) * k).mul_add(v.y, f((zz - xx - yy + ww) * k) * v.z),
-            ),
+            f((xx - yy - zz + ww) * k) * v.x
+                + (f(2.0 * (xy - zw) * k) * v.y + f(2.0 * (xz + yw) * k) * v.z),
+            f(2.0 * (xy + zw) * k) * v.x
+                + (f((yy - xx - zz + ww) * k) * v.y + f(2.0 * (yz - xw) * k) * v.z),
+            f(2.0 * (xz - yw) * k) * v.x
+                + (f(2.0 * (yz + xw) * k) * v.y + f((zz - xx - yy + ww) * k) * v.z),
         )
     }
 }
@@ -130,6 +125,69 @@ impl Quaternionf {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Bits from JOML 1.10.9's default (unfused) `transform(double, double, double, Vector3d)` on
+    /// vanilla's look quaternion; a fused multiply-add rounds each of these differently.
+    #[test]
+    fn look_transform_of_any_vector_is_unfused() {
+        let to_radians = (std::f64::consts::PI / 180.0) as f32;
+        let cases: [(u32, u32, [u64; 3], [u64; 3]); 3] = [
+            (
+                0xc1c7_00ec,
+                0x4098_2c80,
+                [
+                    0x4004_c89f_bb01_6058,
+                    0x3fff_fa0d_90e7_7674,
+                    0xbff0_a888_2502_09f7,
+                ],
+                [
+                    0x4005_e56a_24ad_de7e,
+                    0x3ff6_00b9_3834_030f,
+                    0xbff9_04f7_92e8_b142,
+                ],
+            ),
+            (
+                0xc276_0c52,
+                0x431a_b590,
+                [
+                    0x3ff9_d031_664d_b7b0,
+                    0x4005_5d10_09bc_d2e0,
+                    0xc004_da17_4d0f_e69c,
+                ],
+                [
+                    0x3fb3_3c41_7f6b_4150,
+                    0xbff0_4647_2c52_7770,
+                    0x400f_7bc3_5b85_eacc,
+                ],
+            ),
+            (
+                0x425f_5dd4,
+                0xc267_0fa0,
+                [
+                    0xbfc0_f603_b222_b9c0,
+                    0xbff0_125b_5137_567c,
+                    0x3ff2_7ba6_7790_7410,
+                ],
+                [
+                    0xbfcc_d0a1_1bff_06ce,
+                    0xbff8_5186_99be_71ab,
+                    0x3f8e_1a24_be37_b8a8,
+                ],
+            ),
+        ];
+        for (x_rot, y_rot, v, want) in cases {
+            let (x_rot, y_rot) = (f32::from_bits(x_rot), f32::from_bits(y_rot));
+            let v = Vector3::new(
+                f64::from_bits(v[0]),
+                f64::from_bits(v[1]),
+                f64::from_bits(v[2]),
+            );
+            let out = Quaternionf::rotation_y(-y_rot * to_radians)
+                .rotate_x(x_rot * to_radians)
+                .transform(v);
+            assert_eq!([out.x.to_bits(), out.y.to_bits(), out.z.to_bits()], want);
+        }
+    }
 
     /// Bits from JOML 1.10.9: `new Quaternionf().rotationY(-yRot * TO_RAD).rotateX(xRot * TO_RAD)
     /// .transform(0, 0, 1, new Vector3d())`, as vanilla `getLookQuaternion` uses it.
