@@ -666,8 +666,8 @@ impl ZombieEntityBase {
                     operation: ModifierOperation::MultiplyTotal,
                 });
             });
-            // Vanilla `Mob.onAttributeUpdated`: `getNavigation()`, which is the chicken's once
-            // `finalizeSpawn` has mounted a jockey (Zombie.java:464 runs before :483).
+            // Pumpkin's eager stand-in for the next tick's `refreshDirtyAttributes` →
+            // `Mob.onAttributeUpdated` → `getNavigation()` (LivingEntity.java:2860, Mob.java:1449).
             self.mob_entity.with_navigation(|navigation, owner| {
                 navigation.update_pathfinder_max_visited_nodes(&owner.living_entity);
             });

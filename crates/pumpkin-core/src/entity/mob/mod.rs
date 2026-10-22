@@ -136,7 +136,8 @@ pub struct MobEntity {
     death_loot_table: std::sync::Mutex<Option<String>>,
     /// Vanilla `Mob.lootTableSeed`.
     death_loot_table_seed: AtomicI64,
-    /// The follow range the navigator last sized its search for (`onAttributeUpdated`).
+    /// The follow range last seen by the `onAttributeUpdated` check; NaN until the first AI step,
+    /// which compares against the base value the navigation was built with instead.
     applied_follow_range: AtomicCell<f64>,
     pending_riders: std::sync::Mutex<Vec<Arc<dyn EntityBase>>>,
     pending_vehicle: std::sync::Mutex<Option<Arc<dyn EntityBase>>>,
@@ -463,15 +464,28 @@ impl MobEntity {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .tick();
 
-        // Vanilla `Mob.onAttributeUpdated`: a changed follow range resizes the path search.
-        // Attributes change where the mob can't be reached, so the AI step, after
-        // `tickEffects`, picks it up.
+        // Vanilla `Mob.onAttributeUpdated` (Mob.java:1449), from `refreshDirtyAttributes`: a changed
+        // follow range resizes the path search. Attributes change where the mob can't be reached,
+        // so the AI step, after `tickEffects`, picks it up. An attribute nothing touched never
+        // fires (`AttributeMap.onAttributeModified` only runs on `setDirty`), and the navigation
+        // keeps its construction size, `floor(base * 16)` (PathNavigation.java:62, which the
+        // pathfinder fills lazily). So the first check compares against the base value.
         let follow_range = self
             .living_entity
             .get_attribute_value(&Attributes::FOLLOW_RANGE);
-        if self.applied_follow_range.swap(follow_range).to_bits() != follow_range.to_bits() {
-            self.own_navigation()
-                .update_pathfinder_max_visited_nodes(&self.living_entity);
+        let previous = self.applied_follow_range.swap(follow_range);
+        let previous = if previous.is_nan() {
+            self.living_entity
+                .get_attribute_base(&Attributes::FOLLOW_RANGE)
+        } else {
+            previous
+        };
+        if previous.to_bits() != follow_range.to_bits() {
+            // `getNavigation()`: the controlled vehicle's, re-sized from the vehicle's own follow
+            // range. The rider's own navigation keeps its size, as in vanilla.
+            self.with_navigation(|navigation, owner| {
+                navigation.update_pathfinder_max_visited_nodes(&owner.living_entity);
+            });
         }
 
         // 1. "Take" selectors out of the mutexes
@@ -592,6 +606,9 @@ impl MobEntity {
     }
 
     /// Vanilla `Mob.jumpInLiquid`: a mob whose navigation can't float leaps out.
+    ///
+    /// Reads `getNavigation()`, locking the controlled vehicle's navigation while riding: never
+    /// call it inside a `with_navigation` closure.
     pub fn jump_in_liquid(&self) {
         let can_float = self.with_navigation(|navigation, _| navigation.can_float());
         if can_float {

@@ -163,6 +163,8 @@ impl DrownedEntity {
     }
 
     /// Vanilla `Drowned.closeToNextPos`: within 2 blocks of the path's final target.
+    ///
+    /// Reads `getNavigation()`, so never call it inside a `with_navigation` closure.
     fn close_to_next_pos(&self) -> bool {
         let entity = self.get_entity();
         let pos = entity.pos.load();
