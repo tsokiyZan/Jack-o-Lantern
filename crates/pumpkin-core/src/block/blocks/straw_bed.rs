@@ -204,7 +204,6 @@ impl StrawBedBlock {
     fn sleep_refusal(
         world: &Arc<World>,
         player: &Arc<Player>,
-        occupied: bool,
         bed_head_pos: BlockPos,
         bed_foot_pos: BlockPos,
     ) -> Option<TextComponent> {
@@ -221,13 +220,6 @@ impl StrawBedBlock {
             return Some(pumpkin_macros::translate_cross!(
                 translation::java::BLOCK_MINECRAFT_BED_OBSTRUCTED,
                 translation::bedrock::TILE_BED_OBSTRUCTED
-            ));
-        }
-
-        if occupied {
-            return Some(pumpkin_macros::translate_cross!(
-                translation::java::BLOCK_MINECRAFT_BED_OCCUPIED,
-                translation::bedrock::TILE_BED_OCCUPIED
             ));
         }
 
@@ -281,18 +273,26 @@ impl StrawBedBlock {
             Self::destroy_after_use(world, bed_head_pos);
             return BlockActionResult::SuccessServer;
         }
+        // `AbstractBedBlock.useWithoutItem`: an occupied bed (the head's state) kicks a
+        // sleeping villager out, or says it is occupied.
+        if BedProperties::from_state_id(world.get_block_state_id(&bed_head_pos)).occupied {
+            if !crate::block::blocks::bed::kick_villager_out_of_bed(world, bed_head_pos) {
+                player.send_system_message_raw(
+                    &pumpkin_macros::translate_cross!(
+                        translation::java::BLOCK_MINECRAFT_BED_OCCUPIED,
+                        translation::bedrock::TILE_BED_OCCUPIED
+                    ),
+                    true,
+                );
+            }
+            return BlockActionResult::SuccessServer;
+        }
         // `ServerPlayer.startSleepInBed`: asleep already or dead, `OTHER_PROBLEM` (no message).
         if player.is_sleeping() || !crate::entity::inside_block_effect::is_alive(player.as_ref()) {
             return BlockActionResult::SuccessServer;
         }
 
-        if let Some(message) = Self::sleep_refusal(
-            world,
-            player,
-            bed_props.occupied,
-            bed_head_pos,
-            bed_foot_pos,
-        ) {
+        if let Some(message) = Self::sleep_refusal(world, player, bed_head_pos, bed_foot_pos) {
             player.send_system_message_raw(&message, true);
             return BlockActionResult::SuccessServer;
         }

@@ -7,7 +7,7 @@ use crate::{
     server::Server,
 };
 use pumpkin_data::damage::DamageType;
-use pumpkin_data::entity::{EntityPose, EntityStatus};
+use pumpkin_data::entity::EntityStatus;
 use pumpkin_data::particle::Particle;
 use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_protocol::bedrock::server::actor_event::ActorEventID;
@@ -114,7 +114,8 @@ impl EntityBase for EnderPearlEntity {
         if let Some(owner) = owner
             && owner.get_entity().is_alive()
             && owner.get_living_entity().is_none_or(|living| {
-                living.health.load() > 0.0 && owner.get_entity().pose.load() != EntityPose::Sleeping
+                living.health.load() > 0.0
+                    && !crate::entity::living::LivingEntity::is_sleeping(owner.as_ref())
             })
         {
             // Vanilla only spawns endermites behind, and hurts, a teleported player.

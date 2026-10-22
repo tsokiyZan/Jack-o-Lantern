@@ -6,7 +6,6 @@ use std::sync::atomic::{AtomicBool, AtomicI32, AtomicI64, Ordering};
 use std::sync::{Arc, Weak};
 use uuid::Uuid;
 
-use crate::block::blocks::bed::BedBlock;
 use crate::entity::ai::pathfinder::node::PathType;
 use pumpkin_data::Enchantment;
 use pumpkin_data::attributes::Attributes;
@@ -1706,8 +1705,6 @@ impl VillagerEntity {
         self.update_job_site(&world);
 
         // 1. Bed / Sleeping logic (for all villagers: babies, nitwits, adults)
-        let is_sleeping = self.get_entity().pose.load() == EntityPose::Sleeping;
-
         // Check if current bed is still valid
         if let Some(current_home) = self.get_home_pos() {
             let (block, state) = world.get_block_and_state(&current_home);
@@ -1718,19 +1715,12 @@ impl VillagerEntity {
                 false
             };
 
+            // A sleeper whose bed is gone wakes in `LivingEntity::tick` (`checkBedExists`).
             if !valid {
                 *self
                     .home_pos
                     .lock()
                     .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
-                if is_sleeping {
-                    // Wake up if bed was broken
-                    self.set_pose(EntityPose::Standing);
-                    self.get_entity().set_synced_data(
-                        pumpkin_data::tracked_data::villager::SLEEPING_POS_ID,
-                        None::<BlockPos>,
-                    );
-                }
             }
         }
 
@@ -1800,9 +1790,16 @@ impl VillagerEntity {
             }
         }
 
-        // Handle Sleeping/Waking up based on time
-        let is_sleeping = self.get_entity().pose.load() == EntityPose::Sleeping;
-        if let Some(home_pos) = self.get_home_pos() {
+        // Handle Sleeping/Waking up based on time: the stand-in for the brain's `SleepInBed`
+        // and `WakeUp`, which a NoAI villager never runs.
+        let living = &self.mob_entity.living_entity;
+        let is_sleeping = living.get_sleeping_pos().is_some();
+        let home = if self.mob_entity.is_no_ai() {
+            None
+        } else {
+            self.get_home_pos()
+        };
+        if let Some(home_pos) = home {
             let time = world.get_time_of_day();
             let is_night = (12000..=23000).contains(&time);
 
@@ -1815,44 +1812,20 @@ impl VillagerEntity {
                     if dist <= 4.0 {
                         // Within 2 blocks (squared distance 4.0)
                         let (block, state) = world.get_block_and_state(&home_pos);
-                        if block.has_tag(&pumpkin_data::tag::Block::MINECRAFT_BEDS) {
-                            let bed_props = BedProperties::from_state_id(state.id);
-                            if !bed_props.occupied {
-                                // Make bed occupied
-                                BedBlock::set_occupied(true, &world, block, &home_pos, state.id);
-
-                                self.set_pose(EntityPose::Sleeping);
-                                self.get_entity().set_synced_data(
-                                    pumpkin_data::tracked_data::villager::SLEEPING_POS_ID,
-                                    Some(home_pos),
-                                );
-                            }
+                        if block.has_tag(&pumpkin_data::tag::Block::MINECRAFT_BEDS)
+                            && !BedProperties::from_state_id(state.id).occupied
+                        {
+                            living.start_sleeping(self, home_pos);
                         }
                     }
                 }
             } else if is_sleeping {
                 // It is day, wake up!
-                let (block, state) = world.get_block_and_state(&home_pos);
-                if block.has_tag(&pumpkin_data::tag::Block::MINECRAFT_BEDS) {
-                    let bed_props = BedProperties::from_state_id(state.id);
-                    if bed_props.occupied {
-                        BedBlock::set_occupied(false, &world, block, &home_pos, state.id);
-                    }
-                }
-
-                self.set_pose(EntityPose::Standing);
-                self.get_entity().set_synced_data(
-                    pumpkin_data::tracked_data::villager::SLEEPING_POS_ID,
-                    None::<BlockPos>,
-                );
+                living.stop_sleeping(self);
             }
-        } else if is_sleeping {
+        } else if is_sleeping && !self.mob_entity.is_no_ai() {
             // Wake up during the day
-            self.set_pose(EntityPose::Standing);
-            self.get_entity().set_synced_data(
-                pumpkin_data::tracked_data::villager::SLEEPING_POS_ID,
-                None::<BlockPos>,
-            );
+            living.stop_sleeping(self);
         }
 
         // 2. Iron Golem spawning logic (only for adults)
@@ -1971,7 +1944,7 @@ impl Mob for VillagerEntity {
 
     /// Vanilla `Villager.getAmbientSound`.
     fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
-        if self.get_entity().pose.load() == EntityPose::Sleeping {
+        if self.mob_entity.living_entity.get_sleeping_pos().is_some() {
             None
         } else if self.is_trading.load(Ordering::Relaxed) {
             Some(pumpkin_data::sound::Sound::EntityVillagerTrade)
@@ -2432,7 +2405,7 @@ impl Mob for VillagerEntity {
         if item_stack.item == &Item::VILLAGER_SPAWN_EGG
             || !self.get_entity().is_alive()
             || self.is_trading.load(Ordering::Relaxed)
-            || self.get_entity().pose.load() == EntityPose::Sleeping
+            || self.mob_entity.living_entity.get_sleeping_pos().is_some()
         {
             // TODO: `AgeableMob.mobInteract`'s golden dandelion.
             return InteractionResult::PASS;

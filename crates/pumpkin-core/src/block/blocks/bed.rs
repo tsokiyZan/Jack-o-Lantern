@@ -216,6 +216,21 @@ impl BedBlock {
             return BlockActionResult::SuccessServer;
         }
 
+        // `AbstractBedBlock.useWithoutItem`: an occupied bed (the head's state) kicks a
+        // sleeping villager out, or says it is occupied.
+        if BedProperties::from_state_id(world.get_block_state_id(&bed_head_pos)).occupied {
+            if !kick_villager_out_of_bed(world, bed_head_pos) {
+                player.send_system_message_raw(
+                    &pumpkin_macros::translate_cross!(
+                        translation::java::BLOCK_MINECRAFT_BED_OCCUPIED,
+                        translation::bedrock::TILE_BED_OCCUPIED
+                    ),
+                    true,
+                );
+            }
+            return BlockActionResult::SuccessServer;
+        }
+
         // `ServerPlayer.startSleepInBed`: asleep already or dead, `OTHER_PROBLEM` (no message).
         if player.is_sleeping() || !crate::entity::inside_block_effect::is_alive(player.as_ref()) {
             return BlockActionResult::SuccessServer;
@@ -244,20 +259,6 @@ impl BedBlock {
                 &pumpkin_macros::translate_cross!(
                     translation::java::BLOCK_MINECRAFT_BED_OBSTRUCTED,
                     translation::bedrock::TILE_BED_OBSTRUCTED
-                ),
-                true,
-            );
-            return BlockActionResult::SuccessServer;
-        }
-
-        // Make sure the bed is not occupied
-        if bed_props.occupied {
-            // TODO: Wake up villager
-
-            player.send_system_message_raw(
-                &pumpkin_macros::translate_cross!(
-                    translation::java::BLOCK_MINECRAFT_BED_OCCUPIED,
-                    translation::bedrock::TILE_BED_OCCUPIED
                 ),
                 true,
             );
@@ -402,6 +403,27 @@ impl BedBlock {
 
 fn entity_prevents_sleep(entity: &Entity) -> bool {
     NO_SLEEP_IDS.contains(&entity.entity_type.id)
+}
+
+/// Vanilla `AbstractBedBlock.kickVillagerOutOfBed`: the first sleeping villager in the
+/// head's block space (section order) wakes up.
+pub fn kick_villager_out_of_bed(world: &World, head: BlockPos) -> bool {
+    let villager = world
+        .get_all_at_box(&pumpkin_util::math::boundingbox::BoundingBox::from_block(
+            &head,
+        ))
+        .into_iter()
+        .find(|entity| {
+            entity.get_entity().entity_type == &EntityType::VILLAGER
+                && crate::entity::living::LivingEntity::is_sleeping(entity.as_ref())
+        });
+    let Some(villager) = villager else {
+        return false;
+    };
+    if let Some(living) = villager.get_living_entity() {
+        living.stop_sleeping(villager.as_ref());
+    }
+    true
 }
 
 /// `instanceof AbstractBedBlock`: a bed (`#beds`) or a straw bed.
