@@ -1057,6 +1057,42 @@ pub trait EntityBase: Send + Sync + std::any::Any {
         self.get_entity().move_by_piston(caller, delta);
     }
 
+    /// Vanilla `Entity.canUsePortal`.
+    fn can_use_portal(&self, ignore_passenger: bool) -> bool {
+        let entity = self.get_entity();
+        (ignore_passenger || !entity.has_vehicle()) && entity.is_alive()
+    }
+
+    /// Vanilla `Entity.getDimensionChangingDelay`, with `Projectile`'s override (2).
+    fn dimension_changing_delay(&self) -> u32 {
+        if self.get_projectile().is_some() {
+            return 2;
+        }
+        match self.get_entity().get_first_passenger() {
+            Some(first) if first.get_player().is_some() => first.dimension_changing_delay(),
+            _ => 300,
+        }
+    }
+
+    /// Vanilla `Entity.canTeleport`: leaving the End, a player riding along must have seen
+    /// the credits.
+    fn can_teleport(&self, from: &World, to: &World) -> bool {
+        if from.dimension == Dimension::THE_END && to.dimension == Dimension::OVERWORLD {
+            return !self
+                .get_entity()
+                .passengers
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .iter()
+                .any(|passenger| {
+                    passenger
+                        .get_player()
+                        .is_some_and(|player| !player.seen_credits.load(Ordering::Relaxed))
+                });
+        }
+        true
+    }
+
     /// Vanilla `Entity.getKnownMovement`: a player steering this entity knows its movement best.
     fn get_known_movement(&self) -> Vector3<f64> {
         let entity = self.get_entity();
@@ -2255,19 +2291,6 @@ impl Entity {
             wrap_degrees(to_degrees(pumpkin_util::math::atan2(delta.z, delta.x)) as f32 - 90.0);
         self.yaw.store(yaw);
         self.head_yaw.store(yaw);
-    }
-
-    /// Vanilla `getDimensionChangingDelay`: 10 for a player, and for a vehicle whose first
-    /// passenger is a player; 300 for anything else.
-    fn dimension_changing_delay(&self) -> u32 {
-        let player_first = self
-            .get_first_passenger()
-            .is_some_and(|passenger| passenger.get_player().is_some());
-        if self.entity_type == &EntityType::PLAYER || player_first {
-            10
-        } else {
-            300
-        }
     }
 
     /// Returns the block position of the block the (non-player) entity is standing on, if any.
@@ -3651,15 +3674,13 @@ impl Entity {
         };
         let mut should_remove = false;
         if let Some(portal_processor) = manager_guard.as_mut() {
-            // `canUsePortal(false)`: not a passenger, and alive.
-            let can_use_portal = !self.has_vehicle() && inside_block_effect::is_alive(caller);
             if portal_processor.process_portal_teleportation(
                 &self.world.load(),
                 caller,
-                can_use_portal,
+                caller.can_use_portal(false),
             ) {
                 self.portal_cooldown
-                    .store(self.dimension_changing_delay(), Ordering::Relaxed);
+                    .store(caller.dimension_changing_delay(), Ordering::Relaxed);
 
                 let world_clone = self.world.load_full();
                 let portal_type = portal_processor.portal_type;
@@ -3715,7 +3736,7 @@ impl Entity {
         }
     }
 
-    pub fn try_use_portal(&self, portal_world: Arc<World>, pos: BlockPos) {
+    pub fn try_use_portal(&self, caller: &dyn EntityBase, portal_world: Arc<World>, pos: BlockPos) {
         let mut portal_event =
             crate::plugin::api::events::entity::entity_portal::EntityPortalEvent::new(
                 self.entity_id,
@@ -3733,7 +3754,7 @@ impl Entity {
         // Vanilla `setAsInsidePortal`: a portal touched during the cooldown restarts it.
         if self.portal_cooldown.load(Ordering::Relaxed) > 0 {
             self.portal_cooldown
-                .store(self.dimension_changing_delay(), Ordering::Relaxed);
+                .store(caller.dimension_changing_delay(), Ordering::Relaxed);
             return;
         }
 

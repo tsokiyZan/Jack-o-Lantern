@@ -338,6 +338,17 @@ impl World {
         | PlayerInfoFlags::UPDATE_LIST_PRIORITY.bits()
         | PlayerInfoFlags::UPDATE_HAT.bits();
 
+    /// Vanilla `ServerLevel.isAllowedToEnterPortal`.
+    #[must_use]
+    pub fn is_allowed_to_enter_portal(&self, to: &Self) -> bool {
+        to.dimension != Dimension::THE_NETHER
+            || self
+                .level_info
+                .load()
+                .game_rules
+                .allow_entering_nether_using_portals
+    }
+
     pub async fn get_block_state_id_async(&self, position: &BlockPos) -> BlockStateId {
         if !self.is_in_build_limit(*position) {
             return Block::AIR.default_state.id;

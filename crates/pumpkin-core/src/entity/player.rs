@@ -7613,6 +7613,16 @@ impl NBTStorage for EnderChestInventory {
 impl NBTStorageInit for EnderChestInventory {}
 
 impl EntityBase for Player {
+    fn can_use_portal(&self, ignore_passenger: bool) -> bool {
+        self.living_entity
+            .living_can_use_portal(self, ignore_passenger)
+    }
+
+    /// Vanilla `Player.getDimensionChangingDelay`.
+    fn dimension_changing_delay(&self) -> u32 {
+        10
+    }
+
     /// Vanilla `ServerPlayer.getKnownMovement`: the client's last move, or the vehicle's when
     /// someone else steers it.
     fn get_known_movement(&self) -> Vector3<f64> {

@@ -1844,8 +1844,7 @@ pub trait Mob: EntityBase + Send + Sync {
     /// The part of a vanilla `die` override that runs before `super.die`.
     fn before_die(&self) {}
 
-    /// The mob's own part of vanilla `Entity.canUsePortal`, which portal blocks check before
-    /// they move an entity.
+    /// The mob's own part of vanilla `Entity.canUsePortal`, checked before `LivingEntity`'s.
     fn can_use_portal(&self) -> bool {
         true
     }
@@ -3559,6 +3558,15 @@ pub fn mob_hurt_server<M: Mob + ?Sized>(
 }
 
 impl<T: Mob + Send + 'static> EntityBase for T {
+    /// Vanilla `canUsePortal`: the mob's own override, then `LivingEntity`'s.
+    fn can_use_portal(&self, ignore_passenger: bool) -> bool {
+        Mob::can_use_portal(self)
+            && self
+                .get_mob_entity()
+                .living_entity
+                .living_can_use_portal(self, ignore_passenger)
+    }
+
     /// Vanilla `LivingEntity.getWeaponItem`.
     fn get_weapon_item(&self) -> Option<ItemStack> {
         self.get_living_entity()

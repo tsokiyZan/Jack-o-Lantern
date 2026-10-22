@@ -156,6 +156,11 @@ impl MinecartEntity {
 }
 
 impl EntityBase for MinecartEntity {
+    /// Vanilla `VehicleEntity.getDimensionChangingDelay`.
+    fn dimension_changing_delay(&self) -> u32 {
+        10
+    }
+
     /// Vanilla `AbstractMinecart.getKnownMovement` with `OldMinecartBehavior`'s: the delta
     /// movement (a minecart has no controlling passenger), its horizontal axes clamped to 0.4,
     /// and zero if any axis is NaN.

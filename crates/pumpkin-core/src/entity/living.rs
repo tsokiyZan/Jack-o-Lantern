@@ -4514,6 +4514,14 @@ impl LivingEntity {
         self.health.load() <= 0.0 || self.dead.load(Relaxed)
     }
 
+    /// Vanilla `LivingEntity.canUsePortal`: `Entity`'s, with this class's `isAlive`, and
+    /// not while sleeping.
+    pub fn living_can_use_portal(&self, caller: &dyn EntityBase, ignore_passenger: bool) -> bool {
+        (ignore_passenger || !self.entity.has_vehicle())
+            && self.is_alive()
+            && !Self::is_sleeping(caller)
+    }
+
     /// Vanilla `LivingEntity.isSleeping` (a sleeping position); Pumpkin keeps it on the
     /// player and the mobs that sleep.
     fn is_sleeping(caller: &dyn EntityBase) -> bool {
@@ -5133,6 +5141,10 @@ impl EntityBase for LivingEntity {
     /// Vanilla `LivingEntity.getWeaponItem`.
     fn get_weapon_item(&self) -> Option<ItemStack> {
         Some(self.held_item(self))
+    }
+
+    fn can_use_portal(&self, ignore_passenger: bool) -> bool {
+        self.living_can_use_portal(self, ignore_passenger)
     }
 
     fn damage_with_context(

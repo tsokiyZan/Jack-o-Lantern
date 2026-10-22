@@ -587,6 +587,11 @@ fn living_entity_selector(
 }
 
 impl Mob for WitherEntity {
+    /// Vanilla `WitherBoss.canUsePortal`.
+    fn can_use_portal(&self) -> bool {
+        false
+    }
+
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
     }

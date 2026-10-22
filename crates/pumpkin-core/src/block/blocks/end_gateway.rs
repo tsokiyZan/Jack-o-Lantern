@@ -10,11 +10,7 @@ pub struct EndGatewayBlock;
 
 impl BlockBehaviour for EndGatewayBlock {
     fn on_entity_collision(&self, args: OnEntityCollisionArgs<'_>) {
-        if args
-            .entity
-            .get_mob()
-            .is_some_and(|mob| !mob.can_use_portal())
-        {
+        if !args.entity.can_use_portal(false) {
             return;
         }
         let entity = args.entity.get_entity();

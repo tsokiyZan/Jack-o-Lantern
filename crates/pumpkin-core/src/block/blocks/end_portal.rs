@@ -12,11 +12,7 @@ pub struct EndPortalBlock;
 
 impl BlockBehaviour for EndPortalBlock {
     fn on_entity_collision(&self, args: OnEntityCollisionArgs<'_>) {
-        if args
-            .entity
-            .get_mob()
-            .is_some_and(|mob| !mob.can_use_portal())
-        {
+        if !args.entity.can_use_portal(false) {
             return;
         }
         let target_world =
@@ -30,7 +26,7 @@ impl BlockBehaviour for EndPortalBlock {
         }
         args.entity
             .get_entity()
-            .try_use_portal(target_world, *args.position);
+            .try_use_portal(args.entity, target_world, *args.position);
     }
 
     fn placed(&self, args: PlacedArgs<'_>) {

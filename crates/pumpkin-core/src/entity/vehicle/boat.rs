@@ -54,6 +54,11 @@ impl BoatEntity {
 }
 
 impl EntityBase for BoatEntity {
+    /// Vanilla `VehicleEntity.getDimensionChangingDelay`.
+    fn dimension_changing_delay(&self) -> u32 {
+        10
+    }
+
     /// Vanilla `AbstractBoat.getPassengerAttachmentPoint`: two riders sit fore and aft (an
     /// animal a little further forward), at the boat's or raft's ride height.
     fn passenger_attachment_point(

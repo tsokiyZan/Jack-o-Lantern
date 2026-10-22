@@ -43,6 +43,7 @@ pub enum PortalType {
 }
 
 impl PortalType {
+    /// Vanilla `Portal.getPortalTransitionTime`, with `NetherPortalBlock`'s override.
     pub fn get_portal_transition_time(
         &self,
         current_world: &World,
@@ -51,19 +52,10 @@ impl PortalType {
         match self {
             Self::End => 0,
             Self::Nether => {
-                let entity_type = entity.get_entity().entity_type;
-                let level_info = current_world.level_info.load();
-                match entity_type.id {
-                    id if id == pumpkin_data::entity::EntityType::PLAYER.id => (current_world
-                        .get_player_by_id(entity.get_entity().entity_id))
-                    .map_or(80, |player| match player.gamemode.load() {
-                        pumpkin_util::GameMode::Creative => {
-                            level_info.game_rules.players_nether_portal_creative_delay as u32
-                        }
-                        _ => level_info.game_rules.players_nether_portal_default_delay as u32,
-                    }),
-                    _ => 0,
-                }
+                crate::block::blocks::nether_portal::NetherPortalBlock::get_portal_transition_time(
+                    current_world,
+                    entity,
+                )
             }
         }
     }

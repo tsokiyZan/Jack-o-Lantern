@@ -188,6 +188,11 @@ pub(crate) fn affect_entities_around(potion: &dyn EntityBase, stack: &ItemStack)
 }
 
 impl EntityBase for SplashPotionEntity {
+    /// Vanilla `ThrowableProjectile.canUsePortal`.
+    fn can_use_portal(&self, _ignore_passenger: bool) -> bool {
+        true
+    }
+
     fn get_projectile(&self) -> Option<&crate::entity::projectile::Projectile> {
         Some(&self.thrown.projectile)
     }
