@@ -546,6 +546,8 @@ pub struct Player {
     /// The player's total experience points.
     pub experience_points: AtomicI32,
     pub item_cooldowns: std::sync::Mutex<HashMap<String, ItemCooldown>>,
+    /// Vanilla `ItemCooldowns.tickCount`, the clock the cooldowns run on.
+    pub item_cooldown_tick: AtomicI32,
     pub experience_pick_up_delay: Mutex<u32>,
     pub chunk_sender: Mutex<crate::net::ChunkSender>,
     pub chunk_listener: Mutex<Receiver<(Vector2<i32>, Weak<ChunkData>)>>,
@@ -854,6 +856,7 @@ impl Player {
             experience_progress: AtomicCell::new(0.0),
             experience_points: AtomicI32::new(0),
             item_cooldowns: std::sync::Mutex::new(HashMap::new()),
+            item_cooldown_tick: AtomicI32::new(0),
             chunk_sender: Mutex::new(crate::net::ChunkSender::new()),
             chunk_listener: Mutex::new(world.level.chunk_listener.add_global_chunk_listener()),
             held_chunk_tickets: Mutex::new(None),
@@ -1034,7 +1037,7 @@ impl Player {
         cooldowns.insert(
             group.clone(),
             ItemCooldown {
-                start_tick: self.tick_counter.load(Ordering::Relaxed),
+                start_tick: self.item_cooldown_tick.load(Ordering::Relaxed),
                 duration,
             },
         );
@@ -1047,7 +1050,7 @@ impl Player {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         if let Some(cooldown) = cooldowns.get(group) {
-            let current_tick = self.tick_counter.load(Ordering::Relaxed);
+            let current_tick = self.item_cooldown_tick.load(Ordering::Relaxed);
             let elapsed = current_tick - cooldown.start_tick;
             if elapsed < cooldown.duration {
                 return 1.0 - (elapsed as f32 / cooldown.duration as f32);
@@ -1056,19 +1059,40 @@ impl Player {
         0.0
     }
 
+    /// Vanilla `ItemCooldowns.isOnCooldown`; an ended cooldown leaves in `tick_item_cooldowns`.
     pub fn is_on_cooldown(&self, group: &str) -> bool {
-        let mut cooldowns = self
+        let cooldowns = self
             .item_cooldowns
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        if let Some(cooldown) = cooldowns.get(group) {
-            let current_tick = self.tick_counter.load(Ordering::Relaxed);
-            if current_tick - cooldown.start_tick < cooldown.duration {
-                return true;
+        cooldowns.get(group).is_some_and(|cooldown| {
+            self.item_cooldown_tick.load(Ordering::Relaxed) - cooldown.start_tick
+                < cooldown.duration
+        })
+    }
+
+    /// Vanilla `ItemCooldowns.tick` (`ServerItemCooldowns`): the clock advances, and each
+    /// cooldown that ended leaves with a `cooldown` packet of 0 ticks (`onCooldownEnded`).
+    fn tick_item_cooldowns(&self) {
+        let tick = self.item_cooldown_tick.fetch_add(1, Ordering::Relaxed) + 1;
+        let ended: Vec<String> = {
+            let mut cooldowns = self
+                .item_cooldowns
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let ended: Vec<String> = cooldowns
+                .iter()
+                .filter(|(_, cooldown)| cooldown.start_tick + cooldown.duration <= tick)
+                .map(|(group, _)| group.clone())
+                .collect();
+            for group in &ended {
+                cooldowns.remove(group);
             }
-            cooldowns.remove(group);
+            ended
+        };
+        for group in ended {
+            self.try_send_client_packet(&CItemCooldown::new(group, VarInt(0)));
         }
-        false
     }
 
     pub fn set_display_name(&self, display_name: Option<TextComponent>) {
@@ -3460,6 +3484,7 @@ impl Player {
 
         self.hunger_manager.tick(self);
 
+        self.tick_item_cooldowns();
         // Vanilla updates pose in PlayerEntity#tick after super.tick().
         self.update_player_pose();
         self.check_inventory_advancements();
@@ -4688,7 +4713,7 @@ impl Player {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         if let Some(cooldown) = cooldowns.get(item_id) {
-            let current_tick = self.tick_counter.load(Ordering::Relaxed);
+            let current_tick = self.item_cooldown_tick.load(Ordering::Relaxed);
             let elapsed = current_tick - cooldown.start_tick;
             if elapsed < cooldown.duration {
                 return Some(cooldown.duration - elapsed);
