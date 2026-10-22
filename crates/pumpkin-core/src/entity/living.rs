@@ -3383,7 +3383,9 @@ impl LivingEntity {
     /// loop goes on: when `applyEffectTick` adds or removes an effect (a bad omen giving the raid
     /// omen), vanilla's iterator throws a `ConcurrentModificationException` on its next
     /// `remove` or `next`, which `tickEffects` swallows, so the effect that did it isn't removed
-    /// this tick and the rest of the effects aren't ticked.
+    /// this tick and the rest of the effects aren't ticked. The set is compared before and
+    /// after, so removing and re-adding the same effect inside one `applyEffectTick` (which
+    /// vanilla's `modCount` would catch) goes unnoticed; no effect does that.
     fn tick_effect(&self, effect_type: &'static StatusEffect) -> bool {
         let Some((has_remaining, tick_count, amplifier)) = self
             .active_effects
@@ -3447,6 +3449,11 @@ impl LivingEntity {
                 }
             }
             _ => {
+                // An effect that changed the set and then ran out: `iterator.remove()` throws
+                // too, so it stays for another tick.
+                if modified {
+                    return false;
+                }
                 if self
                     .active_effects
                     .lock()

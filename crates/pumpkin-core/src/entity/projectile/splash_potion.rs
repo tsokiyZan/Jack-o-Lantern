@@ -97,7 +97,8 @@ fn douse_fire(potion: &dyn EntityBase, world: &Arc<World>, pos: BlockPos) {
         world.game_event(
             GameEvent::BlockChange,
             pos.to_centered_f64(),
-            GameEventContext::of(None, Some(world.get_block_state(&pos))),
+            // `gameEvent(null, BLOCK_CHANGE, pos)`: `new Context(null, null)`.
+            GameEventContext::of(None, None),
         );
     } else if block.has_tag(&tag::Block::MINECRAFT_CAMPFIRES)
         && CampfireLikeProperties::from_state_id(state.id).lit
@@ -111,7 +112,8 @@ fn douse_fire(potion: &dyn EntityBase, world: &Arc<World>, pos: BlockPos) {
         world.game_event(
             GameEvent::BlockChange,
             pos.to_centered_f64(),
-            GameEventContext::of(owner.as_deref(), Some(state)),
+            // `gameEvent(owner, BLOCK_CHANGE, pos)`: no affected state.
+            GameEventContext::of(owner.as_deref(), None),
         );
         let mut properties = CampfireLikeProperties::from_state_id(state.id);
         properties.lit = false;
