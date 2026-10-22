@@ -34,6 +34,7 @@ use crate::entity::combat::{CombatRules, CombatTracker, FallLocation, knockback_
 use crate::entity::damage_source::DamageSource;
 use crate::entity::effect::MobEffectInstance;
 use crate::entity::mob::equipment::DEFAULT_EQUIPMENT_DROP_CHANCE;
+use crate::entity::player::advancement::trigger::AdvancementTrigger;
 use crate::entity::player::cooldown_group;
 use crate::entity::player::statistics::{CustomStatistic, StatisticCategory};
 use crate::server::Server;
@@ -753,8 +754,33 @@ impl LivingEntity {
         );
     }
 
-    /// Vanilla `LivingEntity.onItemPickup`, with `ServerPlayer`'s override.
-    pub const fn on_item_pickup(&self, _item: &super::item::ItemEntity) {}
+    /// Vanilla `LivingEntity.onItemPickup`, with `ServerPlayer`'s override: the
+    /// thrown-item-picked-up advancement triggers.
+    pub fn on_item_pickup(&self, item: &super::item::ItemEntity) {
+        let Some(owner) = item.get_owner() else {
+            return;
+        };
+        let stack = item
+            .get_item_stack()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        let world = self.entity.world.load();
+        if let Some(thrower) = owner.get_player()
+            && let Some(picker) = world.get_entity_by_id(self.entity.entity_id)
+        {
+            thrower.trigger_advancement(AdvancementTrigger::ThrownItemPickedUpByEntity {
+                item: stack.clone(),
+                entity: picker,
+            });
+        }
+        if let Some(player) = world.get_player_by_id(self.entity.entity_id) {
+            player.trigger_advancement(AdvancementTrigger::ThrownItemPickedUpByPlayer {
+                item: stack,
+                thrower: owner,
+            });
+        }
+    }
 
     /// Vanilla `ItemStack.causeUseVibration`: the use game event, for items whose
     /// `use_effects` make vibrations.
@@ -4978,7 +5004,9 @@ impl LivingEntity {
 
         if let Some(player) = caller.get_player() {
             player.increment_stat(StatisticCategory::Used, protection_item.item.id as i32, 1);
-            // TODO: the `used_totem` advancement trigger isn't ported.
+            player.trigger_advancement(AdvancementTrigger::UsedTotem {
+                item: protection_item.item,
+            });
             // `causeUseVibration(this, ITEM_INTERACT_FINISH)`.
             if protection_item
                 .get_data_component::<pumpkin_data::data_component_impl::UseEffectsImpl>()

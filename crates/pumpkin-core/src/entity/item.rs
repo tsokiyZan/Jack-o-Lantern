@@ -767,6 +767,11 @@ impl EntityBase for ItemEntity {
         living.take(&self.entity, org_count.into());
         if is_empty {
             self.entity.remove();
+            // As vanilla, so `onItemPickup` sees what was picked up.
+            self.item_stack
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .set_count(org_count);
         }
         player.increment_stat(
             StatisticCategory::PickedUp,

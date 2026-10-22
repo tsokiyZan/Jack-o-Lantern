@@ -2841,6 +2841,14 @@ impl Entity {
                         effect_applier,
                         is_precise,
                     );
+                    // Vanilla `onInsideBlock`, which only `ServerPlayer` overrides.
+                    if let Some(player) = caller.get_player() {
+                        player.trigger_advancement(
+                            crate::entity::player::advancement::trigger::AdvancementTrigger::EnterBlock {
+                                block,
+                            },
+                        );
+                    }
                 }
                 if inside_fluid {
                     effect_applier.advance_step(iteration);

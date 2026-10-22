@@ -1,15 +1,27 @@
+use std::sync::Arc;
+
+use crate::entity::EntityBase;
+use crate::entity::ageable::AgeableMob;
+use crate::entity::mob::cube_mob::CubeMobEntity;
+use crate::entity::mob::piglin::PiglinEntity;
 use crate::entity::player::Player;
+use pumpkin_data::Block;
+use pumpkin_data::data_component_impl::EquipmentSlot;
 use pumpkin_data::entity::EntityType;
+use pumpkin_data::item::Item;
+use pumpkin_data::item_stack::ItemStack;
+use pumpkin_data::tag::{self, Taggable};
 use pumpkin_util::math::vector3::Vector3;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum AdvancementTrigger {
     InventoryChanged,
     PlayerKilledEntity {
         entity_type_resource: String,
     },
+    /// Vanilla `CriteriaTriggers.ENTER_BLOCK`: the player is inside `block`.
     EnterBlock {
-        block_id: String,
+        block: &'static Block,
     },
     PlacedBlock {
         block_id: String,
@@ -50,13 +62,38 @@ pub enum AdvancementTrigger {
     },
     /// Vanilla `CriteriaTriggers.AVOID_VIBRATION`.
     AvoidVibration,
+    /// Vanilla `CriteriaTriggers.USED_TOTEM`: `item` kept the player alive.
+    UsedTotem {
+        item: &'static Item,
+    },
+    /// Vanilla `CriteriaTriggers.THROWN_ITEM_PICKED_UP_BY_ENTITY`: `entity` picked up `item`,
+    /// which this player threw.
+    ThrownItemPickedUpByEntity {
+        item: ItemStack,
+        entity: Arc<dyn EntityBase>,
+    },
+    /// Vanilla `CriteriaTriggers.THROWN_ITEM_PICKED_UP_BY_PLAYER`: this player picked up `item`,
+    /// which `thrower` threw.
+    ThrownItemPickedUpByPlayer {
+        item: ItemStack,
+        thrower: Arc<dyn EntityBase>,
+    },
+}
+
+/// Vanilla `EntityFlagsPredicate.isBaby(false)` on a piglin or a sulfur cube.
+fn is_adult(entity: &dyn EntityBase) -> bool {
+    let any = entity.cast_any();
+    if let Some(piglin) = any.downcast_ref::<PiglinEntity>() {
+        return !piglin.is_baby();
+    }
+    any.downcast_ref::<CubeMobEntity>()
+        .is_some_and(|cube| !cube.is_baby())
 }
 
 impl Player {
     #[allow(clippy::collapsible_if, clippy::too_many_lines)]
     pub fn trigger_advancement(&self, trigger: AdvancementTrigger) {
         use pumpkin_data::advancement::Advancement;
-        use pumpkin_data::item::Item;
 
         match trigger {
             AdvancementTrigger::InventoryChanged => {
@@ -593,7 +630,16 @@ impl Player {
                     &parent_type,
                 );
             }
-            AdvancementTrigger::EnterBlock { block_id: _ } => {}
+            AdvancementTrigger::EnterBlock { block } => {
+                if block == &Block::END_GATEWAY
+                    && !self.has_advancement(Advancement::END_ENTER_END_GATEWAY)
+                {
+                    self.trigger_advancement_criterion(
+                        Advancement::END_ENTER_END_GATEWAY,
+                        "entered_end_gateway",
+                    );
+                }
+            }
             AdvancementTrigger::DealtOverkillDamage => {
                 if !self.has_advancement(Advancement::ADVENTURE_OVEROVERKILL) {
                     self.trigger_advancement_criterion(
@@ -688,6 +734,74 @@ impl Player {
                     );
                 }
             }
+            AdvancementTrigger::UsedTotem { item } => {
+                if item == &Item::TOTEM_OF_UNDYING
+                    && !self.has_advancement(Advancement::ADVENTURE_TOTEM_OF_UNDYING)
+                {
+                    self.trigger_advancement_criterion(
+                        Advancement::ADVENTURE_TOTEM_OF_UNDYING,
+                        "used_totem",
+                    );
+                }
+            }
+            AdvancementTrigger::ThrownItemPickedUpByEntity { item, entity } => {
+                let picker = entity.get_entity().entity_type;
+                // `distract_piglin`'s player condition: no piglin-safe armor in any armor slot.
+                if picker == &EntityType::PIGLIN
+                    && item.item.has_tag(&tag::Item::MINECRAFT_PIGLIN_LOVED)
+                    && is_adult(entity.as_ref())
+                    && !self.wears_piglin_safe_armor()
+                    && !self.has_advancement(Advancement::NETHER_DISTRACT_PIGLIN)
+                {
+                    self.trigger_advancement_criterion(
+                        Advancement::NETHER_DISTRACT_PIGLIN,
+                        "distract_piglin",
+                    );
+                }
+                if picker == &EntityType::SULFUR_CUBE
+                    && item
+                        .item
+                        .has_tag(&tag::Item::MINECRAFT_SULFUR_CUBE_ARCHETYPE_EXPLOSIVE)
+                    && is_adult(entity.as_ref())
+                    && !self.has_advancement(Advancement::HUSBANDRY_UH_OH)
+                {
+                    self.trigger_advancement_criterion(
+                        Advancement::HUSBANDRY_UH_OH,
+                        "pick_up_dropped_tnt",
+                    );
+                }
+            }
+            AdvancementTrigger::ThrownItemPickedUpByPlayer { item: _, thrower } => {
+                if thrower.get_entity().entity_type == &EntityType::ALLAY
+                    && !self.has_advancement(Advancement::HUSBANDRY_ALLAY_DELIVER_ITEM_TO_PLAYER)
+                {
+                    self.trigger_advancement_criterion(
+                        Advancement::HUSBANDRY_ALLAY_DELIVER_ITEM_TO_PLAYER,
+                        "allay_deliver_item_to_player",
+                    );
+                }
+            }
         }
+    }
+
+    fn wears_piglin_safe_armor(&self) -> bool {
+        let equipment = self
+            .living_entity
+            .entity_equipment
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        [
+            EquipmentSlot::HEAD,
+            EquipmentSlot::CHEST,
+            EquipmentSlot::LEGS,
+            EquipmentSlot::FEET,
+        ]
+        .iter()
+        .any(|slot| {
+            equipment
+                .get(slot)
+                .item
+                .has_tag(&tag::Item::MINECRAFT_PIGLIN_SAFE_ARMOR)
+        })
     }
 }
