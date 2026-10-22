@@ -540,10 +540,13 @@ impl Mob for WolfEntity {
                     && owned
                     && !self.is_baby()
                 {
-                    self.mob_entity.set_item_slot_and_drop_when_killed(
+                    // `setItemSlotAndDropWhenKilled`: `setItemSlot` (with `onEquipItem`)
+                    // and a guaranteed drop.
+                    self.set_item_slot_and_notify(
                         &EquipmentSlot::BODY,
                         item_stack.copy_with_count(1),
                     );
+                    self.mob_entity.set_guaranteed_drop(&EquipmentSlot::BODY);
                     item_stack.decrement_unless_creative(player.gamemode.load(), 1);
                     return InteractionResult::SUCCESS;
                 }
@@ -568,6 +571,10 @@ impl Mob for WolfEntity {
                 let parent_interaction = self.animal_interact(player, item_stack, ambient);
                 if !parent_interaction.consumes_action() && owned {
                     self.set_ordered_to_sit(!self.is_ordered_to_sit());
+                    self.mob_entity
+                        .living_entity
+                        .jumping
+                        .store(false, std::sync::atomic::Ordering::Relaxed);
                     self.mob_entity
                         .navigator
                         .lock()
