@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 use crossbeam::atomic::AtomicCell;
 use pumpkin_data::block_properties::{
@@ -196,6 +197,49 @@ impl PistonBlockEntity {
                 }
             }
         }
+    }
+
+    /// Vanilla `moveStuckEntities`: a honey block carries the entities standing on it
+    /// sideways.
+    fn move_stuck_entities(&self, world: &Arc<World>, new_progress: f32) {
+        if !self.is_sticky_for_entities() {
+            return;
+        }
+        let movement = self.get_movement_direction();
+        if movement.to_axis() == Axis::Y {
+            return;
+        }
+        // `shape.max(Y)`: negative infinity for an empty shape.
+        let sticky_top = self
+            .pushed_block_state
+            .get_block_collision_shapes_at(&self.position)
+            .fold(f64::NEG_INFINITY, |top, b| top.max(b.max.y));
+        let aabb = self.move_by_position_and_progress(BoundingBox::new(
+            Vector3::new(0.0, sticky_top, 0.0),
+            Vector3::new(1.0, 1.500_001_000_000_000_1, 1.0),
+        ));
+        let delta_progress = f64::from(new_progress - self.current_progress.load());
+        // `getEntities(null, aabb, predicate)`: only the predicate, no spectator filter.
+        for entity in world.get_all_at_box(&aabb) {
+            if Self::matches_sticky_criteria(aabb, entity.as_ref(), self.position) {
+                Self::move_entity_by_piston(movement, entity.as_ref(), delta_progress, movement);
+            }
+        }
+    }
+
+    /// Vanilla `matchesStickyCritera`.
+    fn matches_sticky_criteria(aabb: BoundingBox, entity: &dyn EntityBase, pos: BlockPos) -> bool {
+        let base = entity.get_entity();
+        let p = base.pos.load();
+        entity.piston_push_reaction() == PistonBehavior::Normal
+            && base.on_ground.load(Ordering::Relaxed)
+            && (base.is_supported_by(pos)
+                || p.x >= aabb.min.x && p.x <= aabb.max.x && p.z >= aabb.min.z && p.z <= aabb.max.z)
+    }
+
+    /// Vanilla `isStickyForEntities`.
+    fn is_sticky_for_entities(&self) -> bool {
+        Block::from_state_id(self.pushed_block_state.id) == &Block::HONEY_BLOCK
     }
 
     /// Vanilla `moveEntityByPiston`: `NOCLIP` lets the entity pass through the moving block
@@ -409,6 +453,7 @@ impl BlockEntity for PistonBlockEntity {
         // Vanilla passes the unclamped `progress + 0.5F` to `moveCollidedEntities`, then clamps.
         let new_progress = current_progress + 0.5;
         self.move_collided_entities(world, new_progress);
+        self.move_stuck_entities(world, new_progress);
         self.current_progress.store(if new_progress >= 1.0 {
             1.0
         } else {
