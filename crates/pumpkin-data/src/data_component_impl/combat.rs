@@ -484,9 +484,10 @@ impl Hash for ToolImpl {
     }
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct WeaponImpl {
     pub item_damage_per_attack: u32,
+    pub disable_blocking_for_seconds: f32,
 }
 impl WeaponImpl {
     pub fn read_data(data: &NbtTag) -> Option<Self> {
@@ -495,8 +496,13 @@ impl WeaponImpl {
             .get_int("item_damage_per_attack")
             .unwrap_or(1)
             .max(0) as u32;
+        let disable_blocking_for_seconds = compound
+            .get_float("disable_blocking_for_seconds")
+            .unwrap_or(0.0)
+            .max(0.0);
         Some(Self {
             item_damage_per_attack,
+            disable_blocking_for_seconds,
         })
     }
 }
@@ -504,12 +510,37 @@ impl DataComponentImpl for WeaponImpl {
     fn write_data(&self) -> NbtTag {
         let mut compound = NbtCompound::new();
         compound.put_int("item_damage_per_attack", self.item_damage_per_attack as i32);
+        if self.disable_blocking_for_seconds != 0.0 {
+            compound.put_float(
+                "disable_blocking_for_seconds",
+                self.disable_blocking_for_seconds,
+            );
+        }
         NbtTag::Compound(compound)
     }
     fn get_hash(&self) -> i32 {
-        self.item_damage_per_attack as i32
+        // Both fields are `optionalFieldOf` with a default, so the default is not encoded.
+        MapHash::new()
+            .optional_field(
+                "item_damage_per_attack",
+                (self.item_damage_per_attack != 1)
+                    .then(|| get_i32_hash(self.item_damage_per_attack as i32)),
+            )
+            .optional_field(
+                "disable_blocking_for_seconds",
+                (self.disable_blocking_for_seconds != 0.0)
+                    .then(|| get_f32_hash(self.disable_blocking_for_seconds)),
+            )
+            .finish() as i32
     }
     default_impl!(Weapon);
+}
+impl Eq for WeaponImpl {}
+impl Hash for WeaponImpl {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.item_damage_per_attack.hash(state);
+        self.disable_blocking_for_seconds.to_bits().hash(state);
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

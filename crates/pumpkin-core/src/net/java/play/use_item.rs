@@ -1,5 +1,6 @@
 #[allow(clippy::wildcard_imports)]
 use super::*;
+use crate::entity::player::cooldown_group;
 use pumpkin_util::version::JavaMinecraftVersion;
 
 impl JavaClient {
@@ -86,14 +87,8 @@ impl JavaClient {
     fn prepare_hand_item_for_use(player: &Arc<Player>, hand: Hand, held: &mut ItemStack) {
         let inventory = player.inventory();
 
-        if let Some(cooldown) = held.get_use_cooldown() {
-            let group = cooldown
-                .cooldown_group
-                .clone()
-                .unwrap_or_else(|| held.item.registry_key.to_string());
-            if player.is_on_cooldown(&group) {
-                return;
-            }
+        if held.get_use_cooldown().is_some() && player.is_on_cooldown(&cooldown_group(held)) {
+            return;
         }
 
         if held.get_data_component::<ConsumableImpl>().is_some()

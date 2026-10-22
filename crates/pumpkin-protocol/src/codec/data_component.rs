@@ -2098,14 +2098,15 @@ impl DataComponentCodec<Self> for ToolImpl {
 impl DataComponentCodec<Self> for WeaponImpl {
     fn serialize(&self, seq: &mut impl NetworkWriteExt) -> Result<(), WritingError> {
         seq.write_var_int(&VarInt::from(self.item_damage_per_attack as i32))?;
-        seq.write_f32(0.0)
+        seq.write_f32(self.disable_blocking_for_seconds)
     }
 
     fn deserialize(seq: &mut impl NetworkReadExt) -> Result<Self, ReadingError> {
         let item_damage_per_attack = seq.get_var_int()?.0 as u32;
-        let _disable_blocking_for_seconds = seq.get_f32()?;
+        let disable_blocking_for_seconds = seq.get_f32()?;
         Ok(Self {
             item_damage_per_attack,
+            disable_blocking_for_seconds,
         })
     }
 }
@@ -4003,5 +4004,17 @@ mod tests {
         bytes.extend_from_slice(&[0x08, 0x00, 0x04, b'R', b'u', b'b', b'y', 0x02]);
         let decoded = decode::<TrimImpl>(&bytes);
         assert_eq!(encode(&decoded), bytes);
+    }
+
+    #[test]
+    fn weapon_carries_its_disable_blocking_seconds() {
+        // An axe: VarInt 1, then 5.0f.
+        assert_wire(
+            &WeaponImpl {
+                item_damage_per_attack: 1,
+                disable_blocking_for_seconds: 5.0,
+            },
+            &[0x01, 0x40, 0xa0, 0x00, 0x00],
+        );
     }
 }

@@ -1,6 +1,6 @@
 use crate::block::registry::BlockActionResult;
 use crate::entity::EntityBase;
-use crate::entity::player::Player;
+use crate::entity::player::{Player, cooldown_group};
 use crate::server::Server;
 use pumpkin_data::Block;
 use pumpkin_data::BlockDirection;
@@ -47,9 +47,7 @@ impl ItemRegistry {
     ) {
         let item = stack.item;
         let cooldown = stack.get_use_cooldown();
-        let cooldown_group = cooldown
-            .and_then(|c| c.cooldown_group.clone())
-            .unwrap_or_else(|| item.registry_key.to_string());
+        let cooldown_group = cooldown_group(stack);
 
         if player.is_on_cooldown(&cooldown_group) {
             return;
@@ -104,10 +102,7 @@ impl ItemRegistry {
         server: &Server,
     ) -> BlockActionResult {
         let cooldown = stack.get_use_cooldown().cloned();
-        let cooldown_group = cooldown
-            .as_ref()
-            .and_then(|c| c.cooldown_group.clone())
-            .unwrap_or_else(|| stack.item.registry_key.to_string());
+        let cooldown_group = cooldown_group(stack);
 
         if player.is_on_cooldown(&cooldown_group) {
             return BlockActionResult::Pass;
@@ -133,10 +128,7 @@ impl ItemRegistry {
         entity: Arc<dyn EntityBase>,
     ) -> bool {
         let cooldown = stack.get_use_cooldown().cloned();
-        let cooldown_group = cooldown
-            .as_ref()
-            .and_then(|c| c.cooldown_group.clone())
-            .unwrap_or_else(|| stack.item.registry_key.to_string());
+        let cooldown_group = cooldown_group(stack);
 
         if player.is_on_cooldown(&cooldown_group) {
             return false;

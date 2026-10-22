@@ -1,5 +1,6 @@
 #[allow(clippy::wildcard_imports)]
 use super::*;
+use crate::entity::player::cooldown_group;
 use crate::item::registry::should_try_block_placement;
 use pumpkin_protocol::bedrock::server::inventory_transaction::HandSlot;
 
@@ -329,16 +330,8 @@ impl BedrockClient {
                     let stack_for_use = held.clone();
 
                     {
-                        let mut cooldown_active = false;
-                        if let Some(cooldown) = held.get_use_cooldown() {
-                            let group = cooldown
-                                .cooldown_group
-                                .clone()
-                                .unwrap_or_else(|| held.item.registry_key.to_string());
-                            if player.is_on_cooldown(&group) {
-                                cooldown_active = true;
-                            }
-                        }
+                        let cooldown_active = held.get_use_cooldown().is_some()
+                            && player.is_on_cooldown(&cooldown_group(&held));
 
                         if !cooldown_active {
                             // Bedrock can repeat click-air while using an item. Do not

@@ -34,6 +34,7 @@ use crate::entity::combat::{CombatRules, CombatTracker, FallLocation, knockback_
 use crate::entity::damage_source::DamageSource;
 use crate::entity::effect::MobEffectInstance;
 use crate::entity::mob::equipment::DEFAULT_EQUIPMENT_DROP_CHANCE;
+use crate::entity::player::cooldown_group;
 use crate::entity::player::statistics::{CustomStatistic, StatisticCategory};
 use crate::server::Server;
 use crate::world::loot::LootContextParameters;
@@ -48,7 +49,7 @@ use pumpkin_data::data_component_impl::SwingAnimationImpl;
 use pumpkin_data::data_component_impl::food::{ConsumableImpl, ConsumeAnimation, ConsumeEffect};
 use pumpkin_data::data_component_impl::{
     AttributeModifiersImpl, BlocksAttacksImpl, DeathProtectionImpl, EquipmentSlot, EquippableImpl,
-    FoodImpl, IDSet, MobVisibilityImpl,
+    FoodImpl, IDSet, MobVisibilityImpl, WeaponImpl,
 };
 use pumpkin_data::effect::StatusEffect;
 use pumpkin_data::entity::{EntityPose, EntityStatus, EntityType};
@@ -4550,28 +4551,119 @@ impl LivingEntity {
             && let Some(attacker) = damage_source.direct
             && attacker.get_living_entity().is_some()
         {
-            // `blockUsingItem`: the attacker's `blockedByItem`.
             let fully_blocked = damage_blocked >= damage;
-            if let Some(mob) = attacker.get_mob() {
-                mob.blocked_by_item(caller, damage_type, damage, fully_blocked);
-            } else if !fully_blocked {
-                // `LivingEntity.blockedByItem`.
-                let attacker_pos = attacker.get_entity().pos.load();
-                let pos = self.entity.pos.load();
-                self.knockback(
-                    caller,
-                    0.5,
-                    pos.x - attacker_pos.x,
-                    pos.z - attacker_pos.z,
-                    damage_source.causing,
-                    damage,
-                    false,
-                );
+            if let Some(player) = caller.get_player() {
+                player.block_using_item(attacker, damage_type, damage, fully_blocked);
+            } else {
+                Self::block_using_item(caller, attacker, damage_type, damage, fully_blocked);
             }
-            // TODO: `Player.blockUsingItem` disabling the shield needs the weapon component's
-            // `disable_blocking_for_seconds`, which `WeaponImpl` doesn't carry.
         }
         damage_blocked
+    }
+
+    /// Vanilla `LivingEntity.blockUsingItem`: the attacker's `blockedByItem`, with the mob
+    /// overrides.
+    pub(crate) fn block_using_item(
+        caller: &dyn EntityBase,
+        attacker: &dyn EntityBase,
+        damage_type: DamageType,
+        damage: f32,
+        fully_blocked: bool,
+    ) {
+        if let Some(mob) = attacker.get_mob() {
+            mob.blocked_by_item(caller, damage_type, damage, fully_blocked);
+        } else if let Some(attacker) = attacker.get_living_entity() {
+            attacker.blocked_by_item(caller, damage, fully_blocked);
+        }
+    }
+
+    /// Vanilla `LivingEntity.blockedByItem`: `defender` blocked this entity's attack with an
+    /// item, and a partial block knocks it back.
+    pub fn blocked_by_item(&self, defender: &dyn EntityBase, damage: f32, fully_blocked: bool) {
+        if fully_blocked {
+            return;
+        }
+        let Some(defender_living) = defender.get_living_entity() else {
+            return;
+        };
+        let pos = self.entity.pos.load();
+        let defender_pos = defender.get_entity().pos.load();
+        defender_living.knockback(
+            defender,
+            0.5,
+            defender_pos.x - pos.x,
+            defender_pos.z - pos.z,
+            Some(self),
+            damage,
+            false,
+        );
+    }
+
+    /// Vanilla `getSecondsToDisableBlocking`, with `Warden`'s override.
+    pub fn get_seconds_to_disable_blocking(&self, caller: &dyn EntityBase) -> f32 {
+        if let Some(seconds) = caller
+            .get_mob()
+            .and_then(super::mob::Mob::seconds_to_disable_blocking_override)
+        {
+            return seconds;
+        }
+        // `weaponItem == getActiveItem()`: the weapon is the main-hand stack, which is the
+        // active item unless the entity is a spectator or is using its off hand.
+        // TODO: the riptide spin stack once Pumpkin tracks it (`Player.getWeaponItem`).
+        if caller.is_spectator()
+            || *self
+                .active_hand
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                == Some(Hand::Left)
+        {
+            return 0.0;
+        }
+        self.held_item(caller)
+            .get_data_component::<WeaponImpl>()
+            .map_or(0.0, |weapon| weapon.disable_blocking_for_seconds)
+    }
+
+    /// Vanilla `BlocksAttacks.disable`: `caller` stops blocking with `blocking_with` for the
+    /// attacker's seconds scaled by the item's `disable_cooldown_scale`.
+    pub(crate) fn disable_blocking(
+        &self,
+        caller: &dyn EntityBase,
+        blocks_attacks: &BlocksAttacksImpl,
+        base_seconds: f32,
+        blocking_with: &ItemStack,
+    ) {
+        // `disableBlockingForTicks`.
+        let seconds = base_seconds * blocks_attacks.disable_cooldown_scale;
+        let cooldown_ticks = if seconds > 0.0 {
+            (seconds * 20.0).round() as i32
+        } else {
+            0
+        };
+        if cooldown_ticks <= 0 {
+            return;
+        }
+        if let Some(player) = caller.get_player() {
+            player.start_cooldown(cooldown_group(blocking_with), cooldown_ticks);
+        }
+        self.clear_active_hand();
+        if let Some(sound) = &blocks_attacks.disabled_sound {
+            let world = self.entity.world.load();
+            let pitch = 0.8
+                + world
+                    .random
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .next_f32()
+                    * 0.4;
+            world.play_sound_event_fine(
+                sound,
+                self.sound_source(),
+                &self.entity.pos.load(),
+                0.8,
+                pitch,
+            );
+        }
     }
 
     /// Vanilla `checkTotemDeathProtection`: a death protection item in either hand cancels
@@ -5286,11 +5378,10 @@ impl LivingEntity {
             && let Some(cooldown) = stack_before_using.get_use_cooldown()
         {
             // `UseCooldown.apply`.
-            let group = cooldown
-                .cooldown_group
-                .clone()
-                .unwrap_or_else(|| stack_before_using.item.registry_key.to_string());
-            player.start_cooldown(group, (cooldown.seconds * 20.0) as i32);
+            player.start_cooldown(
+                cooldown_group(stack_before_using),
+                (cooldown.seconds * 20.0) as i32,
+            );
         }
         result
     }
@@ -6185,6 +6276,44 @@ mod tests {
             .unwrap();
 
         assert_eq!(bytes, [10, 17, 1, 28, 0xff, 0xcd, 0x5c, 0xab]);
+    }
+
+    /// `getSecondsToDisableBlocking` counts the main-hand weapon only while it is the
+    /// active item; a warden disables regardless of what it holds.
+    #[tokio::test]
+    async fn only_the_active_main_hand_weapon_disables_blocking() {
+        let (_folder, world) = test_world();
+        let vindicator = spawn(&world, &EntityType::VINDICATOR);
+        let living = vindicator.get_living_entity().unwrap();
+        put(
+            vindicator.as_ref(),
+            &EquipmentSlot::MAIN_HAND,
+            ItemStack::new(1, &Item::IRON_AXE),
+        );
+        assert_eq!(
+            living.get_seconds_to_disable_blocking(vindicator.as_ref()),
+            5.0
+        );
+
+        living.set_active_hand(Hand::Left, ItemStack::new(1, &Item::SHIELD), 72_000);
+        assert_eq!(
+            living.get_seconds_to_disable_blocking(vindicator.as_ref()),
+            0.0
+        );
+
+        living.clear_active_hand();
+        living.set_active_hand(Hand::Right, ItemStack::new(1, &Item::IRON_AXE), 72_000);
+        assert_eq!(
+            living.get_seconds_to_disable_blocking(vindicator.as_ref()),
+            5.0
+        );
+
+        let warden = spawn(&world, &EntityType::WARDEN);
+        let warden_living = warden.get_living_entity().unwrap();
+        assert_eq!(
+            warden_living.get_seconds_to_disable_blocking(warden.as_ref()),
+            5.0
+        );
     }
 }
 

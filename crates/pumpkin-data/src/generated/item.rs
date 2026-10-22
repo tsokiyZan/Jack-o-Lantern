@@ -21276,6 +21276,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 2,
+                    disable_blocking_for_seconds: 5.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 13 }),
@@ -22249,6 +22250,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 2,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 13 }),
@@ -22895,6 +22897,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 2,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 13 }),
@@ -23006,6 +23009,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 2,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 13 }),
@@ -23097,6 +23101,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 1,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 13 }),
@@ -23269,6 +23274,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 1,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 13 }),
@@ -31502,6 +31508,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 2,
+                    disable_blocking_for_seconds: 5.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 10 }),
@@ -31977,6 +31984,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 2,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 10 }),
@@ -32434,6 +32442,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 2,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 10 }),
@@ -32545,6 +32554,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 2,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 10 }),
@@ -32636,6 +32646,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 1,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 10 }),
@@ -32808,6 +32819,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 1,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 10 }),
@@ -40323,6 +40335,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 2,
+                    disable_blocking_for_seconds: 5.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 22 }),
@@ -40877,6 +40890,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 2,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 22 }),
@@ -41273,6 +41287,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 2,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 22 }),
@@ -41384,6 +41399,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 2,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 22 }),
@@ -41475,6 +41491,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 1,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 22 }),
@@ -41647,6 +41664,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 1,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 22 }),
@@ -47010,6 +47028,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 2,
+                    disable_blocking_for_seconds: 5.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 14 }),
@@ -47730,6 +47749,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 2,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 14 }),
@@ -48315,6 +48335,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 2,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 14 }),
@@ -48426,6 +48447,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 2,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 14 }),
@@ -48517,6 +48539,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 1,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 14 }),
@@ -48689,6 +48712,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 1,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 14 }),
@@ -56536,6 +56560,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 1,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 15 }),
@@ -63989,6 +64014,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 2,
+                    disable_blocking_for_seconds: 5.0f32,
                 },
             ),
             (
@@ -64515,6 +64541,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 2,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (
@@ -65029,6 +65056,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 2,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (
@@ -65213,6 +65241,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 2,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (
@@ -65310,6 +65339,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 1,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (
@@ -65488,6 +65518,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 1,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (
@@ -93050,6 +93081,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 2,
+                    disable_blocking_for_seconds: 5.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 5 }),
@@ -93466,6 +93498,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 2,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 5 }),
@@ -93577,6 +93610,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 2,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 5 }),
@@ -93749,6 +93783,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 2,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 5 }),
@@ -93901,6 +93936,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 1,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 5 }),
@@ -94134,6 +94170,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 1,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 5 }),
@@ -99064,6 +99101,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 1,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 1 }),
@@ -109419,6 +109457,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 2,
+                    disable_blocking_for_seconds: 5.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 15 }),
@@ -109541,6 +109580,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 2,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 15 }),
@@ -109663,6 +109703,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 2,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 15 }),
@@ -109785,6 +109826,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 2,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 15 }),
@@ -109887,6 +109929,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 1,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 15 }),
@@ -110070,6 +110113,7 @@ impl Item {
                 Weapon,
                 &WeaponImpl {
                     item_damage_per_attack: 1,
+                    disable_blocking_for_seconds: 0.0f32,
                 },
             ),
             (Enchantable, &EnchantableImpl { value: 15 }),

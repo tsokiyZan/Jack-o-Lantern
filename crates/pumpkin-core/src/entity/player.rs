@@ -239,7 +239,9 @@ impl BedrockPlayer<'_> {
 use pumpkin_data::attributes::Attributes;
 use pumpkin_data::block_properties::HorizontalFacing;
 use pumpkin_data::damage::DamageType;
-use pumpkin_data::data_component_impl::{EquipmentSlot, EquippableImpl, ToolImpl, WeaponImpl};
+use pumpkin_data::data_component_impl::{
+    BlocksAttacksImpl, EquipmentSlot, EquippableImpl, ToolImpl, WeaponImpl,
+};
 use pumpkin_data::effect::StatusEffect;
 use pumpkin_data::entity::{EntityPose, EntityStatus, EntityType};
 use pumpkin_data::item_stack::ItemStack;
@@ -387,6 +389,15 @@ const fn bedrock_inventory_slot(player_screen_slot: i16) -> Option<u32> {
 pub struct ItemCooldown {
     pub start_tick: i32,
     pub duration: i32,
+}
+
+/// Vanilla `ItemCooldowns.getCooldownGroup`: the `use_cooldown` group, else the item's id.
+#[must_use]
+pub fn cooldown_group(stack: &ItemStack) -> String {
+    stack
+        .get_use_cooldown()
+        .and_then(|cooldown| cooldown.cooldown_group.clone())
+        .unwrap_or_else(|| stack.item.registry_key.to_string())
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -962,6 +973,46 @@ impl Player {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner) = footer.clone();
         self.try_send_client_packet(&CTabList::new(header, footer));
+    }
+
+    /// Vanilla `Player.blockUsingItem`: an attacker that disables blocking puts the raised
+    /// item on cooldown.
+    pub(crate) fn block_using_item(
+        &self,
+        attacker: &dyn EntityBase,
+        damage_type: DamageType,
+        damage: f32,
+        fully_blocked: bool,
+    ) {
+        LivingEntity::block_using_item(self, attacker, damage_type, damage, fully_blocked);
+        let living = &self.living_entity;
+        let Some(blocking_with) = living.get_item_blocking_with() else {
+            return;
+        };
+        // Vanilla's use item is the hand's stack, so a shield this hit broke blocks nothing.
+        let hand = living
+            .active_hand
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .unwrap_or(Hand::Right);
+        if living.get_stack_in_hand(self, hand).is_empty() {
+            return;
+        }
+        let Some(blocks_attacks) = blocking_with.get_data_component::<BlocksAttacksImpl>() else {
+            return;
+        };
+        let seconds_to_disable_blocking =
+            attacker.get_living_entity().map_or(0.0, |attacker_living| {
+                attacker_living.get_seconds_to_disable_blocking(attacker)
+            });
+        if seconds_to_disable_blocking > 0.0 {
+            living.disable_blocking(
+                self,
+                blocks_attacks,
+                seconds_to_disable_blocking,
+                &blocking_with,
+            );
+        }
     }
 
     pub fn start_cooldown(&self, group: String, duration: i32) {

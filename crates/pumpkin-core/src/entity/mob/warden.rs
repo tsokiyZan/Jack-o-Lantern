@@ -213,6 +213,11 @@ impl Mob for WardenEntity {
         &self.mob_entity
     }
 
+    /// Vanilla `Warden.getSecondsToDisableBlocking`.
+    fn seconds_to_disable_blocking_override(&self) -> Option<f32> {
+        Some(5.0)
+    }
+
     /// Vanilla `Warden.checkSpawnObstruction`: `Mob`'s, then no block collision.
     fn check_spawn_obstruction(&self, world: &World) -> bool {
         let entity = &self.mob_entity.living_entity.entity;

@@ -2283,15 +2283,22 @@ pub trait Mob: EntityBase + Send + Sync {
         false
     }
 
-    /// Vanilla `blockedByItem`: `defender` blocked this mob's attack with an item. Pumpkin
-    /// only blocks fully, where vanilla's default does nothing.
+    /// Vanilla `blockedByItem`: `defender` blocked this mob's attack with an item.
     fn blocked_by_item(
         &self,
-        _defender: &dyn EntityBase,
+        defender: &dyn EntityBase,
         _damage_type: DamageType,
-        _damage: f32,
-        _fully_blocked: bool,
+        damage: f32,
+        fully_blocked: bool,
     ) {
+        self.get_mob_entity()
+            .living_entity
+            .blocked_by_item(defender, damage, fully_blocked);
+    }
+
+    /// A vanilla `getSecondsToDisableBlocking` override that ignores the held weapon.
+    fn seconds_to_disable_blocking_override(&self) -> Option<f32> {
+        None
     }
 
     /// Vanilla `isPushable`, which some mobs turn off.

@@ -1151,6 +1151,14 @@ mod tests {
         );
         assert_eq!(SwingAnimationImpl::DEFAULT.get_hash(), -982_207_288);
         assert_eq!(
+            WeaponImpl {
+                item_damage_per_attack: 1,
+                disable_blocking_for_seconds: 0.0,
+            }
+            .get_hash(),
+            -982_207_288
+        );
+        assert_eq!(
             InteractAnimationImpl(SwingAnimationImpl {
                 animation_type: SwingAnimationType::Stab,
                 duration: 10,
