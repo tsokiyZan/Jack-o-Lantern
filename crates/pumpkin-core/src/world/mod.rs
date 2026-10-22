@@ -2044,6 +2044,17 @@ impl World {
                 }
             }
         }
+        // Vanilla `LevelChunk.isTicking`: a block entity outside the world border doesn't tick.
+        {
+            let border = self
+                .worldborder
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            block_entities.retain(|be| {
+                let pos = be.get_position();
+                border.contains_block(pos.0.x, pos.0.z)
+            });
+        }
         let block_entity_count = block_entities.len();
 
         let t_be = std::time::Instant::now();
