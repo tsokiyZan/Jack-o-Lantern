@@ -1413,7 +1413,7 @@ impl World {
         count: i32,
         offset: Vector3<f32>,
         speed: Vector3<f32>,
-        randomization: i32,
+        randomization: ParticleRandomization,
     ) {
         let packet = AxisSpeedParticles {
             particle: pumpkin_protocol::java::client::play::CParticle::new(
@@ -1431,7 +1431,7 @@ impl World {
         };
         for player in self.players.load().iter() {
             if player.position().squared_distance_to_vec(&position) < 32.0 * 32.0 {
-                player.send_java_packet(&packet);
+                player.try_send_client_packet(&packet);
             }
         }
     }
@@ -8556,7 +8556,16 @@ const fn legacy_world_border(
 struct AxisSpeedParticles<'a> {
     particle: pumpkin_protocol::java::client::play::CParticle<'a>,
     speed: Vector3<f32>,
-    randomization: i32,
+    randomization: ParticleRandomization,
+}
+
+/// Vanilla `ClientboundLevelParticlesPacket.RandomizationType`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(i32)]
+pub enum ParticleRandomization {
+    Default = 0,
+    Alternative = 1,
+    AlternativeWithSpeed = 2,
 }
 
 impl pumpkin_protocol::packet::MultiVersionJavaPacket for AxisSpeedParticles<'_> {
@@ -8590,7 +8599,7 @@ impl pumpkin_protocol::ClientPacket for AxisSpeedParticles<'_> {
         write.write_f32_be(self.speed.y)?;
         write.write_f32_be(self.speed.z)?;
         write.write_var_int(&pumpkin_protocol::VarInt(particle.particle_count))?;
-        write.write_var_int(&pumpkin_protocol::VarInt(self.randomization))?;
+        write.write_var_int(&pumpkin_protocol::VarInt(self.randomization as i32))?;
         Ok(())
     }
 }

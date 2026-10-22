@@ -1,4 +1,5 @@
 use crate::item::interaction_result::InteractionResult;
+use crate::world::ParticleRandomization;
 use pumpkin_data::data_component_impl::{
     DataComponentImpl, SuspiciousStewEffect, SuspiciousStewEffectsImpl,
 };
@@ -112,7 +113,7 @@ impl MooshroomEntity {
                 2,
                 Vector3::new(0.5, 0.0, 0.5),
                 Vector3::new(0.0, 0.2, 0.0),
-                2,
+                ParticleRandomization::AlternativeWithSpeed,
             );
         } else {
             item_stack.decrement_unless_creative(player.gamemode.load(), 1);
@@ -126,7 +127,7 @@ impl MooshroomEntity {
                 4,
                 Vector3::new(0.5, 0.0, 0.5),
                 Vector3::new(0.0, 0.2, 0.0),
-                2,
+                ParticleRandomization::AlternativeWithSpeed,
             );
             let (effect, duration) = effect;
             *self
