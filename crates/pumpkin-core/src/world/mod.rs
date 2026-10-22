@@ -440,6 +440,13 @@ impl World {
             NbtCompound::new()
         };
 
+        let forced_chunks = pumpkin_world::world_info::data_files::read_forced_chunks(
+            &level.level_folder.dim_folder,
+        )
+        .into_iter()
+        .map(|(x, z)| Vector2::new(x, z))
+        .collect();
+
         Self {
             uuid: Uuid::new_v4(),
             level,
@@ -471,7 +478,9 @@ impl World {
             spawn_state: ArcSwap::new(Arc::new(SpawnState::empty())),
             active_chunks: RwLock::new(FxHashSet::default()),
             active_chunk_tracker: std::sync::Mutex::new(ActiveChunkTracker::default()),
-            forced_chunks: std::sync::Mutex::new(FxHashSet::default()),
+            // Vanilla `TicketStorage` saved data: the FORCED tickets come back deactivated and
+            // `MinecraftServer.prepareLevels` reactivates them before the first tick.
+            forced_chunks: std::sync::Mutex::new(forced_chunks),
             server,
             block_entities: DashMap::new(),
             game_event_listeners: game_event::GameEventListenerRegistries::default(),
@@ -523,6 +532,63 @@ impl World {
                 }
             });
         }
+    }
+
+    /// Vanilla `ServerLevel.setChunkForced`: adds or removes the chunk's FORCED ticket and
+    /// returns whether that changed anything. A newly forced chunk is loaded before this
+    /// returns (vanilla's `getChunk`, which runs the distance manager's updates first), so the
+    /// next command finds it loaded.
+    pub fn set_chunk_forced(self: &Arc<Self>, chunk_x: i32, chunk_z: i32, forced: bool) -> bool {
+        let pos = Vector2::new(chunk_x, chunk_z);
+        let updated = {
+            let mut forced_chunks = self
+                .forced_chunks
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            if forced {
+                forced_chunks.insert(pos)
+            } else {
+                forced_chunks.remove(&pos)
+            }
+        };
+        if updated {
+            self.update_active_chunks();
+        }
+        if forced && updated {
+            self.load_chunk_blocking(pos);
+        }
+        updated
+    }
+
+    /// Loads (or generates) a chunk and waits for it, like vanilla's main-thread `getChunk`.
+    pub fn load_chunk_blocking(self: &Arc<Self>, pos: Vector2<i32>) {
+        if self.level.is_chunk_loaded(&pos) {
+            return;
+        }
+        let Ok(handle) = tokio::runtime::Handle::try_current() else {
+            return;
+        };
+        tokio::task::block_in_place(|| {
+            handle.block_on(self.level.get_or_fetch_chunk(pos, |_| ()));
+        });
+    }
+
+    /// Vanilla `MinecraftServer.prepareLevels` for the saved FORCED tickets: reactivates them
+    /// and waits until their chunks are loaded.
+    pub async fn prepare_forced_chunks(self: &Arc<Self>) {
+        self.update_active_chunks();
+        let forced: Vec<Vector2<i32>> = self
+            .forced_chunks
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .iter()
+            .copied()
+            .collect();
+        for pos in forced {
+            self.level.get_or_fetch_chunk(pos, |_| ()).await;
+        }
+        // The chunks just loaded start ticking with the next update.
+        self.update_active_chunks();
     }
 
     pub fn update_active_chunks(self: &Arc<Self>) {
@@ -700,7 +766,28 @@ impl World {
             error!("Failed to save portal POI: {e}");
         }
 
+        self.save_chunk_tickets();
+
         self.level.shutdown().await;
+    }
+
+    /// Vanilla `TicketStorage` saved data (`chunk_tickets.dat`), written with the level's
+    /// other saved data on every save, the one on shutdown included.
+    fn save_chunk_tickets(&self) {
+        let forced: Vec<(i32, i32)> = self
+            .forced_chunks
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .iter()
+            .map(|pos| (pos.x, pos.y))
+            .collect();
+        if let Err(err) = pumpkin_world::world_info::data_files::write_forced_chunks(
+            &self.level.level_folder.dim_folder,
+            &forced,
+            pumpkin_world::world_info::WORLD_VERSION,
+        ) {
+            warn!("Failed to save chunk_tickets.dat: {err}");
+        }
     }
 
     /// The passenger part of vanilla `EntityType.loadEntityRecursive`: each saved passenger,
@@ -8313,6 +8400,8 @@ impl World {
         ) {
             warn!("Failed to save world_border.dat: {err}");
         }
+
+        self.save_chunk_tickets();
 
         {
             let custom_data = self

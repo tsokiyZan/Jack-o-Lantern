@@ -429,6 +429,10 @@ impl Server {
 
         server.worlds.store(Arc::new(worlds_vec));
 
+        for world in server.worlds.load().iter() {
+            world.prepare_forced_chunks().await;
+        }
+
         info!("All worlds loaded successfully.");
 
         let enabled_packs = server.level_info.load().data_packs.enabled.clone();
