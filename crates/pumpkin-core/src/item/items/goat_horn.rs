@@ -1,3 +1,6 @@
+use crate::entity::player::cooldown_group;
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::any::Any;
 
 use crate::entity::player::Player;
@@ -16,8 +19,9 @@ impl ItemMetadata for GoatHornItem {
 }
 
 impl ItemBehaviour for GoatHornItem {
-    fn normal_use(&self, _item: &Item, player: &Player) {
-        let stack = player.inventory().held_item();
+    /// Vanilla `InstrumentItem.use`.
+    fn normal_use(&self, _item: &Item, player: &Player, hand: Hand) -> InteractionResult {
+        let stack = player.inventory().get_stack_in_hand(hand);
         let instrument = stack
             .get_data_component::<CustomDataImpl>()
             .and_then(|custom| {
@@ -34,12 +38,12 @@ impl ItemBehaviour for GoatHornItem {
             SoundCategory::Players,
             &player.position(),
         );
-        player.living_entity.set_active_hand(
-            pumpkin_util::Hand::Right,
-            stack,
-            instrument.use_duration_ticks() as i32,
-        );
+        let cooldown = cooldown_group(&stack);
+        crate::item::start_using_item(player, hand, stack, instrument.use_duration_ticks() as i32);
+        // `addCooldown(itemStack, floor(useDuration * 20))`.
+        player.start_cooldown(cooldown, instrument.use_duration_ticks() as i32);
         player.award_item_used(&Item::GOAT_HORN);
+        InteractionResult::CONSUME
     }
 
     fn get_use_duration(&self) -> i32 {

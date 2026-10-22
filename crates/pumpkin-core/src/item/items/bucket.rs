@@ -5,7 +5,9 @@ use crate::{
         EntityBase, mob::cube_mob::CubeMobEntity, mob::spawn::finalize_spawn, player::Player,
         r#type::from_type,
     },
-    item::{ItemBehaviour, ItemMetadata},
+    item::{
+        ItemBehaviour, ItemMetadata, create_filled_result, interaction_result::InteractionResult,
+    },
 };
 use pumpkin_data::{
     Block, BlockDirection,
@@ -18,8 +20,9 @@ use pumpkin_data::{
     item_stack::ItemStack,
     sound::{Sound, SoundCategory},
 };
+use pumpkin_inventory::screen_handler::InventoryPlayer;
 use pumpkin_util::{
-    GameMode,
+    GameMode, Hand,
     math::{position::BlockPos, vector3::Vector3, wrap_degrees},
 };
 use pumpkin_world::{tick::TickPriority, world::BlockFlags};
@@ -110,15 +113,10 @@ pub(crate) fn empty_sulfur_cube_bucket(
 }
 
 impl ItemBehaviour for SulfurCubeBucketItem {
-    fn normal_use(&self, item: &Item, player: &Player) {
-        let (yaw, pitch) = player.rotation();
-        self.normal_use_with_rotation(item, player, yaw, pitch);
-    }
-
     /// Vanilla `BucketItem.use` with `MobBucketItem`'s `ClipContext.Fluid.NONE`.
-    fn normal_use_with_rotation(&self, item: &Item, player: &Player, yaw: f32, pitch: f32) {
+    fn normal_use(&self, item: &Item, player: &Player, hand: Hand) -> InteractionResult {
         let world = player.world();
-        let (start_pos, end_pos) = get_start_and_end_pos(player, yaw, pitch);
+        let (start_pos, end_pos) = get_start_and_end_pos(player);
         let hit = world.clip(&pumpkin_world::clip::ClipContext::new(
             start_pos,
             end_pos,
@@ -126,7 +124,7 @@ impl ItemBehaviour for SulfurCubeBucketItem {
             pumpkin_world::clip::ClipFluid::None,
         ));
         if hit.is_miss {
-            return;
+            return InteractionResult::PASS;
         }
         let pos = hit.block_pos;
         let place_pos = pos.offset(hit.direction.to_offset());
@@ -145,13 +143,13 @@ impl ItemBehaviour for SulfurCubeBucketItem {
 
         empty_sulfur_cube_bucket(
             &world,
-            &player.inventory.held_item(),
+            &player.inventory.get_stack_in_hand(hand),
             place_pos,
             Some(player as &dyn EntityBase),
         );
         player.award_item_used(item);
-        // `ItemUtils.createFilledResult` with the creative stack limit.
-        give_player_bucket_item(player, &Item::BUCKET);
+        empty_bucket_in_hand(player, hand);
+        InteractionResult::SUCCESS
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
@@ -159,7 +157,25 @@ impl ItemBehaviour for SulfurCubeBucketItem {
     }
 }
 
-fn get_start_and_end_pos(player: &Player, yaw: f32, pitch: f32) -> (Vector3<f64>, Vector3<f64>) {
+/// The emptied bucket's `ItemUtils.createFilledResult(stack, player, getEmptySuccessItem)` for
+/// the stack in `hand`: an empty bucket, unless the player has infinite materials, whose full
+/// bucket is already in the inventory.
+fn empty_bucket_in_hand(player: &Player, hand: Hand) {
+    if player.has_infinite_materials() {
+        return;
+    }
+    fill_in_hand(player, hand, ItemStack::new(1, &Item::BUCKET));
+}
+
+/// `ItemUtils.createFilledResult` (with the creative stack limit) for the stack in `hand`.
+fn fill_in_hand(player: &Player, hand: Hand, new_stack: ItemStack) {
+    let mut held = player.inventory.get_stack_in_hand(hand);
+    create_filled_result(&mut held, player, new_stack, true);
+    player.inventory.set_stack_in_hand(hand, held);
+}
+
+fn get_start_and_end_pos(player: &Player) -> (Vector3<f64>, Vector3<f64>) {
+    let (yaw, pitch) = player.rotation();
     let start_pos = player.eye_position();
     let (yaw_rad, pitch_rad) = (f64::from(yaw.to_radians()), f64::from(pitch.to_radians()));
     let block_interaction_range = 4.5;
@@ -389,14 +405,10 @@ pub(crate) fn try_place_filled_bucket(
 }
 
 impl ItemBehaviour for EmptyBucketItem {
-    fn normal_use(&self, item: &Item, player: &Player) {
-        let (yaw, pitch) = player.rotation();
-        self.normal_use_with_rotation(item, player, yaw, pitch);
-    }
-
-    fn normal_use_with_rotation(&self, _block: &Item, player: &Player, yaw: f32, pitch: f32) {
+    /// Vanilla `BucketItem.use` for the empty bucket: picking a fluid up.
+    fn normal_use(&self, _item: &Item, player: &Player, hand: Hand) -> InteractionResult {
         let world = player.world();
-        let (start_pos, end_pos) = get_start_and_end_pos(player, yaw, pitch);
+        let (start_pos, end_pos) = get_start_and_end_pos(player);
 
         let hit = world.clip(&pumpkin_world::clip::ClipContext::new(
             start_pos,
@@ -405,14 +417,14 @@ impl ItemBehaviour for EmptyBucketItem {
             pumpkin_world::clip::ClipFluid::SourceOnly,
         ));
         if hit.is_miss {
-            return;
+            return InteractionResult::PASS;
         }
 
         let block_pos = hit.block_pos;
         let direction = hit.direction;
 
         let Some(item) = try_pickup_bucket_item(&world, block_pos, direction) else {
-            return;
+            return InteractionResult::FAIL;
         };
 
         if let Some(server) = world.server.upgrade()
@@ -426,7 +438,7 @@ impl ItemBehaviour for EmptyBucketItem {
                 );
             server.plugin_manager.fire_blocking(&server, &mut event);
             if event.cancelled {
-                return;
+                return InteractionResult::FAIL;
             }
         }
 
@@ -442,7 +454,8 @@ impl ItemBehaviour for EmptyBucketItem {
             block_pos.to_centered_f64(),
         );
 
-        give_player_bucket_item(player, item);
+        fill_in_hand(player, hand, ItemStack::new(1, item));
+        InteractionResult::SUCCESS
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
@@ -451,14 +464,14 @@ impl ItemBehaviour for EmptyBucketItem {
 }
 
 impl ItemBehaviour for FilledBucketItem {
-    fn normal_use(&self, item: &Item, player: &Player) {
-        let (yaw, pitch) = player.rotation();
-        self.normal_use_with_rotation(item, player, yaw, pitch);
-    }
-
-    fn normal_use_with_rotation(&self, item: &Item, player: &Player, yaw: f32, pitch: f32) {
+    /// Vanilla `BucketItem.use` (and `MobBucketItem`'s) for a full bucket: pouring it out.
+    fn normal_use(&self, item: &Item, player: &Player, hand: Hand) -> InteractionResult {
+        // The powder snow bucket is a `SolidBucketItem`, a block item with no `use` of its own.
+        if item.id == Item::POWDER_SNOW_BUCKET.id {
+            return InteractionResult::PASS;
+        }
         let world = player.world();
-        let (start_pos, end_pos) = get_start_and_end_pos(player, yaw, pitch);
+        let (start_pos, end_pos) = get_start_and_end_pos(player);
         let hit = world.clip(&pumpkin_world::clip::ClipContext::new(
             start_pos,
             end_pos,
@@ -466,18 +479,20 @@ impl ItemBehaviour for FilledBucketItem {
             pumpkin_world::clip::ClipFluid::None,
         ));
         if hit.is_miss {
-            return;
+            return InteractionResult::PASS;
         }
 
         let pos = hit.block_pos;
         let direction = hit.direction;
 
-        if should_evaporate_in_nether(item, &world) {
+        // `emptyContents` succeeds when the water evaporates: the bucket is emptied and its
+        // mob still comes out.
+        // TODO: the evaporation's large smoke particles.
+        let evaporated = should_evaporate_in_nether(item, &world);
+        if evaporated {
             play_bucket_evaporation(&world, &player.position());
-            return;
-        }
-        if !try_place_filled_bucket(&world, item, pos, direction) {
-            return;
+        } else if !try_place_filled_bucket(&world, item, pos, direction) {
+            return InteractionResult::FAIL;
         }
 
         if let Some(server) = world.server.upgrade()
@@ -502,17 +517,19 @@ impl ItemBehaviour for FilledBucketItem {
             pos.offset(direction.to_offset())
         };
 
-        world.play_sound(
-            get_empty_sound(item),
-            SoundCategory::Blocks,
-            &place_pos.to_f64(),
-        );
-        // The end of vanilla `BucketItem.playEmptySound`.
-        world.game_event_from(
-            Some(player),
-            GameEvent::FluidPlace,
-            place_pos.to_centered_f64(),
-        );
+        if !evaporated {
+            world.play_sound(
+                get_empty_sound(item),
+                SoundCategory::Blocks,
+                &place_pos.to_f64(),
+            );
+            // The end of vanilla `BucketItem.playEmptySound`.
+            world.game_event_from(
+                Some(player),
+                GameEvent::FluidPlace,
+                place_pos.to_centered_f64(),
+            );
+        }
 
         if let Some((entity_type, _)) = get_mob_for_bucket(item) {
             let spawn_coord = Vector3::new(
@@ -530,7 +547,7 @@ impl ItemBehaviour for FilledBucketItem {
                 crate::entity::mob::spawn::EntitySpawnReason::Bucket,
                 None,
             );
-            let bucket = player.inventory().held_item();
+            let bucket = player.inventory().get_stack_in_hand(hand);
             // Vanilla `MobBucketItem.spawn`: `createDefaultStackConfig` applies the bucket's
             // components (the custom name, the variant) and entity data, then the mob reads
             // its `bucket_entity_data` and remembers it came from a bucket.
@@ -558,12 +575,8 @@ impl ItemBehaviour for FilledBucketItem {
         }
 
         player.award_item_used(item);
-        if player.gamemode.load() != GameMode::Creative {
-            let item_stack = ItemStack::new(1, &Item::BUCKET);
-            player
-                .inventory
-                .set_slot(player.inventory.get_selected_slot() as usize, item_stack);
-        }
+        empty_bucket_in_hand(player, hand);
+        InteractionResult::SUCCESS
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
@@ -572,13 +585,6 @@ impl ItemBehaviour for FilledBucketItem {
 }
 
 impl ItemBehaviour for MilkBucketItem {
-    fn normal_use(&self, _item: &Item, player: &Player) {
-        let stack = player.inventory().held_item();
-        player
-            .living_entity
-            .set_active_hand(pumpkin_util::Hand::Right, stack, 32);
-    }
-
     fn on_stopped_using(&self, _stack: &ItemStack, player: &Player) {
         player.living_entity.reset_effects_and_attributes();
         give_player_bucket_item(player, &Item::BUCKET);

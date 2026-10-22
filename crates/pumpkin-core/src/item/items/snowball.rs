@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::Arc;
 
 use crate::entity::Entity;
@@ -20,7 +22,7 @@ impl ItemMetadata for SnowBallItem {
 const POWER: f32 = 1.5;
 
 impl ItemBehaviour for SnowBallItem {
-    fn normal_use(&self, item: &Item, player: &Player) {
+    fn normal_use(&self, item: &Item, player: &Player, hand: Hand) -> InteractionResult {
         let position = player.position();
         let world = player.world();
         world.play_sound(
@@ -36,26 +38,9 @@ impl ItemBehaviour for SnowBallItem {
             .set_velocity_from(player, pitch, yaw, 0.0, POWER, 1.0);
         world.spawn_entity(Arc::new(snowball));
 
-        // Consume item
-        let mut main_hand = player.inventory.held_item();
-        let consumed = if !main_hand.is_empty() && main_hand.item.id == Item::SNOWBALL.id {
-            main_hand.decrement_unless_creative(player.gamemode.load(), 1);
-            player.inventory.set_held_item(main_hand);
-            true
-        } else {
-            false
-        };
-
-        if !consumed {
-            let mut off_hand = player.inventory.off_hand_item();
-            if !off_hand.is_empty() && off_hand.item.id == Item::SNOWBALL.id {
-                off_hand.decrement_unless_creative(player.gamemode.load(), 1);
-                player
-                    .inventory
-                    .set_stack_in_hand(pumpkin_util::Hand::Left, off_hand);
-            }
-        }
+        crate::item::consume_in_hand(player, hand);
         player.award_item_used(item);
+        InteractionResult::SUCCESS
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

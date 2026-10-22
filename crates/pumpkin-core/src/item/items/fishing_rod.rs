@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::any::Any;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
@@ -19,7 +21,8 @@ impl ItemMetadata for FishingRodItem {
 }
 
 impl ItemBehaviour for FishingRodItem {
-    fn normal_use(&self, item: &Item, player: &Player) {
+    /// Vanilla `FishingRodItem.use`: `SUCCESS` whether it casts or reels in.
+    fn normal_use(&self, item: &Item, player: &Player, _hand: Hand) -> InteractionResult {
         let world = player.world();
         let bobber_id = player.fishing_bobber.load(Ordering::Relaxed);
 
@@ -68,6 +71,7 @@ impl ItemBehaviour for FishingRodItem {
                 &player.position(),
             );
         }
+        InteractionResult::SUCCESS
     }
 
     fn as_any(&self) -> &dyn Any {

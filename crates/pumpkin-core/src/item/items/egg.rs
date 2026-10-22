@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::Arc;
 
 use crate::entity::Entity;
@@ -21,7 +23,7 @@ impl ItemMetadata for EggItem {
 const POWER: f32 = 1.5;
 
 impl ItemBehaviour for EggItem {
-    fn normal_use(&self, item: &Item, player: &Player) {
+    fn normal_use(&self, item: &Item, player: &Player, hand: Hand) -> InteractionResult {
         let position = player.position();
         let world = player.world();
         world.play_sound(
@@ -31,7 +33,7 @@ impl ItemBehaviour for EggItem {
         );
 
         // Capture the held item stack and pass it to the thrown egg entity
-        let item_stack: ItemStack = player.inventory.held_item();
+        let item_stack: ItemStack = player.inventory.get_stack_in_hand(hand);
 
         let entity = Entity::new(world.clone(), position, &EntityType::EGG);
         let egg = EggEntity::new_shot(entity, player.get_entity());
@@ -44,26 +46,9 @@ impl ItemBehaviour for EggItem {
             .set_velocity_from(player, pitch, yaw, 0.0, POWER, 1.0);
         world.spawn_entity(Arc::new(egg));
 
-        // Consume item
-        let mut main_hand = player.inventory.held_item();
-        let consumed = if !main_hand.is_empty() && Self::ids().contains(&main_hand.item.id) {
-            main_hand.decrement_unless_creative(player.gamemode.load(), 1);
-            player.inventory.set_held_item(main_hand);
-            true
-        } else {
-            false
-        };
-
-        if !consumed {
-            let mut off_hand = player.inventory.off_hand_item();
-            if !off_hand.is_empty() && Self::ids().contains(&off_hand.item.id) {
-                off_hand.decrement_unless_creative(player.gamemode.load(), 1);
-                player
-                    .inventory
-                    .set_stack_in_hand(pumpkin_util::Hand::Left, off_hand);
-            }
-        }
+        crate::item::consume_in_hand(player, hand);
         player.award_item_used(item);
+        InteractionResult::SUCCESS
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

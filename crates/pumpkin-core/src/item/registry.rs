@@ -13,7 +13,8 @@ use pumpkin_util::math::vector3::Vector3;
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
 
-use super::{ItemBehaviour, ItemMetadata};
+use super::{ItemBehaviour, ItemMetadata, default_use};
+use pumpkin_data::data_component_impl::KineticWeaponImpl;
 
 pub(crate) const fn should_try_block_placement(result: &BlockActionResult) -> bool {
     matches!(result, BlockActionResult::Pass)
@@ -33,35 +34,37 @@ impl ItemRegistry {
         }
     }
 
-    pub fn on_use(&self, stack: &ItemStack, player: &Player, hand: Hand) {
-        let (yaw, pitch) = player.rotation();
-        self.on_use_with_rotation(stack, player, yaw, pitch, hand);
-    }
-
-    pub fn on_use_with_rotation(
-        &self,
-        stack: &ItemStack,
-        player: &Player,
-        yaw: f32,
-        pitch: f32,
-        hand: Hand,
-    ) {
+    /// Vanilla `ItemStack.use`: the item's `use`, then, for an item used at once (no use
+    /// duration) that succeeded, its `use_cooldown`.
+    pub fn on_use(&self, stack: &ItemStack, player: &Player, hand: Hand) -> InteractionResult {
         let item = stack.item;
         let cooldown = stack.get_use_cooldown();
         let cooldown_group = cooldown_group(stack);
 
         if player.is_on_cooldown(&cooldown_group) {
-            return;
+            return InteractionResult::PASS;
         }
 
         let pumpkin_item = self.get_pumpkin_item(item.id);
-        if let Some(pumpkin_item) = pumpkin_item {
-            pumpkin_item.normal_use_with_hand(item, player, yaw, pitch, hand);
-        }
+        let instantly_used = stack.get_max_use_time() <= 0
+            && stack.get_data_component::<KineticWeaponImpl>().is_none()
+            && pumpkin_item
+                .as_ref()
+                .is_none_or(|behaviour| behaviour.get_use_duration() <= 0);
+        let result = pumpkin_item.map_or_else(
+            || default_use(player, hand),
+            |pumpkin_item| pumpkin_item.normal_use(item, player, hand),
+        );
 
-        if let Some(cooldown) = cooldown {
+        // `applyAfterUseComponentSideEffects`.
+        // TODO: `use_remainder`.
+        if instantly_used
+            && result.consumes_action()
+            && let Some(cooldown) = cooldown
+        {
             player.start_cooldown(cooldown_group, (cooldown.seconds * 20.0) as i32);
         }
+        result
     }
 
     pub fn on_stopped_using(&self, stack: &ItemStack, player: &Player) {

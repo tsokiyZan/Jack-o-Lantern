@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::any::Any;
 
 use crate::entity::experience_orb::ExperienceOrbEntity;
@@ -15,7 +17,7 @@ impl ItemMetadata for ExperienceBottleItem {
 }
 
 impl ItemBehaviour for ExperienceBottleItem {
-    fn normal_use(&self, item: &Item, player: &Player) {
+    fn normal_use(&self, item: &Item, player: &Player, hand: Hand) -> InteractionResult {
         let world = player.world();
         let pos = player.eye_position();
         world.play_sound(
@@ -27,10 +29,9 @@ impl ItemBehaviour for ExperienceBottleItem {
         let amount = (rand::random::<u32>() % 9 + 3) as u32; // 3..=11 exp
         ExperienceOrbEntity::spawn(&world, pos, amount);
 
-        let mut held = player.inventory().held_item();
-        held.decrement_unless_creative(player.gamemode.load(), 1);
-        player.inventory().set_held_item(held);
         player.award_item_used(item);
+        crate::item::consume_in_hand(player, hand);
+        InteractionResult::SUCCESS
     }
 
     fn as_any(&self) -> &dyn Any {

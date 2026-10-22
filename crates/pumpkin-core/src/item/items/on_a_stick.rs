@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::any::Any;
 
 use crate::entity::EntityBase;
@@ -17,7 +19,8 @@ impl ItemMetadata for CarrotOnAStickItem {
 }
 
 impl ItemBehaviour for CarrotOnAStickItem {
-    fn normal_use(&self, item: &Item, player: &Player) {
+    /// Vanilla `FoodOnAStickItem.use`.
+    fn normal_use(&self, item: &Item, player: &Player, hand: Hand) -> InteractionResult {
         let vehicle_opt = player
             .get_entity()
             .vehicle
@@ -29,16 +32,11 @@ impl ItemBehaviour for CarrotOnAStickItem {
             && let Some(steerable) = vehicle.get_item_steerable()
             && steerable.boost()
         {
-            let before = player.inventory.held_item();
-            player.damage_held_item(7);
-            if !before.is_empty() && player.inventory.held_item().is_empty() {
-                player
-                    .inventory
-                    .set_held_item(ItemStack::new(1, &Item::FISHING_ROD));
-            }
+            stick_boosted(player, hand, 7)
         } else {
             // Vanilla awards the stat only for a use that doesn't boost.
             player.award_item_used(item);
+            InteractionResult::PASS
         }
     }
 
@@ -54,7 +52,8 @@ impl ItemMetadata for WarpedFungusOnAStickItem {
 }
 
 impl ItemBehaviour for WarpedFungusOnAStickItem {
-    fn normal_use(&self, item: &Item, player: &Player) {
+    /// Vanilla `FoodOnAStickItem.use`.
+    fn normal_use(&self, item: &Item, player: &Player, hand: Hand) -> InteractionResult {
         let vehicle_opt = player
             .get_entity()
             .vehicle
@@ -66,20 +65,28 @@ impl ItemBehaviour for WarpedFungusOnAStickItem {
             && let Some(steerable) = vehicle.get_item_steerable()
             && steerable.boost()
         {
-            let before = player.inventory.held_item();
-            player.damage_held_item(1);
-            if !before.is_empty() && player.inventory.held_item().is_empty() {
-                player
-                    .inventory
-                    .set_held_item(ItemStack::new(1, &Item::FISHING_ROD));
-            }
+            stick_boosted(player, hand, 1)
         } else {
             // Vanilla awards the stat only for a use that doesn't boost.
             player.award_item_used(item);
+            InteractionResult::PASS
         }
     }
 
     fn as_any(&self) -> &dyn Any {
         self
     }
+}
+
+/// The boost branch of vanilla `FoodOnAStickItem.use`: `hurtAndConvertOnBreak` into a fishing
+/// rod, and the server's own swing.
+fn stick_boosted(player: &Player, hand: Hand, damage: i32) -> InteractionResult {
+    let before = player.inventory.get_stack_in_hand(hand);
+    player.damage_item_in_hand(hand, damage);
+    if !before.is_empty() && player.inventory.get_stack_in_hand(hand).is_empty() {
+        player
+            .inventory
+            .set_stack_in_hand(hand, ItemStack::new(1, &Item::FISHING_ROD));
+    }
+    InteractionResult::SUCCESS_SERVER
 }

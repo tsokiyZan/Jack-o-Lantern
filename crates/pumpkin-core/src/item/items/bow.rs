@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::any::Any;
 use std::sync::atomic::Ordering;
 
@@ -23,23 +25,14 @@ impl ItemMetadata for BowItem {
 }
 
 impl ItemBehaviour for BowItem {
-    fn normal_use(&self, _item: &Item, player: &Player) {
-        // Check if player has arrows (or is in creative mode)
-        let has_arrows = Self::has_arrows(player);
-        let gamemode = player.gamemode.load();
-
-        if !has_arrows && gamemode != GameMode::Creative {
-            return;
+    /// Vanilla `BowItem.use`.
+    fn normal_use(&self, _item: &Item, player: &Player, hand: Hand) -> InteractionResult {
+        if !Self::has_arrows(player) && player.gamemode.load() != GameMode::Creative {
+            return InteractionResult::FAIL;
         }
-
-        // Get the held item stack
-        let inventory = player.inventory();
-        let stack = inventory.held_item();
-
-        // Start the bow drawing animation
-        player
-            .living_entity
-            .set_active_hand(pumpkin_util::Hand::Right, stack, Self::USE_DURATION);
+        let stack = player.inventory().get_stack_in_hand(hand);
+        crate::item::start_using_item(player, hand, stack, Self::USE_DURATION);
+        InteractionResult::CONSUME
     }
 
     fn on_stopped_using(&self, stack: &ItemStack, player: &Player) {

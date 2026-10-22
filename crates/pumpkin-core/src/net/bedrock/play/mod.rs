@@ -4,10 +4,7 @@ use std::{
 };
 
 use pumpkin_data::{
-    data_component_impl::{
-        BlocksAttacksImpl, ConsumableImpl, ConsumeAnimation, EquipmentSlot, EquippableImpl,
-        FoodImpl,
-    },
+    data_component_impl::{ConsumableImpl, ConsumeAnimation, EquipmentSlot, FoodImpl},
     item_stack::ItemStack,
 };
 use pumpkin_inventory::{

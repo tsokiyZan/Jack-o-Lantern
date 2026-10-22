@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::any::Any;
 
 use crate::entity::player::Player;
@@ -14,17 +16,17 @@ impl ItemMetadata for SpyglassItem {
 }
 
 impl ItemBehaviour for SpyglassItem {
-    fn normal_use(&self, _item: &Item, player: &Player) {
+    fn normal_use(&self, _item: &Item, player: &Player, hand: Hand) -> InteractionResult {
         player.world().play_sound(
             Sound::ItemSpyglassUse,
             SoundCategory::Players,
             &player.position(),
         );
-        let stack = player.inventory().held_item();
-        player
-            .living_entity
-            .set_active_hand(pumpkin_util::Hand::Right, stack, Self::USE_DURATION);
         player.award_item_used(&Item::SPYGLASS);
+        // `ItemUtils.startUsingInstantly`.
+        let stack = player.inventory().get_stack_in_hand(hand);
+        crate::item::start_using_item(player, hand, stack, Self::USE_DURATION);
+        InteractionResult::CONSUME
     }
 
     fn on_stopped_using(&self, _stack: &pumpkin_data::item_stack::ItemStack, player: &Player) {

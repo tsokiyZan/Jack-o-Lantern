@@ -23,7 +23,21 @@ impl JavaClient {
         }
         self.update_sequence(use_item.sequence.0);
 
-        let mut item_in_hand = inventory.get_stack_in_hand(hand);
+        let item_in_hand = inventory.get_stack_in_hand(hand);
+        if item_in_hand.is_empty() {
+            return;
+        }
+        let swing_animation = item_in_hand.get_interact_animation();
+        if self.version.load() >= JavaMinecraftVersion::V_1_21 {
+            // `absSnapRotationTo` the packet's wrapped rotation.
+            let (yaw, pitch) = (wrap_degrees(use_item.yaw), wrap_degrees(use_item.pitch));
+            if (yaw, pitch) != player.rotation() {
+                let entity = player.get_entity();
+                entity.yaw.store(yaw % 360.0);
+                entity.set_pitch(pitch);
+            }
+        }
+        let (use_yaw, use_pitch) = player.rotation();
         // `ServerPlayerGameMode.useItem`: spectators and items on cooldown pass.
         if player.gamemode.load() == GameMode::Spectator
             || player.is_on_cooldown(&cooldown_group(&item_in_hand))
@@ -46,10 +60,9 @@ impl JavaClient {
         // Vanilla's `ITEM_USED` is awarded by each item's `use`, not here.
         let hit = player.world().clip(&pumpkin_world::clip::ClipContext::new(
             player.eye_position(),
-            player.eye_position().add(
-                &(Vector3::rotation_vector(f64::from(use_item.pitch), f64::from(use_item.yaw))
-                    * 4.5),
-            ),
+            player
+                .eye_position()
+                .add(&(Vector3::rotation_vector(f64::from(use_pitch), f64::from(use_yaw)) * 4.5)),
             pumpkin_world::clip::ClipBlock::Outline,
             pumpkin_world::clip::ClipFluid::None,
         ));
@@ -65,15 +78,8 @@ impl JavaClient {
                 Some(hit_pos),
             )
         };
-        let (item_for_use, stack_for_use) = (item_in_hand.item, item_in_hand.clone());
-        let (use_yaw, use_pitch) = if self.version.load() >= JavaMinecraftVersion::V_1_21 {
-            (use_item.yaw, use_item.pitch)
-        } else {
-            player.rotation()
-        };
-        Self::prepare_hand_item_for_use(player, hand, &mut item_in_hand);
 
-        if !Self::should_continue_use_after_fish_event(server, player, hand, item_for_use) {
+        if !Self::should_continue_use_after_fish_event(server, player, hand, item_in_hand.item) {
             return;
         }
 
@@ -81,68 +87,13 @@ impl JavaClient {
             server;
             event;
             'after: {
-                server
+                let result = server
                     .item_registry
-                    .on_use_with_rotation(&stack_for_use, player, use_yaw, use_pitch, hand);
+                    .on_use(&item_in_hand, player, hand);
+                // `handleUseItem`: a success swings and resets the attack strength.
+                player.swing_for_interaction(hand, swing_animation, result.swing_source());
             }
         }}
-    }
-
-    fn prepare_hand_item_for_use(player: &Arc<Player>, hand: Hand, held: &mut ItemStack) {
-        let inventory = player.inventory();
-
-        if held.get_data_component::<ConsumableImpl>().is_some()
-            || held.get_data_component::<BlocksAttacksImpl>().is_some()
-        {
-            // If its food we want to make sure we can actually consume it
-            if let Some(food) = held.get_data_component::<FoodImpl>() {
-                if player.can_eat(food.can_always_eat) {
-                    player.living_entity.set_active_hand(
-                        hand,
-                        held.clone(),
-                        held.get_max_use_time(),
-                    );
-                }
-            } else {
-                player
-                    .living_entity
-                    .set_active_hand(hand, held.clone(), held.get_max_use_time());
-            }
-        }
-        let equipment_slot = held
-            .get_data_component::<EquippableImpl>()
-            .filter(|equippable| equippable.swappable)
-            .map(|equippable| equippable.slot.clone());
-        if let Some(slot) = equipment_slot {
-            // The equipment lock has to be released before touching the hand again:
-            // the off hand lives in the same map, so holding it here would deadlock.
-            let current_equipped = inventory
-                .entity_equipment
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .get(&slot);
-            if current_equipped.are_items_and_components_equal(held) {
-                return;
-            }
-            // `Equippable.swapWithEquipmentSlot`.
-            player.award_item_used(held.item);
-
-            player.enqueue_equipment_change(&slot, held);
-
-            let equipped = if current_equipped.is_empty() {
-                let equipped = held.clone();
-                held.decrement_unless_creative(player.gamemode.load(), 1);
-                equipped
-            } else {
-                std::mem::replace(held, current_equipped)
-            };
-            inventory
-                .entity_equipment
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .put(&slot, equipped);
-            inventory.set_stack_in_hand(hand, held.clone());
-        }
     }
 
     fn should_continue_use_after_fish_event(

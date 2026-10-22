@@ -1,4 +1,6 @@
 use crate::block::registry::BlockActionResult;
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::Arc;
 
 use crate::entity::player::Player;
@@ -49,7 +51,8 @@ impl ItemBehaviour for FireworkRocketItem {
         BlockActionResult::Success
     }
 
-    fn normal_use(&self, _item: &Item, player: &Player) {
+    /// Vanilla `FireworkRocketItem.use`.
+    fn normal_use(&self, _item: &Item, player: &Player, hand: Hand) -> InteractionResult {
         if player.get_entity().is_fall_flying() {
             let world = player.world();
             let entity = Entity::new(
@@ -60,25 +63,11 @@ impl ItemBehaviour for FireworkRocketItem {
             let entity = FireworkRocketEntity::new_shot(entity, player.get_entity());
             world.spawn_entity(Arc::new(entity));
 
-            let mut held = player.inventory().held_item();
-            let mut is_main = true;
-            if held.is_empty() || held.item.id != Item::FIREWORK_ROCKET.id {
-                held = player.inventory().off_hand_item();
-                is_main = false;
-                if held.is_empty() || held.item.id != Item::FIREWORK_ROCKET.id {
-                    return;
-                }
-            }
-            held.decrement_unless_creative(player.gamemode.load(), 1);
-            if is_main {
-                player.inventory().set_held_item(held);
-            } else {
-                player
-                    .inventory()
-                    .set_stack_in_hand(pumpkin_util::Hand::Left, held);
-            }
+            crate::item::consume_in_hand(player, hand);
             player.award_item_used(&Item::FIREWORK_ROCKET);
+            return InteractionResult::SUCCESS;
         }
+        InteractionResult::PASS
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::any::Any;
 
 use crate::entity::player::Player;
@@ -15,33 +17,19 @@ impl ItemMetadata for KnowledgeBookItem {
 }
 
 impl ItemBehaviour for KnowledgeBookItem {
-    fn normal_use(&self, _item: &Item, player: &Player) {
-        let mut held = player.inventory().held_item();
-        let mut matched_main = true;
-        if held.is_empty() || held.item.id != Item::KNOWLEDGE_BOOK.id {
-            held = player.inventory().off_hand_item();
-            matched_main = false;
-            if held.is_empty() || held.item.id != Item::KNOWLEDGE_BOOK.id {
-                return;
-            }
-        }
-
-        let has_recipes = held
+    fn normal_use(&self, _item: &Item, player: &Player, hand: Hand) -> InteractionResult {
+        let has_recipes = player
+            .inventory()
+            .get_stack_in_hand(hand)
             .get_data_component::<RecipesImpl>()
             .is_some_and(|recipes| !recipes.recipes.is_empty());
-
-        held.decrement_unless_creative(player.gamemode.load(), 1);
-        if matched_main {
-            player.inventory().set_held_item(held);
-        } else {
-            player
-                .inventory()
-                .set_stack_in_hand(pumpkin_util::Hand::Left, held);
+        crate::item::consume_in_hand(player, hand);
+        if !has_recipes {
+            return InteractionResult::FAIL;
         }
         // TODO: `awardRecipes`; vanilla also fails on a recipe it doesn't know.
-        if has_recipes {
-            player.award_item_used(&Item::KNOWLEDGE_BOOK);
-        }
+        player.award_item_used(&Item::KNOWLEDGE_BOOK);
+        InteractionResult::SUCCESS
     }
 
     fn as_any(&self) -> &dyn Any {

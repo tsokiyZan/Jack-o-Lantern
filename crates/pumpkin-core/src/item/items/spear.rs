@@ -19,7 +19,6 @@ use pumpkin_data::data_component_impl::{
 };
 use pumpkin_data::effect::StatusEffect;
 use pumpkin_data::entity::{EntityStatus, EntityType};
-use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::SoundCategory;
 use pumpkin_data::tag;
@@ -38,40 +37,6 @@ impl ItemMetadata for SpearItem {
 }
 
 impl ItemBehaviour for SpearItem {
-    fn normal_use(&self, item: &Item, player: &Player) {
-        if player
-            .living_entity
-            .item_in_use
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .is_some()
-        {
-            return;
-        }
-
-        let inventory = player.inventory();
-        let hand = if inventory.held_item().item.id == item.id {
-            Hand::Right
-        } else {
-            Hand::Left
-        };
-        let stack = inventory.get_stack_in_hand(hand);
-        let sound = stack
-            .get_data_component::<KineticWeaponImpl>()
-            .and_then(|weapon| weapon.sound.clone());
-        player
-            .living_entity
-            .set_active_hand(hand, stack, Self::USE_DURATION);
-        if let Some(sound) = sound {
-            player.world().play_sound_event_expect(
-                player,
-                &sound,
-                SoundCategory::Players,
-                &player.position(),
-            );
-        }
-    }
-
     fn on_spear_jab(&self, stack: &ItemStack, player: &Player) {
         let Some(piercing) = stack.get_data_component::<PiercingWeaponImpl>() else {
             return;

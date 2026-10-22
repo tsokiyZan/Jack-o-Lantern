@@ -1,6 +1,6 @@
 #[allow(clippy::wildcard_imports)]
 use super::*;
-use crate::entity::player::cooldown_group;
+use crate::item::interaction_result::InteractionResult;
 use crate::item::registry::should_try_block_placement;
 use pumpkin_protocol::bedrock::server::inventory_transaction::HandSlot;
 
@@ -323,86 +323,29 @@ impl BedrockClient {
                         None,
                     );
 
-                    let stack_for_use = held.clone();
-
-                    {
-                        if !player.is_on_cooldown(&cooldown_group(&held)) {
-                            // Bedrock can repeat click-air while using an item. Do not
-                            // restart its server-side use timer on these timed inputs.
-                            let already_using =
-                                player.living_entity.item_use_time.load(Ordering::Relaxed) > 0
-                                    && player
-                                        .living_entity
-                                        .item_in_use
-                                        .lock()
-                                        .unwrap_or_else(std::sync::PoisonError::into_inner)
-                                        .as_ref()
-                                        .is_some_and(|item| {
-                                            item.are_items_and_components_equal(&held)
-                                        });
-                            if !already_using
-                                && (held.get_data_component::<ConsumableImpl>().is_some()
-                                    || held.get_data_component::<BlocksAttacksImpl>().is_some())
-                            {
-                                if held
-                                    .get_data_component::<FoodImpl>()
-                                    .is_none_or(|food| player.can_eat(food.can_always_eat))
-                                {
-                                    player.living_entity.set_active_hand(
-                                        hand,
-                                        held.clone(),
-                                        held.get_max_use_time(),
-                                    );
-                                } else {
-                                    // Correct predicted eating when the server's food
-                                    // level is already full, even if it has not changed.
-                                    self.correct_rejected_food_use(player);
-                                }
-                            }
-                            if let Some(equippable) = held.get_data_component::<EquippableImpl>() {
-                                let should_change = {
-                                    let inventory = player.inventory();
-                                    let equipment_guard = inventory
-                                        .entity_equipment
-                                        .lock()
-                                        .unwrap_or_else(std::sync::PoisonError::into_inner);
-                                    let current_equipped = equipment_guard.get(equippable.slot);
-                                    !current_equipped.are_items_and_components_equal(&held)
-                                };
-                                if should_change {
-                                    // `Equippable.swapWithEquipmentSlot`.
-                                    player.award_item_used(held.item);
-                                    player.enqueue_equipment_change(equippable.slot, &held);
-
-                                    let inventory = player.inventory();
-                                    let mut equipment_guard = inventory
-                                        .entity_equipment
-                                        .lock()
-                                        .unwrap_or_else(std::sync::PoisonError::into_inner);
-                                    let equip_item = equipment_guard
-                                        .equipment
-                                        .entry(equippable.slot.clone())
-                                        .or_insert_with(|| ItemStack::EMPTY.clone());
-                                    if equip_item.is_empty() {
-                                        *equip_item = held.clone();
-                                        held.decrement_unless_creative(player.gamemode.load(), 1);
-                                    } else {
-                                        let old_held = held.clone();
-                                        held = equip_item.clone();
-                                        *equip_item = old_held;
-                                    }
-                                    drop(equipment_guard);
-                                    player.inventory().set_stack_in_hand(hand, held.clone());
-                                }
-                            }
-                        }
+                    // `handleUseItem` skips an empty hand; `useItem` passes for spectators.
+                    if held.is_empty() || player.gamemode.load() == GameMode::Spectator {
+                        return;
                     }
-
+                    let swing_animation = held.get_interact_animation();
                     send_cancellable_blocking! {{
                         &server;
                         event;
                         'after: {
-                            server.item_registry.on_use(&stack_for_use, player, hand);
+                            // `ServerPlayerGameMode.useItem` then `handleUseItem`'s swing.
+                            let result = server.item_registry.on_use(&held, player, hand);
+                            if result == InteractionResult::FAIL
+                                && held.get_data_component::<FoodImpl>().is_some()
+                            {
+                                // Correct predicted eating when the server's food level is
+                                // already full, even if it has not changed.
+                                self.correct_rejected_food_use(player);
+                            }
+                            player.swing_for_interaction(
+                                hand,
+                                swing_animation,
+                                result.swing_source(),
+                            );
                         }
                     }}
                 }

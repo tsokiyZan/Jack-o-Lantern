@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use rand::{RngExt, rng};
 
 use std::sync::Arc;
@@ -25,7 +27,7 @@ const DIVERGENCE: f32 = 1.0;
 const THROW_SOUND_VOLUME: f32 = 0.5;
 
 impl ItemBehaviour for EnderPearlItem {
-    fn normal_use(&self, item: &Item, player: &Player) {
+    fn normal_use(&self, item: &Item, player: &Player, hand: Hand) -> InteractionResult {
         let position = player.position();
         let world = player.world();
         world.play_sound_fine(
@@ -44,26 +46,9 @@ impl ItemBehaviour for EnderPearlItem {
             .set_velocity_from(player, pitch, yaw, ROLL, POWER, DIVERGENCE);
         world.spawn_entity(Arc::new(pearl));
 
-        // Consume item
-        let mut main_hand = player.inventory.held_item();
-        let consumed = if !main_hand.is_empty() && main_hand.item.id == Item::ENDER_PEARL.id {
-            main_hand.decrement_unless_creative(player.gamemode.load(), 1);
-            player.inventory.set_held_item(main_hand);
-            true
-        } else {
-            false
-        };
-
-        if !consumed {
-            let mut off_hand = player.inventory.off_hand_item();
-            if !off_hand.is_empty() && off_hand.item.id == Item::ENDER_PEARL.id {
-                off_hand.decrement_unless_creative(player.gamemode.load(), 1);
-                player
-                    .inventory
-                    .set_stack_in_hand(pumpkin_util::Hand::Left, off_hand);
-            }
-        }
+        crate::item::consume_in_hand(player, hand);
         player.award_item_used(item);
+        InteractionResult::SUCCESS
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

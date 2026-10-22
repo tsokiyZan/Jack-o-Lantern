@@ -1,3 +1,4 @@
+use crate::item::interaction_result::InteractionResult;
 use std::any::Any;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
@@ -47,26 +48,19 @@ impl ItemMetadata for TridentItem {
 
 impl ItemBehaviour for TridentItem {
     /// Vanilla `TridentItem.use`.
-    fn normal_use_with_hand(
-        &self,
-        _item: &Item,
-        player: &Player,
-        _yaw: f32,
-        _pitch: f32,
-        hand: Hand,
-    ) {
+    /// Vanilla `TridentItem.use`.
+    fn normal_use(&self, _item: &Item, player: &Player, hand: Hand) -> InteractionResult {
         let stack = player.inventory().get_stack_in_hand(hand);
         if stack.next_damage_will_break() {
-            return;
+            return InteractionResult::FAIL;
         }
         if Self::spin_attack_strength(&stack) > 0.0
             && !player.living_entity.entity.is_in_water_or_rain()
         {
-            return;
+            return InteractionResult::FAIL;
         }
-        player
-            .living_entity
-            .set_active_hand(hand, stack, Self::USE_DURATION);
+        crate::item::start_using_item(player, hand, stack, Self::USE_DURATION);
+        InteractionResult::CONSUME
     }
 
     /// Vanilla `TridentItem.releaseUsing`.

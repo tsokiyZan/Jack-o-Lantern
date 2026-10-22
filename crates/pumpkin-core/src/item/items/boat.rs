@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::Arc;
 
 use crate::entity::Entity;
@@ -87,7 +89,8 @@ impl ItemMetadata for BoatItem {
 
 impl ItemBehaviour for BoatItem {
     /// Vanilla: `BoatItem.use()` - raycasts to find placement position
-    fn normal_use(&self, item: &Item, player: &Player) {
+    /// Vanilla `BoatItem.use`.
+    fn normal_use(&self, item: &Item, player: &Player, hand: Hand) -> InteractionResult {
         let world = player.world();
         let (start_pos, end_pos) = self.get_start_and_end_pos(player);
 
@@ -99,7 +102,7 @@ impl ItemBehaviour for BoatItem {
             pumpkin_world::clip::ClipFluid::Any,
         ));
         if hit.is_miss {
-            return;
+            return InteractionResult::PASS;
         }
 
         let hit_vec = hit.location;
@@ -126,7 +129,7 @@ impl ItemBehaviour for BoatItem {
             // Check if entity's bounding box contains the player's eye position
             if entity_box.intersects(&BoundingBox::new(player_eye_pos, player_eye_pos)) {
                 // Entity is blocking the line of sight at eye position
-                return;
+                return InteractionResult::PASS;
             }
         }
 
@@ -137,12 +140,12 @@ impl ItemBehaviour for BoatItem {
 
         // Vanilla: if (!world.isSpaceEmpty(lv7, lv7.getBoundingBox())) return FAIL
         if !world.is_space_empty(boat_box) {
-            return;
+            return InteractionResult::FAIL;
         }
 
         // Check no entities occupy the space
         if !world.get_entities_at_box(&boat_box).is_empty() {
-            return;
+            return InteractionResult::FAIL;
         }
 
         // Create and spawn the boat
@@ -155,26 +158,10 @@ impl ItemBehaviour for BoatItem {
         let boat_entity = Arc::new(BoatEntity::new(entity));
         world.spawn_entity(boat_entity);
 
-        let mut main_hand = player.inventory.held_item();
-        let consumed = if !main_hand.is_empty() && main_hand.item.id == item.id {
-            main_hand.decrement_unless_creative(player.gamemode.load(), 1);
-            player.inventory.set_held_item(main_hand);
-            true
-        } else {
-            false
-        };
-
-        if !consumed {
-            let mut off_hand = player.inventory.off_hand_item();
-            if !off_hand.is_empty() && off_hand.item.id == item.id {
-                off_hand.decrement_unless_creative(player.gamemode.load(), 1);
-                player
-                    .inventory
-                    .set_stack_in_hand(pumpkin_util::Hand::Left, off_hand);
-            }
-        }
+        crate::item::consume_in_hand(player, hand);
 
         player.award_item_used(item);
+        InteractionResult::SUCCESS
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

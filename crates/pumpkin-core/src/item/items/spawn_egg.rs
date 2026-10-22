@@ -1,4 +1,6 @@
 use crate::block::registry::BlockActionResult;
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::Arc;
 
 use crate::block::entities::mob_spawner::MobSpawnerBlockEntity;
@@ -157,73 +159,59 @@ pub(crate) fn prepare_egg_mob(
 }
 
 impl ItemBehaviour for SpawnEggItem {
-    fn normal_use(&self, item: &Item, player: &Player) {
-        if let Some(entity_type) = entity_from_egg(item.id) {
-            let world = player.world();
-            let (start_pos, end_pos) = self.get_start_and_end_pos(player);
-            let hit = world.clip(&pumpkin_world::clip::ClipContext::new(
-                start_pos,
-                end_pos,
-                pumpkin_world::clip::ClipBlock::Outline,
-                pumpkin_world::clip::ClipFluid::SourceOnly,
-            ));
+    /// Vanilla `SpawnEggItem.use`: only a click on a liquid spawns.
+    fn normal_use(&self, item: &Item, player: &Player, hand: Hand) -> InteractionResult {
+        let world = player.world();
+        let (start_pos, end_pos) = self.get_start_and_end_pos(player);
+        let hit = world.clip(&pumpkin_world::clip::ClipContext::new(
+            start_pos,
+            end_pos,
+            pumpkin_world::clip::ClipBlock::Outline,
+            pumpkin_world::clip::ClipFluid::SourceOnly,
+        ));
 
-            if hit.is_miss {
-                return;
-            }
-
-            let hit_pos = hit.block_pos;
-
-            let pos = Vector3::new(
-                f64::from(hit_pos.0.x) + 0.5,
-                f64::from(hit_pos.0.y),
-                f64::from(hit_pos.0.z) + 0.5,
-            );
-            let yaw = wrap_degrees(rand::random::<f32>() * 360.0) % 360.0;
-            let mob = from_type(entity_type, pos, &world, Uuid::new_v4());
-            mob.get_entity().set_rotation(yaw, 0.0);
-
-            let held = player.inventory.held_item();
-            let stack = if !held.is_empty() && held.item.id == item.id {
-                held
-            } else {
-                player.inventory.off_hand_item()
-            };
-            prepare_egg_mob(
-                &stack,
-                &mob,
-                &world,
-                Some(player),
-                crate::entity::mob::spawn::EntitySpawnReason::SpawnItemUse,
-            );
-            if !world.spawn_creature(
-                mob,
-                CreatureSpawnReason::SpawnerEgg,
-                world.get_player_by_uuid(player.gameprofile.id),
-            ) {
-                return;
-            }
-
-            let mut main_hand = player.inventory.held_item();
-            let consumed = if !main_hand.is_empty() && main_hand.item.id == item.id {
-                main_hand.decrement_unless_creative(player.gamemode.load(), 1);
-                player.inventory.set_held_item(main_hand);
-                true
-            } else {
-                false
-            };
-
-            if !consumed {
-                let mut off_hand = player.inventory.off_hand_item();
-                if !off_hand.is_empty() && off_hand.item.id == item.id {
-                    off_hand.decrement_unless_creative(player.gamemode.load(), 1);
-                    player
-                        .inventory
-                        .set_stack_in_hand(pumpkin_util::Hand::Left, off_hand);
-                }
-            }
-            player.award_item_used(item);
+        if hit.is_miss {
+            return InteractionResult::PASS;
         }
+        let Some(entity_type) = entity_from_egg(item.id) else {
+            return InteractionResult::FAIL;
+        };
+
+        let hit_pos = hit.block_pos;
+        // `getBlockState(pos).getBlock() instanceof LiquidBlock`.
+        let hit_block = world.get_block(&hit_pos);
+        if hit_block != &Block::WATER && hit_block != &Block::LAVA {
+            return InteractionResult::PASS;
+        }
+
+        let pos = Vector3::new(
+            f64::from(hit_pos.0.x) + 0.5,
+            f64::from(hit_pos.0.y),
+            f64::from(hit_pos.0.z) + 0.5,
+        );
+        let yaw = wrap_degrees(rand::random::<f32>() * 360.0) % 360.0;
+        let mob = from_type(entity_type, pos, &world, Uuid::new_v4());
+        mob.get_entity().set_rotation(yaw, 0.0);
+
+        let stack = player.inventory.get_stack_in_hand(hand);
+        prepare_egg_mob(
+            &stack,
+            &mob,
+            &world,
+            Some(player),
+            crate::entity::mob::spawn::EntitySpawnReason::SpawnItemUse,
+        );
+        if !world.spawn_creature(
+            mob,
+            CreatureSpawnReason::SpawnerEgg,
+            world.get_player_by_uuid(player.gameprofile.id),
+        ) {
+            return InteractionResult::FAIL;
+        }
+
+        crate::item::consume_in_hand(player, hand);
+        player.award_item_used(item);
+        InteractionResult::SUCCESS
     }
 
     fn use_on_block(

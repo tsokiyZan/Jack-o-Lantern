@@ -52,18 +52,6 @@ fn take_brushed_item(world: &World, location: &BlockPos) -> Option<ItemStack> {
 }
 
 impl ItemBehaviour for BrushItem {
-    fn normal_use(&self, _item: &Item, player: &Player) {
-        player.world().play_sound(
-            Sound::ItemBrushBrushingGeneric,
-            SoundCategory::Players,
-            &player.position(),
-        );
-        let stack = player.inventory().held_item();
-        player
-            .living_entity
-            .set_active_hand(pumpkin_util::Hand::Right, stack, Self::USE_DURATION);
-    }
-
     fn use_on_block(
         &self,
         _item: &mut ItemStack,

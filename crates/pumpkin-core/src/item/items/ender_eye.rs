@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::Arc;
 
 use crate::block::registry::BlockActionResult;
@@ -69,7 +71,8 @@ impl ItemBehaviour for EnderEyeItem {
         BlockActionResult::Success
     }
 
-    fn normal_use(&self, _item: &Item, player: &Player) {
+    /// Vanilla `EnderEyeItem.use`.
+    fn normal_use(&self, _item: &Item, player: &Player, hand: Hand) -> InteractionResult {
         let world = player.world();
 
         let (start_pos, end_pos) = self.get_start_and_end_pos(player);
@@ -80,14 +83,16 @@ impl ItemBehaviour for EnderEyeItem {
             pumpkin_world::clip::ClipFluid::None,
         ));
         if !hit.is_miss && world.get_block(&hit.block_pos) == &Block::END_PORTAL_FRAME {
-            return;
+            return InteractionResult::PASS;
         }
+        // TODO: `startUsingItem(hand)`, which marks the player as using an item with no
+        // use duration.
 
         let origin = player.get_entity().block_pos.load();
         let target_block_pos = find_stronghold(&world, origin);
 
         let Some(target) = target_block_pos else {
-            return;
+            return InteractionResult::CONSUME;
         };
 
         let spawn_pos = Vector3::new(
@@ -121,10 +126,9 @@ impl ItemBehaviour for EnderEyeItem {
         player.trigger_advancement(
             crate::entity::player::advancement::trigger::AdvancementTrigger::LaunchedEyeOfEnder,
         );
-        let mut stack = player.inventory.held_item();
-        stack.decrement_unless_creative(player.gamemode.load(), 1);
-        player.inventory.set_held_item(stack);
+        crate::item::consume_in_hand(player, hand);
         player.award_item_used(&Item::ENDER_EYE);
+        InteractionResult::SUCCESS_SERVER
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

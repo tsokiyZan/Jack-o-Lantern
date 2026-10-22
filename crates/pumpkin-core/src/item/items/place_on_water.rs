@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::any::Any;
 
 use crate::entity::player::Player;
@@ -16,7 +18,9 @@ impl ItemMetadata for PlaceOnWaterBlockItem {
 }
 
 impl ItemBehaviour for PlaceOnWaterBlockItem {
-    fn normal_use(&self, item: &Item, player: &Player) {
+    /// Vanilla `PlaceOnWaterBlockItem.use`: `BlockItem.useOn` one block above the hit, which is
+    /// `SUCCESS` once placed and `FAIL` otherwise.
+    fn normal_use(&self, item: &Item, player: &Player, hand: Hand) -> InteractionResult {
         let world = player.world();
         let (start_pos, end_pos) = self.get_start_and_end_pos(player);
         let hit = world.clip(&pumpkin_world::clip::ClipContext::new(
@@ -26,7 +30,7 @@ impl ItemBehaviour for PlaceOnWaterBlockItem {
             pumpkin_world::clip::ClipFluid::SourceOnly,
         ));
         if hit.is_miss {
-            return;
+            return InteractionResult::FAIL;
         }
 
         let hit_pos = hit.block_pos;
@@ -63,25 +67,10 @@ impl ItemBehaviour for PlaceOnWaterBlockItem {
                 &above_pos.to_f64(),
             );
 
-            let mut main_hand = player.inventory.held_item();
-            let consumed = if !main_hand.is_empty() && main_hand.item.id == item.id {
-                main_hand.decrement_unless_creative(player.gamemode.load(), 1);
-                player.inventory.set_held_item(main_hand);
-                true
-            } else {
-                false
-            };
-
-            if !consumed {
-                let mut off_hand = player.inventory.off_hand_item();
-                if !off_hand.is_empty() && off_hand.item.id == item.id {
-                    off_hand.decrement_unless_creative(player.gamemode.load(), 1);
-                    player
-                        .inventory
-                        .set_stack_in_hand(pumpkin_util::Hand::Left, off_hand);
-                }
-            }
+            crate::item::consume_in_hand(player, hand);
+            return InteractionResult::SUCCESS;
         }
+        InteractionResult::FAIL
     }
 
     fn as_any(&self) -> &dyn Any {

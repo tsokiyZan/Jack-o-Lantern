@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::any::Any;
 use std::sync::atomic::Ordering;
 
@@ -24,9 +26,9 @@ impl ItemMetadata for CrossbowItem {
 }
 
 impl ItemBehaviour for CrossbowItem {
-    fn normal_use(&self, _item: &Item, player: &Player) {
-        let inventory = player.inventory();
-        let stack = inventory.held_item();
+    /// Vanilla `CrossbowItem.use`.
+    fn normal_use(&self, _item: &Item, player: &Player, hand: Hand) -> InteractionResult {
+        let stack = player.inventory().get_stack_in_hand(hand);
 
         // Every crossbow carries a ChargedProjectiles component by default, so its mere
         // presence does not mean the crossbow is loaded. Vanilla checks the list is also
@@ -35,18 +37,17 @@ impl ItemBehaviour for CrossbowItem {
             .get_data_component::<ChargedProjectilesImpl>()
             .is_some_and(|charged| !charged.projectiles.is_empty())
         {
-            Self::fire_projectiles(player);
-            return;
+            Self::fire_projectiles(player, hand);
+            return InteractionResult::CONSUME;
         }
 
         let has_arrows = player.find_arrow().is_some();
         if !has_arrows && player.gamemode.load() != GameMode::Creative {
-            return;
+            return InteractionResult::FAIL;
         }
 
-        player
-            .living_entity
-            .set_active_hand(pumpkin_util::Hand::Right, stack, 72000);
+        crate::item::start_using_item(player, hand, stack, 72000);
+        InteractionResult::CONSUME
     }
 
     fn on_stopped_using(&self, _stack: &ItemStack, player: &Player) {
@@ -132,8 +133,8 @@ impl CrossbowItem {
 
     pub const ARROW_POWER: f32 = 3.15;
 
-    fn fire_projectiles(player: &Player) {
-        let mut held = player.inventory().held_item();
+    fn fire_projectiles(player: &Player, hand: Hand) {
+        let mut held = player.inventory().get_stack_in_hand(hand);
         let charged_opt = held.get_data_component::<ChargedProjectilesImpl>().cloned();
 
         if let Some(charged) = charged_opt {
@@ -167,8 +168,8 @@ impl CrossbowItem {
 
                 held.patch
                     .retain(|(id, _)| *id != DataComponent::ChargedProjectiles);
-                player.inventory().set_held_item(held);
-                player.damage_held_item(1);
+                player.inventory().set_stack_in_hand(hand, held);
+                player.damage_item_in_hand(hand, 1);
                 player.award_item_used(&Item::CROSSBOW);
             }
         }
