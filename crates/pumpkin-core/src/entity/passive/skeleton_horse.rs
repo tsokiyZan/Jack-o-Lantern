@@ -189,19 +189,18 @@ impl SkeletonHorseEntity {
             if mob_entity.get_item_slot(&head).is_empty() {
                 mob_entity.set_item_slot(&head, ItemStack::new(1, &Item::IRON_HELMET));
             }
-            // `enchant`: cleared, then `MOB_SPAWN_EQUIPMENT` for the local difficulty.
-            let special_multiplier =
-                crate::entity::mob::equipment::RegionalDifficulty::at(world, pos)
-                    .special_multiplier;
+            // `enchant`: cleared, then `MOB_SPAWN_EQUIPMENT` on the skeleton's own random.
+            let difficulty = crate::entity::mob::equipment::RegionalDifficulty::at(world, pos);
             for slot in [main_hand, head] {
                 let mut stack = mob_entity.get_item_slot(&slot);
                 stack.patch.retain(|(id, _)| {
                     *id != pumpkin_data::data_component::DataComponent::Enchantments
                 });
-                crate::entity::mob::equipment::apply_vanilla_enchantments(
+                crate::enchantment::EnchantmentHelper::enchant_item_from_provider(
                     &mut stack,
-                    &slot,
-                    special_multiplier,
+                    &pumpkin_data::enchantment_provider::EnchantmentProvider::MOB_SPAWN_EQUIPMENT,
+                    &difficulty,
+                    &mut *skeleton.get_entity().random(),
                 );
                 mob_entity.set_item_slot(&slot, stack);
             }

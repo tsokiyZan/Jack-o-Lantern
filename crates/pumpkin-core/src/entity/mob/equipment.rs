@@ -1,6 +1,5 @@
-//! Mob equipment: vanilla `DifficultyInstance` for spawn equipment, the spawn enchantment
-//! providers, and `Mob`'s equipment rules (`equipItemIfPossible`, `canReplaceCurrentItem`,
-//! `pickUpItem`).
+//! Mob equipment: vanilla `DifficultyInstance` for spawn equipment and `Mob`'s equipment rules
+//! (`equipItemIfPossible`, `canReplaceCurrentItem`, `pickUpItem`).
 
 use std::sync::Arc;
 use std::sync::atomic::Ordering::Relaxed;
@@ -10,7 +9,6 @@ use pumpkin_data::data_component_impl::{
     AttributeModifiersImpl, CustomNameImpl, EnchantmentsImpl, EquipmentSlot, EquipmentType,
     EquippableImpl, IDSet, IdOr, Operation,
 };
-use pumpkin_data::enchantment_provider::EnchantmentProvider;
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::game_event::GameEvent;
 use pumpkin_data::item_stack::ItemStack;
@@ -135,48 +133,6 @@ impl RegionalDifficulty {
 fn moon_brightness(time_of_day: i64) -> f32 {
     let phase = (time_of_day / 24000 % 8) as i32;
     (phase - 4).abs() as f32 / 4.0
-}
-
-// ══════════════════════════════════════════════════════════════════
-// Enchantment system — powered by data-driven EnchantmentProvider
-// ══════════════════════════════════════════════════════════════════
-
-/// Applies mob spawn equipment enchantments to a stack using the data-driven
-/// `minecraft:mob_spawn_equipment` enchantment provider.
-pub fn apply_vanilla_enchantments(
-    stack: &mut ItemStack,
-    _slot: &EquipmentSlot,
-    special_multiplier: f32,
-) {
-    EnchantmentProvider::MOB_SPAWN_EQUIPMENT.apply_to_stack(stack, special_multiplier);
-}
-
-/// Applies pillager crossbow enchantments based on raid wave or default spawn provider.
-pub fn apply_pillager_crossbow_enchantments(stack: &mut ItemStack, wave: Option<u32>) {
-    match wave {
-        Some(w) if w >= 5 => {
-            EnchantmentProvider::RAID_PILLAGER_POST_WAVE_5.apply_to_stack(stack, 0.0);
-        }
-        Some(w) if w >= 3 => {
-            EnchantmentProvider::RAID_PILLAGER_POST_WAVE_3.apply_to_stack(stack, 0.0);
-        }
-        _ => {
-            EnchantmentProvider::PILLAGER_SPAWN_CROSSBOW.apply_to_stack(stack, 0.0);
-        }
-    }
-}
-
-/// Applies vindicator weapon enchantments based on raid wave.
-pub fn apply_vindicator_weapon_enchantments(stack: &mut ItemStack, wave: Option<u32>) {
-    match wave {
-        Some(w) if w >= 5 => {
-            EnchantmentProvider::RAID_VINDICATOR_POST_WAVE_5.apply_to_stack(stack, 0.0);
-        }
-        Some(_) => {
-            EnchantmentProvider::RAID_VINDICATOR.apply_to_stack(stack, 0.0);
-        }
-        None => {}
-    }
 }
 
 #[must_use]
@@ -527,50 +483,5 @@ mod tests {
                 "phase {phase} does not wrap"
             );
         }
-    }
-
-    #[test]
-    fn mob_spawn_equipment_enchantment_provider_applies_enchantments() {
-        use pumpkin_data::data_component_impl::EquipmentSlot;
-        use pumpkin_data::item::Item;
-        use pumpkin_data::item_stack::ItemStack;
-
-        let mut stack = ItemStack::new(1, &Item::DIAMOND_SWORD);
-        super::apply_vanilla_enchantments(&mut stack, &EquipmentSlot::MAIN_HAND, 1.0);
-        assert!(stack.has_enchantments());
-    }
-
-    #[test]
-    fn pillager_crossbow_enchantments() {
-        use pumpkin_data::Enchantment;
-        use pumpkin_data::item::Item;
-        use pumpkin_data::item_stack::ItemStack;
-
-        let mut stack = ItemStack::new(1, &Item::CROSSBOW);
-        super::apply_pillager_crossbow_enchantments(&mut stack, None);
-        assert_eq!(stack.get_enchantment_level(&Enchantment::PIERCING), 1);
-
-        let mut stack3 = ItemStack::new(1, &Item::CROSSBOW);
-        super::apply_pillager_crossbow_enchantments(&mut stack3, Some(3));
-        assert_eq!(stack3.get_enchantment_level(&Enchantment::QUICK_CHARGE), 1);
-
-        let mut stack5 = ItemStack::new(1, &Item::CROSSBOW);
-        super::apply_pillager_crossbow_enchantments(&mut stack5, Some(5));
-        assert_eq!(stack5.get_enchantment_level(&Enchantment::QUICK_CHARGE), 2);
-    }
-
-    #[test]
-    fn vindicator_weapon_enchantments() {
-        use pumpkin_data::Enchantment;
-        use pumpkin_data::item::Item;
-        use pumpkin_data::item_stack::ItemStack;
-
-        let mut stack = ItemStack::new(1, &Item::IRON_AXE);
-        super::apply_vindicator_weapon_enchantments(&mut stack, Some(1));
-        assert_eq!(stack.get_enchantment_level(&Enchantment::SHARPNESS), 1);
-
-        let mut stack5 = ItemStack::new(1, &Item::IRON_AXE);
-        super::apply_vindicator_weapon_enchantments(&mut stack5, Some(5));
-        assert_eq!(stack5.get_enchantment_level(&Enchantment::SHARPNESS), 2);
     }
 }

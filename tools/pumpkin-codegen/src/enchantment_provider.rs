@@ -72,10 +72,7 @@ pub fn build() -> TokenStream {
                     .expect("single provider requires enchantment");
                 let enc_bare = enc_str.strip_prefix("minecraft:").unwrap_or(&enc_str);
                 let enc_ident = format_ident!("{}", enc_bare.to_shouty_snake_case());
-                let level = match raw.level {
-                    Some(serde_json::Value::Number(n)) => n.as_i64().unwrap_or(1) as i32,
-                    _ => 1,
-                };
+                let level = constant_int_provider(raw.level.as_ref(), &qualified);
                 quote! {
                     EnchantmentProviderKind::Single {
                         enchantment: &Enchantment::#enc_ident,
@@ -113,10 +110,7 @@ pub fn build() -> TokenStream {
                         quote! { &Enchantment::#ident }
                     })
                     .collect();
-                let cost = match raw.cost {
-                    Some(serde_json::Value::Number(n)) => n.as_i64().unwrap_or(1) as i32,
-                    _ => 1,
-                };
+                let cost = constant_int_provider(raw.cost.as_ref(), &qualified);
                 quote! {
                     EnchantmentProviderKind::ByCost {
                         enchantments: &[ #( #enc_idents ),* ],
@@ -169,10 +163,7 @@ pub fn build() -> TokenStream {
     }
 
     quote! {
-        use rand::RngExt;
         use crate::enchantment::Enchantment;
-        use crate::item::Item;
-        use crate::item_stack::ItemStack;
 
         #[derive(Clone, Copy, PartialEq)]
         pub enum EnchantmentProviderKind {
@@ -288,115 +279,6 @@ pub fn build() -> TokenStream {
                     #( #all_qualified_names ),*
                 ]
             }
-
-            /// Evaluates the provider for the given item and difficulty multiplier, returning
-            /// the selected enchantments and their levels.
-            #[must_use]
-            pub fn select_enchantments(
-                &self,
-                item: &'static Item,
-                special_multiplier: f32,
-            ) -> Vec<(&'static Enchantment, i32)> {
-                match &self.kind {
-                    EnchantmentProviderKind::Single { enchantment, level } => {
-                        vec![(*enchantment, *level)]
-                    }
-                    EnchantmentProviderKind::ByCostWithDifficulty {
-                        enchantments,
-                        min_cost,
-                        max_cost_span,
-                    } => {
-                        let cost = *min_cost + (special_multiplier * *max_cost_span as f32).round() as i32;
-                        Self::select_by_cost(item, enchantments, cost)
-                    }
-                    EnchantmentProviderKind::ByCost {
-                        enchantments,
-                        cost,
-                    } => Self::select_by_cost(item, enchantments, *cost),
-                }
-            }
-
-            /// Evaluates and applies the enchantments directly to an `ItemStack`.
-            pub fn apply_to_stack(&self, stack: &mut ItemStack, special_multiplier: f32) {
-                let enchantments = self.select_enchantments(stack.item, special_multiplier);
-                for (enchantment, level) in enchantments {
-                    stack.enchant(enchantment, level);
-                }
-            }
-
-            /// Selects enchantments by cost with conflict resolution, matching vanilla
-            /// `EnchantmentHelper.enchantItem`.
-            #[must_use]
-            pub fn select_by_cost(
-                item: &'static Item,
-                possible_enchantments: &[&'static Enchantment],
-                initial_cost: i32,
-            ) -> Vec<(&'static Enchantment, i32)> {
-                let candidates: Vec<&'static Enchantment> = possible_enchantments
-                    .iter()
-                    .copied()
-                    .filter(|e| e.can_enchant(item))
-                    .collect();
-
-                if candidates.is_empty() || initial_cost <= 0 {
-                    return Vec::new();
-                }
-
-                let mut cost = initial_cost;
-                let mut applied: Vec<(&'static Enchantment, i32)> = Vec::new();
-                let mut rng = rand::rng();
-
-                loop {
-                    let available: Vec<&'static Enchantment> = candidates
-                        .iter()
-                        .copied()
-                        .filter(|cand| {
-                            !applied.iter().any(|(app, _)| app.id == cand.id)
-                                && applied.iter().all(|(app, _)| cand.are_compatible(app))
-                        })
-                        .collect();
-
-                    if available.is_empty() {
-                        break;
-                    }
-
-                    let total_weight: f32 = available.iter().map(|e| e.weight as f32).sum();
-                    if total_weight <= 0.0 {
-                        break;
-                    }
-
-                    let mut roll = rng.random_range(0.0..total_weight);
-                    let mut selected: Option<&'static Enchantment> = None;
-                    for e in &available {
-                        roll -= e.weight as f32;
-                        if roll <= 0.0 {
-                            selected = Some(e);
-                            break;
-                        }
-                    }
-                    let Some(&fallback) = available.last() else {
-                        break;
-                    };
-                    let selected = selected.unwrap_or(fallback);
-
-                    let mut level = 1;
-                    for lvl in (1..=selected.max_level).rev() {
-                        if cost >= selected.min_cost.calculate(lvl) {
-                            level = lvl;
-                            break;
-                        }
-                    }
-
-                    applied.push((selected, level.clamp(1, selected.max_level)));
-
-                    cost /= 2;
-                    if cost < 1 {
-                        break;
-                    }
-                }
-
-                applied
-            }
         }
 
         #[cfg(test)]
@@ -437,21 +319,6 @@ pub fn build() -> TokenStream {
                 assert!(EnchantmentProvider::get_raw_json("mob_spawn_equipment").is_some());
                 assert!(EnchantmentProvider::get_raw_json("minecraft:enderman_loot_drop").is_some());
                 assert!(EnchantmentProvider::get_raw_json("nonexistent").is_none());
-            }
-
-            #[test]
-            fn single_enchantment_provider() {
-                let encs = EnchantmentProvider::ENDERMAN_LOOT_DROP.select_enchantments(&Item::DIAMOND_SWORD, 0.0);
-                assert_eq!(encs.len(), 1);
-                assert_eq!(encs[0].0.registry_key, "silk_touch");
-                assert_eq!(encs[0].1, 1);
-            }
-
-            #[test]
-            fn mob_spawn_equipment_application() {
-                let mut stack = ItemStack::new(1, &Item::DIAMOND_SWORD);
-                EnchantmentProvider::MOB_SPAWN_EQUIPMENT.apply_to_stack(&mut stack, 1.0);
-                assert!(stack.has_enchantments());
             }
         }
     }
@@ -534,9 +401,35 @@ fn extract_enchantments(val: Option<&serde_json::Value>, tags_dir: &Path) -> Vec
         _ => {}
     }
 
-    result.sort();
-    result.dedup();
+    // Vanilla's `TagLoader` builds into a `LinkedHashSet`: first occurrence wins, in order. The
+    // weighted pick in `selectEnchantment` depends on this order.
+    let mut seen = HashSet::new();
+    result.retain(|name| seen.insert(name.clone()));
     result
+}
+
+/// The value of a constant `IntProvider` (a bare number or `{"type": "constant"}`). Vanilla's
+/// providers only use constants, which sample without drawing from the random.
+fn constant_int_provider(val: Option<&serde_json::Value>, provider: &str) -> i32 {
+    let value = match val {
+        Some(serde_json::Value::Number(n)) => n.as_i64(),
+        Some(serde_json::Value::Object(obj))
+            if obj
+                .get("type")
+                .and_then(|t| t.as_str())
+                .map(|t| t.trim_start_matches("minecraft:"))
+                == Some("constant") =>
+        {
+            obj.get("value").and_then(serde_json::Value::as_i64)
+        }
+        _ => None,
+    };
+    let Some(value) = value else {
+        panic!(
+            "enchantment provider {provider}: only constant int providers are supported, got {val:?}"
+        );
+    };
+    i32::try_from(value).expect("int provider value fits i32")
 }
 
 fn resolve_tag_recursive(

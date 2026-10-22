@@ -211,7 +211,15 @@ impl Mob for PillagerEntity {
                 .get_mut(&pumpkin_data::data_component_impl::EquipmentSlot::MAIN_HAND)
                 && weapon.item == &pumpkin_data::item::Item::CROSSBOW
             {
-                crate::entity::mob::equipment::apply_pillager_crossbow_enchantments(weapon, None);
+                crate::enchantment::EnchantmentHelper::enchant_item_from_provider(
+                    weapon,
+                    &pumpkin_data::enchantment_provider::EnchantmentProvider::PILLAGER_SPAWN_CROSSBOW,
+                    difficulty,
+                    &mut *world
+                        .random
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner),
+                );
             }
         }
     }

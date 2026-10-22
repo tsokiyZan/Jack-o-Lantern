@@ -1,8 +1,5 @@
 /* This file is generated. Do not edit manually. */
 use crate::enchantment::Enchantment;
-use crate::item::Item;
-use crate::item_stack::ItemStack;
-use rand::RngExt;
 #[derive(Clone, Copy, PartialEq)]
 pub enum EnchantmentProviderKind {
     Single {
@@ -74,42 +71,42 @@ impl EnchantmentProvider {
         name: "minecraft:mob_spawn_equipment",
         kind: EnchantmentProviderKind::ByCostWithDifficulty {
             enchantments: &[
-                &Enchantment::AQUA_AFFINITY,
-                &Enchantment::BANE_OF_ARTHROPODS,
-                &Enchantment::BLAST_PROTECTION,
-                &Enchantment::BREACH,
-                &Enchantment::CHANNELING,
-                &Enchantment::DENSITY,
-                &Enchantment::DEPTH_STRIDER,
-                &Enchantment::EFFICIENCY,
-                &Enchantment::FEATHER_FALLING,
-                &Enchantment::FIRE_ASPECT,
-                &Enchantment::FIRE_PROTECTION,
-                &Enchantment::FLAME,
-                &Enchantment::FORTUNE,
-                &Enchantment::IMPALING,
-                &Enchantment::INFINITY,
-                &Enchantment::KNOCKBACK,
-                &Enchantment::LOOTING,
-                &Enchantment::LOYALTY,
-                &Enchantment::LUCK_OF_THE_SEA,
-                &Enchantment::LUNGE,
-                &Enchantment::LURE,
-                &Enchantment::MULTISHOT,
-                &Enchantment::PIERCING,
-                &Enchantment::POWER,
-                &Enchantment::PROJECTILE_PROTECTION,
                 &Enchantment::PROTECTION,
-                &Enchantment::PUNCH,
-                &Enchantment::QUICK_CHARGE,
+                &Enchantment::FIRE_PROTECTION,
+                &Enchantment::FEATHER_FALLING,
+                &Enchantment::BLAST_PROTECTION,
+                &Enchantment::PROJECTILE_PROTECTION,
                 &Enchantment::RESPIRATION,
-                &Enchantment::RIPTIDE,
-                &Enchantment::SHARPNESS,
-                &Enchantment::SILK_TOUCH,
-                &Enchantment::SMITE,
-                &Enchantment::SWEEPING_EDGE,
+                &Enchantment::AQUA_AFFINITY,
                 &Enchantment::THORNS,
+                &Enchantment::DEPTH_STRIDER,
+                &Enchantment::SHARPNESS,
+                &Enchantment::SMITE,
+                &Enchantment::BANE_OF_ARTHROPODS,
+                &Enchantment::KNOCKBACK,
+                &Enchantment::FIRE_ASPECT,
+                &Enchantment::LOOTING,
+                &Enchantment::SWEEPING_EDGE,
+                &Enchantment::EFFICIENCY,
+                &Enchantment::SILK_TOUCH,
                 &Enchantment::UNBREAKING,
+                &Enchantment::FORTUNE,
+                &Enchantment::POWER,
+                &Enchantment::PUNCH,
+                &Enchantment::FLAME,
+                &Enchantment::INFINITY,
+                &Enchantment::LUCK_OF_THE_SEA,
+                &Enchantment::LURE,
+                &Enchantment::LOYALTY,
+                &Enchantment::IMPALING,
+                &Enchantment::RIPTIDE,
+                &Enchantment::CHANNELING,
+                &Enchantment::MULTISHOT,
+                &Enchantment::QUICK_CHARGE,
+                &Enchantment::PIERCING,
+                &Enchantment::DENSITY,
+                &Enchantment::BREACH,
+                &Enchantment::LUNGE,
             ],
             min_cost: 5i32,
             max_cost_span: 17i32,
@@ -245,101 +242,6 @@ impl EnchantmentProvider {
             "minecraft:raid/vindicator_post_wave_5",
         ]
     }
-    #[doc = r" Evaluates the provider for the given item and difficulty multiplier, returning"]
-    #[doc = r" the selected enchantments and their levels."]
-    #[must_use]
-    pub fn select_enchantments(
-        &self,
-        item: &'static Item,
-        special_multiplier: f32,
-    ) -> Vec<(&'static Enchantment, i32)> {
-        match &self.kind {
-            EnchantmentProviderKind::Single { enchantment, level } => {
-                vec![(*enchantment, *level)]
-            }
-            EnchantmentProviderKind::ByCostWithDifficulty {
-                enchantments,
-                min_cost,
-                max_cost_span,
-            } => {
-                let cost = *min_cost + (special_multiplier * *max_cost_span as f32).round() as i32;
-                Self::select_by_cost(item, enchantments, cost)
-            }
-            EnchantmentProviderKind::ByCost { enchantments, cost } => {
-                Self::select_by_cost(item, enchantments, *cost)
-            }
-        }
-    }
-    #[doc = r" Evaluates and applies the enchantments directly to an `ItemStack`."]
-    pub fn apply_to_stack(&self, stack: &mut ItemStack, special_multiplier: f32) {
-        let enchantments = self.select_enchantments(stack.item, special_multiplier);
-        for (enchantment, level) in enchantments {
-            stack.enchant(enchantment, level);
-        }
-    }
-    #[doc = r" Selects enchantments by cost with conflict resolution, matching vanilla"]
-    #[doc = r" `EnchantmentHelper.enchantItem`."]
-    #[must_use]
-    pub fn select_by_cost(
-        item: &'static Item,
-        possible_enchantments: &[&'static Enchantment],
-        initial_cost: i32,
-    ) -> Vec<(&'static Enchantment, i32)> {
-        let candidates: Vec<&'static Enchantment> = possible_enchantments
-            .iter()
-            .copied()
-            .filter(|e| e.can_enchant(item))
-            .collect();
-        if candidates.is_empty() || initial_cost <= 0 {
-            return Vec::new();
-        }
-        let mut cost = initial_cost;
-        let mut applied: Vec<(&'static Enchantment, i32)> = Vec::new();
-        let mut rng = rand::rng();
-        loop {
-            let available: Vec<&'static Enchantment> = candidates
-                .iter()
-                .copied()
-                .filter(|cand| {
-                    !applied.iter().any(|(app, _)| app.id == cand.id)
-                        && applied.iter().all(|(app, _)| cand.are_compatible(app))
-                })
-                .collect();
-            if available.is_empty() {
-                break;
-            }
-            let total_weight: f32 = available.iter().map(|e| e.weight as f32).sum();
-            if total_weight <= 0.0 {
-                break;
-            }
-            let mut roll = rng.random_range(0.0..total_weight);
-            let mut selected: Option<&'static Enchantment> = None;
-            for e in &available {
-                roll -= e.weight as f32;
-                if roll <= 0.0 {
-                    selected = Some(e);
-                    break;
-                }
-            }
-            let Some(&fallback) = available.last() else {
-                break;
-            };
-            let selected = selected.unwrap_or(fallback);
-            let mut level = 1;
-            for lvl in (1..=selected.max_level).rev() {
-                if cost >= selected.min_cost.calculate(lvl) {
-                    level = lvl;
-                    break;
-                }
-            }
-            applied.push((selected, level.clamp(1, selected.max_level)));
-            cost /= 2;
-            if cost < 1 {
-                break;
-            }
-        }
-        applied
-    }
 }
 #[cfg(test)]
 mod tests {
@@ -376,19 +278,5 @@ mod tests {
         assert!(EnchantmentProvider::get_raw_json("mob_spawn_equipment").is_some());
         assert!(EnchantmentProvider::get_raw_json("minecraft:enderman_loot_drop").is_some());
         assert!(EnchantmentProvider::get_raw_json("nonexistent").is_none());
-    }
-    #[test]
-    fn single_enchantment_provider() {
-        let encs =
-            EnchantmentProvider::ENDERMAN_LOOT_DROP.select_enchantments(&Item::DIAMOND_SWORD, 0.0);
-        assert_eq!(encs.len(), 1);
-        assert_eq!(encs[0].0.registry_key, "silk_touch");
-        assert_eq!(encs[0].1, 1);
-    }
-    #[test]
-    fn mob_spawn_equipment_application() {
-        let mut stack = ItemStack::new(1, &Item::DIAMOND_SWORD);
-        EnchantmentProvider::MOB_SPAWN_EQUIPMENT.apply_to_stack(&mut stack, 1.0);
-        assert!(stack.has_enchantments());
     }
 }

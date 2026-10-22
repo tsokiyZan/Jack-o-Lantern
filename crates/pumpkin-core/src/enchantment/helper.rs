@@ -8,6 +8,7 @@ use crate::entity::EntityBase;
 use crate::entity::attributes::{Modifier, ModifierOperation, send_attribute_updates_for_living};
 use crate::entity::damage_source::DamageSource;
 use crate::entity::living::LivingEntity;
+use crate::entity::mob::equipment::RegionalDifficulty;
 use crate::entity::projectile::arrow::ArrowEntity;
 use crate::world::World;
 use pumpkin_data::attributes::Attributes;
@@ -16,6 +17,7 @@ use pumpkin_data::enchantment::{
     ConditionalEffect, Enchantment, EnchantmentEntityEffect, EnchantmentTarget,
     EnchantmentValueEffect,
 };
+use pumpkin_data::enchantment_provider::{EnchantmentProvider, EnchantmentProviderKind};
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::{DamageResult, ItemStack};
 use pumpkin_util::math::java_round_f32;
@@ -66,6 +68,40 @@ impl EnchantmentHelper {
             }
         }
         results
+    }
+
+    /// Vanilla `EnchantmentHelper.enchantItemFromProvider`: the provider's enchantments, each
+    /// merged into `stack` with `ItemEnchantments.Mutable.upgrade`.
+    pub fn enchant_item_from_provider<R: RandomImpl>(
+        stack: &mut ItemStack,
+        provider: &EnchantmentProvider,
+        difficulty: &RegionalDifficulty,
+        random: &mut R,
+    ) {
+        let enchantments = match provider.kind {
+            // `SingleEnchantment.enchant`; the level is a constant, which samples without drawing.
+            EnchantmentProviderKind::Single { enchantment, level } => {
+                vec![(enchantment, level.clamp(1, enchantment.max_level))]
+            }
+            // `EnchantmentsByCostWithDifficulty.enchant`: `Mth.randomBetweenInclusive` always draws.
+            EnchantmentProviderKind::ByCostWithDifficulty {
+                enchantments,
+                min_cost,
+                max_cost_span,
+            } => {
+                let max_cost =
+                    min_cost + (difficulty.special_multiplier * max_cost_span as f32) as i32;
+                let cost = random.next_bounded_i32(max_cost - min_cost + 1) + min_cost;
+                Self::select_enchantment(random, stack, cost, enchantments)
+            }
+            // `EnchantmentsByCost.enchant`, with a constant cost.
+            EnchantmentProviderKind::ByCost { enchantments, cost } => {
+                Self::select_enchantment(random, stack, cost, enchantments)
+            }
+        };
+        for (enchantment, level) in enchantments {
+            stack.enchant(enchantment, level);
+        }
     }
 
     /// Vanilla `EnchantmentHelper.filterCompatibleEnchantments`.
@@ -978,6 +1014,49 @@ mod tests {
         assert_eq!(random.draws[5], Draw::NextIntBounded(50));
         assert!(!picked.is_empty());
         assert!(picked.iter().all(|(e, _)| e.is_primary_item(stack.item)));
+    }
+
+    fn difficulty(special_multiplier: f32) -> RegionalDifficulty {
+        RegionalDifficulty {
+            base_difficulty: pumpkin_util::difficulty::Difficulty::Hard,
+            effective_difficulty: 2.0 + special_multiplier * 2.0,
+            special_multiplier,
+        }
+    }
+
+    #[test]
+    fn single_provider_with_constant_level_draws_nothing() {
+        let mut stack = ItemStack::new(1, &Item::DIAMOND_AXE);
+        let mut random = TraceRandom::from_seed(7);
+        EnchantmentHelper::enchant_item_from_provider(
+            &mut stack,
+            &EnchantmentProvider::ENDERMAN_LOOT_DROP,
+            &difficulty(1.0),
+            &mut random,
+        );
+        assert!(random.draws.is_empty());
+        assert_eq!(stack.get_enchantment_level(&Enchantment::SILK_TOUCH), 1);
+    }
+
+    #[test]
+    fn by_cost_with_difficulty_draws_its_cost_first() {
+        let mut stack = ItemStack::new(1, &Item::IRON_SWORD);
+        let mut random = TraceRandom::from_seed(7);
+        // `randomBetweenInclusive(5, 5 + (int)(0.5 * 17))`, then `selectEnchantment`.
+        EnchantmentHelper::enchant_item_from_provider(
+            &mut stack,
+            &EnchantmentProvider::MOB_SPAWN_EQUIPMENT,
+            &difficulty(0.5),
+            &mut random,
+        );
+        assert_eq!(
+            random.draws[..3],
+            [
+                Draw::NextIntBounded(9),
+                Draw::NextIntBounded(4),
+                Draw::NextIntBounded(4)
+            ]
+        );
     }
 
     #[test]

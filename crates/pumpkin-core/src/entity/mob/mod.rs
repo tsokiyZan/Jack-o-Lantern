@@ -28,6 +28,7 @@ use crossbeam::atomic::AtomicCell;
 use pumpkin_data::attributes::Attributes;
 use pumpkin_data::damage::DamageType;
 use pumpkin_data::data_component_impl::{EquipmentSlot, EquippableImpl};
+use pumpkin_data::enchantment_provider::EnchantmentProvider;
 use pumpkin_data::entity::{EntityPose, EntityType};
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
@@ -3015,9 +3016,7 @@ pub fn populate_default_armor<M: Mob + ?Sized>(
 }
 
 /// Vanilla `Mob.enchantSpawnedEquipment`: the `level.getRandom()` roll, then the
-/// `mob_spawn_equipment` enchantment provider.
-// TODO: the provider's own picks still come from Pumpkin's `EnchantmentProvider`, not
-// vanilla's `EnchantmentHelper.enchantItemFromProvider` on the level random.
+/// `mob_spawn_equipment` enchantment provider on the same random.
 fn enchant_spawned_equipment<M: Mob + ?Sized>(
     mob: &M,
     world: &World,
@@ -3031,19 +3030,22 @@ fn enchant_spawned_equipment<M: Mob + ?Sized>(
         .entity_equipment
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
-    if let Some(stack) = equipment.equipment.get_mut(slot)
-        && !stack.is_empty()
-        && world
-            .random
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .next_f32()
-            < chance * difficulty.special_multiplier
-    {
-        crate::entity::mob::equipment::apply_vanilla_enchantments(
+    let Some(stack) = equipment.equipment.get_mut(slot) else {
+        return;
+    };
+    if stack.is_empty() {
+        return;
+    }
+    let mut random = world
+        .random
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if random.next_f32() < chance * difficulty.special_multiplier {
+        EnchantmentHelper::enchant_item_from_provider(
             stack,
-            slot,
-            difficulty.special_multiplier,
+            &EnchantmentProvider::MOB_SPAWN_EQUIPMENT,
+            difficulty,
+            &mut *random,
         );
     }
 }

@@ -486,7 +486,7 @@ impl Mob for EndermanEntity {
     }
 
     /// Vanilla `Enderman.dropCustomDeathLoot`: the carried block's drops, as if mined with a
-    /// silk-touch diamond axe.
+    /// diamond axe enchanted by the `enderman_loot_drop` provider.
     fn drop_custom_death_loot(&self) {
         let Some(state_id) = self.get_carried_block() else {
             return;
@@ -496,7 +496,12 @@ impl Mob for EndermanEntity {
         let (block, state) = pumpkin_data::BlockState::from_id_with_block(state_id);
         let mut tool =
             pumpkin_data::item_stack::ItemStack::new(1, &pumpkin_data::item::Item::DIAMOND_AXE);
-        tool.enchant(&pumpkin_data::Enchantment::SILK_TOUCH, 1);
+        crate::enchantment::EnchantmentHelper::enchant_item_from_provider(
+            &mut tool,
+            &pumpkin_data::enchantment_provider::EnchantmentProvider::ENDERMAN_LOOT_DROP,
+            &crate::entity::mob::equipment::RegionalDifficulty::at(&world, entity.pos.load()),
+            &mut *entity.random(),
+        );
         let params = crate::world::loot::LootContextParameters {
             block_state: Some(state),
             position: Some(entity.pos.load()),
