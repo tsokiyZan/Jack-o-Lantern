@@ -5431,6 +5431,8 @@ impl Entity {
             chunk_pos,
             &CSetPassengers::new(VarInt(self.entity_id), &passenger_ids),
         );
+        // The end of `addPassenger`, before `startRiding`'s `entity_mount` game event.
+        vehicle_hooks.after_add_passenger();
         if send_event {
             world.game_event_from(
                 Some(event_source.as_ref()),
@@ -5438,10 +5440,10 @@ impl Entity {
                 self.pos.load(),
             );
         }
-        vehicle_hooks.after_add_passenger();
     }
 
     pub(crate) fn remove_passenger_on_disconnect(&self, passenger_id: i32) {
+        let mut removed = false;
         let mut passengers = self
             .passengers
             .lock()
@@ -5456,6 +5458,7 @@ impl Entity {
                 .vehicle
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
+            removed = true;
         }
 
         let passenger_ids: Vec<VarInt> = passengers
@@ -5463,11 +5466,22 @@ impl Entity {
             .map(|passenger| VarInt(passenger.get_entity().entity_id))
             .collect();
         drop(passengers);
+        if removed {
+            self.after_remove_passenger_hook();
+        }
 
         self.world.load().broadcast_to_chunk(
             self.chunk_pos.load(),
             &CSetPassengers::new(VarInt(self.entity_id), &passenger_ids),
         );
+    }
+
+    /// The vehicle's `removePassenger` override (`EntityBase::after_remove_passenger`), run
+    /// on every dismount path.
+    fn after_remove_passenger_hook(&self) {
+        if let Some(vehicle) = self.world.load().get_entity_by_id(self.entity_id) {
+            vehicle.after_remove_passenger();
+        }
     }
 
     pub fn remove_passenger_sync(&self, passenger_id: i32) {
@@ -5567,6 +5581,8 @@ impl Entity {
 
             // Vanilla: ridingCooldown = 60 (prevents immediate re-mount)
             passenger_entity.riding_cooldown.store(60, Relaxed);
+            // `oldVehicle.removePassenger(this)`, before the dismount game event.
+            self.after_remove_passenger_hook();
             // `removeVehicle`: a passenger that is only unloaded or changing dimension leaves
             // quietly.
             if passenger_entity
@@ -5579,10 +5595,6 @@ impl Entity {
                     pumpkin_data::game_event::GameEvent::EntityDismount,
                     self.pos.load(),
                 );
-            }
-
-            if let Some(vehicle) = self.world.load().get_entity_by_id(self.entity_id) {
-                vehicle.after_remove_passenger();
             }
 
             // Send CSetPassengers directly to the dismounting player before broadcasting it.
