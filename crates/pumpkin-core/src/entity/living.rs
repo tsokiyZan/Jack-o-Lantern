@@ -568,13 +568,17 @@ impl LivingEntity {
         {
             return;
         }
-        last[main_index] = main_hand;
-        last[off_index] = off_hand;
+        last[main_index] = main_hand.clone();
+        last[off_index] = off_hand.clone();
         drop(last);
         self.entity.world.load().send_to_tracking_players(
             &self.entity,
             &CEntityStatus::new(self.entity.entity_id, EntityStatus::SwapHands as i8),
         );
+        self.send_bedrock_hand_equipment(&[
+            (EquipmentSlot::MAIN_HAND, main_hand),
+            (EquipmentSlot::OFF_HAND, off_hand),
+        ]);
         changed.retain(|(slot, _)| {
             *slot != EquipmentSlot::MAIN_HAND && *slot != EquipmentSlot::OFF_HAND
         });
@@ -610,6 +614,13 @@ impl LivingEntity {
             &self.entity,
             &CSetEquipment::new(self.entity_id().into(), equipment_java),
         );
+        self.send_bedrock_hand_equipment(items);
+    }
+
+    /// Bedrock's per-hand `MobEquipment` for the hands among `items`; Bedrock has no swap
+    /// event, so it gets these for a hand swap too.
+    fn send_bedrock_hand_equipment(&self, items: &[(EquipmentSlot, ItemStack)]) {
+        let world = self.entity.world.load();
         for (slot, stack) in items {
             let container_id = match slot {
                 EquipmentSlot::MainHand(_) => 0,
