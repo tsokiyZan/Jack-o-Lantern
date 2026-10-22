@@ -151,36 +151,16 @@ impl TadpoleEntity {
         bucket.set_data_component(BucketEntityDataImpl { nbt: Some(tag) });
     }
 
-    /// Vanilla `Bucketable.bucketMobPickup` with `ItemUtils.createFilledResult`.
+    /// Vanilla `Bucketable.bucketMobPickup`.
     fn bucket_mob_pickup(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
-        let entity = self.get_entity();
-        if item_stack.item != &Item::WATER_BUCKET || !entity.is_alive() {
-            return false;
-        }
-        let world = entity.world.load();
-        if let Some(server) = world.server.upgrade() {
-            let mut event =
-                crate::plugin::api::events::player::player_bucket_entity::PlayerBucketEntityEvent {
-                    player: player.clone(),
-                    entity_id: entity.entity_id,
-                    bucket_item: "tadpole_bucket".to_string(),
-                    cancelled: false,
-                };
-            server.plugin_manager.fire_blocking(&server, &mut event);
-            if event.cancelled {
-                return false;
-            }
-        }
-        self.play_sound_at_self(Sound::ItemBucketFillTadpole, 1.0, 1.0);
-        let mut bucket = ItemStack::new(1, &Item::TADPOLE_BUCKET);
-        self.save_to_bucket_tag(&mut bucket);
-        crate::item::create_filled_result(item_stack, player, bucket, false);
-        if entity.is_leashed() {
-            entity.unleash();
-            entity.spawn_at_location(ItemStack::new(1, &Item::LEAD));
-        }
-        entity.remove();
-        true
+        crate::entity::bucketable::bucket_mob_pickup(
+            self,
+            player,
+            item_stack,
+            &Item::TADPOLE_BUCKET,
+            Sound::ItemBucketFillTadpole,
+            |bucket| self.save_to_bucket_tag(bucket),
+        )
     }
 }
 

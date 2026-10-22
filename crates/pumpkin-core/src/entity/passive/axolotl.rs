@@ -201,12 +201,26 @@ impl AxolotlEntity {
 }
 
 impl AxolotlEntity {
-    /// Vanilla `Axolotl.saveToBucketTag`, short of the variant component and the hunting
-    /// cooldown Pumpkin doesn't keep.
+    /// Vanilla `Axolotl.saveToBucketTag`: the default bucket data, the variant component,
+    /// the age and the hunting cooldown still to run.
     fn save_to_bucket_tag(&self, bucket: &mut ItemStack) {
         let mut tag = crate::entity::bucketable::save_default_data_to_bucket_tag(self, bucket);
+        bucket.set_data_component(pumpkin_data::data_component_impl::AxolotlVariantImpl {
+            value: std::borrow::Cow::Borrowed(
+                pumpkin_data::data_component_impl::AXOLOTL_VARIANTS
+                    [self.get_variant().id() as usize],
+            ),
+        });
         tag.put_int("Age", self.get_age());
         tag.put_bool("AgeLocked", self.is_age_locked());
+        let hunting_cooldown = self.mob_entity.with_brain(self, |tick| {
+            tick.brain.time_until_expiry(
+                crate::entity::ai::brain::memory::types::HAS_HUNTING_COOLDOWN.id(),
+            )
+        });
+        if let Some(cooldown) = hunting_cooldown {
+            tag.put_long("HuntingCooldown", cooldown);
+        }
         bucket.set_data_component(pumpkin_data::data_component_impl::BucketEntityDataImpl {
             nbt: Some(tag),
         });
@@ -234,6 +248,33 @@ impl Animal for AxolotlEntity {
 const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::AXOLOTL_BABY_DIMENSIONS;
 
 impl Mob for AxolotlEntity {
+    /// Vanilla `Axolotl.loadFromBucketTag`.
+    fn load_from_bucket_tag(&self, tag: &NbtCompound) {
+        use crate::entity::ai::brain::memory::types::HAS_HUNTING_COOLDOWN;
+        crate::entity::bucketable::load_default_data_from_bucket_tag(self, tag);
+        self.set_age(tag.get_int("Age").unwrap_or(0));
+        self.set_age_locked(tag.get_bool("AgeLocked").unwrap_or(false));
+        let cooldown = tag.get_long("HuntingCooldown");
+        self.mob_entity.with_brain(self, |tick| match cooldown {
+            Some(ttl) => tick.brain.set_with_expiry(HAS_HUNTING_COOLDOWN, true, ttl),
+            None => tick.brain.erase(HAS_HUNTING_COOLDOWN.id()),
+        });
+    }
+
+    fn set_from_bucket(&self, from_bucket: bool) {
+        Self::set_from_bucket(self, from_bucket);
+    }
+
+    fn mob_set_variant_name(&self, name: &str) {
+        let name = name.strip_prefix("minecraft:").unwrap_or(name);
+        if let Some(id) = pumpkin_data::data_component_impl::AXOLOTL_VARIANTS
+            .iter()
+            .position(|variant| *variant == name)
+        {
+            self.set_variant(AxolotlVariant::from_id(id as i32));
+        }
+    }
+
     /// Vanilla `Axolotl.playAttackSound`.
     fn play_attack_sound(&self) {
         self.play_sound_at_self(pumpkin_data::sound::Sound::EntityAxolotlAttack, 1.0, 1.0);

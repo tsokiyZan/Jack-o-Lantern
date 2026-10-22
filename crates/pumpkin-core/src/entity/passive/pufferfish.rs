@@ -205,6 +205,11 @@ impl Mob for PufferfishEntity {
             .scale(Self::get_scale(self.get_puff_state()))
     }
 
+    /// Vanilla `AbstractFish.loadFromBucketTag`.
+    fn load_from_bucket_tag(&self, tag: &pumpkin_nbt::compound::NbtCompound) {
+        crate::entity::bucketable::load_default_data_from_bucket_tag(self, tag);
+    }
+
     fn mob_interact(
         &self,
         player: &Arc<crate::entity::player::Player>,

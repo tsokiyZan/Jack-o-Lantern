@@ -517,14 +517,26 @@ impl ItemBehaviour for FilledBucketItem {
                 f64::from(place_pos.0.z) + 0.5,
             );
             let mob = from_type(entity_type, spawn_coord, &world, Uuid::new_v4());
-            // Vanilla `MobBucketItem.spawn`'s `loadFromBucketTag`.
-            if let Some(bucket_mob) = mob.get_mob()
-                && let Some(data) = player
-                    .inventory()
-                    .held_item()
-                    .get_data_component::<BucketEntityDataImpl>()
+            let bucket = player.inventory().held_item();
+            // Vanilla `MobBucketItem.spawn`: `createDefaultStackConfig` applies the bucket's
+            // components (the custom name, the variant) and entity data, then the mob reads
+            // its `bucket_entity_data` and remembers it came from a bucket.
+            if let Some(name) =
+                bucket.get_data_component::<pumpkin_data::data_component_impl::CustomNameImpl>()
             {
-                bucket_mob.load_from_bucket_tag(&data.nbt());
+                mob.get_entity().set_custom_name(name.name.clone());
+            }
+            crate::item::items::spawn_egg::apply_entity_variant(&bucket, mob.as_ref(), None);
+            if let Some(bucket_mob) = mob.get_mob() {
+                // `getOrDefault(BUCKET_ENTITY_DATA, CustomData.EMPTY)`.
+                let tag = bucket
+                    .get_data_component::<BucketEntityDataImpl>()
+                    .map_or_else(
+                        pumpkin_nbt::compound::NbtCompound::new,
+                        BucketEntityDataImpl::nbt,
+                    );
+                bucket_mob.load_from_bucket_tag(&tag);
+                bucket_mob.set_from_bucket(true);
             }
             world.spawn_entity(mob);
         }

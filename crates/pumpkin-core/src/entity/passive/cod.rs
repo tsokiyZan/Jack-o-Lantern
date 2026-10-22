@@ -40,6 +40,11 @@ impl Mob for CodEntity {
         world.is_unobstructed(Some(entity), &entity.bounding_box.load())
     }
 
+    /// Vanilla `AbstractFish.loadFromBucketTag`.
+    fn load_from_bucket_tag(&self, tag: &pumpkin_nbt::compound::NbtCompound) {
+        crate::entity::bucketable::load_default_data_from_bucket_tag(self, tag);
+    }
+
     fn mob_interact(
         &self,
         player: &Arc<crate::entity::player::Player>,

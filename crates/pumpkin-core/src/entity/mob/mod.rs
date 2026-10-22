@@ -1970,6 +1970,9 @@ pub trait Mob: EntityBase + Send + Sync {
     /// from the bucket's `bucket_entity_data`.
     fn load_from_bucket_tag(&self, _tag: &NbtCompound) {}
 
+    /// Vanilla `Bucketable.setFromBucket`, for the mobs that keep the flag.
+    fn set_from_bucket(&self, _from_bucket: bool) {}
+
     /// A vanilla `actuallyHurt` override that takes the hit instead of the mob: whether it did.
     fn absorb_hurt(
         &self,
