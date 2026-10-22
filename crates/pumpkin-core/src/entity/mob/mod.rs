@@ -2772,7 +2772,16 @@ fn entity_interact<M: Mob + ?Sized>(
         }
     }
 
-    if item_stack.item == &Item::SHEARS && shear_off_all_leash_connections(mob, player, hand) {
+    let leash_cut = if item_stack.item == &Item::SHEARS {
+        shear_off_all_leash_connections(mob, player, hand)
+    } else {
+        Some(false)
+    };
+    // A plugin cancelled the cut: the click does nothing more.
+    let Some(leash_cut) = leash_cut else {
+        return InteractionResult::PASS;
+    };
+    if leash_cut {
         player.damage_item_in_hand(hand, 1);
         return InteractionResult::SUCCESS;
     }
@@ -2875,15 +2884,15 @@ fn shear_off_all_leash_connections<M: Mob + ?Sized>(
     mob: &M,
     player: &Arc<Player>,
     hand: Hand,
-) -> bool {
+) -> Option<bool> {
     let entity = mob.get_entity();
     let world = entity.world.load_full();
     let leashed = leashed_in_area(&world, entity, entity.entity_id);
-    // Something to cut: the plugin event may still call the shearing off.
+    // Something to cut: the plugin event may still call the shearing off (`None`).
     if (entity.is_leashed() || !leashed.is_empty())
         && shear_event_cancelled(player, entity.entity_id, hand)
     {
-        return false;
+        return None;
     }
     let dropped = if entity.is_leashed() {
         drop_leash(mob, true);
@@ -2900,7 +2909,7 @@ fn shear_off_all_leash_connections<M: Mob + ?Sized>(
         leashed_entity.spawn_at_location(ItemStack::new(1, &Item::LEAD));
     }
     if !dropped {
-        return false;
+        return Some(false);
     }
     let player_base: &dyn EntityBase = player.as_ref();
     world.game_event_from(
@@ -2914,7 +2923,7 @@ fn shear_off_all_leash_connections<M: Mob + ?Sized>(
         SoundCategory::Players,
         &entity.block_pos.load().to_centered_f64(),
     );
-    true
+    Some(true)
 }
 
 /// Vanilla `Mob.attemptToShearEquipment`: the first equipped item, in `EquipmentSlot.VALUES`
