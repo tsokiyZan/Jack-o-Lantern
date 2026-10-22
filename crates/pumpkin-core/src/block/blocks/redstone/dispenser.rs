@@ -1044,14 +1044,23 @@ impl DispenserBlock {
         true
     }
 
-    /// Vanilla `ShearsDispenseItemBehavior.tryShearEntity`: the first live `Shearable` in
-    /// front that is ready is sheared with the `blocks` sound source, with a `shear` game
+    /// Vanilla `ShearsDispenseItemBehavior.tryShearEntity`: for each non-spectator in front,
+    /// its leash connections are cut (`shearOffAllLeashConnections(null)`), else a live
+    /// `Shearable` that is ready is sheared with the `blocks` sound source, with a `shear` game
     /// event at the target.
     fn shear_entity_in_front(ctx: &DispenseContext<'_>, tool: &ItemStack) -> bool {
         let target = Self::target_position(ctx);
         let target_box = BoundingBox::from_block(&target);
 
         for entity in ctx.world.get_entities_at_box(&target_box) {
+            if entity.is_spectator() {
+                continue;
+            }
+            if crate::entity::leash::shear_off_all_leash_connections(entity.as_ref(), None)
+                == Some(true)
+            {
+                return true;
+            }
             if !entity.get_entity().is_alive() {
                 continue;
             }
