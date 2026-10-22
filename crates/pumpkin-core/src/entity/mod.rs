@@ -1045,6 +1045,12 @@ pub trait EntityBase: Send + Sync + std::any::Any {
         self.get_entity().move_entity(caller, motion);
     }
 
+    /// Vanilla `PistonMovingBlockEntity.moveEntityByPiston`'s `entity.move(MoverType.PISTON, ..)`
+    /// and what follows it, for the entities whose `move` override takes the piston too.
+    fn move_by_piston(&self, caller: &dyn EntityBase, delta: Vector3<f64>) {
+        self.get_entity().move_by_piston(caller, delta);
+    }
+
     /// Vanilla `Entity.getKnownMovement`: a player steering this entity knows its movement best.
     fn get_known_movement(&self) -> Vector3<f64> {
         let entity = self.get_entity();

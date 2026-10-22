@@ -138,6 +138,21 @@ impl EntityBase for LeashKnotEntity {
         super::block_attached_ignore_explosion(self, explosion)
     }
 
+    /// Vanilla `BlockAttachedEntity.thunderHit`.
+    fn on_lightning_strike(
+        &self,
+        _caller: &dyn EntityBase,
+        _lightning: &crate::entity::lightning::LightningBoltEntity,
+    ) {
+        super::block_attached_thunder_hit();
+    }
+
+    /// Vanilla `moveEntityByPiston`: `BlockAttachedEntity.move(PISTON, ..)`. A removed entity
+    /// isn't affected by blocks, so the rest of `moveEntityByPiston` does nothing.
+    fn move_by_piston(&self, _caller: &dyn EntityBase, delta: Vector3<f64>) {
+        super::block_attached_moved(self, delta, |_| self.drop_item());
+    }
+
     /// Vanilla `BlockAttachedEntity.move`.
     fn move_entity(&self, _caller: &dyn EntityBase, motion: Vector3<f64>) {
         super::block_attached_moved(self, motion, |_| self.drop_item());

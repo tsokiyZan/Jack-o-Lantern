@@ -129,9 +129,7 @@ impl PistonBlockEntity {
 
     /// Vanilla `moveEntityByPiston`.
     fn move_entity(entity: &dyn EntityBase, dir: BlockDirection, distance: f64) {
-        entity
-            .get_entity()
-            .move_by_piston(entity, Self::dir_vec(dir, distance));
+        entity.move_by_piston(entity, Self::dir_vec(dir, distance));
     }
 
     /// Vanilla `push`: when a piston head retracts, shove entities that ended up

@@ -97,6 +97,9 @@ pub fn block_attached_moved(
     }
 }
 
+/// Vanilla `BlockAttachedEntity.thunderHit`: a lightning bolt does nothing.
+pub const fn block_attached_thunder_hit() {}
+
 /// Vanilla `BlockAttachedEntity.ignoreExplosion`: an explosion whose direct source is in water,
 /// or one that doesn't affect block-like entities (`shouldAffectBlocklikeEntities`), is ignored.
 pub fn block_attached_ignore_explosion(
