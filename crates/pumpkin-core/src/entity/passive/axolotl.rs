@@ -213,10 +213,14 @@ impl AxolotlEntity {
         });
         tag.put_int("Age", self.get_age());
         tag.put_bool("AgeLocked", self.is_age_locked());
+        // `brain.hasMemoryValue(HAS_HUNTING_COOLDOWN)`, then its time until expiry.
         let hunting_cooldown = self.mob_entity.with_brain(self, |tick| {
-            tick.brain.time_until_expiry(
-                crate::entity::ai::brain::memory::types::HAS_HUNTING_COOLDOWN.id(),
-            )
+            let id = crate::entity::ai::brain::memory::types::HAS_HUNTING_COOLDOWN.id();
+            if tick.brain.has_memory_value(id) {
+                tick.brain.time_until_expiry(id)
+            } else {
+                None
+            }
         });
         if let Some(cooldown) = hunting_cooldown {
             tag.put_long("HuntingCooldown", cooldown);
