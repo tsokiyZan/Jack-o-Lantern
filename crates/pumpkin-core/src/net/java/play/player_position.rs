@@ -169,6 +169,9 @@ impl JavaClient {
             Self::clamp_vertical(position.y),
             Self::clamp_horizontal(position.z),
         );
+        if Self::sleeping_move(player, position, None) {
+            return;
+        }
 
         send_cancellable_blocking! {{
             server;
@@ -320,6 +323,13 @@ impl JavaClient {
             Self::clamp_vertical(position.y),
             Self::clamp_horizontal(position.z),
         );
+        if Self::sleeping_move(
+            player,
+            position,
+            Some((wrap_degrees(packet.yaw), wrap_degrees(packet.pitch))),
+        ) {
+            return;
+        }
 
         send_cancellable_blocking! {{
             server;
@@ -428,6 +438,27 @@ impl JavaClient {
                 self.force_tp(player, position);
             }
         }}
+    }
+
+    /// The sleeping branch of vanilla `handlePlayerPositionChange`: a sleeper doesn't move or
+    /// turn, and a move of more than a block is teleported back (with the packet's rotation).
+    /// Measured from the current position (vanilla's `firstGood`, the position at the start
+    /// of the player's tick). Returns whether the player sleeps.
+    fn sleeping_move(
+        player: &Player,
+        position: Vector3<f64>,
+        rotation: Option<(f32, f32)>,
+    ) -> bool {
+        if !player.is_sleeping() {
+            return false;
+        }
+        let entity = player.get_entity();
+        let current = entity.pos.load();
+        if position.squared_distance_to_vec(&current) > 1.0 {
+            let (yaw, pitch) = rotation.unwrap_or_else(|| (entity.yaw.load(), entity.pitch.load()));
+            player.request_teleport(current, yaw, pitch);
+        }
+        true
     }
 
     pub fn force_tp(&self, player: &Arc<Player>, position: Vector3<f64>) {

@@ -346,19 +346,19 @@ impl BedBlock {
 
         // `startSleepInBed`: `startSleeping` occupies the bed; the stat and trigger follow
         // only when the player lay down.
-        if !player.start_sleep_in_bed(bed_head_pos) {
-            return BlockActionResult::SuccessServer;
-        }
-        player.increment_stat(
-            pumpkin_data::statistic::StatisticCategory::Custom,
-            pumpkin_data::statistic::CustomStatistic::SleepInBed as i32,
-            1,
-        );
-        if can_set_spawn {
-            player.trigger_advancement(
-                crate::entity::player::advancement::trigger::AdvancementTrigger::SleptInBed,
+        if player.start_sleep_in_bed(bed_head_pos) {
+            player.increment_stat(
+                pumpkin_data::statistic::StatisticCategory::Custom,
+                pumpkin_data::statistic::CustomStatistic::SleepInBed as i32,
+                1,
             );
+            if can_set_spawn {
+                player.trigger_advancement(
+                    crate::entity::player::advancement::trigger::AdvancementTrigger::SleptInBed,
+                );
+            }
         }
+        player.after_start_sleep_in_bed();
 
         BlockActionResult::SuccessServer
     }

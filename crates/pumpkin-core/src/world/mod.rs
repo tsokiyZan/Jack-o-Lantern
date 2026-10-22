@@ -268,6 +268,8 @@ pub struct World {
     pub scoreboard: std::sync::Mutex<Scoreboard>,
     /// The world's worldborder, defining the playable area and controlling its expansion or contraction.
     pub worldborder: std::sync::Mutex<Worldborder>,
+    /// Vanilla `ServerLevel.sleepStatus`.
+    pub sleep_status: std::sync::Mutex<SleepStatus>,
     /// Vanilla `Level.random`: one `LegacyRandomSource` for the level, seeded uniquely per run
     /// (`RandomSource.create()`), that everything vanilla draws from `level.getRandom()` shares.
     pub random: std::sync::Mutex<pumpkin_util::random::legacy_rand::LegacyRand>,
@@ -438,6 +440,7 @@ impl World {
             entities: ArcSwap::new(Arc::new(Vec::new())),
             scoreboard: std::sync::Mutex::new(Scoreboard::default()),
             worldborder: std::sync::Mutex::new(worldborder),
+            sleep_status: std::sync::Mutex::new(SleepStatus::default()),
             random: std::sync::Mutex::new(
                 pumpkin_util::random::legacy_rand::LegacyRand::from_seed(
                     pumpkin_util::random::get_seed(),
@@ -2367,7 +2370,7 @@ impl World {
     }
 
     pub fn tick_environment(self: &Arc<Self>) {
-        let (is_night, time_of_day) = {
+        let time_of_day = {
             let mut level_time = self
                 .level_time
                 .lock()
@@ -2409,7 +2412,7 @@ impl World {
                     self.level.level_channel.notify();
                 }
             }
-            (level_time.is_night(), level_time.time_of_day)
+            level_time.time_of_day
         };
 
         let (should_reset_weather, weather_cycle_enabled) = {
@@ -2424,7 +2427,39 @@ impl World {
             )
         };
 
-        if self.should_skip_night() && is_night {
+        // Vanilla `ServerLevel.tick`: enough players asleep, and enough of them long enough.
+        let percentage = self
+            .level_info
+            .load()
+            .game_rules
+            .players_sleeping_percentage as i32;
+        let enough_sleeping = {
+            let status = self
+                .sleep_status
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            status.are_enough_sleeping(percentage)
+                && status.are_enough_deep_sleeping(percentage, &self.players.load())
+        };
+        if enough_sleeping {
+            if self.level_info.load().game_rules.advance_time {
+                self.skip_night(time_of_day);
+            }
+            self.wake_up_all_players();
+
+            if weather_cycle_enabled && should_reset_weather {
+                let mut weather = self
+                    .weather
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                weather.reset_weather_cycle(self);
+            }
+        }
+    }
+
+    /// The clock's move to the next morning when the night is slept through.
+    fn skip_night(&self, time_of_day: i64) {
+        {
             let level_time = {
                 let mut guard = self
                     .level_time
@@ -2435,24 +2470,86 @@ impl World {
                 guard.clone()
             };
             level_time.send_time(self);
+        }
+    }
 
-            // Vanilla `wakeUpAllPlayers` wakes only the sleeping players.
-            for player in self
-                .players
-                .load()
-                .iter()
-                .filter(|player| player.is_sleeping())
-            {
-                player.stop_sleep_in_bed(false, false);
-            }
+    /// Vanilla `ServerLevel.wakeUpAllPlayers`.
+    fn wake_up_all_players(&self) {
+        self.sleep_status
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .remove_all_sleepers();
+        let sleepers: Vec<_> = self
+            .players
+            .load()
+            .iter()
+            .filter(|player| player.is_sleeping())
+            .cloned()
+            .collect();
+        for player in sleepers {
+            player.stop_sleep_in_bed(false, false);
+        }
+    }
 
-            if weather_cycle_enabled && should_reset_weather {
-                let mut weather = self
-                    .weather
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner);
-                weather.reset_weather_cycle(self);
+    /// Vanilla `ServerLevel.canSleepThroughNights`.
+    pub fn can_sleep_through_nights(&self) -> bool {
+        self.level_info
+            .load()
+            .game_rules
+            .players_sleeping_percentage
+            <= 100
+    }
+
+    /// Vanilla `ServerLevel.updateSleepingPlayerList`.
+    pub fn update_sleeping_player_list(&self) {
+        let players = self.players.load();
+        if players.is_empty() {
+            return;
+        }
+        let changed = self
+            .sleep_status
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .update(&players);
+        if changed {
+            self.announce_sleep_status(&players);
+        }
+    }
+
+    /// Vanilla `ServerLevel.announceSleepStatus` (a dedicated server always announces).
+    fn announce_sleep_status(&self, players: &[Arc<Player>]) {
+        if !self.can_sleep_through_nights() {
+            return;
+        }
+        let percentage = self
+            .level_info
+            .load()
+            .game_rules
+            .players_sleeping_percentage as i32;
+        let message = {
+            let status = self
+                .sleep_status
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            if status.are_enough_sleeping(percentage) {
+                TextComponent::translate_cross(
+                    translation::java::SLEEP_SKIPPING_NIGHT,
+                    translation::java::SLEEP_SKIPPING_NIGHT,
+                    [],
+                )
+            } else {
+                TextComponent::translate_cross(
+                    translation::java::SLEEP_PLAYERS_SLEEPING,
+                    translation::java::SLEEP_PLAYERS_SLEEPING,
+                    [
+                        TextComponent::text(status.amount_sleeping().to_string()),
+                        TextComponent::text(status.sleepers_needed(percentage).to_string()),
+                    ],
+                )
             }
+        };
+        for player in players {
+            player.send_system_message_raw(&message, true);
         }
     }
 
@@ -4753,6 +4850,7 @@ impl World {
                             new_list.push(player.clone());
                             new_list
                         });
+                        destination.update_sleeping_player_list();
                     }
 
                     (Some(destination), position, yaw, pitch)
@@ -4894,34 +4992,6 @@ impl World {
         player.request_teleport(position, yaw, pitch);
 
         target_world.refresh_java_player_for_bedrock(player).await;
-    }
-
-    /// Returns true if enough players are sleeping and we should skip the night.
-    pub fn should_skip_night(&self) -> bool {
-        let players = self.players.load();
-
-        let player_count = players.len();
-        let sleeping_player_count = players
-            .iter()
-            .filter(|player| player.is_sleeping_long_enough())
-            .count();
-        drop(players);
-
-        if player_count == 0 {
-            return false;
-        }
-
-        let sleep_percentage = self
-            .level_info
-            .load()
-            .game_rules
-            .players_sleeping_percentage
-            .clamp(0, 100);
-        let required_sleeping =
-            ((player_count as f64 * sleep_percentage as f64) / 100.0).ceil() as usize;
-        let required_sleeping = required_sleeping.max(1);
-
-        sleeping_player_count >= required_sleeping
     }
 
     // NOTE: This function doesn't actually await on anything, it just spawns two tokio tasks
@@ -5461,6 +5531,8 @@ impl World {
         });
         self.entity_tracker
             .add_entity(&(player.clone() as Arc<dyn EntityBase>), self);
+        // `onTrackingStart`.
+        self.update_sleeping_player_list();
         Ok(())
     }
 
@@ -5562,6 +5634,10 @@ impl World {
         fire_event: bool,
     ) -> Option<Arc<Player>> {
         let mut removed_player: Option<Arc<Player>> = None;
+        // `ServerPlayer.disconnect` (and `teleportTo`'s wake for a level change).
+        if player.is_sleeping() {
+            player.stop_sleep_in_bed(true, false);
+        }
 
         self.players.rcu(|current_list| {
             let mut new_list = (**current_list).clone();
@@ -5577,6 +5653,8 @@ impl World {
         if let Some(ref player) = removed_player {
             self.entity_tracker
                 .remove_entity(player.as_ref() as &dyn EntityBase, self);
+            // `onTrackingEnd`.
+            self.update_sleeping_player_list();
             let uuid = player.gameprofile.id;
             let entity_id = player.entity_id();
 
@@ -9057,5 +9135,66 @@ impl pumpkin_protocol::ClientPacket for LevelParticles<'_> {
         write.write_var_int(&pumpkin_protocol::VarInt(particle.particle_count))?;
         write.write_var_int(&pumpkin_protocol::VarInt(self.randomization as i32))?;
         Ok(())
+    }
+}
+
+/// Vanilla `SleepStatus`: the world's players, and how many of them sleep.
+#[derive(Default)]
+pub struct SleepStatus {
+    active_players: i32,
+    sleeping_players: i32,
+}
+
+impl SleepStatus {
+    /// Vanilla `areEnoughSleeping`.
+    #[must_use]
+    pub fn are_enough_sleeping(&self, percentage: i32) -> bool {
+        self.sleeping_players >= self.sleepers_needed(percentage)
+    }
+
+    /// Vanilla `areEnoughDeepSleeping`.
+    #[must_use]
+    pub fn are_enough_deep_sleeping(&self, percentage: i32, players: &[Arc<Player>]) -> bool {
+        let deep_sleepers = players
+            .iter()
+            .filter(|player| player.is_sleeping_long_enough())
+            .count() as i32;
+        deep_sleepers >= self.sleepers_needed(percentage)
+    }
+
+    /// Vanilla `sleepersNeeded`: `max(1, ceil(active * percentage / 100.0F))`.
+    #[must_use]
+    pub fn sleepers_needed(&self, percentage: i32) -> i32 {
+        let needed = ((self.active_players.wrapping_mul(percentage)) as f32 / 100.0).ceil() as i32;
+        if needed > 1 { needed } else { 1 }
+    }
+
+    /// Vanilla `removeAllSleepers`.
+    pub const fn remove_all_sleepers(&mut self) {
+        self.sleeping_players = 0;
+    }
+
+    /// Vanilla `amountSleeping`.
+    #[must_use]
+    pub const fn amount_sleeping(&self) -> i32 {
+        self.sleeping_players
+    }
+
+    /// Vanilla `update`: recounts, and says whether an announcement is due.
+    pub fn update(&mut self, players: &[Arc<Player>]) -> bool {
+        let old_active = self.active_players;
+        let old_sleeping = self.sleeping_players;
+        self.active_players = 0;
+        self.sleeping_players = 0;
+        for player in players {
+            if !player.is_spectator() {
+                self.active_players += 1;
+                if player.is_sleeping() {
+                    self.sleeping_players += 1;
+                }
+            }
+        }
+        (old_sleeping > 0 || self.sleeping_players > 0)
+            && (old_active != self.active_players || old_sleeping != self.sleeping_players)
     }
 }

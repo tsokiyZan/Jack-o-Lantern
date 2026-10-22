@@ -309,16 +309,16 @@ impl StrawBedBlock {
             }
         }
 
-        if !player.start_sleep_in_bed(bed_head_pos) {
-            return BlockActionResult::SuccessServer;
-        }
         // `SLEPT_IN_BED` fires only where the bed sets the spawn; `STRAW_BED_RULE`
         // (`DESTROY_ON_LEAVE`) never does.
-        player.increment_stat(
-            pumpkin_data::statistic::StatisticCategory::Custom,
-            pumpkin_data::statistic::CustomStatistic::SleepInStrawBed as i32,
-            1,
-        );
+        if player.start_sleep_in_bed(bed_head_pos) {
+            player.increment_stat(
+                pumpkin_data::statistic::StatisticCategory::Custom,
+                pumpkin_data::statistic::CustomStatistic::SleepInStrawBed as i32,
+                1,
+            );
+        }
+        player.after_start_sleep_in_bed();
 
         BlockActionResult::SuccessServer
     }

@@ -2682,10 +2682,28 @@ impl Player {
         self.is_sleeping() && self.sleep_counter.load(Ordering::Relaxed) >= 100
     }
 
+    /// The end of vanilla `ServerPlayer.startSleepInBed`, whether or not the player lay
+    /// down: the "no rest" overlay where nights can't be slept through, then the world's
+    /// sleeping player list.
+    pub fn after_start_sleep_in_bed(&self) {
+        let world = self.world();
+        if !world.can_sleep_through_nights() {
+            self.send_system_message_raw(
+                &TextComponent::translate_cross(
+                    pumpkin_data::translation::java::SLEEP_NOT_POSSIBLE,
+                    pumpkin_data::translation::java::SLEEP_NOT_POSSIBLE,
+                    [],
+                ),
+                true,
+            );
+        }
+        world.update_sleeping_player_list();
+    }
+
     /// Vanilla `ServerPlayer.stopSleepInBed` with `Player`'s: the wake-up animation while
     /// sleeping, `LivingEntity.stopSleeping` (out of the bed to its stand-up position), the
     /// sleep counter, then the client is teleported there.
-    pub fn stop_sleep_in_bed(&self, forceful_wake_up: bool, _update_level_list: bool) {
+    pub fn stop_sleep_in_bed(&self, forceful_wake_up: bool, update_level_list: bool) {
         let world = self.world();
         if let Some(bed_pos) = self.living_entity.get_sleeping_pos() {
             world.send_to_tracking_players_and_self(
@@ -2703,8 +2721,9 @@ impl Player {
             }
         }
         self.living_entity.living_stop_sleeping(self);
-        // `updateLevelList`: `ServerLevel.updateSleepingPlayerList`; Pumpkin has no sleep
-        // status announcements, and `should_skip_night` counts the sleepers each tick.
+        if update_level_list {
+            world.update_sleeping_player_list();
+        }
         self.sleep_counter
             .store(if forceful_wake_up { 0 } else { 100 }, Ordering::Relaxed);
         let entity = &self.living_entity.entity;
@@ -5633,6 +5652,8 @@ impl Player {
 
         let gamemode = event.new_gamemode;
         self.gamemode.store(gamemode);
+        // `ServerPlayerGameMode.changeGameModeForPlayer`: spectators don't count as sleepers.
+        self.world().update_sleeping_player_list();
         // TODO: Fix this when mojang fixes it
         // This is intentional to keep the pure vanilla mojang experience
         // self.previous_gamemode.store(self.previous_gamemode.load());
