@@ -357,10 +357,16 @@ impl Mob for CamelEntity {
 
     fn mob_write_nbt(&self, nbt: &mut NbtCompound) {
         self.write_ageable_nbt(nbt);
+        // Vanilla `AbstractHorse.addAdditionalSaveData`'s flags.
+        nbt.put_bool("EatingHaystack", self.has_flag(FLAG_EATING));
+        nbt.put_bool("Bred", self.has_flag(FLAG_BRED));
     }
 
     fn mob_read_nbt(&self, nbt: &NbtCompound) {
         self.read_ageable_nbt(nbt);
+        // Vanilla `AbstractHorse.readAdditionalSaveData`'s flags.
+        self.set_flag(FLAG_EATING, nbt.get_bool("EatingHaystack").unwrap_or(false));
+        self.set_flag(FLAG_BRED, nbt.get_bool("Bred").unwrap_or(false));
         read_legacy_saddle(&self.mob_entity, nbt);
     }
 

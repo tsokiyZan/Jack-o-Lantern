@@ -392,6 +392,7 @@ impl Mob for SkeletonHorseEntity {
 
     fn mob_write_nbt(&self, nbt: &mut NbtCompound) {
         self.write_ageable_nbt(nbt);
+        self.write_horse_flags_nbt(nbt);
         nbt.put_bool("Tame", self.is_tame());
         nbt.put_int("Temper", self.temper.load(Ordering::Relaxed));
         if let Some(owner) = self.owner.load() {
@@ -403,6 +404,7 @@ impl Mob for SkeletonHorseEntity {
 
     fn mob_read_nbt(&self, nbt: &NbtCompound) {
         self.read_ageable_nbt(nbt);
+        self.read_horse_flags_nbt(nbt);
         if let Some(tame) = nbt.get_bool("Tame") {
             self.set_tame(tame);
         }

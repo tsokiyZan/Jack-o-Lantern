@@ -377,6 +377,7 @@ impl Mob for LlamaEntity {
 
     fn mob_write_nbt(&self, nbt: &mut NbtCompound) {
         self.write_ageable_nbt(nbt);
+        self.write_horse_flags_nbt(nbt);
         nbt.put_int("Variant", self.get_variant().id());
         nbt.put_int("Strength", self.get_strength());
         self.write_chest_nbt(nbt);
@@ -389,6 +390,7 @@ impl Mob for LlamaEntity {
 
     fn mob_read_nbt(&self, nbt: &NbtCompound) {
         self.read_ageable_nbt(nbt);
+        self.read_horse_flags_nbt(nbt);
         if let Some(variant) = nbt.get_int("Variant") {
             self.set_variant(LlamaVariant::from_id(variant));
         }
