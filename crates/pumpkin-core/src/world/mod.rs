@@ -285,6 +285,9 @@ pub struct World {
     pub block_registry: Arc<BlockRegistry>,
     pub server: Weak<Server>,
     synced_block_event_queue: std::sync::Mutex<Vec<BlockEvent>>,
+    /// Vanilla `ServerLevel.handlingTick`: set from the start of the level tick through the
+    /// block events, cleared before entities and block entities tick.
+    handling_tick: std::sync::atomic::AtomicBool,
     /// A map of unsent block changes, keyed by block position.
     unsent_block_changes: std::sync::Mutex<HashMap<BlockPos, BlockStateId>>,
     /// Persisted vanilla POI storage for portal and villager lookups.
@@ -445,6 +448,7 @@ impl World {
             sea_level: generation_settings.sea_level,
             min_y: i32::from(generation_settings.shape.min_y),
             synced_block_event_queue: std::sync::Mutex::new(Vec::new()),
+            handling_tick: std::sync::atomic::AtomicBool::new(false),
             unsent_block_changes: std::sync::Mutex::new(HashMap::new()),
             portal_poi: std::sync::Mutex::new(portal_poi),
             villager_poi: std::sync::Mutex::new(villager_poi::VillagerPoiStorage::default()),
@@ -1891,6 +1895,7 @@ impl World {
 
         let start = std::time::Instant::now();
 
+        self.handling_tick.store(true, Relaxed);
         self.flush_block_updates();
         self.flush_synced_block_events();
         self.update_active_chunks();
@@ -1918,6 +1923,7 @@ impl World {
         let t_chunks = std::time::Instant::now();
         self.tick_chunks(server);
         let chunk_elapsed = t_chunks.elapsed();
+        self.handling_tick.store(false, Relaxed);
         // Vanilla `ServerChunkCache.tick` ends with `chunkMap.tick`, every tracked entity's
         // `sendChanges`: what changed last tick and between ticks goes out before entities tick.
         self.entity_tracker.update_all(self);
@@ -2991,6 +2997,11 @@ impl World {
         for entity in entities {
             self.spawn_entity_non_save(entity);
         }
+    }
+
+    /// Vanilla `ServerLevel.isHandlingTick`.
+    pub fn is_handling_tick(&self) -> bool {
+        self.handling_tick.load(Relaxed)
     }
 
     pub fn get_world_age(&self) -> i64 {

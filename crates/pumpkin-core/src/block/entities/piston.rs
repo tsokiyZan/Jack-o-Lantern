@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 
 use crossbeam::atomic::AtomicCell;
 use pumpkin_data::block_properties::{
@@ -30,10 +30,41 @@ pub struct PistonBlockEntity {
     pub last_progress: AtomicCell<f32>,
     pub extending: bool,
     pub source: bool,
+    /// Vanilla `lastTicked`: the game time of the last tick. Not saved.
+    last_ticked: AtomicI64,
+    /// Vanilla `BlockEntity.remove`.
+    removed: AtomicBool,
 }
 
 impl PistonBlockEntity {
     pub const ID: &'static str = "minecraft:piston";
+
+    /// Vanilla `PistonMovingBlockEntity(pos, state, movedState, direction, extending, isSourcePiston)`.
+    #[must_use]
+    pub const fn new(
+        position: BlockPos,
+        pushed_block_state: &'static BlockState,
+        facing: BlockDirection,
+        extending: bool,
+        source: bool,
+    ) -> Self {
+        Self {
+            position,
+            pushed_block_state,
+            facing,
+            current_progress: AtomicCell::new(0.0),
+            last_progress: AtomicCell::new(0.0),
+            extending,
+            source,
+            last_ticked: AtomicI64::new(0),
+            removed: AtomicBool::new(false),
+        }
+    }
+
+    /// Vanilla `getLastTicked`.
+    pub fn get_last_ticked(&self) -> i64 {
+        self.last_ticked.load(Ordering::Relaxed)
+    }
 
     /// Vanilla `getMovementDirection`.
     pub const fn get_movement_direction(&self) -> BlockDirection {
@@ -308,18 +339,23 @@ impl PistonBlockEntity {
         }
     }
 
-    pub fn finish(&self, world: &Arc<World>) {
+    /// Vanilla `finalTick`: jumps the move to its end and places the block now.
+    pub fn final_tick(&self, world: &Arc<World>) {
         if self.last_progress.load() < 1.0 {
+            self.current_progress.store(1.0);
+            self.last_progress.store(1.0);
             let pos = self.position;
             world.remove_block_entity(&pos);
+            self.removed.store(true, Ordering::Relaxed);
             if world.get_block(&pos) == &Block::MOVING_PISTON {
-                let state = if self.source {
+                let new_state = if self.source {
                     Block::AIR.default_state.id
                 } else {
                     world.update_from_neighbor_shapes(self.pushed_block_state.id, &pos)
                 };
-                world.set_block_state(&pos, state, BlockFlags::NOTIFY_ALL);
-                world.update_neighbors(&pos, None);
+                // `setBlockAndUpdate`, then `neighborChanged` at the block's own position.
+                world.set_block_state(&pos, new_state, BlockFlags::NOTIFY_ALL);
+                world.update_neighbor(&pos, Block::from_state_id(new_state));
             }
         }
     }
@@ -425,40 +461,71 @@ impl BlockEntity for PistonBlockEntity {
     }
 
     fn tick(&self, world: &Arc<World>) {
-        let current_progress = self.current_progress.load();
-        self.last_progress.store(current_progress);
-        if current_progress >= 1.0 {
-            let pos = self.position;
-            world.remove_block_entity(&pos);
-            if world.get_block(&pos) == &Block::MOVING_PISTON {
-                if self.pushed_block_state.is_air() {
-                    world.set_block_state(
-                        &pos,
-                        self.pushed_block_state.id,
-                        BlockFlags::FORCE_STATE | BlockFlags::MOVED,
-                    );
-                } else {
-                    let updated_state =
-                        world.update_from_neighbor_shapes(self.pushed_block_state.id, &pos);
-                    world.set_block_state(
-                        &pos,
-                        updated_state,
-                        BlockFlags::NOTIFY_ALL | BlockFlags::MOVED,
-                    );
-                    world.update_neighbors(&pos, None);
-                }
-            }
+        // Vanilla `BoundTickingBlockEntity.tick` skips a removed block entity; Pumpkin's
+        // tick list is taken before the tick, so a `finalTick` earlier in it must stop this one.
+        if self.removed.load(Ordering::Relaxed) {
             return;
         }
-        // Vanilla passes the unclamped `progress + 0.5F` to `moveCollidedEntities`, then clamps.
-        let new_progress = current_progress + 0.5;
-        self.move_collided_entities(world, new_progress);
-        self.move_stuck_entities(world, new_progress);
-        self.current_progress.store(if new_progress >= 1.0 {
-            1.0
+        self.last_ticked
+            .store(world.get_world_age(), Ordering::Relaxed);
+        let progress_o = self.current_progress.load();
+        self.last_progress.store(progress_o);
+        if progress_o >= 1.0 {
+            let pos = self.position;
+            world.remove_block_entity(&pos);
+            self.removed.store(true, Ordering::Relaxed);
+            if world.get_block(&pos) == &Block::MOVING_PISTON {
+                let moved = self.pushed_block_state.id;
+                let mut new_state = world.update_from_neighbor_shapes(moved, &pos);
+                if new_state.to_state().is_air() {
+                    // `setBlock(movedState, 340)`: `UPDATE_INVISIBLE` has no Pumpkin flag.
+                    world.set_block_state(
+                        &pos,
+                        moved,
+                        BlockFlags::MOVED
+                            | BlockFlags::UPDATE_KNOWN_SHAPE
+                            | BlockFlags::SKIP_BLOCK_ENTITY_REPLACED_CALLBACK,
+                    );
+                    // `Block.updateOrDestroy(movedState, newState, level, pos, 3)`: the new
+                    // state is air, so `destroyBlock(pos, true, null, 512)`.
+                    if new_state != moved {
+                        world.break_block(&pos, None, BlockFlags::NOTIFY_ALL);
+                    }
+                } else {
+                    if new_state.is_waterlogged() {
+                        new_state = new_state
+                            .to_block()
+                            .set_waterlogged(new_state, false)
+                            .unwrap_or(new_state);
+                    }
+                    world.set_block_state(
+                        &pos,
+                        new_state,
+                        BlockFlags::NOTIFY_ALL | BlockFlags::MOVED,
+                    );
+                    world.update_neighbor(&pos, Block::from_state_id(new_state));
+                }
+            }
         } else {
-            new_progress
-        });
+            let new_progress = progress_o + 0.5;
+            self.move_collided_entities(world, new_progress);
+            self.move_stuck_entities(world, new_progress);
+            self.current_progress.store(if new_progress >= 1.0 {
+                1.0
+            } else {
+                new_progress
+            });
+        }
+    }
+
+    /// Vanilla `preRemoveSideEffects`.
+    fn on_block_replaced(self: Arc<Self>, world: &Arc<World>, _position: &BlockPos) {
+        self.final_tick(world);
+    }
+
+    /// Vanilla `setRemoved`.
+    fn set_removed(&self, _world: &World) {
+        self.removed.store(true, Ordering::Relaxed);
     }
 
     fn from_nbt(nbt: &pumpkin_nbt::compound::NbtCompound, position: BlockPos) -> Self
@@ -474,15 +541,16 @@ impl BlockEntity for PistonBlockEntity {
         let last_progress = nbt.get_float(LAST_PROGRESS).unwrap_or(0.0);
         let extending = nbt.get_bool(EXTENDING).unwrap_or(false);
         let source = nbt.get_bool(SOURCE).unwrap_or(false);
-        Self {
-            pushed_block_state,
+        let be = Self::new(
             position,
-            facing: BlockDirection::from_index(facing as u8).unwrap_or(BlockDirection::Down),
-            current_progress: last_progress.into(),
-            last_progress: last_progress.into(),
+            pushed_block_state,
+            BlockDirection::from_index(facing as u8).unwrap_or(BlockDirection::Down),
             extending,
             source,
-        }
+        );
+        be.current_progress.store(last_progress);
+        be.last_progress.store(last_progress);
+        be
     }
 
     fn write_nbt(&self, nbt: &mut NbtCompound) {
@@ -521,15 +589,16 @@ mod tests {
         extending: bool,
         source: bool,
     ) -> PistonBlockEntity {
-        PistonBlockEntity {
-            position: BlockPos::new(0, 0, 0),
+        let be = PistonBlockEntity::new(
+            BlockPos::new(0, 0, 0),
             pushed_block_state,
             facing,
-            current_progress: progress.into(),
-            last_progress: progress.into(),
             extending,
             source,
-        }
+        );
+        be.current_progress.store(progress);
+        be.last_progress.store(progress);
+        be
     }
 
     fn corners(boxes: &[BoundingBox]) -> Vec<[f64; 6]> {
