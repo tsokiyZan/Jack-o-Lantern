@@ -3360,11 +3360,31 @@ impl LivingEntity {
             .copied()
             .collect();
         for effect_type in effect_types {
-            self.tick_effect(effect_type);
+            if !self.tick_effect(effect_type) {
+                break;
+            }
         }
     }
 
-    fn tick_effect(&self, effect_type: &'static StatusEffect) {
+    /// The effect types active now, to spot an `applyEffectTick` adding or removing one.
+    fn active_effect_types(&self) -> Vec<*const StatusEffect> {
+        let mut types: Vec<*const StatusEffect> = self
+            .active_effects
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .keys()
+            .map(|effect_type| std::ptr::from_ref(*effect_type))
+            .collect();
+        types.sort_unstable();
+        types
+    }
+
+    /// One step of vanilla `tickEffects`' loop over the `activeEffects` `HashMap`. Whether the
+    /// loop goes on: when `applyEffectTick` adds or removes an effect (a bad omen giving the raid
+    /// omen), vanilla's iterator throws a `ConcurrentModificationException` on its next
+    /// `remove` or `next`, which `tickEffects` swallows, so the effect that did it isn't removed
+    /// this tick and the rest of the effects aren't ticked.
+    fn tick_effect(&self, effect_type: &'static StatusEffect) -> bool {
         let Some((has_remaining, tick_count, amplifier)) = self
             .active_effects
             .lock()
@@ -3383,15 +3403,21 @@ impl LivingEntity {
                 )
             })
         else {
-            return;
+            return true;
         };
         let mut keep = has_remaining;
+        let mut modified = false;
         if keep
             && let Some(mob_effect) = crate::entity::effect::get_mob_effect(effect_type)
             && mob_effect.should_apply_effect_tick(tick_count, amplifier)
-            && !mob_effect.apply_effect_tick(self, amplifier)
         {
-            keep = false;
+            let before = self.active_effect_types();
+            keep = mob_effect.apply_effect_tick(self, amplifier);
+            modified = self.active_effect_types() != before;
+            if !keep && modified {
+                // `iterator.remove()` throws: the effect stays, unticked.
+                return false;
+            }
         }
         let snapshot = if keep {
             let mut effects = self
@@ -3399,7 +3425,7 @@ impl LivingEntity {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             let Some(instance) = effects.get_mut(&effect_type) else {
-                return;
+                return !modified;
             };
             instance.tick_down_duration();
             let downgraded = instance.downgrade_to_hidden_effect();
@@ -3432,6 +3458,8 @@ impl LivingEntity {
                 }
             }
         }
+        // The next `iterator.next()` throws after a modification.
+        !modified
     }
 
     /// Vanilla `LivingEntity.hurtArmor`, empty for most entities: players wear all four armour

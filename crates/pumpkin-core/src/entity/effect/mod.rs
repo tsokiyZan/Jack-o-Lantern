@@ -1,4 +1,5 @@
 pub mod absorption;
+pub mod bad_omen;
 pub mod heal_or_harm;
 pub mod hunger;
 pub mod infested;
@@ -74,6 +75,7 @@ pub trait MobEffect: Send + Sync {
 }
 
 pub static ABSORPTION: absorption::AbsorptionMobEffect = absorption::AbsorptionMobEffect;
+pub static BAD_OMEN: bad_omen::BadOmenMobEffect = bad_omen::BadOmenMobEffect;
 pub static INSTANT_HEALTH: heal_or_harm::HealOrHarmMobEffect =
     heal_or_harm::HealOrHarmMobEffect { is_harm: false };
 pub static INSTANT_DAMAGE: heal_or_harm::HealOrHarmMobEffect =
@@ -107,6 +109,8 @@ pub fn get_mob_effect(effect: &'static StatusEffect) -> Option<&'static dyn MobE
         Some(&HUNGER)
     } else if effect == &StatusEffect::SATURATION {
         Some(&SATURATION)
+    } else if effect == &StatusEffect::BAD_OMEN {
+        Some(&BAD_OMEN)
     } else if effect == &StatusEffect::RAID_OMEN {
         Some(&RAID_OMEN)
     } else if effect == &StatusEffect::INFESTED {
