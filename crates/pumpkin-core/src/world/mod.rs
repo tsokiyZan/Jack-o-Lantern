@@ -1160,7 +1160,11 @@ impl World {
     ///
     /// **Note:** This function acquires a lock on the `current_players` map, ensuring thread safety.
     pub fn broadcast_packet_all<P: ClientPacket>(&self, packet: &P) {
-        let players = self.players.load();
+        Self::broadcast_packet_to(&self.players.load(), packet);
+    }
+
+    /// Sends `packet` to the Java clients among `players`.
+    pub fn broadcast_packet_to<P: ClientPacket>(players: &[Arc<Player>], packet: &P) {
         let recipients_by_version = Self::collect_java_recipients_by_version(players.iter());
         Self::broadcast_java_grouped(packet, recipients_by_version);
     }
@@ -1200,11 +1204,28 @@ impl World {
         chat_type: u8,
         target_name: Option<&TextComponent>,
     ) {
+        Self::send_message_to(
+            &self.players.load(),
+            message,
+            sender_name,
+            chat_type,
+            target_name,
+        );
+    }
+
+    /// A disguised chat message (a command's, unsigned) to `players`.
+    pub fn send_message_to(
+        players: &[Arc<Player>],
+        message: &TextComponent,
+        sender_name: &TextComponent,
+        chat_type: u8,
+        target_name: Option<&TextComponent>,
+    ) {
         let be_packet = SText::new(message.clone().get_text(), sender_name.clone().get_text());
         let je_packet =
             CDisguisedChatMessage::new(message, (chat_type + 1).into(), sender_name, target_name);
 
-        self.broadcast_editioned(&je_packet, &be_packet);
+        Self::broadcast_editioned_to(players, &je_packet, &be_packet);
     }
 
     // This should replace broadcast_packet_all at some point
@@ -1213,7 +1234,15 @@ impl World {
         je_packet: &J,
         be_packet: &B,
     ) {
-        let players = self.players.load();
+        Self::broadcast_editioned_to(&self.players.load(), je_packet, be_packet);
+    }
+
+    /// `broadcast_editioned` to `players`.
+    pub fn broadcast_editioned_to<J: ClientPacket, B: BClientPacket>(
+        players: &[Arc<Player>],
+        je_packet: &J,
+        be_packet: &B,
+    ) {
         let je_recipients_by_version = Self::collect_java_recipients_by_version(players.iter());
 
         Self::broadcast_java_grouped(je_packet, je_recipients_by_version);
@@ -1235,11 +1264,36 @@ impl World {
         sender_name: &TextComponent,
         target_name: Option<&TextComponent>,
     ) {
+        // Vanilla `PlayerList.broadcastChatMessage`: every player online, in any level or none.
+        let players = self.server.upgrade().map_or_else(
+            || self.players.load().as_ref().clone(),
+            |server| server.get_all_players(),
+        );
+        Self::send_chat_message_to(
+            &players,
+            message,
+            is_filtered,
+            sender_player,
+            chat_type,
+            sender_name,
+            target_name,
+        );
+    }
+
+    /// The body of vanilla `PlayerList.broadcastChatMessage`, to `players`.
+    pub fn send_chat_message_to(
+        players: &[Arc<Player>],
+        message: &crate::net::chat::PlayerChatMessage,
+        is_filtered: impl Fn(&Player) -> bool,
+        sender_player: Option<&Arc<Player>>,
+        chat_type: VarInt,
+        sender_name: &TextComponent,
+        target_name: Option<&TextComponent>,
+    ) {
         let tracked = crate::net::chat::OutgoingChatMessage::create(message.clone());
         let mut was_fully_filtered = false;
 
-        let players = self.players.load();
-        for player in players.iter() {
+        for player in players {
             let filtered = is_filtered(player);
             tracked.send_to_player(player, filtered, chat_type, sender_name, target_name);
             was_fully_filtered |= filtered && message.is_fully_filtered();
@@ -4222,9 +4276,6 @@ impl World {
         player.get_entity().refresh_synced_data();
 
         chunker::update_position(player);
-        // Update commands
-
-        player.set_health(20.0);
     }
 
     /// Vanilla `ServerLevel.explode(source, x, y, z, r, interaction)`: default damage source,
@@ -4510,17 +4561,20 @@ impl World {
                         // Detach from the old world before publishing into the new one, so no
                         // observer sees the player in a world whose chunk manager doesn't match.
                         // A player back from the End credits left its level already.
+                        // It joins the new level's players once placed, below.
                         if !from_credits {
                             self.remove_player(player, false).await;
                             player.unload_watched_chunks(self).await;
                         }
                         player.change_world_chunks(&self.level, &destination);
                         player.living_entity.entity.set_world(destination.clone());
-                        destination.players.rcu(|current_list| {
-                            let mut new_list = (**current_list).clone();
-                            new_list.push(player.clone());
-                            new_list
-                        });
+                        if !from_credits {
+                            destination.players.rcu(|current_list| {
+                                let mut new_list = (**current_list).clone();
+                                new_list.push(player.clone());
+                                new_list
+                            });
+                        }
                     }
 
                     (Some(destination), position, yaw, pitch)
@@ -4546,28 +4600,6 @@ impl World {
             |new_world| (new_world.clone(), position, yaw, pitch),
         );
 
-        // The level takes the player back (`level.addRespawnedPlayer`); only then is it out of
-        // the credits, so nothing can tick it in its old level meanwhile.
-        if from_credits {
-            if !target_world
-                .players
-                .load()
-                .iter()
-                .any(|p| p.gameprofile.id == player.gameprofile.id)
-            {
-                target_world.players.rcu(|current_list| {
-                    let mut new_list = (**current_list).clone();
-                    new_list.push(player.clone());
-                    new_list
-                });
-            }
-            if let Some(server) = &server {
-                server.take_levelless_player(player.gameprofile.id);
-            }
-            player.living_entity.entity.removal_reason.store(None);
-            player.won_game.store(false, Ordering::SeqCst);
-            player.ending_credits.store(false, Ordering::SeqCst);
-        }
         // Vanilla respawns a fresh `ServerPlayer`: standing, no fall, fire, speed or portal
         // cooldown (sent in `CRespawn`) whatever `restoreFrom` keeps.
         player.living_entity.reset_fresh_entity_state();
@@ -4648,14 +4680,24 @@ impl World {
 
         player.send_permission_lvl_update();
 
+        // `restoreFrom`'s `lastSentExp/Health/Food = -1`: the client's new player gets them on
+        // the next tick.
+        player.reset_sent_info();
+        let mut experience_sent = false;
         if !alive {
             player.hunger_manager.restart();
 
             if !keep_inventory {
                 player.set_experience(0, 0.0, 0);
                 player.inventory.clear();
+                experience_sent = true;
             }
         }
+        // `PlayerList.respawn`: the experience and the active effects, always.
+        if !experience_sent {
+            player.send_experience();
+        }
+        player.send_active_effects();
 
         // Set entity position BEFORE loading chunks, so chunks load at the right location
         // This mirrors the initial spawn flow where update_position is called before teleport
@@ -4663,7 +4705,31 @@ impl World {
         player.get_entity().set_rotation(yaw, pitch);
         player.get_entity().last_pos.store(position);
 
-        // TODO: difficulty, exp bar, status effect
+        // The level takes the player back (`level.addRespawnedPlayer`) once it stands at its
+        // respawn position (`snapTo`); only then is it out of the credits, so no level ticks it
+        // where it left (the End exit portal) meanwhile.
+        if from_credits {
+            if !target_world
+                .players
+                .load()
+                .iter()
+                .any(|p| p.gameprofile.id == player.gameprofile.id)
+            {
+                target_world.players.rcu(|current_list| {
+                    let mut new_list = (**current_list).clone();
+                    new_list.push(player.clone());
+                    new_list
+                });
+            }
+            if let Some(server) = &server {
+                server.take_levelless_player(player.gameprofile.id);
+            }
+            player.living_entity.entity.removal_reason.store(None);
+            player.won_game.store(false, Ordering::SeqCst);
+            player.ending_credits.store(false, Ordering::SeqCst);
+        }
+
+        // TODO: difficulty
 
         // Registered after positioning; a same-dimension respawn keeps its client entities.
         if target_world.uuid == self.uuid {

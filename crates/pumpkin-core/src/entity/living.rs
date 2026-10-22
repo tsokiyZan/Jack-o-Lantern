@@ -3715,6 +3715,8 @@ impl LivingEntity {
 
     pub fn reset_state(&self) {
         self.reset_fresh_entity_state();
+        self.death_time.store(0, Relaxed);
+        self.dead.store(false, Relaxed);
 
         // Restore to maximum health for this entity type
         let max_health = self.get_max_health();
@@ -3745,19 +3747,36 @@ impl LivingEntity {
     }
 
     /// What a respawned player (vanilla's fresh `ServerPlayer`) starts with whatever
-    /// `restoreFrom` copies: standing, not fall-flying or burning, no fall, speed, input or
-    /// portal cooldown, not dead.
+    /// `restoreFrom` copies: standing, not fall-flying, burning or freezing, full air, no
+    /// fall, speed, input, item in use, hurt time or portal cooldown. The dead state is the
+    /// death path's (`reset_state`), after the respawn's awaits.
     pub fn reset_fresh_entity_state(&self) {
         self.entity.reset_state();
         self.entity.portal_cooldown.store(0, Relaxed);
         self.entity.fall_distance.store(0.0);
-        self.death_time.store(0, Relaxed);
         self.entity.fire_ticks.store(0, Relaxed);
+        self.entity.set_frozen_ticks(0);
+        self.breath
+            .air_supply
+            .store(crate::entity::breath::MAX_AIR, Relaxed);
+        self.breath.send_air_supply(&self.entity);
         self.entity.velocity.store(Vector3::default());
         self.entity.velocity_dirty.store(true, SeqCst);
         self.movement_input.store(Vector3::default());
         self.jumping.store(false, Relaxed);
-        self.dead.store(false, Relaxed);
+        self.hurt_time.store(0, Relaxed);
+        self.entity.invulnerable_time.store(0, Relaxed);
+        // `stopUsingItem` state, without its game event: a fresh player was never using one.
+        self.item_in_use
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .take();
+        *self
+            .active_hand
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
+        self.item_use_time.store(0, Relaxed);
+        self.set_living_flag(Self::USING_ITEM_FLAG, false);
     }
 
     pub fn is_player(&self) -> bool {

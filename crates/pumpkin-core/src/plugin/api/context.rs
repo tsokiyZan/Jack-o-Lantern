@@ -250,10 +250,8 @@ impl Context {
 
     /// Reloads (resends) all commands for all currently online players.
     pub fn reload_commands_for_everyone(&self) {
-        for world in self.server.worlds.load().iter() {
-            for player in world.players.load().iter() {
-                self.reload_commands_for(player);
-            }
+        for player in self.server.get_all_players() {
+            self.reload_commands_for(&player);
         }
     }
 

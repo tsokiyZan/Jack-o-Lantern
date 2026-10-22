@@ -845,9 +845,16 @@ impl Server {
     ///
     /// * `packet`: A reference to the packet to be broadcast. The packet must implement the `ClientPacket` trait.
     pub fn broadcast_packet_all<P: ClientPacket>(&self, packet: &P) {
-        for world in self.worlds.load().iter() {
-            world.broadcast_packet_all(packet);
-        }
+        World::broadcast_packet_to(&self.get_all_players(), packet);
+    }
+
+    /// Vanilla `PlayerList.broadcastAll`, editioned: every player online, in a level or not.
+    pub fn broadcast_editioned_all<J: ClientPacket, B: pumpkin_protocol::BClientPacket>(
+        &self,
+        je_packet: &J,
+        be_packet: &B,
+    ) {
+        World::broadcast_editioned_to(&self.get_all_players(), je_packet, be_packet);
     }
 
     /// Broadcasts custom server links to all players on the server.
@@ -858,19 +865,18 @@ impl Server {
 
     pub fn broadcast_tab_list_header_footer(&self, header: &TextComponent, footer: &TextComponent) {
         let packet = CTabList::new(header, footer);
-        for world in self.worlds.load().iter() {
-            for player in world.players.load().iter() {
-                *player
-                    .tab_list_header
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner) = header.clone();
-                *player
-                    .tab_list_footer
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner) = footer.clone();
-            }
-            world.broadcast_packet_all(&packet);
+        let players = self.get_all_players();
+        for player in &players {
+            *player
+                .tab_list_header
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) = header.clone();
+            *player
+                .tab_list_footer
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) = footer.clone();
         }
+        World::broadcast_packet_to(&players, &packet);
     }
 
     pub fn broadcast_message(
@@ -890,9 +896,13 @@ impl Server {
                     Some(NOT_SECURE_CHAT_TAG),
                 );
             }
-            for world in self.worlds.load().iter() {
-                world.broadcast_message(&event.message, &event.sender, chat_type, target_name);
-            }
+            World::send_message_to(
+                &self.get_all_players(),
+                &event.message,
+                &event.sender,
+                chat_type,
+                target_name,
+            );
         }
     }
 
@@ -941,16 +951,15 @@ impl Server {
         sender_name: &TextComponent,
         target_name: Option<&TextComponent>,
     ) {
-        for world in self.worlds.load().iter() {
-            world.broadcast_chat_message(
-                message,
-                &is_filtered,
-                sender_player,
-                chat_type,
-                sender_name,
-                target_name,
-            );
-        }
+        World::send_chat_message_to(
+            &self.get_all_players(),
+            message,
+            is_filtered,
+            sender_player,
+            chat_type,
+            sender_name,
+            target_name,
+        );
     }
 
     /// Gets the current difficulty of the server.
@@ -993,13 +1002,13 @@ impl Server {
 
         for world in self.worlds.load().iter() {
             world.set_difficulty(new_difficulty);
-            world.broadcast_editioned(
-                &CChangeDifficulty::new(new_difficulty as u8, locked),
-                &pumpkin_protocol::bedrock::client::CSetDifficulty {
-                    difficulty: (new_difficulty as u32).into(),
-                },
-            );
         }
+        self.broadcast_editioned_all(
+            &CChangeDifficulty::new(new_difficulty as u8, locked),
+            &pumpkin_protocol::bedrock::client::CSetDifficulty {
+                difficulty: (new_difficulty as u32).into(),
+            },
+        );
     }
 
     /// Sets the difficulty lock status of the server and broadcasts the update to all players.
@@ -1010,14 +1019,12 @@ impl Server {
         let difficulty = new_info.difficulty;
         self.level_info.store(Arc::new(new_info));
 
-        for world in self.worlds.load().iter() {
-            world.broadcast_editioned(
-                &CChangeDifficulty::new(difficulty as u8, locked),
-                &pumpkin_protocol::bedrock::client::CSetDifficulty {
-                    difficulty: (difficulty as u32).into(),
-                },
-            );
-        }
+        self.broadcast_editioned_all(
+            &CChangeDifficulty::new(difficulty as u8, locked),
+            &pumpkin_protocol::bedrock::client::CSetDifficulty {
+                difficulty: (difficulty as u32).into(),
+            },
+        );
     }
 
     /// Searches for a player by their username across all worlds.
@@ -1422,17 +1429,15 @@ impl Server {
             &sample_slice,
             pumpkin_protocol::codec::var_int::VarInt(0),
         );
-        for world in self.worlds.load().iter() {
-            let players = world.players.load();
-            let recipients = players
-                .iter()
-                .filter(|player| {
-                    player.subscribed_debug_sample.load(Ordering::Relaxed)
-                        && player.permission_lvl.load() >= pumpkin_util::PermissionLvl::Two
-                })
-                .filter_map(|player| player.client.java());
-            World::broadcast_java_clients(&packet, recipients);
-        }
+        let players = self.get_all_players();
+        let recipients = players
+            .iter()
+            .filter(|player| {
+                player.subscribed_debug_sample.load(Ordering::Relaxed)
+                    && player.permission_lvl.load() >= pumpkin_util::PermissionLvl::Two
+            })
+            .filter_map(|player| player.client.java());
+        World::broadcast_java_clients(&packet, recipients);
     }
 
     /// Gets the rolling average tick time over the last 100 ticks, in nanoseconds.

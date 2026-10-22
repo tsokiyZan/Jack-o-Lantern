@@ -70,7 +70,9 @@ impl JavaClient {
                 )
             };
 
-            if update_watched {
+            // Vanilla applies a new view distance in `ChunkMap.move`, which a player in no level
+            // (End credits) never reaches.
+            if update_watched && !player.won_game.load(Ordering::SeqCst) {
                 chunker::update_position(player);
             }
 

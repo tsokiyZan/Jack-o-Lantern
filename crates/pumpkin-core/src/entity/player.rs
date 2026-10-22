@@ -5078,6 +5078,9 @@ impl Player {
                 self.on_screen_handler_opened(&self.player_screen_handler);
 
                 self.send_health();
+                // `sendActivePlayerEffects`, then `lastSentExp/Health/Food = -1`.
+                self.send_active_effects();
+                self.reset_sent_info();
 
                 new_world.send_world_info(&player);
                 new_world.send_center_chunk(&player).await;
@@ -5342,6 +5345,19 @@ impl Player {
     /// and chunk map (its tickets dropped, its chunks forgotten), and the server holds it in
     /// no level ([`Server::levelless_players`]).
     fn remove_from_level(self: &Arc<Self>, world: &Arc<World>) {
+        // Only a player still in the level moves out of it; one a disconnect already took
+        // out stays gone.
+        let mut removed = false;
+        world.players.rcu(|current| {
+            let mut list = (**current).clone();
+            let before = list.len();
+            list.retain(|p| p.gameprofile.id != self.gameprofile.id);
+            removed = list.len() != before;
+            list
+        });
+        if !removed {
+            return;
+        }
         let entity = &self.living_entity.entity;
         entity
             .removal_reason
@@ -5349,11 +5365,6 @@ impl Player {
         if let Some(server) = world.server.upgrade() {
             server.add_levelless_player(self);
         }
-        world.players.rcu(|current| {
-            let mut list = (**current).clone();
-            list.retain(|p| p.gameprofile.id != self.gameprofile.id);
-            list
-        });
         world
             .entity_tracker
             .remove_entity(self.as_ref() as &dyn EntityBase, world);
@@ -6475,17 +6486,15 @@ impl Player {
         self.try_enqueue_packet_editioned(&je_packet, &be_packet);
     }
 
+    /// Vanilla `ServerPlayer.doTick`'s `totalExperience != lastSentExp` resend, which runs
+    /// whether or not the client has loaded.
     pub fn tick_experience(&self) {
-        if !self.has_client_loaded() {
-            return;
-        }
-
-        let level = self.experience_level.load(Ordering::Relaxed);
-        if self.last_sent_xp.load(Ordering::Relaxed) != level {
+        let points = self.experience_points.load(Ordering::Relaxed);
+        if self.last_sent_xp.load(Ordering::Relaxed) != points {
             let progress = self.experience_progress.load();
-            let points = self.experience_points.load(Ordering::Relaxed);
+            let level = self.experience_level.load(Ordering::Relaxed);
 
-            self.last_sent_xp.store(level, Ordering::Relaxed);
+            self.last_sent_xp.store(points, Ordering::Relaxed);
 
             let attribute = |name: &str, current_value, max_value| BedrockAttribute {
                 min_value: 0.0,
@@ -6611,6 +6620,23 @@ impl Player {
                 }
             }
         }
+    }
+
+    /// Vanilla `ServerPlayer.resetSentInfo` (the `lastSent*` fields to -1): health, food and
+    /// experience go to the client on the next tick.
+    pub fn reset_sent_info(&self) {
+        self.last_sent_xp.store(-1, Ordering::Relaxed);
+        self.last_sent_health.store(-1, Ordering::Relaxed);
+        self.last_sent_food.store(u8::MAX, Ordering::Relaxed);
+    }
+
+    /// `ClientboundSetExperiencePacket` with the player's current experience.
+    pub fn send_experience(&self) {
+        self.try_send_client_packet(&CSetExperience::new(
+            self.experience_progress.load(),
+            self.experience_level.load(Ordering::Relaxed).into(),
+            self.experience_points.load(Ordering::Relaxed).into(),
+        ));
     }
 
     /// Sets the player's experience level and notifies the client.
