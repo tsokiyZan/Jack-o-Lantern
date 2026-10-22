@@ -7,6 +7,7 @@ use pumpkin_data::data_component_impl::DataComponentImpl;
 use pumpkin_data::data_component_impl::MapIdImpl;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
+use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_util::Hand;
 use std::any::Any;
 
@@ -27,14 +28,21 @@ impl ItemBehaviour for MapItem {
         let inventory = player.inventory();
         crate::item::consume_in_hand(player, hand);
         player.award_item_used(&Item::MAP);
-        // TODO: the `ui.cartography_table.take_result` sound.
+        player.world().play_sound_from_entity(
+            &player.living_entity.entity,
+            Sound::UiCartographyTableTakeResult,
+            SoundCategory::Players,
+            1.0,
+            1.0,
+        );
 
         let map_id = server.next_map_id();
         let _ = server.map_manager.create_map(
             map_id,
             player.world().dimension.clone(),
-            player.position().x as i32,
-            player.position().z as i32,
+            // `getBlockX` / `getBlockZ`.
+            player.position().x.floor() as i32,
+            player.position().z.floor() as i32,
             0, // Default scale
         );
         let mut filled_map = ItemStack::new(1, &Item::FILLED_MAP);
