@@ -492,14 +492,15 @@ pub struct WeaponImpl {
 impl WeaponImpl {
     pub fn read_data(data: &NbtTag) -> Option<Self> {
         let compound = data.extract_compound()?;
-        let item_damage_per_attack = compound
-            .get_int("item_damage_per_attack")
-            .unwrap_or(1)
-            .max(0) as u32;
+        // `NON_NEGATIVE_INT` and `NON_NEGATIVE_FLOAT`: a negative value fails the component.
+        let item_damage_per_attack =
+            u32::try_from(compound.get_int("item_damage_per_attack").unwrap_or(1)).ok()?;
         let disable_blocking_for_seconds = compound
             .get_float("disable_blocking_for_seconds")
-            .unwrap_or(0.0)
-            .max(0.0);
+            .unwrap_or(0.0);
+        if disable_blocking_for_seconds < 0.0 {
+            return None;
+        }
         Some(Self {
             item_damage_per_attack,
             disable_blocking_for_seconds,
@@ -508,8 +509,11 @@ impl WeaponImpl {
 }
 impl DataComponentImpl for WeaponImpl {
     fn write_data(&self) -> NbtTag {
+        // Both fields are `optionalFieldOf` with a default, so the default is not encoded.
         let mut compound = NbtCompound::new();
-        compound.put_int("item_damage_per_attack", self.item_damage_per_attack as i32);
+        if self.item_damage_per_attack != 1 {
+            compound.put_int("item_damage_per_attack", self.item_damage_per_attack as i32);
+        }
         if self.disable_blocking_for_seconds != 0.0 {
             compound.put_float(
                 "disable_blocking_for_seconds",
@@ -1629,5 +1633,45 @@ impl DataComponentImpl for DamageTypeImpl {
 impl Hash for DamageTypeImpl {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.damage_type.id.hash(state);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn weapon(damage: Option<i32>, disable: Option<f32>) -> NbtTag {
+        let mut compound = NbtCompound::new();
+        if let Some(damage) = damage {
+            compound.put_int("item_damage_per_attack", damage);
+        }
+        if let Some(disable) = disable {
+            compound.put_float("disable_blocking_for_seconds", disable);
+        }
+        NbtTag::Compound(compound)
+    }
+
+    /// `NON_NEGATIVE_INT` and `NON_NEGATIVE_FLOAT` reject a negative value, which fails the
+    /// whole component.
+    #[test]
+    fn weapon_rejects_negative_fields() {
+        assert!(WeaponImpl::read_data(&weapon(None, Some(-1.0))).is_none());
+        assert!(WeaponImpl::read_data(&weapon(Some(-1), None)).is_none());
+        let read = WeaponImpl::read_data(&weapon(Some(0), Some(0.5))).unwrap();
+        assert_eq!(read.item_damage_per_attack, 0);
+        assert_eq!(read.disable_blocking_for_seconds, 0.5);
+    }
+
+    /// `optionalFieldOf` with a default doesn't encode the default.
+    #[test]
+    fn weapon_omits_default_fields() {
+        let NbtTag::Compound(written) = WeaponImpl::read_data(&weapon(None, None))
+            .unwrap()
+            .write_data()
+        else {
+            panic!("not a compound");
+        };
+        assert!(written.get_int("item_damage_per_attack").is_none());
+        assert!(written.get_float("disable_blocking_for_seconds").is_none());
     }
 }
