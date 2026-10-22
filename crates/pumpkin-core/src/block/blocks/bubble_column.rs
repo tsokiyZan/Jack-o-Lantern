@@ -12,7 +12,6 @@ use crate::block::{
     BlockBehaviour, BlockMetadata, OnEntityCollisionArgs, OnNeighborUpdateArgs,
     OnScheduledTickArgs, PlacedArgs,
 };
-use crate::entity::Entity;
 use crate::world::World;
 
 const CREATE_DELAY_TICKS: i32 = 20;
@@ -135,9 +134,10 @@ impl BlockBehaviour for BubbleColumnBlock {
         let nothing_above = state_above.get_block_collision_shapes().next().is_none()
             && args.world.get_fluid_and_fluid_state(&above).1.is_empty;
         if nothing_above {
-            Entity::handle_on_above_bubble_column(args.entity, drag_down, *args.position);
+            args.entity
+                .on_above_bubble_column(args.entity, drag_down, *args.position);
         } else {
-            Entity::handle_on_inside_bubble_column(args.entity, drag_down);
+            args.entity.on_inside_bubble_column(args.entity, drag_down);
         }
     }
 

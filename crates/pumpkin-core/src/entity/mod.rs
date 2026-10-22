@@ -655,6 +655,16 @@ pub trait EntityBase: Send + Sync + std::any::Any {
             .is_some_and(|passenger| passenger.is_client_authoritative())
     }
 
+    /// Vanilla `Entity.onAboveBubbleColumn`.
+    fn on_above_bubble_column(&self, caller: &dyn EntityBase, drag_down: bool, pos: BlockPos) {
+        Entity::handle_on_above_bubble_column(caller, drag_down, pos);
+    }
+
+    /// Vanilla `Entity.onInsideBubbleColumn`.
+    fn on_inside_bubble_column(&self, caller: &dyn EntityBase, drag_down: bool) {
+        Entity::handle_on_inside_bubble_column(caller, drag_down);
+    }
+
     /// Vanilla `Entity.canSimulateMovement` on the server: a vehicle a player steers is only
     /// moved by that player's client.
     fn can_simulate_movement(&self) -> bool {

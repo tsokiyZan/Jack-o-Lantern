@@ -57,7 +57,9 @@ pub trait FlowingFluid: Send + Sync {
         }
         if fluid.id == Fluid::FLOWING_WATER.id || fluid.id == Fluid::WATER.id {
             let block = Block::from_state_id(state_id);
-            if block.is_waterlogged(state_id) {
+            // A bubble column holds a water source (vanilla `BubbleColumnBlock.getFluidState`),
+            // so water never spreads into it.
+            if block.is_waterlogged(state_id) || block == &Block::BUBBLE_COLUMN {
                 return Some(self.get_source(fluid, false));
             }
         }

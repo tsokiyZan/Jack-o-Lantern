@@ -2673,6 +2673,14 @@ impl Player {
         if sprinting { 0.025_999_999 } else { 0.02 }
     }
 
+    /// `getAbilities().flying`, waiting for the lock.
+    fn abilities_flying(&self) -> bool {
+        self.abilities
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .flying
+    }
+
     pub fn is_flying(&self) -> bool {
         self.abilities.try_lock().is_ok_and(|a| a.flying)
     }
@@ -8041,6 +8049,20 @@ impl EntityBase for Player {
         cause: Option<&dyn EntityBase>,
     ) -> bool {
         self.damage_with_context(caller, amount, damage_type, position, source, cause)
+    }
+
+    /// Vanilla `Player.onAboveBubbleColumn`: a flying player isn't moved.
+    fn on_above_bubble_column(&self, caller: &dyn EntityBase, drag_down: bool, pos: BlockPos) {
+        if !self.abilities_flying() {
+            Entity::handle_on_above_bubble_column(caller, drag_down, pos);
+        }
+    }
+
+    /// Vanilla `Player.onInsideBubbleColumn`.
+    fn on_inside_bubble_column(&self, caller: &dyn EntityBase, drag_down: bool) {
+        if !self.abilities_flying() {
+            Entity::handle_on_inside_bubble_column(caller, drag_down);
+        }
     }
 
     fn teleport(
