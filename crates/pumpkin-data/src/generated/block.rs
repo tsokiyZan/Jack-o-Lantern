@@ -598220,7 +598220,6 @@ impl Block {
             BlockId::WAXED_WEATHERED_COPPER_GRATE => SuffocationPredicate::Never,
             BlockId::WAXED_OXIDIZED_COPPER_GRATE => SuffocationPredicate::Never,
             BlockId::MUD => SuffocationPredicate::Always,
-            BlockId::FIREFLY_BUSH => SuffocationPredicate::Never,
             _ => SuffocationPredicate::Default,
         }
     }
