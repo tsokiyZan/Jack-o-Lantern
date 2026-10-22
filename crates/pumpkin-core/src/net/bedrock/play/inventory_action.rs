@@ -241,9 +241,11 @@ impl BedrockClient {
                     if !stack.is_empty() {
                         let item_id = stack.item.id;
                         let before = stack.clone();
+                        // Bedrock's click on a block is always the main hand's.
                         let item_result = server.item_registry.use_on_block(
                             &mut stack,
                             player,
+                            Hand::Right,
                             data.block_position,
                             face,
                             data.click_position,

@@ -224,6 +224,7 @@ pub trait ItemBehaviour: Send + Sync {
         &self,
         _item: &mut ItemStack,
         _player: &Player,
+        _hand: pumpkin_util::Hand,
         _location: BlockPos,
         _face: BlockDirection,
         _cursor_pos: Vector3<f32>,

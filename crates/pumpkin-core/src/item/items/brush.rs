@@ -10,7 +10,6 @@ use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_data::{Block, BlockDirection};
-use pumpkin_util::Hand;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
 
@@ -29,6 +28,7 @@ impl ItemBehaviour for BrushItem {
         &self,
         item: &mut ItemStack,
         player: &Player,
+        hand: pumpkin_util::Hand,
         _location: BlockPos,
         _face: BlockDirection,
         _cursor_pos: Vector3<f32>,
@@ -36,13 +36,6 @@ impl ItemBehaviour for BrushItem {
         _server: &Server,
     ) -> BlockActionResult {
         if Self::hit_block(player).is_some() {
-            // The hand holding this brush: `useOn` gets the clicked hand, which this
-            // signature doesn't carry; the main hand wins when both hold the same stack.
-            let hand = if player.inventory.held_item().are_equal(item) {
-                Hand::Right
-            } else {
-                Hand::Left
-            };
             crate::item::start_using_item(player, hand, item.clone(), Self::USE_DURATION);
         }
         BlockActionResult::Consume

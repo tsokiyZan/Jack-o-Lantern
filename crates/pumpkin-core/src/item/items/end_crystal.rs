@@ -27,6 +27,7 @@ impl ItemBehaviour for EndCrystalItem {
         &self,
         item: &mut ItemStack,
         player: &Player,
+        _hand: pumpkin_util::Hand,
         location: BlockPos,
         _face: BlockDirection,
         _cursor_pos: Vector3<f32>,

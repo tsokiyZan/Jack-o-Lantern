@@ -26,6 +26,7 @@ impl ItemBehaviour for HoeItem {
         &self,
         item: &mut ItemStack,
         player: &Player,
+        _hand: pumpkin_util::Hand,
         location: BlockPos,
         face: BlockDirection,
         _cursor_pos: Vector3<f32>,

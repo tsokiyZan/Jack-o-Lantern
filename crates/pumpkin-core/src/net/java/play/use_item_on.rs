@@ -145,9 +145,9 @@ impl JavaClient {
 
         let before = item.clone();
 
-        let item_result = server
-            .item_registry
-            .use_on_block(&mut item, player, position, face, cursor_pos, block, server);
+        let item_result = server.item_registry.use_on_block(
+            &mut item, player, hand, position, face, cursor_pos, block, server,
+        );
 
         let mut item_result = item_result;
         if should_try_block_placement(&item_result) {
