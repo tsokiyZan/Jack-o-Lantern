@@ -1,18 +1,17 @@
 use std::sync::Arc;
 
 use crate::block::registry::BlockActionResult;
-use crate::entity::EntityBase;
 use crate::entity::decoration::leash_knot::LeashKnotEntity;
 use crate::entity::player::Player;
+use crate::entity::{EntityBase, leashable};
 use crate::item::{ItemBehaviour, ItemMetadata};
 use crate::server::Server;
 use pumpkin_data::Block;
 use pumpkin_data::BlockDirection;
+use pumpkin_data::game_event::GameEvent;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
-use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_data::tag::Taggable;
-use pumpkin_util::math::boundingbox::{BoundingBox, EntityDimensions};
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
 
@@ -27,7 +26,7 @@ impl ItemMetadata for LeadItem {
 impl ItemBehaviour for LeadItem {
     fn use_on_block(
         &self,
-        item: &mut ItemStack,
+        _item: &mut ItemStack,
         player: &Player,
         _hand: pumpkin_util::Hand,
         location: BlockPos,
@@ -40,64 +39,59 @@ impl ItemBehaviour for LeadItem {
             return BlockActionResult::Pass;
         }
 
-        let world = player.world();
-        let center = Vector3::new(
-            f64::from(location.0.x) + 0.5,
-            f64::from(location.0.y) + 0.5,
-            f64::from(location.0.z) + 0.5,
-        );
-
-        let search_dim = EntityDimensions::new(32.0, 32.0, 16.0);
-
-        let search_box = BoundingBox::new_from_pos(center.x, center.y, center.z, &search_dim);
-
-        let player_id = player.entity_id();
-        let entities = world.get_entities_at_box(&search_box);
-
-        let mut any_leashed = false;
-        let mut knot: Option<Arc<LeashKnotEntity>> = None;
-
-        for entity_base in entities {
-            let ent = entity_base.get_entity();
-            let is_leashed_to_player = ent
-                .leashed_to
-                .try_lock()
-                .ok()
-                .and_then(|guard| {
-                    guard
-                        .as_ref()
-                        .map(|holder| holder.get_entity().entity_id == player_id)
-                })
-                .unwrap_or(false);
-
-            if is_leashed_to_player {
-                if knot.is_none() {
-                    knot = Some(LeashKnotEntity::get_or_create(&world, location));
-                }
-                if let Some(k) = &knot {
-                    // `LeadItem.bindPlayerMobs`: `leashable.setLeashedTo(activeKnot, true)`.
-                    crate::entity::leashable::set_leashed_to(
-                        entity_base.as_ref(),
-                        k.clone() as Arc<dyn EntityBase>,
-                        true,
-                    );
-                    any_leashed = true;
-                }
-            }
-        }
-
-        if any_leashed {
-            if player.gamemode.load() != pumpkin_util::GameMode::Creative {
-                item.decrement(1);
-            }
-            world.play_sound(Sound::ItemLeadTied, SoundCategory::Neutral, &center);
-            BlockActionResult::Success
-        } else {
-            BlockActionResult::Pass
-        }
+        // `LeadItem.useOn`: on the server, with a player.
+        bind_player_mobs(player, location)
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
+}
+
+/// Vanilla `LeadItem.bindPlayerMobs`: the player's leashed mobs around the fence go to its knot
+/// (an existing one or a new one); the item isn't used up.
+pub fn bind_player_mobs(player: &Player, pos: BlockPos) -> BlockActionResult {
+    let world = player.world();
+    let player_id = player.entity_id();
+    let entities_to_leash =
+        leashable::leashable_in_area(&world, pos.to_centered_f64(), |leashable| {
+            leashable::leash_holder(leashable.get_entity())
+                .is_some_and(|holder| holder.get_entity().entity_id == player_id)
+        });
+    if entities_to_leash.is_empty() {
+        return BlockActionResult::Pass;
+    }
+
+    let existing_knot = LeashKnotEntity::get_knot(&world, pos);
+    let created = existing_knot.is_none();
+    let active_knot = existing_knot.unwrap_or_else(|| LeashKnotEntity::create_knot(&world, pos));
+    let mut any_leashed = false;
+
+    for leashable in entities_to_leash {
+        if leashable::can_have_a_leash_attached_to(leashable.as_ref(), active_knot.get_entity()) {
+            leashable::set_leashed_to(
+                leashable.as_ref(),
+                active_knot.clone() as Arc<dyn EntityBase>,
+                true,
+            );
+            any_leashed = true;
+        }
+    }
+
+    if any_leashed {
+        active_knot.play_placement_sound();
+        let player_base: &dyn EntityBase = player;
+        world.game_event_from(
+            Some(player_base),
+            GameEvent::BlockAttach,
+            pos.to_centered_f64(),
+        );
+        return BlockActionResult::SuccessServer;
+    }
+
+    if created {
+        active_knot.get_entity().remove();
+    }
+
+    BlockActionResult::Pass
 }

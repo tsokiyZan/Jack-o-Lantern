@@ -4,24 +4,33 @@ use crate::item::interaction_result::InteractionResult;
 use crate::world::World;
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::item_stack::ItemStack;
-use pumpkin_data::sound::{Sound, SoundCategory};
+use pumpkin_data::sound::Sound;
 use pumpkin_data::tag::Taggable;
 use pumpkin_util::Hand;
-use pumpkin_util::math::boundingbox::{BoundingBox, EntityDimensions};
+use pumpkin_util::math::boundingbox::BoundingBox;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicI32, Ordering};
 
 pub struct LeashKnotEntity {
     entity: Entity,
     pos: BlockPos,
+    /// Vanilla `BlockAttachedEntity.ticksSinceLastCheck` (not saved).
+    ticks_since_last_check: AtomicI32,
 }
 
 impl LeashKnotEntity {
     pub const OFFSET_Y: f64 = 0.375;
+    /// Vanilla `BlockAttachedEntity.CHECK_INTERVAL`.
+    const CHECK_INTERVAL: i32 = 100;
 
     pub const fn new(entity: Entity, pos: BlockPos) -> Self {
-        Self { entity, pos }
+        Self {
+            entity,
+            pos,
+            ticks_since_last_check: AtomicI32::new(0),
+        }
     }
 
     pub const fn block_pos(&self) -> BlockPos {
@@ -35,16 +44,16 @@ impl LeashKnotEntity {
         Self::create_knot(world, pos)
     }
 
+    /// Vanilla `LeashFenceKnotEntity.getKnot`: the knots touching the box `pos ± 1` whose block is
+    /// `pos`.
     pub fn get_knot(world: &Arc<World>, pos: BlockPos) -> Option<Arc<Self>> {
-        let center = Vector3::new(
-            f64::from(pos.0.x) + 0.5,
-            f64::from(pos.0.y) + Self::OFFSET_Y,
-            f64::from(pos.0.z) + 0.5,
+        let x = f64::from(pos.0.x);
+        let y = f64::from(pos.0.y);
+        let z = f64::from(pos.0.z);
+        let search_box = BoundingBox::new(
+            Vector3::new(x - 1.0, y - 1.0, z - 1.0),
+            Vector3::new(x + 1.0, y + 1.0, z + 1.0),
         );
-
-        let search_dim = EntityDimensions::new(2.0, 2.0, 1.0);
-
-        let search_box = BoundingBox::new_from_pos(center.x, center.y, center.z, &search_dim);
         let entities = world.get_entities_at_box(&search_box);
 
         for entity_base in entities {
@@ -58,6 +67,7 @@ impl LeashKnotEntity {
         None
     }
 
+    /// Vanilla `LeashFenceKnotEntity.createKnot`: `addFreshEntity`, silently.
     pub fn create_knot(world: &Arc<World>, pos: BlockPos) -> Arc<Self> {
         let raw_pos = Vector3::new(
             f64::from(pos.0.x) + 0.5,
@@ -68,15 +78,26 @@ impl LeashKnotEntity {
         let entity = Entity::new(world.clone(), raw_pos, &EntityType::LEASH_KNOT);
         let knot = Arc::new(Self::new(entity, pos));
         world.spawn_entity(knot.clone() as Arc<dyn EntityBase>);
-
-        world.play_sound(Sound::ItemLeadTied, SoundCategory::Neutral, &raw_pos);
-
         knot
     }
 
-    pub fn play_placement_sound(&self, world: &World) {
-        let pos = self.entity.pos.load();
-        world.play_sound(Sound::ItemLeadTied, SoundCategory::Neutral, &pos);
+    /// Vanilla `LeashFenceKnotEntity.playPlacementSound`.
+    pub fn play_placement_sound(&self) {
+        self.play_sound_at_self(Sound::ItemLeadTied, 1.0, 1.0);
+    }
+
+    /// Vanilla `LeashFenceKnotEntity.survives`: the block is still a fence.
+    fn survives(&self) -> bool {
+        self.entity
+            .world
+            .load()
+            .get_block(&self.pos)
+            .has_tag(&pumpkin_data::tag::Block::MINECRAFT_FENCES)
+    }
+
+    /// Vanilla `LeashFenceKnotEntity.dropItem`: only the untie sound, no item.
+    fn drop_item(&self) {
+        self.play_sound_at_self(Sound::ItemLeadUntied, 1.0, 1.0);
     }
 }
 
@@ -109,43 +130,17 @@ impl EntityBase for LeashKnotEntity {
         None
     }
 
-    fn tick(&self, _caller: &dyn EntityBase, _server: &Server) {
-        let world = self.entity.world.load();
-        let block = world.get_block(&self.pos);
-        if !block.has_tag(&pumpkin_data::tag::Block::MINECRAFT_FENCES) {
-            let knot_id = self.entity.entity_id;
-            let search_dim = EntityDimensions::new(32.0, 32.0, 16.0);
-            let pos = self.entity.pos.load();
-            let search_box = BoundingBox::new_from_pos(pos.x, pos.y, pos.z, &search_dim);
-            let entities = world.get_entities_at_box(&search_box);
-
-            for entity_base in entities {
-                let ent = entity_base.get_entity();
-                let is_attached_to_knot = ent
-                    .leashed_to
-                    .try_lock()
-                    .ok()
-                    .and_then(|guard| {
-                        guard
-                            .as_ref()
-                            .map(|holder| holder.get_entity().entity_id == knot_id)
-                    })
-                    .unwrap_or(false);
-
-                if is_attached_to_knot {
-                    // `removeLeash`, with the knot's own lead drop below (not yet vanilla's
-                    // `BlockAttachedEntity.tick`).
-                    leashable::drop_leash(entity_base.as_ref(), true, false);
-                    let lead_item = pumpkin_data::item_stack::ItemStack::new(
-                        1,
-                        &pumpkin_data::item::Item::LEAD,
-                    );
-                    world.drop_stack(&ent.block_pos.load(), lead_item);
-                }
+    /// Vanilla `BlockAttachedEntity.tick`: below the world → discarded; every 100 ticks a knot
+    /// whose fence is gone is discarded and `dropItem`s. Its leashees drop their own leads in
+    /// their next `tickLeash`, as the holder can't interact with the level any more.
+    fn tick(&self, caller: &dyn EntityBase, _server: &Server) {
+        self.entity.check_out_of_world(caller);
+        if self.ticks_since_last_check.fetch_add(1, Ordering::Relaxed) >= Self::CHECK_INTERVAL {
+            self.ticks_since_last_check.store(0, Ordering::Relaxed);
+            if !self.entity.is_removed() && !self.survives() {
+                self.entity.remove();
+                self.drop_item();
             }
-
-            world.play_sound(Sound::ItemLeadUntied, SoundCategory::Neutral, &pos);
-            self.entity.remove();
         }
     }
 
