@@ -15,7 +15,7 @@ use bytes::BufMut;
 use crossbeam::atomic::AtomicCell;
 use inside_block_effect::InsideBlockEffectApplier;
 use living::LivingEntity;
-use player::Player;
+use player::{PassengerRemount, Player};
 use pumpkin_data::BlockState;
 use pumpkin_data::biome::Biome;
 use pumpkin_data::data_component_impl::EquipmentSlot;
@@ -6740,12 +6740,16 @@ fn teleport_cross_dimension(
     let mut new_passengers = Vec::with_capacity(old_passengers.len());
     for passenger in &old_passengers {
         let transition = passenger_transition(base, passenger.get_entity(), target);
-        if passenger.get_player().is_some() {
-            // TODO: vanilla remounts a player passenger on the new vehicle too; the player's
-            // own dimension change can't hand the new player back here.
-            teleport_transition(passenger, &transition);
-        } else if let Some(new_passenger) = teleport_transition(passenger, &transition) {
+        // A player's dimension change finishes later (`teleport_world`): it and the new
+        // vehicle meet through its `passenger_remount`.
+        let player = passenger.get_player();
+        if let Some(player) = player {
+            player.set_passenger_remount(PassengerRemount::Travelling);
+        }
+        if let Some(new_passenger) = teleport_transition(passenger, &transition) {
             new_passengers.push(new_passenger);
+        } else if let Some(player) = player {
+            player.set_passenger_remount(PassengerRemount::Idle);
         }
     }
 
@@ -6788,8 +6792,13 @@ fn teleport_cross_dimension(
     new_base.teleport_set_position(target);
     new_entity.init_data_tracker();
     target.world.add_entity_silent(new_entity.clone());
+    // `newPassenger.startRiding(newEntity, true, false)`.
     for new_passenger in new_passengers {
-        new_base.add_passenger_without_event(new_entity.clone(), new_passenger);
+        if let Some(player) = new_passenger.get_player() {
+            player.vehicle_ready(&new_passenger, &new_entity);
+        } else {
+            new_base.add_passenger_without_event(new_entity.clone(), new_passenger);
+        }
     }
     new_entity
 }

@@ -3,9 +3,12 @@ use super::*;
 
 impl JavaClient {
     pub fn handle_confirm_teleport(&self, player: &Player, confirm_teleport: &SConfirmTeleport) {
+        // Vanilla `handleAcceptTeleportPacket`: only the latest teleport's id counts; an older
+        // one (the client acking a teleport the server already followed with another) is
+        // ignored. The latest id acked with no position awaited disconnects.
         enum TeleportResult {
             Success,
-            WrongId,
+            Stale,
             NotTeleporting,
         }
 
@@ -22,18 +25,21 @@ impl JavaClient {
                     *awaiting_teleport = None;
                     TeleportResult::Success
                 } else {
-                    TeleportResult::WrongId
+                    TeleportResult::Stale
                 }
-            } else {
+            } else if confirm_teleport.teleport_id.0
+                == player
+                    .teleport_id_count
+                    .load(std::sync::atomic::Ordering::Relaxed)
+            {
                 TeleportResult::NotTeleporting
+            } else {
+                TeleportResult::Stale
             }
         };
 
         match result {
-            TeleportResult::Success => {}
-            TeleportResult::WrongId => {
-                self.try_kick(&TextComponent::text("Wrong teleport id"));
-            }
+            TeleportResult::Success | TeleportResult::Stale => {}
             TeleportResult::NotTeleporting => {
                 self.try_kick(&TextComponent::text(
                     "Send Teleport confirm, but we did not teleport",

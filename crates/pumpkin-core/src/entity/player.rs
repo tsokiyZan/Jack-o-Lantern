@@ -426,6 +426,23 @@ pub enum SpamType {
     Command,
 }
 
+/// A player passenger's remount after its vehicle changed dimension.
+///
+/// Vanilla `teleportCrossDimension`'s `newPassenger.startRiding(newEntity, true, false)`. The
+/// player's dimension change is async in Pumpkin, so the new vehicle and the arrived player
+/// meet here, whichever comes first.
+#[derive(Default)]
+pub enum PassengerRemount {
+    #[default]
+    Idle,
+    /// The player is changing dimension as a passenger; its new vehicle isn't made yet.
+    Travelling,
+    /// The new vehicle exists; mount it once the player arrives.
+    VehicleReady(Arc<dyn EntityBase>),
+    /// The player arrived first; the vehicle mounts it when it is added.
+    Arrived,
+}
+
 /// What vanilla `ServerGamePacketListenerImpl` remembers to check the vehicle a player steers.
 #[derive(Default)]
 pub struct SteeredVehicle {
@@ -502,6 +519,8 @@ pub struct Player {
     /// The pending teleport information, including the teleport ID and target location.
     pub awaiting_teleport: Mutex<Option<(VarInt, Vector3<f64>)>>,
     pub steered_vehicle: Mutex<SteeredVehicle>,
+    /// The vehicle a passenger boards again after a change of dimension.
+    pub passenger_remount: std::sync::Mutex<PassengerRemount>,
     /// The coordinates of the chunk section the player is currently watching.
     pub watched_section: AtomicCell<Cylindrical>,
     /// The last time the player performed an action (for idle timeout).
@@ -784,6 +803,7 @@ impl Player {
             client,
             awaiting_teleport: Mutex::new(None),
             steered_vehicle: Mutex::new(SteeredVehicle::default()),
+            passenger_remount: std::sync::Mutex::new(PassengerRemount::Idle),
             // TODO: Load this from previous instance
             hunger_manager: HungerManager::default(),
             current_block_destroy_stage: AtomicI32::new(-1),
@@ -4854,6 +4874,7 @@ impl Player {
         let pitch = target.pitch.unwrap_or(own_pitch);
 
         let Some(server) = new_world.server.upgrade() else {
+            self.set_passenger_remount(PassengerRemount::Idle);
             return;
         };
 
@@ -4878,6 +4899,7 @@ impl Player {
 
                 self.set_client_loaded(false);
                 let Some(player) = current_world.remove_player(self, false).await else {
+                    self.set_passenger_remount(PassengerRemount::Idle);
                     return;
                 };
                new_world.players.rcu(|current_list| {
@@ -4983,6 +5005,7 @@ impl Player {
                     keep_velocity: target.keep_velocity,
                     as_passenger: target.as_passenger,
                 });
+                player.arrived_as_passenger();
 
                 let mut changed_world_event = crate::plugin::api::events::player::player_changed_world::PlayerChangedWorldEvent {
                     player: player.clone(),
@@ -4991,6 +5014,10 @@ impl Player {
                     cancelled: false,
                 };
                 server.plugin_manager.fire(&server, &mut changed_world_event).await;
+            }
+
+            'cancelled: {
+                self.set_passenger_remount(PassengerRemount::Idle);
             }
         }}
     }
@@ -5139,6 +5166,107 @@ impl Player {
             vehicle
                 .get_entity()
                 .remove_passenger_before_teleport(self.entity_id());
+        }
+    }
+
+    pub(crate) fn set_passenger_remount(&self, state: PassengerRemount) {
+        *self
+            .passenger_remount
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = state;
+    }
+
+    /// The new vehicle of a player that changed dimension as its passenger was added:
+    /// mount the player now if it already arrived, else when it does.
+    pub(crate) fn vehicle_ready(
+        &self,
+        passenger: &Arc<dyn EntityBase>,
+        vehicle: &Arc<dyn EntityBase>,
+    ) {
+        let arrived = {
+            let mut state = self
+                .passenger_remount
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            match *state {
+                PassengerRemount::Arrived => {
+                    *state = PassengerRemount::Idle;
+                    true
+                }
+                PassengerRemount::Travelling => {
+                    *state = PassengerRemount::VehicleReady(vehicle.clone());
+                    false
+                }
+                _ => false,
+            }
+        };
+        if arrived {
+            self.finish_remount(passenger.clone(), vehicle);
+        }
+    }
+
+    /// The end of the player's dimension change: board the new vehicle if it is ready, else
+    /// leave word that the player is here.
+    fn arrived_as_passenger(self: &Arc<Self>) {
+        let vehicle = {
+            let mut state = self
+                .passenger_remount
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            match std::mem::take(&mut *state) {
+                PassengerRemount::VehicleReady(vehicle) => Some(vehicle),
+                PassengerRemount::Travelling => {
+                    *state = PassengerRemount::Arrived;
+                    None
+                }
+                _ => None,
+            }
+        };
+        if let Some(vehicle) = vehicle {
+            self.finish_remount(self.clone(), &vehicle);
+        }
+    }
+
+    /// Vanilla `ServerPlayer.startRiding(vehicle, true, false)`.
+    fn finish_remount(&self, passenger: Arc<dyn EntityBase>, vehicle: &Arc<dyn EntityBase>) {
+        let vehicle_entity = vehicle.get_entity();
+        if vehicle_entity.is_removed() || !Arc::ptr_eq(&vehicle_entity.world.load(), &self.world())
+        {
+            return;
+        }
+        vehicle_entity.add_passenger_without_event(vehicle.clone(), passenger);
+        let entity = &self.living_entity.entity;
+        if !entity
+            .vehicle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .as_ref()
+            .is_some_and(|v| Arc::ptr_eq(v, vehicle))
+        {
+            return;
+        }
+        // `entityToRide.positionRider(this)`, then the client is moved there keeping its look.
+        vehicle.position_rider(vehicle.as_ref(), self);
+        self.teleport_in_world(&TeleportTarget {
+            world: self.world(),
+            position: entity.pos.load(),
+            yaw: None,
+            pitch: None,
+            keep_velocity: false,
+            as_passenger: true,
+        });
+        // `sendActiveEffects(livingEntity, connection)`.
+        if let Some(living) = vehicle.get_living_entity() {
+            let effects: Vec<_> = living
+                .active_effects
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .values()
+                .map(|instance| instance.effect.clone())
+                .collect();
+            for effect in &effects {
+                self.send_effect_for(vehicle_entity.entity_id, effect, false);
+            }
         }
     }
 
