@@ -713,6 +713,106 @@ pub fn write_random_sequences_stub(
         .map_err(|e| WorldInfoError::SerializationError(e.to_string()))
 }
 
+/// Vanilla `RandomSequences.CODEC` (`data/minecraft/random_sequences.dat`); each sequence is
+/// the two state words of its `XoroshiroRandomSource`.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct RandomSequencesData {
+    pub salt: i32,
+    pub include_world_seed: bool,
+    pub include_sequence_id: bool,
+    pub sequences: Vec<(String, (u64, u64))>,
+}
+
+impl Default for RandomSequencesData {
+    fn default() -> Self {
+        Self {
+            salt: 0,
+            include_world_seed: true,
+            include_sequence_id: true,
+            sequences: Vec::new(),
+        }
+    }
+}
+
+/// Reads `random_sequences.dat`; a missing or unreadable file gives the defaults.
+#[must_use]
+pub fn read_random_sequences(level_folder: &Path) -> RandomSequencesData {
+    let path = minecraft_data_dir(level_folder).join("random_sequences.dat");
+    if !path.exists() {
+        return RandomSequencesData::default();
+    }
+    match File::open(&path) {
+        Ok(f) => match read_gzip_compound_tag(f) {
+            Ok(root) => random_sequences_from_nbt(&root),
+            Err(e) => {
+                warn!("Failed to parse random_sequences.dat, using defaults: {e}");
+                RandomSequencesData::default()
+            }
+        },
+        Err(e) => {
+            warn!("Failed to open random_sequences.dat, using defaults: {e}");
+            RandomSequencesData::default()
+        }
+    }
+}
+
+fn random_sequences_from_nbt(root: &NbtCompound) -> RandomSequencesData {
+    let mut result = RandomSequencesData::default();
+    let Some(data) = root.get_compound("data") else {
+        return result;
+    };
+    result.salt = data.get_int("salt").unwrap_or(0);
+    result.include_world_seed = data.get_bool("include_world_seed").unwrap_or(true);
+    result.include_sequence_id = data.get_bool("include_sequence_id").unwrap_or(true);
+    if let Some(sequences) = data.get_compound("sequences") {
+        for (key, tag) in &sequences.child_tags {
+            let state = match tag {
+                NbtTag::Compound(sequence) => sequence.get_long_array("source"),
+                _ => None,
+            };
+            if let Some(&[lo, hi]) = state {
+                result
+                    .sequences
+                    .push((key.to_string(), (lo as u64, hi as u64)));
+            } else {
+                warn!("Skipping malformed random sequence {key}");
+            }
+        }
+    }
+    result
+}
+
+pub fn write_random_sequences(
+    level_folder: &Path,
+    data: &RandomSequencesData,
+    data_version: i32,
+) -> Result<(), WorldInfoError> {
+    let dir = ensure_minecraft_data_dir(level_folder)?;
+    let mut sequences = NbtCompound::new();
+    for (key, (lo, hi)) in &data.sequences {
+        let mut sequence = NbtCompound::new();
+        sequence.put("source", NbtTag::LongArray(vec![*lo as i64, *hi as i64]));
+        sequences.put_compound(key, sequence);
+    }
+    let mut inner = NbtCompound::new();
+    inner.put_int("salt", data.salt);
+    // `optionalFieldOf` leaves the fields out at their defaults.
+    if !data.include_world_seed {
+        inner.put_bool("include_world_seed", false);
+    }
+    if !data.include_sequence_id {
+        inner.put_bool("include_sequence_id", false);
+    }
+    inner.put_compound("sequences", sequences);
+    let mut root = NbtCompound::new();
+    root.put_int("DataVersion", data_version);
+    root.put_compound("data", inner);
+
+    let file = File::create(dir.join("random_sequences.dat"))?;
+    pumpkin_nbt::nbt_compress::write_gzip_compound_tag(root, file)
+        .map_err(|e| WorldInfoError::SerializationError(e.to_string()))
+}
+
 pub fn write_scoreboard_stub(level_folder: &Path, data_version: i32) -> Result<(), WorldInfoError> {
     let dir = ensure_minecraft_data_dir(level_folder)?;
     let path = dir.join("scoreboard.dat");
@@ -853,4 +953,24 @@ pub fn write_last_map_id(
     root.put_compound("data", data);
     pumpkin_nbt::nbt_compress::write_gzip_compound_tag(root, BufWriter::new(file))
         .map_err(|e| WorldInfoError::SerializationError(e.to_string()))
+}
+
+#[cfg(test)]
+mod random_sequences_tests {
+    use tempfile::TempDir;
+
+    use super::{RandomSequencesData, read_random_sequences, write_random_sequences};
+
+    #[test]
+    fn random_sequences_file_round_trip() {
+        let dir = TempDir::new().unwrap();
+        let data = RandomSequencesData {
+            salt: -5,
+            include_world_seed: false,
+            include_sequence_id: true,
+            sequences: vec![("minecraft:a".to_string(), (u64::MAX, 7))],
+        };
+        write_random_sequences(dir.path(), &data, 1).unwrap();
+        assert_eq!(read_random_sequences(dir.path()), data);
+    }
 }

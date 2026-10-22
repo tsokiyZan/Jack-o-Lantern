@@ -308,7 +308,7 @@ impl Server {
             command_storage: std::sync::Mutex::new(std::collections::HashMap::new()),
             stopwatches: std::sync::Mutex::new(crate::world::stopwatches::Stopwatches::new()),
             random_sequences: std::sync::Mutex::new(
-                crate::world::random_sequences::RandomSequences::new(),
+                pumpkin_world::world_info::data_files::read_random_sequences(&world_path).into(),
             ),
             advancement_manager,
             white_list,
@@ -570,8 +570,18 @@ impl Server {
     pub fn save_world_info(&self) -> Result<(), WorldInfoError> {
         self.store_level_time();
         let level_data = self.level_info.load();
+        let world_path = self.basic_config.get_world_path();
         self.world_info_writer
-            .write_world_info(&level_data, &self.basic_config.get_world_path())
+            .write_world_info(&level_data, &world_path)?;
+        let sequences = self
+            .random_sequences
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        pumpkin_world::world_info::data_files::write_random_sequences(
+            &world_path,
+            &(&*sequences).into(),
+            level_data.data_version,
+        )
     }
 
     pub fn reload_datapacks(&self, server: &Arc<Self>) {
@@ -815,15 +825,9 @@ impl Server {
         for world in self.worlds.load().iter() {
             world.shutdown().await;
         }
-        self.store_level_time();
-        let level_data = self.level_info.load();
         // then lets save the world info
-
-        if let Err(err) = self
-            .world_info_writer
-            .write_world_info(&level_data, &self.basic_config.get_world_path())
-        {
-            error!("Failed to save level.dat: {err}");
+        if let Err(err) = self.save_world_info() {
+            error!("Failed to save world info: {err}");
         }
         info!("Completed worlds");
     }

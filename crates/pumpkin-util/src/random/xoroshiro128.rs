@@ -43,6 +43,29 @@ impl Xoroshiro {
         Self::new(lo, hi)
     }
 
+    /// Vanilla `RandomSequence.createSequence`: the unmixed 128-bit upgrade of `seed`, xor the
+    /// MD5 halves of `key` (`RandomSupport.seedFromHashOf`), each half Stafford-13 mixed.
+    #[must_use]
+    pub fn from_seed_and_key(seed: u64, key: &str) -> Self {
+        let (lo, hi) = Self::mix_u64(seed);
+        let bytes = md5::compute(key.as_bytes());
+        let key_lo = u64::from_be_bytes(bytes[0..8].try_into().unwrap_or([0; 8]));
+        let key_hi = u64::from_be_bytes(bytes[8..16].try_into().unwrap_or([0; 8]));
+        Self::new(mix_stafford_13(lo ^ key_lo), mix_stafford_13(hi ^ key_hi))
+    }
+
+    /// The two state words, as `Xoroshiro128PlusPlus.CODEC` saves them.
+    #[must_use]
+    pub const fn state(&self) -> (u64, u64) {
+        (self.lo, self.hi)
+    }
+
+    /// Restores a generator from `state()`.
+    #[must_use]
+    pub const fn from_state(lo: u64, hi: u64) -> Self {
+        Self::new(lo, hi)
+    }
+
     /// Creates a new Xoroshiro generator with the given state words.
     ///
     /// If both state words are zero, they are replaced with default values
@@ -268,6 +291,15 @@ mod tests {
     use super::{Xoroshiro, mix_stafford_13};
 
     // Values checked against results from the equivalent Java source
+
+    // Vanilla 26.3 server, `/random reset minecraft:test 0 false` (seed 0, sequence id kept), then
+    // `/random value 1..1000000 minecraft:test` twice, which is `nextInt(1000000) + 1`.
+    #[test]
+    fn from_seed_and_key_matches_vanilla_sequence() {
+        let mut random = Xoroshiro::from_seed_and_key(0, "minecraft:test");
+        assert_eq!(random.next_inbetween_i32(1, 1_000_000), 781_075);
+        assert_eq!(random.next_inbetween_i32(1, 1_000_000), 807_728);
+    }
 
     #[test]
     fn mix_stafford_13_test() {
