@@ -764,7 +764,9 @@ impl PandaEntity {
         living
             .movement_input
             .store(Vector3::new(input.x, input.y, 0.0));
-        self.mob_entity.own_navigation().stop();
+        // `this.getNavigation().stop()` (`Panda.java:606`).
+        self.mob_entity
+            .with_navigation(|navigation, _| navigation.stop());
         self.sit(true);
     }
 
@@ -832,7 +834,9 @@ fn panda_panic_can_continue(mob: &dyn Mob) -> bool {
     if !as_panda(mob).is_some_and(PandaEntity::is_sitting) {
         return true;
     }
-    mob.get_mob_entity().own_navigation().stop();
+    // `this.panda.getNavigation().stop()` (`Panda.java:987`).
+    mob.get_mob_entity()
+        .with_navigation(|navigation, _| navigation.stop());
     false
 }
 
@@ -1313,14 +1317,16 @@ impl Goal for PandaSitGoal {
         };
         if panda.main_hand().is_empty() {
             if let Some(item) = edible_items_in(mob, 8.0).first() {
-                let mob_entity = &panda.mob_entity;
-                let living = &mob_entity.living_entity;
-                let mut navigator = mob_entity.own_navigation();
-                // Vanilla `moveTo(Entity, speed)` paths with a reach of 1.
-                let path = navigator.create_path(living, item.get_entity().pos.load(), 1);
-                if path.is_some() {
-                    navigator.move_to_path(path, f64::from(1.2f32), living);
-                }
+                // `Panda.this.getNavigation().moveTo(items.getFirst(), 1.2F)`
+                // (`Panda.java:1085`) paths with a reach of 1.
+                let item_pos = item.get_entity().pos.load();
+                panda.mob_entity.with_navigation(|navigation, owner| {
+                    let living = &owner.living_entity;
+                    let path = navigation.create_path(living, item_pos, 1);
+                    if path.is_some() {
+                        navigation.move_to_path(path, f64::from(1.2f32), living);
+                    }
+                });
             }
         } else {
             panda.try_to_sit();

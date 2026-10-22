@@ -467,10 +467,13 @@ impl ShootTongue {
 
     /// Vanilla `ShootTongue.canPathfindToTarget`.
     fn can_pathfind_to_target(tick: &BrainTick<'_>, target: &dyn EntityBase) -> bool {
-        let mob_entity = tick.mob.get_mob_entity();
-        mob_entity
-            .own_navigation()
-            .create_path(&mob_entity.living_entity, target.get_entity().pos.load(), 0)
+        // `body.getNavigation().createPath(target, 0)` (`ShootTongue.java:134`).
+        let target_pos = target.get_entity().pos.load();
+        tick.mob
+            .get_mob_entity()
+            .with_navigation(|navigation, owner| {
+                navigation.create_path(&owner.living_entity, target_pos, 0)
+            })
             .is_some_and(|path| path.get_dist_to_target() < EATING_DISTANCE)
     }
 

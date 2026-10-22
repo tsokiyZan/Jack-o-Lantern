@@ -348,14 +348,14 @@ fn select_variant_to_spawn(world: &World, pos: &BlockPos) -> Option<CatVariant> 
 /// Vanilla `Cat.customServerAiStep`, which `Ocelot` repeats: crouches while tempted, sprints
 /// while fleeing or pouncing.
 pub fn feline_custom_server_ai_step(mob: &dyn Mob) {
-    let speed = {
-        let control = mob.get_mob_entity().own_move_control();
-        let control: &dyn Any = &**control;
+    // `this.getMoveControl()` (`Cat.java:236-237`, `Ocelot.java:119-120`).
+    let speed = mob.get_mob_entity().with_move_control(|control| {
+        let control: &dyn Any = &*control;
         control
             .downcast_ref::<MoveControl>()
             .filter(|control| control.has_wanted())
             .map(MoveControl::get_speed_modifier)
-    };
+    });
     let (pose, sprinting) = match speed {
         Some(speed) if speed == CROUCH_SPEED_MOD => (EntityPose::Crouching, false),
         Some(speed) if speed == SPRINT_SPEED_MOD => (EntityPose::Standing, true),
@@ -773,13 +773,15 @@ impl CatRelaxOnOwnerGoal {
             .any(|other| other.is_lying() || other.is_relax_state_one())
     }
 
+    /// `this.cat.getNavigation().moveTo(goalPos, 1.1F)` (`Cat.java:587`, `:638`).
     fn move_to_goal_pos(cat: &CatEntity, goal_pos: BlockPos) {
-        let mut navigator = cat.mob_entity.own_navigation();
-        navigator.set_progress(NavigatorGoal::new(
-            cat.get_entity().pos.load(),
-            goal_pos.0.to_f64(),
-            f64::from(1.1f32),
-        ));
+        cat.mob_entity.with_navigation(|navigation, owner| {
+            navigation.set_progress(NavigatorGoal::new(
+                owner.living_entity.entity.pos.load(),
+                goal_pos.0.to_f64(),
+                f64::from(1.1f32),
+            ));
+        });
     }
 
     /// Vanilla `giveMorningGift`.
@@ -933,7 +935,9 @@ impl Goal for CatRelaxOnOwnerGoal {
         }
         self.on_bed_ticks = 0;
         cat.set_relax_state_one(false);
-        cat.mob_entity.own_navigation().stop();
+        // `this.cat.getNavigation().stop()` (`Cat.java:602`).
+        cat.mob_entity
+            .with_navigation(|navigation, _| navigation.stop());
     }
 
     fn tick(&mut self, mob: &dyn Mob) {

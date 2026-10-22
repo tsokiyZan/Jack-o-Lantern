@@ -1313,8 +1313,10 @@ impl StalkPreyGoal {
             );
     }
 
+    /// `Fox.this.getNavigation().stop()` (`Fox.java:1476`, `:1492`).
     fn stop_navigation(fox: &FoxEntity) {
-        fox.mob_entity.own_navigation().stop();
+        fox.mob_entity
+            .with_navigation(|navigation, _| navigation.stop());
     }
 }
 
@@ -1388,13 +1390,15 @@ impl Goal for StalkPreyGoal {
             fox.set_crouching(true);
             Self::stop_navigation(fox);
         } else {
-            let living = &fox.mob_entity.living_entity;
-            let mut navigator = fox.mob_entity.own_navigation();
-            // Vanilla `moveTo(target, 1.5)` paths with a reach of 1.
-            let path = navigator.create_path(living, target_pos, 1);
-            if path.is_some() {
-                navigator.move_to_path(path, 1.5, living);
-            }
+            // `Fox.this.getNavigation().moveTo(target, 1.5)` (`Fox.java:1494`) paths with
+            // a reach of 1.
+            fox.mob_entity.with_navigation(|navigation, owner| {
+                let living = &owner.living_entity;
+                let path = navigation.create_path(living, target_pos, 1);
+                if path.is_some() {
+                    navigation.move_to_path(path, 1.5, living);
+                }
+            });
         }
     }
 
@@ -1437,10 +1441,11 @@ impl Goal for FoxPounceGoal {
         // which only boats and minecarts have.
         let has_clear_path = fox.is_path_clear(target.get_entity());
         if !has_clear_path {
-            let living = &fox.mob_entity.living_entity;
-            fox.mob_entity
-                .own_navigation()
-                .create_path(living, target.get_entity().pos.load(), 0);
+            // `Fox.this.getNavigation().createPath(target, 0)` (`Fox.java:1145`).
+            let target_pos = target.get_entity().pos.load();
+            fox.mob_entity.with_navigation(|navigation, owner| {
+                navigation.create_path(&owner.living_entity, target_pos, 0);
+            });
             fox.set_crouching(false);
             fox.set_interested(false);
         }
@@ -1494,7 +1499,9 @@ impl Goal for FoxPounceGoal {
                 velocity.z + uz * 0.8,
             ));
         }
-        fox.mob_entity.own_navigation().stop();
+        // `Fox.this.getNavigation().stop()` (`Fox.java:1184`).
+        fox.mob_entity
+            .with_navigation(|navigation, _| navigation.stop());
     }
 
     fn stop(&mut self, mob: &dyn Mob) {
@@ -1763,11 +1770,13 @@ impl Goal for SleepGoal {
             .jumping
             .store(false, Ordering::Relaxed);
         fox.set_sleeping(true);
-        fox.mob_entity.own_navigation().stop();
+        // `Fox.this.getNavigation().stop()` and `Fox.this.getMoveControl()` with the
+        // fox's own position (`Fox.java:1438-1439`).
+        fox.mob_entity
+            .with_navigation(|navigation, _| navigation.stop());
         let pos = fox.get_entity().pos.load();
         fox.mob_entity
-            .own_move_control()
-            .set_wanted_position(pos.x, pos.y, pos.z, 0.0);
+            .with_move_control(|control| control.set_wanted_position(pos.x, pos.y, pos.z, 0.0));
     }
 
     fn controls(&self) -> Controls {
@@ -2022,14 +2031,17 @@ impl FoxSearchForItemsGoal {
             .collect()
     }
 
+    /// `Fox.this.getNavigation().moveTo(item, 1.2F)` (`Fox.java:1264`, `:1272`) paths
+    /// with a reach of 1.
     fn move_to(fox: &FoxEntity, item: &Arc<dyn EntityBase>) {
-        let living = &fox.mob_entity.living_entity;
-        let mut navigator = fox.mob_entity.own_navigation();
-        // Vanilla `moveTo(item, 1.2F)` paths with a reach of 1.
-        let path = navigator.create_path(living, item.get_entity().pos.load(), 1);
-        if path.is_some() {
-            navigator.move_to_path(path, f64::from(1.2f32), living);
-        }
+        let item_pos = item.get_entity().pos.load();
+        fox.mob_entity.with_navigation(|navigation, owner| {
+            let living = &owner.living_entity;
+            let path = navigation.create_path(living, item_pos, 1);
+            if path.is_some() {
+                navigation.move_to_path(path, f64::from(1.2f32), living);
+            }
+        });
     }
 }
 
@@ -2182,7 +2194,9 @@ impl Goal for PerchAndSearchGoal {
         self.reset_look(fox);
         self.looks_remaining = 2 + fox.get_entity().random().next_bounded_i32(3);
         fox.set_sitting(true);
-        fox.mob_entity.own_navigation().stop();
+        // `Fox.this.getNavigation().stop()` (`Fox.java:1335`).
+        fox.mob_entity
+            .with_navigation(|navigation, _| navigation.stop());
     }
 
     fn stop(&mut self, mob: &dyn Mob) {

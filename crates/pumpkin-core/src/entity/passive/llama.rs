@@ -788,9 +788,16 @@ impl Goal for LlamaFollowCaravanGoal {
         } else {
             delta * ((distance - 2.0).max(0.0) / length)
         };
-        mob.get_mob_entity()
-            .own_navigation()
-            .set_progress(NavigatorGoal::new(pos, pos + delta, self.speed_modifier));
+        // `this.llama.getNavigation().moveTo` (`LlamaFollowCaravanGoal.java:117`): the
+        // target is relative to the llama, the stuck check starts at the steered mob.
+        mob.get_mob_entity().with_navigation(|navigation, owner| {
+            let owner_pos = owner.living_entity.entity.pos.load();
+            navigation.set_progress(NavigatorGoal::new(
+                owner_pos,
+                pos + delta,
+                self.speed_modifier,
+            ));
+        });
     }
 
     fn controls(&self) -> Controls {

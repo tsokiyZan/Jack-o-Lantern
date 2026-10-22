@@ -505,7 +505,9 @@ impl Goal for DolphinSwimWithPlayerGoal {
 
     fn stop(&mut self, mob: &dyn Mob) {
         self.player = None;
-        mob.get_mob_entity().own_navigation().stop();
+        // `this.dolphin.getNavigation().stop()` (`Dolphin.java:499`).
+        mob.get_mob_entity()
+            .with_navigation(|navigation, _| navigation.stop());
     }
 
     fn tick(&mut self, mob: &dyn Mob) {
@@ -523,13 +525,20 @@ impl Goal for DolphinSwimWithPlayerGoal {
 
         let pos = mob.get_entity().pos.load();
         let player_pos = player.get_entity().pos.load();
-        let mut navigator = mob_entity.own_navigation();
-        if pos.squared_distance_to_vec(&player_pos) < 6.25 {
-            navigator.stop();
-        } else {
-            navigator.set_progress(NavigatorGoal::new(pos, player_pos, self.speed_modifier));
-        }
-        drop(navigator);
+        // `this.dolphin.getNavigation()` (`Dolphin.java:506`, `:508`).
+        let close = pos.squared_distance_to_vec(&player_pos) < 6.25;
+        mob_entity.with_navigation(|navigation, owner| {
+            if close {
+                navigation.stop();
+            } else {
+                let owner_pos = owner.living_entity.entity.pos.load();
+                navigation.set_progress(NavigatorGoal::new(
+                    owner_pos,
+                    player_pos,
+                    self.speed_modifier,
+                ));
+            }
+        });
 
         // `this.player.level().getRandom().nextInt(6)`.
         if player.is_swimming()
@@ -654,14 +663,13 @@ impl MoveToItemGoal {
         let Some(item) = items.first() else {
             return;
         };
-        let pos = mob.get_entity().pos.load();
-        mob.get_mob_entity()
-            .own_navigation()
-            .set_progress(NavigatorGoal::new(
-                pos,
-                item.get_entity().pos.load(),
-                f64::from(1.2f32),
-            ));
+        let item_pos = item.get_entity().pos.load();
+        // `Dolphin.this.getNavigation().moveTo(items.get(0), 1.2F)` (`Dolphin.java:580`,
+        // `:592`).
+        mob.get_mob_entity().with_navigation(|navigation, owner| {
+            let owner_pos = owner.living_entity.entity.pos.load();
+            navigation.set_progress(NavigatorGoal::new(owner_pos, item_pos, f64::from(1.2f32)));
+        });
     }
 }
 
@@ -763,7 +771,10 @@ impl DolphinSwimToTreasureGoal {
 
     /// Vanilla `Dolphin.closeToNextPos`.
     fn close_to_next_pos(mob: &dyn Mob) -> bool {
-        let target = mob.get_mob_entity().own_navigation().get_target_pos();
+        // `this.getNavigation().getTargetPos()` (`Dolphin.java:356`).
+        let target = mob
+            .get_mob_entity()
+            .with_navigation(|navigation, _| navigation.get_target_pos());
         target.is_some_and(|target| {
             target
                 .to_centered_f64()
@@ -787,7 +798,9 @@ impl Goal for DolphinSwimToTreasureGoal {
 
     fn start(&mut self, mob: &dyn Mob) {
         self.stuck = false;
-        mob.get_mob_entity().own_navigation().stop();
+        // `this.dolphin.getNavigation().stop()` (`Dolphin.java:414`).
+        mob.get_mob_entity()
+            .with_navigation(|navigation, _| navigation.stop());
         let entity = mob.get_entity();
         let structures = structures_in_tag(&tag::WorldgenStructure::MINECRAFT_DOLPHIN_LOCATED);
         let found = entity.world.load().find_nearest_map_structure(
@@ -818,7 +831,10 @@ impl Goal for DolphinSwimToTreasureGoal {
         let Some(treasure) = self.treasure_pos else {
             return;
         };
-        let navigation_done = mob.get_mob_entity().own_navigation().is_done();
+        // `this.dolphin.getNavigation().isDone()` (`Dolphin.java:440`).
+        let navigation_done = mob
+            .get_mob_entity()
+            .with_navigation(|navigation, _| navigation.is_done());
         if !Self::close_to_next_pos(mob) && !navigation_done {
             return;
         }
@@ -870,10 +886,11 @@ impl Goal for DolphinSwimToTreasureGoal {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .look_at_with_range(next.x, next.y, next.z, 21.0, 1.0);
-        let pos = mob.get_entity().pos.load();
-        mob_entity
-            .own_navigation()
-            .set_progress(NavigatorGoal::new(pos, next, 1.3));
+        // `this.dolphin.getNavigation().moveTo(.., 1.3)` (`Dolphin.java:460`).
+        mob_entity.with_navigation(|navigation, owner| {
+            let owner_pos = owner.living_entity.entity.pos.load();
+            navigation.set_progress(NavigatorGoal::new(owner_pos, next, 1.3));
+        });
         // `level.getRandom().nextInt(this.adjustedTickDelay(80))`.
         if mob
             .get_entity()

@@ -388,15 +388,19 @@ fn as_turtle(mob: &dyn Mob) -> Option<&TurtleEntity> {
     mob.cast_any().downcast_ref::<TurtleEntity>()
 }
 
+/// Vanilla `turtle.getNavigation().isDone()` (`Turtle.java:377`, `:613`, `:641`, and
+/// `this.mob.getNavigation()` in `TurtleMoveControl.tick`, `:505`).
 fn navigation_done(mob: &dyn Mob) -> bool {
-    mob.get_mob_entity().own_navigation().is_done()
+    mob.get_mob_entity()
+        .with_navigation(|navigation, _| navigation.is_done())
 }
 
+/// Vanilla `turtle.getNavigation().moveTo` (`Turtle.java:393`, `:634`).
 fn move_to(mob: &dyn Mob, target: Vector3<f64>, speed: f64) {
-    let pos = mob.get_entity().pos.load();
-    mob.get_mob_entity()
-        .own_navigation()
-        .set_progress(NavigatorGoal::new(pos, target, speed));
+    mob.get_mob_entity().with_navigation(|navigation, owner| {
+        let pos = owner.living_entity.entity.pos.load();
+        navigation.set_progress(NavigatorGoal::new(pos, target, speed));
+    });
 }
 
 /// Vanilla `Vec3.atBottomCenterOf`.

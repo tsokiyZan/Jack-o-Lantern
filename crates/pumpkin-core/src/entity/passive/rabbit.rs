@@ -633,7 +633,10 @@ impl RabbitMoveControl {
 
     /// Vanilla `Rabbit.setSpeedModifier`, which sets the speed on this move control.
     fn set_speed_modifier(&mut self, mob: &dyn Mob, speed: f64) {
-        mob.get_mob_entity().own_navigation().set_speed(speed);
+        // `this.getNavigation().setSpeedModifier(speed)` (`Rabbit.java:182`); the
+        // move-control half is the rabbit's own `this.moveControl` (:183).
+        mob.get_mob_entity()
+            .with_navigation(|navigation, _| navigation.set_speed(speed));
         let MoveControl {
             wanted_x,
             wanted_y,

@@ -113,11 +113,12 @@ impl SchoolingFish {
             return;
         };
         let mob_entity = mob.get_mob_entity();
-        let from = mob_entity.living_entity.entity.pos.load();
         let to = leader.get_entity().pos.load();
-        mob_entity
-            .own_navigation()
-            .set_progress(NavigatorGoal::new(from, to, 1.0));
+        // `this.getNavigation().moveTo(this.leader, 1.0)` (`AbstractSchoolingFish.java:91`).
+        mob_entity.with_navigation(|navigation, owner| {
+            let from = owner.living_entity.entity.pos.load();
+            navigation.set_progress(NavigatorGoal::new(from, to, 1.0));
+        });
     }
 
     /// The school part of vanilla's `AbstractSchoolingFish.tick`: a leader that

@@ -977,12 +977,16 @@ impl BeePollinateGoal {
 
     fn set_wanted_pos(&self, bee: &BeeEntity) {
         if let Some(hover_pos) = self.hover_pos {
-            bee.mob_entity.own_move_control().set_wanted_position(
-                hover_pos.x,
-                hover_pos.y,
-                hover_pos.z,
-                f64::from(Self::SPEED_MODIFIER),
-            );
+            // `Bee.this.getMoveControl()` (`Bee.java:1218`), unlike the bee's
+            // `Bee.this.navigation` field reads.
+            bee.mob_entity.with_move_control(|control| {
+                control.set_wanted_position(
+                    hover_pos.x,
+                    hover_pos.y,
+                    hover_pos.z,
+                    f64::from(Self::SPEED_MODIFIER),
+                );
+            });
         }
     }
 

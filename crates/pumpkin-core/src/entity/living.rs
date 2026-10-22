@@ -6030,7 +6030,9 @@ impl LivingEntity {
             world.send_entity_status(&self.entity, EntityStatus::Teleport, None);
         }
         if let Some(mob) = caller.get_mob() {
-            mob.get_mob_entity().own_navigation().stop();
+            // `pathfinderMob.getNavigation().stop()` (`LivingEntity.java:3721`).
+            mob.get_mob_entity()
+                .with_navigation(|navigation, _| navigation.stop());
         }
         true
     }

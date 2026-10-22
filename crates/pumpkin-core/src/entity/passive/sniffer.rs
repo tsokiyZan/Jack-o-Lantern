@@ -280,9 +280,11 @@ impl SnifferEntity {
         if Self::get_explored_positions(brain).any(|explored| Some(*explored) == global_position) {
             return false;
         }
+        // `this.getNavigation().createPath(position, 1)` (`Sniffer.java:282`).
         self.mob_entity
-            .own_navigation()
-            .create_path(&self.mob_entity.living_entity, position.to_f64(), 1)
+            .with_navigation(|navigation, owner| {
+                navigation.create_path(&owner.living_entity, position.to_f64(), 1)
+            })
             .is_some_and(|path| path.can_reach())
     }
 

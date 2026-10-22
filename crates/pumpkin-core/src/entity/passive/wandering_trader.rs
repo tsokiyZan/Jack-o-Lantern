@@ -1083,7 +1083,8 @@ impl Goal for MoveTowardsRestrictionGoal {
 
     fn should_continue(&mut self, mob: &dyn Mob) -> bool {
         let mob_entity = mob.get_mob_entity();
-        !mob_entity.own_navigation().is_idle()
+        // `this.mob.getNavigation()` (`MoveTowardsRestrictionGoal.java:40`).
+        !mob_entity.with_navigation(|navigation, _| navigation.is_idle())
             && mob_entity.has_position_target()
             && !mob_entity.is_in_position_target_range()
     }
@@ -1091,15 +1092,16 @@ impl Goal for MoveTowardsRestrictionGoal {
     fn start(&mut self, mob: &dyn Mob) {
         let mob_entity = mob.get_mob_entity();
         let target = mob_entity.position_target.load();
-        let entity_pos = mob_entity.living_entity.entity.pos.load();
         let dest = Vector3::new(
             target.0.x as f64 + 0.5,
             target.0.y as f64,
             target.0.z as f64 + 0.5,
         );
-        mob_entity
-            .own_navigation()
-            .set_progress(NavigatorGoal::new(entity_pos, dest, self.speed));
+        // `this.mob.getNavigation().moveTo` (`MoveTowardsRestrictionGoal.java:45`).
+        mob_entity.with_navigation(|navigation, owner| {
+            let owner_pos = owner.living_entity.entity.pos.load();
+            navigation.set_progress(NavigatorGoal::new(owner_pos, dest, self.speed));
+        });
     }
 
     fn controls(&self) -> Controls {
