@@ -63,7 +63,11 @@ pub struct MobData {
     /// Vanilla `isInWater`, which is also `isInFloatableFluid` while
     /// `#entity_floatable` holds only water.
     pub is_in_water: bool,
+    /// The mob's own `pathfindingMalus` map, which `setPathfindingMalus` writes.
     pub path_type_malus: [Option<f32>; PATH_TYPE_COUNT],
+    /// The controlled vehicle's map while it lends it (`shouldPassengersInheritMalus`), which
+    /// `getPathfindingMalus` then reads instead of the own map.
+    pub inherited_path_type_malus: Option<[Option<f32>; PATH_TYPE_COUNT]>,
     /// Vanilla `Creaking.getHomePos`, which its `HomeNodeEvaluator` keeps paths near.
     pub home_pos: Option<BlockPos>,
     /// The pathing entity, for draws from its random (vanilla `mob.getRandom()`).
@@ -83,6 +87,7 @@ impl MobData {
             on_ground: true,
             is_in_water: false,
             path_type_malus: [None; PATH_TYPE_COUNT],
+            inherited_path_type_malus: None,
             home_pos: None,
             entity_id: None,
         }
@@ -94,13 +99,30 @@ impl MobData {
         self.can_stand_on_lava && fluid.has_tag(&tag::Fluid::MINECRAFT_LAVA)
     }
 
+    /// Vanilla `Mob.getPathfindingMalus`: the lending vehicle's map, else the own one.
     #[must_use]
     pub fn get_pathfinding_malus(&self, path_type: PathType) -> f32 {
+        self.inherited_path_type_malus
+            .as_ref()
+            .unwrap_or(&self.path_type_malus)[path_type as usize]
+            .unwrap_or_else(|| path_type.get_malus())
+    }
+
+    /// Vanilla `Mob.setPathfindingMalus`: always the mob's own map, which a lending vehicle's
+    /// map shadows for reads.
+    pub const fn set_pathfinding_malus(&mut self, path_type: PathType, malus: f32) {
+        self.path_type_malus[path_type as usize] = Some(malus);
+    }
+
+    /// The mob's own map, whatever a vehicle lends.
+    #[must_use]
+    pub fn own_pathfinding_malus(&self, path_type: PathType) -> f32 {
         self.path_type_malus[path_type as usize].unwrap_or_else(|| path_type.get_malus())
     }
 
-    pub const fn set_pathfinding_malus(&mut self, path_type: PathType, malus: f32) {
-        self.path_type_malus[path_type as usize] = Some(malus);
+    /// Reads come from `malus` (the controlled vehicle's map) from now on.
+    pub const fn inherit_pathfinding_malus(&mut self, malus: [Option<f32>; PATH_TYPE_COUNT]) {
+        self.inherited_path_type_malus = Some(malus);
     }
 
     #[must_use]
@@ -186,5 +208,41 @@ impl BaseNodeEvaluator {
 
             dx <= self.entity_width / 2 && dy <= self.entity_height && dz <= self.entity_depth / 2
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use pumpkin_util::math::vector3::Vector3;
+
+    use super::MobData;
+    use crate::entity::ai::pathfinder::node::{PATH_TYPE_COUNT, PathType};
+
+    /// Vanilla `Mob.setPathfindingMalus` writes the mob's own map, while
+    /// `getPathfindingMalus` reads the vehicle's map when it lends one: a write made
+    /// while inheriting (`AmphibiousNodeEvaluator.prepare`) does not show in reads.
+    #[test]
+    fn writes_go_to_own_map_while_reads_come_from_the_inherited_one() {
+        let mut mob_data = MobData::new(Vector3::new(0.0, 0.0, 0.0), 0.6, 1.8);
+        let mut inherited = [None; PATH_TYPE_COUNT];
+        inherited[PathType::Water as usize] = Some(8.0);
+        mob_data.inherit_pathfinding_malus(inherited);
+
+        mob_data.set_pathfinding_malus(PathType::Water, 0.0);
+
+        assert_eq!(mob_data.get_pathfinding_malus(PathType::Water), 8.0);
+        assert_eq!(mob_data.own_pathfinding_malus(PathType::Water), 0.0);
+        // Untouched types fall back to the default, not to the own map.
+        assert_eq!(
+            mob_data.get_pathfinding_malus(PathType::Lava),
+            PathType::Lava.get_malus()
+        );
+    }
+
+    #[test]
+    fn without_a_lending_vehicle_writes_show_in_reads() {
+        let mut mob_data = MobData::new(Vector3::new(0.0, 0.0, 0.0), 0.6, 1.8);
+        mob_data.set_pathfinding_malus(PathType::Water, 0.0);
+        assert_eq!(mob_data.get_pathfinding_malus(PathType::Water), 0.0);
     }
 }

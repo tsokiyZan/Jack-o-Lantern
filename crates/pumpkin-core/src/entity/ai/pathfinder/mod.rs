@@ -11,7 +11,7 @@ use crate::world::World;
 use crate::entity::ai::pathfinder::amphibious_node_evaluator::AmphibiousNodeEvaluator;
 use crate::entity::ai::pathfinder::binary_heap::BinaryHeap;
 use crate::entity::ai::pathfinder::fly_node_evaluator::FlyNodeEvaluator;
-use crate::entity::ai::pathfinder::node::{Node, PathType, Target};
+use crate::entity::ai::pathfinder::node::{Node, PATH_TYPE_COUNT, PathType, Target};
 use crate::entity::ai::pathfinder::node_evaluator::{BaseNodeEvaluator, MobData, NodeEvaluator};
 use crate::entity::ai::pathfinder::path::Path;
 use crate::entity::ai::pathfinder::pathfinding_context::PathfindingContext;
@@ -534,13 +534,21 @@ impl PathNavigation {
         mob_data.entity_id = Some(entity.entity.entity_id);
 
         // Vanilla's node evaluators call `mob.getPathfindingMalus`, which reads the controlled
-        // vehicle's map when it passes its malus on.
-        let inherited = mob
+        // vehicle's map when it passes its malus on, while `setPathfindingMalus` (the amphibious
+        // evaluator's `prepare`, `onPathfindingStart`) still writes the mob's own map.
+        for (&path_type, &malus) in &self.path_type_overrides {
+            mob_data.set_pathfinding_malus(path_type, malus);
+        }
+        if let Some(inherited) = mob
             .as_ref()
             .and_then(|mob| mob.get_mob())
-            .and_then(|mob| mob.get_mob_entity().inherited_malus_overrides());
-        for (&path_type, &malus) in inherited.as_ref().unwrap_or(&self.path_type_overrides) {
-            mob_data.set_pathfinding_malus(path_type, malus);
+            .and_then(|mob| mob.get_mob_entity().inherited_malus_overrides())
+        {
+            let mut lent = [None; PATH_TYPE_COUNT];
+            for (path_type, malus) in inherited {
+                lent[path_type as usize] = Some(malus);
+            }
+            mob_data.inherit_pathfinding_malus(lent);
         }
         if let Some(mob) = mob.as_ref().and_then(|mob| mob.get_mob()) {
             mob.on_pathfinding_start(&mut mob_data);
