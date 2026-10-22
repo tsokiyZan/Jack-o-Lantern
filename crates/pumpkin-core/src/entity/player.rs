@@ -1677,6 +1677,31 @@ impl Player {
         self.living_entity.post_piercing_attack(self);
     }
 
+    /// Vanilla `ServerPlayer.sendBuildLimitMessage`: `build.tooHigh` or `build.tooLow` with
+    /// the limit, red, over the hotbar.
+    pub fn send_build_limit_message(&self, too_high: bool, limit: i32) {
+        let (java, bedrock) = if too_high {
+            (
+                pumpkin_data::translation::java::BUILD_TOOHIGH,
+                pumpkin_data::translation::bedrock::BUILD_TOOHIGH,
+            )
+        } else {
+            (
+                pumpkin_data::translation::java::BUILD_TOOLOW,
+                pumpkin_data::translation::bedrock::BUILD_TOOLOW,
+            )
+        };
+        self.send_system_message_raw(
+            &TextComponent::translate_cross(
+                java,
+                bedrock,
+                vec![TextComponent::text(limit.to_string())],
+            )
+            .color_named(pumpkin_util::text::color::NamedColor::Red),
+            true,
+        );
+    }
+
     /// Vanilla `Player.cannotAttack`.
     pub(crate) fn cannot_attack(&self, target: &dyn EntityBase) -> bool {
         !target.is_attackable() || target.skip_attack_interaction(self)

@@ -269,7 +269,7 @@ impl BedrockClient {
                                         sequence: VarInt(0),
                                     };
 
-                                if let Ok(Some(_)) = server.block_registry.place_block(
+                                match server.block_registry.place_block(
                                     player,
                                     placed_block,
                                     &server,
@@ -277,10 +277,23 @@ impl BedrockClient {
                                     data.block_position,
                                     face,
                                 ) {
-                                    item_used = true;
-                                    if player.gamemode.load() != GameMode::Creative {
-                                        stack.decrement(1);
+                                    Ok(Some(_)) => {
+                                        item_used = true;
+                                        if player.gamemode.load() != GameMode::Creative {
+                                            stack.decrement(1);
+                                        }
                                     }
+                                    Err(
+                                        crate::block::registry::BlockPlacingError::BlockOutOfWorld,
+                                    ) if data.block_position.0.y + face.to_offset().y
+                                        > player.world().get_top_y() =>
+                                    {
+                                        player.send_build_limit_message(
+                                            true,
+                                            player.world().get_top_y(),
+                                        );
+                                    }
+                                    _ => {}
                                 }
                             }
                         }

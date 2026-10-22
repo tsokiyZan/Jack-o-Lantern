@@ -36,6 +36,20 @@ impl JavaClient {
             return Err(BlockPlacingError::InvalidHand);
         };
 
+        // A click beyond the build limits only tells the player so.
+        let (min_y, max_y) = {
+            let world = player.world();
+            (world.get_bottom_y(), world.get_top_y())
+        };
+        if position.0.y > max_y {
+            player.send_build_limit_message(true, max_y);
+            return Ok(());
+        }
+        if position.0.y < min_y {
+            player.send_build_limit_message(false, min_y);
+            return Ok(());
+        }
+
         if player.gamemode.load() == GameMode::Spectator {
             let entity = &player.get_entity();
             let world = entity.world.load_full();
@@ -180,6 +194,17 @@ impl JavaClient {
 
         let after = item.clone();
 
+        // A placement attempt that didn't succeed at the build limit: `build.tooHigh` from both
+        // branches (twice), `build.tooLow` from the second.
+        if !item_result.consumes_action() && Self::was_block_placement_attempt(player, &item) {
+            if face == BlockDirection::Up && position.0.y >= max_y {
+                player.send_build_limit_message(true, max_y);
+                player.send_build_limit_message(true, max_y);
+            } else if face == BlockDirection::Down && position.0.y <= min_y {
+                player.send_build_limit_message(false, min_y);
+            }
+        }
+
         Self::swing_for_use_item_on(player, hand, swing_animation, &item_result);
 
         // Broadcast the break entity status before the slot sync; the client
@@ -206,6 +231,31 @@ impl JavaClient {
         }
 
         Ok(())
+    }
+
+    /// Vanilla `ServerGamePacketListenerImpl.wasBlockPlacementAttempt`: a block item, or a
+    /// bucket with a fluid, that isn't on cooldown.
+    fn was_block_placement_attempt(player: &Player, stack: &ItemStack) -> bool {
+        if stack.is_empty() {
+            return false;
+        }
+        let item = stack.item;
+        let fluid_bucket = [
+            &Item::WATER_BUCKET,
+            &Item::LAVA_BUCKET,
+            &Item::PUFFERFISH_BUCKET,
+            &Item::SALMON_BUCKET,
+            &Item::COD_BUCKET,
+            &Item::TROPICAL_FISH_BUCKET,
+            &Item::AXOLOTL_BUCKET,
+            &Item::TADPOLE_BUCKET,
+        ]
+        .iter()
+        .any(|bucket| bucket.id == item.id);
+        // `SolidBucketItem` (powder snow) is a `BlockItem`.
+        let block_item =
+            Block::from_item_id(item.id).is_some() || item.id == Item::POWDER_SNOW_BUCKET.id;
+        (block_item || fluid_bucket) && !player.is_on_cooldown(&cooldown_group(stack))
     }
 
     /// The two `swingAndResetAttackStrength` branches of vanilla `handleUseItemOn`: a swinging
@@ -297,9 +347,8 @@ impl JavaClient {
             Err(crate::block::registry::BlockPlacingError::InvalidGamemode) => {
                 Err(BlockPlacingError::InvalidGamemode)
             }
-            Err(crate::block::registry::BlockPlacingError::BlockOutOfWorld) => {
-                Err(BlockPlacingError::BlockOutOfWorld)
-            }
+            // `BlockItem.place` fails; the build limit message follows in `handle_use_item_on`.
+            Err(crate::block::registry::BlockPlacingError::BlockOutOfWorld) => Ok(false),
         }
     }
 }
