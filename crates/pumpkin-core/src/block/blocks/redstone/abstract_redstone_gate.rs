@@ -167,7 +167,10 @@ pub trait RedstoneGateBlock<T: Send + Sync + BlockProperties + RedstoneGateBlock
     where
         Self: Send + Sync,
     {
-        if args.moved || Block::from_state_id(args.old_state_id) == args.block {
+        // Vanilla `DiodeBlock.affectNeighborsAfterRemoval`: only a piston move skips it.
+        // (`args.block` is the removed block itself, so comparing it with the old state's
+        // block skipped every removal.)
+        if args.moved {
             return;
         }
         RedstoneGateBlock::update_target(
