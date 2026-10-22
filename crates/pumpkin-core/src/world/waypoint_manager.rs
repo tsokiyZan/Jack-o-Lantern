@@ -379,24 +379,22 @@ impl WaypointManager {
     }
 }
 
-/// Runs the scoreboard's queued `updatePlayerWaypoint` / `updateTeamWaypoints`, in order.
-/// Must be called with no scoreboard lock held (see the lock order on [`WaypointManager`]).
-pub fn apply_scoreboard_updates(
+/// Sends a world scoreboard's queued events in order.
+///
+/// Each team packet goes to the world's players, each `updatePlayerWaypoint` / `updateTeamWaypoints` as a remake. Must be called
+/// with no scoreboard lock held (see the lock order on [`WaypointManager`]).
+pub fn apply_scoreboard_events(
     world: &super::World,
-    updates: Vec<super::scoreboard::ScoreboardWaypointUpdate>,
+    events: Vec<super::scoreboard::ScoreboardEvent>,
 ) {
-    use super::scoreboard::ScoreboardWaypointUpdate;
-    if updates.is_empty() {
-        return;
-    }
-    let Some(server) = world.server.upgrade() else {
-        return;
-    };
-    for update in updates {
-        match update {
+    use super::scoreboard::ScoreboardEvent;
+    let server = world.server.upgrade();
+    for event in events {
+        match event {
+            ScoreboardEvent::TeamPacket(packet) => packet.send(world),
             // `updatePlayerWaypoint`: the online player of that name, in its own level.
-            ScoreboardWaypointUpdate::Player(name, team_color) => {
-                if let Some(player) = server.get_player_by_name(&name) {
+            ScoreboardEvent::Player(name, team_color) => {
+                if let Some(player) = server.as_ref().and_then(|s| s.get_player_by_name(&name)) {
                     player
                         .world()
                         .waypoint_manager
@@ -404,7 +402,10 @@ pub fn apply_scoreboard_updates(
                 }
             }
             // `updateTeamWaypoints`: in every level, each online player of the team.
-            ScoreboardWaypointUpdate::Team(names, team_color) => {
+            ScoreboardEvent::Team(names, team_color) => {
+                let Some(server) = server.as_ref() else {
+                    continue;
+                };
                 for level in server.worlds.load().iter() {
                     for name in &names {
                         if let Some(player) = server.get_player_by_name(name) {
@@ -447,9 +448,19 @@ impl Drop for ScoreboardGuard<'_> {
         let Some(mut guard) = self.guard.take() else {
             return;
         };
-        let updates = guard.take_waypoint_updates();
+        let events = guard.take_events();
+        if events.is_empty() {
+            return;
+        }
+        // Scoreboard, then the apply lock, then (in the remakes) the manager.
+        let apply = self
+            .world
+            .scoreboard_apply
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         drop(guard);
-        apply_scoreboard_updates(self.world, updates);
+        apply_scoreboard_events(self.world, events);
+        drop(apply);
     }
 }
 
@@ -460,12 +471,31 @@ mod tests {
 
     use pumpkin_util::text::color::NamedColor;
 
-    use crate::world::scoreboard::{NoTarget, ScoreboardWaypointUpdate, Team};
+    use crate::world::scoreboard::{NoTarget, Scoreboard, ScoreboardEvent, Team, TeamPacket};
+
+    fn summary(events: &[ScoreboardEvent]) -> Vec<String> {
+        events
+            .iter()
+            .map(|event| match event {
+                ScoreboardEvent::TeamPacket(packet) => match packet {
+                    TeamPacket::Create(team) => format!("create {}", team.name),
+                    TeamPacket::Update(team) => format!("update {}", team.name),
+                    TeamPacket::Remove(name) => format!("remove {name}"),
+                    TeamPacket::AddPlayers(name, players) => format!("add {name} {players:?}"),
+                    TeamPacket::RemovePlayers(name, players) => {
+                        format!("leave {name} {players:?}")
+                    }
+                },
+                ScoreboardEvent::Player(name, color) => format!("remake {name} {color:?}"),
+                ScoreboardEvent::Team(names, color) => format!("remake {names:?} {color:?}"),
+            })
+            .collect()
+    }
 
     /// A team change under the scoreboard lock must not enter the waypoint manager (whose
     /// connections take the scoreboard lock): with another thread holding the manager, the
-    /// change still completes, and its remakes are queued for after the unlock, in vanilla's
-    /// order and with the colour each one had.
+    /// change still completes. Its team packets and remakes are queued in vanilla's
+    /// interleaved order, each remake with the colour it had.
     #[tokio::test]
     async fn team_changes_never_take_the_manager_under_the_scoreboard_lock() {
         let (_folder, world) = crate::world::test_support::test_world();
@@ -480,38 +510,66 @@ mod tests {
                 scoreboard.add_team(&NoTarget, red);
                 scoreboard.add_team(&NoTarget, Team::new("plain".to_string()));
                 scoreboard.add_player_to_team(&NoTarget, "plain", "Bob".to_string());
+                scoreboard.add_player_to_team(&NoTarget, "red", "Ann".to_string());
                 scoreboard.add_player_to_team(&NoTarget, "red", "Bob".to_string());
                 let mut red = scoreboard.get_team("red").cloned().unwrap();
                 red.color = Some(NamedColor::Gold);
                 scoreboard.update_team(&NoTarget, red);
                 scoreboard.remove_team(&NoTarget, "red");
-                let updates = scoreboard.take_waypoint_updates();
+                let events = scoreboard.take_events();
                 done.send(()).unwrap();
-                updates
+                events
             })
         };
         let completed = finished.recv_timeout(Duration::from_secs(10)).is_ok();
         drop(manager);
-        let updates = changer.join().unwrap();
+        let events = changer.join().unwrap();
         assert!(completed, "a team change waited for the waypoint manager");
-        let summary: Vec<String> = updates
-            .iter()
-            .map(|update| match update {
-                ScoreboardWaypointUpdate::Player(name, color) => format!("player {name} {color:?}"),
-                ScoreboardWaypointUpdate::Team(names, color) => format!("team {names:?} {color:?}"),
-            })
-            .collect();
         assert_eq!(
-            summary,
+            summary(&events),
             [
-                "player Bob None",
-                "player Bob None",
-                "player Bob Some(Red)",
-                "team [\"Bob\"] Some(Gold)",
-                "team [\"Bob\"] None",
+                "create red",
+                "create plain",
+                "add plain [\"Bob\"]",
+                "remake Bob None",
+                "add red [\"Ann\"]",
+                "remake Ann Some(Red)",
+                "leave plain [\"Bob\"]",
+                "remake Bob None",
+                "add red [\"Bob\"]",
+                "remake Bob Some(Red)",
+                "update red",
+                "remake [\"Ann\", \"Bob\"] Some(Gold)",
+                "remove red",
+                "remake [\"Ann\", \"Bob\"] None",
             ]
         );
-        // The guard drains the queue when it unlocks.
-        drop(world.lock_scoreboard());
+    }
+
+    /// The guard sends what a change queued once it unlocks, so nothing stays behind.
+    #[tokio::test]
+    async fn the_guard_drains_the_queue() {
+        let (_folder, world) = crate::world::test_support::test_world();
+        let mut scoreboard = world.lock_scoreboard();
+        scoreboard.add_team(&NoTarget, Team::new("t".to_string()));
+        scoreboard.add_player_to_team(&NoTarget, "t", "Bob".to_string());
+        drop(scoreboard);
+        let mut scoreboard = world
+            .scoreboard
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        assert!(scoreboard.take_events().is_empty());
+        assert!(scoreboard.get_team("t").is_some());
+    }
+
+    /// A player's custom scoreboard isn't a `ServerScoreboard`: it sends its team packets at
+    /// once and queues nothing.
+    #[test]
+    fn custom_scoreboards_queue_nothing() {
+        let mut scoreboard = Scoreboard::default();
+        scoreboard.add_team(&NoTarget, Team::new("t".to_string()));
+        scoreboard.add_player_to_team(&NoTarget, "t", "Bob".to_string());
+        scoreboard.remove_team(&NoTarget, "t");
+        assert!(scoreboard.take_events().is_empty());
     }
 }

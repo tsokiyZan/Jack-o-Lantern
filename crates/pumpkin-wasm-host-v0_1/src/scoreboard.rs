@@ -51,9 +51,7 @@ impl scoreboard::HostScoreboard for PluginHostState {
         match provider {
             ScoreboardProvider::World(world) => {
                 world
-                    .scoreboard
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .lock_scoreboard()
                     .add_objective(world.as_ref(), objective);
             }
             ScoreboardProvider::Player(player) => {
@@ -101,9 +99,7 @@ impl scoreboard::HostScoreboard for PluginHostState {
         match provider {
             ScoreboardProvider::World(world) => {
                 world
-                    .scoreboard
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .lock_scoreboard()
                     .update_objective(world.as_ref(), objective);
             }
             ScoreboardProvider::Player(player) => {
@@ -138,9 +134,7 @@ impl scoreboard::HostScoreboard for PluginHostState {
         match provider {
             ScoreboardProvider::World(world) => {
                 world
-                    .scoreboard
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .lock_scoreboard()
                     .remove_objective(world.as_ref(), &name);
             }
             ScoreboardProvider::Player(player) => {
@@ -169,11 +163,11 @@ impl scoreboard::HostScoreboard for PluginHostState {
 
         match provider {
             ScoreboardProvider::World(world) => {
-                world
-                    .scoreboard
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .set_display_objective(world.as_ref(), slot, Some(&objective_name));
+                world.lock_scoreboard().set_display_objective(
+                    world.as_ref(),
+                    slot,
+                    Some(&objective_name),
+                );
             }
             ScoreboardProvider::Player(player) => {
                 let mut custom_guard = player
@@ -209,9 +203,7 @@ impl scoreboard::HostScoreboard for PluginHostState {
         match provider {
             ScoreboardProvider::World(world) => {
                 world
-                    .scoreboard
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .lock_scoreboard()
                     .clear_display_objective(world.as_ref(), slot);
             }
             ScoreboardProvider::Player(player) => {
@@ -242,11 +234,7 @@ impl scoreboard::HostScoreboard for PluginHostState {
         let score = ScoreboardScore::new(entity_name, objective_name, VarInt(value), None, nf);
         match provider {
             ScoreboardProvider::World(world) => {
-                world
-                    .scoreboard
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .update_score(world.as_ref(), score);
+                world.lock_scoreboard().update_score(world.as_ref(), score);
             }
             ScoreboardProvider::Player(player) => {
                 let mut custom_guard = player
@@ -280,11 +268,12 @@ impl scoreboard::HostScoreboard for PluginHostState {
     ) -> wasmtime::Result<i32> {
         let provider = self.get(&res)?.clone();
         let new_val = match provider {
-            ScoreboardProvider::World(world) => world
-                .scoreboard
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .add_score(world.as_ref(), entity_name, objective_name, delta),
+            ScoreboardProvider::World(world) => world.lock_scoreboard().add_score(
+                world.as_ref(),
+                entity_name,
+                objective_name,
+                delta,
+            ),
             ScoreboardProvider::Player(player) => {
                 let mut custom_guard = player
                     .custom_scoreboard
@@ -319,9 +308,7 @@ impl scoreboard::HostScoreboard for PluginHostState {
         match provider {
             ScoreboardProvider::World(world) => {
                 world
-                    .scoreboard
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .lock_scoreboard()
                     .remove_score(world.as_ref(), &entity_name, &objective_name);
             }
             ScoreboardProvider::Player(player) => {
@@ -348,9 +335,7 @@ impl scoreboard::HostScoreboard for PluginHostState {
         match provider {
             ScoreboardProvider::World(world) => {
                 world
-                    .scoreboard
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .lock_scoreboard()
                     .reset_scores_for_entity(world.as_ref(), &entity_name);
             }
             ScoreboardProvider::Player(player) => {
@@ -378,11 +363,7 @@ impl scoreboard::HostScoreboard for PluginHostState {
         let team = map_team_settings(name, settings, self)?;
         match provider {
             ScoreboardProvider::World(world) => {
-                world
-                    .scoreboard
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .add_team(world.as_ref(), team);
+                world.lock_scoreboard().add_team(world.as_ref(), team);
             }
             ScoreboardProvider::Player(player) => {
                 let mut custom_guard = player
@@ -415,11 +396,7 @@ impl scoreboard::HostScoreboard for PluginHostState {
         let provider = self.get(&res)?.clone();
         match provider {
             ScoreboardProvider::World(world) => {
-                world
-                    .scoreboard
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .remove_team(world.as_ref(), &name);
+                world.lock_scoreboard().remove_team(world.as_ref(), &name);
             }
             ScoreboardProvider::Player(player) => {
                 let mut custom_guard = player
@@ -446,11 +423,7 @@ impl scoreboard::HostScoreboard for PluginHostState {
         let team = map_team_settings(name, settings, self)?;
         match provider {
             ScoreboardProvider::World(world) => {
-                world
-                    .scoreboard
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .update_team(world.as_ref(), team);
+                world.lock_scoreboard().update_team(world.as_ref(), team);
             }
             ScoreboardProvider::Player(player) => {
                 let mut custom_guard = player
@@ -477,9 +450,7 @@ impl scoreboard::HostScoreboard for PluginHostState {
         match provider {
             ScoreboardProvider::World(world) => {
                 world
-                    .scoreboard
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .lock_scoreboard()
                     .add_player_to_team(world.as_ref(), &team_name, player_name);
             }
             ScoreboardProvider::Player(player) => {
@@ -506,11 +477,11 @@ impl scoreboard::HostScoreboard for PluginHostState {
         let provider = self.get(&res)?.clone();
         match provider {
             ScoreboardProvider::World(world) => {
-                world
-                    .scoreboard
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .remove_player_from_team(world.as_ref(), &team_name, &player_name);
+                world.lock_scoreboard().remove_player_from_team(
+                    world.as_ref(),
+                    &team_name,
+                    &player_name,
+                );
             }
             ScoreboardProvider::Player(player) => {
                 let mut custom_guard = player
@@ -536,9 +507,7 @@ impl scoreboard::HostScoreboard for PluginHostState {
         match provider {
             ScoreboardProvider::World(world) => {
                 world
-                    .scoreboard
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .lock_scoreboard()
                     .clear_team_players(world.as_ref(), &team_name);
             }
             ScoreboardProvider::Player(player) => {
@@ -563,9 +532,7 @@ impl scoreboard::HostScoreboard for PluginHostState {
         let provider = self.get(&res)?.clone();
         let teams = match provider {
             ScoreboardProvider::World(world) => world
-                .scoreboard
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .lock_scoreboard()
                 .get_teams()
                 .keys()
                 .cloned()
@@ -594,12 +561,7 @@ impl scoreboard::HostScoreboard for PluginHostState {
     ) -> wasmtime::Result<Option<TeamSettings>> {
         let provider = self.get(&res)?.clone();
         let team_opt = match provider {
-            ScoreboardProvider::World(world) => world
-                .scoreboard
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .get_team(&name)
-                .cloned(),
+            ScoreboardProvider::World(world) => world.lock_scoreboard().get_team(&name).cloned(),
             ScoreboardProvider::Player(player) => {
                 let custom_guard = player
                     .custom_scoreboard
@@ -630,9 +592,7 @@ impl scoreboard::HostScoreboard for PluginHostState {
         let provider = self.get(&res)?.clone();
         let players = match provider {
             ScoreboardProvider::World(world) => world
-                .scoreboard
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .lock_scoreboard()
                 .get_team(&team_name)
                 .map(|t| t.players.clone())
                 .unwrap_or_default(),
@@ -663,9 +623,7 @@ impl scoreboard::HostScoreboard for PluginHostState {
         let provider = self.get(&res)?.clone();
         let team_name = match provider {
             ScoreboardProvider::World(world) => world
-                .scoreboard
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .lock_scoreboard()
                 .get_entity_team(&player_name)
                 .map(|t| t.name.clone()),
             ScoreboardProvider::Player(player) => {

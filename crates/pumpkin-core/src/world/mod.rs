@@ -267,6 +267,10 @@ pub struct World {
     pub entities: ArcSwap<Vec<Arc<dyn EntityBase>>>,
     /// The world's scoreboard, used for tracking scores, objectives, and display information.
     pub scoreboard: std::sync::Mutex<Scoreboard>,
+    /// Held from just before a `lock_scoreboard` guard unlocks the scoreboard until its queued
+    /// team packets and waypoint remakes are sent, so two changes apply in the order they were
+    /// made. Lock order: scoreboard, then this, then the waypoint manager.
+    pub(crate) scoreboard_apply: std::sync::Mutex<()>,
     /// The world's worldborder, defining the playable area and controlling its expansion or contraction.
     pub worldborder: std::sync::Mutex<Worldborder>,
     /// Vanilla `ServerLevel.sleepStatus`.
@@ -441,7 +445,8 @@ impl World {
             level_info,
             players: ArcSwap::new(Arc::new(Vec::new())),
             entities: ArcSwap::new(Arc::new(Vec::new())),
-            scoreboard: std::sync::Mutex::new(Scoreboard::default()),
+            scoreboard: std::sync::Mutex::new(Scoreboard::for_world()),
+            scoreboard_apply: std::sync::Mutex::new(()),
             worldborder: std::sync::Mutex::new(worldborder),
             sleep_status: std::sync::Mutex::new(SleepStatus::default()),
             random: std::sync::Mutex::new(
@@ -5141,11 +5146,12 @@ impl World {
     }
 
     /// Gets a `Player` by an entity id
-    /// Locks the world scoreboard for a change that may move players between teams. The
-    /// guard runs the waypoint remakes the change queued (`ServerScoreboard`'s
-    /// `updatePlayerWaypoint` / `updateTeamWaypoints`) after releasing the lock: the waypoint
+    /// Locks the world scoreboard; use it for any team change. The guard sends what the change
+    /// queued (team packets, and `ServerScoreboard`'s `updatePlayerWaypoint` /
+    /// `updateTeamWaypoints` right after each) once the lock is released: the waypoint
     /// manager reads the scoreboard under its own lock, so it must never be entered with the
-    /// scoreboard held.
+    /// scoreboard held. A team change made through a plain `scoreboard.lock()` stays queued
+    /// until the next guard.
     pub fn lock_scoreboard(&self) -> waypoint_manager::ScoreboardGuard<'_> {
         waypoint_manager::ScoreboardGuard {
             world: self,

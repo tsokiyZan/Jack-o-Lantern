@@ -128,16 +128,71 @@ pub struct Scoreboard {
     tracked_players: OpenHashKeys,
     /// The names in vanilla's `Scoreboard.teamsByName`, in that map's order.
     team_names: OpenHashKeys,
-    /// `ServerScoreboard.updatePlayerWaypoint` / `updateTeamWaypoints` calls made since the
-    /// last [`Scoreboard::take_waypoint_updates`]. They run once the scoreboard lock is
-    /// dropped (see `World::lock_scoreboard`), never under it.
-    waypoint_updates: Vec<ScoreboardWaypointUpdate>,
+    /// Whether this is a world's scoreboard (vanilla's `ServerScoreboard`): its team packets
+    /// and waypoint remakes are queued in `events` and sent, in vanilla's order, once the
+    /// scoreboard lock is dropped (`World::lock_scoreboard`). Any other scoreboard (a player's
+    /// custom one) sends its team packets to its target at once and remakes nothing.
+    queues_for_world: bool,
+    /// The queued team packets and remakes, see `queues_for_world`.
+    events: Vec<ScoreboardEvent>,
 }
 
-/// A waypoint remake the scoreboard owes, with the team colour at the time of the change
-/// (a team switch remakes twice, first without the old team's colour, as vanilla).
+/// A `ClientboundSetPlayerTeamPacket`, owned so it can wait in the queue.
 #[derive(Clone, Debug)]
-pub enum ScoreboardWaypointUpdate {
+pub enum TeamPacket {
+    Create(Team),
+    Update(Team),
+    Remove(String),
+    AddPlayers(String, Vec<String>),
+    RemovePlayers(String, Vec<String>),
+}
+
+impl TeamPacket {
+    pub fn send(&self, target: &impl ScoreboardTarget) {
+        let packet = match self {
+            Self::Create(team) => CSetPlayerTeam {
+                team_name: team.name.clone(),
+                method: TeamMethod::Create,
+                parameters: Some(team.parameters()),
+                players: team.players.clone().into(),
+            },
+            Self::Update(team) => CSetPlayerTeam {
+                team_name: team.name.clone(),
+                method: TeamMethod::Update,
+                parameters: Some(team.parameters()),
+                players: Box::new([]),
+            },
+            Self::Remove(name) => CSetPlayerTeam {
+                team_name: name.clone(),
+                method: TeamMethod::Remove,
+                parameters: None,
+                players: Box::new([]),
+            },
+            Self::AddPlayers(name, players) => CSetPlayerTeam {
+                team_name: name.clone(),
+                method: TeamMethod::AddPlayers,
+                parameters: None,
+                players: players.clone().into(),
+            },
+            Self::RemovePlayers(name, players) => CSetPlayerTeam {
+                team_name: name.clone(),
+                method: TeamMethod::RemovePlayers,
+                parameters: None,
+                players: players.clone().into(),
+            },
+        };
+        target.send_je(&packet);
+    }
+}
+
+/// What a world scoreboard's change owes once its lock is dropped.
+///
+/// In vanilla's order: each team packet followed by the waypoint remake `ServerScoreboard` makes right after it, with
+/// the team colour at that moment (a team switch remakes first without a colour).
+#[derive(Clone, Debug)]
+pub enum ScoreboardEvent {
+    /// Broadcast to the world's players.
+    TeamPacket(TeamPacket),
     /// `updatePlayerWaypoint(name)`.
     Player(String, Option<NamedColor>),
     /// `updateTeamWaypoints(team)`: the team's players.
@@ -153,7 +208,8 @@ impl Default for Scoreboard {
             teams: FxHashMap::default(),
             tracked_players: OpenHashKeys::new(PLAYER_SCORES_EXPECTED, PLAYER_SCORES_LOAD_FACTOR),
             team_names: OpenHashKeys::default(),
-            waypoint_updates: Vec::new(),
+            queues_for_world: false,
+            events: Vec::new(),
         }
     }
 }
@@ -538,10 +594,34 @@ impl Scoreboard {
         self.tracked_players.remove(entity_name);
     }
 
-    /// The waypoint remakes queued since the last call. `World::lock_scoreboard`'s guard runs
-    /// them after the lock is released.
-    pub fn take_waypoint_updates(&mut self) -> Vec<ScoreboardWaypointUpdate> {
-        std::mem::take(&mut self.waypoint_updates)
+    /// A world's scoreboard (`ServerScoreboard`): team packets and waypoint remakes queue up
+    /// for `World::lock_scoreboard`'s guard.
+    #[must_use]
+    pub fn for_world() -> Self {
+        Self {
+            queues_for_world: true,
+            ..Self::default()
+        }
+    }
+
+    /// The team packets and remakes queued since the last call, in order.
+    pub fn take_events(&mut self) -> Vec<ScoreboardEvent> {
+        std::mem::take(&mut self.events)
+    }
+
+    fn team_packet(&mut self, target: &impl ScoreboardTarget, packet: TeamPacket) {
+        if self.queues_for_world {
+            self.events.push(ScoreboardEvent::TeamPacket(packet));
+        } else {
+            packet.send(target);
+        }
+    }
+
+    /// `updatePlayerWaypoint` / `updateTeamWaypoints`: only a world's scoreboard remakes.
+    fn waypoint_event(&mut self, event: ScoreboardEvent) {
+        if self.queues_for_world {
+            self.events.push(event);
+        }
     }
 
     pub fn add_team(&mut self, target: &impl ScoreboardTarget, team: Team) {
@@ -550,12 +630,7 @@ impl Scoreboard {
             return;
         }
 
-        target.send_je(&CSetPlayerTeam {
-            team_name: team.name.clone(),
-            method: TeamMethod::Create,
-            parameters: Some(team.parameters()),
-            players: team.players.clone().into(),
-        });
+        self.team_packet(target, TeamPacket::Create(team.clone()));
 
         self.team_names.insert(&team.name);
         self.teams.insert(team.name.clone(), team);
@@ -571,18 +646,12 @@ impl Scoreboard {
             return;
         }
 
-        target.send_je(&CSetPlayerTeam {
-            team_name: team.name.clone(),
-            method: TeamMethod::Update,
-            parameters: Some(team.parameters()),
-            players: Box::new([]),
-        });
+        self.team_packet(target, TeamPacket::Update(team.clone()));
 
         // `onTeamChanged`: the packet, then `updateTeamWaypoints`.
         let (players, color) = (team.players.clone(), team.color);
         self.teams.insert(team.name.clone(), team);
-        self.waypoint_updates
-            .push(ScoreboardWaypointUpdate::Team(players, color));
+        self.waypoint_event(ScoreboardEvent::Team(players, color));
     }
 
     pub fn remove_team(&mut self, target: &impl ScoreboardTarget, name: &str) {
@@ -591,19 +660,13 @@ impl Scoreboard {
             return;
         }
 
-        target.send_je(&CSetPlayerTeam {
-            team_name: name.to_string(),
-            method: TeamMethod::Remove,
-            parameters: None,
-            players: Box::new([]),
-        });
+        self.team_packet(target, TeamPacket::Remove(name.to_string()));
 
         self.team_names.remove(name);
         // `onTeamRemoved`: the packet, then `updateTeamWaypoints` with the players no longer
         // on any team.
         if let Some(team) = self.teams.remove(name) {
-            self.waypoint_updates
-                .push(ScoreboardWaypointUpdate::Team(team.players, None));
+            self.waypoint_event(ScoreboardEvent::Team(team.players, None));
         }
     }
 
@@ -625,20 +688,18 @@ impl Scoreboard {
 
         self.remove_player_from_any_team(target, &player);
 
-        target.send_je(&CSetPlayerTeam {
-            team_name: team_name.to_string(),
-            method: TeamMethod::AddPlayers,
-            parameters: None,
-            players: vec![player.clone()].into(),
-        });
+        self.team_packet(
+            target,
+            TeamPacket::AddPlayers(team_name.to_string(), vec![player.clone()]),
+        );
 
-        // `ServerScoreboard.addPlayerToTeam`: the packet, then `updatePlayerWaypoint` (queued
-        // with the new team's colour).
-        if let Some(team) = self.teams.get_mut(team_name) {
-            self.waypoint_updates
-                .push(ScoreboardWaypointUpdate::Player(player.clone(), team.color));
-            team.players.push(player);
-        }
+        // `ServerScoreboard.addPlayerToTeam`: the packet, then `updatePlayerWaypoint` (with
+        // the new team's colour).
+        let color = self.teams.get_mut(team_name).and_then(|team| {
+            team.players.push(player.clone());
+            team.color
+        });
+        self.waypoint_event(ScoreboardEvent::Player(player, color));
         true
     }
 
@@ -673,17 +734,13 @@ impl Scoreboard {
             return;
         }
 
-        target.send_je(&CSetPlayerTeam {
-            team_name: team_name.to_string(),
-            method: TeamMethod::RemovePlayers,
-            parameters: None,
-            players: vec![player.to_string()].into(),
-        });
-
         team.players.retain(|p| p != player);
         // `ServerScoreboard.removePlayerFromTeam`: the packet, then `updatePlayerWaypoint`.
-        self.waypoint_updates
-            .push(ScoreboardWaypointUpdate::Player(player.to_string(), None));
+        self.team_packet(
+            target,
+            TeamPacket::RemovePlayers(team_name.to_string(), vec![player.to_string()]),
+        );
+        self.waypoint_event(ScoreboardEvent::Player(player.to_string(), None));
     }
 
     pub fn clear_team_players(&mut self, target: &impl ScoreboardTarget, team_name: &str) {
@@ -699,18 +756,13 @@ impl Scoreboard {
             return;
         }
 
-        let players_to_remove = team.players.clone();
-        target.send_je(&CSetPlayerTeam {
-            team_name: team_name.to_string(),
-            method: TeamMethod::RemovePlayers,
-            parameters: None,
-            players: players_to_remove.clone().into(),
-        });
-
-        team.players.clear();
-        for player in &players_to_remove {
-            self.waypoint_updates
-                .push(ScoreboardWaypointUpdate::Player(player.clone(), None));
+        let players_to_remove = std::mem::take(&mut team.players);
+        self.team_packet(
+            target,
+            TeamPacket::RemovePlayers(team_name.to_string(), players_to_remove.clone()),
+        );
+        for player in players_to_remove {
+            self.waypoint_event(ScoreboardEvent::Player(player, None));
         }
     }
 
