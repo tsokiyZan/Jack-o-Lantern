@@ -1,7 +1,6 @@
 //! Vanilla `SulfurCube`: a passive cube mob that swallows a block and takes on its
 //! `SulfurCubeArchetype`.
 
-use crate::enchantment::HurtAndBreak;
 use crate::item::interaction_result::InteractionResult;
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering::Relaxed};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError, Weak};
@@ -23,7 +22,7 @@ use pumpkin_data::tag::{self, Taggable};
 use pumpkin_data::tracked_data;
 use pumpkin_data::translation;
 use pumpkin_nbt::compound::NbtCompound;
-use pumpkin_util::GameMode;
+use pumpkin_util::Hand;
 use pumpkin_util::math::boundingbox::BoundingBox;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
@@ -900,6 +899,7 @@ impl CubeMobEntity {
     pub(super) fn sulfur_mob_interact(
         &self,
         player: &Arc<Player>,
+        hand: Hand,
         stack: &mut ItemStack,
     ) -> InteractionResult {
         let entity = self.get_entity();
@@ -930,13 +930,10 @@ impl CubeMobEntity {
                 return InteractionResult::PASS;
             }
             self.prime_time(false);
-            if game_mode != GameMode::Creative {
-                if stack.item == &Item::FLINT_AND_STEEL {
-                    let _ =
-                        stack.hurt_and_break(&self.mob_entity.living_entity.entity.world.load(), 1);
-                } else {
-                    stack.decrement(1);
-                }
+            if stack.item == &Item::FLINT_AND_STEEL {
+                player.hurt_and_break_in_hand(stack, hand, 1);
+            } else {
+                stack.decrement_unless_creative(game_mode, 1);
             }
             player.award_item_used(stack.item);
             return InteractionResult::SUCCESS_SERVER;
@@ -949,9 +946,7 @@ impl CubeMobEntity {
                 GameEvent::Shear,
                 entity.pos.load(),
             );
-            if game_mode != GameMode::Creative {
-                let _ = stack.hurt_and_break(&self.mob_entity.living_entity.entity.world.load(), 1);
-            }
+            player.hurt_and_break_in_hand(stack, hand, 1);
             return InteractionResult::SUCCESS;
         }
 

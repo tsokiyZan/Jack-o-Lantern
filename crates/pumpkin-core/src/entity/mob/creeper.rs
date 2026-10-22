@@ -5,13 +5,12 @@ use std::sync::{
     atomic::{AtomicBool, AtomicI32, Ordering},
 };
 
-use crate::enchantment::HurtAndBreak;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::tag::Taggable;
 use pumpkin_data::{entity::EntityType, game_event::GameEvent, item::Item, sound::Sound, tag};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::codec::var_int::VarInt;
-use pumpkin_util::{GameMode, random::RandomImpl};
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::{
     Entity, EntityBase,
@@ -308,7 +307,7 @@ impl Mob for CreeperEntity {
     fn mob_interact(
         &self,
         player: &Arc<Player>,
-        _hand: Hand,
+        hand: Hand,
         item_stack: &mut ItemStack,
     ) -> InteractionResult {
         if !item_stack
@@ -337,11 +336,10 @@ impl Mob for CreeperEntity {
         );
 
         self.set_ignited(true);
-        if !item_stack.is_damageable() {
+        if item_stack.is_damageable() {
+            player.hurt_and_break_in_hand(item_stack, hand, 1);
+        } else {
             item_stack.decrement(1);
-        } else if !matches!(player.gamemode.load(), GameMode::Creative) {
-            // `hurtAndBreak(1, player, slot)`; the interact handler applies a break.
-            let _ = item_stack.hurt_and_break(&world, 1);
         }
 
         InteractionResult::SUCCESS

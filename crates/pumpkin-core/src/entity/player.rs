@@ -1849,61 +1849,82 @@ impl Player {
         slot: &EquipmentSlot,
         amount: i32,
     ) -> bool {
+        let mut stack = self.inventory.get_slot(slot_index);
+        let result = self.hurt_and_break_stack(&mut stack, slot, amount);
+        if result == pumpkin_data::item_stack::DamageResult::Untouched {
+            return false;
+        }
+        self.inventory.set_slot(slot_index, stack.clone());
+        self.try_send_slot_set_packet(&CSetPlayerInventory::new(
+            (slot_index as i32).into(),
+            &ItemStackSerializer::from(stack),
+        ));
+        self.sync_inventory_to_client();
+        true
+    }
+
+    /// Vanilla `ItemStack.hurtAndBreak(amount, player, slot)` on `stack`, a copy of the stack
+    /// held in `slot` that the caller writes back: the wear, and when it breaks, the player's
+    /// `onEquippedItemBroken` and `Broken` stat. A player with infinite materials takes none.
+    pub fn hurt_and_break_stack(
+        &self,
+        stack: &mut ItemStack,
+        slot: &EquipmentSlot,
+        amount: i32,
+    ) -> pumpkin_data::item_stack::DamageResult {
         if matches!(
             self.gamemode.load(),
             GameMode::Creative | GameMode::Spectator
         ) {
-            return false;
+            return pumpkin_data::item_stack::DamageResult::Untouched;
         }
-
-        let mut stack = self.inventory.get_slot(slot_index);
         let original = stack.clone();
         let original_item = stack.item;
         let result = stack.hurt_and_break(&self.world(), amount);
-        let updated = (result != pumpkin_data::item_stack::DamageResult::Untouched)
-            .then_some((result, stack.clone()));
-
-        if let Some((result, updated_stack)) = updated {
-            self.inventory.set_slot(slot_index, updated_stack.clone());
-            if let Some(server) = self.world().server.upgrade()
-                && let Some(player_arc) = self.world().get_player_by_uuid(self.gameprofile.id)
-            {
-                let mut event = crate::plugin::api::events::player::player_item_damage::PlayerItemDamageEvent::new(
+        if result == pumpkin_data::item_stack::DamageResult::Untouched {
+            return result;
+        }
+        if let Some(server) = self.world().server.upgrade()
+            && let Some(player_arc) = self.world().get_player_by_uuid(self.gameprofile.id)
+        {
+            let mut event =
+                crate::plugin::api::events::player::player_item_damage::PlayerItemDamageEvent::new(
                     player_arc,
                     original_item.registry_key.to_string(),
                     amount,
                 );
+            server.plugin_manager.fire_blocking(&server, &mut event);
+        }
+        if result == pumpkin_data::item_stack::DamageResult::Broken {
+            if let Some(server) = self.world().server.upgrade()
+                && let Some(player_arc) = self.world().get_player_by_uuid(self.gameprofile.id)
+            {
+                let mut event = crate::plugin::api::events::player::player_item_break::PlayerItemBreakEvent::new(
+                    player_arc,
+                    original_item.registry_key.to_string(),
+                );
                 server.plugin_manager.fire_blocking(&server, &mut event);
             }
-            if result == pumpkin_data::item_stack::DamageResult::Broken {
-                if let Some(server) = self.world().server.upgrade()
-                    && let Some(player_arc) = self.world().get_player_by_uuid(self.gameprofile.id)
-                {
-                    let mut event = crate::plugin::api::events::player::player_item_break::PlayerItemBreakEvent::new(
-                        player_arc,
-                        original_item.registry_key.to_string(),
-                    );
-                    server.plugin_manager.fire_blocking(&server, &mut event);
-                }
-                // `ServerPlayer.onEquippedItemBroken`: `super` first, then the stat.
-                self.living_entity.on_equipped_item_broken(&original, slot);
-                self.increment_stat(
-                    statistics::StatisticCategory::Broken,
-                    original_item.id as i32,
-                    1,
-                );
-            }
-
-            self.try_send_slot_set_packet(&CSetPlayerInventory::new(
-                (slot_index as i32).into(),
-                &ItemStackSerializer::from(updated_stack),
-            ));
-            self.sync_inventory_to_client();
-
-            return true;
+            // `ServerPlayer.onEquippedItemBroken`: `super` first, then the stat.
+            self.living_entity.on_equipped_item_broken(&original, slot);
+            self.increment_stat(
+                statistics::StatisticCategory::Broken,
+                original_item.id as i32,
+                1,
+            );
         }
+        result
+    }
 
-        false
+    /// [`Self::hurt_and_break_stack`] for `stack`, the interaction's copy of the stack in
+    /// `hand`.
+    pub fn hurt_and_break_in_hand(
+        &self,
+        stack: &mut ItemStack,
+        hand: Hand,
+        amount: i32,
+    ) -> pumpkin_data::item_stack::DamageResult {
+        self.hurt_and_break_stack(stack, &hand_equipment_slot(hand), amount)
     }
 
     /// Convenience wrapper – damages the currently held (main-hand) item.
@@ -3649,15 +3670,6 @@ impl Player {
         // `setItemInHand`, only for a stack the interaction changed; behaviours that write
         // the hand slot themselves (wear, `addItem`) leave it as they put it.
         if !stack.are_equal(&before) {
-            // The stack broke: `hurtAndBreak`'s `onEquippedItemBroken`.
-            if before.is_damageable() && stack.is_empty() {
-                self.increment_stat(StatisticCategory::Broken, before.item.id as i32, 1);
-                self.world().send_entity_status(
-                    self.get_entity(),
-                    crate::entity::equipment_break_status(&hand_equipment_slot(hand)),
-                    None,
-                );
-            }
             inventory.set_stack_in_hand(hand, stack);
         }
         result

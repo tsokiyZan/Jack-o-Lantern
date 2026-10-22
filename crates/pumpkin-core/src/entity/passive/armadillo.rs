@@ -5,7 +5,6 @@ use std::sync::{
     atomic::{AtomicI32, AtomicU64, Ordering},
 };
 
-use crate::enchantment::HurtAndBreak;
 use pumpkin_data::damage::DamageType;
 use pumpkin_data::entity::EntityPose;
 use pumpkin_data::entity::EntityType;
@@ -16,7 +15,6 @@ use pumpkin_data::sound::Sound;
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::codec::var_int::VarInt;
-use pumpkin_util::GameMode;
 use pumpkin_util::math::boundingbox::EntityDimensions;
 use pumpkin_util::random::RandomImpl;
 
@@ -549,14 +547,11 @@ impl Mob for ArmadilloEntity {
     fn mob_interact(
         &self,
         player: &Arc<Player>,
-        _hand: Hand,
+        hand: Hand,
         item_stack: &mut ItemStack,
     ) -> InteractionResult {
         if item_stack.item == &Item::BRUSH && self.brush_off_scute(item_stack) {
-            // Vanilla `hurtAndBreak`: a player with infinite materials keeps the brush whole.
-            if player.gamemode.load() != GameMode::Creative {
-                let _ = item_stack.hurt_and_break(&player.world(), BRUSH_DURABILITY_COST);
-            }
+            player.hurt_and_break_in_hand(item_stack, hand, BRUSH_DURABILITY_COST);
             return InteractionResult::SUCCESS;
         }
         if self.is_scared() {

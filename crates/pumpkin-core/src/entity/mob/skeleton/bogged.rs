@@ -1,4 +1,3 @@
-use crate::enchantment::HurtAndBreak;
 use crate::item::interaction_result::InteractionResult;
 use pumpkin_util::Hand;
 use std::sync::Arc;
@@ -12,7 +11,6 @@ use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_data::tracked_data;
 use pumpkin_nbt::compound::NbtCompound;
-use pumpkin_util::GameMode;
 use pumpkin_util::math::vector3::Vector3;
 
 use crate::entity::item::ItemEntity;
@@ -153,7 +151,7 @@ impl Mob for BoggedSkeletonEntity {
     fn mob_interact(
         &self,
         player: &Arc<Player>,
-        _hand: Hand,
+        hand: Hand,
         item_stack: &mut ItemStack,
     ) -> InteractionResult {
         if item_stack.item != &Item::SHEARS || !self.ready_for_shearing() {
@@ -166,9 +164,7 @@ impl Mob for BoggedSkeletonEntity {
             GameEvent::Shear,
             entity.pos.load(),
         );
-        if player.gamemode.load() != GameMode::Creative {
-            let _ = item_stack.hurt_and_break(&entity.world.load(), 1);
-        }
+        player.hurt_and_break_in_hand(item_stack, hand, 1);
         InteractionResult::SUCCESS
     }
 }

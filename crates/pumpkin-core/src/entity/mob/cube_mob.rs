@@ -758,11 +758,11 @@ impl Mob for CubeMobEntity {
     fn mob_interact(
         &self,
         player: &Arc<Player>,
-        _hand: Hand,
+        hand: Hand,
         item_stack: &mut ItemStack,
     ) -> InteractionResult {
         if self.kind == CubeKind::SulfurCube {
-            return self.sulfur_mob_interact(player, item_stack);
+            return self.sulfur_mob_interact(player, hand, item_stack);
         }
         InteractionResult::PASS
     }
