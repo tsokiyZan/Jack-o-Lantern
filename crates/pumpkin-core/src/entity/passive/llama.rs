@@ -340,6 +340,11 @@ impl Mob for LlamaEntity {
         false
     }
 
+    /// Vanilla `Llama.followLeashSpeed`.
+    fn follow_leash_speed(&self) -> f64 {
+        2.0
+    }
+
     fn mob_after_position_rider(&self, passenger: &dyn EntityBase) {
         self.turn_rider_body(passenger);
     }

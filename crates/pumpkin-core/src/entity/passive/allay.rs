@@ -313,12 +313,6 @@ impl AllayEntity {
         self.liked_player.store(player);
     }
 
-    fn is_panicking(&self) -> bool {
-        self.mob_entity.with_brain(self, |tick| {
-            tick.brain.has_memory_value(types::IS_PANICKING.id())
-        })
-    }
-
     /// Vanilla `Allay.setJukeboxPlaying`.
     pub fn set_jukebox_playing(&self, jukebox: BlockPos, is_playing: bool) {
         if is_playing {
@@ -481,6 +475,11 @@ impl AllayEntity {
 impl Mob for AllayEntity {
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
+    }
+
+    /// Vanilla `Allay.shouldStayCloseToLeashHolder`.
+    fn should_stay_close_to_leash_holder(&self) -> bool {
+        false
     }
 
     fn make_brain(&self, packed: &PackedMemories) -> Brain {

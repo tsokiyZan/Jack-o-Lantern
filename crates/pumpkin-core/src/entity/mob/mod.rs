@@ -1287,6 +1287,12 @@ impl MobEntity {
             >= DAYLIGHT_BRIGHTNESS
     }
 
+    /// Vanilla `Mob.setHomeTo`.
+    pub fn set_home_to(&self, pos: BlockPos, radius: i32) {
+        self.position_target.store(pos);
+        self.position_target_range.store(radius, Relaxed);
+    }
+
     /// Vanilla `Mob.clearHome`.
     pub fn clear_home(&self) {
         self.position_target_range.store(-1, Relaxed);
@@ -2564,18 +2570,74 @@ pub trait Mob: EntityBase + Send + Sync {
         false
     }
 
-    /// Vanilla `Leashable.whenLeashedTo`; `caller` is this mob.
+    /// Vanilla `Leashable.whenLeashedTo`, with `PathfinderMob`'s override: a pathfinder mob's
+    /// home becomes the holder's block, within the elastic distance less one. `caller` is
+    /// this mob.
     fn when_leashed_to(&self, caller: &dyn EntityBase, holder: &dyn EntityBase) {
+        if is_pathfinder_mob(caller) {
+            self.get_mob_entity().set_home_to(
+                holder.get_entity().block_pos.load(),
+                Mob::leash_elastic_distance(self) as i32 - 1,
+            );
+        }
         holder.notify_leash_holder(caller);
     }
 
-    /// Vanilla `Leashable.leashTooFarBehaviour`: `dropLeash()`.
+    /// Vanilla `Mob.leashTooFarBehaviour`: `Leashable`'s `dropLeash()`, then the goals lose
+    /// the MOVE flag (`updateControlFlags` gives it back).
     fn leash_too_far_behaviour(&self, caller: &dyn EntityBase) {
         crate::entity::leashable::drop_leash(caller, true, true);
+        self.get_mob_entity()
+            .goals_selector
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .disable_control(Controls::MOVE);
     }
 
-    /// Vanilla `Leashable.closeRangeLeashBehaviour`.
-    fn close_range_leash_behaviour(&self, _caller: &dyn EntityBase, _holder: &dyn EntityBase) {}
+    /// Vanilla `PathfinderMob.closeRangeLeashBehaviour` (`Leashable`'s is empty): unless it
+    /// panics, a mob that stays close walks to 2 blocks short of the holder.
+    fn close_range_leash_behaviour(&self, caller: &dyn EntityBase, holder: &dyn EntityBase) {
+        if !is_pathfinder_mob(caller) || !self.should_stay_close_to_leash_holder() {
+            return;
+        }
+        if caller.is_panicking() {
+            return;
+        }
+        let mob_entity = self.get_mob_entity();
+        mob_entity
+            .goals_selector
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .enable_control(Controls::MOVE);
+        let pos = self.get_entity().pos.load();
+        let holder_pos = holder.get_entity().pos.load();
+        // `Entity.distanceTo`, in floats.
+        let xd = (pos.x - holder_pos.x) as f32;
+        let yd = (pos.y - holder_pos.y) as f32;
+        let zd = (pos.z - holder_pos.z) as f32;
+        let distance_to = (xd * xd + yd * yd + zd * zd).sqrt();
+        let delta = (holder_pos - pos).normalize() * f64::from((distance_to - 2.0f32).max(0.0));
+        let speed = self.follow_leash_speed();
+        mob_entity.with_navigation(|navigation, owner| {
+            navigation.move_to_coords(
+                pos.x + delta.x,
+                pos.y + delta.y,
+                pos.z + delta.z,
+                speed,
+                &owner.living_entity,
+            );
+        });
+    }
+
+    /// Vanilla `PathfinderMob.shouldStayCloseToLeashHolder`.
+    fn should_stay_close_to_leash_holder(&self) -> bool {
+        true
+    }
+
+    /// Vanilla `PathfinderMob.followLeashSpeed`.
+    fn follow_leash_speed(&self) -> f64 {
+        1.0
+    }
 
     /// Vanilla `Leashable.onElasticLeashPull`.
     fn on_elastic_leash_pull(&self, _caller: &dyn EntityBase) {
@@ -3768,11 +3830,21 @@ impl<T: Mob + Send + 'static> EntityBase for T {
             .store(ticks, Relaxed);
     }
 
-    /// Vanilla `PathfinderMob.isPanicking` for goal-driven mobs: a running `PanicGoal`.
-    /// Inside the mob's own AI tick its selector is detached and this answers `false`.
-    // TODO: brain mobs answer from their `is_panicking` memory, which needs the brain lock.
+    /// Vanilla `PathfinderMob.isPanicking`: a live brain's `IS_PANICKING` memory, else a
+    /// running `PanicGoal`.
+    ///
+    /// The brain is only held by this mob's own brain tick, whose callers read the memory from
+    /// the tick instead (`AnimalMakeLove`); a contended lock reads as "no memory". Inside the
+    /// mob's own AI tick its selector is detached and the goal check answers `false`.
     fn is_panicking(&self) -> bool {
-        self.get_mob_entity()
+        let mob_entity = self.get_mob_entity();
+        if let Ok(brain) = mob_entity.brain.try_lock()
+            && !brain.is_brain_dead()
+            && brain.has_memory_value(crate::entity::ai::brain::memory::types::IS_PANICKING.id())
+        {
+            return true;
+        }
+        mob_entity
             .goals_selector
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)

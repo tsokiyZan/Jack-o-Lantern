@@ -5384,6 +5384,11 @@ impl Entity {
                 self.pos.load(),
             );
         }
+        // `Mob.startRiding`: a mob that mounts lets go of its leash. A passenger restored from
+        // NBT still has its leash delayed, so it keeps it.
+        if event_source.get_mob().is_some() && event_source.get_entity().is_leashed() {
+            leashable::drop_leash(event_source.as_ref(), true, true);
+        }
     }
 
     pub(crate) fn remove_passenger_on_disconnect(&self, passenger_id: i32) {

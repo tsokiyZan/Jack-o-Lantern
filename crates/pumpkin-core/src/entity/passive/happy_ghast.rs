@@ -312,6 +312,11 @@ const BABY_DIMENSIONS: EntityDimensions =
     pumpkin_data::entity_dimensions::HAPPY_GHAST_BABY_DIMENSIONS;
 
 impl Mob for HappyGhastEntity {
+    /// Vanilla `HappyGhast.shouldStayCloseToLeashHolder`.
+    fn should_stay_close_to_leash_holder(&self) -> bool {
+        false
+    }
+
     /// Vanilla `HappyGhast.supportQuadLeashAsHolder`.
     fn support_quad_leash_as_holder(&self) -> bool {
         true
