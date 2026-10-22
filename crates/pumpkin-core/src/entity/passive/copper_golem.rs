@@ -1,5 +1,6 @@
 use crate::item::interaction_result::InteractionResult;
 use pumpkin_util::Hand;
+use pumpkin_util::math::vector3::Vector3;
 use std::sync::{
     Arc, Weak,
     atomic::{AtomicI32, AtomicI64, Ordering},
@@ -268,39 +269,97 @@ impl Mob for CopperGolemEntity {
 
     fn mob_interact(
         &self,
-        _player: &Arc<Player>,
-        _hand: Hand,
+        player: &Arc<Player>,
+        hand: Hand,
         item_stack: &mut ItemStack,
     ) -> InteractionResult {
+        use pumpkin_data::data_component_impl::EquipmentSlot;
+        use pumpkin_data::world::WorldEvent;
         let entity = self.get_entity();
         let world = entity.world.load();
 
-        // Honeycomb waxing
+        // An empty hand takes the item the golem carries, thrown towards the player.
+        if item_stack.is_empty() {
+            let carried = self.mob_entity.get_item_slot(&EquipmentSlot::MAIN_HAND);
+            if !carried.is_empty() {
+                crate::entity::ai::brain::behavior::utils::throw_item(
+                    entity,
+                    carried,
+                    player.get_entity().pos.load(),
+                    Vector3::new(0.3, 0.3, 0.3),
+                    0.3,
+                );
+                self.mob_entity
+                    .set_item_slot(&EquipmentSlot::MAIN_HAND, ItemStack::EMPTY.clone());
+                return InteractionResult::SUCCESS;
+            }
+        }
+
+        // `readyForShearing`: a poppy on the antenna (the saddle slot).
+        if item_stack.item == &Item::SHEARS
+            && self
+                .mob_entity
+                .get_item_slot(&EquipmentSlot::SADDLE)
+                .item
+                .has_tag(&tag::Item::MINECRAFT_SHEARABLE_FROM_COPPER_GOLEM)
+        {
+            // `shear`.
+            world.play_sound(
+                Sound::EntityCopperGolemShear,
+                SoundCategory::Players,
+                &entity.pos.load(),
+            );
+            let antenna = self
+                .mob_entity
+                .set_item_slot(&EquipmentSlot::SADDLE, ItemStack::EMPTY.clone());
+            if !antenna.is_empty() {
+                world.spawn_item_at(entity.pos.load() + Vector3::new(0.0, 1.5, 0.0), antenna);
+            }
+            world.game_event_from(
+                Some(player.as_ref()),
+                pumpkin_data::game_event::GameEvent::Shear,
+                entity.pos.load(),
+            );
+            player.hurt_and_break_in_hand(item_stack, hand, 1);
+            return InteractionResult::SUCCESS;
+        }
+
+        let block_pos = entity.block_pos.load();
         if item_stack.item.id == Item::HONEYCOMB.id
             && self.next_weathering_tick.load(Ordering::Relaxed) != -2
         {
+            world.sync_world_event(WorldEvent::ParticlesWaxOn, block_pos, 0);
+            world.play_sound(
+                Sound::ItemHoneycombWaxOn,
+                SoundCategory::Blocks,
+                &block_pos.to_centered_f64(),
+            );
             self.next_weathering_tick.store(-2, Ordering::Relaxed);
-            let pos = entity.pos.load();
-            world.play_sound(Sound::ItemHoneycombWaxOn, SoundCategory::Blocks, &pos);
+            // `usePlayerItem`.
+            item_stack.decrement_unless_creative(player.gamemode.load(), 1);
             return InteractionResult::SUCCESS_SERVER;
         }
 
-        // Axe scraping
         if item_stack.item.has_tag(&tag::Item::MINECRAFT_AXES) {
-            let current_next = self.next_weathering_tick.load(Ordering::Relaxed);
-            if current_next == -2 {
+            let event = if self.next_weathering_tick.load(Ordering::Relaxed) == -2 {
+                Some(WorldEvent::ParticlesWaxOff)
+            } else if self.get_weather_state() == WeatherState::Unaffected {
+                None
+            } else {
+                Some(WorldEvent::ParticlesScrape)
+            };
+            if let Some(event) = event {
+                world.play_sound(
+                    Sound::ItemAxeScrape,
+                    self.sound_source(),
+                    &entity.pos.load(),
+                );
+                world.sync_world_event(event, block_pos, 0);
                 self.next_weathering_tick.store(-1, Ordering::Relaxed);
-                let pos = entity.pos.load();
-                world.play_sound(Sound::ItemAxeScrape, SoundCategory::Blocks, &pos);
-                return InteractionResult::SUCCESS_SERVER;
-            }
-
-            let weather_state = self.get_weather_state();
-            if weather_state != WeatherState::Unaffected {
-                self.set_weather_state(weather_state.previous());
-                self.next_weathering_tick.store(-1, Ordering::Relaxed);
-                let pos = entity.pos.load();
-                world.play_sound(Sound::ItemAxeScrape, SoundCategory::Blocks, &pos);
+                if event == WorldEvent::ParticlesScrape {
+                    self.set_weather_state(self.get_weather_state().previous());
+                }
+                player.hurt_and_break_in_hand(item_stack, hand, 1);
                 return InteractionResult::SUCCESS_SERVER;
             }
         }

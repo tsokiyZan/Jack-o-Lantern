@@ -438,54 +438,62 @@ impl Mob for LlamaEntity {
         _hand: Hand,
         item_stack: &mut ItemStack,
     ) -> InteractionResult {
+        use crate::entity::passive::abstract_horse::fed_food;
         let item = item_stack.get_item();
+        let is_baby = self.is_baby();
+        let sneaking = player.get_entity().is_sneaking();
 
-        // Vanilla `AbstractChestedHorse.mobInteract` and `AbstractHorse.mobInteract`.
+        // Vanilla `AbstractChestedHorse.mobInteract`.
+        let should_open_inventory = !is_baby && self.is_tame() && sneaking;
         if !self.is_vehicle()
-            && !self.is_baby()
-            && self.is_tame()
-            && player.get_entity().is_sneaking()
+            && !should_open_inventory
+            && (!is_baby
+                || !crate::entity::mob::is_player_holding(player.as_ref(), &Item::GOLDEN_DANDELION))
+            && !item_stack.is_empty()
         {
-            self.open_custom_inventory_screen(player);
-            return InteractionResult::SUCCESS;
-        }
-        if self.is_tame()
-            && item == &Item::CHEST
-            && !self.has_chest()
-            && !self.is_baby()
-            && self.equip_chest(player, item_stack)
-        {
-            return InteractionResult::SUCCESS;
-        }
-
-        if self.is_tame()
-            && !self.is_baby()
-            && let Some(color) = get_carpet_color_from_item(item)
-        {
-            self.carpet_color.store(Some(color));
-            item_stack.decrement_unless_creative(player.gamemode.load(), 1);
-            let entity = self.get_entity();
-            let world = entity.world.load();
-            world.play_sound(
-                Sound::EntityLlamaSwag,
-                SoundCategory::Neutral,
-                &entity.pos.load(),
-            );
-            return InteractionResult::SUCCESS;
-        }
-
-        if !self.is_baby() && !self.is_food(item_stack) {
-            let world = player.world();
-            let ent = &self.mob_entity.living_entity.entity;
-            if let Some(vehicle) = world.get_entity_by_id(ent.entity_id)
-                && let Some(passenger) = world.get_player_by_id(player.entity_id())
-            {
-                ent.add_passenger(vehicle, passenger as Arc<dyn EntityBase>);
+            if self.is_food(item_stack) {
+                return fed_food(self, player, item_stack);
+            }
+            if !self.is_tame() {
+                self.make_mad();
+                return InteractionResult::SUCCESS;
+            }
+            if !self.has_chest() && item == &Item::CHEST && self.equip_chest(player, item_stack) {
                 return InteractionResult::SUCCESS;
             }
         }
 
-        self.animal_interact(player, item_stack, Sound::EntityLlamaAmbient)
+        // Vanilla `AbstractHorse.mobInteract`.
+        if self.is_vehicle() || is_baby {
+            return self.animal_interact(player, item_stack, Sound::EntityLlamaAmbient);
+        }
+        if self.is_tame() && sneaking {
+            self.open_custom_inventory_screen(player);
+            return InteractionResult::SUCCESS;
+        }
+        if !item_stack.is_empty() {
+            if self.equip_on_target(player, item_stack) {
+                return InteractionResult::SUCCESS;
+            }
+            // `equipBodyArmor`: a carpet on a tame llama wearing none.
+            if self.is_tame()
+                && self.carpet_color.load().is_none()
+                && let Some(color) = get_carpet_color_from_item(item)
+            {
+                self.carpet_color.store(Some(color));
+                item_stack.decrement_unless_creative(player.gamemode.load(), 1);
+                let entity = self.get_entity();
+                let world = entity.world.load();
+                world.play_sound(
+                    Sound::EntityLlamaSwag,
+                    SoundCategory::Neutral,
+                    &entity.pos.load(),
+                );
+                return InteractionResult::SUCCESS;
+            }
+        }
+        self.do_player_ride(player);
+        InteractionResult::SUCCESS
     }
 }
 

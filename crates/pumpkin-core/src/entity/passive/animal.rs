@@ -43,6 +43,19 @@ pub trait Animal: Mob {
         animal_can_mate(self.get_mob_entity(), partner)
     }
 
+    /// Vanilla `Animal.setInLove(player)`: 600 ticks of love caused by `player`, with the
+    /// hearts entity event.
+    fn set_in_love_by(&self, player: &Player) {
+        let mob_entity = self.get_mob_entity();
+        mob_entity.set_love_ticks(600, Some(player.gameprofile.id));
+        let entity = &mob_entity.living_entity.entity;
+        entity.world.load().send_entity_status(
+            entity,
+            pumpkin_data::entity::EntityStatus::InLoveHearts,
+            Some(ActorEventID::InLoveHearts),
+        );
+    }
+
     /// Vanilla `Animal.canFallInLove`.
     fn can_fall_in_love(&self) -> bool {
         !self.get_mob_entity().is_in_love()

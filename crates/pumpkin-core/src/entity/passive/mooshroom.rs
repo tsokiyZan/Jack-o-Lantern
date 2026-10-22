@@ -1,4 +1,5 @@
 use crate::item::interaction_result::InteractionResult;
+use pumpkin_data::data_component_impl::{SuspiciousStewEffect, SuspiciousStewEffectsImpl};
 use pumpkin_util::Hand;
 use std::sync::{
     Arc, Weak,
@@ -78,7 +79,8 @@ pub struct MooshroomEntity {
     pub mob_entity: MobEntity,
     pub ageable_data: AgeableData,
     pub variant: AtomicI32,
-    pub stew_effect: AtomicCell<Option<u32>>,
+    /// Vanilla `stewEffects`: the effect and duration (ticks) of the flower it ate.
+    pub stew_effect: AtomicCell<Option<(&'static str, i32)>>,
     pub last_lightning_bolt_uuid: AtomicCell<Option<Uuid>>,
 }
 
@@ -243,17 +245,26 @@ impl Mob for MooshroomEntity {
         let item = item_stack.get_item();
 
         if item == &Item::BOWL && !self.is_baby() {
-            item_stack.decrement_unless_creative(player.gamemode.load(), 1);
-            let entity = self.get_entity();
-            let world = entity.world.load();
-            let pos = entity.pos.load();
-            let is_suspicious = self.stew_effect.swap(None).is_some();
-            let sound = if is_suspicious {
+            let effect = self.stew_effect.swap(None);
+            let stew = if let Some((effect, duration)) = effect {
+                let mut stew = ItemStack::new(1, &Item::SUSPICIOUS_STEW);
+                stew.set_data_component(SuspiciousStewEffectsImpl {
+                    effects: std::borrow::Cow::Owned(vec![SuspiciousStewEffect {
+                        effect: std::borrow::Cow::Borrowed(effect),
+                        duration,
+                    }]),
+                });
+                stew
+            } else {
+                ItemStack::new(1, &Item::MUSHROOM_STEW)
+            };
+            crate::item::create_filled_result(item_stack, player, stew, false);
+            let sound = if effect.is_some() {
                 Sound::EntityMooshroomSuspiciousMilk
             } else {
                 Sound::EntityMooshroomMilk
             };
-            world.play_sound(sound, SoundCategory::Neutral, &pos);
+            self.play_sound_at_self(sound, 1.0, 1.0);
             return InteractionResult::SUCCESS;
         }
 
@@ -310,26 +321,55 @@ impl Mob for MooshroomEntity {
             return InteractionResult::SUCCESS;
         }
 
-        if self.get_variant() == MooshroomVariant::Brown
-            && !self.is_baby()
-            && item.has_tag(&tag::Item::MINECRAFT_SMALL_FLOWERS)
-        {
-            item_stack.decrement_unless_creative(player.gamemode.load(), 1);
+        if self.get_variant() == MooshroomVariant::Brown && !self.is_baby() {
+            let Some(effect) = flower_stew_effect(item) else {
+                return self.animal_interact(player, item_stack, Sound::EntityCowAmbient);
+            };
             let entity = self.get_entity();
             let world = entity.world.load();
             let pos = entity.pos.load();
-            self.stew_effect.store(Some(1));
-            world.play_sound(Sound::EntityMooshroomEat, SoundCategory::Neutral, &pos);
-            world.spawn_particle(
-                pos + Vector3::new(0.0, 0.5, 0.0),
-                Vector3::new(0.5, 0.5, 0.5),
-                0.0,
-                4,
-                Particle::Effect,
-            );
+            if self.stew_effect.load().is_some() {
+                world.spawn_particle(
+                    pos + Vector3::new(0.0, 0.5, 0.0),
+                    Vector3::new(0.5, 0.0, 0.5),
+                    0.0,
+                    2,
+                    Particle::Smoke,
+                );
+            } else {
+                item_stack.decrement_unless_creative(player.gamemode.load(), 1);
+                world.spawn_particle(
+                    pos + Vector3::new(0.0, 0.5, 0.0),
+                    Vector3::new(0.5, 0.0, 0.5),
+                    0.0,
+                    4,
+                    Particle::Effect,
+                );
+                self.stew_effect.store(Some(effect));
+                self.play_sound_at_self(Sound::EntityMooshroomEat, 2.0, 1.0);
+            }
             return InteractionResult::SUCCESS;
         }
 
         self.animal_interact(player, item_stack, Sound::EntityCowAmbient)
     }
+}
+
+/// Vanilla `SuspiciousEffectHolder.tryGet` for an item: the stew effect of a flower
+/// (`FlowerBlock`'s effect for `floor(seconds * 20)` ticks), or `None`.
+fn flower_stew_effect(item: &Item) -> Option<(&'static str, i32)> {
+    let effect = match item.registry_key {
+        "dandelion" | "golden_dandelion" | "blue_orchid" => ("minecraft:saturation", 7),
+        "torchflower" | "poppy" => ("minecraft:night_vision", 100),
+        "allium" => ("minecraft:fire_resistance", 60),
+        "azure_bluet" | "open_eyeblossom" => ("minecraft:blindness", 220),
+        "red_tulip" | "orange_tulip" | "white_tulip" | "pink_tulip" => ("minecraft:weakness", 140),
+        "oxeye_daisy" => ("minecraft:regeneration", 140),
+        "cornflower" => ("minecraft:jump_boost", 100),
+        "wither_rose" => ("minecraft:wither", 140),
+        "lily_of_the_valley" => ("minecraft:poison", 220),
+        "closed_eyeblossom" => ("minecraft:nausea", 140),
+        _ => return None,
+    };
+    Some(effect)
 }

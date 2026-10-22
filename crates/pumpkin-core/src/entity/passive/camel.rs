@@ -8,6 +8,7 @@ use crate::entity::passive::animal::horse_can_parent;
 use crate::item::interaction_result::InteractionResult;
 use pumpkin_inventory::inventory::SimpleInventory;
 use pumpkin_util::Hand;
+use pumpkin_util::random::RandomImpl;
 use std::sync::{
     Arc, Weak,
     atomic::{AtomicBool, AtomicI32, AtomicU8, Ordering},
@@ -136,6 +137,54 @@ impl CamelEntity {
                 Ordering::Relaxed,
             );
         }
+    }
+}
+
+impl CamelEntity {
+    /// Vanilla `Camel.handleEating` for a food stack: heal, breed (camels count as tamed) and
+    /// grow up, with the eating sound and the `eat` game event when any of it happened.
+    fn handle_eating(&self, player: &Player) -> bool {
+        let living = &self.mob_entity.living_entity;
+        let could_heal = living.health.load() < living.get_max_health();
+        if could_heal {
+            living.heal(2.0);
+        }
+        let could_set_in_love = self.get_age() == 0 && self.can_fall_in_love();
+        if could_set_in_love {
+            self.set_in_love_by(player);
+        }
+        let could_age_up = self.can_age_up();
+        if could_age_up {
+            self.age_up(10, false);
+        }
+        if !could_heal && !could_set_in_love && !could_age_up {
+            return false;
+        }
+        let entity = self.get_entity();
+        if !entity.is_silent() {
+            let sound = if entity.entity_type == &pumpkin_data::entity::EntityType::CAMEL_HUSK {
+                Sound::EntityCamelHuskEat
+            } else {
+                Sound::EntityCamelEat
+            };
+            let pitch = {
+                let mut random = entity.random();
+                1.0 + (random.next_f32() - random.next_f32()) * 0.2
+            };
+            entity.world.load().play_sound_fine(
+                sound,
+                self.sound_source(),
+                &entity.pos.load(),
+                1.0,
+                pitch,
+            );
+        }
+        entity.world.load().game_event_from(
+            Some(entity),
+            pumpkin_data::game_event::GameEvent::Eat,
+            entity.pos.load(),
+        );
+        true
     }
 }
 
@@ -393,13 +442,10 @@ impl Mob for CamelEntity {
         if self.equip_on_target(player, item_stack) {
             return InteractionResult::SUCCESS;
         }
-        // TODO: vanilla `Camel.handleEating`; Pumpkin feeds camels like other animals.
-        // `fedFood` answers `SUCCESS_SERVER` when the camel ate, else `PASS`.
+        // `fedFood`: the stack used up when the camel ate (`SUCCESS_SERVER`), else `PASS`.
         if self.is_food(item_stack) {
-            return if self
-                .animal_interact(player, item_stack, Sound::EntityCamelAmbient)
-                .consumes_action()
-            {
+            return if self.handle_eating(player) {
+                item_stack.decrement_unless_creative(player.gamemode.load(), 1);
                 InteractionResult::SUCCESS_SERVER
             } else {
                 InteractionResult::PASS

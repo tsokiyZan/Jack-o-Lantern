@@ -316,17 +316,8 @@ pub fn horse_mob_interact<H: AbstractHorse + Animal + ?Sized>(
         && (!is_baby || !is_player_holding(player.as_ref(), &Item::GOLDEN_DANDELION))
         && !item_stack.is_empty()
     {
-        // TODO: vanilla `AbstractHorse.fedFood`; Pumpkin feeds horses like other animals.
-        // `fedFood` answers `SUCCESS_SERVER` when the horse ate, else `PASS`.
         if horse.is_food(item_stack) {
-            return if horse
-                .animal_interact(player, item_stack, ambient_sound)
-                .consumes_action()
-            {
-                InteractionResult::SUCCESS_SERVER
-            } else {
-                InteractionResult::PASS
-            };
+            return fed_food(horse, player, item_stack);
         }
         if !horse.is_horse_tamed() {
             horse.make_mad();
@@ -374,6 +365,187 @@ pub fn abstract_horse_mob_interact<H: AbstractHorse + Animal + ?Sized>(
     }
     horse.do_player_ride(player);
     InteractionResult::SUCCESS
+}
+
+/// Vanilla `AbstractHorse.fedFood`: `handleEating` (the llamas' own for them), the stack
+/// used up when the horse ate (`SUCCESS_SERVER`), else `PASS`.
+pub fn fed_food<H: AbstractHorse + Animal + ?Sized>(
+    horse: &H,
+    player: &Player,
+    item_stack: &mut ItemStack,
+) -> InteractionResult {
+    let entity_type = horse.get_entity().entity_type;
+    let ate = if entity_type == &pumpkin_data::entity::EntityType::LLAMA
+        || entity_type == &pumpkin_data::entity::EntityType::TRADER_LLAMA
+    {
+        llama_handle_eating(horse, player, item_stack)
+    } else {
+        horse_handle_eating(horse, player, item_stack)
+    };
+    if ate {
+        item_stack.decrement_unless_creative(player.gamemode.load(), 1);
+        InteractionResult::SUCCESS_SERVER
+    } else {
+        InteractionResult::PASS
+    }
+}
+
+/// Vanilla `getEatingSound` of the horse family; the skeleton horse has none.
+fn horse_eating_sound(entity: &crate::entity::Entity) -> Option<Sound> {
+    use pumpkin_data::entity::EntityType;
+    let entity_type = entity.entity_type;
+    if entity_type == &EntityType::HORSE {
+        Some(if entity.is_baby() {
+            Sound::EntityBabyHorseEat
+        } else {
+            Sound::EntityHorseEat
+        })
+    } else if entity_type == &EntityType::DONKEY {
+        Some(Sound::EntityDonkeyEat)
+    } else if entity_type == &EntityType::MULE {
+        Some(Sound::EntityMuleEat)
+    } else if entity_type == &EntityType::ZOMBIE_HORSE {
+        Some(Sound::EntityZombieHorseEat)
+    } else if entity_type == &EntityType::LLAMA || entity_type == &EntityType::TRADER_LLAMA {
+        Some(Sound::EntityLlamaEat)
+    } else {
+        None
+    }
+}
+
+/// The eating sound of `AbstractHorse.eating` and `Llama.handleEating`; a silent horse plays
+/// none and draws no pitch.
+fn play_horse_eating_sound<H: AbstractHorse + ?Sized>(horse: &H) {
+    let entity = horse.get_entity();
+    if entity.is_silent() {
+        return;
+    }
+    let Some(sound) = horse_eating_sound(entity) else {
+        return;
+    };
+    let pitch = {
+        let mut random = entity.random();
+        1.0 + (random.next_f32() - random.next_f32()) * 0.2
+    };
+    entity.world.load().play_sound_fine(
+        sound,
+        horse.sound_source(),
+        &entity.pos.load(),
+        1.0,
+        pitch,
+    );
+}
+
+/// The heal, growth and temper steps both `handleEating`s share.
+fn eat_heal_grow_temper<H: AbstractHorse + Animal + ?Sized>(
+    horse: &H,
+    mut item_used: bool,
+    heal: f32,
+    age_up: i32,
+    temper: i32,
+) -> bool {
+    let living = &horse.get_mob_entity().living_entity;
+    if living.health.load() < living.get_max_health() && heal > 0.0 {
+        living.heal(heal);
+        item_used = true;
+    }
+    if horse.get_entity().is_baby()
+        && age_up > 0
+        && let Some(ageable) = horse.as_ageable()
+        && !ageable.is_age_locked()
+    {
+        ageable.age_up(age_up, false);
+        item_used = true;
+    }
+    if temper > 0
+        && (item_used || !horse.is_horse_tamed())
+        && horse.horse_temper().load(Relaxed) < horse.max_temper()
+    {
+        horse.modify_temper(temper);
+        item_used = true;
+    }
+    item_used
+}
+
+/// Vanilla `AbstractHorse.handleEating`.
+fn horse_handle_eating<H: AbstractHorse + Animal + ?Sized>(
+    horse: &H,
+    player: &Player,
+    item_stack: &ItemStack,
+) -> bool {
+    let item = item_stack.item;
+    let mut item_used = false;
+    let (heal, age_up, temper) = if item == &Item::WHEAT {
+        (2.0, 20, 3)
+    } else if item == &Item::SUGAR {
+        (1.0, 30, 3)
+    } else if item == &Item::HAY_BLOCK {
+        (20.0, 180, 0)
+    } else if item == &Item::APPLE || item == &Item::CARROT {
+        (3.0, 60, 3)
+    } else if item == &Item::RED_MUSHROOM {
+        (3.0, 0, 3)
+    } else if item == &Item::GOLDEN_CARROT
+        || item == &Item::GOLDEN_APPLE
+        || item == &Item::ENCHANTED_GOLDEN_APPLE
+    {
+        let mob_entity = horse.get_mob_entity();
+        if horse.is_horse_tamed()
+            && horse.get_entity().age.load(Relaxed) == 0
+            && !mob_entity.is_in_love()
+        {
+            item_used = true;
+            horse.set_in_love_by(player);
+        }
+        if item == &Item::GOLDEN_CARROT {
+            (4.0, 60, 5)
+        } else {
+            (10.0, 240, 10)
+        }
+    } else {
+        (0.0, 0, 0)
+    };
+    let item_used = eat_heal_grow_temper(horse, item_used, heal, age_up, temper);
+    if item_used {
+        // `eating`: `openMouth` (TODO: the mouth counter isn't ported) and the sound.
+        play_horse_eating_sound(horse);
+        let entity = horse.get_entity();
+        entity.world.load().game_event_from(
+            Some(entity),
+            pumpkin_data::game_event::GameEvent::Eat,
+            entity.pos.load(),
+        );
+    }
+    item_used
+}
+
+/// Vanilla `Llama.handleEating`.
+fn llama_handle_eating<H: AbstractHorse + Animal + ?Sized>(
+    horse: &H,
+    player: &Player,
+    item_stack: &ItemStack,
+) -> bool {
+    let item = item_stack.item;
+    let mut item_used = false;
+    let (heal, age_up, temper) = if item == &Item::WHEAT {
+        (2.0, 10, 3)
+    } else if item == &Item::HAY_BLOCK {
+        if horse.is_horse_tamed()
+            && horse.get_entity().age.load(Relaxed) == 0
+            && horse.can_fall_in_love()
+        {
+            item_used = true;
+            horse.set_in_love_by(player);
+        }
+        (10.0, 90, 6)
+    } else {
+        (0.0, 0, 0)
+    };
+    let item_used = eat_heal_grow_temper(horse, item_used, heal, age_up, temper);
+    if item_used {
+        play_horse_eating_sound(horse);
+    }
+    item_used
 }
 
 /// Vanilla `AbstractHorse.registerGoals`, before each kind's `addBehaviourGoals`.

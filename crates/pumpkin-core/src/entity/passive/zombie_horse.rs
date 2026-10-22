@@ -298,17 +298,8 @@ impl Mob for ZombieHorseEntity {
         let should_open_inventory =
             !self.is_baby() && self.is_tame() && player.get_entity().is_sneaking();
         if !self.is_vehicle() && !should_open_inventory && !item_stack.is_empty() {
-            // TODO: vanilla `AbstractHorse.fedFood`; Pumpkin feeds horses like other animals.
-            // `fedFood` answers `SUCCESS_SERVER` when the horse ate, else `PASS`.
             if self.is_food(item_stack) {
-                return if self
-                    .animal_interact(player, item_stack, Sound::EntityZombieHorseAmbient)
-                    .consumes_action()
-                {
-                    InteractionResult::SUCCESS_SERVER
-                } else {
-                    InteractionResult::PASS
-                };
+                return crate::entity::passive::abstract_horse::fed_food(self, player, item_stack);
             }
             if !self.is_tame() {
                 self.make_mad();
