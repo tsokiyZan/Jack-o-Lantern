@@ -44,8 +44,9 @@ impl ItemRegistry {
         let result = self.on_use(stack, player, hand);
         let result_stack = player.inventory.get_stack_in_hand(hand);
         let use_duration = self.stack_use_duration(&result_stack);
-        // `resultStack == itemStack`: the same stack, which the item kind stands in for.
-        if result_stack.item.id == stack.item.id
+        // `resultStack == itemStack`: the same stack, which the item kind and components
+        // stand in for.
+        if result_stack.are_items_and_components_equal(stack)
             && result_stack.item_count == old_count
             && use_duration <= 0
             && result_stack.get_damage() == old_damage
