@@ -466,7 +466,8 @@ impl PlayerInventory {
             }
 
             if room_for_stack == -1 {
-                player.drop_item(stack, false);
+                // `placeItemBackInInventory(stack, SERVER_ONLY)`.
+                player.drop_item_server_only(stack);
                 break;
             }
 

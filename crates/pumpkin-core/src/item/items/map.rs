@@ -53,10 +53,8 @@ impl ItemBehaviour for MapItem {
 
         if inventory.get_stack_in_hand(hand).is_empty() {
             inventory.set_stack_in_hand(hand, filled_map);
-        } else if !inventory.insert_stack_anywhere(&mut filled_map) && !filled_map.is_empty() {
-            player
-                .world()
-                .drop_stack(&player.position().to_block_pos(), filled_map);
+        } else if !inventory.insert_stack_anywhere(&mut filled_map) {
+            player.drop_from_hand(filled_map, true);
         }
         InteractionResult::SUCCESS
     }

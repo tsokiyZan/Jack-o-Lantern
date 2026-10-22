@@ -64,7 +64,6 @@ impl ItemBehaviour for GoatHornItem {
     }
 }
 
-
 /// What `InstrumentItem` reads from an instrument.
 struct InstrumentValues {
     sound: IdOr<SoundEvent>,

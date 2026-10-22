@@ -74,7 +74,7 @@ impl BundleItem {
             pitch,
         );
         player.inventory.set_stack_in_hand(hand, bundle.clone());
-        player.drop_item(removed);
+        player.drop_from_hand(removed, false);
         // `playDropContentsSound`.
         let pitch = 0.8 + Self::world_random_f32(player) * 0.4;
         world.play_sound_fine(

@@ -127,6 +127,12 @@ pub trait InventoryPlayer: Send + Sync {
     /// - `retain_ownership` - If true, the player keeps ownership (for pickup delay)
     fn drop_item(&self, item: ItemStack, retain_ownership: bool);
 
+    /// Drops an item the client didn't predict dropping (vanilla `Prediction.SERVER_ONLY`),
+    /// as giving back what a closed container held when the inventory is full.
+    fn drop_item_server_only(&self, item: ItemStack) {
+        self.drop_item(item, false);
+    }
+
     /// Gets the player's inventory.
     fn get_inventory(&self) -> Arc<PlayerInventory>;
 

@@ -5607,6 +5607,18 @@ impl Player {
         ));
     }
 
+    /// Vanilla `LivingEntity.drop`'s swing then the drop: the main hand swings for the
+    /// players tracking this one, and for this player too when `server_only` (vanilla's
+    /// `Prediction.SERVER_ONLY`, a drop the client didn't predict).
+    pub fn drop_from_hand(&self, item_stack: ItemStack, server_only: bool) {
+        if item_stack.is_empty() {
+            return;
+        }
+        self.living_entity
+            .swing(Hand::Right, SwingAnimationImpl::DEFAULT, server_only);
+        self.drop_item(item_stack);
+    }
+
     pub fn drop_item(&self, item_stack: ItemStack) {
         self.increment_stat(
             statistics::StatisticCategory::Dropped,
@@ -5685,7 +5697,7 @@ impl Player {
         let updated_stack = item_stack.clone();
         self.inventory().set_held_item(updated_stack.clone());
 
-        self.drop_item(dropped_stack);
+        self.drop_from_hand(dropped_stack, false);
 
         let inv: Arc<dyn Inventory> = self.inventory.clone();
         let screen_binding = self
@@ -8342,7 +8354,11 @@ impl InventoryPlayer for Player {
     }
 
     fn drop_item(&self, item: ItemStack, _retain_ownership: bool) {
-        self.drop_item(item);
+        self.drop_from_hand(item, false);
+    }
+
+    fn drop_item_server_only(&self, item: ItemStack) {
+        self.drop_from_hand(item, true);
     }
 
     fn has_infinite_materials(&self) -> bool {
