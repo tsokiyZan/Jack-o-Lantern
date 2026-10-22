@@ -2,6 +2,7 @@ use std::any::Any;
 
 use crate::block::entities::brushable_block::BrushableBlockBlockEntity;
 use crate::block::registry::BlockActionResult;
+use crate::entity::Entity;
 use crate::entity::player::Player;
 use crate::item::{ItemBehaviour, ItemMetadata};
 use crate::server::Server;
@@ -116,21 +117,51 @@ impl BrushItem {
     pub const USE_DURATION: i32 = 200;
 
     /// Vanilla `calculateHitResult` when it hits a block: the block and the face, along the
-    /// view within the block interaction range.
-    /// TODO: entities in the way (`getHitResultOnViewVector`'s entity pick).
+    /// view within the block interaction range, unless a pickable entity is nearer
+    /// (`ProjectileUtil.getHitResultOnViewVector` with `CAN_BE_PICKED`), which is no block.
+    ///
+    /// Vanilla's view vector is `getViewVector(0)`, the rotation at the start of the tick; a
+    /// player's move packets snap that to the current rotation (`absSnapTo`), so the current
+    /// rotation is the same.
     fn hit_block(player: &Player) -> Option<(BlockPos, BlockDirection)> {
         let (yaw, pitch) = player.rotation();
         let range = player
             .living_entity
             .get_attribute_value(&Attributes::BLOCK_INTERACTION_RANGE);
+        let entity = &player.living_entity.entity;
+        let delta = Entity::calculate_view_vector(pitch, yaw) * range;
         let from = player.eye_position();
-        let to = from.add(&(Vector3::rotation_vector(f64::from(pitch), f64::from(yaw)) * range));
-        let hit = player.world().clip(&pumpkin_world::clip::ClipContext::new(
+        let mut to = from.add(&delta);
+        let world = player.world();
+        let hit = world.clip(&pumpkin_world::clip::ClipContext::new(
             from,
             to,
             pumpkin_world::clip::ClipBlock::Collider,
             pumpkin_world::clip::ClipFluid::None,
         ));
-        (!hit.is_miss).then_some((hit.block_pos, hit.direction))
+        if !hit.is_miss {
+            to = hit.location;
+        }
+        // `getEntityHitResult` with no margin.
+        let search = entity
+            .bounding_box
+            .load()
+            .expand_towards(delta.x, delta.y, delta.z)
+            .expand_all(1.0);
+        let entity_hit = world.get_all_at_box(&search).iter().any(|other| {
+            other.get_entity().entity_id != entity.entity_id
+                && !other.is_spectator()
+                && other.can_hit()
+                && other
+                    .get_entity()
+                    .bounding_box
+                    .load()
+                    .clip(from, to)
+                    .is_some()
+        });
+        if entity_hit || hit.is_miss {
+            return None;
+        }
+        Some((hit.block_pos, hit.direction))
     }
 }
