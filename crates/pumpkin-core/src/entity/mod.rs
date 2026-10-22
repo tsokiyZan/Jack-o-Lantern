@@ -5356,10 +5356,13 @@ impl Entity {
 
         let world = self.world.load();
         let chunk_pos = self.chunk_pos.load();
-        world.broadcast_to_chunk(
-            chunk_pos,
-            &CSetPassengers::new(VarInt(self.entity_id), &passenger_ids),
-        );
+        let passengers_packet = CSetPassengers::new(VarInt(self.entity_id), &passenger_ids);
+        let rider = event_source.get_player();
+        // Everyone else learns of the mount from the vehicle's tracker (here the chunk
+        // broadcast); a riding player only after `ServerPlayer.startRiding`'s own packets.
+        if rider.is_none() {
+            world.broadcast_to_chunk(chunk_pos, &passengers_packet);
+        }
         // The end of `addPassenger`, before `startRiding`'s `entity_mount` game event.
         vehicle_hooks.after_add_passenger();
         if send_event {
@@ -5373,6 +5376,12 @@ impl Entity {
         // NBT still has its leash delayed, so it keeps it.
         if event_source.get_mob().is_some() && event_source.get_entity().is_leashed() {
             leashable::drop_leash(event_source.as_ref(), true, true);
+        }
+        if let Some(player) = rider {
+            // `ServerPlayer.startRiding`: the rider is placed and told, then the tracker's
+            // passenger list reaches everyone watching the vehicle, the rider again too.
+            player.start_riding_packets(&vehicle_hooks, &passengers_packet);
+            world.broadcast_to_chunk(chunk_pos, &passengers_packet);
         }
     }
 

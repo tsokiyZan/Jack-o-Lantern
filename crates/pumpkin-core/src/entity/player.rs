@@ -280,10 +280,10 @@ use pumpkin_protocol::java::client::play::{
     COpenBook, COpenScreen, COpenSignEditor, CParticle, CPlayServerLinks, CPlayerAbilities,
     CPlayerInfoUpdate, CPlayerPosition, CPlayerSpawnPosition, CRespawn, CSetCamera,
     CSetContainerContent, CSetContainerProperty, CSetContainerSlot, CSetCursorItem, CSetExperience,
-    CSetHealth, CSetPlayerInventory, CSetSelectedSlot, CSoundEffect, CStopSound, CSubtitle,
-    CSystemChatMessage, CTabList, CTitleAnimation, CTitleText, CUnloadChunk, CUpdateMobEffect,
-    CUpdateTime, GameEvent, MapIcon, MapPatch, PlayerAction, PlayerInfoFlags, PlayerSpawnData,
-    PreviousMessage, Statistic,
+    CSetHealth, CSetPassengers, CSetPlayerInventory, CSetSelectedSlot, CSoundEffect, CStopSound,
+    CSubtitle, CSystemChatMessage, CTabList, CTitleAnimation, CTitleText, CUnloadChunk,
+    CUpdateMobEffect, CUpdateTime, GameEvent, MapIcon, MapPatch, PlayerAction, PlayerInfoFlags,
+    PlayerSpawnData, PreviousMessage, Statistic,
 };
 use pumpkin_protocol::java::server::play::{
     SClickSlot, SContainerButtonClick, SRenameItem, SlotActionType,
@@ -5032,6 +5032,9 @@ impl Player {
         }
         if !target.as_passenger {
             self.remove_vehicle();
+            // A remount still pending from an earlier vehicle's dimension change would have
+            // happened already in vanilla, and this `removeVehicle` undone it.
+            self.set_passenger_remount(PassengerRemount::Idle);
         }
         if Arc::ptr_eq(&target.world, &self.world()) {
             self.teleport_in_world(target);
@@ -5085,7 +5088,12 @@ impl Player {
                 return false;
             }
         }
+        self.send_connection_teleport(target);
+        true
+    }
 
+    /// `connection.teleport` itself, with no plugin event (vanilla `startRiding`'s teleport).
+    fn send_connection_teleport(&self, target: &TeleportTarget) {
         let teleport_id = self.teleport_id_count.fetch_add(1, Ordering::Relaxed) + 1;
         self.chunk_send_epoch.fetch_add(1, Ordering::Relaxed);
         let entity = &self.living_entity.entity;
@@ -5148,7 +5156,6 @@ impl Player {
                 }
             }
         }
-        true
     }
 
     /// Vanilla `ServerPlayer.removeVehicle`: off the vehicle where it is, without the
@@ -5227,27 +5234,28 @@ impl Player {
         }
     }
 
-    /// Vanilla `ServerPlayer.startRiding(vehicle, true, false)`.
+    /// Vanilla `startRiding(vehicle, true, false)` for the remount.
     fn finish_remount(&self, passenger: Arc<dyn EntityBase>, vehicle: &Arc<dyn EntityBase>) {
         let vehicle_entity = vehicle.get_entity();
-        if vehicle_entity.is_removed() || !Arc::ptr_eq(&vehicle_entity.world.load(), &self.world())
+        if self.living_entity.entity.is_removed()
+            || vehicle_entity.is_removed()
+            || !Arc::ptr_eq(&vehicle_entity.world.load(), &self.world())
         {
             return;
         }
         vehicle_entity.add_passenger_without_event(vehicle.clone(), passenger);
+    }
+
+    /// The rest of vanilla `ServerPlayer.startRiding` once mounted: `positionRider`, the client
+    /// moved to its seat keeping its look, the vehicle's effects, then its passenger list.
+    pub(crate) fn start_riding_packets(
+        &self,
+        vehicle: &Arc<dyn EntityBase>,
+        passengers_packet: &CSetPassengers,
+    ) {
         let entity = &self.living_entity.entity;
-        if !entity
-            .vehicle
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .as_ref()
-            .is_some_and(|v| Arc::ptr_eq(v, vehicle))
-        {
-            return;
-        }
-        // `entityToRide.positionRider(this)`, then the client is moved there keeping its look.
         vehicle.position_rider(vehicle.as_ref(), self);
-        self.teleport_in_world(&TeleportTarget {
+        self.send_connection_teleport(&TeleportTarget {
             world: self.world(),
             position: entity.pos.load(),
             yaw: None,
@@ -5265,83 +5273,23 @@ impl Player {
                 .map(|instance| instance.effect.clone())
                 .collect();
             for effect in &effects {
-                self.send_effect_for(vehicle_entity.entity_id, effect, false);
+                self.send_effect_for(vehicle.get_entity().entity_id, effect, false);
             }
         }
+        self.try_send_client_packet(passengers_packet);
     }
 
-    /// `yaw` and `pitch` are in degrees.
-    /// Rarly used, for example when waking up the player from a bed or their first time spawn. Otherwise, the `teleport` method should be used.
-    /// The player should respond with the `SConfirmTeleport` packet.
+    /// Vanilla `ServerGamePacketListenerImpl.teleport(x, y, z, yRot, xRot)`: an absolute
+    /// position and rotation, the speed stopped. `yaw` and `pitch` are in degrees.
     pub fn request_teleport(&self, position: Vector3<f64>, yaw: f32, pitch: f32) {
-        // This is the ultra special magic code used to create the teleport id
-        // This returns the old value
-        // This operation wraps around on overflow.
-        let Some(server) = self.world().server.upgrade() else {
-            return;
-        };
-        if let Some(player_arc) = self.world().get_player_by_uuid(self.gameprofile.id) {
-            let mut event = PlayerTeleportEvent {
-                player: player_arc,
-                from: self.living_entity.entity.pos.load(),
-                to: position,
-                cancelled: false,
-            };
-            server.plugin_manager.fire_blocking(&server, &mut event);
-            if event.cancelled {
-                return;
-            }
-        }
-
-        let i = self.teleport_id_count.fetch_add(1, Ordering::Relaxed);
-        self.chunk_send_epoch.fetch_add(1, Ordering::Relaxed);
-        let teleport_id = i + 1;
-        self.living_entity.entity.set_pos(position);
-        let entity = &self.living_entity.entity;
-        entity.set_rotation(yaw, pitch);
-        match self.client.as_ref() {
-            ClientPlatform::Java(client) => {
-                *self
-                    .awaiting_teleport
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner) =
-                    Some((teleport_id.into(), position));
-                let packet = CPlayerPosition::new(
-                    teleport_id.into(),
-                    position,
-                    Vector3::new(0.0, 0.0, 0.0),
-                    yaw,
-                    pitch,
-                    // TODO
-                    Vec::new(),
-                );
-                if let Ok(data) = client.serialize_packet(&packet) {
-                    client.try_enqueue_packet(data);
-                }
-            }
-            ClientPlatform::Bedrock(client) => {
-                let packet = CBedrockMovePlayer::new(
-                    VarULong(self.entity_id() as u64),
-                    Vector3::new(
-                        position.x as f32,
-                        position.y as f32 + entity.entity_type.eye_height,
-                        position.z as f32,
-                    ),
-                    pitch,
-                    yaw,
-                    yaw,
-                    CBedrockMovePlayer::MODE_TELEPORT,
-                    false,
-                    VarULong(0),
-                    0,
-                    0,
-                    VarULong(self.tick_counter.load(Ordering::Relaxed).max(0) as u64),
-                );
-                if let Ok(data) = client.serialize_packet(&packet) {
-                    client.try_enqueue_packet(data);
-                }
-            }
-        }
+        self.connection_teleport(&TeleportTarget {
+            world: self.world(),
+            position,
+            yaw: Some(yaw),
+            pitch: Some(pitch),
+            keep_velocity: false,
+            as_passenger: false,
+        });
     }
 
     pub fn block_interaction_range(&self) -> f64 {
