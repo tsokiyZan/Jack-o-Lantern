@@ -215,8 +215,9 @@ impl MobEntity {
     ///
     /// `f` runs with that navigation locked. Inside it, never call `get_pathfinding_malus`,
     /// `goal_utils::has_malus`/`is_not_stable`, the `random_pos` helpers, `is_navigator_idle`,
-    /// `with_navigation` or `stop_in_place` on this mob or its rider: each locks the same
-    /// navigation and would deadlock. Compute positions and malus checks before entering.
+    /// `with_navigation` or `stop_in_place` on this mob or on any mob in its vehicle chain: each
+    /// locks the navigation at the end of that chain and would deadlock. Compute positions and
+    /// malus checks before entering.
     pub fn with_navigation<R>(&self, f: impl FnOnce(&mut Navigator, &Self) -> R) -> R {
         if let Some(vehicle) = self.controlled_vehicle_mob()
             && let Some(vehicle_mob) = vehicle.get_mob()
