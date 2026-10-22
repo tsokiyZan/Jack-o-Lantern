@@ -115,6 +115,22 @@ impl MapData {
         (adjusted * 16.0 / 360.0) as i8
     }
 
+    /// Vanilla `MapItemSavedData.isTrackedCountOverLimit`: more than `limit` decorations whose
+    /// type counts towards the limit (`trackCount`).
+    #[must_use]
+    pub fn is_tracked_count_over_limit(&self, limit: usize) -> bool {
+        self.decorations
+            .iter()
+            .filter(|decoration| {
+                u32::try_from(decoration.icon_type)
+                    .ok()
+                    .and_then(pumpkin_data::map_decoration::MapDecorationType::from_id)
+                    .is_some_and(|decoration_type| decoration_type.track_count)
+            })
+            .count()
+            > limit
+    }
+
     pub fn set_color(&mut self, x: usize, z: usize, color: u8) {
         if x < 128 && z < 128 {
             let idx = z * 128 + x;

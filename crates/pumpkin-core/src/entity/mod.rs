@@ -837,6 +837,18 @@ pub trait EntityBase: Send + Sync + std::any::Any {
         false
     }
 
+    /// Vanilla `Entity.interact` with the clicked `location` (relative to the entity), for
+    /// the entities that care where they were clicked (the armor stand). Others ignore it.
+    fn interact_at(
+        &self,
+        player: &Arc<Player>,
+        hand: Hand,
+        _location: Vector3<f64>,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
+        self.interact(player, hand, item_stack)
+    }
+
     /// Vanilla `Entity.interact`: `player` right-clicks this entity with `item_stack`, the
     /// stack in `hand`.
     fn interact(

@@ -160,10 +160,6 @@ impl EntityBase for CushionEntity {
         if player.get_entity().is_sneaking() {
             return InteractionResult::PASS;
         }
-        // Pumpkin rides nothing while riding; vanilla `startRiding` would switch.
-        if player.get_entity().has_vehicle() {
-            return InteractionResult::CONSUME;
-        }
         if !self
             .entity
             .passengers
@@ -181,6 +177,10 @@ impl EntityBase for CushionEntity {
         let Some(passenger) = world.get_player_by_id(player.entity_id()) else {
             return InteractionResult::CONSUME;
         };
+        // `startRiding`: a player riding something else gets off it first.
+        if let Some(current) = player.get_entity().get_vehicle() {
+            current.get_entity().remove_passenger(player.entity_id());
+        }
 
         world.play_sound(
             Sound::EntityCushionSit,

@@ -47,6 +47,23 @@ impl JavaClient {
                 player.try_send_client_packet(&CSetCamera::new(entity_id));
                 return;
             }
+            // `handleInteract` ignores a target outside the world border or out of reach
+            // (`isWithinEntityInteractionRange(bounds, 3.0)`).
+            if action != ActionType::Attack {
+                let target_entity = target.get_entity();
+                let block_pos = target_entity.block_pos.load();
+                let in_border = world
+                    .worldborder
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .contains_block(block_pos.0.x, block_pos.0.z);
+                if !in_border
+                    || !player
+                        .is_within_entity_interaction_range(&target_entity.bounding_box.load(), 3.0)
+                {
+                    return;
+                }
+            }
             send_cancellable_blocking! {{
                 server;
                 PlayerInteractEntityEvent::new(
@@ -124,7 +141,12 @@ impl JavaClient {
                             let swing_animation =
                                 player.inventory().get_stack_in_hand(hand).get_interact_animation();
                             if let InteractionResult::Success { swing } =
-                                player.interact_on(&event.target, hand, server)
+                                player.interact_on(
+                                    &event.target,
+                                    hand,
+                                    interact.target_position.unwrap_or_default(),
+                                    server,
+                                )
                             {
                                 player.swing_for_interaction(hand, swing_animation, swing);
                             }

@@ -449,7 +449,12 @@ impl BedrockClient {
                 match event.action {
                     ActionType::Interact | ActionType::InteractAt => {
                         // Bedrock's packet names no hand: the main hand interacts.
-                        player.interact_on(&event.target, pumpkin_util::Hand::Right, &server);
+                        player.interact_on(
+                            &event.target,
+                            pumpkin_util::Hand::Right,
+                            pumpkin_util::math::vector3::Vector3::default(),
+                            &server,
+                        );
                     }
                     ActionType::Attack => player.attack(&event.target),
                 }

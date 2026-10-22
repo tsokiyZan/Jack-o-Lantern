@@ -3614,6 +3614,21 @@ impl Player {
         self.swing_and_reset_attack_strength(hand, animation, send_to_swinging_entity);
     }
 
+    /// Vanilla `Player.isWithinEntityInteractionRange(aabb, buffer)`: the box within the
+    /// `entity_interaction_range` attribute plus `buffer` of the eyes.
+    #[must_use]
+    pub fn is_within_entity_interaction_range(
+        &self,
+        bounding_box: &pumpkin_util::math::boundingbox::BoundingBox,
+        buffer: f64,
+    ) -> bool {
+        let max_range = self
+            .living_entity
+            .get_attribute_value(&pumpkin_data::attributes::Attributes::ENTITY_INTERACTION_RANGE)
+            + buffer;
+        bounding_box.squared_magnitude(self.eye_position()) < max_range * max_range
+    }
+
     /// Vanilla `Player.interactOn`: right-clicking `target` with the stack in `hand`. The
     /// entity's own `interact` goes first; when it passes, the stack is used on a living
     /// target (`ItemStack.interactLivingEntity`). A player with infinite materials keeps a
@@ -3622,6 +3637,7 @@ impl Player {
         self: &Arc<Self>,
         target: &Arc<dyn EntityBase>,
         hand: Hand,
+        location: Vector3<f64>,
         server: &Server,
     ) -> InteractionResult {
         if self.gamemode.load() == GameMode::Spectator {
@@ -3631,7 +3647,7 @@ impl Player {
         let before = inventory.get_stack_in_hand(hand);
         let mut stack = before.clone();
         let infinite_materials = self.has_infinite_materials();
-        let interact = target.interact(self, hand, &mut stack);
+        let interact = target.interact_at(self, hand, location, &mut stack);
         let result = if interact.consumes_action() {
             // `itemStack == getItemInHand(hand)`: the same stack, only shrunk.
             if infinite_materials

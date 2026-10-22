@@ -1,4 +1,6 @@
 use crate::item::interaction_result::InteractionResult;
+use pumpkin_data::data_component_impl::EquipmentSlot;
+use pumpkin_data::sound::Sound;
 use pumpkin_util::Hand;
 use std::sync::{
     Arc, Weak,
@@ -522,31 +524,68 @@ impl Mob for WolfEntity {
             .unwrap_or_default();
         let ambient = sound_variant.ambient_sound(self.is_baby());
         if self.is_tame() {
-            if self.is_food(item_stack)
-                && self.mob_entity.living_entity.health.load()
-                    < self.mob_entity.living_entity.get_max_health()
-            {
-                item_stack.decrement_unless_creative(player.gamemode.load(), 1);
-                self.mob_entity.living_entity.heal(2.0);
+            let living = &self.mob_entity.living_entity;
+            if self.is_food(item_stack) && living.health.load() < living.get_max_health() {
+                // `TamableAnimal.feed(player, hand, itemStack, 2.0F, 2.0F)`.
+                self.feed(player, item_stack, 2.0, 2.0);
                 self.play_eating_sound(ambient);
                 return InteractionResult::SUCCESS;
             }
 
-            if self.is_owned_by(&player.gameprofile.id) {
-                if let Some(color) = super::animal::get_dye_color_from_item(item)
-                    && color != self.get_collar_color()
+            let owned = self.is_owned_by(&player.gameprofile.id);
+            if !item.has_tag(&tag::Item::MINECRAFT_WOLF_COLLAR_DYES) || !owned {
+                let body = self.mob_entity.get_item_slot(&EquipmentSlot::BODY);
+                if self.is_equippable_in_slot(item_stack, &EquipmentSlot::BODY)
+                    && body.is_empty()
+                    && owned
+                    && !self.is_baby()
                 {
-                    self.set_collar_color(color);
+                    self.mob_entity.set_item_slot_and_drop_when_killed(
+                        &EquipmentSlot::BODY,
+                        item_stack.copy_with_count(1),
+                    );
                     item_stack.decrement_unless_creative(player.gamemode.load(), 1);
                     return InteractionResult::SUCCESS;
                 }
 
+                // Repairing worn armor while sitting: an eighth of its max durability per item.
+                if self.is_in_sitting_pose()
+                    && !body.is_empty()
+                    && owned
+                    && body.is_damageable()
+                    && body.get_damage() > 0
+                    && body.is_valid_repair_item(item_stack)
+                {
+                    item_stack.decrement(1);
+                    self.play_sound_at_self(Sound::ItemWolfArmorRepair, 1.0, 1.0);
+                    let mut armor = body;
+                    let repair_unit = (armor.get_max_damage().unwrap_or(0) as f32 * 0.125) as i32;
+                    armor.set_damage((armor.get_damage() - repair_unit).max(0));
+                    self.mob_entity.set_item_slot(&EquipmentSlot::BODY, armor);
+                    return InteractionResult::SUCCESS;
+                }
+
                 let parent_interaction = self.animal_interact(player, item_stack, ambient);
-                if !parent_interaction.consumes_action() {
+                if !parent_interaction.consumes_action() && owned {
                     self.set_ordered_to_sit(!self.is_ordered_to_sit());
+                    self.mob_entity
+                        .navigator
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner)
+                        .stop();
+                    self.mob_entity.set_target(None);
+                    // `SUCCESS.withoutItem()`.
                     return InteractionResult::SUCCESS;
                 }
                 return parent_interaction;
+            }
+
+            if let Some(color) = super::animal::get_dye_color_from_item(item)
+                && color != self.get_collar_color()
+            {
+                self.set_collar_color(color);
+                item_stack.decrement_unless_creative(player.gamemode.load(), 1);
+                return InteractionResult::SUCCESS;
             }
         } else if item == &Item::BONE && !self.mob_entity.is_attacking() {
             item_stack.decrement_unless_creative(player.gamemode.load(), 1);

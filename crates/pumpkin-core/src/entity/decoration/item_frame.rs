@@ -397,6 +397,19 @@ impl EntityBase for ItemFrameEntity {
             self.entity.play_sound(self.get_rotate_item_sound());
             InteractionResult::SUCCESS
         } else if has_held_item && !self.entity.removed.load(Ordering::Relaxed) {
+            // `MapItem.getSavedData(itemStack).isTrackedCountOverLimit(256)`: a map already
+            // showing too many frames and banners isn't framed.
+            if let Some(map_id) =
+                item_stack.get_data_component::<pumpkin_data::data_component_impl::MapIdImpl>()
+                && let Some(server) = self.entity.world.load().server.upgrade()
+                && let Some(map_data) = server.map_manager.get_map(map_id.id)
+                && map_data
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .is_tracked_count_over_limit(256)
+            {
+                return InteractionResult::FAIL;
+            }
             let mut new_stack = item_stack.clone();
             new_stack.item_count = 1;
             self.set_item(new_stack, true);

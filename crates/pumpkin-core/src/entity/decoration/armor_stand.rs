@@ -1,6 +1,7 @@
 use std::sync::atomic::{AtomicI32, AtomicI64, AtomicU8, Ordering};
 
-use crate::entity::{Entity, EntityBase, living::LivingEntity};
+use crate::entity::{Entity, EntityBase, living::LivingEntity, player::Player};
+use crate::item::interaction_result::InteractionResult;
 use crossbeam::atomic::AtomicCell;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::{
@@ -194,6 +195,139 @@ impl ArmorStandEntity {
         self.rotation.store(packed.to_owned());
     }
 
+    /// Vanilla `LivingEntity.getItemBySlot`.
+    fn item_by_slot(&self, slot: &EquipmentSlot) -> ItemStack {
+        self.living_entity
+            .entity_equipment
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get(slot)
+    }
+
+    /// Vanilla `LivingEntity.setItemSlot`, with `onEquipItem`'s equip sound and game event.
+    fn set_item_slot(&self, slot: &EquipmentSlot, stack: ItemStack) {
+        let old = self
+            .living_entity
+            .entity_equipment
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .put(slot, stack);
+        let stack = self.item_by_slot(slot);
+        let entity = self.get_entity();
+        // `firstTick`: nothing sounds before the first tick.
+        if old.are_items_and_components_equal(&stack)
+            || entity.tick_count.load(Ordering::Relaxed) == 0
+        {
+            return;
+        }
+        let world = entity.world.load();
+        let pos = entity.pos.load();
+        let equippable =
+            stack.get_data_component::<pumpkin_data::data_component_impl::EquippableImpl>();
+        if let Some(equippable) = equippable
+            && !entity.is_silent()
+            && equippable.slot == slot
+        {
+            let seed = {
+                use pumpkin_util::random::RandomImpl;
+                entity.random().next_i64()
+            };
+            world.play_seeded_sound_event(
+                &equippable.equip_sound,
+                SoundCategory::Neutral,
+                &pos,
+                seed,
+            );
+        }
+        let event = if equippable.is_some() {
+            pumpkin_data::game_event::GameEvent::Equip
+        } else {
+            pumpkin_data::game_event::GameEvent::Unequip
+        };
+        world.game_event_from(Some(self), event, pos);
+    }
+
+    /// Vanilla `LivingEntity.getEquipmentSlotForItem` for the armor stand.
+    fn equipment_slot_for_item(&self, stack: &ItemStack) -> EquipmentSlot {
+        stack
+            .get_data_component::<pumpkin_data::data_component_impl::EquippableImpl>()
+            .filter(|equippable| self.can_use_slot(equippable.slot))
+            .map_or(EquipmentSlot::MAIN_HAND, |equippable| {
+                equippable.slot.clone()
+            })
+    }
+
+    fn has_item_in_slot(&self, slot: &EquipmentSlot) -> bool {
+        !self.item_by_slot(slot).is_empty()
+    }
+
+    /// Vanilla `ArmorStand.getClickedSlot`: the slot at the clicked height.
+    fn clicked_slot(&self, location: Vector3<f64>) -> EquipmentSlot {
+        let small = self.is_small();
+        // `getScale() * getAgeScale()`: a small stand counts as a baby.
+        let age_scale = if small { 0.5 } else { 1.0 };
+        let y = location.y / (f64::from(self.living_entity.get_scale()) * age_scale);
+        if y >= 0.1
+            && y < 0.1 + if small { 0.8 } else { 0.45 }
+            && self.has_item_in_slot(&EquipmentSlot::FEET)
+        {
+            EquipmentSlot::FEET
+        } else if y >= 0.9 + if small { 0.3 } else { 0.0 }
+            && y < 0.9 + if small { 1.0 } else { 0.7 }
+            && self.has_item_in_slot(&EquipmentSlot::CHEST)
+        {
+            EquipmentSlot::CHEST
+        } else if y >= 0.4
+            && y < 0.4 + if small { 1.0 } else { 0.8 }
+            && self.has_item_in_slot(&EquipmentSlot::LEGS)
+        {
+            EquipmentSlot::LEGS
+        } else if y >= 1.6 && self.has_item_in_slot(&EquipmentSlot::HEAD) {
+            EquipmentSlot::HEAD
+        } else if !self.has_item_in_slot(&EquipmentSlot::MAIN_HAND)
+            && self.has_item_in_slot(&EquipmentSlot::OFF_HAND)
+        {
+            EquipmentSlot::OFF_HAND
+        } else {
+            EquipmentSlot::MAIN_HAND
+        }
+    }
+
+    /// Vanilla `ArmorStand.swapItem`: trades `player_stack` (the stack in the interacting
+    /// hand) for the stand's item in `slot`, unless the disabled-slot bits forbid taking or
+    /// placing there.
+    fn swap_item(
+        &self,
+        player: &Player,
+        slot: &EquipmentSlot,
+        player_stack: &mut ItemStack,
+    ) -> bool {
+        use pumpkin_inventory::screen_handler::InventoryPlayer;
+        let stand_stack = self.item_by_slot(slot);
+        let disabled = self.disabled_slots.load(Ordering::Relaxed);
+        if !stand_stack.is_empty() && disabled & (1 << slot.get_offset_entity_slot_id(8)) != 0 {
+            return false;
+        }
+        if stand_stack.is_empty() && disabled & (1 << slot.get_offset_entity_slot_id(16)) != 0 {
+            return false;
+        }
+        if player.has_infinite_materials() && stand_stack.is_empty() && !player_stack.is_empty() {
+            self.set_item_slot(slot, player_stack.copy_with_count(1));
+            return true;
+        }
+        if player_stack.is_empty() || player_stack.item_count <= 1 {
+            self.set_item_slot(slot, player_stack.clone());
+            // `player.setItemInHand(hand, itemStack)`.
+            *player_stack = stand_stack;
+            return true;
+        }
+        if !stand_stack.is_empty() {
+            return false;
+        }
+        self.set_item_slot(slot, player_stack.split(1));
+        true
+    }
+
     fn break_and_drop_items(&self) {
         let entity = self.get_entity();
         //let name = entity.custom_name.unwrap_or(entity.get_name());
@@ -239,6 +373,47 @@ impl ArmorStandEntity {
 }
 
 impl EntityBase for ArmorStandEntity {
+    /// Vanilla `ArmorStand.interact`: an empty hand takes the item at the clicked height,
+    /// anything else goes into its own slot, swapping with what is there.
+    fn interact_at(
+        &self,
+        player: &std::sync::Arc<Player>,
+        _hand: pumpkin_util::Hand,
+        location: Vector3<f64>,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
+        if self.is_marker() || item_stack.item == &Item::NAME_TAG {
+            // `Entity.interact`: no leash on an armor stand.
+            return InteractionResult::PASS;
+        }
+        if player.gamemode.load() == pumpkin_util::GameMode::Spectator {
+            return InteractionResult::SUCCESS;
+        }
+        let item_slot = self.equipment_slot_for_item(item_stack);
+        if item_stack.is_empty() {
+            let clicked = self.clicked_slot(location);
+            let target = if self.is_slot_disabled(&clicked) {
+                item_slot
+            } else {
+                clicked
+            };
+            if self.has_item_in_slot(&target) && self.swap_item(player, &target, item_stack) {
+                return InteractionResult::SUCCESS_SERVER;
+            }
+        } else {
+            if self.is_slot_disabled(&item_slot) {
+                return InteractionResult::FAIL;
+            }
+            if item_slot.slot_type() == EquipmentType::Hand && !self.should_show_arms() {
+                return InteractionResult::FAIL;
+            }
+            if self.swap_item(player, &item_slot, item_stack) {
+                return InteractionResult::SUCCESS_SERVER;
+            }
+        }
+        InteractionResult::PASS
+    }
+
     /// Vanilla `ArmorStand.isPickable`.
     fn can_hit(&self) -> bool {
         !self.get_entity().is_removed() && !self.is_marker()
