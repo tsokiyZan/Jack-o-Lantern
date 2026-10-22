@@ -235,6 +235,7 @@ impl Mob for PufferfishEntity {
             player,
             item_stack,
             &pumpkin_data::item::Item::PUFFERFISH_BUCKET,
+            |bucket| crate::entity::bucketable::save_fish_to_bucket_tag(self, bucket),
         )
     }
 

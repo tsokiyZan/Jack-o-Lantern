@@ -50,16 +50,31 @@ impl<S: crate::source::CommandSource> ArgumentType<S> for ItemStackArgumentType 
             let mut patch = Vec::new();
             while reader.can_read_char() && reader.peek() != Some(']') {
                 let key_start = reader.cursor();
+                // An identifier: `salmon/size` and the other `/` paths included.
                 while let Some(c) = reader.peek() {
-                    if c.is_alphanumeric() || c == '_' || c == ':' || c == '.' || c == '-' {
+                    if c.is_alphanumeric()
+                        || c == '_'
+                        || c == ':'
+                        || c == '/'
+                        || c == '.'
+                        || c == '-'
+                    {
                         reader.skip();
                     } else {
                         break;
                     }
                 }
-                let key_str = reader.string()[key_start..reader.cursor()]
-                    .trim()
-                    .to_string();
+                if reader.cursor() == key_start {
+                    // Nothing this loop understands; stop instead of spinning on it.
+                    break;
+                }
+                let key_str = reader.string()[key_start..reader.cursor()].trim();
+                // `Identifier.read`: the namespace defaults to `minecraft`.
+                let key_str = if key_str.contains(':') {
+                    key_str.to_string()
+                } else {
+                    format!("minecraft:{key_str}")
+                };
 
                 reader.skip_whitespace();
                 if reader.peek() == Some('=') {

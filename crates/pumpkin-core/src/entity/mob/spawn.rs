@@ -35,6 +35,14 @@ pub enum SpawnGroupData {
         is_baby: bool,
         can_spawn_jockey: bool,
     },
+    /// Vanilla `AbstractSchoolingFish.SchoolSpawnGroupData`, or `TropicalFish.TropicalFishGroupData`
+    /// when it carries the group's packed variant. The leader's own `finalize_spawn` returns it
+    /// with no leader; the free `finalize_spawn`, which holds the shared entity, makes it the
+    /// leader.
+    School {
+        leader: Option<Arc<dyn EntityBase>>,
+        tropical_variant: Option<i32>,
+    },
 }
 
 impl SpawnGroupData {
@@ -196,7 +204,15 @@ pub fn finalize_spawn(
     group_data: Option<SpawnGroupData>,
 ) -> Option<SpawnGroupData> {
     match entity.get_mob() {
-        Some(mob) => mob.finalize_spawn(world, reason, group_data),
+        Some(mob) => {
+            let mut group_data = mob.finalize_spawn(world, reason, group_data);
+            if let Some(SpawnGroupData::School { leader, .. }) = &mut group_data
+                && leader.is_none()
+            {
+                *leader = Some(entity.clone());
+            }
+            group_data
+        }
         None => group_data,
     }
 }

@@ -2130,6 +2130,19 @@ pub trait Mob: EntityBase + Send + Sync {
     /// Vanilla `Bucketable.setFromBucket`, for the mobs that keep the flag.
     fn set_from_bucket(&self, _from_bucket: bool) {}
 
+    /// Vanilla `Entity.applyImplicitComponents` for components a mob keeps beyond its
+    /// variant name (salmon size, tropical fish pattern and colours): applies those `item`
+    /// carries and returns whether this mob took any.
+    fn mob_apply_item_components(&self, _item: &pumpkin_data::item_stack::ItemStack) -> bool {
+        false
+    }
+
+    /// Vanilla `Mob.isMaxGroupSizeReached`: whether a natural spawn group stops at
+    /// `group_size`.
+    fn is_max_group_size_reached(&self, _group_size: i32) -> bool {
+        false
+    }
+
     /// A vanilla `actuallyHurt` override that takes the hit instead of the mob: whether it did.
     fn absorb_hurt(
         &self,

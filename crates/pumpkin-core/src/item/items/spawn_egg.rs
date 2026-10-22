@@ -116,6 +116,12 @@ pub(crate) fn apply_entity_variant(item: &ItemStack, mob: &dyn EntityBase, user:
 }
 
 fn apply_variant(item: &ItemStack, mob: &dyn EntityBase) {
+    if mob
+        .get_mob()
+        .is_some_and(|mob| mob.mob_apply_item_components(item))
+    {
+        return;
+    }
     macro_rules! apply_variant {
         ($($ty:ty),+ $(,)?) => {
             $(
