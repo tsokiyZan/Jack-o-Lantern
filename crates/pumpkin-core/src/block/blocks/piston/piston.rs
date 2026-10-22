@@ -36,17 +36,35 @@ impl BlockMetadata for PistonBlock {
 }
 
 impl PistonBlock {
+    /// Vanilla `PistonBaseBlock.isPushable`.
     #[must_use]
     pub fn is_movable(
+        world: &World,
+        pos: &BlockPos,
         block: &Block,
         state: &BlockState,
         dir: BlockDirection,
         can_break: bool,
         piston_dir: BlockDirection,
     ) -> bool {
-        // TODO: more checks
+        let y = pos.0.y;
+        if y < world.get_bottom_y()
+            || y > world.get_top_y()
+            || !world
+                .worldborder
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .contains_block(pos.0.x, pos.0.z)
+        {
+            return false;
+        }
         if state.is_air() {
             return true;
+        }
+        if dir == BlockDirection::Down && y == world.get_bottom_y()
+            || dir == BlockDirection::Up && y == world.get_top_y()
+        {
+            return false;
         }
         // Vanilla hardcoded them aswell
         if block == &Block::OBSIDIAN
@@ -263,7 +281,7 @@ impl PistonBlock {
             if !piston_piece {
                 if r#type != 1
                     || state.is_air()
-                    || !Self::is_movable(block, state, dir.opposite(), false, dir)
+                    || !Self::is_movable(world, &pull_pos, block, state, dir.opposite(), false, dir)
                     || state.piston_behavior != PistonBehavior::Normal
                         && block != &Block::PISTON
                         && block != &Block::STICKY_PISTON
