@@ -1,5 +1,6 @@
 #[allow(clippy::wildcard_imports)]
 use super::*;
+use crate::entity::player::cooldown_group;
 use crate::item::registry::should_try_block_placement;
 
 impl JavaClient {
@@ -139,9 +140,8 @@ impl JavaClient {
             PlayerInventory::OFF_HAND_SLOT
         };
 
-        if item.is_empty() {
-            // TODO item cool down
-            // If the hand is empty we stop here
+        // An item on cooldown is not used on the block, nor placed.
+        if item.is_empty() || player.is_on_cooldown(&cooldown_group(&item)) {
             return Ok(());
         }
 

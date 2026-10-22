@@ -24,6 +24,12 @@ impl JavaClient {
         self.update_sequence(use_item.sequence.0);
 
         let mut item_in_hand = inventory.get_stack_in_hand(hand);
+        // `ServerPlayerGameMode.useItem`: spectators and items on cooldown pass.
+        if player.gamemode.load() == GameMode::Spectator
+            || player.is_on_cooldown(&cooldown_group(&item_in_hand))
+        {
+            return;
+        }
 
         let mut consume_event =
             crate::plugin::api::events::player::player_item_consume::PlayerItemConsumeEvent::new(
@@ -86,10 +92,6 @@ impl JavaClient {
 
     fn prepare_hand_item_for_use(player: &Arc<Player>, hand: Hand, held: &mut ItemStack) {
         let inventory = player.inventory();
-
-        if held.get_use_cooldown().is_some() && player.is_on_cooldown(&cooldown_group(held)) {
-            return;
-        }
 
         if held.get_data_component::<ConsumableImpl>().is_some()
             || held.get_data_component::<BlocksAttacksImpl>().is_some()

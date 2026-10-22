@@ -330,10 +330,7 @@ impl BedrockClient {
                     let stack_for_use = held.clone();
 
                     {
-                        let cooldown_active = held.get_use_cooldown().is_some()
-                            && player.is_on_cooldown(&cooldown_group(&held));
-
-                        if !cooldown_active {
+                        if !player.is_on_cooldown(&cooldown_group(&held)) {
                             // Bedrock can repeat click-air while using an item. Do not
                             // restart its server-side use timer on these timed inputs.
                             let already_using =

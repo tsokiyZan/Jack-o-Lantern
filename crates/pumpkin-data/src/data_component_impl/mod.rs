@@ -1158,6 +1158,23 @@ mod tests {
             .get_hash(),
             -982_207_288
         );
+        // An axe, and both fields set (vanilla `Weapon.CODEC` through `HashOps`).
+        assert_eq!(
+            WeaponImpl {
+                item_damage_per_attack: 1,
+                disable_blocking_for_seconds: 5.0,
+            }
+            .get_hash(),
+            1_437_456_533
+        );
+        assert_eq!(
+            WeaponImpl {
+                item_damage_per_attack: 3,
+                disable_blocking_for_seconds: 2.5,
+            }
+            .get_hash(),
+            211_448_302
+        );
         assert_eq!(
             InteractAnimationImpl(SwingAnimationImpl {
                 animation_type: SwingAnimationType::Stab,
