@@ -13,6 +13,9 @@ impl JavaClient {
             self.try_kick(&TextComponent::text("Invalid hand"));
             return;
         };
+        // Vanilla `handlePunch` resets it on every punch, so a plugin cancelling the swing
+        // doesn't keep it.
+        player.reset_attack_strength_ticker();
 
         let mut anim_event = crate::plugin::api::events::player::player_animation::PlayerAnimationEvent::new(
             player.clone(),

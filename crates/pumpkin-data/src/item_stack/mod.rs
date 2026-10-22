@@ -736,6 +736,19 @@ impl ItemStack {
         (a.is_empty() && b.is_empty()) || a.are_equal(b)
     }
 
+    /// Vanilla `ItemStack.isSameItem`: the same item, an empty stack counting as air.
+    #[must_use]
+    pub fn is_same_item(a: &Self, b: &Self) -> bool {
+        let item = |stack: &Self| {
+            if stack.is_empty() {
+                Item::AIR.id
+            } else {
+                stack.item.id
+            }
+        };
+        item(a) == item(b)
+    }
+
     /// Vanilla `ItemStack.isBroken`: a damageable stack worn down to its maximum damage.
     #[must_use]
     pub fn is_broken(&self) -> bool {

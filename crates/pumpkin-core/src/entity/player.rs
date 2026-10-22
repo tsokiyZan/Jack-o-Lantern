@@ -240,7 +240,7 @@ use pumpkin_data::attributes::Attributes;
 use pumpkin_data::block_properties::HorizontalFacing;
 use pumpkin_data::damage::DamageType;
 use pumpkin_data::data_component_impl::{
-    BlocksAttacksImpl, EquipmentSlot, EquippableImpl, ToolImpl, WeaponImpl,
+    BlocksAttacksImpl, EquipmentSlot, EquippableImpl, MinimumAttackChargeImpl, ToolImpl, WeaponImpl,
 };
 use pumpkin_data::effect::StatusEffect;
 use pumpkin_data::entity::{EntityPose, EntityStatus, EntityType};
@@ -496,6 +496,8 @@ pub struct Player {
     pub ping: AtomicU32,
     /// The amount of ticks since the player's last attack.
     pub last_attacked_ticks: AtomicU32,
+    /// Vanilla `Player.lastItemInMainHand`: switching to another item resets the attack strength.
+    last_item_in_main_hand: std::sync::Mutex<ItemStack>,
     /// The player's last known experience level.
     pub last_sent_xp: AtomicI32,
     pub last_sent_health: AtomicI32,
@@ -813,6 +815,7 @@ impl Player {
             last_action_time: AtomicCell::new(std::time::Instant::now()),
             ping: AtomicU32::new(0),
             last_attacked_ticks: AtomicU32::new(0),
+            last_item_in_main_hand: std::sync::Mutex::new(ItemStack::EMPTY.clone()),
             client_loaded: AtomicBool::new(initially_loaded),
             bedrock_spawned: AtomicBool::new(false),
             client_loaded_timeout: AtomicU32::new(if initially_loaded { 0 } else { 60 }),
@@ -1496,7 +1499,8 @@ impl Player {
         } else {
             f64::from(self.get_attack_strength_scale(0.5))
         };
-        self.last_attacked_ticks.store(0, Ordering::Relaxed);
+        // Vanilla `onAttack` (`resetOnlyAttackStrengthTicker`).
+        self.reset_attack_strength_ticker();
 
         // Vanilla `baseDamageScaleFactor`.
         if attack_cooldown_progress < 1.0 {
@@ -3186,13 +3190,29 @@ impl Player {
                 }
             }
         }
-        self.last_attacked_ticks.fetch_add(1, Ordering::Relaxed);
 
         // Vanilla `Player.aiStep`: flying ends any fall.
         if self.is_flying() && !self.living_entity.entity.has_vehicle() {
             self.living_entity.entity.reset_fall_distance();
         }
         self.living_entity.tick(self, server);
+
+        // Vanilla `Player.tick` after `super.tick()`: an item used up or swapped during the
+        // living tick already counts this tick.
+        self.last_attacked_ticks.fetch_add(1, Ordering::Relaxed);
+        {
+            let main_hand = self.inventory.held_item();
+            let mut last = self
+                .last_item_in_main_hand
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            if !ItemStack::matches(&last, &main_hand) {
+                if !ItemStack::is_same_item(&last, &main_hand) {
+                    self.reset_attack_strength_ticker();
+                }
+                *last = main_hand;
+            }
+        }
 
         let level_info = self.world().level_info.load();
         if level_info.difficulty == Difficulty::Peaceful
@@ -3487,11 +3507,36 @@ impl Player {
             * 20.0) as f32
     }
 
+    /// Vanilla `Player.cannotAttackWithItem`: the item's `minimum_attack_charge` isn't reached
+    /// even `tolerance` ticks from now.
+    pub fn cannot_attack_with_item(&self, item_stack: &ItemStack, tolerance: u32) -> bool {
+        let required_strength = item_stack
+            .get_data_component::<MinimumAttackChargeImpl>()
+            .map_or(0.0, |charge| charge.charge);
+        let optimistic_strength = (self.last_attacked_ticks.load(Ordering::Acquire) + tolerance)
+            as f32
+            / self.get_current_item_attack_strength_delay();
+        required_strength > 0.0 && optimistic_strength < required_strength
+    }
+
     /// Vanilla `Player.getAttackStrengthScale`.
     pub fn get_attack_strength_scale(&self, a: f32) -> f32 {
         ((self.last_attacked_ticks.load(Ordering::Acquire) as f32 + a)
             / self.get_current_item_attack_strength_delay())
         .clamp(0.0, 1.0)
+    }
+
+    /// Vanilla `Player.resetAttackStrengthTicker`. Pumpkin has no `itemSwapTicker`, which only
+    /// the client's hand rendering reads.
+    pub fn reset_attack_strength_ticker(&self) {
+        self.last_attacked_ticks.store(0, Ordering::Relaxed);
+    }
+
+    /// Vanilla `ServerPlayer.swingAndResetAttackStrength`. Pumpkin has no swing state, so every
+    /// swing counts as started.
+    pub fn swing_and_reset_attack_strength(&self, hand: Hand, all: bool) {
+        self.swing_hand(hand, all);
+        self.reset_attack_strength_ticker();
     }
 
     pub async fn fire_packet_sent<P: Send + Sync + std::any::Any>(
@@ -5438,6 +5483,8 @@ impl Player {
     }
 
     pub fn drop_held_item(&self, drop_stack: bool) {
+        // Vanilla `ServerPlayer.drop` resets it whether or not anything drops.
+        self.reset_attack_strength_ticker();
         let mut item_stack = self.inventory().held_item();
 
         if item_stack.is_empty() {

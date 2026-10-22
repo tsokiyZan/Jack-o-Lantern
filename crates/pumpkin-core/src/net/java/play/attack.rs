@@ -51,6 +51,9 @@ impl JavaClient {
                 return;
             }
         }
+        if player.cannot_attack_with_item(&player.inventory().held_item(), 5) {
+            return;
+        }
         player.attack(&target);
     }
 }

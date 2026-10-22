@@ -81,12 +81,6 @@ impl ItemBehaviour for SpearItem {
             return;
         };
 
-        let attack_delay = player.get_current_item_attack_strength_delay();
-        let elapsed = player.last_attacked_ticks.load(Ordering::Acquire) as f32;
-        if elapsed + 5.0 < attack_delay {
-            return;
-        }
-
         let damage = Self::attack_damage(player, stack) as f32;
         let mut hit_something = false;
         for target in Self::targets_in_range(player, &server, stack) {
@@ -104,7 +98,8 @@ impl ItemBehaviour for SpearItem {
                 },
             );
         }
-        player.last_attacked_ticks.store(0, Ordering::Relaxed);
+        // `onAttack`.
+        player.reset_attack_strength_ticker();
 
         let position = player.position();
         if hit_something && let Some(sound) = piercing.hit_sound.as_ref() {
@@ -113,7 +108,7 @@ impl ItemBehaviour for SpearItem {
         if let Some(sound) = piercing.sound.as_ref() {
             world.play_sound_event_expect(player, sound, SoundCategory::Players, &position);
         }
-        player.swing_hand(Hand::Right, false);
+        player.swing_and_reset_attack_strength(Hand::Right, false);
     }
 
     fn on_use_tick(&self, stack: &ItemStack, player: &Player, remaining_use_ticks: i32) {

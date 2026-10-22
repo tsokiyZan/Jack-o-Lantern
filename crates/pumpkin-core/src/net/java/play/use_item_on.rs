@@ -128,7 +128,7 @@ impl JavaClient {
                 // TODO: Trigger ANY_BLOCK_USE Criteria
 
                 if matches!(result, BlockActionResult::SuccessServer) {
-                    player.swing_hand(hand, true);
+                    player.swing_and_reset_attack_strength(hand, true);
                 }
                 return Ok(());
             }
@@ -171,7 +171,7 @@ impl JavaClient {
         let after = item.clone();
 
         if matches!(item_result, BlockActionResult::SuccessServer) {
-            player.swing_hand(hand, true);
+            player.swing_and_reset_attack_strength(hand, true);
         }
 
         // Broadcast the break entity status before the slot sync; the client

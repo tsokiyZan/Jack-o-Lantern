@@ -254,6 +254,9 @@ impl JavaClient {
                     }
 
                     let stack = player.inventory().held_item();
+                    if player.cannot_attack_with_item(&stack, 5) {
+                        return;
+                    }
                     server.item_registry.on_spear_jab(&stack, player);
                 }
                 // The block being mined does not change, so there is nothing to update
