@@ -48,6 +48,7 @@ use pumpkin_protocol::{
         CTeleportEntity, Metadata, MetadataSerializer,
     },
 };
+use pumpkin_util::math::quaternion::Quaternionf;
 use pumpkin_util::math::vector3::Axis;
 use pumpkin_util::math::{
     boundingbox::{AttachmentPoints, BoundingBox, EntityAttachments, EntityDimensions},
@@ -4214,6 +4215,19 @@ impl Entity {
             f64::from(-x_sin),
             f64::from(y_cos * x_cos),
         )
+    }
+
+    /// Vanilla `Entity.getLookQuaternion`.
+    #[must_use]
+    pub fn get_look_quaternion(&self) -> Quaternionf {
+        Self::calculate_view_quaternion(self.pitch.load(), self.yaw.load())
+    }
+
+    /// Vanilla `Entity.calculateViewQuaternion`.
+    #[must_use]
+    pub fn calculate_view_quaternion(x_rot: f32, y_rot: f32) -> Quaternionf {
+        let to_radians = (std::f64::consts::PI / 180.0) as f32;
+        Quaternionf::rotation_y(-y_rot * to_radians).rotate_x(x_rot * to_radians)
     }
 
     pub fn get_horizontal_facing(&self) -> HorizontalFacing {

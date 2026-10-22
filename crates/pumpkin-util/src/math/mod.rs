@@ -12,6 +12,7 @@ pub mod float_provider;
 pub mod int_provider;
 pub mod pool;
 pub mod position;
+pub mod quaternion;
 pub mod vector2;
 pub mod vector3;
 pub mod vertical_surface_type;

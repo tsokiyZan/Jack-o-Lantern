@@ -762,8 +762,9 @@ impl EnchantmentHelper {
         user: &dyn EntityBase,
         living: &LivingEntity,
     ) {
-        // `user.getWeaponItem()`, the main hand for every living entity.
-        let weapon = living.held_item(user);
+        let weapon = user
+            .get_weapon_item()
+            .unwrap_or_else(|| living.held_item(user));
         let item = EnchantedItemInUse::in_slot(&weapon, EquipmentSlot::MAIN_HAND, user);
         Self::run_iteration_on_item_in_slot(
             &item,
