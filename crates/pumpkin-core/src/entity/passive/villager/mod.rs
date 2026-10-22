@@ -11,6 +11,7 @@ use crate::entity::ai::pathfinder::node::PathType;
 use pumpkin_data::Enchantment;
 use pumpkin_data::attributes::Attributes;
 use pumpkin_data::block_properties::{BedPart, WhiteBedLikeProperties as BedProperties};
+use pumpkin_data::data_component_impl::VillagerFoodImpl;
 use pumpkin_data::effect::StatusEffect;
 use pumpkin_data::entity::{EntityPose, EntityType};
 use pumpkin_data::item::{Item, JavaToBedrockItemMapping};
@@ -36,6 +37,7 @@ use pumpkin_util::text::TextComponent;
 use pumpkin_util::version::JavaMinecraftVersion;
 
 use crate::entity::player::Player;
+use crate::entity::simple_container;
 use crate::entity::{
     Entity, EntityBase,
     ai::{
@@ -56,7 +58,6 @@ use crate::world::villager_poi::profession_for_block;
 pub mod data;
 pub use data::{
     BREEDING_FOOD_THRESHOLD, GossipType, VillagerData, VillagerProfession, VillagerType,
-    get_food_points,
 };
 
 pub(crate) fn trigger_trade_advancement(player: &Player) {
@@ -532,18 +533,21 @@ impl VillagerEntity {
         mob_arc
     }
 
+    /// Vanilla `Villager.countFoodPointsInInventory`: count times `villager_food` nutrition
+    /// over the inventory.
     pub fn count_food_points_in_inventory(&self) -> i32 {
         let inventory = self
             .inventory
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let mut total = 0;
-        for stack in inventory.iter() {
-            if !stack.is_empty() {
-                total += get_food_points(stack.get_item()) * stack.item_count as i32;
-            }
-        }
-        total
+        inventory
+            .iter()
+            .filter_map(|stack| {
+                stack
+                    .get_data_component::<VillagerFoodImpl>()
+                    .map(|food| i32::from(stack.item_count) * food.nutrition)
+            })
+            .sum()
     }
 
     fn poi_owner(&self) -> Option<Weak<dyn EntityBase>> {
@@ -556,32 +560,40 @@ impl VillagerEntity {
         Some(owner)
     }
 
+    /// Vanilla `Villager.hungry`.
+    fn hungry(&self) -> bool {
+        self.food_level.load(Ordering::Relaxed) < BREEDING_FOOD_THRESHOLD
+    }
+
+    /// Vanilla `Villager.eatUntilFull`: per slot, one item at a time, removing what was eaten
+    /// once full or once the slot is done.
     pub fn eat_until_full(&self) {
-        if self.food_level.load(Ordering::Relaxed) >= BREEDING_FOOD_THRESHOLD {
+        if !self.hungry() {
             return;
         }
         let mut inventory = self
             .inventory
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        for stack in inventory.iter_mut() {
-            if !stack.is_empty() {
-                let points = get_food_points(stack.get_item());
-                if points > 0 {
-                    while stack.item_count > 0
-                        && self.food_level.load(Ordering::Relaxed) < BREEDING_FOOD_THRESHOLD
-                    {
-                        self.food_level.fetch_add(points, Ordering::Relaxed);
-                        stack.item_count -= 1;
-                    }
-                    if stack.item_count == 0 {
-                        *stack = ItemStack::EMPTY.clone();
-                    }
-                    if self.food_level.load(Ordering::Relaxed) >= BREEDING_FOOD_THRESHOLD {
-                        break;
-                    }
+        for slot in 0..inventory.len() {
+            let stack = &inventory[slot];
+            let Some(nutrition) = stack
+                .get_data_component::<VillagerFoodImpl>()
+                .map(|food| food.nutrition)
+            else {
+                continue;
+            };
+            let item_count = stack.item_count;
+            let mut to_remove = 0;
+            for _ in 0..item_count {
+                self.food_level.fetch_add(nutrition, Ordering::Relaxed);
+                to_remove += 1;
+                if !self.hungry() {
+                    simple_container::remove_item(&mut inventory, slot, to_remove);
+                    return;
                 }
             }
+            simple_container::remove_item(&mut inventory, slot, to_remove);
         }
     }
 
@@ -1957,7 +1969,8 @@ impl Mob for VillagerEntity {
             nbt.put_compound("VillagerData", villager_data_nbt);
         };
 
-        nbt.put_int("FoodLevel", self.food_level.load(Ordering::Relaxed));
+        // Vanilla `putByte`.
+        nbt.put_byte("FoodLevel", self.food_level.load(Ordering::Relaxed) as i8);
         nbt.put_int("Xp", self.xp.load(Ordering::Relaxed));
         nbt.put_long(
             "LastRestock",
@@ -2089,9 +2102,12 @@ impl Mob for VillagerEntity {
             }
         }
 
-        if let Some(food) = nbt.get_int("FoodLevel") {
-            self.food_level.store(food, Ordering::Relaxed);
-        }
+        // Vanilla `getByteOr("FoodLevel", 0)`: any numeric tag, cut to a byte.
+        let food = nbt
+            .get("FoodLevel")
+            .and_then(NbtTag::as_numeric_int)
+            .map_or(0, |food| i32::from(food as i8));
+        self.food_level.store(food, Ordering::Relaxed);
         if let Some(xp) = nbt.get_int("Xp") {
             self.xp.store(xp, Ordering::Relaxed);
         }
@@ -2199,30 +2215,13 @@ impl Mob for VillagerEntity {
                 .inventory
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
-            // Vanilla `SimpleContainer.fromItemList`: clear the slots, then `addItem` each stack.
-            for slot in inventory.iter_mut() {
-                *slot = ItemStack::EMPTY.clone();
-            }
-            for tag in inventory_list {
-                if let Some(item_compound) = tag.extract_compound()
-                    && let Some(mut stack) = ItemStack::read_item_stack(item_compound)
-                {
-                    for slot in inventory.iter_mut() {
-                        if !slot.is_empty() && slot.are_items_and_components_equal(&stack) {
-                            let moved = stack
-                                .item_count
-                                .min(slot.get_max_stack_size().saturating_sub(slot.item_count));
-                            slot.item_count += moved;
-                            stack.item_count -= moved;
-                        }
-                    }
-                    if stack.item_count > 0
-                        && let Some(slot) = inventory.iter_mut().find(|slot| slot.is_empty())
-                    {
-                        *slot = stack;
-                    }
-                }
-            }
+            simple_container::from_item_list(
+                &mut inventory,
+                inventory_list
+                    .iter()
+                    .filter_map(NbtTag::extract_compound)
+                    .filter_map(ItemStack::read_item_stack),
+            );
         }
 
         // Gossips

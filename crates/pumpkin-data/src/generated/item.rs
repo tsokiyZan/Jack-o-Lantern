@@ -5216,6 +5216,7 @@ impl Item {
                     layers: IntProvider::Id(Cow::Borrowed("minecraft:compostable/medium")),
                 },
             ),
+            (VillagerFood, &VillagerFoodImpl { nutrition: 1i32 }),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -11104,6 +11105,7 @@ impl Item {
                     layers: IntProvider::Id(Cow::Borrowed("minecraft:compostable/medium_high")),
                 },
             ),
+            (VillagerFood, &VillagerFoodImpl { nutrition: 4i32 }),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -14669,6 +14671,7 @@ impl Item {
                     layers: IntProvider::Id(Cow::Borrowed("minecraft:compostable/medium")),
                 },
             ),
+            (VillagerFood, &VillagerFoodImpl { nutrition: 1i32 }),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -78484,6 +78487,7 @@ impl Item {
                     layers: IntProvider::Id(Cow::Borrowed("minecraft:compostable/medium")),
                 },
             ),
+            (VillagerFood, &VillagerFoodImpl { nutrition: 1i32 }),
             (
                 Enchantments,
                 &EnchantmentsImpl {

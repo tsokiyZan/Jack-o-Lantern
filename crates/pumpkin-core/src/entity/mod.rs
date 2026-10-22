@@ -104,6 +104,7 @@ pub mod passive;
 pub mod player;
 pub mod projectile;
 pub mod projectile_deflection;
+pub mod simple_container;
 pub mod spawn_util;
 pub mod synched_entity_data;
 pub mod tnt;
