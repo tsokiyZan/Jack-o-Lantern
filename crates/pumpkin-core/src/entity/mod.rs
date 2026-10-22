@@ -5385,6 +5385,17 @@ impl Entity {
             .clone()
     }
 
+    /// Vanilla `Entity.getControlledVehicle`: the vehicle this entity rides when it is that vehicle's
+    /// controlling passenger.
+    #[must_use]
+    pub fn get_controlled_vehicle(&self) -> Option<Arc<dyn EntityBase>> {
+        let vehicle = self.get_vehicle()?;
+        vehicle
+            .controlling_passenger()
+            .is_some_and(|c| c.get_entity().entity_id == self.entity_id)
+            .then_some(vehicle)
+    }
+
     pub fn is_leashed(&self) -> bool {
         self.leashed_to
             .lock()

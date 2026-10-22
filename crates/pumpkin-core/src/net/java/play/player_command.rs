@@ -45,7 +45,7 @@ impl JavaClient {
             Action::LeaveBed => player.wake_up(),
 
             Action::StartHorseJump => {
-                if let Some(vehicle) = controlled_vehicle(player)
+                if let Some(vehicle) = player.get_entity().get_controlled_vehicle()
                     && let Some(mob) = vehicle.get_mob()
                     && mob.can_jump()
                     && command.jump_boost.0 > 0
@@ -54,7 +54,7 @@ impl JavaClient {
                 }
             }
             Action::StopHorseJump => {
-                if let Some(vehicle) = controlled_vehicle(player)
+                if let Some(vehicle) = player.get_entity().get_controlled_vehicle()
                     && let Some(mob) = vehicle.get_mob()
                 {
                     mob.handle_stop_jump();
@@ -92,13 +92,4 @@ impl JavaClient {
             }
         }
     }
-}
-
-/// Vanilla `Player.getControlledVehicle`: the vehicle `player` rides and steers.
-fn controlled_vehicle(player: &Player) -> Option<Arc<dyn EntityBase>> {
-    let vehicle = player.get_entity().get_vehicle()?;
-    vehicle
-        .controlling_passenger()
-        .is_some_and(|controller| controller.get_entity().entity_id == player.entity_id())
-        .then_some(vehicle)
 }

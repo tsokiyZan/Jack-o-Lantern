@@ -197,10 +197,7 @@ impl Goal for BowAttackGoal {
                     if self.strafing_clockwise { 0.5 } else { -0.5 },
                 );
             // `getControlledVehicle`: the vehicle this mob steers.
-            if let Some(vehicle) = living.entity.get_vehicle()
-                && vehicle
-                    .controlling_passenger()
-                    .is_some_and(|rider| rider.get_entity().entity_id == living.entity.entity_id)
+            if let Some(vehicle) = living.entity.get_controlled_vehicle()
                 && let Some(vehicle) = vehicle.get_mob()
             {
                 vehicle

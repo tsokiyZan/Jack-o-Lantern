@@ -3747,15 +3747,7 @@ pub fn is_pathfinder_mob(entity: &dyn EntityBase) -> bool {
 /// pathfinding vehicle this mob steers (`getControlledVehicle`).
 pub fn turn_body_with_controlled_vehicle(mob: &dyn Mob) {
     let entity = mob.get_entity();
-    let vehicle = entity
-        .vehicle
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .clone();
-    if let Some(vehicle) = vehicle
-        && vehicle
-            .controlling_passenger()
-            .is_some_and(|c| c.get_entity().entity_id == entity.entity_id)
+    if let Some(vehicle) = entity.get_controlled_vehicle()
         && is_pathfinder_mob(vehicle.as_ref())
     {
         entity.body_yaw.store(vehicle.get_entity().body_yaw.load());
