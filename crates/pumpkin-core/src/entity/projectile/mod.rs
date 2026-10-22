@@ -417,8 +417,13 @@ impl ThrownItemEntity {
         let start_pos = entity.pos.load();
         let delta = velocity;
 
-        // Update position
-        let new_pos = start_pos.add(&delta);
+        // `getHitResultOnMoveVector`, then the move: to the hit location when something is
+        // hit, else the full step, before `Projectile.tick` (leaving the owner, the shoot
+        // game event) sees the new position.
+        let hit = self.hit_result_on_move_vector(start_pos, delta);
+        let new_pos = hit
+            .as_ref()
+            .map_or_else(|| start_pos.add(&delta), ProjectileHit::hit_pos);
         entity.set_pos(new_pos);
 
         // Send updated velocity to clients
@@ -426,16 +431,12 @@ impl ThrownItemEntity {
         let chunk_pos = entity.chunk_pos.load();
         world.broadcast_to_chunk(chunk_pos, &packet);
 
-        let hit = self.hit_result_on_move_vector(start_pos, delta);
         // `Projectile.tick`, between the move and `hitTargetOrDeflectSelf`.
         self.projectile.tick(entity);
         if let Some(h) = hit {
             if is_deflected(caller, &self.last_deflected_by, &h) {
                 return;
             }
-            // Vanilla moves the projectile to the hit location, not the full step, before
-            // `hitTargetOrDeflectSelf`, so effects such as a wind charge's burst start there.
-            entity.set_pos(h.hit_pos());
             self.on_hit_result(caller, h);
         }
     }
