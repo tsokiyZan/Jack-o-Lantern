@@ -1401,6 +1401,38 @@ impl World {
         self.spawn_particle_with_data(position, offset, max_speed, particle_count, particle, &[]);
     }
 
+    /// Vanilla `ServerLevel.sendParticles` with a speed per axis and a randomization type
+    /// (26.3): `count` particles of `particle` (options `data`) spread by `offset`.
+    #[expect(clippy::too_many_arguments)]
+    pub fn send_particles_with_axis_speed(
+        &self,
+        particle: Particle,
+        data: &[u8],
+        position: Vector3<f64>,
+        count: i32,
+        offset: Vector3<f32>,
+        speed: Vector3<f32>,
+        randomization: i32,
+    ) {
+        let packet = pumpkin_protocol::java::client::play::CParticle::new(
+            false,
+            false,
+            position,
+            offset,
+            speed.x,
+            count,
+            pumpkin_protocol::VarInt(particle as i32),
+            data,
+        )
+        .with_axis_speed(speed, randomization);
+        // `sendParticles(player, ...)`: players within 32 blocks.
+        for player in self.players.load().iter() {
+            if player.position().squared_distance_to_vec(&position) < 32.0 * 32.0 {
+                player.send_particle_packet(&packet);
+            }
+        }
+    }
+
     /// Like [`Self::spawn_particle`], for particles whose type carries options.
     /// `data` is those options in vanilla's stream encoding.
     pub fn spawn_particle_with_data(

@@ -1,5 +1,7 @@
 use crate::item::interaction_result::InteractionResult;
-use pumpkin_data::data_component_impl::{SuspiciousStewEffect, SuspiciousStewEffectsImpl};
+use pumpkin_data::data_component_impl::{
+    DataComponentImpl, SuspiciousStewEffect, SuspiciousStewEffectsImpl,
+};
 use pumpkin_util::Hand;
 use std::sync::{
     Arc, Weak,
@@ -79,12 +81,69 @@ pub struct MooshroomEntity {
     pub mob_entity: MobEntity,
     pub ageable_data: AgeableData,
     pub variant: AtomicI32,
-    /// Vanilla `stewEffects`: the effect and duration (ticks) of the flower it ate.
-    pub stew_effect: AtomicCell<Option<(&'static str, i32)>>,
+    /// Vanilla `stewEffects`: what the flower it ate puts in its next stew.
+    pub stew_effects: std::sync::Mutex<Option<SuspiciousStewEffectsImpl>>,
     pub last_lightning_bolt_uuid: AtomicCell<Option<Uuid>>,
 }
 
 impl MooshroomEntity {
+    /// The flower branch of `MushroomCow.mobInteract` for a brown adult: a smoke puff when it
+    /// already has stew effects, else it eats the flower and keeps its effect.
+    fn eat_flower(
+        &self,
+        player: &Player,
+        item_stack: &mut ItemStack,
+        effect: (&'static str, i32),
+    ) -> InteractionResult {
+        let entity = self.get_entity();
+        let world = entity.world.load();
+        let pos = entity.pos.load();
+        let particle_pos = pos + Vector3::new(0.0, f64::from(entity.height()) * 0.5, 0.0);
+        let has_effects = self
+            .stew_effects
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .is_some();
+        if has_effects {
+            world.send_particles_with_axis_speed(
+                Particle::Smoke,
+                &[],
+                particle_pos,
+                2,
+                Vector3::new(0.5, 0.0, 0.5),
+                Vector3::new(0.0, 0.2, 0.0),
+                2,
+            );
+        } else {
+            item_stack.decrement_unless_creative(player.gamemode.load(), 1);
+            // `SpellParticleOption.create(EFFECT, -1, 1.0F)`: color, then power.
+            let mut options = (-1i32).to_be_bytes().to_vec();
+            options.extend_from_slice(&1.0f32.to_be_bytes());
+            world.send_particles_with_axis_speed(
+                Particle::Effect,
+                &options,
+                particle_pos,
+                4,
+                Vector3::new(0.5, 0.0, 0.5),
+                Vector3::new(0.0, 0.2, 0.0),
+                2,
+            );
+            let (effect, duration) = effect;
+            *self
+                .stew_effects
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) =
+                Some(SuspiciousStewEffectsImpl {
+                    effects: std::borrow::Cow::Owned(vec![SuspiciousStewEffect {
+                        effect: std::borrow::Cow::Borrowed(effect),
+                        duration,
+                    }]),
+                });
+            self.play_sound_at_self(Sound::EntityMooshroomEat, 2.0, 1.0);
+        }
+        InteractionResult::SUCCESS
+    }
+
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
         set_animal_pathfinding_malus(&mob_entity);
@@ -92,7 +151,7 @@ impl MooshroomEntity {
             mob_entity,
             ageable_data: AgeableData::default(),
             variant: AtomicI32::new(MooshroomVariant::Red.id()),
-            stew_effect: AtomicCell::new(None),
+            stew_effects: std::sync::Mutex::new(None),
             last_lightning_bolt_uuid: AtomicCell::new(None),
         };
         let mob_arc = Arc::new(mooshroom);
@@ -208,12 +267,25 @@ impl Mob for MooshroomEntity {
 
     fn mob_write_nbt(&self, nbt: &mut NbtCompound) {
         nbt.put_string("Type", self.get_variant().as_str().to_string());
+        if let Some(effects) = &*self
+            .stew_effects
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+        {
+            nbt.put("stew_effects", effects.write_data());
+        }
     }
 
     fn mob_read_nbt(&self, nbt: &NbtCompound) {
         if let Some(variant_str) = nbt.get_string("Type") {
             self.set_variant(MooshroomVariant::from_name(variant_str));
         }
+        *self
+            .stew_effects
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = nbt
+            .get("stew_effects")
+            .and_then(SuspiciousStewEffectsImpl::read_data);
     }
 
     fn get_mob_entity(&self) -> &MobEntity {
@@ -245,21 +317,22 @@ impl Mob for MooshroomEntity {
         let item = item_stack.get_item();
 
         if item == &Item::BOWL && !self.is_baby() {
-            let effect = self.stew_effect.swap(None);
-            let stew = if let Some((effect, duration)) = effect {
-                let mut stew = ItemStack::new(1, &Item::SUSPICIOUS_STEW);
-                stew.set_data_component(SuspiciousStewEffectsImpl {
-                    effects: std::borrow::Cow::Owned(vec![SuspiciousStewEffect {
-                        effect: std::borrow::Cow::Borrowed(effect),
-                        duration,
-                    }]),
-                });
-                stew
-            } else {
-                ItemStack::new(1, &Item::MUSHROOM_STEW)
-            };
+            let effects = self
+                .stew_effects
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .take();
+            let is_suspicious = effects.is_some();
+            let stew = effects.map_or_else(
+                || ItemStack::new(1, &Item::MUSHROOM_STEW),
+                |effects| {
+                    let mut stew = ItemStack::new(1, &Item::SUSPICIOUS_STEW);
+                    stew.set_data_component(effects);
+                    stew
+                },
+            );
             crate::item::create_filled_result(item_stack, player, stew, false);
-            let sound = if effect.is_some() {
+            let sound = if is_suspicious {
                 Sound::EntityMooshroomSuspiciousMilk
             } else {
                 Sound::EntityMooshroomMilk
@@ -310,30 +383,7 @@ impl Mob for MooshroomEntity {
             let Some(effect) = flower_stew_effect(item) else {
                 return self.animal_interact(player, item_stack, Sound::EntityCowAmbient);
             };
-            let entity = self.get_entity();
-            let world = entity.world.load();
-            let pos = entity.pos.load();
-            if self.stew_effect.load().is_some() {
-                world.spawn_particle(
-                    pos + Vector3::new(0.0, 0.5, 0.0),
-                    Vector3::new(0.5, 0.0, 0.5),
-                    0.0,
-                    2,
-                    Particle::Smoke,
-                );
-            } else {
-                item_stack.decrement_unless_creative(player.gamemode.load(), 1);
-                world.spawn_particle(
-                    pos + Vector3::new(0.0, 0.5, 0.0),
-                    Vector3::new(0.5, 0.0, 0.5),
-                    0.0,
-                    4,
-                    Particle::Effect,
-                );
-                self.stew_effect.store(Some(effect));
-                self.play_sound_at_self(Sound::EntityMooshroomEat, 2.0, 1.0);
-            }
-            return InteractionResult::SUCCESS;
+            return self.eat_flower(player, item_stack, effect);
         }
 
         self.animal_interact(player, item_stack, Sound::EntityCowAmbient)

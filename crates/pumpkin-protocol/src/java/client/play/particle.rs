@@ -37,6 +37,11 @@ pub struct CParticle<'a> {
     /// Extra data required by specific particles (e.g., block states for
     /// `block` particles or RGB values for `dust`).
     pub data: &'a [u8],
+    /// Since 26.3: a speed per axis in place of `max_speed` on all three.
+    pub axis_speed: Option<Vector3<f32>>,
+    /// Since 26.3: the `RandomizationType` id (0 default, 1 alternative, 2 alternative with
+    /// speed).
+    pub randomization: i32,
 }
 
 impl<'a> CParticle<'a> {
@@ -61,7 +66,18 @@ impl<'a> CParticle<'a> {
             particle_count,
             particle_id,
             data,
+            axis_speed: None,
+            randomization: 0,
         }
+    }
+
+    /// The 26.3 per-axis speed and randomization type (vanilla's `sendParticles` overloads
+    /// taking them).
+    #[must_use]
+    pub const fn with_axis_speed(mut self, speed: Vector3<f32>, randomization: i32) -> Self {
+        self.axis_speed = Some(speed);
+        self.randomization = randomization;
+        self
     }
 }
 
@@ -202,16 +218,22 @@ impl ClientPacket for CParticle<'_> {
         write.write_f32_be(self.offset.y)?;
         write.write_f32_be(self.offset.z)?;
 
-        write.write_f32_be(self.max_speed)?;
         if *version >= JavaMinecraftVersion::V_26_3 {
             // Since 26.3 the speed is set per axis and the count is a var int, followed by the
-            // randomization type, 0 being the default one.
-            write.write_f32_be(self.max_speed)?;
-            write.write_f32_be(self.max_speed)?;
+            // randomization type.
+            let speed = self.axis_speed.unwrap_or(Vector3::new(
+                self.max_speed,
+                self.max_speed,
+                self.max_speed,
+            ));
+            write.write_f32_be(speed.x)?;
+            write.write_f32_be(speed.y)?;
+            write.write_f32_be(speed.z)?;
             write.write_var_int(&VarInt(self.particle_count))?;
-            write.write_var_int(&VarInt(0))?;
+            write.write_var_int(&VarInt(self.randomization))?;
             return Ok(());
         }
+        write.write_f32_be(self.max_speed)?;
         write.write_i32_be(self.particle_count)?;
 
         if *version >= JavaMinecraftVersion::V_1_20_5 {
@@ -287,6 +309,8 @@ impl<'a> ServerPacket<'a> for CParticle<'a> {
             particle_count,
             particle_id,
             data,
+            axis_speed: None,
+            randomization: 0,
         })
     }
 }
