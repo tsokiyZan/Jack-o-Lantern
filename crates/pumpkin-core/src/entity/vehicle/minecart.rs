@@ -156,6 +156,17 @@ impl MinecartEntity {
 }
 
 impl EntityBase for MinecartEntity {
+    /// Vanilla `AbstractMinecart.getKnownMovement` with `OldMinecartBehavior`'s: the delta
+    /// movement (a minecart has no controlling passenger), its horizontal axes clamped to 0.4,
+    /// and zero if any axis is NaN.
+    fn get_known_movement(&self) -> Vector3<f64> {
+        let known = self.vehicle.entity.velocity.load();
+        if known.x.is_nan() || known.y.is_nan() || known.z.is_nan() {
+            return Vector3::new(0.0, 0.0, 0.0);
+        }
+        Vector3::new(known.x.clamp(-0.4, 0.4), known.y, known.z.clamp(-0.4, 0.4))
+    }
+
     /// Vanilla `AbstractMinecart.isOnRails`.
     fn is_on_rails(&self) -> bool {
         self.on_rails.load(std::sync::atomic::Ordering::Relaxed)

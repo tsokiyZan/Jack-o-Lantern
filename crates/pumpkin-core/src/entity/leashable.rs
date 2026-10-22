@@ -9,6 +9,7 @@ use std::sync::atomic::Ordering;
 
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
+use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_protocol::codec::var_long::VarLong;
 use pumpkin_util::math::boundingbox::BoundingBox;
 use pumpkin_util::math::vector3::Vector3;
@@ -118,14 +119,249 @@ pub fn compute_dampened_spring_interaction(
     })
 }
 
+/// Vanilla `Entity.canInteractWithLevel`: alive (`LivingEntity`'s health-aware `isAlive`), not
+/// removed and not a spectator.
+#[must_use]
+pub fn can_interact_with_level(entity: &dyn EntityBase) -> bool {
+    super::inside_block_effect::is_alive(entity)
+        && !entity.get_entity().is_removed()
+        && !entity.is_spectator()
+}
+
+/// Vanilla `Leashable.tickLeash`, run at the end of `Entity.baseTick` for a leashable `caller`.
+pub fn tick_leash(caller: &dyn EntityBase) {
+    let entity = caller.get_entity();
+    // `leashData != null && leashData.delayedLeashInfo != null`.
+    if entity.delayed_leash_is_some() {
+        restore_leash_from_save(caller);
+    }
+    // `leashData != null && leashData.leashHolder != null`: `restoreLeashFromSave` sets the
+    // holder on that same `LeashData`, so a restored leash ticks right away.
+    let Some(holder) = entity.leash_holder() else {
+        return;
+    };
+    let world = entity.world.load_full();
+    if !can_interact_with_level(caller) || !can_interact_with_level(holder.as_ref()) {
+        if world.level_info.load().game_rules.entity_drops {
+            drop_leash(caller, true, true);
+        } else {
+            drop_leash(caller, true, false);
+        }
+    }
+
+    // `entity.getLeashHolder()`, now possibly dropped above.
+    let Some(holder) = entity.leash_holder() else {
+        return;
+    };
+    let holder_entity = holder.get_entity();
+    if !Arc::ptr_eq(&holder_entity.world.load_full(), &world) {
+        return;
+    }
+    // Vanilla keeps `leashData` in a local: a leash dropped below still rotates this tick by
+    // the momentum its detached `LeashData` holds.
+    let mut momentum = entity.leash_angular_momentum.load();
+    let distance_to = leash_distance_to(entity, holder_entity);
+    caller.when_leashed_to(caller, holder.as_ref());
+    if distance_to > caller.leash_snap_distance() {
+        world.play_sound(
+            Sound::ItemLeadBreak,
+            SoundCategory::Neutral,
+            &holder_entity.pos.load(),
+        );
+        caller.leash_too_far_behaviour(caller);
+    } else if distance_to
+        > caller.leash_elastic_distance()
+            - f64::from(holder_entity.width())
+            - f64::from(entity.width())
+        && let Some(new_momentum) = check_elastic_interactions(caller, holder.as_ref(), momentum)
+    {
+        momentum = new_momentum;
+        caller.on_elastic_leash_pull(caller);
+    } else {
+        caller.close_range_leash_behaviour(caller, holder.as_ref());
+    }
+
+    // While still leashed the `LeashData` is the entity's own, so a reset made by the
+    // behaviours above (`Mob.resetAngularLeashMomentum`) shows here as in vanilla.
+    let leashed = entity.is_leashed();
+    if leashed {
+        momentum = entity.leash_angular_momentum.load();
+    }
+    entity.set_y_rot((f64::from(entity.yaw.load()) - momentum) as f32);
+    let next = momentum * f64::from(angular_friction(caller));
+    if leashed {
+        entity.leash_angular_momentum.store(next);
+    }
+}
+
+/// Vanilla `Leashable.angularFriction`.
+fn angular_friction(caller: &dyn EntityBase) -> f32 {
+    let entity = caller.get_entity();
+    if entity.on_ground.load(Ordering::Relaxed) {
+        // `getBlockState(getBlockPosBelowThatAffectsMyMovement()).getBlock().getFriction()`.
+        entity
+            .get_block_with_y_offset(super::DELTA_AFFECTED_BY_BLOCKS_BELOW_0_5)
+            .1
+            .slipperiness
+            * 0.91f32
+    } else if entity.is_in_liquid() {
+        0.8
+    } else {
+        0.91
+    }
+}
+
+/// Vanilla `Leashable.checkElasticInteractions`: `None` when no attachment pulls (vanilla's
+/// `false`), else the angular momentum plus `10 * torque`, already written back, with the pull
+/// added to the velocity.
+fn check_elastic_interactions(
+    caller: &dyn EntityBase,
+    holder: &dyn EntityBase,
+    momentum: f64,
+) -> Option<f64> {
+    let quad_connection = holder.support_quad_leash_as_holder() && caller.support_quad_leash();
+    let wrenches = if quad_connection {
+        compute_elastic_interaction(
+            caller,
+            holder,
+            &SHARED_QUAD_ATTACHMENT_POINTS,
+            &SHARED_QUAD_ATTACHMENT_POINTS,
+        )
+    } else {
+        compute_elastic_interaction(
+            caller,
+            holder,
+            &ENTITY_ATTACHMENT_POINT,
+            &LEASHER_ATTACHMENT_POINT,
+        )
+    };
+    if wrenches.is_empty() {
+        return None;
+    }
+    let result = Wrench::accumulate(&wrenches).scale(if quad_connection { 0.25 } else { 1.0 });
+    let momentum = momentum + TORSIONAL_ELASTICITY * result.torque;
+    let entity = caller.get_entity();
+    entity.leash_angular_momentum.store(momentum);
+    let relative_velocity_to_leasher = holder_movement(holder) - caller.get_known_movement();
+    // `addDeltaMovement`: a finite change only, and no velocity packet of its own.
+    let delta =
+        multiply(result.force, AXIS_SPECIFIC_ELASTICITY) + relative_velocity_to_leasher * STIFFNESS;
+    if delta.x.is_finite() && delta.y.is_finite() && delta.z.is_finite() {
+        let velocity = entity.velocity.load() + delta;
+        if velocity.x.is_finite() && velocity.y.is_finite() && velocity.z.is_finite() {
+            entity.velocity.store(velocity);
+        }
+    }
+    Some(momentum)
+}
+
+/// Vanilla `Leashable.getHolderMovement`: a `NoAI` mob is taken as still.
+fn holder_movement(entity: &dyn EntityBase) -> Vector3<f64> {
+    if entity
+        .get_mob()
+        .is_some_and(|mob| mob.get_mob_entity().is_no_ai())
+    {
+        Vector3::new(0.0, 0.0, 0.0)
+    } else {
+        entity.get_known_movement()
+    }
+}
+
+/// Vanilla `Leashable.computeElasticInteraction` for `entity` leashed to `holder`.
+fn compute_elastic_interaction(
+    entity: &dyn EntityBase,
+    holder: &dyn EntityBase,
+    entity_attachment_points: &[Vector3<f64>],
+    leasher_attachment_points: &[Vector3<f64>],
+) -> Vec<Wrench> {
+    let base = entity.get_entity();
+    let holder_base = holder.get_entity();
+    elastic_wrenches(
+        &ElasticBody {
+            pos: base.pos.load(),
+            width: base.width(),
+            height: base.height(),
+            y_rot: base.yaw.load(),
+        },
+        &ElasticBody {
+            pos: holder_base.pos.load(),
+            width: holder_base.width(),
+            height: holder_base.height(),
+            y_rot: holder_base.yaw.load(),
+        },
+        entity.leash_elastic_distance(),
+        // Vanilla reads the leashed entity's own movement through `getHolderMovement`.
+        holder_movement(entity),
+        entity_attachment_points,
+        leasher_attachment_points,
+    )
+}
+
+/// What `computeElasticInteraction` reads of an entity: `position()`, `getBbWidth()`,
+/// `getBbHeight()` and `getYRot()` (degrees).
+#[derive(Clone, Copy, Debug)]
+struct ElasticBody {
+    pos: Vector3<f64>,
+    width: f32,
+    height: f32,
+    y_rot: f32,
+}
+
+/// The body of `computeElasticInteraction`, over plain values.
+fn elastic_wrenches(
+    entity: &ElasticBody,
+    holder: &ElasticBody,
+    slack_distance: f64,
+    current_movement: Vector3<f64>,
+    entity_attachment_points: &[Vector3<f64>],
+    leasher_attachment_points: &[Vector3<f64>],
+) -> Vec<Wrench> {
+    // `getYRot() * (float)(Math.PI / 180.0)`, in float.
+    let deg_to_rad = std::f64::consts::PI / 180.0;
+    let entity_y_rot = entity.y_rot * deg_to_rad as f32;
+    let entity_dimensions = Vector3::new(
+        f64::from(entity.width),
+        f64::from(entity.height),
+        f64::from(entity.width),
+    );
+    let leash_holder_y_rot = holder.y_rot * deg_to_rad as f32;
+    let leasher_dimensions = Vector3::new(
+        f64::from(holder.width),
+        f64::from(holder.height),
+        f64::from(holder.width),
+    );
+    let mut wrenches = Vec::new();
+    for (entity_point, leasher_point) in entity_attachment_points
+        .iter()
+        .zip(leasher_attachment_points)
+    {
+        let entity_attach_vector = multiply(*entity_point, entity_dimensions).y_rot(-entity_y_rot);
+        let entity_attach_pos = entity.pos + entity_attach_vector;
+        let leasher_attach_vector =
+            multiply(*leasher_point, leasher_dimensions).y_rot(-leash_holder_y_rot);
+        let leasher_attach_pos = holder.pos + leasher_attach_vector;
+        if let Some(wrench) = compute_dampened_spring_interaction(
+            leasher_attach_pos,
+            entity_attach_pos,
+            slack_distance,
+            current_movement,
+            entity_attach_vector,
+        ) {
+            wrenches.push(wrench);
+        }
+    }
+    wrenches
+}
+
+/// Vanilla `Vec3.multiply(Vec3)`: per axis.
+fn multiply(a: Vector3<f64>, b: Vector3<f64>) -> Vector3<f64> {
+    Vector3::new(a.x * b.x, a.y * b.y, a.z * b.z)
+}
+
 /// The entity that holds `entity`'s leash, if any (vanilla `getLeashHolder` on the server).
 #[must_use]
 pub fn leash_holder(entity: &Entity) -> Option<Arc<dyn EntityBase>> {
-    entity
-        .leashed_to
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .clone()
+    entity.leash_holder()
 }
 
 /// Vanilla `Leashable.leashableInArea(level, pos, test)`: `AABB.ofSize(pos, 32, 32, 32)`, every
@@ -486,6 +722,158 @@ mod tests {
         .expect("past slack");
         assert_eq!(r.force, v(2.0, 0.0, 0.0));
         assert_eq!(r.torque, 2.0);
+    }
+
+    fn assert_wrenches(actual: &[Wrench], expected: &[([f64; 3], f64)]) {
+        assert_eq!(actual.len(), expected.len(), "{actual:?}");
+        for (wrench, (force, torque)) in actual.iter().zip(expected) {
+            assert_eq!(wrench.force.x.to_bits(), force[0].to_bits(), "{wrench:?}");
+            assert_eq!(wrench.force.y.to_bits(), force[1].to_bits(), "{wrench:?}");
+            assert_eq!(wrench.force.z.to_bits(), force[2].to_bits(), "{wrench:?}");
+            assert_eq!(wrench.torque.to_bits(), torque.to_bits(), "{wrench:?}");
+        }
+    }
+
+    // `elastic_wrenches` expectations come from an independent Python model of vanilla
+    // `computeElasticInteraction` (Mth's 65536-entry float sine table, Java float rounding of
+    // the yaw in radians, f32-rounded 0.3).
+
+    #[test]
+    fn elastic_single_attachment() {
+        // A cow-sized entity yawed 30 degrees, leashed to a knot-sized holder.
+        let wrenches = elastic_wrenches(
+            &ElasticBody {
+                pos: v(0.5, 0.0, 0.5),
+                width: 0.9,
+                height: 1.4,
+                y_rot: 30.0,
+            },
+            &ElasticBody {
+                pos: v(8.5, 1.0, 3.5),
+                width: 0.375,
+                height: 0.5,
+                y_rot: 0.0,
+            },
+            6.0,
+            v(0.1, 0.0, -0.05),
+            &ENTITY_ATTACHMENT_POINT,
+            &LEASHER_ATTACHMENT_POINT,
+        );
+        assert_wrenches(
+            &wrenches,
+            &[(
+                [
+                    0.755_298_495_925_716,
+                    0.050_506_360_038_387_98,
+                    0.239_703_451_569_916_51,
+                ],
+                1.160_892_871_262_981_4,
+            )],
+        );
+    }
+
+    #[test]
+    fn elastic_quad_all_attachments_pull() {
+        // A horse-sized entity under a ghast-sized holder, every corner past the slack.
+        let wrenches = elastic_wrenches(
+            &ElasticBody {
+                pos: v(1.0, 0.0, -2.0),
+                width: 1.396_484_4,
+                height: 1.6,
+                y_rot: -135.0,
+            },
+            &ElasticBody {
+                pos: v(6.0, 4.0, 5.0),
+                width: 4.0,
+                height: 4.0,
+                y_rot: 45.0,
+            },
+            6.0,
+            v(0.0, 0.0, 0.0),
+            &SHARED_QUAD_ATTACHMENT_POINTS,
+            &SHARED_QUAD_ATTACHMENT_POINTS,
+        );
+        assert_wrenches(
+            &wrenches,
+            &[
+                (
+                    [
+                        0.113_042_406_035_410_59,
+                        0.496_367_351_891_543,
+                        0.668_173_883_287_993_2,
+                    ],
+                    -2.199_324_438_622_803,
+                ),
+                (
+                    [
+                        0.358_671_260_618_644_4,
+                        0.373_007_998_615_641_7,
+                        0.228_413_235_337_646_76,
+                    ],
+                    1.180_582_612_760_147_8,
+                ),
+                (
+                    [
+                        1.365_017_847_136_288_6,
+                        0.805_159_934_286_248_7,
+                        1.083_890_131_745_567_8,
+                    ],
+                    3.567_673_198_778_185,
+                ),
+                (
+                    [
+                        0.807_709_772_070_857_7,
+                        0.840_040_933_019_235,
+                        1.747_245_580_350_663_5,
+                    ],
+                    -2.658_613_102_757_607,
+                ),
+            ],
+        );
+    }
+
+    #[test]
+    fn elastic_quad_skips_slack_attachments() {
+        // Closer: two corners are inside the slack and give no wrench.
+        let wrenches = elastic_wrenches(
+            &ElasticBody {
+                pos: v(1.0, 0.0, -2.0),
+                width: 1.396_484_4,
+                height: 1.6,
+                y_rot: -135.0,
+            },
+            &ElasticBody {
+                pos: v(4.5, 2.0, 2.5),
+                width: 4.0,
+                height: 4.0,
+                y_rot: 45.0,
+            },
+            6.0,
+            v(0.0, 0.0, 0.0),
+            &SHARED_QUAD_ATTACHMENT_POINTS,
+            &SHARED_QUAD_ATTACHMENT_POINTS,
+        );
+        assert_wrenches(
+            &wrenches,
+            &[
+                (
+                    [
+                        0.758_039_055_867_086_8,
+                        0.331_575_475_113_960_35,
+                        0.466_292_058_009_500_4,
+                    ],
+                    1.534_821_315_777_165_3,
+                ),
+                (
+                    [
+                        0.391_878_561_821_951_7,
+                        0.358_302_845_106_023_06,
+                        0.931_112_099_688_103_8,
+                    ],
+                    -1.289_885_940_686_934_5,
+                ),
+            ],
+        );
     }
 
     #[test]

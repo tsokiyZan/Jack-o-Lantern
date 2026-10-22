@@ -5111,8 +5111,30 @@ impl Entity {
         })
     }
 
-    pub const LEASH_SNAP_DISTANCE: f64 = 12.0;
-    pub const LEASH_ELASTIC_DISTANCE: f64 = 6.0;
+    /// The entity holding this one's leash (vanilla `getLeashHolder` on the server).
+    #[must_use]
+    pub fn leash_holder(&self) -> Option<Arc<dyn EntityBase>> {
+        self.leashed_to
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+    }
+
+    /// Whether a saved leash is waiting for its holder (vanilla `LeashData.delayedLeashInfo`).
+    #[must_use]
+    pub fn delayed_leash_is_some(&self) -> bool {
+        self.delayed_leash
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .is_some()
+    }
+
+    /// Vanilla `Entity.setYRot`: a non-finite rotation is discarded.
+    pub fn set_y_rot(&self, y_rot: f32) {
+        if y_rot.is_finite() {
+            self.yaw.store(y_rot);
+        }
+    }
 
     /// Vanilla `writeLeashData`: a knot's block position, or the holder's UUID.
     pub fn write_leash_nbt(&self, nbt: &mut NbtCompound) {
@@ -5176,43 +5198,6 @@ impl Entity {
             .delayed_leash
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner) = leash;
-    }
-
-    pub fn tick_leash(&self, caller: &dyn EntityBase) {
-        leashable::restore_leash_from_save(caller);
-        let holder = {
-            let Ok(guard) = self.leashed_to.try_lock() else {
-                return;
-            };
-            guard.clone()
-        };
-
-        if let Some(holder) = holder {
-            let holder_entity = holder.get_entity();
-
-            // Drop leash if entity or holder is removed or dead
-            if !self.is_alive() || !holder_entity.is_alive() {
-                leashable::drop_leash(caller, true, false);
-                return;
-            }
-
-            let self_pos = self.pos.load();
-            let holder_pos = holder_entity.pos.load();
-            let diff = self_pos - holder_pos;
-            let distance = diff.length();
-
-            if distance > Self::LEASH_SNAP_DISTANCE {
-                // Too far: snap/break leash and drop lead item
-                leashable::drop_leash(caller, true, true);
-            } else if distance > Self::LEASH_ELASTIC_DISTANCE {
-                // Elastic pull force towards leash holder
-                let dir = (holder_pos - self_pos).normalize();
-                let pull_strength = (distance - Self::LEASH_ELASTIC_DISTANCE) * 0.11;
-                let current_vel = self.velocity.load();
-                self.velocity.store(current_vel + dir * pull_strength);
-                self.velocity_dirty.store(true, Relaxed);
-            }
-        }
     }
 
     /// Vanilla `Entity.spawnAtLocation`: drops `stack` where the entity stands.
@@ -6254,6 +6239,9 @@ impl EntityBase for Entity {
         self.check_out_of_world(caller);
         self.set_on_fire(self.fire_ticks.load(Ordering::Relaxed) > 0);
         self.first_tick.store(false, Ordering::Relaxed);
+        if caller.is_leashable() {
+            leashable::tick_leash(caller);
+        }
     }
 
     fn get_entity(&self) -> &Entity {
