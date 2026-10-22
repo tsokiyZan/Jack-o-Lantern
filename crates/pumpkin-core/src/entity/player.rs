@@ -5,6 +5,7 @@ use crate::enchantment::EnchantmentHelper;
 use crate::enchantment::HurtAndBreak;
 use crate::entity::damage_source::DamageSource;
 use crate::entity::movement_emission::MovementEmission;
+use crate::item::item_stack_hurt_enemy;
 use crate::item::items::mace::MaceItem;
 use core::f32;
 use std::collections::{HashMap, VecDeque};
@@ -1690,21 +1691,8 @@ impl Player {
         damage_source: &DamageSource<'_>,
     ) {
         let is_mace = item_stack.item.id == pumpkin_data::item::Item::MACE.id;
-        // `ItemStack.hurtEnemy`, for a living target only.
-        let item_hurt_enemy = victim.get_living_entity().is_some() && {
-            if is_mace {
-                MaceItem::hurt_enemy(victim, self);
-            }
-            let has_weapon = item_stack.get_data_component::<WeaponImpl>().is_some();
-            if has_weapon {
-                self.increment_stat(
-                    statistics::StatisticCategory::Used,
-                    item_stack.item.id as i32,
-                    1,
-                );
-            }
-            has_weapon
-        };
+        let item_hurt_enemy =
+            victim.get_living_entity().is_some() && item_stack_hurt_enemy(item_stack, victim, self);
 
         EnchantmentHelper::do_post_attack_effects_with_item_source(
             &self.world(),

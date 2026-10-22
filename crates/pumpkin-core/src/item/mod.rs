@@ -8,15 +8,37 @@ use std::sync::Arc;
 use crate::block::registry::BlockActionResult;
 use crate::entity::EntityBase;
 use crate::entity::player::Player;
+use crate::entity::player::statistics::StatisticCategory;
+use crate::item::items::mace::MaceItem;
 use crate::server::Server;
 use pumpkin_data::Block;
 use pumpkin_data::BlockDirection;
+use pumpkin_data::data_component_impl::WeaponImpl;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_inventory::screen_handler::InventoryPlayer;
 use pumpkin_util::Hand;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
+
+/// Vanilla `ItemStack.hurtEnemy`: the item's own `hurtEnemy` (only the mace has one), then the
+/// player's `ITEM_USED` stat for a weapon. Returns whether the stack is a weapon.
+pub fn item_stack_hurt_enemy(
+    stack: &ItemStack,
+    victim: &dyn EntityBase,
+    attacker: &dyn EntityBase,
+) -> bool {
+    if stack.item.id == Item::MACE.id {
+        MaceItem::hurt_enemy(victim, attacker);
+    }
+    if stack.get_data_component::<WeaponImpl>().is_none() {
+        return false;
+    }
+    if let Some(player) = attacker.get_player() {
+        player.increment_stat(StatisticCategory::Used, stack.item.id as i32, 1);
+    }
+    true
+}
 
 /// Vanilla `ItemUtils.createFilledResult`: `stack` becomes what the hand holds once one of it
 /// was filled into `new_stack`.

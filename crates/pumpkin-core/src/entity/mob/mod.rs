@@ -21,6 +21,7 @@ use crate::entity::movement_emission::MovementEmission;
 use crate::entity::player::Player;
 use crate::entity::predicate::EntityPredicate;
 use crate::entity::projectile_deflection::ProjectileDeflectionType;
+use crate::item::item_stack_hurt_enemy;
 use crate::server::Server;
 use crate::world::World;
 use crate::world::brightness::DAYLIGHT_BRIGHTNESS;
@@ -1077,8 +1078,9 @@ impl MobEntity {
         if damaged {
             let knockback = living.get_knockback(caller, &world, target, &damage_source);
             self.cause_extra_knockback(caller, target, knockback, damage);
-            // TODO: `weaponItem.hurtEnemy`, whose only effect for a mob is the mace's smash
-            // (`MaceItem.hurtEnemy`), which Pumpkin only ports for players.
+            if target.get_living_entity().is_some() {
+                item_stack_hurt_enemy(&weapon, target, caller);
+            }
             EnchantmentHelper::do_post_attack_effects(&world, target, &damage_source);
             // `setLastHurtMob`.
             living.last_attacking_id.store(

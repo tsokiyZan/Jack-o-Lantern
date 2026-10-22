@@ -48,8 +48,10 @@ impl MaceItem {
 
     /// Vanilla `MaceItem.hurtEnemy` for a player's smash: stop the fall, keep the bounce that
     /// follows from counting as a fall, and push everything around the target away.
-    pub fn hurt_enemy(victim: &dyn EntityBase, attacker: &Player) {
-        let living = &attacker.living_entity;
+    pub fn hurt_enemy(victim: &dyn EntityBase, attacker: &dyn EntityBase) {
+        let Some(living) = attacker.get_living_entity() else {
+            return;
+        };
         if !Self::can_smash_attack(living) {
             return;
         }
@@ -58,7 +60,9 @@ impl MaceItem {
             .entity
             .velocity
             .store(Vector3::new(velocity.x, f64::from(0.01f32), velocity.z));
-        attacker.send_own_motion();
+        if let Some(player) = attacker.get_player() {
+            player.send_own_motion();
+        }
         living.set_ignore_fall_damage_from_current_impulse(
             true,
             Self::calculate_impact_position(living),
@@ -66,9 +70,11 @@ impl MaceItem {
 
         let world = living.entity.world.load_full();
         let sound = if victim.get_entity().on_ground.load(Ordering::Relaxed) {
-            attacker
-                .spawn_extra_particles_on_fall
-                .store(true, Ordering::Relaxed);
+            if let Some(player) = attacker.get_player() {
+                player
+                    .spawn_extra_particles_on_fall
+                    .store(true, Ordering::Relaxed);
+            }
             if living.entity.fall_distance.load() > SMASH_ATTACK_HEAVY_THRESHOLD {
                 Sound::ItemMaceSmashGroundHeavy
             } else {
@@ -85,7 +91,7 @@ impl MaceItem {
             1.0,
         );
 
-        Self::knockback(&world, attacker, victim);
+        Self::knockback(&world, living, attacker, victim);
     }
 
     /// Vanilla `MaceItem.getAttackDamageBonus`: falling turns into damage, steeply for the first
@@ -132,7 +138,12 @@ impl MaceItem {
     }
 
     /// Vanilla `MaceItem.knockback`.
-    fn knockback(world: &World, attacker: &Player, victim: &dyn EntityBase) {
+    fn knockback(
+        world: &World,
+        attacker_living: &LivingEntity,
+        attacker: &dyn EntityBase,
+        victim: &dyn EntityBase,
+    ) {
         let victim_entity = victim.get_entity();
         world.sync_world_event(
             WorldEvent::ParticlesSmashAttack,
@@ -153,7 +164,7 @@ impl MaceItem {
                 continue;
             }
             let direction = nearby.get_entity().pos.load() - victim_pos;
-            let power = Self::get_knockback_power(attacker, nearby_living, direction);
+            let power = Self::get_knockback_power(attacker_living, nearby_living, direction);
             if power > 0.0 {
                 let knockback = direction.normalize() * power;
                 nearby.push_impulse(Vector3::new(
@@ -170,7 +181,7 @@ impl MaceItem {
 
     /// Vanilla `MaceItem.knockbackPredicate`.
     fn knockback_predicate(
-        attacker: &Player,
+        attacker: &dyn EntityBase,
         victim: &dyn EntityBase,
         nearby: &dyn EntityBase,
     ) -> bool {
@@ -179,7 +190,7 @@ impl MaceItem {
         let not_spectator = !nearby.is_spectator();
         let not_player = nearby_id != attacker.get_entity().entity_id
             && nearby_id != victim.get_entity().entity_id;
-        let not_allied_to_player = !(attacker as &dyn EntityBase).is_allied_to(nearby);
+        let not_allied_to_player = !attacker.is_allied_to(nearby);
         // Vanilla checks the owner against the target, not the attacker.
         let victim_uuid = victim.get_entity().entity_uuid;
         let not_tamed_by_player = !(victim.get_living_entity().is_some()
@@ -211,16 +222,16 @@ impl MaceItem {
 
     /// Vanilla `MaceItem.getKnockbackPower`.
     fn get_knockback_power(
-        attacker: &Player,
+        attacker: &LivingEntity,
         nearby: &LivingEntity,
         direction: Vector3<f64>,
     ) -> f64 {
-        let fall_multiplier =
-            if attacker.living_entity.entity.fall_distance.load() > SMASH_ATTACK_HEAVY_THRESHOLD {
-                2.0
-            } else {
-                1.0
-            };
+        let fall_multiplier = if attacker.entity.fall_distance.load() > SMASH_ATTACK_HEAVY_THRESHOLD
+        {
+            2.0
+        } else {
+            1.0
+        };
         (f64::from(SMASH_ATTACK_KNOCKBACK_RADIUS) - direction.length())
             * f64::from(SMASH_ATTACK_KNOCKBACK_POWER)
             * fall_multiplier
