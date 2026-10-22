@@ -12,6 +12,7 @@ use crate::server::Server;
 
 use pumpkin_data::damage::DamageType;
 use pumpkin_data::item_stack::ItemStack;
+use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::java::client::play::Metadata;
 
 use pumpkin_util::math::vector3::Vector3;
@@ -214,6 +215,29 @@ impl EntityBase for BoatEntity {
 
     fn init_data_tracker(&self) {
         self.send_wobble_metadata();
+    }
+
+    /// Vanilla `AbstractBoat.addAdditionalSaveData`: `writeLeashData`.
+    fn write_custom_nbt(&self, nbt: &mut NbtCompound) {
+        self.vehicle.entity.write_leash_nbt(nbt);
+    }
+
+    /// Vanilla `AbstractBoat.readAdditionalSaveData`: `readLeashData`. A boat wraps no other
+    /// entity, so it is its own caller.
+    fn read_custom_nbt(&self, nbt: &NbtCompound) {
+        self.vehicle.entity.read_leash_nbt(self, nbt);
+    }
+
+    /// Vanilla `Entity.kill`: `remove(KILLED)`, which `AbstractBoat.remove` makes drop the
+    /// leash first, then `ENTITY_DIE`.
+    fn kill(&self, caller: &dyn EntityBase) {
+        self.vehicle.remove_destroyed(caller);
+        let entity = &self.vehicle.entity;
+        entity.world.load().game_event_from(
+            Some(caller),
+            pumpkin_data::game_event::GameEvent::EntityDie,
+            entity.pos.load(),
+        );
     }
 
     fn can_hit(&self) -> bool {
