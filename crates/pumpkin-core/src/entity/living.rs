@@ -4514,6 +4514,14 @@ impl LivingEntity {
         self.health.load() <= 0.0 || self.dead.load(Relaxed)
     }
 
+    /// Vanilla `LivingEntity.isAffectedByPotions`: not dead or dying; never an armor stand
+    /// (`ArmorStand`'s override). `caller` is this entity.
+    #[must_use]
+    pub fn is_affected_by_potions(&self, caller: &dyn EntityBase) -> bool {
+        caller.get_entity().entity_type != &pumpkin_data::entity::EntityType::ARMOR_STAND
+            && !self.is_dead_or_dying()
+    }
+
     /// Vanilla `LivingEntity.isSleeping` (a sleeping position); Pumpkin keeps it on the
     /// player and the mobs that sleep.
     fn is_sleeping(caller: &dyn EntityBase) -> bool {
