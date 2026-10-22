@@ -216,13 +216,8 @@ impl JavaClient {
         animation: SwingAnimationImpl,
         result: &BlockActionResult,
     ) {
-        let send_to_self = match result {
-            BlockActionResult::Success => false,
-            BlockActionResult::SuccessServer => true,
-            _ => return,
-        };
         for _ in 0..2 {
-            player.swing_and_reset_attack_strength(hand, animation, send_to_self);
+            player.swing_for_interaction(hand, animation, result.swing_source());
         }
     }
 

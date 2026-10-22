@@ -182,6 +182,7 @@ use crate::block::{
 use crate::entity::EntityBase;
 use crate::entity::inside_block_effect::InsideBlockEffectApplier;
 use crate::entity::player::Player;
+use crate::item::interaction_result::SwingSource;
 use crate::server::Server;
 use crate::world::World;
 use pumpkin_data::BlockStateId;
@@ -497,6 +498,16 @@ impl BlockActionResult {
     #[must_use]
     pub const fn consumes_action(&self) -> bool {
         matches!(self, Self::Consume | Self::Success | Self::SuccessServer)
+    }
+
+    /// The swing a success asks for, as vanilla `InteractionResult.Success.swingSource`.
+    #[must_use]
+    pub const fn swing_source(&self) -> SwingSource {
+        match self {
+            Self::Success => SwingSource::Client,
+            Self::SuccessServer => SwingSource::Server,
+            _ => SwingSource::None,
+        }
     }
 }
 

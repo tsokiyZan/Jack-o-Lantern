@@ -5,7 +5,7 @@ use crate::enchantment::EnchantmentHelper;
 use crate::enchantment::HurtAndBreak;
 use crate::entity::damage_source::DamageSource;
 use crate::entity::movement_emission::MovementEmission;
-use crate::item::interaction_result::InteractionResult;
+use crate::item::interaction_result::{InteractionResult, SwingSource};
 use crate::item::item_stack_hurt_enemy;
 use crate::item::items::mace::MaceItem;
 use core::f32;
@@ -3574,6 +3574,23 @@ impl Player {
             .last_item_in_main_hand
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner) = ItemStack::EMPTY.clone();
+    }
+
+    /// The swing after a successful interaction in vanilla `handleInteract` and
+    /// `handleUseItemOn`: `swingAndResetAttackStrength` unless the result asked for none, sent
+    /// to the swinging player too only when the server, not the client, owns the swing.
+    pub fn swing_for_interaction(
+        &self,
+        hand: Hand,
+        animation: SwingAnimationImpl,
+        swing: SwingSource,
+    ) {
+        let send_to_swinging_entity = match swing {
+            SwingSource::None => return,
+            SwingSource::Client => false,
+            SwingSource::Server => true,
+        };
+        self.swing_and_reset_attack_strength(hand, animation, send_to_swinging_entity);
     }
 
     /// Vanilla `Player.interactOn`: right-clicking `target` with the stack in `hand`. The

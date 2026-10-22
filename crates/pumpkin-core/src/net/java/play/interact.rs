@@ -1,5 +1,6 @@
 #[allow(clippy::wildcard_imports)]
 use super::*;
+use crate::item::interaction_result::InteractionResult;
 
 impl JavaClient {
     #[expect(clippy::too_many_lines)]
@@ -118,8 +119,15 @@ impl JavaClient {
                                 }
                             }
                             // `ServerGamePacketListenerImpl.handleInteract`: `interactOn`
-                            // with the packet's hand.
-                            player.interact_on(&event.target, hand, server);
+                            // with the packet's hand, then the success's swing, animated as
+                            // the stack held before the interaction.
+                            let swing_animation =
+                                player.inventory().get_stack_in_hand(hand).get_interact_animation();
+                            if let InteractionResult::Success { swing } =
+                                player.interact_on(&event.target, hand, server)
+                            {
+                                player.swing_for_interaction(hand, swing_animation, swing);
+                            }
                         }
                     }
                 }
