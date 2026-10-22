@@ -492,13 +492,17 @@ pub struct WeaponImpl {
 impl WeaponImpl {
     pub fn read_data(data: &NbtTag) -> Option<Self> {
         let compound = data.extract_compound()?;
-        // `NON_NEGATIVE_INT` and `NON_NEGATIVE_FLOAT`: a negative value fails the component.
+        // `NON_NEGATIVE_INT` and `NON_NEGATIVE_FLOAT`: a value out of range fails the component.
         let item_damage_per_attack =
             u32::try_from(compound.get_int("item_damage_per_attack").unwrap_or(1)).ok()?;
         let disable_blocking_for_seconds = compound
             .get_float("disable_blocking_for_seconds")
             .unwrap_or(0.0);
-        if disable_blocking_for_seconds < 0.0 {
+        // `floatRangeMinInclusive(0, Float.MAX_VALUE)` compares with `Float.compareTo`, which
+        // `total_cmp` matches: -0, NaN and the infinities are out of range.
+        if disable_blocking_for_seconds.total_cmp(&0.0).is_lt()
+            || disable_blocking_for_seconds.total_cmp(&f32::MAX).is_gt()
+        {
             return None;
         }
         Some(Self {
@@ -1657,6 +1661,15 @@ mod tests {
     fn weapon_rejects_negative_fields() {
         assert!(WeaponImpl::read_data(&weapon(None, Some(-1.0))).is_none());
         assert!(WeaponImpl::read_data(&weapon(Some(-1), None)).is_none());
+        // `Float.compareTo` against [0, Float.MAX_VALUE]: -0 sorts below 0, NaN and +Inf above
+        // the maximum.
+        for bad in [-0.0, f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            assert!(
+                WeaponImpl::read_data(&weapon(None, Some(bad))).is_none(),
+                "{bad} accepted"
+            );
+        }
+        assert!(WeaponImpl::read_data(&weapon(None, Some(f32::MAX))).is_some());
         let read = WeaponImpl::read_data(&weapon(Some(0), Some(0.5))).unwrap();
         assert_eq!(read.item_damage_per_attack, 0);
         assert_eq!(read.disable_blocking_for_seconds, 0.5);
