@@ -3421,7 +3421,7 @@ pub fn mob_hurt_server<M: Mob + ?Sized>(
 }
 
 impl<T: Mob + Send + 'static> EntityBase for T {
-    /// Vanilla `LivingEntity.getWeaponItem`; Pumpkin doesn't track the riptide spin stack.
+    /// Vanilla `LivingEntity.getWeaponItem`.
     fn get_weapon_item(&self) -> Option<ItemStack> {
         self.get_living_entity()
             .map(|living| living.held_item(self))

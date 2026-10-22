@@ -134,6 +134,12 @@ pub struct LivingEntity {
     pub item_use_time: AtomicI32,
     pub item_in_use: std::sync::Mutex<Option<ItemStack>>,
     pub active_hand: std::sync::Mutex<Option<Hand>>,
+    /// Vanilla `autoSpinAttackTicks`: the riptide spin's ticks left.
+    pub auto_spin_attack_ticks: AtomicI32,
+    pub auto_spin_attack_dmg: AtomicCell<f32>,
+    /// Vanilla `autoSpinAttackItemStack`, with the hand it is in: Pumpkin's stacks are copies,
+    /// so the hand stands in for vanilla's identity checks.
+    pub auto_spin_attack_item: std::sync::Mutex<Option<(ItemStack, Hand)>>,
     pub recent_kinetic_enemies: std::sync::Mutex<FxHashMap<i32, i32>>,
     swing_state: std::sync::Mutex<SwingState>,
     pub death_time: AtomicU8,
@@ -312,8 +318,7 @@ impl LivingEntity {
     const USING_ITEM_FLAG: u8 = 1;
     const OFF_HAND_ACTIVE_FLAG: u8 = 2;
     const RANDOM_TELEPORT_ATTEMPTS: usize = 16;
-    #[expect(dead_code)]
-    const USING_RIPTIDE_FLAG: u8 = 4;
+    pub(crate) const AUTO_SPIN_ATTACK_FLAG: u8 = 4;
 
     fn hurt_sound_for_entity(entity_type: &'static EntityType) -> Sound {
         entity_type.hurt_sound.unwrap_or(Sound::EntityGenericHurt)
@@ -377,6 +382,9 @@ impl LivingEntity {
             item_use_time: AtomicI32::new(0),
             item_in_use: std::sync::Mutex::new(None),
             active_hand: std::sync::Mutex::new(None),
+            auto_spin_attack_ticks: AtomicI32::new(0),
+            auto_spin_attack_dmg: AtomicCell::new(0.0),
+            auto_spin_attack_item: std::sync::Mutex::new(None),
             recent_kinetic_enemies: std::sync::Mutex::new(FxHashMap::default()),
             swing_state: std::sync::Mutex::new(SwingState::default()),
             livings_flags: AtomicU8::new(0),
@@ -777,7 +785,7 @@ impl LivingEntity {
             .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(stack);
     }
 
-    fn set_living_flag(&self, flag: u8, value: bool) {
+    pub(crate) fn set_living_flag(&self, flag: u8, value: bool) {
         let index = flag;
         let mut b = self.livings_flags.load(Ordering::Relaxed);
         if value {
@@ -1831,6 +1839,7 @@ impl LivingEntity {
             self.update_fall_flying(caller);
         }
 
+        let before_travel_box = self.entity.bounding_box.load();
         if self.has_effect(&StatusEffect::SLOW_FALLING)
             || self.has_effect(&StatusEffect::LEVITATION)
         {
@@ -1881,6 +1890,7 @@ impl LivingEntity {
         self.entity.tick_frozen(caller);
         self.update_frost();
 
+        self.tick_auto_spin_attack(caller, before_travel_box);
         if caller
             .get_mob()
             .is_none_or(super::mob::Mob::pushes_entities)
@@ -1912,6 +1922,81 @@ impl LivingEntity {
         movement_input.x *= f64::from(INPUT_FRICTION);
         movement_input.z *= f64::from(INPUT_FRICTION);
         self.movement_input.store(movement_input);
+    }
+
+    /// Vanilla `LivingEntity.isAutoSpinAttack`.
+    pub fn is_auto_spin_attack(&self) -> bool {
+        self.livings_flags.load(Relaxed) & Self::AUTO_SPIN_ATTACK_FLAG != 0
+    }
+
+    /// Vanilla `aiStep`'s spin step, right before `pushEntities`.
+    fn tick_auto_spin_attack(&self, caller: &dyn EntityBase, before_travel_box: BoundingBox) {
+        if self.auto_spin_attack_ticks.load(Relaxed) > 0 {
+            self.auto_spin_attack_ticks.fetch_sub(1, Relaxed);
+            self.check_auto_spin_attack(caller, before_travel_box, self.entity.bounding_box.load());
+        }
+    }
+
+    /// Vanilla `LivingEntity.checkAutoSpinAttack`: the spin hits the first living entity in
+    /// the box it swept, and ends on that hit or against a wall.
+    fn check_auto_spin_attack(
+        &self,
+        caller: &dyn EntityBase,
+        old: BoundingBox,
+        current: BoundingBox,
+    ) {
+        // `getEntities(this, minmax)`: `NO_SPECTATORS`.
+        let entities: Vec<Arc<dyn EntityBase>> = self
+            .entity
+            .world
+            .load()
+            .get_all_at_box(&old.minmax(&current))
+            .into_iter()
+            .filter(|entity| {
+                entity.get_entity().entity_id != self.entity.entity_id && !entity.is_spectator()
+            })
+            .collect();
+        if !entities.is_empty() {
+            if let Some(target) = entities
+                .iter()
+                .find(|entity| entity.get_living_entity().is_some())
+            {
+                Self::do_auto_attack_on_touch(caller, target);
+                self.auto_spin_attack_ticks.store(0, Relaxed);
+                self.entity
+                    .velocity
+                    .store(self.entity.velocity.load() * -0.2);
+            }
+        } else if self.entity.horizontal_collision.load(Relaxed) {
+            self.auto_spin_attack_ticks.store(0, Relaxed);
+        }
+
+        if self.auto_spin_attack_ticks.load(Relaxed) <= 0 {
+            self.set_living_flag(Self::AUTO_SPIN_ATTACK_FLAG, false);
+            self.auto_spin_attack_dmg.store(0.0);
+            *self
+                .auto_spin_attack_item
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
+        }
+    }
+
+    /// Vanilla `doAutoAttackOnTouch`: only `Player` overrides it, with `attack`.
+    fn do_auto_attack_on_touch(caller: &dyn EntityBase, target: &Arc<dyn EntityBase>) {
+        if let Some(player) = caller.get_player() {
+            player.attack(target);
+        }
+    }
+
+    /// The riptide stack while auto-spinning, for vanilla `Player.getWeaponItem`.
+    pub fn auto_spin_attack_item(&self) -> Option<(ItemStack, Hand)> {
+        if !self.is_auto_spin_attack() {
+            return None;
+        }
+        self.auto_spin_attack_item
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
     }
 
     fn push_entities(&self, dyn_self: &dyn EntityBase) {
@@ -4629,19 +4714,20 @@ impl LivingEntity {
         {
             return seconds;
         }
-        // `weaponItem == getActiveItem()`: the weapon is the main-hand stack, which is the
-        // active item unless the entity is a spectator or is using its off hand.
-        // TODO: the riptide spin stack once Pumpkin tracks it (`Player.getWeaponItem`).
-        if caller.is_spectator()
-            || *self
-                .active_hand
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                == Some(Hand::Left)
-        {
+        // `weaponItem == getActiveItem()`: the weapon is the riptide stack while spinning, else
+        // the main-hand stack; the active item is the used hand's stack, else the main hand's.
+        // A spectator's active item is empty.
+        let spin = self.auto_spin_attack_item();
+        let weapon_hand = spin.as_ref().map_or(Hand::Right, |(_, hand)| *hand);
+        let active_hand = self
+            .active_hand
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .unwrap_or(Hand::Right);
+        if caller.is_spectator() || weapon_hand != active_hand {
             return 0.0;
         }
-        self.held_item(caller)
+        spin.map_or_else(|| self.held_item(caller), |(stack, _)| stack)
             .get_data_component::<WeaponImpl>()
             .map_or(0.0, |weapon| weapon.disable_blocking_for_seconds)
     }
@@ -4933,10 +5019,12 @@ impl LivingEntity {
 }
 
 impl EntityBase for LivingEntity {
-    /// Vanilla `LivingEntity.getWeaponItem`; Pumpkin doesn't track the riptide spin stack.
+    /// Vanilla `LivingEntity.getWeaponItem`, with `Player`'s riptide stack.
     fn get_weapon_item(&self) -> Option<ItemStack> {
-        self.get_living_entity()
-            .map(|living| living.held_item(self))
+        Some(
+            self.auto_spin_attack_item()
+                .map_or_else(|| self.held_item(self), |(stack, _)| stack),
+        )
     }
 
     fn damage_with_context(
@@ -5058,6 +5146,9 @@ impl EntityBase for LivingEntity {
                     let _ = self.entity.tick_block_collisions(caller);
                     self.entity.tick_frozen(caller);
                     self.update_frost();
+                    // The server's move is undone, so the box before and after travel is
+                    // the one the client moved the player to.
+                    self.tick_auto_spin_attack(caller, self.entity.bounding_box.load());
                     self.push_entities(caller);
                 }
             } else {

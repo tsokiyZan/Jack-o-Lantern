@@ -1630,6 +1630,21 @@ pub fn build() -> TokenStream {
             parse_optional_value_effect(effects_map.get("minecraft:trident_spin_attack_strength"));
         let crossbow_charge_time =
             parse_optional_value_effect(effects_map.get("minecraft:crossbow_charge_time"));
+        let trident_sound = effects_map
+            .get("minecraft:trident_sound")
+            .and_then(|v| v.as_array())
+            .map(|sounds| {
+                sounds
+                    .iter()
+                    .map(|s| {
+                        let s = s.as_str().expect("trident_sound entry is a string");
+                        let raw = s.strip_prefix("minecraft:").unwrap_or(s);
+                        let ident = format_ident!("{}", raw.to_pascal_case());
+                        quote! { crate::sound::Sound::#ident }
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
         let location_changed =
             parse_conditional_entity_effects(effects_map.get("minecraft:location_changed"));
         let damage_immunity =
@@ -1665,6 +1680,7 @@ pub fn build() -> TokenStream {
                 trident_return_acceleration: #trident_return_acceleration,
                 trident_spin_attack_strength: #trident_spin_attack_strength,
                 crossbow_charge_time: #crossbow_charge_time,
+                trident_sound: &[#(#trident_sound),*],
                 location_changed: #location_changed,
                 tick: #tick,
                 post_piercing_attack: #post_piercing_attack,
@@ -2324,6 +2340,8 @@ pub fn build() -> TokenStream {
             pub trident_return_acceleration: &'static [ConditionalEffect<EnchantmentValueEffect>],
             pub trident_spin_attack_strength: Option<EnchantmentValueEffect>,
             pub crossbow_charge_time: Option<EnchantmentValueEffect>,
+            /// `minecraft:trident_sound`: the riptide sounds, picked by level.
+            pub trident_sound: &'static [crate::sound::Sound],
             pub location_changed: &'static [ConditionalEffect<EnchantmentEntityEffect>],
             /// `minecraft:tick`: entity effects run every tick on the wearer.
             pub tick: &'static [ConditionalEffect<EnchantmentEntityEffect>],

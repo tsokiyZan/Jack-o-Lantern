@@ -1464,12 +1464,17 @@ impl Player {
         let attacker_entity = &self.living_entity.entity;
         let config = &server.advanced_config.pvp;
 
-        let inventory = self.inventory();
-        let item_stack = inventory.held_item();
-
-        let base_damage = self
+        let base_damage = if self.living_entity.is_auto_spin_attack() {
+            f64::from(self.living_entity.auto_spin_attack_dmg.load())
+        } else {
+            self.living_entity
+                .get_attribute_value(&Attributes::ATTACK_DAMAGE)
+        };
+        // Vanilla `getWeaponItem`, and the hand it is in for its wear.
+        let (item_stack, weapon_hand) = self
             .living_entity
-            .get_attribute_value(&Attributes::ATTACK_DAMAGE);
+            .auto_spin_attack_item()
+            .unwrap_or_else(|| (self.inventory().held_item(), Hand::Right));
         let mut damage_multiplier = 1.0;
 
         // Vanilla `createAttackSource`: the mace's while it can smash.
@@ -1638,7 +1643,12 @@ impl Player {
                     std::sync::atomic::Ordering::Relaxed,
                 );
 
-                self.item_attack_interaction(victim.as_ref(), &item_stack, &damage_source);
+                self.item_attack_interaction(
+                    victim.as_ref(),
+                    &item_stack,
+                    weapon_hand,
+                    &damage_source,
+                );
 
                 // Vanilla `damageStatsAndHearts`.
                 if let Some(living) = victim.get_living_entity() {
@@ -1689,6 +1699,7 @@ impl Player {
         &self,
         victim: &dyn EntityBase,
         item_stack: &ItemStack,
+        weapon_hand: Hand,
         damage_source: &DamageSource<'_>,
     ) {
         let is_mace = item_stack.item.id == pumpkin_data::item::Item::MACE.id;
@@ -1707,7 +1718,11 @@ impl Player {
             if is_mace {
                 MaceItem::post_hurt_enemy(&self.living_entity);
             }
-            self.damage_held_item(Self::combat_weapon_durability_cost(item_stack));
+            let slot = match weapon_hand {
+                Hand::Right => EquipmentSlot::MAIN_HAND,
+                Hand::Left => EquipmentSlot::OFF_HAND,
+            };
+            self.damage_item_in_slot(&slot, Self::combat_weapon_durability_cost(item_stack));
         }
     }
 
@@ -2346,11 +2361,6 @@ impl Player {
         }
     }
 
-    const fn is_auto_spin_attack() -> bool {
-        // TODO: Track active auto-spin/riptide state and return true while it is active.
-        false
-    }
-
     fn can_fit_pose(&self, pose: EntityPose) -> bool {
         let entity = self.get_entity();
         let dimensions = entity.get_dimensions(pose);
@@ -2371,7 +2381,7 @@ impl Player {
             EntityPose::Swimming
         } else if entity.is_fall_flying() {
             EntityPose::FallFlying
-        } else if Self::is_auto_spin_attack() {
+        } else if self.living_entity.is_auto_spin_attack() {
             EntityPose::SpinAttack
         } else if entity.is_sneaking() && !self.is_flying() {
             EntityPose::Crouching
@@ -6781,6 +6791,21 @@ impl Player {
         self.using_hand.store(Some(hand));
     }
 
+    /// Vanilla `Player.startAutoSpinAttack`; `hand` holds `stack`.
+    pub fn start_auto_spin_attack(&self, ticks: i32, dmg: f32, stack: ItemStack, hand: Hand) {
+        let living = &self.living_entity;
+        living
+            .auto_spin_attack_ticks
+            .store(ticks, Ordering::Relaxed);
+        living.auto_spin_attack_dmg.store(dmg);
+        *living
+            .auto_spin_attack_item
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some((stack, hand));
+        // TODO: `removeEntitiesOnShoulder`; shoulder parrots aren't ported.
+        living.set_living_flag(LivingEntity::AUTO_SPIN_ATTACK_FLAG, true);
+    }
+
     /// Stop using an item
     pub fn stop_using_item(&self) {
         self.using_item.store(false, Ordering::Relaxed);
@@ -7227,10 +7252,13 @@ impl EntityBase for Player {
             .check_fall_damage(caller, ya, on_ground, state, pos);
     }
 
-    /// Vanilla `LivingEntity.getWeaponItem`; Pumpkin doesn't track the riptide spin stack.
+    /// Vanilla `Player.getWeaponItem`: the riptide stack while auto-spinning.
     fn get_weapon_item(&self) -> Option<ItemStack> {
-        self.get_living_entity()
-            .map(|living| living.held_item(self))
+        Some(
+            self.living_entity
+                .auto_spin_attack_item()
+                .map_or_else(|| self.living_entity.held_item(self), |(stack, _)| stack),
+        )
     }
 
     fn damage_with_context(

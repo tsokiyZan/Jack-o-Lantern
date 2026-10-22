@@ -9,6 +9,7 @@ use crate::entity::attributes::{Modifier, ModifierOperation, send_attribute_upda
 use crate::entity::damage_source::DamageSource;
 use crate::entity::living::LivingEntity;
 use crate::entity::mob::equipment::RegionalDifficulty;
+use crate::entity::player::Player;
 use crate::entity::projectile::arrow::ArrowEntity;
 use crate::world::World;
 use pumpkin_data::attributes::Attributes;
@@ -20,6 +21,8 @@ use pumpkin_data::enchantment::{
 use pumpkin_data::enchantment_provider::{EnchantmentProvider, EnchantmentProviderKind};
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::{DamageResult, ItemStack};
+use pumpkin_data::sound::Sound;
+use pumpkin_inventory::screen_handler::InventoryPlayer;
 use pumpkin_util::math::java_round_f32;
 use pumpkin_util::random::RandomImpl;
 use pumpkin_util::random::weighted;
@@ -647,6 +650,28 @@ impl EnchantmentHelper {
         strength
     }
 
+    /// Vanilla `EnchantmentHelper.pickHighestLevel(stack, TRIDENT_SOUND)`: from the highest
+    /// level enchantment with trident sounds, the sound for its level.
+    #[must_use]
+    pub fn pick_highest_level_trident_sound(stack: &ItemStack) -> Option<Sound> {
+        // `getHighestLevel`: a later enchantment replaces the pick only at a higher level.
+        let mut found: Option<(&'static [Sound], i32)> = None;
+        Self::run_iteration_on_item(stack, |enchantment, level| {
+            if found.is_none_or(|(_, found_level)| found_level < level)
+                && !enchantment.effects.trident_sound.is_empty()
+            {
+                found = Some((enchantment.effects.trident_sound, level));
+            }
+        });
+        found.and_then(|(sounds, level)| {
+            let index = usize::try_from(level)
+                .ok()?
+                .min(sounds.len())
+                .checked_sub(1)?;
+            sounds.get(index).copied()
+        })
+    }
+
     /// Modifies fishing time reduction using data-driven effects (e.g. Lure).
     #[must_use]
     pub fn modify_fishing_time_reduction(rod: &ItemStack, base_reduction: f32) -> f32 {
@@ -900,6 +925,9 @@ fn apply_value_effects(
 /// before it is applied.
 pub trait HurtAndBreak {
     fn hurt_and_break(&mut self, world: &World, amount: i32) -> DamageResult;
+
+    /// Vanilla `ItemStack.hurtWithoutBreaking`: the wear stops one short of breaking.
+    fn hurt_without_breaking(&mut self, world: &World, amount: i32, player: &Player);
 }
 
 impl HurtAndBreak for ItemStack {
@@ -913,6 +941,23 @@ impl HurtAndBreak for ItemStack {
             amount
         };
         self.damage_item(amount)
+    }
+
+    fn hurt_without_breaking(&mut self, world: &World, amount: i32, player: &Player) {
+        // `processDurabilityChange`.
+        if !self.is_damageable() || self.is_unbreakable() || player.has_infinite_materials() {
+            return;
+        }
+        let amount = if amount > 0 {
+            EnchantmentHelper::process_durability_change(world, self, amount)
+        } else {
+            amount
+        };
+        if amount == 0 {
+            return;
+        }
+        let max_damage = self.get_max_damage().unwrap_or(0);
+        self.set_damage((self.get_damage() + amount).min(max_damage - 1));
     }
 }
 
@@ -1135,6 +1180,27 @@ mod tests {
         let book = ItemStack::new(1, &Item::BOOK);
         let results = EnchantmentHelper::get_available_enchantment_results(45, &book, &source);
         assert_eq!(results.len(), 3);
+    }
+
+    #[test]
+    fn trident_sound_is_picked_by_level_and_capped_at_the_last() {
+        let mut stack = ItemStack::new(1, &Item::TRIDENT);
+        assert_eq!(
+            EnchantmentHelper::pick_highest_level_trident_sound(&stack),
+            None
+        );
+        stack.enchant(&Enchantment::RIPTIDE, 2);
+        assert_eq!(
+            EnchantmentHelper::pick_highest_level_trident_sound(&stack),
+            Some(Sound::ItemTridentRiptide2)
+        );
+        // `list.get(min(level, size) - 1)`: an over-level riptide uses the last sound.
+        let mut stack = ItemStack::new(1, &Item::TRIDENT);
+        stack.enchant(&Enchantment::RIPTIDE, 5);
+        assert_eq!(
+            EnchantmentHelper::pick_highest_level_trident_sound(&stack),
+            Some(Sound::ItemTridentRiptide3)
+        );
     }
 
     #[test]
