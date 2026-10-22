@@ -12,6 +12,7 @@ use crate::entity::ai::control::body_rotation_control::{
 use crate::entity::ai::control::jump_control::{JumpControl, JumpControlTrait};
 use crate::entity::ai::control::look_control::LookControl;
 use crate::entity::ai::control::move_control::MoveControl;
+use crate::entity::ai::goal::Controls;
 use crate::entity::ai::goal::escape_danger::EscapeDangerGoal;
 use crate::entity::ai::goal::goal_selector::GoalSelector;
 use crate::entity::ai::sensing::Sensing;
@@ -1673,6 +1674,22 @@ pub trait Mob: EntityBase + Send + Sync {
         mob_controlling_passenger(self.get_mob_entity())
     }
 
+    /// Vanilla `Mob.updateControlFlags`: a mob rider takes over MOVE and LOOK, and JUMP too
+    /// unless this mob sits in a boat.
+    fn update_control_flags(&self) {
+        let no_controller =
+            Mob::get_controlling_passenger(self).is_none_or(|p| p.get_mob().is_none());
+        let not_in_boat = !is_in_abstract_boat(self.get_entity());
+        let mut goals = self
+            .get_mob_entity()
+            .goals_selector
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        goals.set_control_enabled(Controls::MOVE, no_controller);
+        goals.set_control_enabled(Controls::JUMP, no_controller && not_in_boat);
+        goals.set_control_enabled(Controls::LOOK, no_controller);
+    }
+
     /// Vanilla `Mob.isEffectiveAi`: the server runs this mob's AI unless it has none or a
     /// player steers it.
     fn is_effective_ai(&self) -> bool {
@@ -3205,6 +3222,18 @@ pub fn monster_walk_target_value(world: &World, pos: &BlockPos) -> f32 {
     -(world.get_light_level_dependent_magic_value(pos) - 0.5)
 }
 
+/// Vanilla `getVehicle() instanceof AbstractBoat`. `BoatEntity` covers boats, chest boats and
+/// rafts; the `#minecraft:boat` tag leaves chest boats out, so it is not used.
+#[must_use]
+pub fn is_in_abstract_boat(entity: &Entity) -> bool {
+    entity.get_vehicle().is_some_and(|vehicle| {
+        vehicle
+            .cast_any()
+            .downcast_ref::<crate::entity::vehicle::boat::BoatEntity>()
+            .is_some()
+    })
+}
+
 /// Vanilla `Mob.getControllingPassenger`: a first passenger that is a mob able to steer,
 /// while this mob has AI.
 #[must_use]
@@ -3563,6 +3592,11 @@ impl<T: Mob + Send + 'static> EntityBase for T {
         // `LivingEntity::tick_movement` runs at its vanilla place in `aiStep`. The
         // ambient-sound roll of `Mob.baseTick` runs inside it too, via `mob_base_tick`.
         mob_entity.living_entity.tick(caller, server);
+        // Vanilla `Mob.tick` after `super.tick()` (`!isClientSide && tickCount % 5 == 0`),
+        // before the subclass code that follows its own `super.tick()`.
+        if mob_entity.living_entity.entity.tick_count.load(Relaxed) % 5 == 0 {
+            self.update_control_flags();
+        }
         self.post_tick();
     }
 

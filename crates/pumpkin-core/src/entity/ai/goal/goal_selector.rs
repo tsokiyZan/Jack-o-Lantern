@@ -196,3 +196,76 @@ impl Default for GoalSelector {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::GoalSelector;
+    use crate::entity::ai::goal::{Controls, Goal};
+    use crate::entity::mob::Mob;
+    use pumpkin_data::entity::EntityType;
+    use pumpkin_util::math::vector3::Vector3;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
+
+    /// Always wants to run, under the given controls; records `stop`.
+    struct Always<const C: u8>(Arc<AtomicBool>);
+
+    impl<const C: u8> Goal for Always<C> {
+        fn can_start(&mut self, _mob: &dyn Mob) -> bool {
+            true
+        }
+
+        fn stop(&mut self, _mob: &dyn Mob) {
+            self.0.store(true, Relaxed);
+        }
+
+        fn controls(&self) -> Controls {
+            match C {
+                0 => Controls::MOVE,
+                _ => Controls::LOOK,
+            }
+        }
+    }
+
+    type MoveGoal = Always<0>;
+    type LookGoal = Always<1>;
+
+    /// Vanilla `GoalSelector.tick`: a running goal that uses a disabled flag stops on the next
+    /// tick (`goalContainsAnyFlags(goal, disabledFlags)`); goals on other flags keep running.
+    #[tokio::test]
+    async fn disabling_move_stops_the_move_goal_and_keeps_the_look_goal() {
+        let (_folder, world) = crate::world::test_support::test_world();
+        let zombie = crate::entity::r#type::from_type(
+            &EntityType::ZOMBIE,
+            Vector3::new(0.0, 100.0, 0.0),
+            &world,
+            uuid::Uuid::new_v4(),
+        );
+        let mob = zombie.get_mob().unwrap();
+
+        let move_stopped = Arc::new(AtomicBool::new(false));
+        let look_stopped = Arc::new(AtomicBool::new(false));
+        let mut selector = GoalSelector::default();
+        selector.add_goal(1, Box::new(Always::<0>(move_stopped.clone())));
+        selector.add_goal(1, Box::new(Always::<1>(look_stopped.clone())));
+
+        selector.tick(mob);
+        assert!(selector.is_running::<MoveGoal>());
+        assert!(selector.is_running::<LookGoal>());
+
+        selector.set_control_enabled(Controls::MOVE, false);
+        selector.tick(mob);
+        assert!(!selector.is_running::<MoveGoal>());
+        assert!(move_stopped.load(Relaxed));
+        assert!(selector.is_running::<LookGoal>());
+        assert!(!look_stopped.load(Relaxed));
+
+        // Still disabled: the move goal may not start again.
+        selector.tick(mob);
+        assert!(!selector.is_running::<MoveGoal>());
+
+        selector.set_control_enabled(Controls::MOVE, true);
+        selector.tick(mob);
+        assert!(selector.is_running::<MoveGoal>());
+    }
+}

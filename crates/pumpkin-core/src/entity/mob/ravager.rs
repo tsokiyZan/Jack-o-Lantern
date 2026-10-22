@@ -19,11 +19,11 @@ use crate::entity::ai::pathfinder::node::PathType;
 use crate::entity::{
     Entity, EntityBase,
     ai::goal::{
-        active_target::ActiveTargetGoal, look_at_entity::LookAtEntityGoal,
+        Controls, active_target::ActiveTargetGoal, look_at_entity::LookAtEntityGoal,
         melee_attack::MeleeAttackGoal, swim::SwimGoal, wander_around::WanderAroundGoal,
     },
     mob::{
-        Mob, MobEntity,
+        Mob, MobEntity, is_in_abstract_boat,
         patrol::{PatrolData, PatrollingMonster},
         raider::{Raider, RaiderData},
     },
@@ -215,6 +215,27 @@ impl Mob for RavagerEntity {
     /// Vanilla `Ravager.checkSpawnObstruction`: only liquid obstructs it.
     fn check_spawn_obstruction(&self, world: &crate::world::World) -> bool {
         !world.contains_any_liquid(self.get_entity().bounding_box.load())
+    }
+
+    /// Vanilla `Ravager.updateControlFlags`: a raider rider leaves the ravager its own goals,
+    /// any other mob rider also takes TARGET.
+    fn update_control_flags(&self) {
+        let no_controller = Mob::get_controlling_passenger(self).is_none_or(|p| {
+            p.get_mob().is_none()
+                || p.get_entity()
+                    .entity_type
+                    .has_tag(&tag::EntityType::MINECRAFT_RAIDERS)
+        });
+        let not_in_boat = !is_in_abstract_boat(self.get_entity());
+        let mut goals = self
+            .mob_entity
+            .goals_selector
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        goals.set_control_enabled(Controls::MOVE, no_controller);
+        goals.set_control_enabled(Controls::JUMP, no_controller && not_in_boat);
+        goals.set_control_enabled(Controls::LOOK, no_controller);
+        goals.set_control_enabled(Controls::TARGET, no_controller);
     }
 
     /// Vanilla `Ravager.aiStep` after `super.aiStep()`.
