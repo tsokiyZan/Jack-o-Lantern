@@ -406,6 +406,8 @@ impl VillagerEntity {
         mob_entity.set_pathfinding_malus(PathType::DamageFire, -1.0);
         // Vanilla `Villager`'s constructor.
         mob_entity.set_required_path_length(48.0);
+        // `/summon` reads `CanPickUpLoot` (default false) over this, as vanilla's load does.
+        mob_entity.set_can_pick_up_loot(true);
         let villager_data = VillagerData::new(VillagerType::Plains, VillagerProfession::None, 1);
         let inventory = std::sync::Mutex::new((0..8).map(|_| ItemStack::EMPTY.clone()).collect());
 
@@ -1932,6 +1934,39 @@ impl Mob for VillagerEntity {
     /// `update_control_flags`).
     fn leash_too_far_behaviour(&self, caller: &dyn EntityBase) {
         crate::entity::leashable::drop_leash(caller, true, true);
+    }
+
+    /// Vanilla `Villager.wantsToPickUp`.
+    fn wants_to_pick_up(
+        &self,
+        _brain: &crate::entity::ai::brain::Brain,
+        stack: &ItemStack,
+    ) -> bool {
+        let requested = self
+            .villager_data
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .profession_enum()
+            .requested_items()
+            .iter()
+            .any(|item| item.id == stack.item.id);
+        (stack
+            .item
+            .has_tag(&pumpkin_data::tag::Item::MINECRAFT_VILLAGER_PICKS_UP)
+            || stack.has_data_component(pumpkin_data::data_component::DataComponent::VillagerFood)
+            || requested)
+            && simple_container::can_add_item(
+                &self
+                    .inventory
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner),
+                stack,
+            )
+    }
+
+    /// Vanilla `Villager.pickUpItem`.
+    fn mob_pick_up_item(&self, item: &crate::entity::item::ItemEntity) {
+        simple_container::inventory_carrier_pick_up_item(self, &self.inventory, item);
     }
 
     /// Vanilla `Villager.getAmbientSound`.

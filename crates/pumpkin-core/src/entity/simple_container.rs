@@ -3,7 +3,12 @@
 //! Vanilla keeps the slots in a `NonNullList` and the container's stack limit at the
 //! `Container` default of 99; here the slots are a plain slice of stacks.
 
+use std::sync::Mutex;
+
 use pumpkin_data::item_stack::ItemStack;
+
+use crate::entity::item::ItemEntity;
+use crate::entity::mob::Mob;
 
 /// Vanilla `Container.getMaxStackSize()`'s default, which `SimpleContainer` doesn't override.
 const MAX_STACK: u8 = 99;
@@ -122,6 +127,56 @@ fn move_items_between_stacks(source: &mut ItemStack, target: &mut ItemStack) {
     if diff > 0 {
         target.increment(diff);
         source.decrement(diff);
+    }
+}
+
+/// Vanilla `InventoryCarrier.pickUpItem`: what fits of `item` goes into `inventory`. Pumpkin's
+/// pickup event goes after the room check, before anything changes.
+pub fn inventory_carrier_pick_up_item(
+    mob: &dyn Mob,
+    inventory: &Mutex<Vec<ItemStack>>,
+    item: &ItemEntity,
+) {
+    let stack = item
+        .get_item_stack()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone();
+    let mob_entity = mob.get_mob_entity();
+    if !mob_entity.with_brain(mob, |tick| mob.wants_to_pick_up(tick.brain, &stack)) {
+        return;
+    }
+    let has_space = can_add_item(
+        &inventory
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
+        &stack,
+    );
+    if !has_space {
+        return;
+    }
+    let living = &mob_entity.living_entity;
+    let count = stack.item_count;
+    if !living.fire_pickup_event(item.get_entity(), u32::from(count)) {
+        return;
+    }
+    living.on_item_pickup(item);
+    let remainder = add_item(
+        &mut inventory
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
+        &stack,
+    );
+    living.take(item.get_entity(), u32::from(count - remainder.item_count));
+    if remainder.is_empty() {
+        item.get_entity().remove();
+    } else {
+        // Vanilla sets the count on the item's own stack without marking its entity data
+        // dirty, so no metadata update goes out.
+        item.get_item_stack()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .set_count(remainder.item_count);
     }
 }
 
