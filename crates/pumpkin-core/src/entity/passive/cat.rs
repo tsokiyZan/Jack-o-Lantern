@@ -70,8 +70,6 @@ pub const SPRINT_SPEED_MOD: f64 = 1.33;
 const DEFAULT_VARIANT: CatVariant = CatVariant::Black;
 const DEFAULT_COLLAR_COLOR: DyeColor = DyeColor::Red;
 const MORNING_GIFT_LOOT_TABLE: &str = "minecraft:gameplay/cat_morning_gift";
-/// Vanilla `DimensionType.MOON_BRIGHTNESS_PER_PHASE`.
-const MOON_BRIGHTNESS_PER_PHASE: [f32; 8] = [1.0, 0.75, 0.5, 0.25, 0.0, 0.25, 0.5, 0.75];
 
 /// Vanilla `Cat.BABY_DIMENSIONS`.
 const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::CAT_BABY_DIMENSIONS;
@@ -327,8 +325,7 @@ fn as_cat(mob: &dyn Mob) -> Option<&CatEntity> {
 fn select_variant_to_spawn(world: &World, pos: &BlockPos) -> Option<CatVariant> {
     // TODO: `StructureCheck(#cats_spawn_as_black)` needs vanilla's
     // `StructureManager.getStructureWithPieceAt`; swamp huts place their cat as `all_black`.
-    let moon_phase = world.environment_attributes().get_value_moon_phase(pos);
-    let full_moon = MOON_BRIGHTNESS_PER_PHASE[usize::from(moon_phase.index())] >= 0.9;
+    let full_moon = world.get_moon_brightness(pos) >= 0.9;
     let candidates: Vec<CatVariant> = CatVariant::all()
         .iter()
         .copied()

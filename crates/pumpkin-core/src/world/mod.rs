@@ -191,6 +191,8 @@ use weather::Weather;
 const MAX_LIGHT_LEVEL: u8 = 15;
 /// The range vanilla `ServerLevel.levelEvent` passes to `PlayerList.broadcast`.
 const LEVEL_EVENT_RANGE: f64 = 64.0;
+/// Vanilla `DimensionType.MOON_BRIGHTNESS_PER_PHASE`.
+pub const MOON_BRIGHTNESS_PER_PHASE: [f32; 8] = [1.0, 0.75, 0.5, 0.25, 0.0, 0.25, 0.5, 0.75];
 
 fn bedrock_chest_block_actor(state_id: BlockStateId, position: BlockPos) -> Option<NbtCompound> {
     let (block, _) = BlockState::from_id_with_block(state_id);
@@ -6074,6 +6076,26 @@ impl World {
             pos,
         );
         sun_angle_deg * (std::f32::consts::PI / 180.0)
+    }
+
+    /// Vanilla `ServerLevel.getMoonBrightness`.
+    #[must_use]
+    pub fn get_moon_brightness(&self, pos: &BlockPos) -> f32 {
+        let moon_phase = self.environment_attributes().get_value_moon_phase(pos);
+        MOON_BRIGHTNESS_PER_PHASE[usize::from(moon_phase.index())]
+    }
+
+    /// Vanilla `Level.getOverworldClockTime`: the overworld's clock, whichever world asks.
+    #[must_use]
+    pub fn get_overworld_clock_time(&self) -> i64 {
+        if self.dimension != Dimension::OVERWORLD
+            && let Some(server) = self.server.upgrade()
+        {
+            return server
+                .get_world_from_dimension(&Dimension::OVERWORLD)
+                .get_time_of_day();
+        }
+        self.get_time_of_day()
     }
 
     #[must_use]

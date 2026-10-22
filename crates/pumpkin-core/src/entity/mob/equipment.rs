@@ -47,28 +47,29 @@ pub struct RegionalDifficulty {
 }
 
 impl RegionalDifficulty {
-    /// Computes difficulty at the given world position.
-    ///
-    /// Looks up the chunk's inhabited time and combines it with the world's
-    /// difficulty, game time, and moon phase.
+    /// Vanilla `ServerLevel.getCurrentDifficultyAt`: the chunk's inhabited time and the moon
+    /// only count when the chunk is loaded; the time is the overworld clock's.
     pub fn at(world: &Arc<crate::world::World>, pos: Vector3<f64>) -> Self {
-        let level_info = world.level_info.load();
-        let difficulty = level_info.difficulty;
-        let time_of_day = world.level_time.try_lock().map_or(0, |t| t.time_of_day);
-        let inhabited_time = {
-            let chunk_x = (pos.x / 16.0).floor() as i32;
-            let chunk_z = (pos.z / 16.0).floor() as i32;
-            world
-                .level
-                .loaded_chunks
-                .get(&pumpkin_util::math::vector2::Vector2::new(chunk_x, chunk_z))
-                .map_or(0, |c| {
-                    c.inhabited_time.load(std::sync::atomic::Ordering::Relaxed)
-                })
-        };
-        let moon_brightness = moon_brightness(time_of_day);
+        let difficulty = world.level_info.load().difficulty;
+        let block_pos = pos.to_block_pos();
+        let chunk = world
+            .level
+            .loaded_chunks
+            .get(&pumpkin_util::math::vector2::Vector2::new(
+                block_pos.0.x >> 4,
+                block_pos.0.z >> 4,
+            ))
+            .map(|chunk| chunk.inhabited_time.load(Relaxed));
+        let (inhabited_time, moon_brightness) = chunk.map_or((0, 0.0), |inhabited_time| {
+            (inhabited_time, world.get_moon_brightness(&block_pos))
+        });
 
-        Self::calculate(difficulty, time_of_day, inhabited_time, moon_brightness)
+        Self::calculate(
+            difficulty,
+            world.get_overworld_clock_time(),
+            inhabited_time,
+            moon_brightness,
+        )
     }
 
     /// Direct calculation from raw inputs. Used by `at()` and for testing.
@@ -125,14 +126,6 @@ impl RegionalDifficulty {
             special_multiplier,
         }
     }
-}
-
-/// Moon brightness factor for the given time of day (0.0 to 1.0).
-/// Full moon at phase 0, new moon at phase 4.
-#[must_use]
-fn moon_brightness(time_of_day: i64) -> f32 {
-    let phase = (time_of_day / 24000 % 8) as i32;
-    (phase - 4).abs() as f32 / 4.0
 }
 
 #[must_use]
@@ -425,7 +418,7 @@ pub fn pick_up_item<M: Mob + ?Sized>(mob: &M, item: &crate::entity::item::ItemEn
 
 #[cfg(test)]
 mod tests {
-    use super::moon_brightness;
+    use super::*;
 
     #[test]
     fn attribute_modifiers_compute_in_order() {
@@ -461,27 +454,20 @@ mod tests {
         assert!((value - 6.0).abs() < f64::EPSILON, "got {value}");
     }
 
-    #[test]
-    fn moon_brightness_matches_the_vanilla_phase_table() {
-        let expected = [1.0, 0.75, 0.5, 0.25, 0.0, 0.25, 0.5, 0.75];
-        for (phase, want) in expected.into_iter().enumerate() {
-            let time_of_day = phase as i64 * 24000;
-            assert!(
-                (moon_brightness(time_of_day) - want).abs() < f32::EPSILON,
-                "phase {phase}: got {}, want {want}",
-                moon_brightness(time_of_day)
-            );
-        }
-    }
-
-    #[test]
-    fn moon_brightness_wraps_every_eight_days() {
-        for phase in 0..8i64 {
-            assert!(
-                (moon_brightness(phase * 24000) - moon_brightness((phase + 8) * 24000)).abs()
-                    < f32::EPSILON,
-                "phase {phase} does not wrap"
-            );
-        }
+    /// `getCurrentDifficultyAt` with the chunk unloaded: no inhabited time and no moon. Day 63
+    /// on hard is `3 * (0.75 + 0.25)`; the waxing gibbous moon would add `3 * 0.1875`.
+    #[tokio::test]
+    async fn unloaded_chunk_has_no_moon_or_inhabited_time() {
+        let (_folder, world) = crate::world::test_support::test_world();
+        world.set_time_of_day(1_512_000);
+        let mut level_info = (**world.level_info.load()).clone();
+        level_info.difficulty = Difficulty::Hard;
+        world.level_info.store(Arc::new(level_info));
+        let difficulty = RegionalDifficulty::at(&world, Vector3::new(8.0, 64.0, 8.0));
+        assert!(
+            (difficulty.effective_difficulty - 3.0).abs() < f32::EPSILON,
+            "got {}",
+            difficulty.effective_difficulty
+        );
     }
 }

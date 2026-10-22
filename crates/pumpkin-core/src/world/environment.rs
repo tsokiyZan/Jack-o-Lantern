@@ -188,9 +188,13 @@ impl<'a> EnvironmentAttributes<'a> {
         }
     }
 
-    /// Evaluates the current `MoonPhase` from the moon timeline.
+    /// Evaluates the current `MoonPhase` from the moon timeline; dimensions without it (the
+    /// Nether and the End) have the attribute's default, a full moon.
     #[must_use]
     pub fn get_dimension_value_moon_phase(&self) -> MoonPhase {
+        if !self.world.dimension.has_skylight || self.world.dimension.has_fixed_time {
+            return MoonPhase::FullMoon;
+        }
         sample_moon_phase_track(
             MoonTimeline::MOON_PHASE_KEYFRAMES,
             MoonTimeline::PERIOD_TICKS,
