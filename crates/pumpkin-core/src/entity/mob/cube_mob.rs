@@ -695,6 +695,9 @@ impl Mob for CubeMobEntity {
             let Some(cube) = child.cast_any().downcast_ref::<Self>() else {
                 continue;
             };
+            // `SPLIT_ON_DEATH.convert`: a leashed parent drops its leash (a no-op after the
+            // first child).
+            crate::entity::leashable::drop_leash(self, true, true);
             convert_common(
                 self,
                 cube,

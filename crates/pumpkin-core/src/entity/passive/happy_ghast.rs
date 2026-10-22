@@ -312,6 +312,30 @@ const BABY_DIMENSIONS: EntityDimensions =
     pumpkin_data::entity_dimensions::HAPPY_GHAST_BABY_DIMENSIONS;
 
 impl Mob for HappyGhastEntity {
+    /// Vanilla `HappyGhast.supportQuadLeashAsHolder`.
+    fn support_quad_leash_as_holder(&self) -> bool {
+        true
+    }
+
+    /// Vanilla `HappyGhast.leashElasticDistance`.
+    fn leash_elastic_distance(&self) -> f64 {
+        10.0
+    }
+
+    /// Vanilla `HappyGhast.leashSnapDistance`.
+    fn leash_snap_distance(&self) -> f64 {
+        16.0
+    }
+
+    /// Vanilla `HappyGhast.notifyLeashHolder`: a quad-leashed entity keeps the leash-holder
+    /// flag up for 5 ticks.
+    fn notify_leash_holder(&self, leashable: &dyn EntityBase) {
+        if leashable.support_quad_leash() {
+            self.leash_holder_time
+                .store(5, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
+
     /// Vanilla `HappyGhast.canBeCollidedWith`, server side.
     fn mob_can_be_collided_with(&self, other: Option<&dyn EntityBase>) -> bool {
         let entity = self.get_entity();

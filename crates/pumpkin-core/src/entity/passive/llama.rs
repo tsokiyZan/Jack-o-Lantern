@@ -335,6 +335,11 @@ impl Animal for LlamaEntity {
 const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::LLAMA_BABY_DIMENSIONS;
 
 impl Mob for LlamaEntity {
+    /// Vanilla `Llama.supportQuadLeash`.
+    fn support_quad_leash(&self) -> bool {
+        false
+    }
+
     fn mob_after_position_rider(&self, passenger: &dyn EntityBase) {
         self.turn_rider_body(passenger);
     }

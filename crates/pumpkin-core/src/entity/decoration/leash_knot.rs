@@ -1,5 +1,5 @@
 use crate::entity::player::Player;
-use crate::entity::{Entity, EntityBase, leash, living::LivingEntity};
+use crate::entity::{Entity, EntityBase, leash, leashable, living::LivingEntity};
 use crate::item::interaction_result::InteractionResult;
 use crate::world::World;
 use pumpkin_data::entity::EntityType;
@@ -85,9 +85,8 @@ use crate::server::Server;
 impl EntityBase for LeashKnotEntity {
     /// Vanilla `LeashFenceKnotEntity.notifyLeasheeRemoved`: a knot that holds nothing more is
     /// discarded.
-    fn notify_leashee_removed(&self) {
-        let world = self.entity.world.load_full();
-        if leash::leashable_leashed_to(&world, &self.entity).is_empty() {
+    fn notify_leashee_removed(&self, _caller: &dyn EntityBase, _leashable: &dyn EntityBase) {
+        if leashable::leashable_leashed_to(&self.entity).is_empty() {
             self.entity.remove();
         }
     }
@@ -134,7 +133,9 @@ impl EntityBase for LeashKnotEntity {
                     .unwrap_or(false);
 
                 if is_attached_to_knot {
-                    ent.unleash();
+                    // `removeLeash`, with the knot's own lead drop below (not yet vanilla's
+                    // `BlockAttachedEntity.tick`).
+                    leashable::drop_leash(entity_base.as_ref(), true, false);
                     let lead_item = pumpkin_data::item_stack::ItemStack::new(
                         1,
                         &pumpkin_data::item::Item::LEAD,
@@ -171,18 +172,18 @@ impl EntityBase for LeashKnotEntity {
         }
 
         let mut attached_mob = false;
-        for leashable in leash::leashable_leashed_to(&world, player.get_entity()) {
-            if leash::can_have_a_leash_attached_to(leashable.as_ref(), &self.entity) {
-                leash::set_leashed_to(leashable.as_ref(), this.clone());
+        for leashee in leashable::leashable_leashed_to(player.get_entity()) {
+            if leashable::can_have_a_leash_attached_to(leashee.as_ref(), &self.entity) {
+                leashable::set_leashed_to(leashee.as_ref(), this.clone(), true);
                 attached_mob = true;
             }
         }
 
         let mut any_dropped = false;
         if !attached_mob && !player.get_entity().is_sneaking() {
-            for mob in leash::leashable_leashed_to(&world, &self.entity) {
-                if leash::can_have_a_leash_attached_to(mob.as_ref(), player.get_entity()) {
-                    leash::set_leashed_to(mob.as_ref(), player.clone());
+            for mob in leashable::leashable_leashed_to(&self.entity) {
+                if leashable::can_have_a_leash_attached_to(mob.as_ref(), player.get_entity()) {
+                    leashable::set_leashed_to(mob.as_ref(), player.clone(), true);
                     any_dropped = true;
                 }
             }

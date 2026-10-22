@@ -328,7 +328,7 @@ impl CubeMobEntity {
         if sulfur.fuse.load(Relaxed) != 0 {
             return;
         }
-        self.drop_leash();
+        crate::entity::leashable::drop_leash(self, true, true);
         let living = &self.mob_entity.living_entity;
         living.dead.store(true, Relaxed);
         let entity = self.get_entity();
@@ -536,19 +536,6 @@ impl CubeMobEntity {
             .add_raw(0.0, f64::from(entity.height()), 0.0);
         let item = ItemEntity::new(Entity::new(world.clone(), pos, &EntityType::ITEM), stack);
         world.spawn_entity(Arc::new(item));
-    }
-
-    /// Vanilla `Leashable.dropLeash`.
-    fn drop_leash(&self) {
-        let entity = self.get_entity();
-        if !entity.is_leashed() {
-            return;
-        }
-        entity.unleash();
-        entity
-            .world
-            .load()
-            .drop_stack(&entity.block_pos.load(), ItemStack::new(1, &Item::LEAD));
     }
 
     /// Vanilla `SulfurCube.applyContactDamage`.
@@ -987,7 +974,7 @@ impl CubeMobEntity {
         let mut bucket = ItemStack::new(1, &Item::SULFUR_CUBE_BUCKET);
         self.save_to_bucket_tag(&mut bucket);
         crate::item::create_filled_result(stack, player, bucket, false);
-        self.drop_leash();
+        crate::entity::leashable::drop_leash(self, true, true);
         self.get_entity().remove();
         true
     }

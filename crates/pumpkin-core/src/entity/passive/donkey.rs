@@ -172,6 +172,11 @@ const BABY_DIMENSIONS: EntityDimensions = Entity::type_dimensions(&EntityType::D
     .scale(0.5);
 
 impl Mob for DonkeyEntity {
+    /// Vanilla `AbstractHorse.supportQuadLeash`.
+    fn support_quad_leash(&self) -> bool {
+        true
+    }
+
     fn mob_passenger_attachment_point(
         &self,
         passenger: &dyn EntityBase,

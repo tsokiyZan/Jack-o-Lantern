@@ -363,7 +363,8 @@ impl BeehiveBlockEntity {
         while let Some(passenger) = entity.get_first_passenger() {
             entity.remove_passenger(passenger.get_entity().entity_id);
         }
-        entity.unleash();
+        // `bee.dropLeash()`.
+        crate::entity::leashable::drop_leash(bee, true, true);
         stored.push(BeeData::new(Occupant::of(bee)));
         drop(stored);
 

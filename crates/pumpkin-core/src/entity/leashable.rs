@@ -1,7 +1,23 @@
-//! Vanilla `Leashable` spring math: the constants and `Wrench` record, plus
-//! `computeDampenedSpringInteraction`.
+//! Vanilla `Leashable`'s static functions.
+//!
+//! The spring math (constants, `Wrench`, `computeDampenedSpringInteraction`) and attaching,
+//! dropping and finding leashes. The overridable `Leashable` methods are hooks on
+//! `EntityBase`.
 
+use std::sync::Arc;
+use std::sync::atomic::Ordering;
+
+use pumpkin_data::item::Item;
+use pumpkin_data::item_stack::ItemStack;
+use pumpkin_protocol::codec::var_long::VarLong;
+use pumpkin_util::math::boundingbox::BoundingBox;
 use pumpkin_util::math::vector3::Vector3;
+
+use super::{DelayedLeash, Entity, EntityBase};
+use crate::plugin::api::events::entity::entity_unleash::EntityUnleashEvent;
+use crate::plugin::api::events::player::player_leash_entity::PlayerLeashEntityEvent;
+use crate::plugin::api::events::player::player_unleash_entity::PlayerUnleashEntityEvent;
+use crate::world::World;
 
 /// Vanilla `Leashable.LEASH_TOO_FAR_DIST`.
 pub const LEASH_TOO_FAR_DIST: f64 = 12.0;
@@ -100,6 +116,254 @@ pub fn compute_dampened_spring_interaction(
         force: displacement,
         torque,
     })
+}
+
+/// The entity that holds `entity`'s leash, if any (vanilla `getLeashHolder` on the server).
+#[must_use]
+pub fn leash_holder(entity: &Entity) -> Option<Arc<dyn EntityBase>> {
+    entity
+        .leashed_to
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone()
+}
+
+/// Vanilla `Leashable.leashableInArea(level, pos, test)`: `AABB.ofSize(pos, 32, 32, 32)`, every
+/// leashable entity passing `test`, in `getEntitiesOfClass` order.
+pub fn leashable_in_area(
+    world: &World,
+    pos: Vector3<f64>,
+    test: impl Fn(&dyn EntityBase) -> bool,
+) -> Vec<Arc<dyn EntityBase>> {
+    let area = BoundingBox::new(
+        Vector3::new(pos.x - 16.0, pos.y - 16.0, pos.z - 16.0),
+        Vector3::new(pos.x + 16.0, pos.y + 16.0, pos.z + 16.0),
+    );
+    world
+        .get_entities_at_box(&area)
+        .into_iter()
+        .filter(|candidate| candidate.is_leashable() && test(candidate.as_ref()))
+        .collect()
+}
+
+/// Vanilla `Leashable.leashableInArea(entity, l -> l.getLeashHolder() == holder)`: around the
+/// centre of `entity`'s box, the leashables held by the entity with id `holder_id`.
+pub fn leashable_held_by_in_area(entity: &Entity, holder_id: i32) -> Vec<Arc<dyn EntityBase>> {
+    let world = entity.world.load_full();
+    leashable_in_area(
+        &world,
+        entity.bounding_box.load().get_center(),
+        |candidate| {
+            leash_holder(candidate.get_entity())
+                .is_some_and(|holder| holder.get_entity().entity_id == holder_id)
+        },
+    )
+}
+
+/// Vanilla `Leashable.leashableLeashedTo(entity)`: `leashableInArea(entity, l ->
+/// l.getLeashHolder() == entity)`, centred on the bounding box.
+pub fn leashable_leashed_to(entity: &Entity) -> Vec<Arc<dyn EntityBase>> {
+    leashable_held_by_in_area(entity, entity.entity_id)
+}
+
+/// Vanilla `Leashable.canBeLeashed`: `Mob`'s own answer, `true` for the other leashables.
+#[must_use]
+pub fn can_be_leashed(leashable: &dyn EntityBase) -> bool {
+    leashable
+        .get_mob()
+        .is_none_or(crate::entity::mob::Mob::can_be_leashed)
+}
+
+/// Vanilla `Leashable.leashDistanceTo`: between the bounding box centres.
+#[must_use]
+pub fn leash_distance_to(leashable: &Entity, holder: &Entity) -> f64 {
+    holder
+        .bounding_box
+        .load()
+        .get_center()
+        .squared_distance_to_vec(&leashable.bounding_box.load().get_center())
+        .sqrt()
+}
+
+/// Vanilla `Leashable.canHaveALeashAttachedTo`: not itself, within `leashSnapDistance`, and
+/// `canBeLeashed`.
+#[must_use]
+pub fn can_have_a_leash_attached_to(leashable: &dyn EntityBase, holder: &Entity) -> bool {
+    let entity = leashable.get_entity();
+    if entity.entity_id == holder.entity_id {
+        return false;
+    }
+    if leash_distance_to(entity, holder) > leashable.leash_snap_distance() {
+        return false;
+    }
+    can_be_leashed(leashable)
+}
+
+/// `ClientboundSetEntityLinkPacket(entity, holder)` (and Bedrock's actor link) to the players
+/// tracking `entity`; `None` is the unlink.
+fn send_leash_link(entity: &Entity, holder_id: Option<i32>) {
+    let je_packet = pumpkin_protocol::java::client::play::CSetEntityLink::new(
+        entity.entity_id,
+        holder_id.unwrap_or(-1),
+        true,
+    );
+    let be_packet = pumpkin_protocol::bedrock::client::CSetActorLink {
+        link: pumpkin_protocol::bedrock::client::common::ActorLink {
+            ridden_unique_id: VarLong(i64::from(entity.entity_id)),
+            rider_unique_id: VarLong(i64::from(holder_id.unwrap_or(-1))),
+            // 1 is the leash link, 0 the unlink.
+            link_type: u8::from(holder_id.is_some()),
+            immediate: true,
+            rider_initiated: false,
+            vehicle_angular_velocity: 0.0,
+        },
+    };
+    entity
+        .world
+        .load()
+        .send_to_tracking_players_editioned(entity, &je_packet, &be_packet);
+}
+
+/// Vanilla `Leashable.dropLeash(entity, sendPacket, dropLead)`; `dropLeash()` is (true, true),
+/// `removeLeash()` is (true, false).
+///
+/// The plugin events: `EntityUnleashEvent` before anything changes (a cancel keeps the
+/// leash), `PlayerUnleashEntityEvent` when a player held it.
+pub fn drop_leash(entity: &dyn EntityBase, send_packet: bool, drop_lead: bool) {
+    let base = entity.get_entity();
+    if !base.is_leashed() {
+        return;
+    }
+    let world = base.world.load_full();
+    if let Some(server) = world.server.upgrade() {
+        let mut event = EntityUnleashEvent::new(base.entity_id, "unleashed".to_string());
+        server.plugin_manager.fire_blocking(&server, &mut event);
+        if event.cancelled {
+            return;
+        }
+    }
+    // `setLeashData(null)`: the holder and any delayed holder go.
+    let Some(holder) = base
+        .leashed_to
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .take()
+    else {
+        return;
+    };
+    *base
+        .delayed_leash
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
+    base.leash_angular_momentum.store(0.0);
+    entity.on_leash_removed();
+    if drop_lead {
+        base.spawn_at_location(ItemStack::new(1, &Item::LEAD));
+    }
+    if send_packet {
+        send_leash_link(base, None);
+    }
+    if let Some(server) = world.server.upgrade()
+        && let Some(player) = holder.get_player()
+        && let Some(player) = world.get_player_by_uuid(player.gameprofile.id)
+    {
+        let mut event = PlayerUnleashEntityEvent {
+            player,
+            entity_id: base.entity_id,
+            cancelled: false,
+        };
+        server.plugin_manager.fire_blocking(&server, &mut event);
+    }
+    holder.notify_leashee_removed(holder.as_ref(), entity);
+}
+
+/// Vanilla `Leashable.setLeashedTo(entity, holder, synch)`.
+///
+/// A player holder fires `PlayerLeashEntityEvent` first; a cancel leaves the leash as it was.
+pub fn set_leashed_to(entity: &dyn EntityBase, holder: Arc<dyn EntityBase>, synch: bool) {
+    let base = entity.get_entity();
+    let holder_id = holder.get_entity().entity_id;
+    // `Leashable.setLeashedTo(holder, synch)`: `this != holder`.
+    if base.entity_id == holder_id {
+        return;
+    }
+    let world = base.world.load_full();
+    if let Some(server) = world.server.upgrade()
+        && let Some(player) = holder.get_player()
+        && let Some(player) = world.get_player_by_uuid(player.gameprofile.id)
+    {
+        let mut event = PlayerLeashEntityEvent {
+            player,
+            entity_id: base.entity_id,
+            holder_id,
+            cancelled: false,
+        };
+        server.plugin_manager.fire_blocking(&server, &mut event);
+        if event.cancelled {
+            return;
+        }
+    }
+    let old_holder = base
+        .leashed_to
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .replace(holder);
+    // A new `LeashData` starts without momentum; an existing one keeps it.
+    if old_holder.is_none() {
+        base.leash_angular_momentum.store(0.0);
+    }
+    // `LeashData.setLeashHolder` clears the delayed holder.
+    *base
+        .delayed_leash
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
+    if let Some(old_holder) = old_holder
+        && old_holder.get_entity().entity_id != holder_id
+    {
+        old_holder.notify_leashee_removed(old_holder.as_ref(), entity);
+    }
+    if synch {
+        send_leash_link(base, Some(holder_id));
+    }
+    // `if (entity.isPassenger()) entity.stopRiding()`.
+    if let Some(vehicle) = base.get_vehicle() {
+        vehicle.get_entity().remove_passenger(base.entity_id);
+    }
+}
+
+/// Vanilla `Leashable.restoreLeashFromSave`: attaches a saved leash once its holder is
+/// around (a knot is found or made), and gives up with a dropped lead after 100 ticks.
+pub fn restore_leash_from_save(entity: &dyn EntityBase) {
+    let base = entity.get_entity();
+    let Some(delayed) = *base
+        .delayed_leash
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+    else {
+        return;
+    };
+    let world = base.world.load_full();
+    let holder: Option<Arc<dyn EntityBase>> = match delayed {
+        DelayedLeash::Holder(uuid) => world.get_entity_by_uuid(uuid),
+        DelayedLeash::Knot(pos) => {
+            Some(crate::entity::decoration::leash_knot::LeashKnotEntity::get_or_create(&world, pos))
+        }
+    };
+    if let Some(holder) = holder {
+        // `setLeashHolder` clears it in vanilla; clearing it first as well keeps a plugin's
+        // cancelled `PlayerLeashEntityEvent` from retrying every tick.
+        *base
+            .delayed_leash
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
+        set_leashed_to(entity, holder, true);
+    } else if base.tick_count.load(Ordering::Relaxed) > 100 {
+        base.spawn_at_location(ItemStack::new(1, &Item::LEAD));
+        *base
+            .delayed_leash
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
+    }
 }
 
 #[cfg(test)]

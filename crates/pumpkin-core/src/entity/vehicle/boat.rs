@@ -199,10 +199,10 @@ impl EntityBase for BoatEntity {
         None
     }
 
-    fn tick(&self, _caller: &dyn EntityBase, _server: &Server) {
+    fn tick(&self, caller: &dyn EntityBase, _server: &Server) {
         self.vehicle.tick();
         // The end of `Entity.baseTick`: `Leashable.tickLeash`.
-        self.vehicle.entity.tick_leash();
+        self.vehicle.entity.tick_leash(caller);
 
         let underwater = self.ticks_underwater.load();
         if self.vehicle.entity.touching_water.load(Ordering::Relaxed) {
@@ -326,6 +326,11 @@ impl EntityBase for BoatEntity {
 
     /// `AbstractBoat implements Leashable`.
     fn is_leashable(&self) -> bool {
+        true
+    }
+
+    /// Vanilla `AbstractBoat.supportQuadLeash`.
+    fn support_quad_leash(&self) -> bool {
         true
     }
 

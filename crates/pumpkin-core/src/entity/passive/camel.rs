@@ -226,6 +226,11 @@ const BABY_DIMENSIONS: EntityDimensions =
     pumpkin_data::entity_dimensions::CAMEL_BABY_STANDING_DIMENSIONS;
 
 impl Mob for CamelEntity {
+    /// Vanilla `AbstractHorse.supportQuadLeash`.
+    fn support_quad_leash(&self) -> bool {
+        true
+    }
+
     /// Vanilla `Camel` (and `CamelHusk`) runs on a brain and leaves its goal selector empty, so
     /// `Mob.updateControlFlags` gates nothing; the goals standing in for that brain here must
     /// not be gated either.

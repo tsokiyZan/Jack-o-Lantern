@@ -279,7 +279,7 @@ impl MobEntity {
         )
     }
 
-    /// Vanilla `Mob.stopInPlace`. Pumpkin's leash has no angular momentum to reset.
+    /// Vanilla `Mob.stopInPlace`.
     ///
     /// Stops `getNavigation()`, so it locks the controlled vehicle's navigation while riding:
     /// never call it inside a `with_navigation` closure.
@@ -289,6 +289,9 @@ impl MobEntity {
         living.movement_input.store(Vector3::new(0.0, 0.0, 0.0));
         self.set_speed(0.0);
         living.entity.velocity.store(Vector3::new(0.0, 0.0, 0.0));
+        // `resetAngularLeashMomentum`: only with leash data. Pumpkin's momentum sits on the
+        // entity and is already 0 without a leash, so resetting it unconditionally is the same.
+        living.entity.leash_angular_momentum.store(0.0);
     }
 
     /// Vanilla `Mob.setPathfindingMalus`: what this mob pays to path through
@@ -904,14 +907,15 @@ impl MobEntity {
     }
 
     /// Vanilla `Mob.readAdditionalSaveData`: every tag falls back to its default when missing.
-    pub fn read_mob_nbt(&self, nbt: &NbtCompound) {
+    /// `caller` is this mob.
+    pub fn read_mob_nbt(&self, caller: &dyn EntityBase, nbt: &NbtCompound) {
         self.set_can_pick_up_loot(nbt.get_bool("CanPickUpLoot").unwrap_or(false));
         self.persistence_required.store(
             nbt.get_bool("PersistenceRequired").unwrap_or(false),
             Relaxed,
         );
         self.read_drop_chances(nbt);
-        self.living_entity.entity.read_leash_nbt(nbt);
+        self.living_entity.entity.read_leash_nbt(caller, nbt);
         // Vanilla `home_radius` (-1 for no home), then `home_pos` (the origin if missing).
         let radius = nbt.get_int("home_radius").unwrap_or(-1);
         self.position_target_range.store(radius, Relaxed);
@@ -2536,6 +2540,54 @@ pub trait Mob: EntityBase + Send + Sync {
         }
     }
 
+    // The `Leashable` and leash-holder hooks of `EntityBase`, which the blanket impl forwards
+    // here so mob types override them on `Mob`. The defaults are vanilla `Leashable`'s and
+    // `Entity`'s.
+
+    /// Vanilla `Leashable.leashSnapDistance`.
+    fn leash_snap_distance(&self) -> f64 {
+        crate::entity::leashable::LEASH_TOO_FAR_DIST
+    }
+
+    /// Vanilla `Leashable.leashElasticDistance`.
+    fn leash_elastic_distance(&self) -> f64 {
+        crate::entity::leashable::LEASH_ELASTIC_DIST
+    }
+
+    /// Vanilla `Leashable.supportQuadLeash`.
+    fn support_quad_leash(&self) -> bool {
+        false
+    }
+
+    /// Vanilla `Entity.supportQuadLeashAsHolder`.
+    fn support_quad_leash_as_holder(&self) -> bool {
+        false
+    }
+
+    /// Vanilla `Leashable.whenLeashedTo`; `caller` is this mob.
+    fn when_leashed_to(&self, caller: &dyn EntityBase, holder: &dyn EntityBase) {
+        holder.notify_leash_holder(caller);
+    }
+
+    /// Vanilla `Leashable.leashTooFarBehaviour`: `dropLeash()`.
+    fn leash_too_far_behaviour(&self, caller: &dyn EntityBase) {
+        crate::entity::leashable::drop_leash(caller, true, true);
+    }
+
+    /// Vanilla `Leashable.closeRangeLeashBehaviour`.
+    fn close_range_leash_behaviour(&self, _caller: &dyn EntityBase, _holder: &dyn EntityBase) {}
+
+    /// Vanilla `Leashable.onElasticLeashPull`.
+    fn on_elastic_leash_pull(&self, _caller: &dyn EntityBase) {
+        self.get_entity().check_fall_distance_accumulation();
+    }
+
+    /// Vanilla `Entity.notifyLeashHolder`.
+    fn notify_leash_holder(&self, _leashable: &dyn EntityBase) {}
+
+    /// Vanilla `Entity.notifyLeasheeRemoved`.
+    fn notify_leashee_removed(&self, _caller: &dyn EntityBase, _leashable: &dyn EntityBase) {}
+
     fn tame(&self, player: &Arc<Player>) {
         let mob = self.get_mob_entity();
         let mut event = crate::plugin::api::events::entity::entity_tame::EntityTameEvent::new(
@@ -3557,7 +3609,7 @@ impl<T: Mob + Send + 'static> EntityBase for T {
     fn tick(&self, caller: &dyn EntityBase, server: &Server) {
         self.mob_pre_tick();
         let mob_entity = self.get_mob_entity();
-        mob_entity.living_entity.entity.tick_leash();
+        mob_entity.living_entity.entity.tick_leash(caller);
 
         if mob_entity.breeding_cooldown.load(Relaxed) > 0 {
             mob_entity.breeding_cooldown.fetch_sub(1, Relaxed);
@@ -3638,8 +3690,53 @@ impl<T: Mob + Send + 'static> EntityBase for T {
         self.mob_player_collision(player);
     }
 
+    /// `Mob implements Leashable`.
     fn is_leashable(&self) -> bool {
         true
+    }
+
+    fn leash_snap_distance(&self) -> f64 {
+        Mob::leash_snap_distance(self)
+    }
+
+    fn leash_elastic_distance(&self) -> f64 {
+        Mob::leash_elastic_distance(self)
+    }
+
+    fn support_quad_leash(&self) -> bool {
+        Mob::support_quad_leash(self)
+    }
+
+    fn support_quad_leash_as_holder(&self) -> bool {
+        Mob::support_quad_leash_as_holder(self)
+    }
+
+    fn when_leashed_to(&self, caller: &dyn EntityBase, holder: &dyn EntityBase) {
+        Mob::when_leashed_to(self, caller, holder);
+    }
+
+    fn leash_too_far_behaviour(&self, caller: &dyn EntityBase) {
+        Mob::leash_too_far_behaviour(self, caller);
+    }
+
+    fn close_range_leash_behaviour(&self, caller: &dyn EntityBase, holder: &dyn EntityBase) {
+        Mob::close_range_leash_behaviour(self, caller, holder);
+    }
+
+    fn on_elastic_leash_pull(&self, caller: &dyn EntityBase) {
+        Mob::on_elastic_leash_pull(self, caller);
+    }
+
+    fn notify_leash_holder(&self, leashable: &dyn EntityBase) {
+        Mob::notify_leash_holder(self, leashable);
+    }
+
+    fn notify_leashee_removed(&self, caller: &dyn EntityBase, leashable: &dyn EntityBase) {
+        Mob::notify_leashee_removed(self, caller, leashable);
+    }
+
+    fn on_leash_removed(&self) {
+        Mob::on_leash_removed(self);
     }
 
     fn get_entity(&self) -> &Entity {
@@ -3766,7 +3863,7 @@ impl<T: Mob + Send + 'static> EntityBase for T {
     }
 
     fn read_custom_nbt(&self, nbt: &NbtCompound) {
-        self.get_mob_entity().read_mob_nbt(nbt);
+        self.get_mob_entity().read_mob_nbt(self, nbt);
         if let Some(brain) = nbt.get_compound("Brain") {
             *self
                 .get_mob_entity()

@@ -106,10 +106,8 @@ pub fn bucket_mob_pickup(
     let mut bucket = ItemStack::new(1, bucket_item);
     save_to_bucket_tag(&mut bucket);
     crate::item::create_filled_result(item_stack, player, bucket, false);
-    if entity.is_leashed() {
-        entity.unleash();
-        entity.spawn_at_location(ItemStack::new(1, &Item::LEAD));
-    }
+    // `leashable.dropLeash()`.
+    crate::entity::leashable::drop_leash(mob, true, true);
     entity.remove();
     true
 }

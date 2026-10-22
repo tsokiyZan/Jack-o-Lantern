@@ -419,6 +419,11 @@ const DIGGING_DIMENSIONS: EntityDimensions =
     pumpkin_data::entity_dimensions::SNIFFER_DIGGING_DIMENSIONS;
 
 impl Mob for SnifferEntity {
+    /// Vanilla `Sniffer.supportQuadLeash`.
+    fn support_quad_leash(&self) -> bool {
+        true
+    }
+
     /// Vanilla `Sniffer.getAmbientSound`.
     fn ambient_sound(&self) -> Option<Sound> {
         (!matches!(

@@ -217,13 +217,8 @@ fn convert_single_type(from: &dyn Mob, to: &dyn Mob, params: ConversionParams) {
     new_entity
         .on_ground
         .store(old_entity.on_ground.load(Relaxed), Relaxed);
-    let leash_holder = old_entity
-        .leashed_to
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .clone();
-    if let Some(holder) = leash_holder {
-        new_entity.leash_to(holder);
+    if let Some(holder) = crate::entity::leashable::leash_holder(old_entity) {
+        crate::entity::leashable::set_leashed_to(to, holder, true);
     }
 
     convert_common(from, to, params);

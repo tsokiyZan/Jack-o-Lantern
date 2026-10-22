@@ -75,7 +75,12 @@ impl ItemBehaviour for LeadItem {
                     knot = Some(LeashKnotEntity::get_or_create(&world, location));
                 }
                 if let Some(k) = &knot {
-                    ent.leash_to(k.clone() as Arc<dyn EntityBase>);
+                    // `LeadItem.bindPlayerMobs`: `leashable.setLeashedTo(activeKnot, true)`.
+                    crate::entity::leashable::set_leashed_to(
+                        entity_base.as_ref(),
+                        k.clone() as Arc<dyn EntityBase>,
+                        true,
+                    );
                     any_leashed = true;
                 }
             }

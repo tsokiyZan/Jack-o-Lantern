@@ -115,6 +115,21 @@ impl GhastEntity {
 }
 
 impl Mob for GhastEntity {
+    /// Vanilla `Ghast.supportQuadLeashAsHolder`.
+    fn support_quad_leash_as_holder(&self) -> bool {
+        true
+    }
+
+    /// Vanilla `Ghast.leashElasticDistance`.
+    fn leash_elastic_distance(&self) -> f64 {
+        10.0
+    }
+
+    /// Vanilla `Ghast.leashSnapDistance`.
+    fn leash_snap_distance(&self) -> f64 {
+        16.0
+    }
+
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
     }

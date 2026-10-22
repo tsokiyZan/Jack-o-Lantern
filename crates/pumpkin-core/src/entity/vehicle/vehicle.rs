@@ -174,10 +174,15 @@ impl VehicleEntity {
     /// `remove(KILLED)`: `AbstractBoat.remove` drops its leash first. Only boats among the
     /// vehicles are `Leashable`, so a leashed vehicle is a boat.
     fn remove_destroyed(&self) {
-        if self.entity.is_leashed() {
-            self.entity.unleash();
-            self.entity
-                .spawn_at_location(ItemStack::new(1, &pumpkin_data::item::Item::LEAD));
+        // `dropLeash()` on the boat, looked up as the `EntityBase` its hooks run on.
+        if self.entity.is_leashed()
+            && let Some(boat) = self
+                .entity
+                .world
+                .load()
+                .get_entity_by_id(self.entity.entity_id)
+        {
+            crate::entity::leashable::drop_leash(boat.as_ref(), true, true);
         }
         self.entity.remove();
     }

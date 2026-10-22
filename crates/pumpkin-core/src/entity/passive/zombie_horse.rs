@@ -134,6 +134,11 @@ const BABY_DIMENSIONS: EntityDimensions =
     pumpkin_data::entity_dimensions::ZOMBIE_HORSE_BABY_DIMENSIONS;
 
 impl Mob for ZombieHorseEntity {
+    /// Vanilla `AbstractHorse.supportQuadLeash`.
+    fn support_quad_leash(&self) -> bool {
+        true
+    }
+
     /// Vanilla `ZombieHorse.interact`, before `super.interact`.
     fn before_interact(&self) {
         self.get_mob_entity()
