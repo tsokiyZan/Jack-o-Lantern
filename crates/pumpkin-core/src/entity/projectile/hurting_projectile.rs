@@ -59,6 +59,16 @@ impl HurtingProjectile {
         }
     }
 
+    /// A hurting projectile around an already built `thrown` projectile, with
+    /// `acceleration_power` (wind charges start at 0).
+    #[must_use]
+    pub const fn with_thrown(thrown: ThrownItemEntity, acceleration_power: f64) -> Self {
+        Self {
+            thrown,
+            acceleration_power: AtomicCell::new(acceleration_power),
+        }
+    }
+
     /// Vanilla `AbstractHurtingProjectile(type, x, y, z, direction, level)`, at the entity's
     /// position.
     #[must_use]

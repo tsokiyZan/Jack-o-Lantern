@@ -17,7 +17,10 @@ use crate::{
     entity::{
         Entity, EntityBase,
         living::LivingEntity,
-        projectile::{ProjectileHit, ThrownItemEntity},
+        projectile::{
+            ProjectileHit, ThrownItemEntity,
+            hurting_projectile::{HurtingProjectile, HurtingProjectileTick},
+        },
         projectile_deflection::ProjectileDeflectionType,
     },
     server::Server,
@@ -34,7 +37,8 @@ enum WindChargeKind {
 
 pub struct WindChargeEntity {
     kind: WindChargeKind,
-    thrown_item_entity: ThrownItemEntity,
+    /// `AbstractWindCharge extends AbstractHurtingProjectile`.
+    hurting: HurtingProjectile,
 }
 
 pub static WIND_CHARGE_EXPLOSION_DAMAGE_CALCULATOR: LazyLock<Arc<SimpleExplosionDamageCalculator>> =
@@ -65,7 +69,8 @@ impl WindChargeEntity {
             kind: WindChargeKind::Normal {
                 deflect_cooldown: AtomicU8::new(DEFAULT_DEFLECT_COOLDOWN),
             },
-            thrown_item_entity,
+            // `AbstractWindCharge`'s constructors: `accelerationPower = 0.0`.
+            hurting: HurtingProjectile::with_thrown(thrown_item_entity, 0.0),
         }
     }
 
@@ -73,7 +78,7 @@ impl WindChargeEntity {
     pub const fn new_breeze(thrown_item_entity: ThrownItemEntity) -> Self {
         Self {
             kind: WindChargeKind::Breeze,
-            thrown_item_entity,
+            hurting: HurtingProjectile::with_thrown(thrown_item_entity, 0.0),
         }
     }
 
@@ -132,9 +137,8 @@ impl WindChargeEntity {
 
 impl EntityBase for WindChargeEntity {
     /// Vanilla `WindCharge.deflect`: not within its first ticks (`noDeflectTicks`); then
-    /// `Projectile.deflect(AIM_DEFLECT, ...)`, along the attacker's look and owned by it.
-    // TODO: `AbstractHurtingProjectile.onDeflection`'s acceleration reset; Pumpkin's wind
-    // charges don't accelerate.
+    /// `Projectile.deflect(AIM_DEFLECT, ...)`, along the attacker's look and owned by it, and
+    /// `AbstractHurtingProjectile.onDeflection(true)`.
     fn deflect_by_attack(&self, deflector: &dyn EntityBase, power: f64) -> bool {
         if let Some(cooldown) = self.deflect_cooldown()
             && cooldown.load(Ordering::Relaxed) > 0
@@ -147,9 +151,11 @@ impl EntityBase for WindChargeEntity {
             .velocity
             .store(deflector_entity.get_look_angle() * power);
         entity.velocity_dirty.store(true, Ordering::SeqCst);
-        self.thrown_item_entity
+        self.hurting
+            .thrown
             .projectile
             .set_owner(Some(deflector_entity));
+        self.hurting.on_deflection(true);
         true
     }
 
@@ -169,12 +175,39 @@ impl EntityBase for WindChargeEntity {
             .has_tag(&pumpkin_data::tag::EntityType::MINECRAFT_REDIRECTABLE_PROJECTILE)
     }
 
-    fn get_projectile(&self) -> Option<&crate::entity::projectile::Projectile> {
-        Some(&self.thrown_item_entity.projectile)
+    /// `AbstractHurtingProjectile.addAdditionalSaveData`: `acceleration_power`.
+    fn write_custom_nbt(&self, nbt: &mut pumpkin_nbt::compound::NbtCompound) {
+        self.hurting.write_nbt(nbt);
     }
 
-    fn tick(&self, caller: &dyn EntityBase, _server: &Server) {
-        self.thrown_item_entity.process_tick(caller);
+    /// `AbstractHurtingProjectile.readAdditionalSaveData`: `acceleration_power`, 0.1 when absent.
+    fn read_custom_nbt(&self, nbt: &pumpkin_nbt::compound::NbtCompound) {
+        self.hurting.read_nbt(nbt);
+    }
+
+    fn get_projectile(&self) -> Option<&crate::entity::projectile::Projectile> {
+        Some(&self.hurting.thrown.projectile)
+    }
+
+    /// Vanilla `WindCharge.tick`: `AbstractWindCharge.tick` (an explosion once 30 blocks above
+    /// the build height, else `AbstractHurtingProjectile.tick` with inertia 1 and no burning),
+    /// then the `noDeflectTicks` count-down.
+    fn tick(&self, caller: &dyn EntityBase, server: &Server) {
+        let entity = self.get_entity();
+        if entity.block_pos.load().0.y > entity.world.load().get_top_y() + 30 {
+            self.create_explosion(entity.pos.load());
+            entity.remove();
+        } else {
+            self.hurting.tick(
+                caller,
+                server,
+                &HurtingProjectileTick {
+                    inertia: 1.0,
+                    liquid_inertia: 1.0,
+                    should_burn: false,
+                },
+            );
+        }
 
         if let Some(cooldown) = self.deflect_cooldown() {
             let cooldown_ticks = cooldown.load(Ordering::Relaxed);
@@ -185,7 +218,7 @@ impl EntityBase for WindChargeEntity {
     }
 
     fn get_entity(&self) -> &Entity {
-        &self.thrown_item_entity.entity
+        &self.hurting.thrown.entity
     }
 
     fn get_living_entity(&self) -> Option<&LivingEntity> {
@@ -203,9 +236,10 @@ impl EntityBase for WindChargeEntity {
             ProjectileHit::Entity { ref entity, .. } => {
                 let world = self.get_entity().world.load();
                 let owner = self
-                    .thrown_item_entity
+                    .hurting
+                    .thrown
                     .projectile
-                    .get_owner(&self.thrown_item_entity.entity)
+                    .get_owner(&self.hurting.thrown.entity)
                     .filter(|owner| owner.get_living_entity().is_some());
                 if let Some(owner_living) = owner.as_ref().and_then(|o| o.get_living_entity()) {
                     // `setLastHurtMob`.
