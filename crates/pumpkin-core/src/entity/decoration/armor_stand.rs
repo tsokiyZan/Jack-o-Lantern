@@ -377,6 +377,15 @@ impl ArmorStandEntity {
 }
 
 impl EntityBase for ArmorStandEntity {
+    /// Vanilla `ArmorStand.getPistonPushReaction`: a marker is ignored, else the default.
+    fn piston_push_reaction(&self) -> pumpkin_data::block_state::PistonBehavior {
+        if self.is_marker() {
+            pumpkin_data::block_state::PistonBehavior::Ignore
+        } else {
+            pumpkin_data::block_state::PistonBehavior::Normal
+        }
+    }
+
     /// Vanilla `ArmorStand.getDefaultDimensions` (scaled by `LivingEntity.getDimensions`): a
     /// marker's fixed 0 x 0 box, a small stand's `BABY_DIMENSIONS`, else the type's.
     fn dimensions_for_pose(

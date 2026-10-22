@@ -689,6 +689,11 @@ impl BlockDisplayEntity {
 }
 
 impl EntityBase for BlockDisplayEntity {
+    /// Vanilla `Display.getPistonPushReaction`.
+    fn piston_push_reaction(&self) -> pumpkin_data::block_state::PistonBehavior {
+        pumpkin_data::block_state::PistonBehavior::Ignore
+    }
+
     fn write_custom_nbt(&self, nbt: &mut NbtCompound) {
         self.display.write_display_nbt(nbt);
         let state = BlockStateId::new_or_air(self.block_state.load(Ordering::Relaxed) as u16);
@@ -806,6 +811,11 @@ impl ItemDisplayEntity {
 }
 
 impl EntityBase for ItemDisplayEntity {
+    /// Vanilla `Display.getPistonPushReaction`.
+    fn piston_push_reaction(&self) -> pumpkin_data::block_state::PistonBehavior {
+        pumpkin_data::block_state::PistonBehavior::Ignore
+    }
+
     fn write_custom_nbt(&self, nbt: &mut NbtCompound) {
         self.display.write_display_nbt(nbt);
         let display_mode_str = match self.item_display.load(Ordering::Relaxed) {
@@ -1055,6 +1065,11 @@ impl TextDisplayEntity {
 }
 
 impl EntityBase for TextDisplayEntity {
+    /// Vanilla `Display.getPistonPushReaction`.
+    fn piston_push_reaction(&self) -> pumpkin_data::block_state::PistonBehavior {
+        pumpkin_data::block_state::PistonBehavior::Ignore
+    }
+
     fn write_custom_nbt(&self, nbt: &mut NbtCompound) {
         self.display.write_display_nbt(nbt);
         let text_json_res = pumpkin_util::serde_json::to_string(
