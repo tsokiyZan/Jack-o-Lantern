@@ -2,6 +2,7 @@ use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
 use crossbeam::atomic::AtomicCell;
+use pumpkin_data::block_properties::{PistonHeadLikeProperties, StickyPistonLikeProperties};
 use pumpkin_data::{Block, BlockDirection, BlockState};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::math::{boundingbox::BoundingBox, position::BlockPos, vector3::Vector3};
@@ -11,11 +12,18 @@ use crate::world::{BlockFlags, World};
 
 use super::BlockEntity;
 
+thread_local! {
+    /// Vanilla `PistonMovingBlockEntity.NOCLIP`: the direction a piston is moving an entity in.
+    static NOCLIP: std::cell::Cell<Option<BlockDirection>> = const { std::cell::Cell::new(None) };
+}
+
 pub struct PistonBlockEntity {
     pub position: BlockPos,
     pub pushed_block_state: &'static BlockState,
     pub facing: BlockDirection,
+    /// Vanilla `progress`.
     pub current_progress: AtomicCell<f32>,
+    /// Vanilla `progressO`.
     pub last_progress: AtomicCell<f32>,
     pub extending: bool,
     pub source: bool,
@@ -24,7 +32,8 @@ pub struct PistonBlockEntity {
 impl PistonBlockEntity {
     pub const ID: &'static str = "minecraft:piston";
 
-    const fn movement_direction(&self) -> BlockDirection {
+    /// Vanilla `getMovementDirection`.
+    pub const fn get_movement_direction(&self) -> BlockDirection {
         if self.extending {
             self.facing
         } else {
@@ -32,14 +41,52 @@ impl PistonBlockEntity {
         }
     }
 
-    /// Vanilla's `getAmountExtended`: how far back from the block's final position
+    /// Vanilla `getExtendedProgress`: how far back from the block's final position
     /// the visual is at a given animation progress. Negative for extending.
-    fn amount_extended(&self, progress: f32) -> f32 {
+    fn get_extended_progress(&self, progress: f32) -> f32 {
         if self.extending {
             progress - 1.0
         } else {
             1.0 - progress
         }
+    }
+
+    /// Vanilla `getCollisionShape`: block-local boxes.
+    pub fn get_collision_shape(&self) -> Vec<BoundingBox> {
+        let progress = self.current_progress.load();
+        // `pistonHeadShape`: a retracting piston base keeps its extended shape where it stands.
+        let base: Vec<BoundingBox> =
+            if !self.extending && self.source && is_piston_base(self.pushed_block_state) {
+                extended_base_state(self.pushed_block_state)
+                    .get_block_collision_shapes_at(&self.position)
+                    .collect()
+            } else {
+                Vec::new()
+            };
+        if f64::from(progress) < 1.0 && NOCLIP.get() == Some(self.get_movement_direction()) {
+            return base;
+        }
+        let state = if self.source {
+            // `SHORT`: `extending != (1.0F - progress < 0.25F)`.
+            piston_head_state(self.facing, self.extending != (1.0 - progress < 0.25))
+        } else {
+            self.pushed_block_state
+        };
+        let extended = self.get_extended_progress(progress);
+        let off = self.facing.to_offset();
+        // `direction.getStep*() * extendedProgress`: int times float, widened to double.
+        let offset = Vector3::new(
+            f64::from(off.x as f32 * extended),
+            f64::from(off.y as f32 * extended),
+            f64::from(off.z as f32 * extended),
+        );
+        base.into_iter()
+            .chain(
+                state
+                    .get_block_collision_shapes_at(&self.position)
+                    .map(|b| b.shift(offset)),
+            )
+            .collect()
     }
 
     fn dir_vec(dir: BlockDirection, scale: f64) -> Vector3<f64> {
@@ -60,8 +107,8 @@ impl PistonBlockEntity {
             return;
         }
 
-        let motion_dir = self.movement_direction();
-        let amount = f64::from(self.amount_extended(last));
+        let motion_dir = self.get_movement_direction();
+        let amount = f64::from(self.get_extended_progress(last));
 
         // Block AABB at the current visual position (start of this tick).
         // For source=true (the piston head BE), vanilla uses the piston-head
@@ -97,7 +144,7 @@ impl PistonBlockEntity {
                 continue;
             }
             let push_amount = intersection.min(delta) + 0.01;
-            Self::move_entity(entity.as_ref(), motion_dir, push_amount);
+            Self::move_entity(motion_dir, entity.as_ref(), motion_dir, push_amount);
 
             // For a retracting head, vanilla also shoves the entity OUT of the
             // piston body cube. Without this, entities get pulled into the
@@ -127,9 +174,17 @@ impl PistonBlockEntity {
         }
     }
 
-    /// Vanilla `moveEntityByPiston`.
-    fn move_entity(entity: &dyn EntityBase, dir: BlockDirection, distance: f64) {
+    /// Vanilla `moveEntityByPiston`: `NOCLIP` lets the entity pass through the moving block
+    /// pushing it while it moves.
+    fn move_entity(
+        piston_direction: BlockDirection,
+        entity: &dyn EntityBase,
+        dir: BlockDirection,
+        distance: f64,
+    ) {
+        NOCLIP.set(Some(piston_direction));
         entity.move_by_piston(entity, Self::dir_vec(dir, distance));
+        NOCLIP.set(None);
     }
 
     /// Vanilla `push`: when a piston head retracts, shove entities that ended up
@@ -155,7 +210,7 @@ impl PistonBlockEntity {
         ) + 0.01;
         if (e - f).abs() < 0.01 {
             let distance = e.min(amount) + 0.01;
-            Self::move_entity(entity, back, distance);
+            Self::move_entity(motion_dir, entity, back, distance);
         }
     }
 
@@ -206,6 +261,27 @@ impl PistonBlockEntity {
             }
         }
     }
+}
+
+/// Vanilla `movedState.getBlock() instanceof PistonBaseBlock`.
+fn is_piston_base(state: &BlockState) -> bool {
+    let block = Block::from_state_id(state.id);
+    block == &Block::PISTON || block == &Block::STICKY_PISTON
+}
+
+/// Vanilla `movedState.setValue(PistonBaseBlock.EXTENDED, true)`.
+fn extended_base_state(state: &BlockState) -> &'static BlockState {
+    let mut props = StickyPistonLikeProperties::from_state_id(state.id);
+    props.extended = true;
+    BlockState::from_id(props.to_state_id(Block::from_state_id(state.id)))
+}
+
+/// Vanilla `PISTON_HEAD.defaultBlockState()` with `FACING` and `SHORT` set; `TYPE` stays default.
+fn piston_head_state(facing: BlockDirection, short: bool) -> &'static BlockState {
+    let mut props = PistonHeadLikeProperties::default(&Block::PISTON_HEAD);
+    props.facing = facing.to_facing();
+    props.short = short;
+    BlockState::from_id(props.to_state_id(&Block::PISTON_HEAD))
 }
 
 const BLOCK_STATE: &str = "blockState";
@@ -299,5 +375,75 @@ impl BlockEntity for PistonBlockEntity {
 
     fn as_any(&self) -> &dyn std::any::Any {
         self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pumpkin_data::block_properties::Facing;
+
+    fn piston_be(
+        pushed_block_state: &'static BlockState,
+        facing: BlockDirection,
+        progress: f32,
+        extending: bool,
+        source: bool,
+    ) -> PistonBlockEntity {
+        PistonBlockEntity {
+            position: BlockPos::new(0, 0, 0),
+            pushed_block_state,
+            facing,
+            current_progress: progress.into(),
+            last_progress: progress.into(),
+            extending,
+            source,
+        }
+    }
+
+    fn corners(boxes: &[BoundingBox]) -> Vec<[f64; 6]> {
+        boxes
+            .iter()
+            .map(|b| [b.min.x, b.min.y, b.min.z, b.max.x, b.max.y, b.max.z])
+            .collect()
+    }
+
+    fn with_noclip<T>(direction: BlockDirection, f: impl FnOnce() -> T) -> T {
+        NOCLIP.set(Some(direction));
+        let result = f();
+        NOCLIP.set(None);
+        result
+    }
+
+    #[test]
+    fn pushed_block_shape_trails_by_progress_and_noclip_hides_it() {
+        let be = piston_be(
+            Block::STONE.default_state,
+            BlockDirection::East,
+            0.5,
+            true,
+            false,
+        );
+        let expected = vec![[-0.5, 0.0, 0.0, 0.5, 1.0, 1.0]];
+        assert_eq!(corners(&be.get_collision_shape()), expected);
+        assert!(with_noclip(BlockDirection::East, || be.get_collision_shape()).is_empty());
+        // NOCLIP for another piston's direction does not hide this block.
+        assert_eq!(
+            corners(&with_noclip(BlockDirection::West, || be.get_collision_shape())),
+            expected
+        );
+    }
+
+    #[test]
+    fn retracting_source_piston_keeps_extended_base_under_noclip() {
+        let mut props = StickyPistonLikeProperties::default(&Block::PISTON);
+        props.facing = Facing::East;
+        props.extended = false;
+        let moved = BlockState::from_id(props.to_state_id(&Block::PISTON));
+        let be = piston_be(moved, BlockDirection::East, 0.5, false, true);
+        assert_eq!(
+            corners(&with_noclip(BlockDirection::West, || be.get_collision_shape())),
+            vec![[0.0, 0.0, 0.0, 0.75, 1.0, 1.0]]
+        );
     }
 }

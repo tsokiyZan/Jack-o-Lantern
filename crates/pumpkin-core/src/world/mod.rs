@@ -1,3 +1,4 @@
+use crate::block::entities::piston::PistonBlockEntity;
 use crate::block::entities::{BlockEntity, block_entity_from_nbt};
 use dashmap::DashMap;
 use pumpkin_data::chunk::Biome;
@@ -2723,6 +2724,14 @@ impl World {
                         collisions.push(shape);
                     }
                 }
+            } else if block == &Block::MOVING_PISTON {
+                for shape in self.moving_piston_collision_shape(&pos) {
+                    let shape = shape.at_pos(pos);
+                    if shape.intersects(&bounding_box) {
+                        collided = true;
+                        collisions.push(shape);
+                    }
+                }
             } else {
                 for shape in state.get_block_collision_shapes_at(&pos) {
                     let shape = shape.at_pos(pos);
@@ -2738,7 +2747,68 @@ impl World {
             }
         }
 
+        for pos in self.moving_pistons_beyond(&bounding_box, min, max) {
+            let mut collided = false;
+            for shape in self.moving_piston_collision_shape(&pos) {
+                let shape = shape.at_pos(pos);
+                if shape.intersects(&bounding_box) {
+                    collided = true;
+                    collisions.push(shape);
+                }
+            }
+            if collided {
+                positions.push((collisions.len(), pos));
+            }
+        }
+
         (collisions, positions)
+    }
+
+    /// Vanilla `MovingPistonBlock.getCollisionShape`: the block entity's shape, or none.
+    pub fn moving_piston_collision_shape(&self, pos: &BlockPos) -> Vec<BoundingBox> {
+        self.get_block_entity(pos)
+            .and_then(|block_entity| {
+                block_entity
+                    .as_any()
+                    .downcast_ref::<PistonBlockEntity>()
+                    .map(PistonBlockEntity::get_collision_shape)
+            })
+            .unwrap_or_default()
+    }
+
+    /// The `MOVING_PISTON` cells of vanilla's `BlockCollisions` cursor outside `inner_min..=inner_max`.
+    /// The cursor reaches one block past the box; a moving piston collides on its face and edge
+    /// cells (`cursorFaceType` 1 and 2) but never its corners (3), since its shape can stick up to
+    /// a block out of its cell.
+    fn moving_pistons_beyond(
+        &self,
+        bounding_box: &BoundingBox,
+        inner_min: BlockPos,
+        inner_max: BlockPos,
+    ) -> impl Iterator<Item = BlockPos> + '_ {
+        let cursor_min = BlockPos::new(
+            (bounding_box.min.x - 1.0E-7).floor() as i32 - 1,
+            (bounding_box.min.y - 1.0E-7).floor() as i32 - 1,
+            (bounding_box.min.z - 1.0E-7).floor() as i32 - 1,
+        );
+        let cursor_max = BlockPos::new(
+            (bounding_box.max.x + 1.0E-7).floor() as i32 + 1,
+            (bounding_box.max.y + 1.0E-7).floor() as i32 + 1,
+            (bounding_box.max.z + 1.0E-7).floor() as i32 + 1,
+        );
+        BlockPos::iterate(cursor_min, cursor_max).filter(move |pos| {
+            let (p, lo, hi) = (pos.0, inner_min.0, inner_max.0);
+            let inner = (lo.x..=hi.x).contains(&p.x)
+                && (lo.y..=hi.y).contains(&p.y)
+                && (lo.z..=hi.z).contains(&p.z);
+            if inner {
+                return false;
+            }
+            let face_type = u8::from(p.x == cursor_min.0.x || p.x == cursor_max.0.x)
+                + u8::from(p.y == cursor_min.0.y || p.y == cursor_max.0.y)
+                + u8::from(p.z == cursor_min.0.z || p.z == cursor_max.0.z);
+            face_type != 3 && self.get_block(pos) == &Block::MOVING_PISTON
+        })
     }
 
     /// Vanilla `CollisionGetter.noCollision(AABB)`: no block shape and no collidable entity in
@@ -2786,13 +2856,25 @@ impl World {
 
         for pos in BlockPos::iterate(min, max) {
             let state = self.get_block_state(&pos);
-            let collided = Self::check_collision(&bounding_box, pos, state, false, |_| ());
+            let collided = if Block::from_state_id(state.id) == &Block::MOVING_PISTON {
+                self.moving_piston_collides(&bounding_box, &pos)
+            } else {
+                Self::check_collision(&bounding_box, pos, state, false, |_| ())
+            };
 
             if collided {
                 return false;
             }
         }
-        true
+        !self
+            .moving_pistons_beyond(&bounding_box, min, max)
+            .any(|pos| self.moving_piston_collides(&bounding_box, &pos))
+    }
+
+    fn moving_piston_collides(&self, bounding_box: &BoundingBox, pos: &BlockPos) -> bool {
+        self.moving_piston_collision_shape(pos)
+            .iter()
+            .any(|shape| shape.at_pos(*pos).intersects(bounding_box))
     }
 
     /// Vanilla's `BlockView.getDismountHeight()`.
