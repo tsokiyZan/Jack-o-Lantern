@@ -139,7 +139,8 @@ fn load_entity_recursive(
     let uuid = nbt.get_uuid("UUID").unwrap_or_else(Uuid::new_v4);
     let entity = from_type(entity_type, pos, world, uuid);
     entity.read_nbt_non_mut(nbt);
-    entity.get_entity().set_pos(pos);
+    // `snapTo` → `reapplyPosition` → the virtual `setPos`.
+    entity.set_position(pos);
     let index = loaded.len();
     loaded.push((entity.clone(), None));
     for passenger in nbt.get_list("Passengers").unwrap_or_default() {

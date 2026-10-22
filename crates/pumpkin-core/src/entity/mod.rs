@@ -1045,6 +1045,12 @@ pub trait EntityBase: Send + Sync + std::any::Any {
         self.get_entity().move_entity(caller, motion);
     }
 
+    /// Vanilla `Entity.setPos`, with its overrides (`BlockAttachedEntity` re-derives its
+    /// block and snaps to it). The inherent [`Entity::set_pos`] is the plain base version.
+    fn set_position(&self, position: Vector3<f64>) {
+        self.get_entity().set_pos(position);
+    }
+
     /// Vanilla `PistonMovingBlockEntity.moveEntityByPiston`'s `entity.move(MoverType.PISTON, ..)`
     /// and what follows it, for the entities whose `move` override takes the piston too.
     fn move_by_piston(&self, caller: &dyn EntityBase, delta: Vector3<f64>) {

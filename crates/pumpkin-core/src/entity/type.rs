@@ -9,6 +9,7 @@ use uuid::Uuid;
 
 use crate::entity::boss::ender_dragon::EnderDragonEntity;
 use crate::entity::boss::wither::WitherEntity;
+use crate::entity::decoration::leash_knot::LeashKnotEntity;
 use crate::entity::decoration::{
     armor_stand::ArmorStandEntity,
     cushion::CushionEntity,
@@ -244,6 +245,7 @@ pub fn from_type(
         id if id == EntityType::ITEM_DISPLAY.id => ItemDisplayEntity::new(entity),
         id if id == EntityType::TEXT_DISPLAY.id => TextDisplayEntity::new(entity),
         id if id == EntityType::PAINTING.id => Arc::new(PaintingEntity::new(entity)),
+        id if id == EntityType::LEASH_KNOT.id => Arc::new(LeashKnotEntity::from_entity(entity)),
         id if id == EntityType::ITEM_FRAME.id || id == EntityType::GLOW_ITEM_FRAME.id => {
             Arc::new(ItemFrameEntity::new(entity))
         }

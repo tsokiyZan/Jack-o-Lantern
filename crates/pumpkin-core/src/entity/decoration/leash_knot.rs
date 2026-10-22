@@ -2,11 +2,13 @@ use crate::entity::player::Player;
 use crate::entity::{Entity, EntityBase, leash, leashable, living::LivingEntity};
 use crate::item::interaction_result::InteractionResult;
 use crate::world::World;
+use crossbeam::atomic::AtomicCell;
 use pumpkin_data::damage::DamageType;
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::Sound;
 use pumpkin_data::tag::Taggable;
+use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::Hand;
 use pumpkin_util::math::boundingbox::BoundingBox;
 use pumpkin_util::math::position::BlockPos;
@@ -16,7 +18,9 @@ use std::sync::atomic::{AtomicI32, Ordering};
 
 pub struct LeashKnotEntity {
     entity: Entity,
-    pos: BlockPos,
+    /// Vanilla `BlockAttachedEntity.pos`, the fence's block; set with the position
+    /// (`setPos`), never saved by a knot.
+    pos: AtomicCell<BlockPos>,
     /// Vanilla `BlockAttachedEntity.ticksSinceLastCheck` (not saved).
     ticks_since_last_check: AtomicI32,
 }
@@ -29,13 +33,35 @@ impl LeashKnotEntity {
     pub const fn new(entity: Entity, pos: BlockPos) -> Self {
         Self {
             entity,
-            pos,
+            pos: AtomicCell::new(pos),
             ticks_since_last_check: AtomicI32::new(0),
         }
     }
 
-    pub const fn block_pos(&self) -> BlockPos {
-        self.pos
+    /// Vanilla `EntityType.LEASH_KNOT`'s factory, then `setPos` at the entity's position: the
+    /// knot of a `/summon` or a loaded chunk.
+    #[must_use]
+    pub fn from_entity(entity: Entity) -> Self {
+        let position = entity.pos.load();
+        let knot = Self::new(entity, BlockPos::containing_vec(position));
+        knot.set_block_attached_pos(position);
+        knot
+    }
+
+    pub fn block_pos(&self) -> BlockPos {
+        self.pos.load()
+    }
+
+    /// Vanilla `BlockAttachedEntity.setPos`: the block containing `position`, then
+    /// `LeashFenceKnotEntity.recalculateBoundingBox` puts the knot at its centre, 0.375 up.
+    fn set_block_attached_pos(&self, position: Vector3<f64>) {
+        let pos = BlockPos::containing_vec(position);
+        self.pos.store(pos);
+        self.entity.set_pos(Vector3::new(
+            f64::from(pos.0.x) + 0.5,
+            f64::from(pos.0.y) + Self::OFFSET_Y,
+            f64::from(pos.0.z) + 0.5,
+        ));
     }
 
     /// Vanilla `LeashFenceKnotEntity.getOrCreateKnot`; `None` when a plugin cancels the new
@@ -61,7 +87,7 @@ impl LeashKnotEntity {
                 entity_base
                     .cast_any()
                     .downcast_ref::<Self>()
-                    .is_some_and(|knot| knot.pos == pos)
+                    .is_some_and(|knot| knot.pos.load() == pos)
             })
     }
 
@@ -89,7 +115,7 @@ impl LeashKnotEntity {
         self.entity
             .world
             .load()
-            .get_block(&self.pos)
+            .get_block(&self.pos.load())
             .has_tag(&pumpkin_data::tag::Block::MINECRAFT_FENCES)
     }
 
@@ -108,6 +134,18 @@ impl EntityBase for LeashKnotEntity {
         if leashable::leashable_leashed_to(&self.entity).is_empty() {
             self.entity.remove();
         }
+    }
+
+    /// Vanilla `BlockAttachedEntity.setPos`.
+    fn set_position(&self, position: Vector3<f64>) {
+        self.set_block_attached_pos(position);
+    }
+
+    /// Vanilla `Entity.load`'s `reapplyPosition` (`setPos`) after `Pos`; the knot's own
+    /// `readAdditionalSaveData` reads nothing (no `block_pos`, unlike other block-attached
+    /// entities).
+    fn read_custom_nbt(&self, _nbt: &NbtCompound) {
+        self.set_block_attached_pos(self.entity.pos.load());
     }
 
     /// Vanilla `BlockAttachedEntity.skipAttackInteraction`.
