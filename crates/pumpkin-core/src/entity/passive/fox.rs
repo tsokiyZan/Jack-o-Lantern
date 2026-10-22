@@ -717,10 +717,7 @@ fn is_consumable_food(stack: &ItemStack) -> bool {
 
 /// Vanilla `LivingEntity.isSleeping` for any entity.
 fn is_sleeping(entity: &dyn EntityBase) -> bool {
-    entity.get_player().map_or_else(
-        || entity.get_mob().is_some_and(Mob::is_sleeping),
-        Player::is_sleeping,
-    )
+    crate::entity::living::LivingEntity::is_sleeping(entity)
 }
 
 /// Vanilla `FoxMeleeAttackGoal.checkAndPerformAttack`: a bite, without a swing.

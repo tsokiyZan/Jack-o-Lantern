@@ -2553,10 +2553,7 @@ impl Player {
         self.living_entity
             .entity
             .set_pos(bed_head_pos.to_f64().add_raw(0.5, 0.6875, 0.5));
-        self.get_entity().set_synced_data(
-            pumpkin_data::tracked_data::player::SLEEPING_POS_ID,
-            Some(bed_head_pos),
-        );
+        self.living_entity.set_sleeping_pos(bed_head_pos);
         self.get_entity().set_velocity(Vector3::default());
 
         self.sleeping.store(true, Ordering::Relaxed);
@@ -2733,10 +2730,7 @@ impl Player {
 
         self.set_pose(EntityPose::Standing);
         self.living_entity.entity.set_pos(self.position());
-        self.living_entity.entity.set_synced_data(
-            pumpkin_data::tracked_data::player::SLEEPING_POS_ID,
-            None::<BlockPos>,
-        );
+        self.living_entity.clear_sleeping_pos();
 
         self.set_stat(
             statistics::StatisticCategory::Custom,

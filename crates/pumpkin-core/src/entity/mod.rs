@@ -85,6 +85,7 @@ pub mod bucketable;
 pub mod custom_sound;
 pub mod damage_source;
 pub mod decoration;
+pub mod dismount_helper;
 pub mod effect;
 pub mod entity_reference;
 pub mod experience_orb;

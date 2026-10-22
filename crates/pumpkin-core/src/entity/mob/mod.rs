@@ -1962,9 +1962,13 @@ pub trait Mob: EntityBase + Send + Sync {
         true
     }
 
-    /// Vanilla `LivingEntity.isSleeping`, for mobs that sleep without a bed.
+    /// Vanilla `LivingEntity.isSleeping`: a sleeping position, unless the mob overrides it
+    /// (`Fox.isSleeping`, which sleeps without a bed).
     fn is_sleeping(&self) -> bool {
-        false
+        self.get_mob_entity()
+            .living_entity
+            .get_sleeping_pos()
+            .is_some()
     }
 
     /// The mob's own part of vanilla `LivingEntity.canBeSeenAsEnemy`.

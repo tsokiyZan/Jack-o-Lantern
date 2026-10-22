@@ -156,6 +156,8 @@ pub struct LivingEntity {
     pub active_effects: std::sync::Mutex<FxHashMap<&'static StatusEffect, MobEffectInstance>>,
     /// Vanilla `fallFlyTicks`.
     pub fall_fly_ticks: AtomicI32,
+    /// The synced `SLEEPING_POS_ID`: the bed this entity sleeps in.
+    sleeping_pos: AtomicCell<Option<BlockPos>>,
     /// The synced `DATA_ARROW_COUNT_ID` and its countdown, `removeArrowTime`.
     arrow_count: AtomicI32,
     remove_arrow_time: AtomicI32,
@@ -404,6 +406,7 @@ impl LivingEntity {
             active_effects: std::sync::Mutex::new(FxHashMap::default()),
             effects_dirty: AtomicBool::new(false),
             fall_fly_ticks: AtomicI32::new(0),
+            sleeping_pos: AtomicCell::new(None),
             arrow_count: AtomicI32::new(0),
             remove_arrow_time: AtomicI32::new(0),
             stinger_count: AtomicI32::new(0),
@@ -2899,7 +2902,7 @@ impl LivingEntity {
         self.update_death_stats(&*dyn_self, kill_credit.as_deref());
 
         if Self::is_sleeping(&*dyn_self) {
-            Self::stop_sleeping(&*dyn_self);
+            self.stop_sleeping(&*dyn_self);
         }
         self.clear_active_hand();
 
@@ -3924,11 +3927,7 @@ impl LivingEntity {
         nbt.put_short("HurtTime", self.hurt_time.load(Relaxed) as i16);
         nbt.put_short("DeathTime", i16::from(self.death_time.load(Relaxed)));
         nbt.put_bool("FallFlying", self.entity.is_fall_flying());
-        // `sleeping_pos`: only players keep the bed they sleep in.
-        if let Some(sleeping_pos) = self
-            .self_player()
-            .and_then(|player| player.sleeping_bed_pos.load())
-        {
+        if let Some(sleeping_pos) = self.get_sleeping_pos() {
             nbt.put(
                 "sleeping_pos",
                 NbtTag::IntArray(vec![sleeping_pos.0.x, sleeping_pos.0.y, sleeping_pos.0.z]),
@@ -4140,6 +4139,31 @@ impl LivingEntity {
         self.entity
             .fall_flying
             .store(nbt.get_bool("FallFlying").unwrap_or(false), Relaxed);
+        // `sleeping_pos`: lie down at once, and move to the bed now unless the first tick
+        // will (`baseTick`).
+        if let Some(NbtTag::IntArray(bed)) = nbt.get("sleeping_pos")
+            && let &[x, y, z] = bed.as_slice()
+        {
+            let bed = BlockPos::new(x, y, z);
+            self.set_sleeping_pos(bed);
+            // `entityData.set(DATA_POSE, SLEEPING)`, which refreshes the dimensions.
+            self.entity.set_pose_with_dimensions(
+                EntityPose::Sleeping,
+                self.entity.get_dimensions(EntityPose::Sleeping),
+            );
+            if !self.entity.first_tick.load(Relaxed)
+                && !self.set_pos_to_bed(bed)
+                && let Some(caller) = self
+                    .entity
+                    .world
+                    .load()
+                    .get_entity_by_id(self.entity.entity_id)
+            {
+                self.stop_sleeping(caller.as_ref());
+            }
+        } else {
+            self.clear_sleeping_pos();
+        }
         // todo more...
     }
 
@@ -4332,7 +4356,7 @@ impl LivingEntity {
         }
 
         if Self::is_sleeping(caller) {
-            Self::stop_sleeping(caller);
+            self.stop_sleeping(caller);
         }
 
         self.no_action_time.store(0, Relaxed);
@@ -4590,20 +4614,171 @@ impl LivingEntity {
             && !self.is_dead_or_dying()
     }
 
-    /// Vanilla `LivingEntity.isSleeping` (a sleeping position); Pumpkin keeps it on the
-    /// player and the mobs that sleep.
-    fn is_sleeping(caller: &dyn EntityBase) -> bool {
-        caller.get_player().map_or_else(
-            || caller.get_mob().is_some_and(super::mob::Mob::is_sleeping),
-            crate::entity::player::Player::is_sleeping,
-        )
+    /// Vanilla `LivingEntity.isSleeping`: a sleeping position, or a mob's own override
+    /// (`Fox.isSleeping`, its sleeping flag). `caller` is the entity.
+    #[must_use]
+    pub fn is_sleeping(caller: &dyn EntityBase) -> bool {
+        if let Some(mob) = caller.get_mob() {
+            return mob.is_sleeping();
+        }
+        if let Some(player) = caller.get_player() {
+            return player.is_sleeping();
+        }
+        caller
+            .get_living_entity()
+            .is_some_and(|living| living.get_sleeping_pos().is_some())
     }
 
-    /// Vanilla `LivingEntity.stopSleeping`. Only players keep a bed in Pumpkin.
-    fn stop_sleeping(caller: &dyn EntityBase) {
+    /// Vanilla `LivingEntity.getSleepingPos`.
+    #[must_use]
+    pub fn get_sleeping_pos(&self) -> Option<BlockPos> {
+        self.sleeping_pos.load()
+    }
+
+    /// Vanilla `LivingEntity.setSleepingPos`.
+    pub fn set_sleeping_pos(&self, pos: BlockPos) {
+        self.sleeping_pos.store(Some(pos));
+        self.entity
+            .set_synced_data(tracked_data::living_entity::SLEEPING_POS_ID, Some(pos));
+    }
+
+    /// Vanilla `LivingEntity.clearSleepingPos`.
+    pub fn clear_sleeping_pos(&self) {
+        self.sleeping_pos.store(None);
+        self.entity.set_synced_data(
+            tracked_data::living_entity::SLEEPING_POS_ID,
+            None::<BlockPos>,
+        );
+    }
+
+    /// Vanilla `LivingEntity.startSleeping`: lies down in the bed at `bed` (its head).
+    /// `caller` is this entity.
+    pub fn start_sleeping(&self, caller: &dyn EntityBase, bed: BlockPos) -> bool {
+        let world = self.entity.world.load_full();
+        let state = world.get_block_state(&bed);
+        let block = Block::from_state_id(state.id);
+        if !crate::block::blocks::bed::is_abstract_bed(block) {
+            return false;
+        }
+        let Some(sleep_height) = crate::block::blocks::bed::get_sleep_height(&world, bed, state)
+        else {
+            return false;
+        };
+        // `if (isPassenger()) stopRiding()`.
+        if let Some(vehicle) = self.entity.get_vehicle() {
+            vehicle.get_entity().remove_passenger(self.entity.entity_id);
+        }
+        self.set_pos_to_bed_at(sleep_height, bed);
+        // `setBlockAndUpdate(bed, OCCUPIED=true)`; the foot follows through `updateShape`.
+        crate::block::blocks::bed::BedBlock::set_occupied(true, &world, block, &bed, state.id);
+        caller.set_pose(EntityPose::Sleeping);
+        self.set_sleeping_pos(bed);
+        self.entity.velocity.store(Vector3::default());
+        self.entity.velocity_dirty.store(true, SeqCst);
+        true
+    }
+
+    /// Vanilla `LivingEntity.setPosToBed(BlockPos)`.
+    fn set_pos_to_bed(&self, bed: BlockPos) -> bool {
+        let world = self.entity.world.load();
+        let state = world.get_block_state(&bed);
+        if !crate::block::blocks::bed::is_abstract_bed(Block::from_state_id(state.id)) {
+            return false;
+        }
+        let Some(sleep_height) = crate::block::blocks::bed::get_sleep_height(&world, bed, state)
+        else {
+            return false;
+        };
+        self.set_pos_to_bed_at(sleep_height, bed);
+        true
+    }
+
+    /// Vanilla `LivingEntity.setPosToBed(double, BlockPos)`.
+    fn set_pos_to_bed_at(&self, sleep_height: f64, bed: BlockPos) {
+        self.entity.set_pos(Vector3::new(
+            f64::from(bed.0.x) + 0.5,
+            f64::from(bed.0.y) + sleep_height + 0.125,
+            f64::from(bed.0.z) + 0.5,
+        ));
+    }
+
+    /// Vanilla `LivingEntity.checkBedExists`.
+    fn check_bed_exists(&self) -> bool {
+        self.get_sleeping_pos().is_some_and(|bed| {
+            let world = self.entity.world.load();
+            let state = world.get_block_state(&bed);
+            crate::block::blocks::bed::is_abstract_bed(Block::from_state_id(state.id))
+                && crate::block::blocks::bed::get_sleep_height(&world, bed, state).is_some()
+        })
+    }
+
+    /// Vanilla `stopSleeping` with its overrides: a player through
+    /// `Player.stopSleepInBed(true, true)`. `caller` is this entity.
+    pub fn stop_sleeping(&self, caller: &dyn EntityBase) {
         if let Some(player) = caller.get_player() {
             player.wake_up();
+            return;
         }
+        self.living_stop_sleeping(caller);
+    }
+
+    /// Vanilla `LivingEntity.stopSleeping`: frees the bed and stands up beside it.
+    pub(crate) fn living_stop_sleeping(&self, caller: &dyn EntityBase) {
+        let world = self.entity.world.load_full();
+        if let Some(bed) = self.get_sleeping_pos()
+            && world.is_loaded(&bed)
+        {
+            let state = world.get_block_state(&bed);
+            let block = Block::from_state_id(state.id);
+            if crate::block::blocks::bed::is_abstract_bed(block) {
+                let facing =
+                    pumpkin_data::block_properties::WhiteBedLikeProperties::from_state_id(state.id)
+                        .facing;
+                crate::block::blocks::bed::BedBlock::set_occupied(
+                    false, &world, block, &bed, state.id,
+                );
+                crate::block::blocks::bed::on_stop_sleeping(&world, bed, block);
+                let stand_up = crate::block::blocks::bed::find_stand_up_position(
+                    self.entity.entity_type,
+                    &world,
+                    bed,
+                    facing,
+                    self.entity.yaw.load(),
+                )
+                .unwrap_or_else(|| {
+                    Vector3::new(
+                        f64::from(bed.0.x) + 0.5,
+                        f64::from(bed.0.y + 1) + 0.1,
+                        f64::from(bed.0.z) + 0.5,
+                    )
+                });
+                // `Vec3.atBottomCenterOf(bed).subtract(standUp).normalize()`.
+                let look = Vector3::new(
+                    f64::from(bed.0.x) + 0.5 - stand_up.x,
+                    f64::from(bed.0.y) - stand_up.y,
+                    f64::from(bed.0.z) + 0.5 - stand_up.z,
+                );
+                let length = (look.x * look.x + look.y * look.y + look.z * look.z).sqrt();
+                let look = if length < f64::from(1.0E-5f32) {
+                    Vector3::default()
+                } else {
+                    Vector3::new(look.x / length, look.y / length, look.z / length)
+                };
+                // `(float)Mth.wrapDegrees(Mth.atan2(z, x) * 180.0F / (float)Math.PI - 90.0)`.
+                let yaw = pumpkin_util::math::wrap_degrees_f64(
+                    pumpkin_util::math::atan2(look.z, look.x) * 180.0
+                        / f64::from(std::f32::consts::PI)
+                        - 90.0,
+                ) as f32;
+                self.entity.set_pos(stand_up);
+                self.entity.yaw.store(yaw);
+                self.entity.set_pitch(0.0);
+            }
+        }
+        let pos = self.entity.pos.load();
+        caller.set_pose(EntityPose::Standing);
+        self.entity.set_pos(pos);
+        self.clear_sleeping_pos();
     }
 
     /// Vanilla `LivingEntity.actuallyHurt`, with `Player`'s override.
@@ -5257,6 +5432,12 @@ impl EntityBase for LivingEntity {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .tick();
+        if self.entity.first_tick.load(Relaxed)
+            && let Some(bed) = self.get_sleeping_pos()
+            && !self.set_pos_to_bed(bed)
+        {
+            self.stop_sleeping(caller);
+        }
         crate::enchantment::EnchantmentHelper::tick_effects(caller, self);
         self.entity.tick(caller, server);
 
@@ -5319,7 +5500,11 @@ impl EntityBase for LivingEntity {
         if self.entity.tick_count.load(Relaxed) % 20 == 0 {
             self.recheck_combat_status();
         }
-        // TODO: `checkBedExists`: only players keep a bed, and the bed's own removal wakes them.
+        if Self::is_sleeping(caller)
+            && (!super::leashable::can_interact_with_level(caller) || !self.check_bed_exists())
+        {
+            self.stop_sleeping(caller);
+        }
 
         if !self.entity.removed.load(Relaxed) {
             if is_player {
@@ -5345,9 +5530,6 @@ impl EntityBase for LivingEntity {
                         .lock()
                         .unwrap_or_else(std::sync::PoisonError::into_inner)
                         .client_tick(mob);
-                    if mob.is_sleeping() {
-                        self.entity.set_pitch(0.0);
-                    }
                 }
             }
         }
@@ -5356,6 +5538,9 @@ impl EntityBase for LivingEntity {
             self.fall_fly_ticks.fetch_add(1, Relaxed);
         } else {
             self.fall_fly_ticks.store(0, Relaxed);
+        }
+        if Self::is_sleeping(caller) {
+            self.entity.set_pitch(0.0);
         }
         self.refresh_dirty_attributes();
 
