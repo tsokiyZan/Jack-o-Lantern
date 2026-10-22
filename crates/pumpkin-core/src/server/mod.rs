@@ -1288,12 +1288,8 @@ impl Server {
             // A frozen level still runs `chunkSource.tick`, so tracked entities still send.
             world.entity_tracker.update_all(world);
 
-            let players = world.players.load();
-            let player_handle = handle.clone();
-            players.par_iter().for_each(|player| {
-                let _guard = player_handle.enter();
-                player.tick(self);
-            });
+            let _guard = handle.enter();
+            world.tick_frozen(self);
         }
     }
 

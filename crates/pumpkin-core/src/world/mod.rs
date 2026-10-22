@@ -1801,6 +1801,88 @@ impl World {
     }
 
     #[expect(clippy::too_many_lines)]
+    /// Each player's position, touch box and chunk, for the entities that touch players.
+    fn player_collision_cache(players: &[Arc<Player>]) -> Vec<PlayerCollisionEntry<'_>> {
+        players
+            .par_iter()
+            .map(|player| {
+                let entity = player.get_entity();
+                let pos = entity.pos.load();
+                let bb = entity.bounding_box.load().expand(1.0, 0.5, 1.0);
+                let chunk_pos = Vector2::new(
+                    get_section_cord(pos.x.floor() as i32),
+                    get_section_cord(pos.z.floor() as i32),
+                );
+                (player, pos, bb, chunk_pos)
+            })
+            .collect()
+    }
+
+    /// Vanilla `Entity.countPlayerPassengers`: the players among all of the entity's
+    /// passengers, however deep.
+    fn count_player_passengers(entity: &dyn EntityBase) -> usize {
+        entity
+            .get_entity()
+            .passengers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+            .iter()
+            .map(|passenger| {
+                usize::from(passenger.get_player().is_some())
+                    + Self::count_player_passengers(passenger.as_ref())
+            })
+            .sum()
+    }
+
+    /// The entity half of vanilla `ServerLevel.tick` while the tick is frozen:
+    /// `TickRateManager.isEntityFrozen` never freezes a player or an entity that carries one,
+    /// so they tick as in `tick`, and the players then move (`ServerPlayer.doTick`, from the
+    /// connection, which the freeze doesn't stop either).
+    pub fn tick_frozen(self: &Arc<Self>, server: &Arc<Server>) {
+        let handle = server.runtime.clone();
+        let players = self.players.load();
+        let players_cache = Self::player_collision_cache(&players);
+        let player_handle = handle.clone();
+        players.par_iter().for_each(|player| {
+            let _guard = player_handle.enter();
+            player.get_entity().common_tick();
+            player.tick(server);
+        });
+        for player in players.iter() {
+            if player.get_entity().has_passengers() {
+                let vehicle: Arc<dyn EntityBase> = player.clone();
+                Self::tick_passengers(&vehicle, server.as_ref(), &players_cache);
+            }
+        }
+
+        // The vehicles that carry a player: a passenger ticks with its vehicle.
+        let guard = handle.enter();
+        for entity in self.entities.load().iter() {
+            if entity.get_entity().has_vehicle()
+                || Self::count_player_passengers(entity.as_ref()) == 0
+            {
+                continue;
+            }
+            let pos = entity.get_entity().pos.load();
+            let entity_chunk = Vector2::new(
+                get_section_cord(pos.x.floor() as i32),
+                get_section_cord(pos.z.floor() as i32),
+            );
+            entity.get_entity().common_tick();
+            entity.tick(entity.as_ref(), server.as_ref());
+            Self::touch_players(entity.as_ref(), entity_chunk, &players_cache);
+            Self::tick_passengers(entity, server.as_ref(), &players_cache);
+        }
+        drop(guard);
+
+        players.par_iter().for_each(|player| {
+            let _guard = player_handle.enter();
+            player.tick_server_travel();
+            player.track_steered_vehicle();
+        });
+    }
+
     pub fn tick(self: &Arc<Self>, server: &Arc<Server>) {
         const ENTITY_TICK_BATCH_SIZE: usize = 16;
 
@@ -1841,19 +1923,7 @@ impl World {
 
         let players = self.players.load();
         let player_count = players.len();
-        let players_cache: Vec<_> = players
-            .par_iter()
-            .map(|player| {
-                let entity = player.get_entity();
-                let pos = entity.pos.load();
-                let bb = entity.bounding_box.load().expand(1.0, 0.5, 1.0);
-                let chunk_pos = Vector2::new(
-                    get_section_cord(pos.x.floor() as i32),
-                    get_section_cord(pos.z.floor() as i32),
-                );
-                (player, pos, bb, chunk_pos)
-            })
-            .collect();
+        let players_cache = Self::player_collision_cache(&players);
 
         let t_players = std::time::Instant::now();
         let player_handle = handle.clone();
