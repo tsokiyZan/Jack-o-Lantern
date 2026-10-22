@@ -18,19 +18,19 @@ impl JavaClient {
             return;
         }
         let entity = &player.get_entity();
-        // `setOnGroundWithMovement` with the client's flags.
-        entity.on_ground.store(rotation.ground, Ordering::Relaxed);
-        entity
-            .horizontal_collision
-            .store(rotation.horizontal_collision, Ordering::Relaxed);
-        // Vanilla `handleMovePlayer` for a packet without a position: no move, but the fall
-        // still ends on the ground.
+        // Vanilla `handleMovePlayer` for a packet without a position: no move, but the client's
+        // flags (`setOnGroundWithMovement`) and the fall's end on the ground. While a teleport
+        // waits for its confirmation, only the rotation is taken (`absSnapRotationTo`).
         if player
             .awaiting_teleport
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .is_none()
         {
+            entity.on_ground.store(rotation.ground, Ordering::Relaxed);
+            entity
+                .horizontal_collision
+                .store(rotation.horizontal_collision, Ordering::Relaxed);
             player.known_movement.store(Vector3::default());
             entity.do_check_fall_damage(player, Vector3::default(), rotation.ground);
         }

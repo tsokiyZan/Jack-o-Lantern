@@ -278,13 +278,19 @@ impl JavaClient {
         if player.get_entity().has_vehicle() {
             return;
         }
-        // Ignore movement packets while awaiting a teleport confirmation (vanilla behavior)
+        // While a teleport waits for its confirmation, vanilla takes only the rotation
+        // (`absSnapRotationTo`).
         if player
             .awaiting_teleport
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .is_some()
         {
+            if packet.yaw.is_finite() && packet.pitch.is_finite() {
+                player
+                    .get_entity()
+                    .set_rotation(wrap_degrees(packet.yaw), wrap_degrees(packet.pitch));
+            }
             return;
         }
         if player.is_movement_locked.load(Ordering::Relaxed) {
