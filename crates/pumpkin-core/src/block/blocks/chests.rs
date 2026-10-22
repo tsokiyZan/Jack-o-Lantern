@@ -5,7 +5,6 @@ use crate::block::entities::chest::ChestBlockEntity;
 use pumpkin_data::BlockStateId;
 use pumpkin_data::block_properties::{ChestLikeProperties, ChestType, HorizontalFacing};
 use pumpkin_data::entity::{EntityPose, EntityType};
-use pumpkin_data::loot_table::get_loot_table;
 use pumpkin_data::{Block, BlockDirection, translation};
 use pumpkin_inventory::Inventory;
 use pumpkin_inventory::double::DoubleInventory;
@@ -207,12 +206,12 @@ fn get_chest_screen_handler_factory(
 
     let unpack = |entity: &Arc<dyn BlockEntity>| {
         if let Some((loot_key, seed)) = entity.take_loot_table()
-            && let Some(table) = get_loot_table(&loot_key)
+            && let Some(table) = args.world.get_loot_table(&loot_key)
             && let Some(inv) = entity.clone().get_inventory()
         {
             fill_chest_inventory_handle(
                 &inv,
-                &table.into(),
+                &table,
                 args.world,
                 seed,
                 &container_unpack_params(
