@@ -56,6 +56,15 @@ impl JavaClient {
                             if !config.enabled {
                                 return;
                             }
+                            // Vanilla `handleAttack` ignores the packet while the main hand jabs instead.
+                            if player
+                                .inventory()
+                                .held_item()
+                                .get_data_component::<pumpkin_data::data_component_impl::PiercingWeaponImpl>()
+                                .is_some()
+                            {
+                                return;
+                            }
 
                             if entity_id.0 == player.entity_id() {
                                 self.try_kick(&TextComponent::translate_cross(translation::java::MULTIPLAYER_DISCONNECT_INVALID_ENTITY_ATTACKED, translation::java::MULTIPLAYER_DISCONNECT_INVALID_ENTITY_ATTACKED, []));

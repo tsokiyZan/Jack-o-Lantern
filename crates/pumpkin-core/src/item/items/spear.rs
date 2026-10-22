@@ -108,7 +108,7 @@ impl ItemBehaviour for SpearItem {
         if let Some(sound) = piercing.sound.as_ref() {
             world.play_sound_event_expect(player, sound, SoundCategory::Players, &position);
         }
-        player.swing_and_reset_attack_strength(Hand::Right, false);
+        player.swing_and_reset_attack_strength(Hand::Right, stack.get_attack_animation(), false);
     }
 
     fn on_use_tick(&self, stack: &ItemStack, player: &Player, remaining_use_ticks: i32) {

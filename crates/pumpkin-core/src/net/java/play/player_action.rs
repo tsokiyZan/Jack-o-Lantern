@@ -227,10 +227,14 @@ impl JavaClient {
                     self.update_sequence(player_action.sequence.0);
                 }
                 Status::DropItem => {
-                    player.drop_held_item(false);
+                    if player.gamemode.load() != GameMode::Spectator {
+                        player.drop_held_item(false);
+                    }
                 }
                 Status::DropItemStack => {
-                    player.drop_held_item(true);
+                    if player.gamemode.load() != GameMode::Spectator {
+                        player.drop_held_item(true);
+                    }
                 }
                 Status::ReleaseItemInUse => {
                     let item_in_use = player

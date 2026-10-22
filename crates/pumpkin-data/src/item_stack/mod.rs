@@ -736,6 +736,21 @@ impl ItemStack {
         (a.is_empty() && b.is_empty()) || a.are_equal(b)
     }
 
+    /// Vanilla `ItemStack.getAttackAnimation`.
+    #[must_use]
+    pub fn get_attack_animation(&self) -> crate::data_component_impl::SwingAnimationImpl {
+        self.get_data_component::<crate::data_component_impl::SwingAnimationImpl>()
+            .copied()
+            .unwrap_or_default()
+    }
+
+    /// Vanilla `ItemStack.getInteractAnimation`.
+    #[must_use]
+    pub fn get_interact_animation(&self) -> crate::data_component_impl::SwingAnimationImpl {
+        self.get_data_component::<crate::data_component_impl::InteractAnimationImpl>()
+            .map_or_else(Default::default, |animation| animation.0)
+    }
+
     /// Vanilla `ItemStack.isSameItem`: the same item, an empty stack counting as air.
     #[must_use]
     pub fn is_same_item(a: &Self, b: &Self) -> bool {

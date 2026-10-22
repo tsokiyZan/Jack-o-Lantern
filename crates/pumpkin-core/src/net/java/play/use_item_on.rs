@@ -2,6 +2,7 @@
 use super::*;
 use crate::entity::player::cooldown_group;
 use crate::item::registry::should_try_block_placement;
+use pumpkin_data::data_component_impl::SwingAnimationImpl;
 
 impl JavaClient {
     #[allow(clippy::too_many_lines)]
@@ -76,6 +77,7 @@ impl JavaClient {
         let off_hand_item_empty = off_hand_item.is_empty();
 
         let mut item = inventory.get_stack_in_hand(hand);
+        let swing_animation = item.get_interact_animation();
         let item_id = item.item.id;
         player.increment_stat(StatisticCategory::Used, item_id as i32, 1);
 
@@ -127,9 +129,7 @@ impl JavaClient {
             if result.consumes_action() {
                 // TODO: Trigger ANY_BLOCK_USE Criteria
 
-                if matches!(result, BlockActionResult::SuccessServer) {
-                    player.swing_and_reset_attack_strength(hand, true);
-                }
+                Self::swing_for_use_item_on(player, hand, swing_animation, &result);
                 return Ok(());
             }
         }
@@ -151,12 +151,19 @@ impl JavaClient {
             .item_registry
             .use_on_block(&mut item, player, position, face, cursor_pos, block, server);
 
+        let mut item_result = item_result;
         if should_try_block_placement(&item_result) {
             // Check if the item is a block, because not every item can be placed :D
             let item_id = item.item.id;
             if let Some(block) = Block::from_item_id(item_id) {
                 should_try_decrement =
                     Self::run_is_block_place(player, block, server, use_item_on, position, face)?;
+                // Vanilla `BlockItem.place`: `SUCCESS` once placed, else `FAIL`.
+                item_result = if should_try_decrement {
+                    BlockActionResult::Success
+                } else {
+                    BlockActionResult::Fail
+                };
             }
         }
 
@@ -170,9 +177,7 @@ impl JavaClient {
 
         let after = item.clone();
 
-        if matches!(item_result, BlockActionResult::SuccessServer) {
-            player.swing_and_reset_attack_strength(hand, true);
-        }
+        Self::swing_for_use_item_on(player, hand, swing_animation, &item_result);
 
         // Broadcast the break entity status before the slot sync; the client
         // needs the old item texture in the slot for break particles.
@@ -198,6 +203,24 @@ impl JavaClient {
         }
 
         Ok(())
+    }
+
+    /// The two `swingAndResetAttackStrength` branches of vanilla `handleUseItemOn`: a swinging
+    /// success passes both, so it swings twice. A `PREDICTED` swing skips the swinging player.
+    fn swing_for_use_item_on(
+        player: &Player,
+        hand: Hand,
+        animation: SwingAnimationImpl,
+        result: &BlockActionResult,
+    ) {
+        let send_to_self = match result {
+            BlockActionResult::Success => false,
+            BlockActionResult::SuccessServer => true,
+            _ => return,
+        };
+        for _ in 0..2 {
+            player.swing_and_reset_attack_strength(hand, animation, send_to_self);
+        }
     }
 
     #[expect(clippy::too_many_arguments)]

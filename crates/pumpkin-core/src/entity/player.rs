@@ -240,7 +240,8 @@ use pumpkin_data::attributes::Attributes;
 use pumpkin_data::block_properties::HorizontalFacing;
 use pumpkin_data::damage::DamageType;
 use pumpkin_data::data_component_impl::{
-    BlocksAttacksImpl, EquipmentSlot, EquippableImpl, MinimumAttackChargeImpl, ToolImpl, WeaponImpl,
+    BlocksAttacksImpl, EquipmentSlot, EquippableImpl, MinimumAttackChargeImpl, SwingAnimationImpl,
+    ToolImpl, WeaponImpl,
 };
 use pumpkin_data::effect::StatusEffect;
 use pumpkin_data::entity::{EntityPose, EntityStatus, EntityType};
@@ -1579,42 +1580,40 @@ impl Player {
             total_damage as f32,
         );
 
-        if victim.get_living_entity().is_some() {
-            // Vanilla `doSweepAttack`, after the extra knockback. It reuses the attack's
-            // damage source.
-            if matches!(attack_type, AttackType::Sweeping) {
-                combat::spawn_sweep_particle(attacker_entity, &world, &pos);
+        // Vanilla `doSweepAttack`, after the extra knockback. It reuses the attack's
+        // damage source.
+        if matches!(attack_type, AttackType::Sweeping) {
+            combat::spawn_sweep_particle(attacker_entity, &world, &pos);
 
-                let sweep_damage = 1.0
-                    + self
-                        .living_entity
-                        .get_attribute_value(&Attributes::SWEEPING_DAMAGE_RATIO)
-                        as f32
-                        * damage as f32;
+            let sweep_damage = 1.0
+                + self
+                    .living_entity
+                    .get_attribute_value(&Attributes::SWEEPING_DAMAGE_RATIO)
+                    as f32
+                    * damage as f32;
 
-                let search_box = BoundingBox::new(
-                    Vector3::new(pos.x - 1.0, pos.y - 0.5, pos.z - 1.0),
-                    Vector3::new(pos.x + 1.0, pos.y + 0.5, pos.z + 1.0),
-                );
-                let victims = world.get_all_at_box(&search_box);
-                for other_victim in victims {
-                    if other_victim.get_entity().entity_id != victim_entity.entity_id
-                        && other_victim.get_entity().entity_id != attacker_entity.entity_id
-                        && other_victim.damage_with_context(
-                            other_victim.as_ref(),
-                            sweep_damage,
-                            damage_source.damage_type,
-                            None,
-                            damage_source.direct,
-                            damage_source.causing,
-                        )
-                    {
-                        EnchantmentHelper::do_post_attack_effects(
-                            &world,
-                            other_victim.as_ref(),
-                            &damage_source,
-                        );
-                    }
+            let search_box = BoundingBox::new(
+                Vector3::new(pos.x - 1.0, pos.y - 0.5, pos.z - 1.0),
+                Vector3::new(pos.x + 1.0, pos.y + 0.5, pos.z + 1.0),
+            );
+            let victims = world.get_all_at_box(&search_box);
+            for other_victim in victims {
+                if other_victim.get_entity().entity_id != victim_entity.entity_id
+                    && other_victim.get_entity().entity_id != attacker_entity.entity_id
+                    && other_victim.damage_with_context(
+                        other_victim.as_ref(),
+                        sweep_damage,
+                        damage_source.damage_type,
+                        None,
+                        damage_source.direct,
+                        damage_source.causing,
+                    )
+                {
+                    EnchantmentHelper::do_post_attack_effects(
+                        &world,
+                        other_victim.as_ref(),
+                        &damage_source,
+                    );
                 }
             }
         }
@@ -3532,11 +3531,28 @@ impl Player {
         self.last_attacked_ticks.store(0, Ordering::Relaxed);
     }
 
-    /// Vanilla `ServerPlayer.swingAndResetAttackStrength`. Pumpkin has no swing state, so every
-    /// swing counts as started.
-    pub fn swing_and_reset_attack_strength(&self, hand: Hand, all: bool) {
-        self.swing_hand(hand, all);
+    /// The attack strength state of a freshly constructed vanilla `Player`.
+    pub fn clear_attack_strength_for_respawn(&self) {
         self.reset_attack_strength_ticker();
+        *self
+            .last_item_in_main_hand
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = ItemStack::EMPTY.clone();
+    }
+
+    /// Vanilla `ServerPlayer.swingAndResetAttackStrength`: resets only when the swing starts.
+    pub fn swing_and_reset_attack_strength(
+        &self,
+        hand: Hand,
+        animation: SwingAnimationImpl,
+        send_to_swinging_entity: bool,
+    ) {
+        if self
+            .living_entity
+            .swing(hand, animation, send_to_swinging_entity)
+        {
+            self.reset_attack_strength_ticker();
+        }
     }
 
     pub async fn fire_packet_sent<P: Send + Sync + std::any::Any>(
@@ -6766,30 +6782,6 @@ impl Player {
         !self.is_creative()
             && !self.is_spectator()
             && self.world().level_info.load().difficulty != Difficulty::Peaceful
-    }
-
-    /// Swing the hand of the player
-    pub fn swing_hand(&self, hand: Hand, all: bool) {
-        let world = self.world();
-        let entity_id = self.entity_id();
-
-        let je_packet = pumpkin_protocol::java::client::play::CSwingArm::new(
-            VarInt(entity_id),
-            hand == Hand::Left,
-        );
-
-        let be_packet = pumpkin_protocol::bedrock::server::animate::SAnimate {
-            action: pumpkin_protocol::bedrock::server::animate::AnimateAction::SwingArm,
-            target_actor_runtime_id: pumpkin_protocol::codec::var_ulong::VarULong(entity_id as u64),
-            data: 0.0,
-            swing_source: None,
-        };
-
-        if all {
-            world.broadcast_editioned(&je_packet, &be_packet);
-        } else {
-            world.broadcast_packet_except_editioned(&[self.gameprofile.id], &je_packet, &be_packet);
-        }
     }
 
     /// Start using an item (e.g. drawing a bow)

@@ -55,7 +55,8 @@ impl JavaClient {
             &server;
             event;
             'after: {
-                player.swing_hand(hand, false);
+                let animation = player.inventory().get_stack_in_hand(hand).get_attack_animation();
+                player.living_entity.swing(hand, animation, false);
             }
         }}
     }
