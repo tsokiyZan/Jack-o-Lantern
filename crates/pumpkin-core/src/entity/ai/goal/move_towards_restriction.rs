@@ -68,13 +68,13 @@ impl Goal for MoveTowardsRestrictionGoal {
     }
 
     fn start(&mut self, mob: &dyn Mob) {
-        let mob_pos = mob.get_entity().pos.load();
-        let mut navigator = mob.get_mob_entity().own_navigation();
-        navigator.set_progress(NavigatorGoal::new(
-            mob_pos,
-            Vector3::new(self.wanted_x, self.wanted_y, self.wanted_z),
-            self.speed_modifier,
-        ));
+        mob.get_mob_entity().with_navigation(|navigation, owner| {
+            navigation.set_progress(NavigatorGoal::new(
+                owner.living_entity.entity.pos.load(),
+                Vector3::new(self.wanted_x, self.wanted_y, self.wanted_z),
+                self.speed_modifier,
+            ));
+        });
     }
 
     fn controls(&self) -> Controls {

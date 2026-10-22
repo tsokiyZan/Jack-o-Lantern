@@ -57,9 +57,11 @@ impl MoveToTargetSink {
     }
 
     fn create_path(tick: &BrainTick<'_>, destination: Vector3<f64>) -> Option<Path> {
-        let mob_entity = tick.mob.get_mob_entity();
-        let mut navigator = mob_entity.own_navigation();
-        navigator.create_path(&mob_entity.living_entity, destination, 0)
+        tick.mob
+            .get_mob_entity()
+            .with_navigation(|navigation, owner| {
+                navigation.create_path(&owner.living_entity, destination, 0)
+            })
     }
 
     fn try_compute_path(&mut self, tick: &mut BrainTick<'_>) -> bool {
@@ -121,12 +123,15 @@ impl MoveToTargetSink {
         };
         tick.brain.set(types::PATH, path.copy());
 
-        let mob_entity = tick.mob.get_mob_entity();
-        mob_entity.own_navigation().move_to_path(
-            Some(path),
-            f64::from(self.speed_modifier),
-            &mob_entity.living_entity,
-        );
+        tick.mob
+            .get_mob_entity()
+            .with_navigation(|navigation, owner| {
+                navigation.move_to_path(
+                    Some(path),
+                    f64::from(self.speed_modifier),
+                    &owner.living_entity,
+                );
+            });
     }
 }
 
@@ -181,7 +186,10 @@ impl Behavior for MoveToTargetSink {
         if walk_target.target().tracks_spectator() {
             return false;
         }
-        let navigation_done = tick.mob.get_mob_entity().own_navigation().is_done();
+        let navigation_done = tick
+            .mob
+            .get_mob_entity()
+            .with_navigation(|navigation, _| navigation.is_done());
         !navigation_done && !reached_target(&tick.mob.get_entity().block_pos.load(), walk_target)
     }
 
@@ -189,9 +197,7 @@ impl Behavior for MoveToTargetSink {
         let navigator_path = tick
             .mob
             .get_mob_entity()
-            .own_navigation()
-            .get_path()
-            .map(Path::copy);
+            .with_navigation(|navigation, _| navigation.get_path().map(Path::copy));
         let changed = match (self.path.as_ref(), navigator_path.as_ref()) {
             (None, None) => false,
             (Some(current), Some(other)) => !current.same_as_path(other),
@@ -231,13 +237,11 @@ impl Behavior for MoveToTargetSink {
             .is_some_and(|walk_target| {
                 !reached_target(&tick.mob.get_entity().block_pos.load(), walk_target)
             });
-        let stuck = {
-            let mob_entity = tick.mob.get_mob_entity();
-            let mut navigator = mob_entity.own_navigation();
-            let stuck = navigator.is_stuck();
-            navigator.stop();
+        let stuck = tick.mob.get_mob_entity().with_navigation(|navigation, _| {
+            let stuck = navigation.is_stuck();
+            navigation.stop();
             stuck
-        };
+        });
         if still_trying && stuck {
             // `level.getRandom().nextInt(40)` (MoveToTargetSink.java:82).
             self.remaining_cooldown = tick

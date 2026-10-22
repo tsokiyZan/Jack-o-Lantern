@@ -106,12 +106,9 @@ impl Goal for BlazeShootFireballGoal {
                 }
             }
 
-            blaze.entity.own_move_control().set_wanted_position(
-                target_pos.x,
-                target_pos.y,
-                target_pos.z,
-                1.0,
-            );
+            blaze.entity.with_move_control(|control| {
+                control.set_wanted_position(target_pos.x, target_pos.y, target_pos.z, 1.0);
+            });
         } else if distance_sq < Self::get_follow_distance(&blaze).powi(2) && has_line_of_sight {
             let yd = (target_pos.y + f64::from(target_entity.entity_dimension.load().height) * 0.5)
                 - (blaze_pos.y + f64::from(entity.entity_dimension.load().height) * 0.5);
@@ -141,12 +138,9 @@ impl Goal for BlazeShootFireballGoal {
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
                 .look_at_entity_with_range(&target, 10.0, 10.0);
         } else if self.last_seen < 5 {
-            blaze.entity.own_move_control().set_wanted_position(
-                target_pos.x,
-                target_pos.y,
-                target_pos.z,
-                1.0,
-            );
+            blaze.entity.with_move_control(|control| {
+                control.set_wanted_position(target_pos.x, target_pos.y, target_pos.z, 1.0);
+            });
         }
     }
 

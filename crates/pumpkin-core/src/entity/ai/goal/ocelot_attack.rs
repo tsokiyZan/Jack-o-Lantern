@@ -58,8 +58,8 @@ impl Goal for OcelotAttackGoal {
 
     fn stop(&mut self, mob: &dyn Mob) {
         self.target = None;
-        let mut navigator = mob.get_mob_entity().own_navigation();
-        navigator.stop();
+        mob.get_mob_entity()
+            .with_navigation(|navigation, _| navigation.stop());
     }
 
     fn should_run_every_tick(&self) -> bool {
@@ -92,8 +92,10 @@ impl Goal for OcelotAttackGoal {
             0.8
         };
 
-        let mut navigator = mob_entity.own_navigation();
-        navigator.set_progress(NavigatorGoal::new(mob_pos, target_pos, speed_modifier));
+        mob_entity.with_navigation(|navigation, owner| {
+            let owner_pos = owner.living_entity.entity.pos.load();
+            navigation.set_progress(NavigatorGoal::new(owner_pos, target_pos, speed_modifier));
+        });
 
         self.attack_time = (self.attack_time - 1).max(0);
         if dist_sq <= f64::from(melee_radius_sq) && self.attack_time <= 0 {

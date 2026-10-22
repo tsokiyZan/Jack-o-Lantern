@@ -185,7 +185,8 @@ impl Goal for RangedCrossbowAttackGoal {
         }
         mob.get_mob_entity().living_entity.clear_active_hand();
         self.state = CrossbowState::Uncharged;
-        mob.get_mob_entity().own_navigation().stop();
+        mob.get_mob_entity()
+            .with_navigation(|navigation, _| navigation.stop());
     }
 
     #[expect(clippy::too_many_lines)]
@@ -217,16 +218,18 @@ impl Goal for RangedCrossbowAttackGoal {
                 } else {
                     self.speed * 0.5
                 };
-                mob.get_mob_entity()
-                    .own_navigation()
-                    .set_progress(NavigatorGoal::new(mob_pos, target_pos, move_speed));
+                mob.get_mob_entity().with_navigation(|navigation, owner| {
+                    let owner_pos = owner.living_entity.entity.pos.load();
+                    navigation.set_progress(NavigatorGoal::new(owner_pos, target_pos, move_speed));
+                });
                 // Vanilla `PATHFINDING_DELAY_RANGE.sample`: `TimeUtil.rangeOfSeconds(1, 2)`.
                 self.update_path_delay =
                     mob.get_entity().random().next_int_between_inclusive(20, 40);
             }
         } else {
             self.update_path_delay = 0;
-            mob.get_mob_entity().own_navigation().stop();
+            mob.get_mob_entity()
+                .with_navigation(|navigation, _| navigation.stop());
         }
 
         mob.get_mob_entity()

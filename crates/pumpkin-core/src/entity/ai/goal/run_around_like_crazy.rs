@@ -53,14 +53,13 @@ impl Goal for RunAroundLikeCrazyGoal {
     }
 
     fn start(&mut self, mob: &dyn Mob) {
-        let mob_pos = mob.get_entity().pos.load();
-        mob.get_mob_entity()
-            .own_navigation()
-            .set_progress(NavigatorGoal::new(
-                mob_pos,
+        mob.get_mob_entity().with_navigation(|navigation, owner| {
+            navigation.set_progress(NavigatorGoal::new(
+                owner.living_entity.entity.pos.load(),
                 Vector3::new(self.pos_x, self.pos_y, self.pos_z),
                 self.speed_modifier,
             ));
+        });
     }
 
     /// Vanilla's taming roll: now and then the rider either tames the horse (more likely the

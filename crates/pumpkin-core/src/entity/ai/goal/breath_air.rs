@@ -55,9 +55,10 @@ impl BreathAirGoal {
             f64::from(destination.0.y + 1),
             f64::from(destination.0.z),
         );
-        mob.get_mob_entity()
-            .own_navigation()
-            .set_progress(NavigatorGoal::new(entity.pos.load(), to, 1.0));
+        mob.get_mob_entity().with_navigation(|navigation, owner| {
+            let owner_pos = owner.living_entity.entity.pos.load();
+            navigation.set_progress(NavigatorGoal::new(owner_pos, to, 1.0));
+        });
     }
 }
 
@@ -73,7 +74,8 @@ impl Goal for BreathAirGoal {
     }
 
     fn start(&mut self, mob: &dyn Mob) {
-        mob.get_mob_entity().own_navigation().stop();
+        mob.get_mob_entity()
+            .with_navigation(|navigation, _| navigation.stop());
         Self::find_air_position(mob);
     }
 

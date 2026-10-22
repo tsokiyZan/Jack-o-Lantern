@@ -1555,11 +1555,14 @@ impl BeeWanderGoal {
 
 impl Goal for BeeWanderGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
-        mob.is_navigator_idle() && mob.get_entity().random().next_bounded_i32(10) == 0
+        // `Bee.this.navigation`: the field, not `getNavigation()`.
+        mob.get_mob_entity().own_navigation().is_idle()
+            && mob.get_entity().random().next_bounded_i32(10) == 0
     }
 
     fn should_continue(&mut self, mob: &dyn Mob) -> bool {
-        !mob.is_navigator_idle()
+        // `Bee.this.navigation.isInProgress()`: the field, not `getNavigation()`.
+        !mob.get_mob_entity().own_navigation().is_idle()
     }
 
     fn start(&mut self, mob: &dyn Mob) {

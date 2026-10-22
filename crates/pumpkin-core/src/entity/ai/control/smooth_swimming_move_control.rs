@@ -68,7 +68,7 @@ impl MoveControlTrait for SmoothSwimmingMoveControl {
                 .store(Vector3::new(vel.x, vel.y + 0.005, vel.z));
         }
 
-        let navigation_done = mob_entity.own_navigation().is_done();
+        let navigation_done = mob_entity.with_navigation(|navigation, _| navigation.is_done());
         if self.operation != Operation::MoveTo || navigation_done {
             living_entity.speed.store(0.0);
             living_entity

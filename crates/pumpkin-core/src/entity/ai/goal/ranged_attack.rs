@@ -126,15 +126,15 @@ impl Goal for RangedAttackGoal {
             self.see_time = 0;
         }
 
-        {
-            let mut navigator = mob_entity.own_navigation();
+        mob_entity.with_navigation(|navigation, owner| {
+            let owner = &owner.living_entity;
             if target_dist_sqr <= f64::from(self.attack_radius_sqr) && self.see_time >= 5 {
-                navigator.stop();
-            } else if let Some(path) = navigator.create_path(living, target_pos, 1) {
+                navigation.stop();
+            } else if let Some(path) = navigation.create_path(owner, target_pos, 1) {
                 // Vanilla `moveTo(Entity, speed)` keeps the old path when none is found.
-                navigator.move_to_path(Some(path), self.speed_modifier, living);
+                navigation.move_to_path(Some(path), self.speed_modifier, owner);
             }
-        }
+        });
 
         mob_entity
             .look_control

@@ -64,14 +64,13 @@ impl Goal for WorkAtJobSiteGoal {
 
     fn start(&mut self, mob: &dyn Mob) {
         if let Some(target) = self.target {
-            let entity = &mob.get_mob_entity().living_entity.entity;
-            mob.get_mob_entity()
-                .own_navigation()
-                .set_progress(NavigatorGoal::new(
-                    entity.pos.load(),
+            mob.get_mob_entity().with_navigation(|navigation, owner| {
+                navigation.set_progress(NavigatorGoal::new(
+                    owner.living_entity.entity.pos.load(),
                     target.to_centered_f64(),
                     self.speed,
                 ));
+            });
         }
     }
 
@@ -86,7 +85,8 @@ impl Goal for WorkAtJobSiteGoal {
             mob.release_pending_job_site(target);
         }
         self.target = None;
-        mob.get_mob_entity().own_navigation().stop();
+        mob.get_mob_entity()
+            .with_navigation(|navigation, _| navigation.stop());
     }
 
     fn controls(&self) -> Controls {

@@ -200,9 +200,10 @@ impl MoveControl {
             f64::from(entity.block_pos.load().0.y),
             pos.z + f64::from(dz),
         );
+        // Vanilla `getNavigation().getNodeEvaluator().getPathType(this.mob, ..)`: the
+        // navigation's evaluator, asked about this mob.
         mob.get_mob_entity()
-            .own_navigation()
-            .get_path_type_at(entity, target)
+            .with_navigation(|navigation, _| navigation.get_path_type_at(entity, target))
             .is_none_or(|path_type| path_type == PathType::Walkable)
     }
 

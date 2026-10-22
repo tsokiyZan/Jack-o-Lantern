@@ -54,14 +54,15 @@ impl FollowPlayerRiddenEntityGoal {
     }
 
     fn move_to(mob: &dyn Mob, pos: BlockPos) {
-        let mob_entity = mob.get_mob_entity();
-        mob_entity.own_navigation().move_to_coords(
-            f64::from(pos.0.x),
-            f64::from(pos.0.y),
-            f64::from(pos.0.z),
-            1.0,
-            &mob_entity.living_entity,
-        );
+        mob.get_mob_entity().with_navigation(|navigation, owner| {
+            navigation.move_to_coords(
+                f64::from(pos.0.x),
+                f64::from(pos.0.y),
+                f64::from(pos.0.z),
+                1.0,
+                &owner.living_entity,
+            );
+        });
     }
 }
 

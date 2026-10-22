@@ -210,6 +210,11 @@ impl MobEntity {
     /// Vanilla `Mob.getNavigation()`: the controlled `Mob` vehicle's navigation (recursively), else
     /// this mob's own. `f` also gets the mob that owns the navigation; pass its `living_entity` to
     /// every `Navigator` call.
+    ///
+    /// `f` runs with that navigation locked. Inside it, never call `get_pathfinding_malus`,
+    /// `goal_utils::has_malus`/`is_not_stable`, the `random_pos` helpers, `is_navigator_idle`,
+    /// `with_navigation` or `stop_in_place` on this mob or its rider: each locks the same
+    /// navigation and would deadlock. Compute positions and malus checks before entering.
     pub fn with_navigation<R>(&self, f: impl FnOnce(&mut Navigator, &Self) -> R) -> R {
         if let Some(vehicle) = self.controlled_vehicle_mob()
             && let Some(vehicle_mob) = vehicle.get_mob()
@@ -242,6 +247,9 @@ impl MobEntity {
 
     /// Vanilla `Mob.getPathfindingMalus`: a vehicle that passes its malus on
     /// (`shouldPassengersInheritMalus`) lends its own map, not recursively.
+    ///
+    /// Locks the navigation that holds the map (the vehicle's while inheriting), so never call
+    /// it inside a `with_navigation` closure.
     #[must_use]
     pub fn get_pathfinding_malus(&self, path_type: PathType) -> f32 {
         if let Some(vehicle) = self.malus_inheritance_vehicle()
@@ -1508,9 +1516,12 @@ pub trait Mob: EntityBase + Send + Sync {
         false
     }
 
-    /// Takes the navigation lock, so callers must not already hold it.
+    /// `getNavigation().isDone()`: the steered vehicle's navigation while riding one. Takes
+    /// that navigation's lock, so callers must not already hold it (nor call this from inside
+    /// a `with_navigation` closure).
     fn is_navigator_idle(&self) -> bool {
-        self.get_mob_entity().own_navigation().is_idle()
+        self.get_mob_entity()
+            .with_navigation(|navigation, _| navigation.is_idle())
     }
 
     fn has_line_of_sight(&self, target: &crate::entity::Entity) -> bool {
@@ -3769,9 +3780,11 @@ pub trait PathAwareEntity: Mob + Send + Sync {
         ) >= 0.0
     }
 
+    /// Vanilla `PathfinderMob.isPathFinding`: `!getNavigation().isDone()`.
     fn is_navigation(&self) -> bool {
-        let navigator = self.get_mob_entity().own_navigation();
-        !navigator.is_idle()
+        !self
+            .get_mob_entity()
+            .with_navigation(|navigation, _| navigation.is_idle())
     }
 
     fn should_follow_leash(&self) -> bool {

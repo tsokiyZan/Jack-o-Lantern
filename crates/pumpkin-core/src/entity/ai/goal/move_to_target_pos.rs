@@ -121,17 +121,17 @@ impl<M: MoveToTargetPos> MoveToTargetPosGoal<M> {
 
     pub fn move_mob_to_block(&self, mob: &dyn Mob) {
         let target = self.get_target_pos();
-        let mut navigator = mob.get_mob_entity().own_navigation();
-
-        navigator.set_progress(NavigatorGoal::new(
-            mob.get_entity().pos.load(),
-            Vector3::new(
-                target.0.x as f64 + 0.5,
-                target.0.y as f64,
-                target.0.z as f64 + 0.5,
-            ),
-            self.speed,
-        ));
+        mob.get_mob_entity().with_navigation(|navigation, owner| {
+            navigation.set_progress(NavigatorGoal::new(
+                owner.living_entity.entity.pos.load(),
+                Vector3::new(
+                    target.0.x as f64 + 0.5,
+                    target.0.y as f64,
+                    target.0.z as f64 + 0.5,
+                ),
+                self.speed,
+            ));
+        });
     }
 }
 
@@ -227,17 +227,17 @@ impl<M: MoveToTargetPos> Goal for MoveToTargetPosGoal<M> {
             self.reached = false;
             self.trying_time += 1;
             if move_to_target_pos.should_recalculate_path(self.trying_time) {
-                let mut navigator = mob.get_mob_entity().own_navigation();
-
-                navigator.set_progress(NavigatorGoal::new(
-                    mob.get_entity().pos.load(),
-                    Vector3::new(
-                        target.0.x as f64 + 0.5,
-                        target.0.y as f64,
-                        target.0.z as f64 + 0.5,
-                    ),
-                    self.speed,
-                ));
+                mob.get_mob_entity().with_navigation(|navigation, owner| {
+                    navigation.set_progress(NavigatorGoal::new(
+                        owner.living_entity.entity.pos.load(),
+                        Vector3::new(
+                            target.0.x as f64 + 0.5,
+                            target.0.y as f64,
+                            target.0.z as f64 + 0.5,
+                        ),
+                        self.speed,
+                    ));
+                });
             }
         }
     }

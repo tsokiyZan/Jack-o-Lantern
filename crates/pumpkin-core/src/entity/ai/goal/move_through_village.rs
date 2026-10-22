@@ -67,12 +67,14 @@ impl MoveThroughVillageGoal {
     /// Vanilla `createPath` with `setCanOpenDoors(canDealWithDoors)` around it, which leaves
     /// the navigation able to open doors afterwards.
     fn create_path_with_doors(&self, mob: &dyn Mob, destination: Vector3<f64>) -> Option<Path> {
-        let mob_entity = mob.get_mob_entity();
-        let mut navigator = mob_entity.own_navigation();
-        navigator.set_can_open_doors((self.can_deal_with_doors)(mob));
-        let path = navigator.create_path(&mob_entity.living_entity, destination, 0);
-        navigator.set_can_open_doors(true);
-        path
+        // Evaluated before taking the navigation lock: the predicate may read the mob.
+        let can_deal_with_doors = (self.can_deal_with_doors)(mob);
+        mob.get_mob_entity().with_navigation(|navigation, owner| {
+            navigation.set_can_open_doors(can_deal_with_doors);
+            let path = navigation.create_path(&owner.living_entity, destination, 0);
+            navigation.set_can_open_doors(true);
+            path
+        })
     }
 }
 
@@ -83,7 +85,7 @@ fn block_corner(pos: BlockPos) -> Vector3<f64> {
 impl Goal for MoveThroughVillageGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
         let mob_entity = mob.get_mob_entity();
-        if !mob_entity.own_navigation().can_navigate_ground() {
+        if !mob_entity.with_navigation(|navigation, _| navigation.can_navigate_ground()) {
             return false;
         }
 
@@ -158,11 +160,9 @@ impl Goal for MoveThroughVillageGoal {
                 .map(|node| node.pos)
         });
         if let Some(node_pos) = door_node {
-            self.path = mob_entity.own_navigation().create_path(
-                &mob_entity.living_entity,
-                block_corner(node_pos),
-                0,
-            );
+            self.path = mob_entity.with_navigation(|navigation, owner| {
+                navigation.create_path(&owner.living_entity, block_corner(node_pos), 0)
+            });
         }
 
         self.path.is_some()
@@ -170,7 +170,7 @@ impl Goal for MoveThroughVillageGoal {
 
     fn should_continue(&mut self, mob: &dyn Mob) -> bool {
         let mob_entity = mob.get_mob_entity();
-        if mob_entity.own_navigation().is_done() {
+        if mob_entity.with_navigation(|navigation, _| navigation.is_done()) {
             return false;
         }
         let entity = &mob_entity.living_entity.entity;
@@ -183,16 +183,14 @@ impl Goal for MoveThroughVillageGoal {
 
     fn start(&mut self, mob: &dyn Mob) {
         let mob_entity = mob.get_mob_entity();
-        mob_entity.own_navigation().move_to_path(
-            self.path.take(),
-            self.speed_modifier,
-            &mob_entity.living_entity,
-        );
+        mob_entity.with_navigation(|navigation, owner| {
+            navigation.move_to_path(self.path.take(), self.speed_modifier, &owner.living_entity);
+        });
     }
 
     fn stop(&mut self, mob: &dyn Mob) {
         let mob_entity = mob.get_mob_entity();
-        let is_done = mob_entity.own_navigation().is_done();
+        let is_done = mob_entity.with_navigation(|navigation, _| navigation.is_done());
         if is_done
             || Self::closer_to_center_than(
                 &self.poi_pos,

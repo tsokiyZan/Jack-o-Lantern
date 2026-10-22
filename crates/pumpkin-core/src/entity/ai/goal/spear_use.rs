@@ -101,7 +101,7 @@ impl Goal for SpearUseGoal {
 
     fn stop(&mut self, mob: &dyn Mob) {
         let mob_entity = mob.get_mob_entity();
-        mob_entity.own_navigation().stop();
+        mob_entity.with_navigation(|navigation, _| navigation.stop());
         mob_entity.set_attacking(false);
         self.state = None;
         mob_entity.living_entity.clear_active_hand();
@@ -133,14 +133,15 @@ impl Goal for SpearUseGoal {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .look_at_entity_with_range(&target, 30.0, 30.0);
 
-        let navigator = || mob_entity.own_navigation();
         if state.not_engaged_yet() {
             if target_dist_sqr > f64::from(self.approach_distance_sq) {
-                navigator().move_to_entity(
-                    target_living,
-                    f64::from(speed_modifier) * self.speed_modifier_when_repositioning,
-                    living,
-                );
+                mob_entity.with_navigation(|navigation, owner| {
+                    navigation.move_to_entity(
+                        target_living,
+                        f64::from(speed_modifier) * self.speed_modifier_when_repositioning,
+                        &owner.living_entity,
+                    );
+                });
                 return;
             }
 
@@ -165,17 +166,16 @@ impl Goal for SpearUseGoal {
             return;
         }
         if let Some(away_pos) = state.away_pos {
-            let is_done = {
-                let mut navigator = navigator();
-                navigator.move_to_coords(
+            let is_done = mob_entity.with_navigation(|navigation, owner| {
+                navigation.move_to_coords(
                     away_pos.x,
                     away_pos.y,
                     away_pos.z,
                     f64::from(speed_modifier) * self.speed_modifier_when_repositioning,
-                    living,
+                    &owner.living_entity,
                 );
-                navigator.is_done()
-            };
+                navigation.is_done()
+            });
             if is_done {
                 if state.fleeing_time > 0 {
                     state.done = true;
@@ -184,15 +184,14 @@ impl Goal for SpearUseGoal {
                 state.away_pos = None;
             }
         } else {
-            let is_done = {
-                let mut navigator = navigator();
-                navigator.move_to_entity(
+            let is_done = mob_entity.with_navigation(|navigation, owner| {
+                navigation.move_to_entity(
                     target_living,
                     f64::from(speed_modifier) * self.speed_modifier_when_charging,
-                    living,
+                    &owner.living_entity,
                 );
-                navigator.is_done()
-            };
+                navigation.is_done()
+            });
             if target_dist_sqr < f64::from(self.target_in_range_radius_sq) || is_done {
                 let distance = target_dist_sqr.sqrt();
                 state.away_pos = land_random_pos::get_pos_away_between(

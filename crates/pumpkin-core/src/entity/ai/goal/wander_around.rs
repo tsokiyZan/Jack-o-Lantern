@@ -198,16 +198,17 @@ impl Goal for WanderAroundGoal {
 
     fn start(&mut self, mob: &dyn Mob) {
         if let Some(target) = self.target {
-            let pos = mob.get_mob_entity().living_entity.entity.pos.load();
-            mob.get_mob_entity()
-                .own_navigation()
-                .set_progress(NavigatorGoal::new(pos, target, self.speed));
+            mob.get_mob_entity().with_navigation(|navigation, owner| {
+                let owner_pos = owner.living_entity.entity.pos.load();
+                navigation.set_progress(NavigatorGoal::new(owner_pos, target, self.speed));
+            });
         }
     }
 
     fn stop(&mut self, mob: &dyn Mob) {
         self.target = None;
-        mob.get_mob_entity().own_navigation().stop();
+        mob.get_mob_entity()
+            .with_navigation(|navigation, _| navigation.stop());
     }
 
     fn controls(&self) -> Controls {

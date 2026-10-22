@@ -238,13 +238,13 @@ impl Goal for BreedGoal {
             .look_at_entity_with_range(mate, 10.0, mob.get_max_look_pitch_change());
 
         let living = &mob_entity.living_entity;
-        {
-            let mut navigator = mob_entity.own_navigation();
+        mob_entity.with_navigation(|navigation, owner| {
+            let owner = &owner.living_entity;
             // Vanilla `moveTo(partner, speed)` paths with a reach of 1.
-            if let Some(path) = navigator.create_path(living, mate.get_entity().pos.load(), 1) {
-                navigator.move_to_path(Some(path), self.speed, living);
+            if let Some(path) = navigation.create_path(owner, mate.get_entity().pos.load(), 1) {
+                navigation.move_to_path(Some(path), self.speed, owner);
             }
-        }
+        });
 
         self.timer += 1;
         let dist_sq = living

@@ -82,12 +82,14 @@ impl Goal for TryFindWaterGoal {
         }
 
         if let Some(pos) = water_pos {
-            mob.get_mob_entity().own_move_control().set_wanted_position(
-                f64::from(pos.0.x),
-                f64::from(pos.0.y),
-                f64::from(pos.0.z),
-                1.0,
-            );
+            mob.get_mob_entity().with_move_control(|control| {
+                control.set_wanted_position(
+                    f64::from(pos.0.x),
+                    f64::from(pos.0.y),
+                    f64::from(pos.0.z),
+                    1.0,
+                );
+            });
         }
     }
 

@@ -148,13 +148,13 @@ impl Goal for PathfindToRaidGoal {
                 raid_center,
                 f64::from(std::f32::consts::FRAC_PI_2),
             ) {
-                mob.get_mob_entity()
-                    .own_navigation()
-                    .set_progress(NavigatorGoal::new(
-                        mob.get_entity().pos.load(),
+                mob.get_mob_entity().with_navigation(|navigation, owner| {
+                    navigation.set_progress(NavigatorGoal::new(
+                        owner.living_entity.entity.pos.load(),
                         dest,
                         self.speed_modifier,
                     ));
+                });
             }
         }
     }

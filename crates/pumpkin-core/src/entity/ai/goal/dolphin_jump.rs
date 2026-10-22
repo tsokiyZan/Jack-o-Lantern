@@ -94,7 +94,8 @@ impl Goal for DolphinJumpGoal {
             velocity.y + 0.7,
             velocity.z + f64::from(step_z) * 0.6,
         ));
-        mob.get_mob_entity().own_navigation().stop();
+        mob.get_mob_entity()
+            .with_navigation(|navigation, _| navigation.stop());
     }
 
     fn stop(&mut self, mob: &dyn Mob) {

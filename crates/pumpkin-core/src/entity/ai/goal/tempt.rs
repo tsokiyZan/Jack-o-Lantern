@@ -190,9 +190,11 @@ impl TemptGoal {
         if let Some(navigation) = &self.navigation {
             (navigation.stop)(mob);
         } else if self.non_pathfinder {
-            mob_entity.own_move_control().set_wait();
+            mob_entity.with_move_control(|control| {
+                control.set_wait();
+            });
         } else {
-            mob_entity.own_navigation().stop();
+            mob_entity.with_navigation(|navigation, _| navigation.stop());
         }
     }
 
@@ -207,13 +209,14 @@ impl TemptGoal {
         } else if self.non_pathfinder {
             let eye = Vector3::new(player_pos.x, player.get_entity().get_eye_y(), player_pos.z);
             let target = (eye - mob_pos) * mob.get_entity().random().next_f64() + mob_pos;
-            mob_entity
-                .own_move_control()
-                .set_wanted_position(target.x, target.y, target.z, self.speed);
+            mob_entity.with_move_control(|control| {
+                control.set_wanted_position(target.x, target.y, target.z, self.speed);
+            });
         } else {
-            mob_entity
-                .own_navigation()
-                .set_progress(NavigatorGoal::new(mob_pos, player_pos, self.speed));
+            mob_entity.with_navigation(|navigation, owner| {
+                let owner_pos = owner.living_entity.entity.pos.load();
+                navigation.set_progress(NavigatorGoal::new(owner_pos, player_pos, self.speed));
+            });
         }
     }
 

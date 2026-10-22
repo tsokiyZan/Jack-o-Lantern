@@ -44,7 +44,8 @@ impl Goal for CreeperIgniteGoal {
     }
 
     fn start(&mut self, mob: &dyn Mob) {
-        mob.get_mob_entity().own_navigation().stop();
+        mob.get_mob_entity()
+            .with_navigation(|navigation, _| navigation.stop());
         self.target = mob.get_target();
     }
 

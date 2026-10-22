@@ -219,12 +219,14 @@ impl LongJumpToRandomPos {
                 Arc::new(BlockPosTracker::new(target_pos)) as Arc<dyn PositionTracker>,
             );
             let mob_entity = tick.mob.get_mob_entity();
-            let path = mob_entity.own_navigation().create_path_within(
-                &mob_entity.living_entity,
-                target_pos.to_centered_f64(),
-                0,
-                MIN_PATHFIND_DISTANCE_TO_VALID_JUMP,
-            );
+            let path = mob_entity.with_navigation(|navigation, owner| {
+                navigation.create_path_within(
+                    &owner.living_entity,
+                    target_pos.to_centered_f64(),
+                    0,
+                    MIN_PATHFIND_DISTANCE_TO_VALID_JUMP,
+                )
+            });
             if path.is_none_or(|path| !path.can_reach()) {
                 self.chosen_jump = Some(jump_vector);
                 self.prepare_jump_start = tick.time;

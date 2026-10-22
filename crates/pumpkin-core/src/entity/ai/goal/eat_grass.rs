@@ -68,8 +68,8 @@ impl Goal for EatGrassGoal {
             .world
             .load()
             .send_entity_status(entity, EntityStatus::EatGrass, None);
-        let mut navigator = mob.get_mob_entity().own_navigation();
-        navigator.stop();
+        mob.get_mob_entity()
+            .with_navigation(|navigation, _| navigation.stop());
     }
 
     fn tick(&mut self, mob: &dyn Mob) {

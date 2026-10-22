@@ -155,19 +155,19 @@ impl Goal for BowAttackGoal {
             self.see_time -= 1;
         }
 
-        {
-            let mut navigator = mob_entity.own_navigation();
+        mob_entity.with_navigation(|navigation, owner| {
+            let owner = &owner.living_entity;
             if target_dist_sqr <= f64::from(self.attack_radius_sqr) && self.see_time >= 20 {
-                navigator.stop();
+                navigation.stop();
                 self.strafing_time += 1;
             } else {
                 // Vanilla `moveTo(Entity, speed)` keeps the old path when none is found.
-                if let Some(path) = navigator.create_path(living, target_pos, 1) {
-                    navigator.move_to_path(Some(path), self.speed_modifier, living);
+                if let Some(path) = navigation.create_path(owner, target_pos, 1) {
+                    navigation.move_to_path(Some(path), self.speed_modifier, owner);
                 }
                 self.strafing_time = -1;
             }
-        }
+        });
 
         if self.strafing_time >= 20 {
             if mob.get_entity().random().next_f32() < 0.3 {
@@ -185,10 +185,12 @@ impl Goal for BowAttackGoal {
             } else if target_dist_sqr < f64::from(self.attack_radius_sqr * 0.25) {
                 self.strafing_backwards = true;
             }
-            mob_entity.own_move_control().strafe(
-                if self.strafing_backwards { -0.5 } else { 0.5 },
-                if self.strafing_clockwise { 0.5 } else { -0.5 },
-            );
+            mob_entity.with_move_control(|control| {
+                control.strafe(
+                    if self.strafing_backwards { -0.5 } else { 0.5 },
+                    if self.strafing_clockwise { 0.5 } else { -0.5 },
+                );
+            });
             // `getControlledVehicle`: the vehicle this mob steers.
             if let Some(vehicle) = living.entity.get_controlled_vehicle()
                 && let Some(vehicle) = vehicle.get_mob()

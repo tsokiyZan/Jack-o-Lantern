@@ -52,8 +52,8 @@ impl Goal for ChasePlayerGoal {
     }
 
     fn start(&mut self, mob: &dyn Mob) {
-        let mut navigator = mob.get_mob_entity().own_navigation();
-        navigator.stop();
+        mob.get_mob_entity()
+            .with_navigation(|navigation, _| navigation.stop());
     }
 
     fn tick(&mut self, mob: &dyn Mob) {

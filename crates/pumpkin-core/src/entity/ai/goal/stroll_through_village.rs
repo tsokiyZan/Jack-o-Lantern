@@ -42,12 +42,12 @@ impl StrollThroughVillageGoal {
     /// Vanilla `navigation.moveTo(x, y, z, 1.0)` on a block position, returning whether
     /// a path was found.
     fn move_to(mob: &dyn Mob, pos: BlockPos) -> bool {
-        let mob_entity = mob.get_mob_entity();
-        let living = &mob_entity.living_entity;
-        let mut navigator = mob_entity.own_navigation();
-        navigator
-            .create_path(living, pos.to_f64(), 1)
-            .is_some_and(|path| navigator.move_to_path(Some(path), 1.0, living))
+        mob.get_mob_entity().with_navigation(|navigation, owner| {
+            let owner = &owner.living_entity;
+            navigation
+                .create_path(owner, pos.to_f64(), 1)
+                .is_some_and(|path| navigation.move_to_path(Some(path), 1.0, owner))
+        })
     }
 
     /// Vanilla `moveRandomly`.
@@ -92,8 +92,9 @@ impl Goal for StrollThroughVillageGoal {
         let Some(wanted_pos) = self.wanted_pos else {
             return false;
         };
-        let navigator = mob.get_mob_entity().own_navigation();
-        !navigator.is_done() && navigator.get_target_pos() == Some(wanted_pos)
+        mob.get_mob_entity().with_navigation(|navigation, _| {
+            !navigation.is_done() && navigation.get_target_pos() == Some(wanted_pos)
+        })
     }
 
     fn tick(&mut self, mob: &dyn Mob) {

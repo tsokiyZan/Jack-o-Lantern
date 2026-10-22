@@ -134,7 +134,8 @@ impl Goal for AvoidEntityGoal {
     }
 
     fn should_continue(&mut self, mob: &dyn Mob) -> bool {
-        self.gate.is_none_or(|gate| gate(mob)) && !mob.is_navigator_idle()
+        // Vanilla reads the `pathNav` it cached at construction: the mob's own navigation.
+        self.gate.is_none_or(|gate| gate(mob)) && !mob.get_mob_entity().own_navigation().is_idle()
     }
 
     fn start(&mut self, mob: &dyn Mob) {
@@ -159,7 +160,7 @@ impl Goal for AvoidEntityGoal {
         } else {
             self.walk_speed_modifier
         };
-        mob_entity.own_navigation().set_speed(speed);
+        mob_entity.with_navigation(|navigation, _| navigation.set_speed(speed));
     }
 
     fn stop(&mut self, _mob: &dyn Mob) {

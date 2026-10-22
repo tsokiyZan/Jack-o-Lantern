@@ -121,8 +121,7 @@ pub fn is_restricted(restrict: bool, mob: &dyn Mob, pos: &BlockPos) -> bool {
 #[must_use]
 pub fn is_not_stable(mob: &dyn Mob, world: &World, pos: &BlockPos) -> bool {
     !mob.get_mob_entity()
-        .own_navigation()
-        .is_stable_destination(world, pos)
+        .with_navigation(|navigation, _| navigation.is_stable_destination(world, pos))
 }
 
 #[must_use]
@@ -136,7 +135,10 @@ pub fn is_water(world: &World, pos: &BlockPos) -> bool {
 }
 
 /// Vanilla `GoalUtils.hasMalus`, typed by `WalkNodeEvaluator.getPathTypeStatic`.
-/// Takes the navigation lock, so callers must not already hold it.
+///
+/// Takes the navigation lock (the vehicle's, while the mob inherits its malus), so callers
+/// must not already hold it: never call this inside a `with_navigation` closure. Check malus
+/// before entering the closure.
 #[must_use]
 pub fn has_malus(mob: &dyn Mob, context: &mut PathfindingContext, pos: &BlockPos) -> bool {
     let path_type = context.get_land_node_type(Vector3::new(pos.0.x, pos.0.y, pos.0.z));

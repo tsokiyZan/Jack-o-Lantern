@@ -167,7 +167,7 @@ impl LookControl {
                 ));
             }
         } else {
-            let navigation_done = mob_entity.own_navigation().is_done();
+            let navigation_done = mob_entity.with_navigation(|navigation, _| navigation.is_done());
             if navigation_done {
                 entity.set_pitch(self.change_angle(entity.pitch.load(), 0.0, 5.0));
             }
@@ -188,7 +188,7 @@ impl LookControl {
 
     fn clamp_head_yaw(mob: &dyn Mob) {
         let mob_entity = mob.get_mob_entity();
-        if mob_entity.own_navigation().is_in_progress() {
+        if mob_entity.with_navigation(|navigation, _| navigation.is_in_progress()) {
             let entity = &mob_entity.living_entity.entity;
             let max_head_rotation = mob.get_max_head_rotation();
             entity.head_yaw.store(clamp_angle(

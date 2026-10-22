@@ -64,25 +64,25 @@ impl DoorInteractGoal {
             return false;
         }
 
-        let navigator = mob.get_mob_entity().own_navigation();
-
-        let Some(path) = navigator.get_path() else {
+        // The nodes up to two past the next one, read from `getNavigation().getPath()`.
+        let node_positions = mob.get_mob_entity().with_navigation(|navigation, _| {
+            let path = navigation.get_path().filter(|path| !path.is_done())?;
+            let limit = (path.get_next_node_index() + 2).min(path.get_node_count());
+            Some(
+                (0..limit)
+                    .filter_map(|i| path.get_node(i).map(|node| node.pos))
+                    .collect::<Vec<_>>(),
+            )
+        });
+        let Some(node_positions) = node_positions else {
             return false;
         };
 
-        if path.is_done() {
-            return false;
-        }
-
         let world = mob.get_entity().world.load();
         let mob_pos = mob.get_entity().pos.load();
-        let limit = (path.get_next_node_index() + 2).min(path.get_node_count());
 
-        for i in 0..limit {
-            let Some(node) = path.get_node(i) else {
-                continue;
-            };
-            let door_pos = BlockPos::new(node.pos.0.x, node.pos.0.y + 1, node.pos.0.z);
+        for node_pos in node_positions {
+            let door_pos = BlockPos::new(node_pos.0.x, node_pos.0.y + 1, node_pos.0.z);
             let dx = mob_pos.x - f64::from(door_pos.0.x);
             let dz = mob_pos.z - f64::from(door_pos.0.z);
             let dist_sqr = dx * dx + dz * dz;

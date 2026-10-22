@@ -150,14 +150,16 @@ impl Goal for WaterAvoidingRandomFlyingGoal {
 
     fn start(&mut self, mob: &dyn Mob) {
         if let Some(target) = self.target {
-            let mob_pos = mob.get_entity().pos.load();
-            let mut navigator = mob.get_mob_entity().own_navigation();
-            navigator.set_progress(NavigatorGoal::new(mob_pos, target, self.speed));
+            mob.get_mob_entity().with_navigation(|navigation, owner| {
+                let owner_pos = owner.living_entity.entity.pos.load();
+                navigation.set_progress(NavigatorGoal::new(owner_pos, target, self.speed));
+            });
         }
     }
 
     fn stop(&mut self, mob: &dyn Mob) {
-        mob.get_mob_entity().own_navigation().stop();
+        mob.get_mob_entity()
+            .with_navigation(|navigation, _| navigation.stop());
         self.target = None;
     }
 

@@ -127,8 +127,9 @@ impl PrepareRamNearestTarget {
         let mob_entity = body.get_mob_entity();
         possible_ram_positions.into_iter().find(|pos| {
             mob_entity
-                .own_navigation()
-                .create_path(&mob_entity.living_entity, pos.to_f64(), 0)
+                .with_navigation(|navigation, owner| {
+                    navigation.create_path(&owner.living_entity, pos.to_f64(), 0)
+                })
                 .is_some_and(|path| path.can_reach())
         })
     }
@@ -222,7 +223,9 @@ impl Behavior for PrepareRamNearestTarget {
         if did_target_move {
             tick.world
                 .send_entity_status(tick.mob.get_entity(), EntityStatus::EndRam, None);
-            tick.mob.get_mob_entity().own_navigation().stop();
+            tick.mob
+                .get_mob_entity()
+                .with_navigation(|navigation, _| navigation.stop());
             let target = Arc::clone(&candidate.target);
             self.choose_ram_position(tick.mob, target);
             return;
