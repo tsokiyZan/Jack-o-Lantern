@@ -3313,10 +3313,8 @@ impl LivingEntity {
         );
         let mut touched = Vec::new();
         self.stop_location_based_effects(broken, slot, &mut touched);
-        // Synced with the dirty attributes, like `detect_equipment_updates`.
-        if !touched.is_empty() {
-            crate::entity::attributes::send_attribute_updates_for_living(self, touched);
-        }
+        // Synced with the other dirty attributes (`sendDirtyEntityData`).
+        self.mark_attributes_dirty(&touched);
     }
 
     /// Vanilla `LivingEntity.getItemBySlot`; a player's main hand is its selected hotbar slot.
@@ -5961,6 +5959,28 @@ mod tests {
         );
         living.detect_equipment_updates(zombie.as_ref());
         assert_eq!(living.get_attribute_value(&Attributes::ARMOR), armor);
+    }
+
+    /// `onEquippedItemBroken` only dirties the attributes; they sync with the next
+    /// `sendDirtyEntityData`, not at once.
+    #[tokio::test]
+    async fn broken_item_leaves_its_attributes_for_the_next_sync() {
+        let (_folder, world) = test_world();
+        let zombie = spawn(&world, &EntityType::ZOMBIE);
+        let living = zombie.get_living_entity().unwrap();
+        let helmet = ItemStack::new(1, &Item::IRON_HELMET);
+        put(zombie.as_ref(), &EquipmentSlot::HEAD, helmet.clone());
+        living.detect_equipment_updates(zombie.as_ref());
+        assert!(living.pending_dirty_attributes.lock().unwrap().is_empty());
+
+        living.on_equipped_item_broken(&helmet, &EquipmentSlot::HEAD);
+        assert!(
+            living
+                .pending_dirty_attributes
+                .lock()
+                .unwrap()
+                .contains(&Attributes::ARMOR)
+        );
     }
 
     #[tokio::test]
