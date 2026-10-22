@@ -1429,8 +1429,10 @@ impl World {
             speed,
             randomization,
         };
+        // `player.blockPosition().closerToCenterThan(pos, 32)`.
         for player in self.players.load().iter() {
-            if player.position().squared_distance_to_vec(&position) < 32.0 * 32.0 {
+            let block_center = player.get_entity().block_pos.load().to_centered_f64();
+            if block_center.squared_distance_to_vec(&position) < 32.0 * 32.0 {
                 player.try_send_client_packet(&packet);
             }
         }
