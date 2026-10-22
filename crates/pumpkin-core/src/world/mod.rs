@@ -7491,6 +7491,46 @@ impl World {
         pumpkin_world::clip::clip(self, context)
     }
 
+    /// Vanilla `CollisionGetter.clipIncludingBorder`: a ray from inside the world border that
+    /// ends outside it hits the border instead, where it crosses it (clamped), facing
+    /// `Direction.getApproximateNearest` of the ray.
+    pub fn clip_including_border(
+        &self,
+        context: &pumpkin_world::clip::ClipContext,
+    ) -> pumpkin_world::clip::BlockHitResult {
+        let hit = self.clip(context);
+        let border = self
+            .worldborder
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let from = context.from;
+        if !border.contains(from.x, from.z) || border.contains(hit.location.x, hit.location.z) {
+            return hit;
+        }
+        let delta = hit.location.sub(&from);
+        // `getApproximateNearest(float, float, float)`: the first direction with the largest
+        // positive dot product, else north.
+        let (dx, dy, dz) = (delta.x as f32, delta.y as f32, delta.z as f32);
+        let mut direction = BlockDirection::North;
+        let mut highest_dot = f32::from_bits(1); // `Float.MIN_VALUE`
+        for candidate in BlockDirection::all() {
+            let normal = candidate.to_offset();
+            let dot = dx * normal.x as f32 + dy * normal.y as f32 + dz * normal.z as f32;
+            if dot > highest_dot {
+                highest_dot = dot;
+                direction = candidate;
+            }
+        }
+        let location = border.clamp_vec3_to_bound(hit.location.x, hit.location.y, hit.location.z);
+        pumpkin_world::clip::BlockHitResult {
+            location,
+            direction,
+            block_pos: BlockPos::containing_vec(location),
+            is_miss: false,
+            is_inside: false,
+        }
+    }
+
     pub fn ray_trace_block(
         &self,
         start_pos: Vector3<f64>,

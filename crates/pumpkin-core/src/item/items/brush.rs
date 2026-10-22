@@ -133,7 +133,7 @@ impl BrushItem {
         let from = player.eye_position();
         let mut to = from.add(&delta);
         let world = player.world();
-        let hit = world.clip(&pumpkin_world::clip::ClipContext::new(
+        let hit = world.clip_including_border(&pumpkin_world::clip::ClipContext::new(
             from,
             to,
             pumpkin_world::clip::ClipBlock::Collider,
