@@ -218,6 +218,13 @@ impl BedrockClient {
             PlayerAction::DropItem => {
                 player.drop_held_item(false);
             }
+            // After the End credits (`wonGame`), the player comes back keeping everything.
+            PlayerAction::Respawn if player.won_game.swap(false, Ordering::SeqCst) => {
+                let player_c = player.clone();
+                player.spawn_task(async move {
+                    player_c.world().respawn_player(&player_c, true).await;
+                });
+            }
             PlayerAction::Respawn
                 if player.living_entity.dead.load(Ordering::Relaxed)
                     || player.living_entity.health.load() <= 0.0 =>

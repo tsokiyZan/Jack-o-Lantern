@@ -598,6 +598,9 @@ pub struct Player {
     pub fishing_bobber: AtomicI32,
     pub bedrock_skin: arc_swap::ArcSwap<pumpkin_protocol::bedrock::client::Skin>,
     pub seen_credits: AtomicBool,
+    /// Vanilla `ServerPlayer.wonGame` (not saved): the End credits are rolling, and the
+    /// player is out of its level until the client asks to respawn.
+    pub won_game: AtomicBool,
     pub warden_spawn_tracker: std::sync::Mutex<WardenSpawnTracker>,
     pub score: AtomicI32,
     pub spawn_extra_particles_on_fall: AtomicBool,
@@ -907,6 +910,7 @@ impl Player {
             fishing_bobber: AtomicI32::new(-1),
             bedrock_skin: ArcSwap::new(Arc::new(bedrock_skin)),
             seen_credits: AtomicBool::new(false),
+            won_game: AtomicBool::new(false),
             warden_spawn_tracker: std::sync::Mutex::new(WardenSpawnTracker::default()),
             score: AtomicI32::new(0),
             spawn_extra_particles_on_fall: AtomicBool::new(false),
@@ -1396,9 +1400,10 @@ impl Player {
             return;
         }
 
+        // Vanilla `loadAndSpawnParentVehicle`: `startRiding(vehicle, true, false)`, no game event.
         vehicle
             .get_entity()
-            .add_passenger(vehicle.clone(), self.clone());
+            .add_passenger_without_event(vehicle.clone(), self.clone());
     }
 
     pub fn clean_up_chunk_tickets(&self, level: &Arc<pumpkin_world::level::Level>) {
@@ -2285,7 +2290,13 @@ impl Player {
     /// # Note
     /// This function does NOT send any packets. The caller is responsible for
     /// sending `NoRespawnBlockAvailable` if this returns `None`.
-    pub async fn calculate_respawn_point(&self) -> Option<CalculatedRespawnPoint> {
+    ///
+    /// `consume_spawn_block`: a respawn anchor used loses a charge (vanilla
+    /// `findRespawnAndUseSpawnBlock`'s flag; an End exit portal passes false).
+    pub async fn calculate_respawn_point(
+        &self,
+        consume_spawn_block: bool,
+    ) -> Option<CalculatedRespawnPoint> {
         type BedProperties = pumpkin_data::block_properties::WhiteBedLikeProperties;
         type AnchorProperties = pumpkin_data::block_properties::RespawnAnchorLikeProperties;
 
@@ -2381,15 +2392,15 @@ impl Player {
 
             // Try positions around the anchor
             if let Some(spawn_pos) = Self::find_anchor_spawn_position(&world, pos) {
-                // Decrement charges after successful respawn position found
-                let new_charges = charges - 1;
-                let mut new_props = anchor_props;
-                new_props.charges = new_charges;
-                world.set_block_state(
-                    pos,
-                    new_props.to_state_id(block),
-                    pumpkin_world::world::BlockFlags::NOTIFY_ALL,
-                );
+                if consume_spawn_block {
+                    let mut new_props = anchor_props;
+                    new_props.charges = charges - 1;
+                    world.set_block_state(
+                        pos,
+                        new_props.to_state_id(block),
+                        pumpkin_world::world::BlockFlags::NOTIFY_ALL,
+                    );
+                }
 
                 return Some(CalculatedRespawnPoint {
                     position: spawn_pos,
@@ -2402,6 +2413,69 @@ impl Player {
         }
 
         None
+    }
+
+    /// Vanilla `ServerPlayer.findRespawnPositionAndUseSpawnBlock`: the respawn block's
+    /// stand-up position, else the world spawn (`TeleportTransition.createDefault`, or
+    /// `missingRespawnBlock` when the player had a respawn point that no longer works).
+    pub async fn find_respawn_position_and_use_spawn_block(
+        &self,
+        consume_spawn_block: bool,
+    ) -> RespawnPosition {
+        if let Some(respawn) = self.calculate_respawn_point(consume_spawn_block).await {
+            return RespawnPosition {
+                position: respawn.position,
+                yaw: respawn.yaw,
+                pitch: respawn.pitch,
+                dimension: respawn.dimension,
+                missing_respawn_block: false,
+            };
+        }
+        let missing_respawn_block = self
+            .respawn_point
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .is_some();
+        let world = self.world();
+        let default_world = world
+            .server
+            .upgrade()
+            .map_or(world, |s| s.get_world_from_dimension(&Dimension::OVERWORLD));
+        let (spawn_x, spawn_y, spawn_z, spawn_yaw, spawn_pitch) = {
+            let info = default_world.level_info.load();
+            (
+                info.spawn_x,
+                info.spawn_y,
+                info.spawn_z,
+                info.spawn_yaw,
+                info.spawn_pitch,
+            )
+        };
+        // FIXME: This spawn position calculation is incorrect. Should use vanilla's
+        // proper spawn position calculation (see #1381). The y-level calculation
+        // needs to account for spawn radius and find a safe spawn position.
+        let chunk_pos = Vector2::new(spawn_x >> 4, spawn_z >> 4);
+        default_world
+            .level
+            .get_or_fetch_chunk(chunk_pos, |_| ())
+            .await;
+        let top = default_world.get_top_block(Vector2::new(spawn_x, spawn_z));
+        let pos_y = if top > default_world.dimension.min_y {
+            top + 1
+        } else {
+            spawn_y
+        };
+        RespawnPosition {
+            position: Vector3::new(
+                f64::from(spawn_x) + 0.5,
+                f64::from(pos_y),
+                f64::from(spawn_z) + 0.5,
+            ),
+            yaw: spawn_yaw,
+            pitch: spawn_pitch,
+            dimension: default_world.dimension.clone(),
+            missing_respawn_block,
+        }
     }
 
     /// Find a valid spawn position around a bed.
@@ -5173,6 +5247,45 @@ impl Player {
             vehicle
                 .get_entity()
                 .remove_passenger_before_teleport(self.entity_id());
+        }
+    }
+
+    /// Vanilla `Entity.unRide`: eject the passengers (last first), then leave the vehicle
+    /// (`stopRiding`).
+    pub fn un_ride(&self) {
+        let entity = &self.living_entity.entity;
+        entity.eject_passengers();
+        let vehicle = entity
+            .vehicle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        if let Some(vehicle) = vehicle {
+            vehicle.get_entity().remove_passenger(self.entity_id());
+        }
+    }
+
+    /// Vanilla `ServerPlayer.showEndCredits`: the player leaves its level
+    /// (`removePlayerImmediately(CHANGED_DIMENSION)`: no longer ticked by it nor tracked by
+    /// anyone, though still in the player list) and, the first time, the client rolls the
+    /// credits. It comes back when the client asks to respawn (`PERFORM_RESPAWN`).
+    pub fn show_end_credits(self: &Arc<Self>) {
+        self.un_ride();
+        // Set before the removal, so the tracker can't pair the player again in between.
+        let first = !self.won_game.swap(true, Ordering::SeqCst);
+        let world = self.world();
+        world
+            .entity_tracker
+            .remove_entity(self.as_ref() as &dyn EntityBase, &world);
+        if first {
+            self.try_enqueue_packet_editioned(
+                &CGameEvent::new(GameEvent::WinGame, 0.0),
+                &pumpkin_protocol::bedrock::client::CShowCredits {
+                    player_runtime_id: VarULong(self.entity_id() as u64),
+                    credits_state: VarInt(0),
+                },
+            );
+            self.seen_credits.store(true, Ordering::Relaxed);
         }
     }
 
@@ -8536,6 +8649,16 @@ impl Abilities {
             }
         }
     }
+}
+
+/// Where [`Player::find_respawn_position_and_use_spawn_block`] puts the player.
+pub struct RespawnPosition {
+    pub position: Vector3<f64>,
+    pub yaw: f32,
+    pub pitch: f32,
+    pub dimension: Dimension,
+    /// The player had a respawn point, and its block no longer works.
+    pub missing_respawn_block: bool,
 }
 
 /// Represents the player's stored respawn point (bed/anchor/forced).

@@ -1077,20 +1077,7 @@ pub trait EntityBase: Send + Sync + std::any::Any {
     /// Vanilla `Entity.canTeleport`: leaving the End, a player riding along must have seen
     /// the credits.
     fn can_teleport(&self, from: &World, to: &World) -> bool {
-        if from.dimension == Dimension::THE_END && to.dimension == Dimension::OVERWORLD {
-            return !self
-                .get_entity()
-                .passengers
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .iter()
-                .any(|passenger| {
-                    passenger
-                        .get_player()
-                        .is_some_and(|player| !player.seen_credits.load(Ordering::Relaxed))
-                });
-        }
-        true
+        self.get_entity().can_teleport_base(from, to)
     }
 
     /// Vanilla `Entity.getKnownMovement`: a player steering this entity knows its movement best.
@@ -3646,6 +3633,36 @@ impl Entity {
         let mut velo = self.velocity.load() * 0.75;
         velo.set_axis(direction.to_axis().into(), step * speed);
         self.velocity.store(velo);
+    }
+
+    /// Vanilla `Entity.ejectPassengers`: each passenger stops riding, the last first.
+    pub fn eject_passengers(&self) {
+        let passengers = self
+            .passengers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        for passenger in passengers.iter().rev() {
+            self.remove_passenger(passenger.get_entity().entity_id);
+        }
+    }
+
+    /// The base of vanilla `Entity.canTeleport` (`EntityBase::can_teleport`'s default), for
+    /// overrides that call `super`.
+    pub fn can_teleport_base(&self, from: &World, to: &World) -> bool {
+        if from.dimension == Dimension::THE_END && to.dimension == Dimension::OVERWORLD {
+            return !self
+                .passengers
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .iter()
+                .any(|passenger| {
+                    passenger
+                        .get_player()
+                        .is_some_and(|player| !player.seen_credits.load(Ordering::Relaxed))
+                });
+        }
+        true
     }
 
     /// Vanilla `Entity.handlePortal`: the destination is searched for, and the entity changes
@@ -6647,7 +6664,15 @@ pub fn teleport_to_portal_destination(
     {
         return;
     }
-    // Portals keep the entity's speed (`Relative.DELTA`).
+    // `ServerPlayer.teleport` first tells the player its respawn block is gone.
+    if transition.missing_respawn_block
+        && let Some(player) = entity.get_player()
+    {
+        player.try_send_client_packet(&pumpkin_protocol::java::client::play::CGameEvent::new(
+            pumpkin_protocol::java::client::play::GameEvent::NoRespawnBlockAvailable,
+            0.0,
+        ));
+    }
     teleport_transition(
         entity,
         &TeleportTarget {
@@ -6655,7 +6680,7 @@ pub fn teleport_to_portal_destination(
             position: transition.position,
             yaw: transition.yaw,
             pitch: transition.pitch,
-            keep_velocity: true,
+            keep_velocity: transition.keep_velocity,
             as_passenger: false,
         },
     );

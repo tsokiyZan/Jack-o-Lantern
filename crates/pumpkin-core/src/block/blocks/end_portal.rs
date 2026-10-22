@@ -13,7 +13,19 @@ pub struct EndPortalBlock;
 
 impl BlockBehaviour for EndPortalBlock {
     fn on_entity_collision(&self, args: OnEntityCollisionArgs<'_>) {
+        // Vanilla `EndPortalBlock.entityInside`.
         if !args.entity.can_use_portal(false) {
+            return;
+        }
+        if args.world.dimension == Dimension::THE_END
+            && let Some(player) = args.entity.get_player()
+            && !player
+                .seen_credits
+                .load(std::sync::atomic::Ordering::Relaxed)
+        {
+            if let Some(player) = args.world.get_player_by_id(player.entity_id()) {
+                player.show_end_credits();
+            }
             return;
         }
         let target_world =

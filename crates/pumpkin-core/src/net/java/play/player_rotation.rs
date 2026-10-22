@@ -17,6 +17,10 @@ impl JavaClient {
             ));
             return;
         }
+        // Vanilla `handleMovePlayer`: nothing moves while the End credits roll (`wonGame`).
+        if player.won_game.load(Ordering::Relaxed) {
+            return;
+        }
         let entity = &player.get_entity();
         // Vanilla `handleMovePlayer` for a packet without a position: no move, but the client's
         // flags (`setOnGroundWithMovement`) and the fall's end on the ground. While a teleport

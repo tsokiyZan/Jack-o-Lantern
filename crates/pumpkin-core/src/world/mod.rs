@@ -1817,6 +1817,7 @@ impl World {
     fn player_collision_cache(players: &[Arc<Player>]) -> Vec<PlayerCollisionEntry<'_>> {
         players
             .par_iter()
+            .filter(|player| !player.won_game.load(Ordering::Relaxed))
             .map(|player| {
                 let entity = player.get_entity();
                 let pos = entity.pos.load();
@@ -1858,6 +1859,12 @@ impl World {
         let player_handle = handle.clone();
         players.par_iter().for_each(|player| {
             let _guard = player_handle.enter();
+            // Out of the level while the End credits roll (`showEndCredits`): only its
+            // connection is served.
+            if player.won_game.load(Ordering::Relaxed) {
+                player.process_inbound_packets();
+                return;
+            }
             player.get_entity().common_tick();
             player.tick(server);
         });
@@ -1890,6 +1897,9 @@ impl World {
 
         players.par_iter().for_each(|player| {
             let _guard = player_handle.enter();
+            if player.won_game.load(Ordering::Relaxed) {
+                return;
+            }
             player.tick_server_travel();
             player.track_steered_vehicle();
         });
@@ -1942,6 +1952,12 @@ impl World {
         let player_handle = handle.clone();
         players.par_iter().for_each(|player| {
             let _guard = player_handle.enter();
+            // Out of the level while the End credits roll (`showEndCredits`): only its
+            // connection is served.
+            if player.won_game.load(Ordering::Relaxed) {
+                player.process_inbound_packets();
+                return;
+            }
             player.get_entity().common_tick();
             player.tick(server);
         });
@@ -2059,6 +2075,9 @@ impl World {
         // the level, so the travel sees this tick's hits and knockback before they are sent.
         players.par_iter().for_each(|player| {
             let _guard = player_handle.enter();
+            if player.won_game.load(Ordering::Relaxed) {
+                return;
+            }
             player.tick_server_travel();
             player.track_steered_vehicle();
         });
@@ -4411,82 +4430,41 @@ impl World {
         let data_kept = u8::from(alive);
 
         let server = self.server.upgrade();
-        let default_world = server.as_ref().map_or_else(
-            || self.clone(),
-            |s| s.get_world_from_dimension(&Dimension::OVERWORLD),
+        let keep_inventory = server.as_ref().map_or_else(
+            || self.level_info.load().game_rules.keep_inventory,
+            |s| {
+                s.get_world_from_dimension(&Dimension::OVERWORLD)
+                    .level_info
+                    .load()
+                    .game_rules
+                    .keep_inventory
+            },
         );
 
-        // Copy spawn info from default world level_info to avoid holding lock across await
-        let (spawn_x, spawn_y, spawn_z, spawn_yaw, spawn_pitch, keep_inventory) = {
-            let info = default_world.level_info.load();
-            (
-                info.spawn_x,
-                info.spawn_y,
-                info.spawn_z,
-                info.spawn_yaw,
-                info.spawn_pitch,
-                info.game_rules.keep_inventory,
-            )
-        };
-
-        // Get respawn position and dimension
-        let (position, yaw, pitch, respawn_dimension) = if let Some(respawn) =
-            player.calculate_respawn_point().await
-        {
-            (
-                respawn.position,
-                respawn.yaw,
-                respawn.pitch,
-                respawn.dimension,
-            )
-        } else {
-            // No valid respawn point - send notification if player had one set
-            if player
+        // Vanilla `PlayerList.respawn`: `findRespawnPositionAndUseSpawnBlock(!keepAllPlayerData)`.
+        let respawn = player
+            .find_respawn_position_and_use_spawn_block(!alive)
+            .await;
+        if respawn.missing_respawn_block {
+            player
+                .send_client_packet(&CGameEvent::new(GameEvent::NoRespawnBlockAvailable, 0.0))
+                .await;
+            let mut guard = player
                 .respawn_point
                 .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .is_some()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            if let Some(point) = guard.as_ref()
+                && !point.force
             {
-                player
-                    .send_client_packet(&CGameEvent::new(GameEvent::NoRespawnBlockAvailable, 0.0))
-                    .await;
-                let mut guard = player
-                    .respawn_point
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner);
-                if let Some(point) = guard.as_ref()
-                    && !point.force
-                {
-                    *guard = None;
-                }
+                *guard = None;
             }
-
-            // FIXME: This spawn position calculation is incorrect. Should use vanilla's
-            // proper spawn position calculation (see #1381). The y-level calculation
-            // needs to account for spawn radius and find a safe spawn position.
-            let chunk_pos = Vector2::new(spawn_x >> 4, spawn_z >> 4);
-            default_world
-                .level
-                .get_or_fetch_chunk(chunk_pos, |_| ())
-                .await;
-            let top = default_world.get_top_block(Vector2::new(spawn_x, spawn_z));
-            let pos_y = if top > default_world.dimension.min_y {
-                top + 1
-            } else {
-                spawn_y
-            };
-
-            (
-                Vector3::new(
-                    f64::from(spawn_x) + 0.5,
-                    f64::from(pos_y),
-                    f64::from(spawn_z) + 0.5,
-                ),
-                spawn_yaw,
-                spawn_pitch,
-                default_world.dimension.clone(),
-            )
-        };
+        }
+        let (position, yaw, pitch, respawn_dimension) = (
+            respawn.position,
+            respawn.yaw,
+            respawn.pitch,
+            respawn.dimension,
+        );
 
         let mut spawn_loc_event = crate::plugin::api::events::player::player_spawn_location::PlayerSpawnLocationEvent::new(
             player.clone(),
@@ -4650,15 +4628,21 @@ impl World {
             )
             .await;
 
-        player.living_entity.reset_state();
+        // Vanilla `restoreFrom(old, keepAllPlayerData)`: after the credits (`alive`) the player
+        // keeps its health, food, effects, inventory and experience.
+        if !alive {
+            player.living_entity.reset_state();
+        }
 
         player.send_permission_lvl_update();
 
-        player.hunger_manager.restart();
+        if !alive {
+            player.hunger_manager.restart();
 
-        if !keep_inventory {
-            player.set_experience(0, 0.0, 0);
-            player.inventory.clear();
+            if !keep_inventory {
+                player.set_experience(0, 0.0, 0);
+                player.inventory.clear();
+            }
         }
 
         // Set entity position BEFORE loading chunks, so chunks load at the right location

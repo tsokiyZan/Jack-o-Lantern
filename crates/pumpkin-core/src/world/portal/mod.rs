@@ -135,20 +135,58 @@ impl PortalType {
                             position: Vector3::new(100.5f64, y, 0.5f64),
                             yaw: Some(90.0f32),
                             pitch: None,
+                            keep_velocity: true,
+                            missing_respawn_block: false,
                         })
                     } else {
-                        // Leaving the End through the exit portal: return to overworld spawn.
-                        // The credits are the portal block's (`EndPortalBlock.entityInside`).
-                        let info = dest_world.level_info.load();
+                        // Leaving the End: to the level's respawn data (Pumpkin keeps the world
+                        // spawn in the Overworld), a player to its own respawn position. The
+                        // credits are the portal block's (`EndPortalBlock.entityInside`).
+                        if let Some(player) = caller.get_player() {
+                            let respawn = block_on_tick(
+                                player.find_respawn_position_and_use_spawn_block(false),
+                            );
+                            let server = current_level.server.upgrade()?;
+                            let new_world = server
+                                .worlds
+                                .load()
+                                .iter()
+                                .find(|world| world.dimension == respawn.dimension)
+                                .cloned()?;
+                            // `TeleportTransition.DO_NOTHING`, no relatives.
+                            return Some(TeleportTransition {
+                                new_world,
+                                position: respawn.position,
+                                yaw: Some(respawn.yaw),
+                                pitch: Some(respawn.pitch),
+                                keep_velocity: false,
+                                missing_respawn_block: respawn.missing_respawn_block,
+                            });
+                        }
+                        let (spawn_x, spawn_z, spawn_yaw, spawn_pitch) = {
+                            let info = dest_world.level_info.load();
+                            (info.spawn_x, info.spawn_z, info.spawn_yaw, info.spawn_pitch)
+                        };
+                        // `Entity.adjustSpawnLocation`: on top of the spawn column
+                        // (`MOTION_BLOCKING_NO_LEAVES`), then `atBottomCenterOf`.
+                        let top = block_on_tick(dest_world.get_heightmap_height_async(
+                            pumpkin_world::chunk::ChunkHeightmapType::MotionBlockingNoLeaves,
+                            spawn_x,
+                            spawn_z,
+                        ));
+                        let entity = caller.get_entity();
+                        // `Relative.ROTATION`: the respawn angles are added to the entity's.
                         Some(TeleportTransition {
                             new_world: dest_world,
                             position: Vector3::new(
-                                f64::from(info.spawn_x) + 0.5,
-                                f64::from(info.spawn_y),
-                                f64::from(info.spawn_z) + 0.5,
+                                f64::from(spawn_x) + 0.5,
+                                f64::from(top + 1),
+                                f64::from(spawn_z) + 0.5,
                             ),
-                            yaw: None,
-                            pitch: None,
+                            yaw: Some(entity.yaw.load() + spawn_yaw),
+                            pitch: Some(entity.pitch.load() + spawn_pitch),
+                            keep_velocity: true,
+                            missing_respawn_block: false,
                         })
                     }
                 } else {
@@ -242,6 +280,8 @@ impl PortalType {
                     position: final_pos,
                     yaw,
                     pitch: None,
+                    keep_velocity: true,
+                    missing_respawn_block: false,
                 })
             }
         }
@@ -253,6 +293,11 @@ pub struct TeleportTransition {
     pub position: Vector3<f64>,
     pub yaw: Option<f32>,
     pub pitch: Option<f32>,
+    /// `Relative.DELTA`: the entity keeps its speed.
+    pub keep_velocity: bool,
+    /// Vanilla `TeleportTransition.missingRespawnBlock`: the player is told its respawn
+    /// block no longer works.
+    pub missing_respawn_block: bool,
 }
 
 #[derive(Clone)]

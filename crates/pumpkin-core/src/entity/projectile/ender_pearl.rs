@@ -7,12 +7,14 @@ use crate::{
     server::Server,
 };
 use pumpkin_data::damage::DamageType;
+use pumpkin_data::dimension::Dimension;
 use pumpkin_data::entity::{EntityPose, EntityStatus};
 use pumpkin_data::particle::Particle;
 use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_protocol::bedrock::server::actor_event::ActorEventID;
 use pumpkin_util::math::vector3::Vector3;
 use pumpkin_util::random::RandomImpl;
+use std::sync::atomic::Ordering;
 
 const GRAVITY: f64 = 0.03;
 const PARTICLE_COUNT: i32 = 32;
@@ -38,10 +40,40 @@ impl EnderPearlEntity {
     }
 }
 
+impl EnderPearlEntity {
+    /// Vanilla `ThrownEnderpearl.isAllowedToTeleportOwner`: an owner in the pearl's level must
+    /// be alive (a living one also awake); one in another level must be able to use a portal.
+    fn is_allowed_to_teleport_owner(owner: &dyn EntityBase, level: &crate::world::World) -> bool {
+        let owner_entity = owner.get_entity();
+        if owner_entity.world.load().dimension == level.dimension {
+            owner_entity.is_alive()
+                && owner.get_living_entity().is_none_or(|living| {
+                    living.health.load() > 0.0 && owner_entity.pose.load() != EntityPose::Sleeping
+                })
+        } else {
+            owner.can_use_portal(true)
+        }
+    }
+}
+
 impl EntityBase for EnderPearlEntity {
     /// Vanilla `ThrowableProjectile.canUsePortal`.
     fn can_use_portal(&self, _ignore_passenger: bool) -> bool {
         true
+    }
+
+    /// Vanilla `ThrownEnderpearl.canTeleport`: out of the End, a player's pearl only goes once
+    /// its owner has seen the credits.
+    fn can_teleport(&self, from: &crate::world::World, to: &crate::world::World) -> bool {
+        let base = self.get_entity().can_teleport_base(from, to);
+        if from.dimension == Dimension::THE_END
+            && to.dimension == Dimension::OVERWORLD
+            && let Some(owner) = self.thrown.projectile.get_owner(&self.thrown.entity)
+            && let Some(player) = owner.get_player()
+        {
+            return base && player.seen_credits.load(Ordering::Relaxed);
+        }
+        base
     }
 
     fn get_projectile(&self) -> Option<&crate::entity::projectile::Projectile> {
@@ -117,10 +149,7 @@ impl EntityBase for EnderPearlEntity {
         }
 
         if let Some(owner) = owner
-            && owner.get_entity().is_alive()
-            && owner.get_living_entity().is_none_or(|living| {
-                living.health.load() > 0.0 && owner.get_entity().pose.load() != EntityPose::Sleeping
-            })
+            && Self::is_allowed_to_teleport_owner(owner.as_ref(), &world)
         {
             // Vanilla only spawns endermites behind, and hurts, a teleported player.
             let is_player = owner.get_player().is_some();
@@ -134,6 +163,14 @@ impl EntityBase for EnderPearlEntity {
                 );
                 let endermite = EndermiteEntity::new(entity);
                 world.spawn_entity(endermite);
+            }
+
+            // `if (isOnPortalCooldown()) owner.setPortalCooldown()`, for a player owner.
+            if is_player && entity.portal_cooldown.load(Ordering::Relaxed) > 0 {
+                owner
+                    .get_entity()
+                    .portal_cooldown
+                    .store(owner.dimension_changing_delay(), Ordering::Relaxed);
             }
 
             // In vanilla, teleport handles everything including sound

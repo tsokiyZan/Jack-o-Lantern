@@ -11,6 +11,7 @@ impl JavaClient {
         // before the client has loaded or while a teleport waits for its confirmation.
         let entity = &player.living_entity.entity;
         if player.has_client_loaded()
+            && !player.won_game.load(Ordering::Relaxed)
             && player
                 .awaiting_teleport
                 .lock()

@@ -457,8 +457,10 @@ impl TrackedEntity {
             .load()
             .is_within_distance(entity_chunk.x, entity_chunk.y);
 
-        // Vanilla `isChunkTracked`: never spawn before the chunk packet.
-        let is_visible = dist_sq <= range_sq
+        // Vanilla `isChunkTracked`: never spawn before the chunk packet. A player watching the
+        // End credits is out of the level (`removePlayerImmediately`) and tracks nothing.
+        let is_visible = !player.won_game.load(Relaxed)
+            && dist_sq <= range_sq
             && self.broadcast_to_player(player)
             && in_view
             && player

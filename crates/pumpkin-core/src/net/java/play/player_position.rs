@@ -138,6 +138,10 @@ impl JavaClient {
         // A movement packet was received this tick — tracked for SClientTickEnd zeroing.
         self.received_movement_this_tick
             .store(true, Ordering::Relaxed);
+        // Vanilla `handleMovePlayer`: nothing moves while the End credits roll (`wonGame`).
+        if player.won_game.load(Ordering::Relaxed) {
+            return;
+        }
         if player.get_entity().has_vehicle() {
             return;
         }
@@ -275,6 +279,10 @@ impl JavaClient {
         // A movement packet was received this tick — tracked for SClientTickEnd zeroing.
         self.received_movement_this_tick
             .store(true, Ordering::Relaxed);
+        // Vanilla `handleMovePlayer`: nothing moves while the End credits roll (`wonGame`).
+        if player.won_game.load(Ordering::Relaxed) {
+            return;
+        }
         if player.get_entity().has_vehicle() {
             return;
         }
