@@ -226,6 +226,15 @@ const BABY_DIMENSIONS: EntityDimensions =
     pumpkin_data::entity_dimensions::CAMEL_BABY_STANDING_DIMENSIONS;
 
 impl Mob for CamelEntity {
+    /// Vanilla `Camel.onElasticLeashPull`: `AbstractHorse`'s. Its stand-up of a sitting camel
+    /// has nothing to do, as Pumpkin's camel never sits.
+    fn on_elastic_leash_pull(&self, _caller: &dyn EntityBase) {
+        self.get_entity().check_fall_distance_accumulation();
+        if self.has_flag(FLAG_EATING) {
+            self.set_flag(FLAG_EATING, false);
+        }
+    }
+
     /// Vanilla `AbstractHorse.supportQuadLeash`.
     fn support_quad_leash(&self) -> bool {
         true

@@ -556,6 +556,10 @@ impl MoveControlTrait for DrownedMoveControl {
     fn has_wanted(&self) -> bool {
         self.base.has_wanted()
     }
+
+    fn set_wait(&mut self) {
+        self.base.set_wait();
+    }
 }
 
 /// Vanilla `Drowned.DrownedGoToWaterGoal`: by day, a drowned on land heads for water.

@@ -691,6 +691,10 @@ impl MoveControlTrait for RabbitMoveControl {
     fn has_wanted(&self) -> bool {
         MoveControlTrait::has_wanted(&self.move_control)
     }
+
+    fn set_wait(&mut self) {
+        self.move_control.set_wait();
+    }
 }
 
 /// `RabbitAvoidEntityGoal`: the killer bunny doesn't flee.

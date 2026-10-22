@@ -157,6 +157,10 @@ const BABY_DIMENSIONS: EntityDimensions = Entity::type_dimensions(&EntityType::M
     .scale(0.5);
 
 impl Mob for MuleEntity {
+    fn on_elastic_leash_pull(&self, _caller: &dyn EntityBase) {
+        self.horse_on_elastic_leash_pull();
+    }
+
     /// Vanilla `AbstractHorse.supportQuadLeash`.
     fn support_quad_leash(&self) -> bool {
         true

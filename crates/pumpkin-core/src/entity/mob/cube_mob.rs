@@ -902,6 +902,13 @@ impl MoveControlTrait for CubeMobMoveControl {
             mob_entity.set_speed(0.0);
         }
     }
+
+    /// Vanilla `MoveControl.setWait`: `wants_to_move` is this control's `MOVE_TO`.
+    fn set_wait(&mut self) {
+        if let Some(cube) = self.cube.upgrade() {
+            cube.wants_to_move.store(false, Relaxed);
+        }
+    }
 }
 
 /// Vanilla `CubeMobAttackGoal`.

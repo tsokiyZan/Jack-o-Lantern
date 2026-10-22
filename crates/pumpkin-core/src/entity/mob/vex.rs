@@ -344,6 +344,11 @@ impl MoveControlTrait for VexMoveControl {
     fn has_wanted(&self) -> bool {
         self.operation == Operation::MoveTo
     }
+
+    /// Vanilla `MoveControl.setWait`.
+    fn set_wait(&mut self) {
+        self.operation = Operation::Wait;
+    }
 }
 
 /// Vanilla `Vex.VexChargeAttackGoal`: dashes at the target's eyes and hits it on contact.

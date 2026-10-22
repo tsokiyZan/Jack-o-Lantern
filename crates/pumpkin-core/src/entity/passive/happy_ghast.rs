@@ -1,5 +1,6 @@
 use crate::entity::ai::brain::BrainTick;
 use crate::entity::ai::brain::{Brain, memory::PackedMemories};
+use crate::entity::ai::control::MoveControlTrait;
 use crate::entity::ai::control::flying_move_control::FlyingMoveControl;
 use crate::entity::ai::control::look_control::LookControl;
 use crate::entity::ai::pathfinder::{FlyingPathNavigation, Navigator};
@@ -315,6 +316,13 @@ impl Mob for HappyGhastEntity {
     /// Vanilla `HappyGhast.shouldStayCloseToLeashHolder`.
     fn should_stay_close_to_leash_holder(&self) -> bool {
         false
+    }
+
+    /// Vanilla `HappyGhast.onElasticLeashPull`: `Leashable`'s, then the move control waits.
+    fn on_elastic_leash_pull(&self, _caller: &dyn EntityBase) {
+        self.get_entity().check_fall_distance_accumulation();
+        self.get_mob_entity()
+            .with_move_control(MoveControlTrait::set_wait);
     }
 
     /// Vanilla `HappyGhast.supportQuadLeashAsHolder`.

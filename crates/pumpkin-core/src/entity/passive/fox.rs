@@ -1166,6 +1166,10 @@ impl MoveControlTrait for FoxMoveControl {
     fn has_wanted(&self) -> bool {
         MoveControlTrait::has_wanted(&self.move_control)
     }
+
+    fn set_wait(&mut self) {
+        self.move_control.set_wait();
+    }
 }
 
 /// Vanilla `Fox.FoxFloatGoal`: floats in shallower water than other mobs, dropping

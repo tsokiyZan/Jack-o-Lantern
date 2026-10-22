@@ -249,6 +249,10 @@ impl Animal for HorseEntity {
 const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::HORSE_BABY_DIMENSIONS;
 
 impl Mob for HorseEntity {
+    fn on_elastic_leash_pull(&self, _caller: &dyn EntityBase) {
+        self.horse_on_elastic_leash_pull();
+    }
+
     /// Vanilla `AbstractHorse.supportQuadLeash`.
     fn support_quad_leash(&self) -> bool {
         true

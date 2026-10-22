@@ -75,4 +75,9 @@ impl MoveControlTrait for FishMoveControl {
     fn has_wanted(&self) -> bool {
         self.operation == Operation::MoveTo
     }
+
+    /// Vanilla `MoveControl.setWait`.
+    fn set_wait(&mut self) {
+        self.operation = Operation::Wait;
+    }
 }

@@ -198,6 +198,14 @@ pub trait AbstractHorse: Mob {
         }
     }
 
+    /// Vanilla `AbstractHorse.onElasticLeashPull`: `Leashable`'s, then the horse stops eating.
+    fn horse_on_elastic_leash_pull(&self) {
+        self.get_entity().check_fall_distance_accumulation();
+        if self.horse_flag(FLAG_EATING) {
+            self.set_horse_flag(FLAG_EATING, false);
+        }
+    }
+
     /// Vanilla `modifyTemper`.
     fn modify_temper(&self, amount: i32) -> i32 {
         let temper = (self.horse_temper().load(Relaxed) + amount).clamp(0, self.max_temper());

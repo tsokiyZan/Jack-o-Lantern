@@ -51,6 +51,7 @@ pub trait MoveControlTrait: Control + Any {
         Vector3::new(0.0, 0.0, 0.0)
     }
 
-    /// Vanilla `MoveControl.setWait`.
+    /// Vanilla `MoveControl.setWait`. Left empty only by a control that never reads its
+    /// `operation` (the phantom's).
     fn set_wait(&mut self) {}
 }

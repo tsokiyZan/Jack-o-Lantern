@@ -1104,6 +1104,10 @@ impl MoveControlTrait for PandaMoveControl {
     fn has_wanted(&self) -> bool {
         self.0.has_wanted()
     }
+
+    fn set_wait(&mut self) {
+        self.0.set_wait();
+    }
 }
 
 /// Vanilla `Panda.PandaBreedGoal`: without bamboo nearby a panda in love sulks instead.
