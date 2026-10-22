@@ -130,6 +130,13 @@ impl ItemRegistry {
         hand: Hand,
         entity: Arc<dyn EntityBase>,
     ) -> InteractionResult {
+        // `Equippable.equipOnInteract`: `equipOnTarget` first, for any stack.
+        if entity
+            .get_mob()
+            .is_some_and(|mob| mob.equip_on_target(player, stack))
+        {
+            return InteractionResult::SUCCESS;
+        }
         self.get_pumpkin_item(stack.item.id)
             .map_or(InteractionResult::PASS, |pumpkin_item| {
                 pumpkin_item.use_on_entity(stack, player, hand, entity)

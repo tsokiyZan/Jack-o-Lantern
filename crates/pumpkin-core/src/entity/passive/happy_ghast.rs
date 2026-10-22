@@ -233,6 +233,39 @@ impl HappyGhastEntity {
         })
     }
 
+    /// Vanilla `HappyGhast.doPlayerRide`: `player.startRiding(this)`, which `canAddPassenger`
+    /// allows for up to four riders; the first one pulls the harness goggles down
+    /// (`addPassenger`).
+    fn do_player_ride(&self, player: &Arc<Player>) {
+        let entity = self.get_entity();
+        let passengers = entity
+            .passengers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .len();
+        if passengers >= 4
+            || player
+                .get_entity()
+                .get_vehicle()
+                .is_some_and(|vehicle| vehicle.get_entity().entity_id == entity.entity_id)
+        {
+            return;
+        }
+        let world = entity.world.load();
+        let Some(vehicle) = world.get_entity_by_id(entity.entity_id) else {
+            return;
+        };
+        if let Some(current) = player.get_entity().get_vehicle() {
+            current
+                .get_entity()
+                .remove_passenger(player.get_entity().entity_id);
+        }
+        if passengers == 0 {
+            self.play_sound_at_self(Sound::EntityHappyGhastHarnessGogglesDown, 1.0, 1.0);
+        }
+        entity.add_passenger(vehicle, player.clone());
+    }
+
     /// Vanilla `Mob.isWearingBodyArmor`.
     fn is_wearing_body_armor(&self) -> bool {
         let living = &self.mob_entity.living_entity;
@@ -542,13 +575,34 @@ impl Mob for HappyGhastEntity {
     fn mob_interact(
         &self,
         player: &Arc<Player>,
-        _hand: Hand,
+        hand: Hand,
         item_stack: &mut ItemStack,
     ) -> InteractionResult {
         if self.is_baby() {
             return self.animal_interact(player, item_stack, Sound::EntityGhastlingAmbient);
         }
 
+        // `itemStack.interactLivingEntity`: a harness goes on.
+        let entity = self.get_entity();
+        let world = entity.world.load();
+        if !item_stack.is_empty()
+            && let (Some(server), Some(this)) = (
+                world.server.upgrade(),
+                world.get_entity_by_id(entity.entity_id),
+            )
+        {
+            let result = server
+                .item_registry
+                .use_on_entity(item_stack, player, hand, this);
+            if result.consumes_action() {
+                return result;
+            }
+        }
+
+        if self.is_wearing_body_armor() && !player.get_entity().is_sneaking() {
+            self.do_player_ride(player);
+            return InteractionResult::SUCCESS;
+        }
         self.animal_interact(player, item_stack, Sound::EntityHappyGhastAmbient)
     }
 }
