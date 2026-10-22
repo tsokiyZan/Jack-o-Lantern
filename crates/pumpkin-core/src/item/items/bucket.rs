@@ -463,7 +463,15 @@ impl ItemBehaviour for FilledBucketItem {
         // TODO: the evaporation's large smoke particles.
         let evaporated = should_evaporate_in_nether(item, &world);
         if evaporated {
-            play_bucket_evaporation(&world, Some(player), &player.position());
+            // `BucketItem.use`'s `placePos`: the clicked block when it holds water
+            // (`LiquidBlockContainer`), else the block in front of the clicked face; the sound
+            // plays at its centre.
+            let place_pos = if world.get_block(&pos).is_waterloggable() {
+                pos
+            } else {
+                pos.offset(direction.to_offset())
+            };
+            play_bucket_evaporation(&world, Some(player), &place_pos.to_centered_f64());
         } else if !try_place_filled_bucket(&world, item, pos, direction) {
             return InteractionResult::FAIL;
         }

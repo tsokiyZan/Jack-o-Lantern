@@ -867,7 +867,8 @@ impl DispenserBlock {
 
         // TODO: Spawn the stored entity for axolotl/fish/tadpole buckets, like the player path.
         let emptied = if should_evaporate_in_nether(item.item, ctx.world) {
-            play_bucket_evaporation(ctx.world, None, &front.to_f64());
+            // `level.playSound(null, pos, ...)`: the front block's centre.
+            play_bucket_evaporation(ctx.world, None, &front.to_centered_f64());
             true
         } else {
             let placed = try_place_filled_bucket(
