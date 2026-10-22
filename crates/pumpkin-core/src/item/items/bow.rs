@@ -35,8 +35,8 @@ impl ItemBehaviour for BowItem {
         InteractionResult::CONSUME
     }
 
-    fn on_stopped_using(&self, stack: &ItemStack, player: &Player) {
-        Self::release_bow(player, stack);
+    fn on_stopped_using(&self, _stack: &ItemStack, player: &Player) {
+        Self::release_bow(player, crate::item::used_item_hand(player));
     }
 
     fn get_use_duration(&self) -> i32 {
@@ -54,8 +54,9 @@ impl BowItem {
     const MAX_DRAW_DURATION: f32 = 20.0;
     pub const ARROW_SPEED_MULTIPLIER: f32 = 3.0;
 
-    /// Called when the player releases the bow
-    pub fn release_bow(player: &Player, weapon: &ItemStack) {
+    /// Vanilla `BowItem.releaseUsing` for the bow in `hand`.
+    pub fn release_bow(player: &Player, hand: Hand) {
+        let weapon = &player.inventory().get_stack_in_hand(hand);
         // Get the used ticks
         let use_ticks = player.living_entity.item_use_time.load(Ordering::Relaxed);
         let use_ticks = Self::USE_DURATION - use_ticks;
@@ -106,7 +107,7 @@ impl BowItem {
         }
 
         // Damage bow
-        player.damage_held_item(1);
+        player.damage_item_in_hand(hand, 1);
         player.award_item_used(&Item::BOW);
     }
 
@@ -185,28 +186,5 @@ impl BowItem {
         );
         let chunk_pos = player.get_entity().chunk_pos.load();
         world.broadcast_to_chunk(chunk_pos, &sound_packet);
-    }
-
-    /// Fire an arrow from the bow with explicit critical flag
-    pub fn fire_arrow_with_crit(
-        player: &Player,
-        power: f32,
-        projectile: &ItemStack,
-        is_crit: bool,
-    ) {
-        let held = player.inventory().held_item();
-        Self::shoot(
-            player,
-            &held,
-            std::slice::from_ref(projectile),
-            power,
-            1.0,
-            is_crit,
-        );
-    }
-
-    /// Fire an arrow from the bow
-    pub fn fire_arrow(player: &Player, power: f32, projectile: &ItemStack) {
-        Self::fire_arrow_with_crit(player, power, projectile, power >= 1.0);
     }
 }

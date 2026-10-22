@@ -54,7 +54,8 @@ impl ItemBehaviour for CrossbowItem {
         let use_ticks = player.living_entity.item_use_time.load(Ordering::Relaxed);
         let use_ticks = 72000 - use_ticks;
 
-        let mut stack = player.inventory().held_item();
+        let hand = crate::item::used_item_hand(player);
+        let mut stack = player.inventory().get_stack_in_hand(hand);
         let charge_time =
             crate::enchantment::EnchantmentHelper::modify_crossbow_charge_time(&stack, 25);
 
@@ -88,7 +89,7 @@ impl ItemBehaviour for CrossbowItem {
                             projectiles: charged_nbts,
                         })),
                     ));
-                    player.inventory().set_held_item(stack);
+                    player.inventory().set_stack_in_hand(hand, stack);
 
                     if let Some(slot) = arrow_slot
                         && !is_creative

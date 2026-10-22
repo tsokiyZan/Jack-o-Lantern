@@ -89,7 +89,6 @@ impl ItemMetadata for BoatItem {
 
 impl ItemBehaviour for BoatItem {
     /// Vanilla: `BoatItem.use()` - raycasts to find placement position
-    /// Vanilla `BoatItem.use`.
     fn normal_use(&self, item: &Item, player: &Player, hand: Hand) -> InteractionResult {
         let world = player.world();
         let (start_pos, end_pos) = self.get_start_and_end_pos(player);

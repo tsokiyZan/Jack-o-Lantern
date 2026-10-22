@@ -48,7 +48,6 @@ impl ItemMetadata for TridentItem {
 
 impl ItemBehaviour for TridentItem {
     /// Vanilla `TridentItem.use`.
-    /// Vanilla `TridentItem.use`.
     fn normal_use(&self, _item: &Item, player: &Player, hand: Hand) -> InteractionResult {
         let stack = player.inventory().get_stack_in_hand(hand);
         if stack.next_damage_will_break() {

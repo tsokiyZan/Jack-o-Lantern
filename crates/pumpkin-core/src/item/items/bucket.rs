@@ -22,7 +22,7 @@ use pumpkin_data::{
 };
 use pumpkin_inventory::screen_handler::InventoryPlayer;
 use pumpkin_util::{
-    GameMode, Hand,
+    Hand,
     math::{position::BlockPos, vector3::Vector3, wrap_degrees},
 };
 use pumpkin_world::{tick::TickPriority, world::BlockFlags};
@@ -226,41 +226,6 @@ const fn get_fill_sound(item: &Item) -> Sound {
         Sound::ItemBucketFillPowderSnow
     } else {
         Sound::ItemBucketFill
-    }
-}
-
-fn give_player_bucket_item(player: &Player, item: &'static Item) {
-    if player.gamemode.load() == GameMode::Creative {
-        let has_item = {
-            let inv = player
-                .inventory
-                .main_inventory
-                .read()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            inv.iter().any(|stack| stack.item.id == item.id)
-        };
-        if has_item {
-            return;
-        }
-        let mut item_stack = ItemStack::new(1, item);
-        player.inventory.insert_stack_anywhere(&mut item_stack);
-    } else {
-        let item_stack = ItemStack::new(1, item);
-        let mut held_stack = player.inventory.held_item();
-
-        if held_stack.item_count == 1 {
-            player.inventory.set_held_item(item_stack);
-        } else {
-            held_stack.decrement(1);
-            player.inventory.set_held_item(held_stack);
-            let mut stack_to_give = item_stack;
-            let was_added = player.inventory.insert_stack_anywhere(&mut stack_to_give);
-            if !was_added && !stack_to_give.is_empty() {
-                player
-                    .world()
-                    .drop_stack(&player.position().to_block_pos(), stack_to_give);
-            }
-        }
     }
 }
 
@@ -585,11 +550,6 @@ impl ItemBehaviour for FilledBucketItem {
 }
 
 impl ItemBehaviour for MilkBucketItem {
-    fn on_stopped_using(&self, _stack: &ItemStack, player: &Player) {
-        player.living_entity.reset_effects_and_attributes();
-        give_player_bucket_item(player, &Item::BUCKET);
-    }
-
     fn get_use_duration(&self) -> i32 {
         32
     }
