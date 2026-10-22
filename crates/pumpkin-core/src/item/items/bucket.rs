@@ -101,7 +101,11 @@ pub(crate) fn empty_sulfur_cube_bucket(
     if let Some(cube) = mob.cast_any().downcast_ref::<CubeMobEntity>() {
         cube.load_from_bucket(bucket);
     }
-    world.spawn_entity(mob);
+    world.spawn_entity(mob.clone());
+    // `MobBucketItem.spawn`: `mob.playAmbientSound()`.
+    if let Some(cube) = mob.get_mob() {
+        cube.play_ambient_sound();
+    }
     world.game_event_from(user, GameEvent::EntityPlace, pos.to_centered_f64());
 }
 
@@ -517,6 +521,15 @@ impl ItemBehaviour for FilledBucketItem {
                 f64::from(place_pos.0.z) + 0.5,
             );
             let mob = from_type(entity_type, spawn_coord, &world, Uuid::new_v4());
+            // `EntityType.create`: a random yaw, then `finalizeSpawn(BUCKET)`.
+            mob.get_entity()
+                .set_rotation(wrap_degrees(rand::random::<f32>() * 360.0), 0.0);
+            finalize_spawn(
+                &mob,
+                &world,
+                crate::entity::mob::spawn::EntitySpawnReason::Bucket,
+                None,
+            );
             let bucket = player.inventory().held_item();
             // Vanilla `MobBucketItem.spawn`: `createDefaultStackConfig` applies the bucket's
             // components (the custom name, the variant) and entity data, then the mob reads
@@ -538,7 +551,10 @@ impl ItemBehaviour for FilledBucketItem {
                 bucket_mob.load_from_bucket_tag(&tag);
                 bucket_mob.set_from_bucket(true);
             }
-            world.spawn_entity(mob);
+            world.spawn_entity(mob.clone());
+            if let Some(bucket_mob) = mob.get_mob() {
+                bucket_mob.play_ambient_sound();
+            }
         }
 
         player.award_item_used(item);
