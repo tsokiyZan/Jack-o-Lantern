@@ -89,7 +89,7 @@ impl JavaClient {
             'after: {
                 let result = server
                     .item_registry
-                    .on_use(&item_in_hand, player, hand);
+                    .use_item(&item_in_hand, player, hand);
                 // `handleUseItem`: a success swings and resets the attack strength.
                 player.swing_for_interaction(hand, swing_animation, result.swing_source());
             }

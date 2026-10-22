@@ -15,6 +15,7 @@ use std::sync::Arc;
 
 use super::{ItemBehaviour, ItemMetadata, default_use};
 use pumpkin_data::data_component_impl::KineticWeaponImpl;
+use pumpkin_inventory::screen_handler::ScreenHandler;
 
 pub(crate) const fn should_try_block_placement(result: &BlockActionResult) -> bool {
     matches!(result, BlockActionResult::Pass)
@@ -34,6 +35,56 @@ impl ItemRegistry {
         }
     }
 
+    /// Vanilla `ServerPlayerGameMode.useItem` once its spectator and cooldown checks passed:
+    /// `ItemStack.use` on `stack`, the stack in `hand`, then, unless the use left the hand's
+    /// stack as it was or failed to start a timed use, the whole inventory sent again when no
+    /// item is in use.
+    pub fn use_item(&self, stack: &ItemStack, player: &Player, hand: Hand) -> InteractionResult {
+        let (old_count, old_damage) = (stack.item_count, stack.get_damage());
+        let result = self.on_use(stack, player, hand);
+        let result_stack = player.inventory.get_stack_in_hand(hand);
+        let use_duration = self.stack_use_duration(&result_stack);
+        // `resultStack == itemStack`: the same stack, which the item kind stands in for.
+        if result_stack.item.id == stack.item.id
+            && result_stack.item_count == old_count
+            && use_duration <= 0
+            && result_stack.get_damage() == old_damage
+        {
+            return result;
+        }
+        let using_item = player
+            .living_entity
+            .item_in_use
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .is_some();
+        if result == InteractionResult::FAIL && use_duration > 0 && !using_item {
+            return result;
+        }
+        if !using_item {
+            // `inventoryMenu.sendAllDataToRemote`.
+            player
+                .player_screen_handler
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .sync_state();
+        }
+        result
+    }
+
+    /// Vanilla `ItemStack.getUseDuration`: the item's own duration, else a consumable's, else
+    /// 72000 for a shield or a kinetic weapon.
+    #[must_use]
+    pub fn stack_use_duration(&self, stack: &ItemStack) -> i32 {
+        if let Some(duration) = self.get_use_duration(stack.item.id) {
+            return duration;
+        }
+        if stack.get_data_component::<KineticWeaponImpl>().is_some() {
+            return 72000;
+        }
+        stack.get_max_use_time()
+    }
+
     /// Vanilla `ItemStack.use`: the item's `use`, then, for an item used at once (no use
     /// duration) that succeeded, its `use_cooldown`.
     pub fn on_use(&self, stack: &ItemStack, player: &Player, hand: Hand) -> InteractionResult {
@@ -46,11 +97,7 @@ impl ItemRegistry {
         }
 
         let pumpkin_item = self.get_pumpkin_item(item.id);
-        let instantly_used = stack.get_max_use_time() <= 0
-            && stack.get_data_component::<KineticWeaponImpl>().is_none()
-            && pumpkin_item
-                .as_ref()
-                .is_none_or(|behaviour| behaviour.get_use_duration() <= 0);
+        let instantly_used = self.stack_use_duration(stack) <= 0;
         let result = pumpkin_item.map_or_else(
             || default_use(player, hand),
             |pumpkin_item| pumpkin_item.normal_use(item, player, hand),

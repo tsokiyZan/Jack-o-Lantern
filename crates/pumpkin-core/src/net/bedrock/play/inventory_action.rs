@@ -333,7 +333,7 @@ impl BedrockClient {
                         event;
                         'after: {
                             // `ServerPlayerGameMode.useItem` then `handleUseItem`'s swing.
-                            let result = server.item_registry.on_use(&held, player, hand);
+                            let result = server.item_registry.use_item(&held, player, hand);
                             if result == InteractionResult::FAIL
                                 && held.get_data_component::<FoodImpl>().is_some()
                             {
