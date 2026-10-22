@@ -88,6 +88,8 @@ pub struct LootPool {
 /// A complete loot table consisting of one or more pools.
 #[derive(Clone, Copy, Debug)]
 pub struct LootTable {
+    /// Vanilla `LootTable.randomSequence`: the sequence an unseeded roll draws from.
+    pub random_sequence: Option<&'static str>,
     /// All pools to roll when generating loot for this table.
     pub pools: &'static [LootPool],
 }
@@ -254,6 +256,8 @@ impl From<LootPool> for DynamicLootPool {
 /// A complete dynamic loot table consisting of one or more pools.
 #[derive(Clone, Debug, Default)]
 pub struct DynamicLootTable {
+    /// Vanilla `LootTable.randomSequence`: the sequence an unseeded roll draws from.
+    pub random_sequence: Option<String>,
     /// All pools to roll when generating loot for this table.
     pub pools: Vec<DynamicLootPool>,
 }
@@ -261,6 +265,7 @@ pub struct DynamicLootTable {
 impl From<&LootTable> for DynamicLootTable {
     fn from(t: &LootTable) -> Self {
         Self {
+            random_sequence: t.random_sequence.map(ToString::to_string),
             pools: t.pools.iter().copied().map(DynamicLootPool::from).collect(),
         }
     }

@@ -1104,7 +1104,7 @@ pub fn get_barter_response_items(tick: &BrainTick<'_>) -> Vec<ItemStack> {
         this_entity: Some(tick.mob.get_entity().entity_type),
         ..Default::default()
     };
-    crate::world::loot::generate_loot_from_handle(&table, rand::random(), &params)
+    crate::world::loot::generate_loot_from_handle(&table, tick.world, 0, &params)
 }
 
 fn look_behaviors() -> Vec<(Box<dyn BehaviorControl>, i32)> {

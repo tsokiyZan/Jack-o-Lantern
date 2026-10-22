@@ -44,7 +44,12 @@ fn get_archaeology_loot(is_sand: bool, location: BlockPos, world: &World) -> Ite
     };
 
     if let Some(table) = world.get_loot_table(loot_key) {
-        let items = table.generate_loot(rand::random());
+        let items = crate::world::loot::generate_loot_from_handle(
+            &table,
+            world,
+            0,
+            &crate::world::loot::LootContextParameters::default(),
+        );
         if let Some(first) = items.into_iter().next() {
             return first;
         }

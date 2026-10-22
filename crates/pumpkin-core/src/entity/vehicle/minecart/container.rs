@@ -15,6 +15,7 @@ use pumpkin_util::math::vector3::Vector3;
 use pumpkin_util::text::TextComponent;
 
 use crate::entity::{Entity, player::Player};
+use crate::world::World;
 
 pub(super) struct MinecartInventory {
     items: RwLock<Vec<ItemStack>>,
@@ -87,7 +88,8 @@ impl MinecartInventory {
             .is_some()
     }
 
-    pub(super) fn unpack_loot(self: &Arc<Self>) {
+    /// Vanilla `ContainerEntity.unpackChestVehicleLootTable`.
+    pub(super) fn unpack_loot(self: &Arc<Self>, world: &World) {
         let loot_table = self
             .loot_table
             .lock()
@@ -105,7 +107,7 @@ impl MinecartInventory {
         };
 
         let inventory: Arc<dyn Inventory> = self.clone();
-        crate::world::loot::fill_chest_inventory_handle(&inventory, &table, seed);
+        crate::world::loot::fill_chest_inventory_handle(&inventory, &table, world, seed);
     }
 }
 
@@ -207,7 +209,7 @@ pub(super) fn open(
     hopper: bool,
 ) -> bool {
     if !player.is_spectator() {
-        inventory.unpack_loot();
+        inventory.unpack_loot(&player.world());
     }
 
     player
@@ -274,8 +276,8 @@ mod tests {
     use pumpkin_inventory::Inventory;
     use pumpkin_nbt::compound::NbtCompound;
 
-    #[test]
-    fn deferred_mineshaft_loot_is_preserved_until_unpacked() {
+    #[tokio::test]
+    async fn deferred_mineshaft_loot_is_preserved_until_unpacked() {
         let inventory = std::sync::Arc::new(MinecartInventory::new(27));
         let mut source = NbtCompound::new();
         source.put_string(
@@ -294,7 +296,8 @@ mod tests {
         assert_eq!(deferred.get_long("LootTableSeed"), Some(1234));
         assert!(deferred.get_list("Items").is_none());
 
-        inventory.unpack_loot();
+        let (_folder, world) = crate::world::test_support::test_world();
+        inventory.unpack_loot(&world);
         assert!(!inventory.is_empty());
 
         let mut unpacked = NbtCompound::new();

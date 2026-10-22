@@ -3046,12 +3046,12 @@ impl LivingEntity {
         });
         let world = self.entity.world.load();
         if let Some(loot_table) = world.get_loot_table(&key) {
-            let seed: i64 = if death_loot_table_seed == 0 {
-                rand::random()
-            } else {
-                death_loot_table_seed
-            };
-            for stack in crate::world::loot::generate_loot_from_handle(&loot_table, seed, params) {
+            for stack in crate::world::loot::generate_loot_from_handle(
+                &loot_table,
+                &world,
+                death_loot_table_seed,
+                params,
+            ) {
                 self.entity.spawn_at_location(stack);
             }
         }
@@ -3069,11 +3069,11 @@ impl LivingEntity {
         params: &LootContextParameters,
         consumer: impl FnMut(ItemStack),
     ) -> bool {
-        let Some(loot_table) = self.entity.world.load().get_loot_table(key) else {
+        let world = self.entity.world.load();
+        let Some(loot_table) = world.get_loot_table(key) else {
             return false;
         };
-        let drops =
-            crate::world::loot::generate_loot_from_handle(&loot_table, rand::random(), params);
+        let drops = crate::world::loot::generate_loot_from_handle(&loot_table, &world, 0, params);
         let dropped = !drops.is_empty();
         drops.into_iter().for_each(consumer);
         dropped
@@ -5878,27 +5878,7 @@ mod tests {
 
     // ── equipment detection ───────────────────────────────────────────
 
-    /// The world, and the folder it lives in, removed when the `TempDir` drops.
-    fn test_world() -> (tempfile::TempDir, Arc<crate::world::World>) {
-        let folder = tempfile::tempdir().unwrap();
-        let level = pumpkin_world::dimension::into_level(
-            pumpkin_data::dimension::Dimension::OVERWORLD,
-            &pumpkin_config::world::LevelConfig::default(),
-            folder.path().to_path_buf(),
-            0,
-        );
-        let level_info = Arc::new(arc_swap::ArcSwap::from_pointee(
-            pumpkin_world::world_info::LevelData::default(pumpkin_util::world_seed::Seed(0)),
-        ));
-        let world = Arc::new(crate::world::World::load(
-            level,
-            level_info,
-            pumpkin_data::dimension::Dimension::OVERWORLD,
-            crate::block::registry::default_registry(),
-            std::sync::Weak::new(),
-        ));
-        (folder, world)
-    }
+    use crate::world::test_support::test_world;
 
     fn spawn(
         world: &Arc<crate::world::World>,

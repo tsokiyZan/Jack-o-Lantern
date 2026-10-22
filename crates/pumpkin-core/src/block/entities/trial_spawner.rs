@@ -1086,8 +1086,13 @@ impl TrialSpawner {
             && let Some(loot_table) = world.get_loot_table(&equip)
             && let Some(living) = entity.get_living_entity()
         {
-            let seed = rand::random::<i64>();
-            let items = loot_table.generate_loot(seed);
+            // Vanilla `EquipmentUser.equip(EquipmentTable, params)`: seed 0.
+            let items = crate::world::loot::generate_loot_from_handle(
+                &loot_table,
+                world,
+                0,
+                &crate::world::loot::LootContextParameters::default(),
+            );
             let mut equipment = living
                 .entity_equipment
                 .lock()
@@ -1160,8 +1165,13 @@ impl TrialSpawner {
         if let Some(key) = ejecting_loot_table
             && let Some(loot_table) = world.get_loot_table(key)
         {
-            let seed = rand::random::<i64>();
-            let items = loot_table.generate_loot(seed);
+            // Vanilla `TrialSpawner.ejectReward`: `getRandomItems(params)`.
+            let items = crate::world::loot::generate_loot_from_handle(
+                &loot_table,
+                world,
+                0,
+                &crate::world::loot::LootContextParameters::default(),
+            );
             for stack in items {
                 world.drop_stack(&spawner_pos, stack);
                 dropped_any = true;

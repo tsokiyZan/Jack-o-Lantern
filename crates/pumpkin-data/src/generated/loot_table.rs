@@ -82,6 +82,7 @@ static ARCHAEOLOGY_DESERT_PYRAMID_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ARCHAEOLOGY_DESERT_PYRAMID: LootTable = LootTable {
+    random_sequence: Some("minecraft:archaeology/desert_pyramid"),
     pools: ARCHAEOLOGY_DESERT_PYRAMID_POOLS,
 };
 static ARCHAEOLOGY_DESERT_WELL_POOL0_ENTRIES: &[LootEntry] = &[
@@ -148,6 +149,7 @@ static ARCHAEOLOGY_DESERT_WELL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ARCHAEOLOGY_DESERT_WELL: LootTable = LootTable {
+    random_sequence: Some("minecraft:archaeology/desert_well"),
     pools: ARCHAEOLOGY_DESERT_WELL_POOLS,
 };
 static ARCHAEOLOGY_OCEAN_RUIN_COLD_POOL0_ENTRIES: &[LootEntry] = &[
@@ -250,6 +252,7 @@ static ARCHAEOLOGY_OCEAN_RUIN_COLD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ARCHAEOLOGY_OCEAN_RUIN_COLD: LootTable = LootTable {
+    random_sequence: Some("minecraft:archaeology/ocean_ruin_cold"),
     pools: ARCHAEOLOGY_OCEAN_RUIN_COLD_POOLS,
 };
 static ARCHAEOLOGY_OCEAN_RUIN_WARM_POOL0_ENTRIES: &[LootEntry] = &[
@@ -352,6 +355,7 @@ static ARCHAEOLOGY_OCEAN_RUIN_WARM_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ARCHAEOLOGY_OCEAN_RUIN_WARM: LootTable = LootTable {
+    random_sequence: Some("minecraft:archaeology/ocean_ruin_warm"),
     pools: ARCHAEOLOGY_OCEAN_RUIN_WARM_POOLS,
 };
 static ARCHAEOLOGY_TRAIL_RUINS_COMMON_POOL0_ENTRIES: &[LootEntry] = &[
@@ -643,6 +647,7 @@ static ARCHAEOLOGY_TRAIL_RUINS_COMMON_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ARCHAEOLOGY_TRAIL_RUINS_COMMON: LootTable = LootTable {
+    random_sequence: Some("minecraft:archaeology/trail_ruins_common"),
     pools: ARCHAEOLOGY_TRAIL_RUINS_COMMON_POOLS,
 };
 static ARCHAEOLOGY_TRAIL_RUINS_RARE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -763,6 +768,7 @@ static ARCHAEOLOGY_TRAIL_RUINS_RARE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ARCHAEOLOGY_TRAIL_RUINS_RARE: LootTable = LootTable {
+    random_sequence: Some("minecraft:archaeology/trail_ruins_rare"),
     pools: ARCHAEOLOGY_TRAIL_RUINS_RARE_POOLS,
 };
 static BARRELS_ABANDONED_CAMP_BARREL_POOL0_ENTRIES: &[LootEntry] = &[
@@ -939,6 +945,7 @@ static BARRELS_ABANDONED_CAMP_BARREL_POOLS: &[LootPool] = &[
     },
 ];
 pub static BARRELS_ABANDONED_CAMP_BARREL: LootTable = LootTable {
+    random_sequence: Some("minecraft:barrels/abandoned_camp_barrel"),
     pools: BARRELS_ABANDONED_CAMP_BARREL_POOLS,
 };
 static BLOCKS_ACACIA_BUTTON_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -958,6 +965,7 @@ static BLOCKS_ACACIA_BUTTON_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_ACACIA_BUTTON: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/acacia_button"),
     pools: BLOCKS_ACACIA_BUTTON_POOLS,
 };
 static BLOCKS_ACACIA_DOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -977,6 +985,7 @@ static BLOCKS_ACACIA_DOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_ACACIA_DOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/acacia_door"),
     pools: BLOCKS_ACACIA_DOOR_POOLS,
 };
 static BLOCKS_ACACIA_FENCE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -996,6 +1005,7 @@ static BLOCKS_ACACIA_FENCE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_ACACIA_FENCE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/acacia_fence"),
     pools: BLOCKS_ACACIA_FENCE_POOLS,
 };
 static BLOCKS_ACACIA_FENCE_GATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1015,6 +1025,7 @@ static BLOCKS_ACACIA_FENCE_GATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_ACACIA_FENCE_GATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/acacia_fence_gate"),
     pools: BLOCKS_ACACIA_FENCE_GATE_POOLS,
 };
 static BLOCKS_ACACIA_HANGING_SIGN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1034,6 +1045,7 @@ static BLOCKS_ACACIA_HANGING_SIGN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_ACACIA_HANGING_SIGN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/acacia_hanging_sign"),
     pools: BLOCKS_ACACIA_HANGING_SIGN_POOLS,
 };
 static BLOCKS_ACACIA_LEAVES_POOL0_ENTRIES: &[LootEntry] = &[
@@ -1092,6 +1104,7 @@ static BLOCKS_ACACIA_LEAVES_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_ACACIA_LEAVES: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/acacia_leaves"),
     pools: BLOCKS_ACACIA_LEAVES_POOLS,
 };
 static BLOCKS_ACACIA_LOG_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1111,6 +1124,7 @@ static BLOCKS_ACACIA_LOG_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_ACACIA_LOG: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/acacia_log"),
     pools: BLOCKS_ACACIA_LOG_POOLS,
 };
 static BLOCKS_ACACIA_PLANKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1130,6 +1144,7 @@ static BLOCKS_ACACIA_PLANKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_ACACIA_PLANKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/acacia_planks"),
     pools: BLOCKS_ACACIA_PLANKS_POOLS,
 };
 static BLOCKS_ACACIA_PRESSURE_PLATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1149,6 +1164,7 @@ static BLOCKS_ACACIA_PRESSURE_PLATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_ACACIA_PRESSURE_PLATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/acacia_pressure_plate"),
     pools: BLOCKS_ACACIA_PRESSURE_PLATE_POOLS,
 };
 static BLOCKS_ACACIA_SAPLING_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1168,6 +1184,7 @@ static BLOCKS_ACACIA_SAPLING_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_ACACIA_SAPLING: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/acacia_sapling"),
     pools: BLOCKS_ACACIA_SAPLING_POOLS,
 };
 static BLOCKS_ACACIA_SHELF_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1187,6 +1204,7 @@ static BLOCKS_ACACIA_SHELF_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_ACACIA_SHELF: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/acacia_shelf"),
     pools: BLOCKS_ACACIA_SHELF_POOLS,
 };
 static BLOCKS_ACACIA_SIGN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1206,6 +1224,7 @@ static BLOCKS_ACACIA_SIGN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_ACACIA_SIGN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/acacia_sign"),
     pools: BLOCKS_ACACIA_SIGN_POOLS,
 };
 static BLOCKS_ACACIA_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1225,6 +1244,7 @@ static BLOCKS_ACACIA_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_ACACIA_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/acacia_slab"),
     pools: BLOCKS_ACACIA_SLAB_POOLS,
 };
 static BLOCKS_ACACIA_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1244,6 +1264,7 @@ static BLOCKS_ACACIA_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_ACACIA_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/acacia_stairs"),
     pools: BLOCKS_ACACIA_STAIRS_POOLS,
 };
 static BLOCKS_ACACIA_TRAPDOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1263,6 +1284,7 @@ static BLOCKS_ACACIA_TRAPDOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_ACACIA_TRAPDOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/acacia_trapdoor"),
     pools: BLOCKS_ACACIA_TRAPDOOR_POOLS,
 };
 static BLOCKS_ACACIA_WOOD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1282,6 +1304,7 @@ static BLOCKS_ACACIA_WOOD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_ACACIA_WOOD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/acacia_wood"),
     pools: BLOCKS_ACACIA_WOOD_POOLS,
 };
 static BLOCKS_ACTIVATOR_RAIL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1301,6 +1324,7 @@ static BLOCKS_ACTIVATOR_RAIL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_ACTIVATOR_RAIL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/activator_rail"),
     pools: BLOCKS_ACTIVATOR_RAIL_POOLS,
 };
 static BLOCKS_ALLIUM_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1320,6 +1344,7 @@ static BLOCKS_ALLIUM_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_ALLIUM: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/allium"),
     pools: BLOCKS_ALLIUM_POOLS,
 };
 static BLOCKS_AMETHYST_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1339,6 +1364,7 @@ static BLOCKS_AMETHYST_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_AMETHYST_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/amethyst_block"),
     pools: BLOCKS_AMETHYST_BLOCK_POOLS,
 };
 static BLOCKS_AMETHYST_CLUSTER_POOL0_ENTRIES: &[LootEntry] = &[
@@ -1378,6 +1404,7 @@ static BLOCKS_AMETHYST_CLUSTER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_AMETHYST_CLUSTER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/amethyst_cluster"),
     pools: BLOCKS_AMETHYST_CLUSTER_POOLS,
 };
 static BLOCKS_ANCIENT_DEBRIS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1397,6 +1424,7 @@ static BLOCKS_ANCIENT_DEBRIS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_ANCIENT_DEBRIS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/ancient_debris"),
     pools: BLOCKS_ANCIENT_DEBRIS_POOLS,
 };
 static BLOCKS_ANDESITE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1416,6 +1444,7 @@ static BLOCKS_ANDESITE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_ANDESITE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/andesite"),
     pools: BLOCKS_ANDESITE_POOLS,
 };
 static BLOCKS_ANDESITE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1435,6 +1464,7 @@ static BLOCKS_ANDESITE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_ANDESITE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/andesite_slab"),
     pools: BLOCKS_ANDESITE_SLAB_POOLS,
 };
 static BLOCKS_ANDESITE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1454,6 +1484,7 @@ static BLOCKS_ANDESITE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_ANDESITE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/andesite_stairs"),
     pools: BLOCKS_ANDESITE_STAIRS_POOLS,
 };
 static BLOCKS_ANDESITE_WALL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1473,6 +1504,7 @@ static BLOCKS_ANDESITE_WALL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_ANDESITE_WALL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/andesite_wall"),
     pools: BLOCKS_ANDESITE_WALL_POOLS,
 };
 static BLOCKS_ANVIL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1492,6 +1524,7 @@ static BLOCKS_ANVIL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_ANVIL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/anvil"),
     pools: BLOCKS_ANVIL_POOLS,
 };
 static BLOCKS_ATTACHED_MELON_STEM_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1511,6 +1544,7 @@ static BLOCKS_ATTACHED_MELON_STEM_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_ATTACHED_MELON_STEM: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/attached_melon_stem"),
     pools: BLOCKS_ATTACHED_MELON_STEM_POOLS,
 };
 static BLOCKS_ATTACHED_PUMPKIN_STEM_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1530,6 +1564,7 @@ static BLOCKS_ATTACHED_PUMPKIN_STEM_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_ATTACHED_PUMPKIN_STEM: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/attached_pumpkin_stem"),
     pools: BLOCKS_ATTACHED_PUMPKIN_STEM_POOLS,
 };
 static BLOCKS_AZALEA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1549,6 +1584,7 @@ static BLOCKS_AZALEA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_AZALEA: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/azalea"),
     pools: BLOCKS_AZALEA_POOLS,
 };
 static BLOCKS_AZALEA_LEAVES_POOL0_ENTRIES: &[LootEntry] = &[
@@ -1607,6 +1643,7 @@ static BLOCKS_AZALEA_LEAVES_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_AZALEA_LEAVES: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/azalea_leaves"),
     pools: BLOCKS_AZALEA_LEAVES_POOLS,
 };
 static BLOCKS_AZURE_BLUET_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1626,6 +1663,7 @@ static BLOCKS_AZURE_BLUET_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_AZURE_BLUET: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/azure_bluet"),
     pools: BLOCKS_AZURE_BLUET_POOLS,
 };
 static BLOCKS_BAMBOO_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1645,6 +1683,7 @@ static BLOCKS_BAMBOO_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BAMBOO: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/bamboo"),
     pools: BLOCKS_BAMBOO_POOLS,
 };
 static BLOCKS_BAMBOO_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1664,6 +1703,7 @@ static BLOCKS_BAMBOO_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BAMBOO_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/bamboo_block"),
     pools: BLOCKS_BAMBOO_BLOCK_POOLS,
 };
 static BLOCKS_BAMBOO_BUTTON_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1683,6 +1723,7 @@ static BLOCKS_BAMBOO_BUTTON_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BAMBOO_BUTTON: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/bamboo_button"),
     pools: BLOCKS_BAMBOO_BUTTON_POOLS,
 };
 static BLOCKS_BAMBOO_DOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1702,6 +1743,7 @@ static BLOCKS_BAMBOO_DOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BAMBOO_DOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/bamboo_door"),
     pools: BLOCKS_BAMBOO_DOOR_POOLS,
 };
 static BLOCKS_BAMBOO_FENCE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1721,6 +1763,7 @@ static BLOCKS_BAMBOO_FENCE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BAMBOO_FENCE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/bamboo_fence"),
     pools: BLOCKS_BAMBOO_FENCE_POOLS,
 };
 static BLOCKS_BAMBOO_FENCE_GATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1740,6 +1783,7 @@ static BLOCKS_BAMBOO_FENCE_GATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BAMBOO_FENCE_GATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/bamboo_fence_gate"),
     pools: BLOCKS_BAMBOO_FENCE_GATE_POOLS,
 };
 static BLOCKS_BAMBOO_HANGING_SIGN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1759,6 +1803,7 @@ static BLOCKS_BAMBOO_HANGING_SIGN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BAMBOO_HANGING_SIGN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/bamboo_hanging_sign"),
     pools: BLOCKS_BAMBOO_HANGING_SIGN_POOLS,
 };
 static BLOCKS_BAMBOO_MOSAIC_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1778,6 +1823,7 @@ static BLOCKS_BAMBOO_MOSAIC_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BAMBOO_MOSAIC: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/bamboo_mosaic"),
     pools: BLOCKS_BAMBOO_MOSAIC_POOLS,
 };
 static BLOCKS_BAMBOO_MOSAIC_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1797,6 +1843,7 @@ static BLOCKS_BAMBOO_MOSAIC_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_BAMBOO_MOSAIC_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/bamboo_mosaic_slab"),
     pools: BLOCKS_BAMBOO_MOSAIC_SLAB_POOLS,
 };
 static BLOCKS_BAMBOO_MOSAIC_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1816,6 +1863,7 @@ static BLOCKS_BAMBOO_MOSAIC_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BAMBOO_MOSAIC_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/bamboo_mosaic_stairs"),
     pools: BLOCKS_BAMBOO_MOSAIC_STAIRS_POOLS,
 };
 static BLOCKS_BAMBOO_PLANKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1835,6 +1883,7 @@ static BLOCKS_BAMBOO_PLANKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BAMBOO_PLANKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/bamboo_planks"),
     pools: BLOCKS_BAMBOO_PLANKS_POOLS,
 };
 static BLOCKS_BAMBOO_PRESSURE_PLATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1854,6 +1903,7 @@ static BLOCKS_BAMBOO_PRESSURE_PLATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BAMBOO_PRESSURE_PLATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/bamboo_pressure_plate"),
     pools: BLOCKS_BAMBOO_PRESSURE_PLATE_POOLS,
 };
 static BLOCKS_BAMBOO_SAPLING_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1873,6 +1923,7 @@ static BLOCKS_BAMBOO_SAPLING_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BAMBOO_SAPLING: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/bamboo_sapling"),
     pools: BLOCKS_BAMBOO_SAPLING_POOLS,
 };
 static BLOCKS_BAMBOO_SHELF_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1892,6 +1943,7 @@ static BLOCKS_BAMBOO_SHELF_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BAMBOO_SHELF: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/bamboo_shelf"),
     pools: BLOCKS_BAMBOO_SHELF_POOLS,
 };
 static BLOCKS_BAMBOO_SIGN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1911,6 +1963,7 @@ static BLOCKS_BAMBOO_SIGN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BAMBOO_SIGN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/bamboo_sign"),
     pools: BLOCKS_BAMBOO_SIGN_POOLS,
 };
 static BLOCKS_BAMBOO_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1930,6 +1983,7 @@ static BLOCKS_BAMBOO_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_BAMBOO_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/bamboo_slab"),
     pools: BLOCKS_BAMBOO_SLAB_POOLS,
 };
 static BLOCKS_BAMBOO_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1949,6 +2003,7 @@ static BLOCKS_BAMBOO_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BAMBOO_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/bamboo_stairs"),
     pools: BLOCKS_BAMBOO_STAIRS_POOLS,
 };
 static BLOCKS_BAMBOO_TRAPDOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1968,6 +2023,7 @@ static BLOCKS_BAMBOO_TRAPDOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BAMBOO_TRAPDOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/bamboo_trapdoor"),
     pools: BLOCKS_BAMBOO_TRAPDOOR_POOLS,
 };
 static BLOCKS_BARREL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -1987,6 +2043,7 @@ static BLOCKS_BARREL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BARREL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/barrel"),
     pools: BLOCKS_BARREL_POOLS,
 };
 static BLOCKS_BASALT_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2006,6 +2063,7 @@ static BLOCKS_BASALT_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BASALT: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/basalt"),
     pools: BLOCKS_BASALT_POOLS,
 };
 static BLOCKS_BEACON_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2025,6 +2083,7 @@ static BLOCKS_BEACON_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_BEACON: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/beacon"),
     pools: BLOCKS_BEACON_POOLS,
 };
 static BLOCKS_BEE_NEST_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2044,6 +2103,7 @@ static BLOCKS_BEE_NEST_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_BEE_NEST: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/bee_nest"),
     pools: BLOCKS_BEE_NEST_POOLS,
 };
 static BLOCKS_BEEHIVE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -2074,6 +2134,7 @@ static BLOCKS_BEEHIVE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_BEEHIVE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/beehive"),
     pools: BLOCKS_BEEHIVE_POOLS,
 };
 static BLOCKS_BEETROOTS_POOL0_ENTRIES: &[LootEntry] = &[
@@ -2125,6 +2186,7 @@ static BLOCKS_BEETROOTS_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_BEETROOTS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/beetroots"),
     pools: BLOCKS_BEETROOTS_POOLS,
 };
 static BLOCKS_BELL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2144,6 +2206,7 @@ static BLOCKS_BELL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BELL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/bell"),
     pools: BLOCKS_BELL_POOLS,
 };
 static BLOCKS_BIG_DRIPLEAF_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2163,6 +2226,7 @@ static BLOCKS_BIG_DRIPLEAF_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BIG_DRIPLEAF: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/big_dripleaf"),
     pools: BLOCKS_BIG_DRIPLEAF_POOLS,
 };
 static BLOCKS_BIG_DRIPLEAF_STEM_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2182,6 +2246,7 @@ static BLOCKS_BIG_DRIPLEAF_STEM_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BIG_DRIPLEAF_STEM: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/big_dripleaf_stem"),
     pools: BLOCKS_BIG_DRIPLEAF_STEM_POOLS,
 };
 static BLOCKS_BIRCH_BUTTON_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2201,6 +2266,7 @@ static BLOCKS_BIRCH_BUTTON_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BIRCH_BUTTON: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/birch_button"),
     pools: BLOCKS_BIRCH_BUTTON_POOLS,
 };
 static BLOCKS_BIRCH_DOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2220,6 +2286,7 @@ static BLOCKS_BIRCH_DOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BIRCH_DOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/birch_door"),
     pools: BLOCKS_BIRCH_DOOR_POOLS,
 };
 static BLOCKS_BIRCH_FENCE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2239,6 +2306,7 @@ static BLOCKS_BIRCH_FENCE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BIRCH_FENCE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/birch_fence"),
     pools: BLOCKS_BIRCH_FENCE_POOLS,
 };
 static BLOCKS_BIRCH_FENCE_GATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2258,6 +2326,7 @@ static BLOCKS_BIRCH_FENCE_GATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BIRCH_FENCE_GATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/birch_fence_gate"),
     pools: BLOCKS_BIRCH_FENCE_GATE_POOLS,
 };
 static BLOCKS_BIRCH_HANGING_SIGN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2277,6 +2346,7 @@ static BLOCKS_BIRCH_HANGING_SIGN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BIRCH_HANGING_SIGN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/birch_hanging_sign"),
     pools: BLOCKS_BIRCH_HANGING_SIGN_POOLS,
 };
 static BLOCKS_BIRCH_LEAVES_POOL0_ENTRIES: &[LootEntry] = &[
@@ -2335,6 +2405,7 @@ static BLOCKS_BIRCH_LEAVES_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_BIRCH_LEAVES: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/birch_leaves"),
     pools: BLOCKS_BIRCH_LEAVES_POOLS,
 };
 static BLOCKS_BIRCH_LOG_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2354,6 +2425,7 @@ static BLOCKS_BIRCH_LOG_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BIRCH_LOG: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/birch_log"),
     pools: BLOCKS_BIRCH_LOG_POOLS,
 };
 static BLOCKS_BIRCH_PLANKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2373,6 +2445,7 @@ static BLOCKS_BIRCH_PLANKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BIRCH_PLANKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/birch_planks"),
     pools: BLOCKS_BIRCH_PLANKS_POOLS,
 };
 static BLOCKS_BIRCH_PRESSURE_PLATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2392,6 +2465,7 @@ static BLOCKS_BIRCH_PRESSURE_PLATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BIRCH_PRESSURE_PLATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/birch_pressure_plate"),
     pools: BLOCKS_BIRCH_PRESSURE_PLATE_POOLS,
 };
 static BLOCKS_BIRCH_SAPLING_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2411,6 +2485,7 @@ static BLOCKS_BIRCH_SAPLING_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BIRCH_SAPLING: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/birch_sapling"),
     pools: BLOCKS_BIRCH_SAPLING_POOLS,
 };
 static BLOCKS_BIRCH_SHELF_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2430,6 +2505,7 @@ static BLOCKS_BIRCH_SHELF_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BIRCH_SHELF: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/birch_shelf"),
     pools: BLOCKS_BIRCH_SHELF_POOLS,
 };
 static BLOCKS_BIRCH_SIGN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2449,6 +2525,7 @@ static BLOCKS_BIRCH_SIGN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BIRCH_SIGN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/birch_sign"),
     pools: BLOCKS_BIRCH_SIGN_POOLS,
 };
 static BLOCKS_BIRCH_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2468,6 +2545,7 @@ static BLOCKS_BIRCH_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_BIRCH_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/birch_slab"),
     pools: BLOCKS_BIRCH_SLAB_POOLS,
 };
 static BLOCKS_BIRCH_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2487,6 +2565,7 @@ static BLOCKS_BIRCH_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BIRCH_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/birch_stairs"),
     pools: BLOCKS_BIRCH_STAIRS_POOLS,
 };
 static BLOCKS_BIRCH_TRAPDOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2506,6 +2585,7 @@ static BLOCKS_BIRCH_TRAPDOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BIRCH_TRAPDOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/birch_trapdoor"),
     pools: BLOCKS_BIRCH_TRAPDOOR_POOLS,
 };
 static BLOCKS_BIRCH_WOOD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2525,6 +2605,7 @@ static BLOCKS_BIRCH_WOOD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BIRCH_WOOD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/birch_wood"),
     pools: BLOCKS_BIRCH_WOOD_POOLS,
 };
 static BLOCKS_BLACK_BANNER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2544,6 +2625,7 @@ static BLOCKS_BLACK_BANNER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BLACK_BANNER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/black_banner"),
     pools: BLOCKS_BLACK_BANNER_POOLS,
 };
 static BLOCKS_BLACK_BED_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2563,6 +2645,7 @@ static BLOCKS_BLACK_BED_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BLACK_BED: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/black_bed"),
     pools: BLOCKS_BLACK_BED_POOLS,
 };
 static BLOCKS_BLACK_CANDLE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2582,6 +2665,7 @@ static BLOCKS_BLACK_CANDLE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_BLACK_CANDLE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/black_candle"),
     pools: BLOCKS_BLACK_CANDLE_POOLS,
 };
 static BLOCKS_BLACK_CANDLE_CAKE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2601,6 +2685,7 @@ static BLOCKS_BLACK_CANDLE_CAKE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_BLACK_CANDLE_CAKE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/black_candle_cake"),
     pools: BLOCKS_BLACK_CANDLE_CAKE_POOLS,
 };
 static BLOCKS_BLACK_CARPET_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2620,6 +2705,7 @@ static BLOCKS_BLACK_CARPET_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BLACK_CARPET: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/black_carpet"),
     pools: BLOCKS_BLACK_CARPET_POOLS,
 };
 static BLOCKS_BLACK_CONCRETE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2639,6 +2725,7 @@ static BLOCKS_BLACK_CONCRETE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BLACK_CONCRETE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/black_concrete"),
     pools: BLOCKS_BLACK_CONCRETE_POOLS,
 };
 static BLOCKS_BLACK_CONCRETE_POWDER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2658,6 +2745,7 @@ static BLOCKS_BLACK_CONCRETE_POWDER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BLACK_CONCRETE_POWDER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/black_concrete_powder"),
     pools: BLOCKS_BLACK_CONCRETE_POWDER_POOLS,
 };
 static BLOCKS_BLACK_CONCRETE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2677,6 +2765,7 @@ static BLOCKS_BLACK_CONCRETE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_BLACK_CONCRETE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/black_concrete_slab"),
     pools: BLOCKS_BLACK_CONCRETE_SLAB_POOLS,
 };
 static BLOCKS_BLACK_CONCRETE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2696,6 +2785,7 @@ static BLOCKS_BLACK_CONCRETE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BLACK_CONCRETE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/black_concrete_stairs"),
     pools: BLOCKS_BLACK_CONCRETE_STAIRS_POOLS,
 };
 static BLOCKS_BLACK_GLAZED_TERRACOTTA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2715,6 +2805,7 @@ static BLOCKS_BLACK_GLAZED_TERRACOTTA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BLACK_GLAZED_TERRACOTTA: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/black_glazed_terracotta"),
     pools: BLOCKS_BLACK_GLAZED_TERRACOTTA_POOLS,
 };
 static BLOCKS_BLACK_SHULKER_BOX_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2734,6 +2825,7 @@ static BLOCKS_BLACK_SHULKER_BOX_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_BLACK_SHULKER_BOX: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/black_shulker_box"),
     pools: BLOCKS_BLACK_SHULKER_BOX_POOLS,
 };
 static BLOCKS_BLACK_STAINED_GLASS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2753,6 +2845,7 @@ static BLOCKS_BLACK_STAINED_GLASS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_BLACK_STAINED_GLASS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/black_stained_glass"),
     pools: BLOCKS_BLACK_STAINED_GLASS_POOLS,
 };
 static BLOCKS_BLACK_STAINED_GLASS_PANE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2772,6 +2865,7 @@ static BLOCKS_BLACK_STAINED_GLASS_PANE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_BLACK_STAINED_GLASS_PANE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/black_stained_glass_pane"),
     pools: BLOCKS_BLACK_STAINED_GLASS_PANE_POOLS,
 };
 static BLOCKS_BLACK_TERRACOTTA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2791,6 +2885,7 @@ static BLOCKS_BLACK_TERRACOTTA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BLACK_TERRACOTTA: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/black_terracotta"),
     pools: BLOCKS_BLACK_TERRACOTTA_POOLS,
 };
 static BLOCKS_BLACK_WOOL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2810,6 +2905,7 @@ static BLOCKS_BLACK_WOOL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BLACK_WOOL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/black_wool"),
     pools: BLOCKS_BLACK_WOOL_POOLS,
 };
 static BLOCKS_BLACK_WOOL_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2829,6 +2925,7 @@ static BLOCKS_BLACK_WOOL_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_BLACK_WOOL_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/black_wool_slab"),
     pools: BLOCKS_BLACK_WOOL_SLAB_POOLS,
 };
 static BLOCKS_BLACK_WOOL_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2848,6 +2945,7 @@ static BLOCKS_BLACK_WOOL_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BLACK_WOOL_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/black_wool_stairs"),
     pools: BLOCKS_BLACK_WOOL_STAIRS_POOLS,
 };
 static BLOCKS_BLACKSTONE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2867,6 +2965,7 @@ static BLOCKS_BLACKSTONE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BLACKSTONE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/blackstone"),
     pools: BLOCKS_BLACKSTONE_POOLS,
 };
 static BLOCKS_BLACKSTONE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2886,6 +2985,7 @@ static BLOCKS_BLACKSTONE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_BLACKSTONE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/blackstone_slab"),
     pools: BLOCKS_BLACKSTONE_SLAB_POOLS,
 };
 static BLOCKS_BLACKSTONE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2905,6 +3005,7 @@ static BLOCKS_BLACKSTONE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BLACKSTONE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/blackstone_stairs"),
     pools: BLOCKS_BLACKSTONE_STAIRS_POOLS,
 };
 static BLOCKS_BLACKSTONE_WALL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2924,6 +3025,7 @@ static BLOCKS_BLACKSTONE_WALL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BLACKSTONE_WALL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/blackstone_wall"),
     pools: BLOCKS_BLACKSTONE_WALL_POOLS,
 };
 static BLOCKS_BLAST_FURNACE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2943,6 +3045,7 @@ static BLOCKS_BLAST_FURNACE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BLAST_FURNACE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/blast_furnace"),
     pools: BLOCKS_BLAST_FURNACE_POOLS,
 };
 static BLOCKS_BLUE_BANNER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2962,6 +3065,7 @@ static BLOCKS_BLUE_BANNER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BLUE_BANNER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/blue_banner"),
     pools: BLOCKS_BLUE_BANNER_POOLS,
 };
 static BLOCKS_BLUE_BED_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -2981,6 +3085,7 @@ static BLOCKS_BLUE_BED_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BLUE_BED: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/blue_bed"),
     pools: BLOCKS_BLUE_BED_POOLS,
 };
 static BLOCKS_BLUE_CANDLE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3000,6 +3105,7 @@ static BLOCKS_BLUE_CANDLE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_BLUE_CANDLE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/blue_candle"),
     pools: BLOCKS_BLUE_CANDLE_POOLS,
 };
 static BLOCKS_BLUE_CANDLE_CAKE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3019,6 +3125,7 @@ static BLOCKS_BLUE_CANDLE_CAKE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_BLUE_CANDLE_CAKE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/blue_candle_cake"),
     pools: BLOCKS_BLUE_CANDLE_CAKE_POOLS,
 };
 static BLOCKS_BLUE_CARPET_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3038,6 +3145,7 @@ static BLOCKS_BLUE_CARPET_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BLUE_CARPET: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/blue_carpet"),
     pools: BLOCKS_BLUE_CARPET_POOLS,
 };
 static BLOCKS_BLUE_CONCRETE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3057,6 +3165,7 @@ static BLOCKS_BLUE_CONCRETE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BLUE_CONCRETE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/blue_concrete"),
     pools: BLOCKS_BLUE_CONCRETE_POOLS,
 };
 static BLOCKS_BLUE_CONCRETE_POWDER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3076,6 +3185,7 @@ static BLOCKS_BLUE_CONCRETE_POWDER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BLUE_CONCRETE_POWDER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/blue_concrete_powder"),
     pools: BLOCKS_BLUE_CONCRETE_POWDER_POOLS,
 };
 static BLOCKS_BLUE_CONCRETE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3095,6 +3205,7 @@ static BLOCKS_BLUE_CONCRETE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_BLUE_CONCRETE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/blue_concrete_slab"),
     pools: BLOCKS_BLUE_CONCRETE_SLAB_POOLS,
 };
 static BLOCKS_BLUE_CONCRETE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3114,6 +3225,7 @@ static BLOCKS_BLUE_CONCRETE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BLUE_CONCRETE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/blue_concrete_stairs"),
     pools: BLOCKS_BLUE_CONCRETE_STAIRS_POOLS,
 };
 static BLOCKS_BLUE_GLAZED_TERRACOTTA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3133,6 +3245,7 @@ static BLOCKS_BLUE_GLAZED_TERRACOTTA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BLUE_GLAZED_TERRACOTTA: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/blue_glazed_terracotta"),
     pools: BLOCKS_BLUE_GLAZED_TERRACOTTA_POOLS,
 };
 static BLOCKS_BLUE_ICE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3152,6 +3265,7 @@ static BLOCKS_BLUE_ICE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_BLUE_ICE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/blue_ice"),
     pools: BLOCKS_BLUE_ICE_POOLS,
 };
 static BLOCKS_BLUE_ORCHID_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3171,6 +3285,7 @@ static BLOCKS_BLUE_ORCHID_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BLUE_ORCHID: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/blue_orchid"),
     pools: BLOCKS_BLUE_ORCHID_POOLS,
 };
 static BLOCKS_BLUE_SHULKER_BOX_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3190,6 +3305,7 @@ static BLOCKS_BLUE_SHULKER_BOX_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_BLUE_SHULKER_BOX: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/blue_shulker_box"),
     pools: BLOCKS_BLUE_SHULKER_BOX_POOLS,
 };
 static BLOCKS_BLUE_STAINED_GLASS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3209,6 +3325,7 @@ static BLOCKS_BLUE_STAINED_GLASS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_BLUE_STAINED_GLASS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/blue_stained_glass"),
     pools: BLOCKS_BLUE_STAINED_GLASS_POOLS,
 };
 static BLOCKS_BLUE_STAINED_GLASS_PANE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3228,6 +3345,7 @@ static BLOCKS_BLUE_STAINED_GLASS_PANE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_BLUE_STAINED_GLASS_PANE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/blue_stained_glass_pane"),
     pools: BLOCKS_BLUE_STAINED_GLASS_PANE_POOLS,
 };
 static BLOCKS_BLUE_TERRACOTTA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3247,6 +3365,7 @@ static BLOCKS_BLUE_TERRACOTTA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BLUE_TERRACOTTA: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/blue_terracotta"),
     pools: BLOCKS_BLUE_TERRACOTTA_POOLS,
 };
 static BLOCKS_BLUE_WOOL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3266,6 +3385,7 @@ static BLOCKS_BLUE_WOOL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BLUE_WOOL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/blue_wool"),
     pools: BLOCKS_BLUE_WOOL_POOLS,
 };
 static BLOCKS_BLUE_WOOL_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3285,6 +3405,7 @@ static BLOCKS_BLUE_WOOL_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_BLUE_WOOL_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/blue_wool_slab"),
     pools: BLOCKS_BLUE_WOOL_SLAB_POOLS,
 };
 static BLOCKS_BLUE_WOOL_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3304,6 +3425,7 @@ static BLOCKS_BLUE_WOOL_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BLUE_WOOL_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/blue_wool_stairs"),
     pools: BLOCKS_BLUE_WOOL_STAIRS_POOLS,
 };
 static BLOCKS_BONE_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3323,6 +3445,7 @@ static BLOCKS_BONE_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BONE_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/bone_block"),
     pools: BLOCKS_BONE_BLOCK_POOLS,
 };
 static BLOCKS_BOOKSHELF_POOL0_ENTRIES: &[LootEntry] = &[
@@ -3353,6 +3476,7 @@ static BLOCKS_BOOKSHELF_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_BOOKSHELF: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/bookshelf"),
     pools: BLOCKS_BOOKSHELF_POOLS,
 };
 static BLOCKS_BRAIN_CORAL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3372,6 +3496,7 @@ static BLOCKS_BRAIN_CORAL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_BRAIN_CORAL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/brain_coral"),
     pools: BLOCKS_BRAIN_CORAL_POOLS,
 };
 static BLOCKS_BRAIN_CORAL_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[
@@ -3405,6 +3530,7 @@ static BLOCKS_BRAIN_CORAL_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_BRAIN_CORAL_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/brain_coral_block"),
     pools: BLOCKS_BRAIN_CORAL_BLOCK_POOLS,
 };
 static BLOCKS_BRAIN_CORAL_FAN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3424,6 +3550,7 @@ static BLOCKS_BRAIN_CORAL_FAN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_BRAIN_CORAL_FAN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/brain_coral_fan"),
     pools: BLOCKS_BRAIN_CORAL_FAN_POOLS,
 };
 static BLOCKS_BREWING_STAND_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3443,6 +3570,7 @@ static BLOCKS_BREWING_STAND_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BREWING_STAND: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/brewing_stand"),
     pools: BLOCKS_BREWING_STAND_POOLS,
 };
 static BLOCKS_BRICK_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3462,6 +3590,7 @@ static BLOCKS_BRICK_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_BRICK_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/brick_slab"),
     pools: BLOCKS_BRICK_SLAB_POOLS,
 };
 static BLOCKS_BRICK_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3481,6 +3610,7 @@ static BLOCKS_BRICK_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BRICK_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/brick_stairs"),
     pools: BLOCKS_BRICK_STAIRS_POOLS,
 };
 static BLOCKS_BRICK_WALL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3500,6 +3630,7 @@ static BLOCKS_BRICK_WALL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BRICK_WALL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/brick_wall"),
     pools: BLOCKS_BRICK_WALL_POOLS,
 };
 static BLOCKS_BRICKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3519,6 +3650,7 @@ static BLOCKS_BRICKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BRICKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/bricks"),
     pools: BLOCKS_BRICKS_POOLS,
 };
 static BLOCKS_BROWN_BANNER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3538,6 +3670,7 @@ static BLOCKS_BROWN_BANNER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BROWN_BANNER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/brown_banner"),
     pools: BLOCKS_BROWN_BANNER_POOLS,
 };
 static BLOCKS_BROWN_BED_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3557,6 +3690,7 @@ static BLOCKS_BROWN_BED_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BROWN_BED: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/brown_bed"),
     pools: BLOCKS_BROWN_BED_POOLS,
 };
 static BLOCKS_BROWN_CANDLE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3576,6 +3710,7 @@ static BLOCKS_BROWN_CANDLE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_BROWN_CANDLE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/brown_candle"),
     pools: BLOCKS_BROWN_CANDLE_POOLS,
 };
 static BLOCKS_BROWN_CANDLE_CAKE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3595,6 +3730,7 @@ static BLOCKS_BROWN_CANDLE_CAKE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_BROWN_CANDLE_CAKE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/brown_candle_cake"),
     pools: BLOCKS_BROWN_CANDLE_CAKE_POOLS,
 };
 static BLOCKS_BROWN_CARPET_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3614,6 +3750,7 @@ static BLOCKS_BROWN_CARPET_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BROWN_CARPET: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/brown_carpet"),
     pools: BLOCKS_BROWN_CARPET_POOLS,
 };
 static BLOCKS_BROWN_CONCRETE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3633,6 +3770,7 @@ static BLOCKS_BROWN_CONCRETE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BROWN_CONCRETE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/brown_concrete"),
     pools: BLOCKS_BROWN_CONCRETE_POOLS,
 };
 static BLOCKS_BROWN_CONCRETE_POWDER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3652,6 +3790,7 @@ static BLOCKS_BROWN_CONCRETE_POWDER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BROWN_CONCRETE_POWDER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/brown_concrete_powder"),
     pools: BLOCKS_BROWN_CONCRETE_POWDER_POOLS,
 };
 static BLOCKS_BROWN_CONCRETE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3671,6 +3810,7 @@ static BLOCKS_BROWN_CONCRETE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_BROWN_CONCRETE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/brown_concrete_slab"),
     pools: BLOCKS_BROWN_CONCRETE_SLAB_POOLS,
 };
 static BLOCKS_BROWN_CONCRETE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3690,6 +3830,7 @@ static BLOCKS_BROWN_CONCRETE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BROWN_CONCRETE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/brown_concrete_stairs"),
     pools: BLOCKS_BROWN_CONCRETE_STAIRS_POOLS,
 };
 static BLOCKS_BROWN_GLAZED_TERRACOTTA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3709,6 +3850,7 @@ static BLOCKS_BROWN_GLAZED_TERRACOTTA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BROWN_GLAZED_TERRACOTTA: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/brown_glazed_terracotta"),
     pools: BLOCKS_BROWN_GLAZED_TERRACOTTA_POOLS,
 };
 static BLOCKS_BROWN_MUSHROOM_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3728,6 +3870,7 @@ static BLOCKS_BROWN_MUSHROOM_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BROWN_MUSHROOM: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/brown_mushroom"),
     pools: BLOCKS_BROWN_MUSHROOM_POOLS,
 };
 static BLOCKS_BROWN_MUSHROOM_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[
@@ -3758,6 +3901,7 @@ static BLOCKS_BROWN_MUSHROOM_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_BROWN_MUSHROOM_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/brown_mushroom_block"),
     pools: BLOCKS_BROWN_MUSHROOM_BLOCK_POOLS,
 };
 static BLOCKS_BROWN_SHULKER_BOX_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3777,6 +3921,7 @@ static BLOCKS_BROWN_SHULKER_BOX_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_BROWN_SHULKER_BOX: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/brown_shulker_box"),
     pools: BLOCKS_BROWN_SHULKER_BOX_POOLS,
 };
 static BLOCKS_BROWN_STAINED_GLASS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3796,6 +3941,7 @@ static BLOCKS_BROWN_STAINED_GLASS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_BROWN_STAINED_GLASS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/brown_stained_glass"),
     pools: BLOCKS_BROWN_STAINED_GLASS_POOLS,
 };
 static BLOCKS_BROWN_STAINED_GLASS_PANE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3815,6 +3961,7 @@ static BLOCKS_BROWN_STAINED_GLASS_PANE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_BROWN_STAINED_GLASS_PANE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/brown_stained_glass_pane"),
     pools: BLOCKS_BROWN_STAINED_GLASS_PANE_POOLS,
 };
 static BLOCKS_BROWN_TERRACOTTA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3834,6 +3981,7 @@ static BLOCKS_BROWN_TERRACOTTA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BROWN_TERRACOTTA: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/brown_terracotta"),
     pools: BLOCKS_BROWN_TERRACOTTA_POOLS,
 };
 static BLOCKS_BROWN_WOOL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3853,6 +4001,7 @@ static BLOCKS_BROWN_WOOL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BROWN_WOOL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/brown_wool"),
     pools: BLOCKS_BROWN_WOOL_POOLS,
 };
 static BLOCKS_BROWN_WOOL_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3872,6 +4021,7 @@ static BLOCKS_BROWN_WOOL_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_BROWN_WOOL_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/brown_wool_slab"),
     pools: BLOCKS_BROWN_WOOL_SLAB_POOLS,
 };
 static BLOCKS_BROWN_WOOL_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3891,6 +4041,7 @@ static BLOCKS_BROWN_WOOL_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_BROWN_WOOL_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/brown_wool_stairs"),
     pools: BLOCKS_BROWN_WOOL_STAIRS_POOLS,
 };
 static BLOCKS_BUBBLE_CORAL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3910,6 +4061,7 @@ static BLOCKS_BUBBLE_CORAL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_BUBBLE_CORAL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/bubble_coral"),
     pools: BLOCKS_BUBBLE_CORAL_POOLS,
 };
 static BLOCKS_BUBBLE_CORAL_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[
@@ -3943,6 +4095,7 @@ static BLOCKS_BUBBLE_CORAL_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_BUBBLE_CORAL_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/bubble_coral_block"),
     pools: BLOCKS_BUBBLE_CORAL_BLOCK_POOLS,
 };
 static BLOCKS_BUBBLE_CORAL_FAN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3962,10 +4115,12 @@ static BLOCKS_BUBBLE_CORAL_FAN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_BUBBLE_CORAL_FAN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/bubble_coral_fan"),
     pools: BLOCKS_BUBBLE_CORAL_FAN_POOLS,
 };
 static BLOCKS_BUDDING_AMETHYST_POOLS: &[LootPool] = &[];
 pub static BLOCKS_BUDDING_AMETHYST: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/budding_amethyst"),
     pools: BLOCKS_BUDDING_AMETHYST_POOLS,
 };
 static BLOCKS_BUSH_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -3985,6 +4140,7 @@ static BLOCKS_BUSH_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouchOrShears,
 }];
 pub static BLOCKS_BUSH: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/bush"),
     pools: BLOCKS_BUSH_POOLS,
 };
 static BLOCKS_CACTUS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4004,6 +4160,7 @@ static BLOCKS_CACTUS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CACTUS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cactus"),
     pools: BLOCKS_CACTUS_POOLS,
 };
 static BLOCKS_CACTUS_FLOWER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4023,10 +4180,12 @@ static BLOCKS_CACTUS_FLOWER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CACTUS_FLOWER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cactus_flower"),
     pools: BLOCKS_CACTUS_FLOWER_POOLS,
 };
 static BLOCKS_CAKE_POOLS: &[LootPool] = &[];
 pub static BLOCKS_CAKE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cake"),
     pools: BLOCKS_CAKE_POOLS,
 };
 static BLOCKS_CALCITE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4046,6 +4205,7 @@ static BLOCKS_CALCITE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CALCITE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/calcite"),
     pools: BLOCKS_CALCITE_POOLS,
 };
 static BLOCKS_CALIBRATED_SCULK_SENSOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4065,6 +4225,7 @@ static BLOCKS_CALIBRATED_SCULK_SENSOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_CALIBRATED_SCULK_SENSOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/calibrated_sculk_sensor"),
     pools: BLOCKS_CALIBRATED_SCULK_SENSOR_POOLS,
 };
 static BLOCKS_CAMPFIRE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -4098,6 +4259,7 @@ static BLOCKS_CAMPFIRE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_CAMPFIRE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/campfire"),
     pools: BLOCKS_CAMPFIRE_POOLS,
 };
 static BLOCKS_CANDLE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4117,6 +4279,7 @@ static BLOCKS_CANDLE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_CANDLE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/candle"),
     pools: BLOCKS_CANDLE_POOLS,
 };
 static BLOCKS_CANDLE_CAKE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4136,6 +4299,7 @@ static BLOCKS_CANDLE_CAKE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_CANDLE_CAKE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/candle_cake"),
     pools: BLOCKS_CANDLE_CAKE_POOLS,
 };
 static BLOCKS_CARROTS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4176,6 +4340,7 @@ static BLOCKS_CARROTS_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_CARROTS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/carrots"),
     pools: BLOCKS_CARROTS_POOLS,
 };
 static BLOCKS_CARTOGRAPHY_TABLE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4195,6 +4360,7 @@ static BLOCKS_CARTOGRAPHY_TABLE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CARTOGRAPHY_TABLE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cartography_table"),
     pools: BLOCKS_CARTOGRAPHY_TABLE_POOLS,
 };
 static BLOCKS_CARVED_PUMPKIN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4214,6 +4380,7 @@ static BLOCKS_CARVED_PUMPKIN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CARVED_PUMPKIN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/carved_pumpkin"),
     pools: BLOCKS_CARVED_PUMPKIN_POOLS,
 };
 static BLOCKS_CAULDRON_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4233,6 +4400,7 @@ static BLOCKS_CAULDRON_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CAULDRON: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cauldron"),
     pools: BLOCKS_CAULDRON_POOLS,
 };
 static BLOCKS_CAVE_VINES_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4252,6 +4420,7 @@ static BLOCKS_CAVE_VINES_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_CAVE_VINES: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cave_vines"),
     pools: BLOCKS_CAVE_VINES_POOLS,
 };
 static BLOCKS_CAVE_VINES_PLANT_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4271,6 +4440,7 @@ static BLOCKS_CAVE_VINES_PLANT_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_CAVE_VINES_PLANT: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cave_vines_plant"),
     pools: BLOCKS_CAVE_VINES_PLANT_POOLS,
 };
 static BLOCKS_CHERRY_BUTTON_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4290,6 +4460,7 @@ static BLOCKS_CHERRY_BUTTON_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CHERRY_BUTTON: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cherry_button"),
     pools: BLOCKS_CHERRY_BUTTON_POOLS,
 };
 static BLOCKS_CHERRY_DOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4309,6 +4480,7 @@ static BLOCKS_CHERRY_DOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CHERRY_DOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cherry_door"),
     pools: BLOCKS_CHERRY_DOOR_POOLS,
 };
 static BLOCKS_CHERRY_FENCE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4328,6 +4500,7 @@ static BLOCKS_CHERRY_FENCE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CHERRY_FENCE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cherry_fence"),
     pools: BLOCKS_CHERRY_FENCE_POOLS,
 };
 static BLOCKS_CHERRY_FENCE_GATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4347,6 +4520,7 @@ static BLOCKS_CHERRY_FENCE_GATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CHERRY_FENCE_GATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cherry_fence_gate"),
     pools: BLOCKS_CHERRY_FENCE_GATE_POOLS,
 };
 static BLOCKS_CHERRY_HANGING_SIGN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4366,6 +4540,7 @@ static BLOCKS_CHERRY_HANGING_SIGN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CHERRY_HANGING_SIGN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cherry_hanging_sign"),
     pools: BLOCKS_CHERRY_HANGING_SIGN_POOLS,
 };
 static BLOCKS_CHERRY_LEAVES_POOL0_ENTRIES: &[LootEntry] = &[
@@ -4424,6 +4599,7 @@ static BLOCKS_CHERRY_LEAVES_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_CHERRY_LEAVES: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cherry_leaves"),
     pools: BLOCKS_CHERRY_LEAVES_POOLS,
 };
 static BLOCKS_CHERRY_LOG_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4443,6 +4619,7 @@ static BLOCKS_CHERRY_LOG_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CHERRY_LOG: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cherry_log"),
     pools: BLOCKS_CHERRY_LOG_POOLS,
 };
 static BLOCKS_CHERRY_PLANKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4462,6 +4639,7 @@ static BLOCKS_CHERRY_PLANKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CHERRY_PLANKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cherry_planks"),
     pools: BLOCKS_CHERRY_PLANKS_POOLS,
 };
 static BLOCKS_CHERRY_PRESSURE_PLATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4481,6 +4659,7 @@ static BLOCKS_CHERRY_PRESSURE_PLATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CHERRY_PRESSURE_PLATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cherry_pressure_plate"),
     pools: BLOCKS_CHERRY_PRESSURE_PLATE_POOLS,
 };
 static BLOCKS_CHERRY_SAPLING_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4500,6 +4679,7 @@ static BLOCKS_CHERRY_SAPLING_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CHERRY_SAPLING: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cherry_sapling"),
     pools: BLOCKS_CHERRY_SAPLING_POOLS,
 };
 static BLOCKS_CHERRY_SHELF_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4519,6 +4699,7 @@ static BLOCKS_CHERRY_SHELF_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CHERRY_SHELF: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cherry_shelf"),
     pools: BLOCKS_CHERRY_SHELF_POOLS,
 };
 static BLOCKS_CHERRY_SIGN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4538,6 +4719,7 @@ static BLOCKS_CHERRY_SIGN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CHERRY_SIGN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cherry_sign"),
     pools: BLOCKS_CHERRY_SIGN_POOLS,
 };
 static BLOCKS_CHERRY_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4557,6 +4739,7 @@ static BLOCKS_CHERRY_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_CHERRY_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cherry_slab"),
     pools: BLOCKS_CHERRY_SLAB_POOLS,
 };
 static BLOCKS_CHERRY_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4576,6 +4759,7 @@ static BLOCKS_CHERRY_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CHERRY_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cherry_stairs"),
     pools: BLOCKS_CHERRY_STAIRS_POOLS,
 };
 static BLOCKS_CHERRY_TRAPDOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4595,6 +4779,7 @@ static BLOCKS_CHERRY_TRAPDOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CHERRY_TRAPDOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cherry_trapdoor"),
     pools: BLOCKS_CHERRY_TRAPDOOR_POOLS,
 };
 static BLOCKS_CHERRY_WOOD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4614,6 +4799,7 @@ static BLOCKS_CHERRY_WOOD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CHERRY_WOOD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cherry_wood"),
     pools: BLOCKS_CHERRY_WOOD_POOLS,
 };
 static BLOCKS_CHEST_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4633,6 +4819,7 @@ static BLOCKS_CHEST_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CHEST: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/chest"),
     pools: BLOCKS_CHEST_POOLS,
 };
 static BLOCKS_CHIPPED_ANVIL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4652,6 +4839,7 @@ static BLOCKS_CHIPPED_ANVIL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CHIPPED_ANVIL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/chipped_anvil"),
     pools: BLOCKS_CHIPPED_ANVIL_POOLS,
 };
 static BLOCKS_CHISELED_BOOKSHELF_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4671,6 +4859,7 @@ static BLOCKS_CHISELED_BOOKSHELF_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_CHISELED_BOOKSHELF: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/chiseled_bookshelf"),
     pools: BLOCKS_CHISELED_BOOKSHELF_POOLS,
 };
 static BLOCKS_CHISELED_CINNABAR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4690,6 +4879,7 @@ static BLOCKS_CHISELED_CINNABAR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CHISELED_CINNABAR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/chiseled_cinnabar"),
     pools: BLOCKS_CHISELED_CINNABAR_POOLS,
 };
 static BLOCKS_CHISELED_COPPER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4709,6 +4899,7 @@ static BLOCKS_CHISELED_COPPER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CHISELED_COPPER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/chiseled_copper"),
     pools: BLOCKS_CHISELED_COPPER_POOLS,
 };
 static BLOCKS_CHISELED_DEEPSLATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4728,6 +4919,7 @@ static BLOCKS_CHISELED_DEEPSLATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CHISELED_DEEPSLATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/chiseled_deepslate"),
     pools: BLOCKS_CHISELED_DEEPSLATE_POOLS,
 };
 static BLOCKS_CHISELED_NETHER_BRICKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4747,6 +4939,7 @@ static BLOCKS_CHISELED_NETHER_BRICKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CHISELED_NETHER_BRICKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/chiseled_nether_bricks"),
     pools: BLOCKS_CHISELED_NETHER_BRICKS_POOLS,
 };
 static BLOCKS_CHISELED_POLISHED_BLACKSTONE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4766,6 +4959,7 @@ static BLOCKS_CHISELED_POLISHED_BLACKSTONE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CHISELED_POLISHED_BLACKSTONE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/chiseled_polished_blackstone"),
     pools: BLOCKS_CHISELED_POLISHED_BLACKSTONE_POOLS,
 };
 static BLOCKS_CHISELED_QUARTZ_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4785,6 +4979,7 @@ static BLOCKS_CHISELED_QUARTZ_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CHISELED_QUARTZ_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/chiseled_quartz_block"),
     pools: BLOCKS_CHISELED_QUARTZ_BLOCK_POOLS,
 };
 static BLOCKS_CHISELED_RED_SANDSTONE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4804,6 +4999,7 @@ static BLOCKS_CHISELED_RED_SANDSTONE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CHISELED_RED_SANDSTONE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/chiseled_red_sandstone"),
     pools: BLOCKS_CHISELED_RED_SANDSTONE_POOLS,
 };
 static BLOCKS_CHISELED_RESIN_BRICKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4823,6 +5019,7 @@ static BLOCKS_CHISELED_RESIN_BRICKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CHISELED_RESIN_BRICKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/chiseled_resin_bricks"),
     pools: BLOCKS_CHISELED_RESIN_BRICKS_POOLS,
 };
 static BLOCKS_CHISELED_SANDSTONE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4842,6 +5039,7 @@ static BLOCKS_CHISELED_SANDSTONE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CHISELED_SANDSTONE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/chiseled_sandstone"),
     pools: BLOCKS_CHISELED_SANDSTONE_POOLS,
 };
 static BLOCKS_CHISELED_STONE_BRICKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4861,6 +5059,7 @@ static BLOCKS_CHISELED_STONE_BRICKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CHISELED_STONE_BRICKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/chiseled_stone_bricks"),
     pools: BLOCKS_CHISELED_STONE_BRICKS_POOLS,
 };
 static BLOCKS_CHISELED_SULFUR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4880,6 +5079,7 @@ static BLOCKS_CHISELED_SULFUR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CHISELED_SULFUR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/chiseled_sulfur"),
     pools: BLOCKS_CHISELED_SULFUR_POOLS,
 };
 static BLOCKS_CHISELED_TUFF_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4899,6 +5099,7 @@ static BLOCKS_CHISELED_TUFF_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CHISELED_TUFF: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/chiseled_tuff"),
     pools: BLOCKS_CHISELED_TUFF_POOLS,
 };
 static BLOCKS_CHISELED_TUFF_BRICKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4918,6 +5119,7 @@ static BLOCKS_CHISELED_TUFF_BRICKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CHISELED_TUFF_BRICKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/chiseled_tuff_bricks"),
     pools: BLOCKS_CHISELED_TUFF_BRICKS_POOLS,
 };
 static BLOCKS_CHORUS_FLOWER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4937,6 +5139,7 @@ static BLOCKS_CHORUS_FLOWER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_CHORUS_FLOWER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/chorus_flower"),
     pools: BLOCKS_CHORUS_FLOWER_POOLS,
 };
 static BLOCKS_CHORUS_PLANT_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4956,6 +5159,7 @@ static BLOCKS_CHORUS_PLANT_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_CHORUS_PLANT: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/chorus_plant"),
     pools: BLOCKS_CHORUS_PLANT_POOLS,
 };
 static BLOCKS_CINNABAR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4975,6 +5179,7 @@ static BLOCKS_CINNABAR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CINNABAR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cinnabar"),
     pools: BLOCKS_CINNABAR_POOLS,
 };
 static BLOCKS_CINNABAR_BRICK_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -4994,6 +5199,7 @@ static BLOCKS_CINNABAR_BRICK_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_CINNABAR_BRICK_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cinnabar_brick_slab"),
     pools: BLOCKS_CINNABAR_BRICK_SLAB_POOLS,
 };
 static BLOCKS_CINNABAR_BRICK_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5013,6 +5219,7 @@ static BLOCKS_CINNABAR_BRICK_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CINNABAR_BRICK_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cinnabar_brick_stairs"),
     pools: BLOCKS_CINNABAR_BRICK_STAIRS_POOLS,
 };
 static BLOCKS_CINNABAR_BRICK_WALL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5032,6 +5239,7 @@ static BLOCKS_CINNABAR_BRICK_WALL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CINNABAR_BRICK_WALL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cinnabar_brick_wall"),
     pools: BLOCKS_CINNABAR_BRICK_WALL_POOLS,
 };
 static BLOCKS_CINNABAR_BRICKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5051,6 +5259,7 @@ static BLOCKS_CINNABAR_BRICKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CINNABAR_BRICKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cinnabar_bricks"),
     pools: BLOCKS_CINNABAR_BRICKS_POOLS,
 };
 static BLOCKS_CINNABAR_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5070,6 +5279,7 @@ static BLOCKS_CINNABAR_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_CINNABAR_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cinnabar_slab"),
     pools: BLOCKS_CINNABAR_SLAB_POOLS,
 };
 static BLOCKS_CINNABAR_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5089,6 +5299,7 @@ static BLOCKS_CINNABAR_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CINNABAR_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cinnabar_stairs"),
     pools: BLOCKS_CINNABAR_STAIRS_POOLS,
 };
 static BLOCKS_CINNABAR_WALL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5108,6 +5319,7 @@ static BLOCKS_CINNABAR_WALL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CINNABAR_WALL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cinnabar_wall"),
     pools: BLOCKS_CINNABAR_WALL_POOLS,
 };
 static BLOCKS_CLAY_POOL0_ENTRIES: &[LootEntry] = &[
@@ -5138,6 +5350,7 @@ static BLOCKS_CLAY_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_CLAY: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/clay"),
     pools: BLOCKS_CLAY_POOLS,
 };
 static BLOCKS_CLOSED_EYEBLOSSOM_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5157,6 +5370,7 @@ static BLOCKS_CLOSED_EYEBLOSSOM_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CLOSED_EYEBLOSSOM: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/closed_eyeblossom"),
     pools: BLOCKS_CLOSED_EYEBLOSSOM_POOLS,
 };
 static BLOCKS_COAL_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5176,6 +5390,7 @@ static BLOCKS_COAL_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_COAL_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/coal_block"),
     pools: BLOCKS_COAL_BLOCK_POOLS,
 };
 static BLOCKS_COAL_ORE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -5206,6 +5421,7 @@ static BLOCKS_COAL_ORE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_COAL_ORE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/coal_ore"),
     pools: BLOCKS_COAL_ORE_POOLS,
 };
 static BLOCKS_COARSE_DIRT_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5225,6 +5441,7 @@ static BLOCKS_COARSE_DIRT_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_COARSE_DIRT: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/coarse_dirt"),
     pools: BLOCKS_COARSE_DIRT_POOLS,
 };
 static BLOCKS_COBBLED_DEEPSLATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5244,6 +5461,7 @@ static BLOCKS_COBBLED_DEEPSLATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_COBBLED_DEEPSLATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cobbled_deepslate"),
     pools: BLOCKS_COBBLED_DEEPSLATE_POOLS,
 };
 static BLOCKS_COBBLED_DEEPSLATE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5263,6 +5481,7 @@ static BLOCKS_COBBLED_DEEPSLATE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_COBBLED_DEEPSLATE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cobbled_deepslate_slab"),
     pools: BLOCKS_COBBLED_DEEPSLATE_SLAB_POOLS,
 };
 static BLOCKS_COBBLED_DEEPSLATE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5282,6 +5501,7 @@ static BLOCKS_COBBLED_DEEPSLATE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_COBBLED_DEEPSLATE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cobbled_deepslate_stairs"),
     pools: BLOCKS_COBBLED_DEEPSLATE_STAIRS_POOLS,
 };
 static BLOCKS_COBBLED_DEEPSLATE_WALL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5301,6 +5521,7 @@ static BLOCKS_COBBLED_DEEPSLATE_WALL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_COBBLED_DEEPSLATE_WALL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cobbled_deepslate_wall"),
     pools: BLOCKS_COBBLED_DEEPSLATE_WALL_POOLS,
 };
 static BLOCKS_COBBLESTONE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5320,6 +5541,7 @@ static BLOCKS_COBBLESTONE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_COBBLESTONE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cobblestone"),
     pools: BLOCKS_COBBLESTONE_POOLS,
 };
 static BLOCKS_COBBLESTONE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5339,6 +5561,7 @@ static BLOCKS_COBBLESTONE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_COBBLESTONE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cobblestone_slab"),
     pools: BLOCKS_COBBLESTONE_SLAB_POOLS,
 };
 static BLOCKS_COBBLESTONE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5358,6 +5581,7 @@ static BLOCKS_COBBLESTONE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_COBBLESTONE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cobblestone_stairs"),
     pools: BLOCKS_COBBLESTONE_STAIRS_POOLS,
 };
 static BLOCKS_COBBLESTONE_WALL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5377,6 +5601,7 @@ static BLOCKS_COBBLESTONE_WALL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_COBBLESTONE_WALL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cobblestone_wall"),
     pools: BLOCKS_COBBLESTONE_WALL_POOLS,
 };
 static BLOCKS_COBWEB_POOL0_ENTRIES: &[LootEntry] = &[
@@ -5410,6 +5635,7 @@ static BLOCKS_COBWEB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_COBWEB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cobweb"),
     pools: BLOCKS_COBWEB_POOLS,
 };
 static BLOCKS_COCOA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5429,6 +5655,7 @@ static BLOCKS_COCOA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_COCOA: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cocoa"),
     pools: BLOCKS_COCOA_POOLS,
 };
 static BLOCKS_COMPARATOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5448,6 +5675,7 @@ static BLOCKS_COMPARATOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_COMPARATOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/comparator"),
     pools: BLOCKS_COMPARATOR_POOLS,
 };
 static BLOCKS_COMPOSTER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5485,6 +5713,7 @@ static BLOCKS_COMPOSTER_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_COMPOSTER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/composter"),
     pools: BLOCKS_COMPOSTER_POOLS,
 };
 static BLOCKS_CONDUIT_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5504,6 +5733,7 @@ static BLOCKS_CONDUIT_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_CONDUIT: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/conduit"),
     pools: BLOCKS_CONDUIT_POOLS,
 };
 static BLOCKS_COPPER_BARS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5523,6 +5753,7 @@ static BLOCKS_COPPER_BARS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_COPPER_BARS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/copper_bars"),
     pools: BLOCKS_COPPER_BARS_POOLS,
 };
 static BLOCKS_COPPER_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5542,6 +5773,7 @@ static BLOCKS_COPPER_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_COPPER_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/copper_block"),
     pools: BLOCKS_COPPER_BLOCK_POOLS,
 };
 static BLOCKS_COPPER_BULB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5561,6 +5793,7 @@ static BLOCKS_COPPER_BULB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_COPPER_BULB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/copper_bulb"),
     pools: BLOCKS_COPPER_BULB_POOLS,
 };
 static BLOCKS_COPPER_CHAIN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5580,6 +5813,7 @@ static BLOCKS_COPPER_CHAIN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_COPPER_CHAIN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/copper_chain"),
     pools: BLOCKS_COPPER_CHAIN_POOLS,
 };
 static BLOCKS_COPPER_CHEST_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5599,6 +5833,7 @@ static BLOCKS_COPPER_CHEST_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_COPPER_CHEST: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/copper_chest"),
     pools: BLOCKS_COPPER_CHEST_POOLS,
 };
 static BLOCKS_COPPER_DOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5618,6 +5853,7 @@ static BLOCKS_COPPER_DOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_COPPER_DOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/copper_door"),
     pools: BLOCKS_COPPER_DOOR_POOLS,
 };
 static BLOCKS_COPPER_GOLEM_STATUE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5637,6 +5873,7 @@ static BLOCKS_COPPER_GOLEM_STATUE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_COPPER_GOLEM_STATUE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/copper_golem_statue"),
     pools: BLOCKS_COPPER_GOLEM_STATUE_POOLS,
 };
 static BLOCKS_COPPER_GRATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5656,6 +5893,7 @@ static BLOCKS_COPPER_GRATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_COPPER_GRATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/copper_grate"),
     pools: BLOCKS_COPPER_GRATE_POOLS,
 };
 static BLOCKS_COPPER_LANTERN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5675,6 +5913,7 @@ static BLOCKS_COPPER_LANTERN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_COPPER_LANTERN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/copper_lantern"),
     pools: BLOCKS_COPPER_LANTERN_POOLS,
 };
 static BLOCKS_COPPER_ORE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -5705,6 +5944,7 @@ static BLOCKS_COPPER_ORE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_COPPER_ORE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/copper_ore"),
     pools: BLOCKS_COPPER_ORE_POOLS,
 };
 static BLOCKS_COPPER_TORCH_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5724,6 +5964,7 @@ static BLOCKS_COPPER_TORCH_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_COPPER_TORCH: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/copper_torch"),
     pools: BLOCKS_COPPER_TORCH_POOLS,
 };
 static BLOCKS_COPPER_TRAPDOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5743,6 +5984,7 @@ static BLOCKS_COPPER_TRAPDOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_COPPER_TRAPDOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/copper_trapdoor"),
     pools: BLOCKS_COPPER_TRAPDOOR_POOLS,
 };
 static BLOCKS_CORNFLOWER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5762,6 +6004,7 @@ static BLOCKS_CORNFLOWER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CORNFLOWER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cornflower"),
     pools: BLOCKS_CORNFLOWER_POOLS,
 };
 static BLOCKS_CRACKED_DEEPSLATE_BRICKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5781,6 +6024,7 @@ static BLOCKS_CRACKED_DEEPSLATE_BRICKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CRACKED_DEEPSLATE_BRICKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cracked_deepslate_bricks"),
     pools: BLOCKS_CRACKED_DEEPSLATE_BRICKS_POOLS,
 };
 static BLOCKS_CRACKED_DEEPSLATE_TILES_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5800,6 +6044,7 @@ static BLOCKS_CRACKED_DEEPSLATE_TILES_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CRACKED_DEEPSLATE_TILES: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cracked_deepslate_tiles"),
     pools: BLOCKS_CRACKED_DEEPSLATE_TILES_POOLS,
 };
 static BLOCKS_CRACKED_NETHER_BRICKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5819,6 +6064,7 @@ static BLOCKS_CRACKED_NETHER_BRICKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CRACKED_NETHER_BRICKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cracked_nether_bricks"),
     pools: BLOCKS_CRACKED_NETHER_BRICKS_POOLS,
 };
 static BLOCKS_CRACKED_POLISHED_BLACKSTONE_BRICKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5838,6 +6084,7 @@ static BLOCKS_CRACKED_POLISHED_BLACKSTONE_BRICKS_POOLS: &[LootPool] = &[LootPool
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CRACKED_POLISHED_BLACKSTONE_BRICKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cracked_polished_blackstone_bricks"),
     pools: BLOCKS_CRACKED_POLISHED_BLACKSTONE_BRICKS_POOLS,
 };
 static BLOCKS_CRACKED_STONE_BRICKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5857,6 +6104,7 @@ static BLOCKS_CRACKED_STONE_BRICKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CRACKED_STONE_BRICKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cracked_stone_bricks"),
     pools: BLOCKS_CRACKED_STONE_BRICKS_POOLS,
 };
 static BLOCKS_CRAFTER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5876,6 +6124,7 @@ static BLOCKS_CRAFTER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CRAFTER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/crafter"),
     pools: BLOCKS_CRAFTER_POOLS,
 };
 static BLOCKS_CRAFTING_TABLE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5895,6 +6144,7 @@ static BLOCKS_CRAFTING_TABLE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CRAFTING_TABLE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/crafting_table"),
     pools: BLOCKS_CRAFTING_TABLE_POOLS,
 };
 static BLOCKS_CREAKING_HEART_POOL0_ENTRIES: &[LootEntry] = &[
@@ -5925,6 +6175,7 @@ static BLOCKS_CREAKING_HEART_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_CREAKING_HEART: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/creaking_heart"),
     pools: BLOCKS_CREAKING_HEART_POOLS,
 };
 static BLOCKS_CREEPER_HEAD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5944,6 +6195,7 @@ static BLOCKS_CREEPER_HEAD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_CREEPER_HEAD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/creeper_head"),
     pools: BLOCKS_CREEPER_HEAD_POOLS,
 };
 static BLOCKS_CRIMSON_BUTTON_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5963,6 +6215,7 @@ static BLOCKS_CRIMSON_BUTTON_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CRIMSON_BUTTON: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/crimson_button"),
     pools: BLOCKS_CRIMSON_BUTTON_POOLS,
 };
 static BLOCKS_CRIMSON_DOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -5982,6 +6235,7 @@ static BLOCKS_CRIMSON_DOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CRIMSON_DOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/crimson_door"),
     pools: BLOCKS_CRIMSON_DOOR_POOLS,
 };
 static BLOCKS_CRIMSON_FENCE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6001,6 +6255,7 @@ static BLOCKS_CRIMSON_FENCE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CRIMSON_FENCE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/crimson_fence"),
     pools: BLOCKS_CRIMSON_FENCE_POOLS,
 };
 static BLOCKS_CRIMSON_FENCE_GATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6020,6 +6275,7 @@ static BLOCKS_CRIMSON_FENCE_GATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CRIMSON_FENCE_GATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/crimson_fence_gate"),
     pools: BLOCKS_CRIMSON_FENCE_GATE_POOLS,
 };
 static BLOCKS_CRIMSON_FUNGUS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6039,6 +6295,7 @@ static BLOCKS_CRIMSON_FUNGUS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CRIMSON_FUNGUS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/crimson_fungus"),
     pools: BLOCKS_CRIMSON_FUNGUS_POOLS,
 };
 static BLOCKS_CRIMSON_HANGING_SIGN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6058,6 +6315,7 @@ static BLOCKS_CRIMSON_HANGING_SIGN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CRIMSON_HANGING_SIGN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/crimson_hanging_sign"),
     pools: BLOCKS_CRIMSON_HANGING_SIGN_POOLS,
 };
 static BLOCKS_CRIMSON_HYPHAE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6077,6 +6335,7 @@ static BLOCKS_CRIMSON_HYPHAE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CRIMSON_HYPHAE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/crimson_hyphae"),
     pools: BLOCKS_CRIMSON_HYPHAE_POOLS,
 };
 static BLOCKS_CRIMSON_NYLIUM_POOL0_ENTRIES: &[LootEntry] = &[
@@ -6110,6 +6369,7 @@ static BLOCKS_CRIMSON_NYLIUM_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_CRIMSON_NYLIUM: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/crimson_nylium"),
     pools: BLOCKS_CRIMSON_NYLIUM_POOLS,
 };
 static BLOCKS_CRIMSON_PLANKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6129,6 +6389,7 @@ static BLOCKS_CRIMSON_PLANKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CRIMSON_PLANKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/crimson_planks"),
     pools: BLOCKS_CRIMSON_PLANKS_POOLS,
 };
 static BLOCKS_CRIMSON_PRESSURE_PLATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6148,6 +6409,7 @@ static BLOCKS_CRIMSON_PRESSURE_PLATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CRIMSON_PRESSURE_PLATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/crimson_pressure_plate"),
     pools: BLOCKS_CRIMSON_PRESSURE_PLATE_POOLS,
 };
 static BLOCKS_CRIMSON_ROOTS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6167,6 +6429,7 @@ static BLOCKS_CRIMSON_ROOTS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CRIMSON_ROOTS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/crimson_roots"),
     pools: BLOCKS_CRIMSON_ROOTS_POOLS,
 };
 static BLOCKS_CRIMSON_SHELF_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6186,6 +6449,7 @@ static BLOCKS_CRIMSON_SHELF_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CRIMSON_SHELF: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/crimson_shelf"),
     pools: BLOCKS_CRIMSON_SHELF_POOLS,
 };
 static BLOCKS_CRIMSON_SIGN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6205,6 +6469,7 @@ static BLOCKS_CRIMSON_SIGN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CRIMSON_SIGN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/crimson_sign"),
     pools: BLOCKS_CRIMSON_SIGN_POOLS,
 };
 static BLOCKS_CRIMSON_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6224,6 +6489,7 @@ static BLOCKS_CRIMSON_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_CRIMSON_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/crimson_slab"),
     pools: BLOCKS_CRIMSON_SLAB_POOLS,
 };
 static BLOCKS_CRIMSON_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6243,6 +6509,7 @@ static BLOCKS_CRIMSON_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CRIMSON_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/crimson_stairs"),
     pools: BLOCKS_CRIMSON_STAIRS_POOLS,
 };
 static BLOCKS_CRIMSON_STEM_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6262,6 +6529,7 @@ static BLOCKS_CRIMSON_STEM_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CRIMSON_STEM: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/crimson_stem"),
     pools: BLOCKS_CRIMSON_STEM_POOLS,
 };
 static BLOCKS_CRIMSON_TRAPDOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6281,6 +6549,7 @@ static BLOCKS_CRIMSON_TRAPDOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CRIMSON_TRAPDOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/crimson_trapdoor"),
     pools: BLOCKS_CRIMSON_TRAPDOOR_POOLS,
 };
 static BLOCKS_CRYING_OBSIDIAN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6300,6 +6569,7 @@ static BLOCKS_CRYING_OBSIDIAN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CRYING_OBSIDIAN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/crying_obsidian"),
     pools: BLOCKS_CRYING_OBSIDIAN_POOLS,
 };
 static BLOCKS_CUT_COPPER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6319,6 +6589,7 @@ static BLOCKS_CUT_COPPER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CUT_COPPER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cut_copper"),
     pools: BLOCKS_CUT_COPPER_POOLS,
 };
 static BLOCKS_CUT_COPPER_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6338,6 +6609,7 @@ static BLOCKS_CUT_COPPER_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_CUT_COPPER_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cut_copper_slab"),
     pools: BLOCKS_CUT_COPPER_SLAB_POOLS,
 };
 static BLOCKS_CUT_COPPER_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6357,6 +6629,7 @@ static BLOCKS_CUT_COPPER_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CUT_COPPER_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cut_copper_stairs"),
     pools: BLOCKS_CUT_COPPER_STAIRS_POOLS,
 };
 static BLOCKS_CUT_RED_SANDSTONE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6376,6 +6649,7 @@ static BLOCKS_CUT_RED_SANDSTONE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CUT_RED_SANDSTONE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cut_red_sandstone"),
     pools: BLOCKS_CUT_RED_SANDSTONE_POOLS,
 };
 static BLOCKS_CUT_RED_SANDSTONE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6395,6 +6669,7 @@ static BLOCKS_CUT_RED_SANDSTONE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_CUT_RED_SANDSTONE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cut_red_sandstone_slab"),
     pools: BLOCKS_CUT_RED_SANDSTONE_SLAB_POOLS,
 };
 static BLOCKS_CUT_SANDSTONE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6414,6 +6689,7 @@ static BLOCKS_CUT_SANDSTONE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CUT_SANDSTONE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cut_sandstone"),
     pools: BLOCKS_CUT_SANDSTONE_POOLS,
 };
 static BLOCKS_CUT_SANDSTONE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6433,6 +6709,7 @@ static BLOCKS_CUT_SANDSTONE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_CUT_SANDSTONE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cut_sandstone_slab"),
     pools: BLOCKS_CUT_SANDSTONE_SLAB_POOLS,
 };
 static BLOCKS_CYAN_BANNER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6452,6 +6729,7 @@ static BLOCKS_CYAN_BANNER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CYAN_BANNER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cyan_banner"),
     pools: BLOCKS_CYAN_BANNER_POOLS,
 };
 static BLOCKS_CYAN_BED_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6471,6 +6749,7 @@ static BLOCKS_CYAN_BED_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CYAN_BED: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cyan_bed"),
     pools: BLOCKS_CYAN_BED_POOLS,
 };
 static BLOCKS_CYAN_CANDLE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6490,6 +6769,7 @@ static BLOCKS_CYAN_CANDLE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_CYAN_CANDLE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cyan_candle"),
     pools: BLOCKS_CYAN_CANDLE_POOLS,
 };
 static BLOCKS_CYAN_CANDLE_CAKE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6509,6 +6789,7 @@ static BLOCKS_CYAN_CANDLE_CAKE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_CYAN_CANDLE_CAKE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cyan_candle_cake"),
     pools: BLOCKS_CYAN_CANDLE_CAKE_POOLS,
 };
 static BLOCKS_CYAN_CARPET_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6528,6 +6809,7 @@ static BLOCKS_CYAN_CARPET_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CYAN_CARPET: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cyan_carpet"),
     pools: BLOCKS_CYAN_CARPET_POOLS,
 };
 static BLOCKS_CYAN_CONCRETE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6547,6 +6829,7 @@ static BLOCKS_CYAN_CONCRETE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CYAN_CONCRETE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cyan_concrete"),
     pools: BLOCKS_CYAN_CONCRETE_POOLS,
 };
 static BLOCKS_CYAN_CONCRETE_POWDER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6566,6 +6849,7 @@ static BLOCKS_CYAN_CONCRETE_POWDER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CYAN_CONCRETE_POWDER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cyan_concrete_powder"),
     pools: BLOCKS_CYAN_CONCRETE_POWDER_POOLS,
 };
 static BLOCKS_CYAN_CONCRETE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6585,6 +6869,7 @@ static BLOCKS_CYAN_CONCRETE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_CYAN_CONCRETE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cyan_concrete_slab"),
     pools: BLOCKS_CYAN_CONCRETE_SLAB_POOLS,
 };
 static BLOCKS_CYAN_CONCRETE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6604,6 +6889,7 @@ static BLOCKS_CYAN_CONCRETE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CYAN_CONCRETE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cyan_concrete_stairs"),
     pools: BLOCKS_CYAN_CONCRETE_STAIRS_POOLS,
 };
 static BLOCKS_CYAN_GLAZED_TERRACOTTA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6623,6 +6909,7 @@ static BLOCKS_CYAN_GLAZED_TERRACOTTA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CYAN_GLAZED_TERRACOTTA: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cyan_glazed_terracotta"),
     pools: BLOCKS_CYAN_GLAZED_TERRACOTTA_POOLS,
 };
 static BLOCKS_CYAN_SHULKER_BOX_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6642,6 +6929,7 @@ static BLOCKS_CYAN_SHULKER_BOX_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_CYAN_SHULKER_BOX: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cyan_shulker_box"),
     pools: BLOCKS_CYAN_SHULKER_BOX_POOLS,
 };
 static BLOCKS_CYAN_STAINED_GLASS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6661,6 +6949,7 @@ static BLOCKS_CYAN_STAINED_GLASS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_CYAN_STAINED_GLASS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cyan_stained_glass"),
     pools: BLOCKS_CYAN_STAINED_GLASS_POOLS,
 };
 static BLOCKS_CYAN_STAINED_GLASS_PANE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6680,6 +6969,7 @@ static BLOCKS_CYAN_STAINED_GLASS_PANE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_CYAN_STAINED_GLASS_PANE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cyan_stained_glass_pane"),
     pools: BLOCKS_CYAN_STAINED_GLASS_PANE_POOLS,
 };
 static BLOCKS_CYAN_TERRACOTTA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6699,6 +6989,7 @@ static BLOCKS_CYAN_TERRACOTTA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CYAN_TERRACOTTA: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cyan_terracotta"),
     pools: BLOCKS_CYAN_TERRACOTTA_POOLS,
 };
 static BLOCKS_CYAN_WOOL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6718,6 +7009,7 @@ static BLOCKS_CYAN_WOOL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CYAN_WOOL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cyan_wool"),
     pools: BLOCKS_CYAN_WOOL_POOLS,
 };
 static BLOCKS_CYAN_WOOL_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6737,6 +7029,7 @@ static BLOCKS_CYAN_WOOL_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_CYAN_WOOL_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cyan_wool_slab"),
     pools: BLOCKS_CYAN_WOOL_SLAB_POOLS,
 };
 static BLOCKS_CYAN_WOOL_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6756,6 +7049,7 @@ static BLOCKS_CYAN_WOOL_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_CYAN_WOOL_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/cyan_wool_stairs"),
     pools: BLOCKS_CYAN_WOOL_STAIRS_POOLS,
 };
 static BLOCKS_DAMAGED_ANVIL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6775,6 +7069,7 @@ static BLOCKS_DAMAGED_ANVIL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DAMAGED_ANVIL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/damaged_anvil"),
     pools: BLOCKS_DAMAGED_ANVIL_POOLS,
 };
 static BLOCKS_DANDELION_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6794,6 +7089,7 @@ static BLOCKS_DANDELION_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DANDELION: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dandelion"),
     pools: BLOCKS_DANDELION_POOLS,
 };
 static BLOCKS_DARK_OAK_BUTTON_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6813,6 +7109,7 @@ static BLOCKS_DARK_OAK_BUTTON_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DARK_OAK_BUTTON: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dark_oak_button"),
     pools: BLOCKS_DARK_OAK_BUTTON_POOLS,
 };
 static BLOCKS_DARK_OAK_DOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6832,6 +7129,7 @@ static BLOCKS_DARK_OAK_DOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DARK_OAK_DOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dark_oak_door"),
     pools: BLOCKS_DARK_OAK_DOOR_POOLS,
 };
 static BLOCKS_DARK_OAK_FENCE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6851,6 +7149,7 @@ static BLOCKS_DARK_OAK_FENCE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DARK_OAK_FENCE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dark_oak_fence"),
     pools: BLOCKS_DARK_OAK_FENCE_POOLS,
 };
 static BLOCKS_DARK_OAK_FENCE_GATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6870,6 +7169,7 @@ static BLOCKS_DARK_OAK_FENCE_GATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DARK_OAK_FENCE_GATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dark_oak_fence_gate"),
     pools: BLOCKS_DARK_OAK_FENCE_GATE_POOLS,
 };
 static BLOCKS_DARK_OAK_HANGING_SIGN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6889,6 +7189,7 @@ static BLOCKS_DARK_OAK_HANGING_SIGN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DARK_OAK_HANGING_SIGN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dark_oak_hanging_sign"),
     pools: BLOCKS_DARK_OAK_HANGING_SIGN_POOLS,
 };
 static BLOCKS_DARK_OAK_LEAVES_POOL0_ENTRIES: &[LootEntry] = &[
@@ -6974,6 +7275,7 @@ static BLOCKS_DARK_OAK_LEAVES_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_DARK_OAK_LEAVES: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dark_oak_leaves"),
     pools: BLOCKS_DARK_OAK_LEAVES_POOLS,
 };
 static BLOCKS_DARK_OAK_LOG_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -6993,6 +7295,7 @@ static BLOCKS_DARK_OAK_LOG_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DARK_OAK_LOG: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dark_oak_log"),
     pools: BLOCKS_DARK_OAK_LOG_POOLS,
 };
 static BLOCKS_DARK_OAK_PLANKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7012,6 +7315,7 @@ static BLOCKS_DARK_OAK_PLANKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DARK_OAK_PLANKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dark_oak_planks"),
     pools: BLOCKS_DARK_OAK_PLANKS_POOLS,
 };
 static BLOCKS_DARK_OAK_PRESSURE_PLATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7031,6 +7335,7 @@ static BLOCKS_DARK_OAK_PRESSURE_PLATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DARK_OAK_PRESSURE_PLATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dark_oak_pressure_plate"),
     pools: BLOCKS_DARK_OAK_PRESSURE_PLATE_POOLS,
 };
 static BLOCKS_DARK_OAK_SAPLING_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7050,6 +7355,7 @@ static BLOCKS_DARK_OAK_SAPLING_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DARK_OAK_SAPLING: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dark_oak_sapling"),
     pools: BLOCKS_DARK_OAK_SAPLING_POOLS,
 };
 static BLOCKS_DARK_OAK_SHELF_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7069,6 +7375,7 @@ static BLOCKS_DARK_OAK_SHELF_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DARK_OAK_SHELF: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dark_oak_shelf"),
     pools: BLOCKS_DARK_OAK_SHELF_POOLS,
 };
 static BLOCKS_DARK_OAK_SIGN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7088,6 +7395,7 @@ static BLOCKS_DARK_OAK_SIGN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DARK_OAK_SIGN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dark_oak_sign"),
     pools: BLOCKS_DARK_OAK_SIGN_POOLS,
 };
 static BLOCKS_DARK_OAK_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7107,6 +7415,7 @@ static BLOCKS_DARK_OAK_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_DARK_OAK_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dark_oak_slab"),
     pools: BLOCKS_DARK_OAK_SLAB_POOLS,
 };
 static BLOCKS_DARK_OAK_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7126,6 +7435,7 @@ static BLOCKS_DARK_OAK_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DARK_OAK_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dark_oak_stairs"),
     pools: BLOCKS_DARK_OAK_STAIRS_POOLS,
 };
 static BLOCKS_DARK_OAK_TRAPDOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7145,6 +7455,7 @@ static BLOCKS_DARK_OAK_TRAPDOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DARK_OAK_TRAPDOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dark_oak_trapdoor"),
     pools: BLOCKS_DARK_OAK_TRAPDOOR_POOLS,
 };
 static BLOCKS_DARK_OAK_WOOD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7164,6 +7475,7 @@ static BLOCKS_DARK_OAK_WOOD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DARK_OAK_WOOD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dark_oak_wood"),
     pools: BLOCKS_DARK_OAK_WOOD_POOLS,
 };
 static BLOCKS_DARK_PRISMARINE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7183,6 +7495,7 @@ static BLOCKS_DARK_PRISMARINE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DARK_PRISMARINE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dark_prismarine"),
     pools: BLOCKS_DARK_PRISMARINE_POOLS,
 };
 static BLOCKS_DARK_PRISMARINE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7202,6 +7515,7 @@ static BLOCKS_DARK_PRISMARINE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_DARK_PRISMARINE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dark_prismarine_slab"),
     pools: BLOCKS_DARK_PRISMARINE_SLAB_POOLS,
 };
 static BLOCKS_DARK_PRISMARINE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7221,6 +7535,7 @@ static BLOCKS_DARK_PRISMARINE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DARK_PRISMARINE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dark_prismarine_stairs"),
     pools: BLOCKS_DARK_PRISMARINE_STAIRS_POOLS,
 };
 static BLOCKS_DAYLIGHT_DETECTOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7240,6 +7555,7 @@ static BLOCKS_DAYLIGHT_DETECTOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DAYLIGHT_DETECTOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/daylight_detector"),
     pools: BLOCKS_DAYLIGHT_DETECTOR_POOLS,
 };
 static BLOCKS_DEAD_BRAIN_CORAL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7259,6 +7575,7 @@ static BLOCKS_DEAD_BRAIN_CORAL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_DEAD_BRAIN_CORAL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dead_brain_coral"),
     pools: BLOCKS_DEAD_BRAIN_CORAL_POOLS,
 };
 static BLOCKS_DEAD_BRAIN_CORAL_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7278,6 +7595,7 @@ static BLOCKS_DEAD_BRAIN_CORAL_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DEAD_BRAIN_CORAL_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dead_brain_coral_block"),
     pools: BLOCKS_DEAD_BRAIN_CORAL_BLOCK_POOLS,
 };
 static BLOCKS_DEAD_BRAIN_CORAL_FAN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7297,6 +7615,7 @@ static BLOCKS_DEAD_BRAIN_CORAL_FAN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_DEAD_BRAIN_CORAL_FAN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dead_brain_coral_fan"),
     pools: BLOCKS_DEAD_BRAIN_CORAL_FAN_POOLS,
 };
 static BLOCKS_DEAD_BUBBLE_CORAL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7316,6 +7635,7 @@ static BLOCKS_DEAD_BUBBLE_CORAL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_DEAD_BUBBLE_CORAL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dead_bubble_coral"),
     pools: BLOCKS_DEAD_BUBBLE_CORAL_POOLS,
 };
 static BLOCKS_DEAD_BUBBLE_CORAL_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7335,6 +7655,7 @@ static BLOCKS_DEAD_BUBBLE_CORAL_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DEAD_BUBBLE_CORAL_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dead_bubble_coral_block"),
     pools: BLOCKS_DEAD_BUBBLE_CORAL_BLOCK_POOLS,
 };
 static BLOCKS_DEAD_BUBBLE_CORAL_FAN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7354,6 +7675,7 @@ static BLOCKS_DEAD_BUBBLE_CORAL_FAN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_DEAD_BUBBLE_CORAL_FAN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dead_bubble_coral_fan"),
     pools: BLOCKS_DEAD_BUBBLE_CORAL_FAN_POOLS,
 };
 static BLOCKS_DEAD_BUSH_POOL0_ENTRIES: &[LootEntry] = &[
@@ -7384,6 +7706,7 @@ static BLOCKS_DEAD_BUSH_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_DEAD_BUSH: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dead_bush"),
     pools: BLOCKS_DEAD_BUSH_POOLS,
 };
 static BLOCKS_DEAD_FIRE_CORAL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7403,6 +7726,7 @@ static BLOCKS_DEAD_FIRE_CORAL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_DEAD_FIRE_CORAL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dead_fire_coral"),
     pools: BLOCKS_DEAD_FIRE_CORAL_POOLS,
 };
 static BLOCKS_DEAD_FIRE_CORAL_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7422,6 +7746,7 @@ static BLOCKS_DEAD_FIRE_CORAL_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DEAD_FIRE_CORAL_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dead_fire_coral_block"),
     pools: BLOCKS_DEAD_FIRE_CORAL_BLOCK_POOLS,
 };
 static BLOCKS_DEAD_FIRE_CORAL_FAN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7441,6 +7766,7 @@ static BLOCKS_DEAD_FIRE_CORAL_FAN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_DEAD_FIRE_CORAL_FAN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dead_fire_coral_fan"),
     pools: BLOCKS_DEAD_FIRE_CORAL_FAN_POOLS,
 };
 static BLOCKS_DEAD_HORN_CORAL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7460,6 +7786,7 @@ static BLOCKS_DEAD_HORN_CORAL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_DEAD_HORN_CORAL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dead_horn_coral"),
     pools: BLOCKS_DEAD_HORN_CORAL_POOLS,
 };
 static BLOCKS_DEAD_HORN_CORAL_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7479,6 +7806,7 @@ static BLOCKS_DEAD_HORN_CORAL_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DEAD_HORN_CORAL_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dead_horn_coral_block"),
     pools: BLOCKS_DEAD_HORN_CORAL_BLOCK_POOLS,
 };
 static BLOCKS_DEAD_HORN_CORAL_FAN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7498,6 +7826,7 @@ static BLOCKS_DEAD_HORN_CORAL_FAN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_DEAD_HORN_CORAL_FAN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dead_horn_coral_fan"),
     pools: BLOCKS_DEAD_HORN_CORAL_FAN_POOLS,
 };
 static BLOCKS_DEAD_TUBE_CORAL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7517,6 +7846,7 @@ static BLOCKS_DEAD_TUBE_CORAL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_DEAD_TUBE_CORAL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dead_tube_coral"),
     pools: BLOCKS_DEAD_TUBE_CORAL_POOLS,
 };
 static BLOCKS_DEAD_TUBE_CORAL_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7536,6 +7866,7 @@ static BLOCKS_DEAD_TUBE_CORAL_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DEAD_TUBE_CORAL_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dead_tube_coral_block"),
     pools: BLOCKS_DEAD_TUBE_CORAL_BLOCK_POOLS,
 };
 static BLOCKS_DEAD_TUBE_CORAL_FAN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7555,6 +7886,7 @@ static BLOCKS_DEAD_TUBE_CORAL_FAN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_DEAD_TUBE_CORAL_FAN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dead_tube_coral_fan"),
     pools: BLOCKS_DEAD_TUBE_CORAL_FAN_POOLS,
 };
 static BLOCKS_DECORATED_POT_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7574,6 +7906,7 @@ static BLOCKS_DECORATED_POT_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_DECORATED_POT: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/decorated_pot"),
     pools: BLOCKS_DECORATED_POT_POOLS,
 };
 static BLOCKS_DEEPSLATE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -7607,6 +7940,7 @@ static BLOCKS_DEEPSLATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_DEEPSLATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/deepslate"),
     pools: BLOCKS_DEEPSLATE_POOLS,
 };
 static BLOCKS_DEEPSLATE_BRICK_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7626,6 +7960,7 @@ static BLOCKS_DEEPSLATE_BRICK_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_DEEPSLATE_BRICK_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/deepslate_brick_slab"),
     pools: BLOCKS_DEEPSLATE_BRICK_SLAB_POOLS,
 };
 static BLOCKS_DEEPSLATE_BRICK_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7645,6 +7980,7 @@ static BLOCKS_DEEPSLATE_BRICK_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DEEPSLATE_BRICK_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/deepslate_brick_stairs"),
     pools: BLOCKS_DEEPSLATE_BRICK_STAIRS_POOLS,
 };
 static BLOCKS_DEEPSLATE_BRICK_WALL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7664,6 +8000,7 @@ static BLOCKS_DEEPSLATE_BRICK_WALL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DEEPSLATE_BRICK_WALL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/deepslate_brick_wall"),
     pools: BLOCKS_DEEPSLATE_BRICK_WALL_POOLS,
 };
 static BLOCKS_DEEPSLATE_BRICKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7683,6 +8020,7 @@ static BLOCKS_DEEPSLATE_BRICKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DEEPSLATE_BRICKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/deepslate_bricks"),
     pools: BLOCKS_DEEPSLATE_BRICKS_POOLS,
 };
 static BLOCKS_DEEPSLATE_COAL_ORE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -7713,6 +8051,7 @@ static BLOCKS_DEEPSLATE_COAL_ORE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_DEEPSLATE_COAL_ORE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/deepslate_coal_ore"),
     pools: BLOCKS_DEEPSLATE_COAL_ORE_POOLS,
 };
 static BLOCKS_DEEPSLATE_COPPER_ORE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -7743,6 +8082,7 @@ static BLOCKS_DEEPSLATE_COPPER_ORE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_DEEPSLATE_COPPER_ORE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/deepslate_copper_ore"),
     pools: BLOCKS_DEEPSLATE_COPPER_ORE_POOLS,
 };
 static BLOCKS_DEEPSLATE_DIAMOND_ORE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -7773,6 +8113,7 @@ static BLOCKS_DEEPSLATE_DIAMOND_ORE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_DEEPSLATE_DIAMOND_ORE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/deepslate_diamond_ore"),
     pools: BLOCKS_DEEPSLATE_DIAMOND_ORE_POOLS,
 };
 static BLOCKS_DEEPSLATE_EMERALD_ORE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -7803,6 +8144,7 @@ static BLOCKS_DEEPSLATE_EMERALD_ORE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_DEEPSLATE_EMERALD_ORE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/deepslate_emerald_ore"),
     pools: BLOCKS_DEEPSLATE_EMERALD_ORE_POOLS,
 };
 static BLOCKS_DEEPSLATE_GOLD_ORE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -7833,6 +8175,7 @@ static BLOCKS_DEEPSLATE_GOLD_ORE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_DEEPSLATE_GOLD_ORE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/deepslate_gold_ore"),
     pools: BLOCKS_DEEPSLATE_GOLD_ORE_POOLS,
 };
 static BLOCKS_DEEPSLATE_IRON_ORE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -7863,6 +8206,7 @@ static BLOCKS_DEEPSLATE_IRON_ORE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_DEEPSLATE_IRON_ORE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/deepslate_iron_ore"),
     pools: BLOCKS_DEEPSLATE_IRON_ORE_POOLS,
 };
 static BLOCKS_DEEPSLATE_LAPIS_ORE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -7893,6 +8237,7 @@ static BLOCKS_DEEPSLATE_LAPIS_ORE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_DEEPSLATE_LAPIS_ORE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/deepslate_lapis_ore"),
     pools: BLOCKS_DEEPSLATE_LAPIS_ORE_POOLS,
 };
 static BLOCKS_DEEPSLATE_REDSTONE_ORE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -7923,6 +8268,7 @@ static BLOCKS_DEEPSLATE_REDSTONE_ORE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_DEEPSLATE_REDSTONE_ORE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/deepslate_redstone_ore"),
     pools: BLOCKS_DEEPSLATE_REDSTONE_ORE_POOLS,
 };
 static BLOCKS_DEEPSLATE_TILE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7942,6 +8288,7 @@ static BLOCKS_DEEPSLATE_TILE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_DEEPSLATE_TILE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/deepslate_tile_slab"),
     pools: BLOCKS_DEEPSLATE_TILE_SLAB_POOLS,
 };
 static BLOCKS_DEEPSLATE_TILE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7961,6 +8308,7 @@ static BLOCKS_DEEPSLATE_TILE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DEEPSLATE_TILE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/deepslate_tile_stairs"),
     pools: BLOCKS_DEEPSLATE_TILE_STAIRS_POOLS,
 };
 static BLOCKS_DEEPSLATE_TILE_WALL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7980,6 +8328,7 @@ static BLOCKS_DEEPSLATE_TILE_WALL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DEEPSLATE_TILE_WALL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/deepslate_tile_wall"),
     pools: BLOCKS_DEEPSLATE_TILE_WALL_POOLS,
 };
 static BLOCKS_DEEPSLATE_TILES_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -7999,6 +8348,7 @@ static BLOCKS_DEEPSLATE_TILES_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DEEPSLATE_TILES: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/deepslate_tiles"),
     pools: BLOCKS_DEEPSLATE_TILES_POOLS,
 };
 static BLOCKS_DETECTOR_RAIL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8018,6 +8368,7 @@ static BLOCKS_DETECTOR_RAIL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DETECTOR_RAIL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/detector_rail"),
     pools: BLOCKS_DETECTOR_RAIL_POOLS,
 };
 static BLOCKS_DIAMOND_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8037,6 +8388,7 @@ static BLOCKS_DIAMOND_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DIAMOND_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/diamond_block"),
     pools: BLOCKS_DIAMOND_BLOCK_POOLS,
 };
 static BLOCKS_DIAMOND_ORE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -8067,6 +8419,7 @@ static BLOCKS_DIAMOND_ORE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_DIAMOND_ORE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/diamond_ore"),
     pools: BLOCKS_DIAMOND_ORE_POOLS,
 };
 static BLOCKS_DIORITE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8086,6 +8439,7 @@ static BLOCKS_DIORITE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DIORITE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/diorite"),
     pools: BLOCKS_DIORITE_POOLS,
 };
 static BLOCKS_DIORITE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8105,6 +8459,7 @@ static BLOCKS_DIORITE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_DIORITE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/diorite_slab"),
     pools: BLOCKS_DIORITE_SLAB_POOLS,
 };
 static BLOCKS_DIORITE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8124,6 +8479,7 @@ static BLOCKS_DIORITE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DIORITE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/diorite_stairs"),
     pools: BLOCKS_DIORITE_STAIRS_POOLS,
 };
 static BLOCKS_DIORITE_WALL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8143,6 +8499,7 @@ static BLOCKS_DIORITE_WALL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DIORITE_WALL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/diorite_wall"),
     pools: BLOCKS_DIORITE_WALL_POOLS,
 };
 static BLOCKS_DIRT_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8162,6 +8519,7 @@ static BLOCKS_DIRT_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DIRT: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dirt"),
     pools: BLOCKS_DIRT_POOLS,
 };
 static BLOCKS_DIRT_PATH_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8181,6 +8539,7 @@ static BLOCKS_DIRT_PATH_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DIRT_PATH: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dirt_path"),
     pools: BLOCKS_DIRT_PATH_POOLS,
 };
 static BLOCKS_DISPENSER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8200,6 +8559,7 @@ static BLOCKS_DISPENSER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DISPENSER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dispenser"),
     pools: BLOCKS_DISPENSER_POOLS,
 };
 static BLOCKS_DRAGON_EGG_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8219,6 +8579,7 @@ static BLOCKS_DRAGON_EGG_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_DRAGON_EGG: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dragon_egg"),
     pools: BLOCKS_DRAGON_EGG_POOLS,
 };
 static BLOCKS_DRAGON_HEAD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8238,6 +8599,7 @@ static BLOCKS_DRAGON_HEAD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_DRAGON_HEAD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dragon_head"),
     pools: BLOCKS_DRAGON_HEAD_POOLS,
 };
 static BLOCKS_DRIED_GHAST_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8257,6 +8619,7 @@ static BLOCKS_DRIED_GHAST_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DRIED_GHAST: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dried_ghast"),
     pools: BLOCKS_DRIED_GHAST_POOLS,
 };
 static BLOCKS_DRIED_KELP_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8276,6 +8639,7 @@ static BLOCKS_DRIED_KELP_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DRIED_KELP_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dried_kelp_block"),
     pools: BLOCKS_DRIED_KELP_BLOCK_POOLS,
 };
 static BLOCKS_DRIPSTONE_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8295,6 +8659,7 @@ static BLOCKS_DRIPSTONE_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DRIPSTONE_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dripstone_block"),
     pools: BLOCKS_DRIPSTONE_BLOCK_POOLS,
 };
 static BLOCKS_DROPPER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8314,6 +8679,7 @@ static BLOCKS_DROPPER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_DROPPER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/dropper"),
     pools: BLOCKS_DROPPER_POOLS,
 };
 static BLOCKS_EMERALD_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8333,6 +8699,7 @@ static BLOCKS_EMERALD_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_EMERALD_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/emerald_block"),
     pools: BLOCKS_EMERALD_BLOCK_POOLS,
 };
 static BLOCKS_EMERALD_ORE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -8363,6 +8730,7 @@ static BLOCKS_EMERALD_ORE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_EMERALD_ORE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/emerald_ore"),
     pools: BLOCKS_EMERALD_ORE_POOLS,
 };
 static BLOCKS_ENCHANTING_TABLE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8382,6 +8750,7 @@ static BLOCKS_ENCHANTING_TABLE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_ENCHANTING_TABLE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/enchanting_table"),
     pools: BLOCKS_ENCHANTING_TABLE_POOLS,
 };
 static BLOCKS_END_ROD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8401,6 +8770,7 @@ static BLOCKS_END_ROD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_END_ROD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/end_rod"),
     pools: BLOCKS_END_ROD_POOLS,
 };
 static BLOCKS_END_STONE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8420,6 +8790,7 @@ static BLOCKS_END_STONE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_END_STONE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/end_stone"),
     pools: BLOCKS_END_STONE_POOLS,
 };
 static BLOCKS_END_STONE_BRICK_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8439,6 +8810,7 @@ static BLOCKS_END_STONE_BRICK_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_END_STONE_BRICK_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/end_stone_brick_slab"),
     pools: BLOCKS_END_STONE_BRICK_SLAB_POOLS,
 };
 static BLOCKS_END_STONE_BRICK_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8458,6 +8830,7 @@ static BLOCKS_END_STONE_BRICK_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_END_STONE_BRICK_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/end_stone_brick_stairs"),
     pools: BLOCKS_END_STONE_BRICK_STAIRS_POOLS,
 };
 static BLOCKS_END_STONE_BRICK_WALL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8477,6 +8850,7 @@ static BLOCKS_END_STONE_BRICK_WALL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_END_STONE_BRICK_WALL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/end_stone_brick_wall"),
     pools: BLOCKS_END_STONE_BRICK_WALL_POOLS,
 };
 static BLOCKS_END_STONE_BRICKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8496,6 +8870,7 @@ static BLOCKS_END_STONE_BRICKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_END_STONE_BRICKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/end_stone_bricks"),
     pools: BLOCKS_END_STONE_BRICKS_POOLS,
 };
 static BLOCKS_ENDER_CHEST_POOL0_ENTRIES: &[LootEntry] = &[
@@ -8526,6 +8901,7 @@ static BLOCKS_ENDER_CHEST_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_ENDER_CHEST: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/ender_chest"),
     pools: BLOCKS_ENDER_CHEST_POOLS,
 };
 static BLOCKS_EXPOSED_CHISELED_COPPER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8545,6 +8921,7 @@ static BLOCKS_EXPOSED_CHISELED_COPPER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_EXPOSED_CHISELED_COPPER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/exposed_chiseled_copper"),
     pools: BLOCKS_EXPOSED_CHISELED_COPPER_POOLS,
 };
 static BLOCKS_EXPOSED_COPPER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8564,6 +8941,7 @@ static BLOCKS_EXPOSED_COPPER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_EXPOSED_COPPER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/exposed_copper"),
     pools: BLOCKS_EXPOSED_COPPER_POOLS,
 };
 static BLOCKS_EXPOSED_COPPER_BARS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8583,6 +8961,7 @@ static BLOCKS_EXPOSED_COPPER_BARS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_EXPOSED_COPPER_BARS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/exposed_copper_bars"),
     pools: BLOCKS_EXPOSED_COPPER_BARS_POOLS,
 };
 static BLOCKS_EXPOSED_COPPER_BULB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8602,6 +8981,7 @@ static BLOCKS_EXPOSED_COPPER_BULB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_EXPOSED_COPPER_BULB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/exposed_copper_bulb"),
     pools: BLOCKS_EXPOSED_COPPER_BULB_POOLS,
 };
 static BLOCKS_EXPOSED_COPPER_CHAIN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8621,6 +9001,7 @@ static BLOCKS_EXPOSED_COPPER_CHAIN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_EXPOSED_COPPER_CHAIN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/exposed_copper_chain"),
     pools: BLOCKS_EXPOSED_COPPER_CHAIN_POOLS,
 };
 static BLOCKS_EXPOSED_COPPER_CHEST_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8640,6 +9021,7 @@ static BLOCKS_EXPOSED_COPPER_CHEST_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_EXPOSED_COPPER_CHEST: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/exposed_copper_chest"),
     pools: BLOCKS_EXPOSED_COPPER_CHEST_POOLS,
 };
 static BLOCKS_EXPOSED_COPPER_DOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8659,6 +9041,7 @@ static BLOCKS_EXPOSED_COPPER_DOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_EXPOSED_COPPER_DOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/exposed_copper_door"),
     pools: BLOCKS_EXPOSED_COPPER_DOOR_POOLS,
 };
 static BLOCKS_EXPOSED_COPPER_GOLEM_STATUE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8678,6 +9061,7 @@ static BLOCKS_EXPOSED_COPPER_GOLEM_STATUE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_EXPOSED_COPPER_GOLEM_STATUE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/exposed_copper_golem_statue"),
     pools: BLOCKS_EXPOSED_COPPER_GOLEM_STATUE_POOLS,
 };
 static BLOCKS_EXPOSED_COPPER_GRATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8697,6 +9081,7 @@ static BLOCKS_EXPOSED_COPPER_GRATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_EXPOSED_COPPER_GRATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/exposed_copper_grate"),
     pools: BLOCKS_EXPOSED_COPPER_GRATE_POOLS,
 };
 static BLOCKS_EXPOSED_COPPER_LANTERN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8716,6 +9101,7 @@ static BLOCKS_EXPOSED_COPPER_LANTERN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_EXPOSED_COPPER_LANTERN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/exposed_copper_lantern"),
     pools: BLOCKS_EXPOSED_COPPER_LANTERN_POOLS,
 };
 static BLOCKS_EXPOSED_COPPER_TRAPDOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8735,6 +9121,7 @@ static BLOCKS_EXPOSED_COPPER_TRAPDOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_EXPOSED_COPPER_TRAPDOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/exposed_copper_trapdoor"),
     pools: BLOCKS_EXPOSED_COPPER_TRAPDOOR_POOLS,
 };
 static BLOCKS_EXPOSED_CUT_COPPER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8754,6 +9141,7 @@ static BLOCKS_EXPOSED_CUT_COPPER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_EXPOSED_CUT_COPPER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/exposed_cut_copper"),
     pools: BLOCKS_EXPOSED_CUT_COPPER_POOLS,
 };
 static BLOCKS_EXPOSED_CUT_COPPER_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8773,6 +9161,7 @@ static BLOCKS_EXPOSED_CUT_COPPER_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_EXPOSED_CUT_COPPER_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/exposed_cut_copper_slab"),
     pools: BLOCKS_EXPOSED_CUT_COPPER_SLAB_POOLS,
 };
 static BLOCKS_EXPOSED_CUT_COPPER_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8792,6 +9181,7 @@ static BLOCKS_EXPOSED_CUT_COPPER_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_EXPOSED_CUT_COPPER_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/exposed_cut_copper_stairs"),
     pools: BLOCKS_EXPOSED_CUT_COPPER_STAIRS_POOLS,
 };
 static BLOCKS_EXPOSED_LIGHTNING_ROD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8811,6 +9201,7 @@ static BLOCKS_EXPOSED_LIGHTNING_ROD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_EXPOSED_LIGHTNING_ROD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/exposed_lightning_rod"),
     pools: BLOCKS_EXPOSED_LIGHTNING_ROD_POOLS,
 };
 static BLOCKS_FARMLAND_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8830,6 +9221,7 @@ static BLOCKS_FARMLAND_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_FARMLAND: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/farmland"),
     pools: BLOCKS_FARMLAND_POOLS,
 };
 static BLOCKS_FERN_POOL0_ENTRIES: &[LootEntry] = &[
@@ -8863,10 +9255,12 @@ static BLOCKS_FERN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_FERN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/fern"),
     pools: BLOCKS_FERN_POOLS,
 };
 static BLOCKS_FIRE_POOLS: &[LootPool] = &[];
 pub static BLOCKS_FIRE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/fire"),
     pools: BLOCKS_FIRE_POOLS,
 };
 static BLOCKS_FIRE_CORAL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8886,6 +9280,7 @@ static BLOCKS_FIRE_CORAL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_FIRE_CORAL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/fire_coral"),
     pools: BLOCKS_FIRE_CORAL_POOLS,
 };
 static BLOCKS_FIRE_CORAL_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[
@@ -8919,6 +9314,7 @@ static BLOCKS_FIRE_CORAL_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_FIRE_CORAL_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/fire_coral_block"),
     pools: BLOCKS_FIRE_CORAL_BLOCK_POOLS,
 };
 static BLOCKS_FIRE_CORAL_FAN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8938,6 +9334,7 @@ static BLOCKS_FIRE_CORAL_FAN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_FIRE_CORAL_FAN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/fire_coral_fan"),
     pools: BLOCKS_FIRE_CORAL_FAN_POOLS,
 };
 static BLOCKS_FIREFLY_BUSH_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8957,6 +9354,7 @@ static BLOCKS_FIREFLY_BUSH_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_FIREFLY_BUSH: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/firefly_bush"),
     pools: BLOCKS_FIREFLY_BUSH_POOLS,
 };
 static BLOCKS_FLETCHING_TABLE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8976,6 +9374,7 @@ static BLOCKS_FLETCHING_TABLE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_FLETCHING_TABLE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/fletching_table"),
     pools: BLOCKS_FLETCHING_TABLE_POOLS,
 };
 static BLOCKS_FLOWER_POT_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -8995,6 +9394,7 @@ static BLOCKS_FLOWER_POT_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_FLOWER_POT: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/flower_pot"),
     pools: BLOCKS_FLOWER_POT_POOLS,
 };
 static BLOCKS_FLOWERING_AZALEA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9014,6 +9414,7 @@ static BLOCKS_FLOWERING_AZALEA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_FLOWERING_AZALEA: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/flowering_azalea"),
     pools: BLOCKS_FLOWERING_AZALEA_POOLS,
 };
 static BLOCKS_FLOWERING_AZALEA_LEAVES_POOL0_ENTRIES: &[LootEntry] = &[
@@ -9072,14 +9473,17 @@ static BLOCKS_FLOWERING_AZALEA_LEAVES_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_FLOWERING_AZALEA_LEAVES: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/flowering_azalea_leaves"),
     pools: BLOCKS_FLOWERING_AZALEA_LEAVES_POOLS,
 };
 static BLOCKS_FROGSPAWN_POOLS: &[LootPool] = &[];
 pub static BLOCKS_FROGSPAWN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/frogspawn"),
     pools: BLOCKS_FROGSPAWN_POOLS,
 };
 static BLOCKS_FROSTED_ICE_POOLS: &[LootPool] = &[];
 pub static BLOCKS_FROSTED_ICE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/frosted_ice"),
     pools: BLOCKS_FROSTED_ICE_POOLS,
 };
 static BLOCKS_FURNACE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9099,6 +9503,7 @@ static BLOCKS_FURNACE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_FURNACE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/furnace"),
     pools: BLOCKS_FURNACE_POOLS,
 };
 static BLOCKS_GILDED_BLACKSTONE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -9146,6 +9551,7 @@ static BLOCKS_GILDED_BLACKSTONE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_GILDED_BLACKSTONE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/gilded_blackstone"),
     pools: BLOCKS_GILDED_BLACKSTONE_POOLS,
 };
 static BLOCKS_GLASS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9165,6 +9571,7 @@ static BLOCKS_GLASS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_GLASS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/glass"),
     pools: BLOCKS_GLASS_POOLS,
 };
 static BLOCKS_GLASS_PANE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9184,6 +9591,7 @@ static BLOCKS_GLASS_PANE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_GLASS_PANE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/glass_pane"),
     pools: BLOCKS_GLASS_PANE_POOLS,
 };
 static BLOCKS_GLOW_LICHEN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9203,6 +9611,7 @@ static BLOCKS_GLOW_LICHEN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_GLOW_LICHEN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/glow_lichen"),
     pools: BLOCKS_GLOW_LICHEN_POOLS,
 };
 static BLOCKS_GLOWSTONE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -9233,6 +9642,7 @@ static BLOCKS_GLOWSTONE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_GLOWSTONE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/glowstone"),
     pools: BLOCKS_GLOWSTONE_POOLS,
 };
 static BLOCKS_GOLD_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9252,6 +9662,7 @@ static BLOCKS_GOLD_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_GOLD_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/gold_block"),
     pools: BLOCKS_GOLD_BLOCK_POOLS,
 };
 static BLOCKS_GOLD_ORE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -9282,6 +9693,7 @@ static BLOCKS_GOLD_ORE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_GOLD_ORE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/gold_ore"),
     pools: BLOCKS_GOLD_ORE_POOLS,
 };
 static BLOCKS_GOLDEN_DANDELION_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9301,6 +9713,7 @@ static BLOCKS_GOLDEN_DANDELION_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_GOLDEN_DANDELION: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/golden_dandelion"),
     pools: BLOCKS_GOLDEN_DANDELION_POOLS,
 };
 static BLOCKS_GRANITE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9320,6 +9733,7 @@ static BLOCKS_GRANITE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_GRANITE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/granite"),
     pools: BLOCKS_GRANITE_POOLS,
 };
 static BLOCKS_GRANITE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9339,6 +9753,7 @@ static BLOCKS_GRANITE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_GRANITE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/granite_slab"),
     pools: BLOCKS_GRANITE_SLAB_POOLS,
 };
 static BLOCKS_GRANITE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9358,6 +9773,7 @@ static BLOCKS_GRANITE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_GRANITE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/granite_stairs"),
     pools: BLOCKS_GRANITE_STAIRS_POOLS,
 };
 static BLOCKS_GRANITE_WALL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9377,6 +9793,7 @@ static BLOCKS_GRANITE_WALL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_GRANITE_WALL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/granite_wall"),
     pools: BLOCKS_GRANITE_WALL_POOLS,
 };
 static BLOCKS_GRASS_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[
@@ -9410,6 +9827,7 @@ static BLOCKS_GRASS_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_GRASS_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/grass_block"),
     pools: BLOCKS_GRASS_BLOCK_POOLS,
 };
 static BLOCKS_GRAVEL_POOL0_ENTRIES: &[LootEntry] = &[
@@ -9457,6 +9875,7 @@ static BLOCKS_GRAVEL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_GRAVEL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/gravel"),
     pools: BLOCKS_GRAVEL_POOLS,
 };
 static BLOCKS_GRAY_BANNER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9476,6 +9895,7 @@ static BLOCKS_GRAY_BANNER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_GRAY_BANNER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/gray_banner"),
     pools: BLOCKS_GRAY_BANNER_POOLS,
 };
 static BLOCKS_GRAY_BED_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9495,6 +9915,7 @@ static BLOCKS_GRAY_BED_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_GRAY_BED: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/gray_bed"),
     pools: BLOCKS_GRAY_BED_POOLS,
 };
 static BLOCKS_GRAY_CANDLE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9514,6 +9935,7 @@ static BLOCKS_GRAY_CANDLE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_GRAY_CANDLE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/gray_candle"),
     pools: BLOCKS_GRAY_CANDLE_POOLS,
 };
 static BLOCKS_GRAY_CANDLE_CAKE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9533,6 +9955,7 @@ static BLOCKS_GRAY_CANDLE_CAKE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_GRAY_CANDLE_CAKE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/gray_candle_cake"),
     pools: BLOCKS_GRAY_CANDLE_CAKE_POOLS,
 };
 static BLOCKS_GRAY_CARPET_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9552,6 +9975,7 @@ static BLOCKS_GRAY_CARPET_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_GRAY_CARPET: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/gray_carpet"),
     pools: BLOCKS_GRAY_CARPET_POOLS,
 };
 static BLOCKS_GRAY_CONCRETE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9571,6 +9995,7 @@ static BLOCKS_GRAY_CONCRETE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_GRAY_CONCRETE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/gray_concrete"),
     pools: BLOCKS_GRAY_CONCRETE_POOLS,
 };
 static BLOCKS_GRAY_CONCRETE_POWDER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9590,6 +10015,7 @@ static BLOCKS_GRAY_CONCRETE_POWDER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_GRAY_CONCRETE_POWDER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/gray_concrete_powder"),
     pools: BLOCKS_GRAY_CONCRETE_POWDER_POOLS,
 };
 static BLOCKS_GRAY_CONCRETE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9609,6 +10035,7 @@ static BLOCKS_GRAY_CONCRETE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_GRAY_CONCRETE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/gray_concrete_slab"),
     pools: BLOCKS_GRAY_CONCRETE_SLAB_POOLS,
 };
 static BLOCKS_GRAY_CONCRETE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9628,6 +10055,7 @@ static BLOCKS_GRAY_CONCRETE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_GRAY_CONCRETE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/gray_concrete_stairs"),
     pools: BLOCKS_GRAY_CONCRETE_STAIRS_POOLS,
 };
 static BLOCKS_GRAY_GLAZED_TERRACOTTA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9647,6 +10075,7 @@ static BLOCKS_GRAY_GLAZED_TERRACOTTA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_GRAY_GLAZED_TERRACOTTA: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/gray_glazed_terracotta"),
     pools: BLOCKS_GRAY_GLAZED_TERRACOTTA_POOLS,
 };
 static BLOCKS_GRAY_SHULKER_BOX_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9666,6 +10095,7 @@ static BLOCKS_GRAY_SHULKER_BOX_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_GRAY_SHULKER_BOX: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/gray_shulker_box"),
     pools: BLOCKS_GRAY_SHULKER_BOX_POOLS,
 };
 static BLOCKS_GRAY_STAINED_GLASS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9685,6 +10115,7 @@ static BLOCKS_GRAY_STAINED_GLASS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_GRAY_STAINED_GLASS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/gray_stained_glass"),
     pools: BLOCKS_GRAY_STAINED_GLASS_POOLS,
 };
 static BLOCKS_GRAY_STAINED_GLASS_PANE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9704,6 +10135,7 @@ static BLOCKS_GRAY_STAINED_GLASS_PANE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_GRAY_STAINED_GLASS_PANE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/gray_stained_glass_pane"),
     pools: BLOCKS_GRAY_STAINED_GLASS_PANE_POOLS,
 };
 static BLOCKS_GRAY_TERRACOTTA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9723,6 +10155,7 @@ static BLOCKS_GRAY_TERRACOTTA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_GRAY_TERRACOTTA: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/gray_terracotta"),
     pools: BLOCKS_GRAY_TERRACOTTA_POOLS,
 };
 static BLOCKS_GRAY_WOOL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9742,6 +10175,7 @@ static BLOCKS_GRAY_WOOL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_GRAY_WOOL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/gray_wool"),
     pools: BLOCKS_GRAY_WOOL_POOLS,
 };
 static BLOCKS_GRAY_WOOL_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9761,6 +10195,7 @@ static BLOCKS_GRAY_WOOL_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_GRAY_WOOL_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/gray_wool_slab"),
     pools: BLOCKS_GRAY_WOOL_SLAB_POOLS,
 };
 static BLOCKS_GRAY_WOOL_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9780,6 +10215,7 @@ static BLOCKS_GRAY_WOOL_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_GRAY_WOOL_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/gray_wool_stairs"),
     pools: BLOCKS_GRAY_WOOL_STAIRS_POOLS,
 };
 static BLOCKS_GREEN_BANNER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9799,6 +10235,7 @@ static BLOCKS_GREEN_BANNER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_GREEN_BANNER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/green_banner"),
     pools: BLOCKS_GREEN_BANNER_POOLS,
 };
 static BLOCKS_GREEN_BED_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9818,6 +10255,7 @@ static BLOCKS_GREEN_BED_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_GREEN_BED: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/green_bed"),
     pools: BLOCKS_GREEN_BED_POOLS,
 };
 static BLOCKS_GREEN_CANDLE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9837,6 +10275,7 @@ static BLOCKS_GREEN_CANDLE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_GREEN_CANDLE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/green_candle"),
     pools: BLOCKS_GREEN_CANDLE_POOLS,
 };
 static BLOCKS_GREEN_CANDLE_CAKE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9856,6 +10295,7 @@ static BLOCKS_GREEN_CANDLE_CAKE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_GREEN_CANDLE_CAKE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/green_candle_cake"),
     pools: BLOCKS_GREEN_CANDLE_CAKE_POOLS,
 };
 static BLOCKS_GREEN_CARPET_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9875,6 +10315,7 @@ static BLOCKS_GREEN_CARPET_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_GREEN_CARPET: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/green_carpet"),
     pools: BLOCKS_GREEN_CARPET_POOLS,
 };
 static BLOCKS_GREEN_CONCRETE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9894,6 +10335,7 @@ static BLOCKS_GREEN_CONCRETE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_GREEN_CONCRETE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/green_concrete"),
     pools: BLOCKS_GREEN_CONCRETE_POOLS,
 };
 static BLOCKS_GREEN_CONCRETE_POWDER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9913,6 +10355,7 @@ static BLOCKS_GREEN_CONCRETE_POWDER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_GREEN_CONCRETE_POWDER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/green_concrete_powder"),
     pools: BLOCKS_GREEN_CONCRETE_POWDER_POOLS,
 };
 static BLOCKS_GREEN_CONCRETE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9932,6 +10375,7 @@ static BLOCKS_GREEN_CONCRETE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_GREEN_CONCRETE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/green_concrete_slab"),
     pools: BLOCKS_GREEN_CONCRETE_SLAB_POOLS,
 };
 static BLOCKS_GREEN_CONCRETE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9951,6 +10395,7 @@ static BLOCKS_GREEN_CONCRETE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_GREEN_CONCRETE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/green_concrete_stairs"),
     pools: BLOCKS_GREEN_CONCRETE_STAIRS_POOLS,
 };
 static BLOCKS_GREEN_GLAZED_TERRACOTTA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9970,6 +10415,7 @@ static BLOCKS_GREEN_GLAZED_TERRACOTTA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_GREEN_GLAZED_TERRACOTTA: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/green_glazed_terracotta"),
     pools: BLOCKS_GREEN_GLAZED_TERRACOTTA_POOLS,
 };
 static BLOCKS_GREEN_SHULKER_BOX_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -9989,6 +10435,7 @@ static BLOCKS_GREEN_SHULKER_BOX_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_GREEN_SHULKER_BOX: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/green_shulker_box"),
     pools: BLOCKS_GREEN_SHULKER_BOX_POOLS,
 };
 static BLOCKS_GREEN_STAINED_GLASS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10008,6 +10455,7 @@ static BLOCKS_GREEN_STAINED_GLASS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_GREEN_STAINED_GLASS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/green_stained_glass"),
     pools: BLOCKS_GREEN_STAINED_GLASS_POOLS,
 };
 static BLOCKS_GREEN_STAINED_GLASS_PANE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10027,6 +10475,7 @@ static BLOCKS_GREEN_STAINED_GLASS_PANE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_GREEN_STAINED_GLASS_PANE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/green_stained_glass_pane"),
     pools: BLOCKS_GREEN_STAINED_GLASS_PANE_POOLS,
 };
 static BLOCKS_GREEN_TERRACOTTA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10046,6 +10495,7 @@ static BLOCKS_GREEN_TERRACOTTA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_GREEN_TERRACOTTA: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/green_terracotta"),
     pools: BLOCKS_GREEN_TERRACOTTA_POOLS,
 };
 static BLOCKS_GREEN_WOOL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10065,6 +10515,7 @@ static BLOCKS_GREEN_WOOL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_GREEN_WOOL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/green_wool"),
     pools: BLOCKS_GREEN_WOOL_POOLS,
 };
 static BLOCKS_GREEN_WOOL_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10084,6 +10535,7 @@ static BLOCKS_GREEN_WOOL_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_GREEN_WOOL_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/green_wool_slab"),
     pools: BLOCKS_GREEN_WOOL_SLAB_POOLS,
 };
 static BLOCKS_GREEN_WOOL_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10103,6 +10555,7 @@ static BLOCKS_GREEN_WOOL_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_GREEN_WOOL_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/green_wool_stairs"),
     pools: BLOCKS_GREEN_WOOL_STAIRS_POOLS,
 };
 static BLOCKS_GRINDSTONE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10122,6 +10575,7 @@ static BLOCKS_GRINDSTONE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_GRINDSTONE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/grindstone"),
     pools: BLOCKS_GRINDSTONE_POOLS,
 };
 static BLOCKS_HANGING_ROOTS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10141,6 +10595,7 @@ static BLOCKS_HANGING_ROOTS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::Shears,
 }];
 pub static BLOCKS_HANGING_ROOTS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/hanging_roots"),
     pools: BLOCKS_HANGING_ROOTS_POOLS,
 };
 static BLOCKS_HAY_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10160,6 +10615,7 @@ static BLOCKS_HAY_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_HAY_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/hay_block"),
     pools: BLOCKS_HAY_BLOCK_POOLS,
 };
 static BLOCKS_HEAVY_CORE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10179,6 +10635,7 @@ static BLOCKS_HEAVY_CORE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_HEAVY_CORE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/heavy_core"),
     pools: BLOCKS_HEAVY_CORE_POOLS,
 };
 static BLOCKS_HEAVY_WEIGHTED_PRESSURE_PLATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10198,6 +10655,7 @@ static BLOCKS_HEAVY_WEIGHTED_PRESSURE_PLATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_HEAVY_WEIGHTED_PRESSURE_PLATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/heavy_weighted_pressure_plate"),
     pools: BLOCKS_HEAVY_WEIGHTED_PRESSURE_PLATE_POOLS,
 };
 static BLOCKS_HONEY_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10217,6 +10675,7 @@ static BLOCKS_HONEY_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_HONEY_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/honey_block"),
     pools: BLOCKS_HONEY_BLOCK_POOLS,
 };
 static BLOCKS_HONEYCOMB_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10236,6 +10695,7 @@ static BLOCKS_HONEYCOMB_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_HONEYCOMB_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/honeycomb_block"),
     pools: BLOCKS_HONEYCOMB_BLOCK_POOLS,
 };
 static BLOCKS_HOPPER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10255,6 +10715,7 @@ static BLOCKS_HOPPER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_HOPPER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/hopper"),
     pools: BLOCKS_HOPPER_POOLS,
 };
 static BLOCKS_HORN_CORAL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10274,6 +10735,7 @@ static BLOCKS_HORN_CORAL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_HORN_CORAL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/horn_coral"),
     pools: BLOCKS_HORN_CORAL_POOLS,
 };
 static BLOCKS_HORN_CORAL_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[
@@ -10307,6 +10769,7 @@ static BLOCKS_HORN_CORAL_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_HORN_CORAL_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/horn_coral_block"),
     pools: BLOCKS_HORN_CORAL_BLOCK_POOLS,
 };
 static BLOCKS_HORN_CORAL_FAN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10326,6 +10789,7 @@ static BLOCKS_HORN_CORAL_FAN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_HORN_CORAL_FAN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/horn_coral_fan"),
     pools: BLOCKS_HORN_CORAL_FAN_POOLS,
 };
 static BLOCKS_ICE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10345,6 +10809,7 @@ static BLOCKS_ICE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_ICE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/ice"),
     pools: BLOCKS_ICE_POOLS,
 };
 static BLOCKS_INFESTED_CHISELED_STONE_BRICKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10364,6 +10829,7 @@ static BLOCKS_INFESTED_CHISELED_STONE_BRICKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_INFESTED_CHISELED_STONE_BRICKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/infested_chiseled_stone_bricks"),
     pools: BLOCKS_INFESTED_CHISELED_STONE_BRICKS_POOLS,
 };
 static BLOCKS_INFESTED_COBBLESTONE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10383,6 +10849,7 @@ static BLOCKS_INFESTED_COBBLESTONE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_INFESTED_COBBLESTONE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/infested_cobblestone"),
     pools: BLOCKS_INFESTED_COBBLESTONE_POOLS,
 };
 static BLOCKS_INFESTED_CRACKED_STONE_BRICKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10402,6 +10869,7 @@ static BLOCKS_INFESTED_CRACKED_STONE_BRICKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_INFESTED_CRACKED_STONE_BRICKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/infested_cracked_stone_bricks"),
     pools: BLOCKS_INFESTED_CRACKED_STONE_BRICKS_POOLS,
 };
 static BLOCKS_INFESTED_DEEPSLATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10421,6 +10889,7 @@ static BLOCKS_INFESTED_DEEPSLATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_INFESTED_DEEPSLATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/infested_deepslate"),
     pools: BLOCKS_INFESTED_DEEPSLATE_POOLS,
 };
 static BLOCKS_INFESTED_MOSSY_STONE_BRICKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10440,6 +10909,7 @@ static BLOCKS_INFESTED_MOSSY_STONE_BRICKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_INFESTED_MOSSY_STONE_BRICKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/infested_mossy_stone_bricks"),
     pools: BLOCKS_INFESTED_MOSSY_STONE_BRICKS_POOLS,
 };
 static BLOCKS_INFESTED_STONE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10459,6 +10929,7 @@ static BLOCKS_INFESTED_STONE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_INFESTED_STONE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/infested_stone"),
     pools: BLOCKS_INFESTED_STONE_POOLS,
 };
 static BLOCKS_INFESTED_STONE_BRICKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10478,6 +10949,7 @@ static BLOCKS_INFESTED_STONE_BRICKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_INFESTED_STONE_BRICKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/infested_stone_bricks"),
     pools: BLOCKS_INFESTED_STONE_BRICKS_POOLS,
 };
 static BLOCKS_IRON_BARS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10497,6 +10969,7 @@ static BLOCKS_IRON_BARS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_IRON_BARS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/iron_bars"),
     pools: BLOCKS_IRON_BARS_POOLS,
 };
 static BLOCKS_IRON_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10516,6 +10989,7 @@ static BLOCKS_IRON_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_IRON_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/iron_block"),
     pools: BLOCKS_IRON_BLOCK_POOLS,
 };
 static BLOCKS_IRON_CHAIN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10535,6 +11009,7 @@ static BLOCKS_IRON_CHAIN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_IRON_CHAIN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/iron_chain"),
     pools: BLOCKS_IRON_CHAIN_POOLS,
 };
 static BLOCKS_IRON_DOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10554,6 +11029,7 @@ static BLOCKS_IRON_DOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_IRON_DOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/iron_door"),
     pools: BLOCKS_IRON_DOOR_POOLS,
 };
 static BLOCKS_IRON_ORE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -10584,6 +11060,7 @@ static BLOCKS_IRON_ORE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_IRON_ORE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/iron_ore"),
     pools: BLOCKS_IRON_ORE_POOLS,
 };
 static BLOCKS_IRON_TRAPDOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10603,6 +11080,7 @@ static BLOCKS_IRON_TRAPDOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_IRON_TRAPDOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/iron_trapdoor"),
     pools: BLOCKS_IRON_TRAPDOOR_POOLS,
 };
 static BLOCKS_JACK_O_LANTERN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10622,6 +11100,7 @@ static BLOCKS_JACK_O_LANTERN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_JACK_O_LANTERN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/jack_o_lantern"),
     pools: BLOCKS_JACK_O_LANTERN_POOLS,
 };
 static BLOCKS_JUKEBOX_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10641,6 +11120,7 @@ static BLOCKS_JUKEBOX_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_JUKEBOX: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/jukebox"),
     pools: BLOCKS_JUKEBOX_POOLS,
 };
 static BLOCKS_JUNGLE_BUTTON_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10660,6 +11140,7 @@ static BLOCKS_JUNGLE_BUTTON_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_JUNGLE_BUTTON: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/jungle_button"),
     pools: BLOCKS_JUNGLE_BUTTON_POOLS,
 };
 static BLOCKS_JUNGLE_DOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10679,6 +11160,7 @@ static BLOCKS_JUNGLE_DOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_JUNGLE_DOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/jungle_door"),
     pools: BLOCKS_JUNGLE_DOOR_POOLS,
 };
 static BLOCKS_JUNGLE_FENCE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10698,6 +11180,7 @@ static BLOCKS_JUNGLE_FENCE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_JUNGLE_FENCE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/jungle_fence"),
     pools: BLOCKS_JUNGLE_FENCE_POOLS,
 };
 static BLOCKS_JUNGLE_FENCE_GATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10717,6 +11200,7 @@ static BLOCKS_JUNGLE_FENCE_GATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_JUNGLE_FENCE_GATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/jungle_fence_gate"),
     pools: BLOCKS_JUNGLE_FENCE_GATE_POOLS,
 };
 static BLOCKS_JUNGLE_HANGING_SIGN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10736,6 +11220,7 @@ static BLOCKS_JUNGLE_HANGING_SIGN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_JUNGLE_HANGING_SIGN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/jungle_hanging_sign"),
     pools: BLOCKS_JUNGLE_HANGING_SIGN_POOLS,
 };
 static BLOCKS_JUNGLE_LEAVES_POOL0_ENTRIES: &[LootEntry] = &[
@@ -10794,6 +11279,7 @@ static BLOCKS_JUNGLE_LEAVES_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_JUNGLE_LEAVES: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/jungle_leaves"),
     pools: BLOCKS_JUNGLE_LEAVES_POOLS,
 };
 static BLOCKS_JUNGLE_LOG_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10813,6 +11299,7 @@ static BLOCKS_JUNGLE_LOG_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_JUNGLE_LOG: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/jungle_log"),
     pools: BLOCKS_JUNGLE_LOG_POOLS,
 };
 static BLOCKS_JUNGLE_PLANKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10832,6 +11319,7 @@ static BLOCKS_JUNGLE_PLANKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_JUNGLE_PLANKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/jungle_planks"),
     pools: BLOCKS_JUNGLE_PLANKS_POOLS,
 };
 static BLOCKS_JUNGLE_PRESSURE_PLATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10851,6 +11339,7 @@ static BLOCKS_JUNGLE_PRESSURE_PLATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_JUNGLE_PRESSURE_PLATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/jungle_pressure_plate"),
     pools: BLOCKS_JUNGLE_PRESSURE_PLATE_POOLS,
 };
 static BLOCKS_JUNGLE_SAPLING_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10870,6 +11359,7 @@ static BLOCKS_JUNGLE_SAPLING_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_JUNGLE_SAPLING: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/jungle_sapling"),
     pools: BLOCKS_JUNGLE_SAPLING_POOLS,
 };
 static BLOCKS_JUNGLE_SHELF_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10889,6 +11379,7 @@ static BLOCKS_JUNGLE_SHELF_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_JUNGLE_SHELF: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/jungle_shelf"),
     pools: BLOCKS_JUNGLE_SHELF_POOLS,
 };
 static BLOCKS_JUNGLE_SIGN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10908,6 +11399,7 @@ static BLOCKS_JUNGLE_SIGN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_JUNGLE_SIGN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/jungle_sign"),
     pools: BLOCKS_JUNGLE_SIGN_POOLS,
 };
 static BLOCKS_JUNGLE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10927,6 +11419,7 @@ static BLOCKS_JUNGLE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_JUNGLE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/jungle_slab"),
     pools: BLOCKS_JUNGLE_SLAB_POOLS,
 };
 static BLOCKS_JUNGLE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10946,6 +11439,7 @@ static BLOCKS_JUNGLE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_JUNGLE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/jungle_stairs"),
     pools: BLOCKS_JUNGLE_STAIRS_POOLS,
 };
 static BLOCKS_JUNGLE_TRAPDOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10965,6 +11459,7 @@ static BLOCKS_JUNGLE_TRAPDOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_JUNGLE_TRAPDOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/jungle_trapdoor"),
     pools: BLOCKS_JUNGLE_TRAPDOOR_POOLS,
 };
 static BLOCKS_JUNGLE_WOOD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -10984,6 +11479,7 @@ static BLOCKS_JUNGLE_WOOD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_JUNGLE_WOOD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/jungle_wood"),
     pools: BLOCKS_JUNGLE_WOOD_POOLS,
 };
 static BLOCKS_KELP_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11003,6 +11499,7 @@ static BLOCKS_KELP_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_KELP: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/kelp"),
     pools: BLOCKS_KELP_POOLS,
 };
 static BLOCKS_KELP_PLANT_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11022,6 +11519,7 @@ static BLOCKS_KELP_PLANT_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_KELP_PLANT: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/kelp_plant"),
     pools: BLOCKS_KELP_PLANT_POOLS,
 };
 static BLOCKS_LADDER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11041,6 +11539,7 @@ static BLOCKS_LADDER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LADDER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/ladder"),
     pools: BLOCKS_LADDER_POOLS,
 };
 static BLOCKS_LANTERN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11060,6 +11559,7 @@ static BLOCKS_LANTERN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LANTERN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/lantern"),
     pools: BLOCKS_LANTERN_POOLS,
 };
 static BLOCKS_LAPIS_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11079,6 +11579,7 @@ static BLOCKS_LAPIS_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LAPIS_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/lapis_block"),
     pools: BLOCKS_LAPIS_BLOCK_POOLS,
 };
 static BLOCKS_LAPIS_ORE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -11109,6 +11610,7 @@ static BLOCKS_LAPIS_ORE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_LAPIS_ORE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/lapis_ore"),
     pools: BLOCKS_LAPIS_ORE_POOLS,
 };
 static BLOCKS_LARGE_AMETHYST_BUD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11128,6 +11630,7 @@ static BLOCKS_LARGE_AMETHYST_BUD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_LARGE_AMETHYST_BUD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/large_amethyst_bud"),
     pools: BLOCKS_LARGE_AMETHYST_BUD_POOLS,
 };
 static BLOCKS_LARGE_FERN_POOL0_ENTRIES: &[LootEntry] = &[
@@ -11199,6 +11702,7 @@ static BLOCKS_LARGE_FERN_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_LARGE_FERN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/large_fern"),
     pools: BLOCKS_LARGE_FERN_POOLS,
 };
 static BLOCKS_LAVA_CAULDRON_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11218,6 +11722,7 @@ static BLOCKS_LAVA_CAULDRON_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LAVA_CAULDRON: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/lava_cauldron"),
     pools: BLOCKS_LAVA_CAULDRON_POOLS,
 };
 static BLOCKS_LEAF_LITTER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11237,6 +11742,7 @@ static BLOCKS_LEAF_LITTER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_LEAF_LITTER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/leaf_litter"),
     pools: BLOCKS_LEAF_LITTER_POOLS,
 };
 static BLOCKS_LECTERN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11256,6 +11762,7 @@ static BLOCKS_LECTERN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LECTERN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/lectern"),
     pools: BLOCKS_LECTERN_POOLS,
 };
 static BLOCKS_LEVER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11275,6 +11782,7 @@ static BLOCKS_LEVER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LEVER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/lever"),
     pools: BLOCKS_LEVER_POOLS,
 };
 static BLOCKS_LIGHT_BLUE_BANNER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11294,6 +11802,7 @@ static BLOCKS_LIGHT_BLUE_BANNER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LIGHT_BLUE_BANNER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/light_blue_banner"),
     pools: BLOCKS_LIGHT_BLUE_BANNER_POOLS,
 };
 static BLOCKS_LIGHT_BLUE_BED_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11313,6 +11822,7 @@ static BLOCKS_LIGHT_BLUE_BED_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LIGHT_BLUE_BED: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/light_blue_bed"),
     pools: BLOCKS_LIGHT_BLUE_BED_POOLS,
 };
 static BLOCKS_LIGHT_BLUE_CANDLE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11332,6 +11842,7 @@ static BLOCKS_LIGHT_BLUE_CANDLE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_LIGHT_BLUE_CANDLE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/light_blue_candle"),
     pools: BLOCKS_LIGHT_BLUE_CANDLE_POOLS,
 };
 static BLOCKS_LIGHT_BLUE_CANDLE_CAKE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11351,6 +11862,7 @@ static BLOCKS_LIGHT_BLUE_CANDLE_CAKE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_LIGHT_BLUE_CANDLE_CAKE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/light_blue_candle_cake"),
     pools: BLOCKS_LIGHT_BLUE_CANDLE_CAKE_POOLS,
 };
 static BLOCKS_LIGHT_BLUE_CARPET_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11370,6 +11882,7 @@ static BLOCKS_LIGHT_BLUE_CARPET_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LIGHT_BLUE_CARPET: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/light_blue_carpet"),
     pools: BLOCKS_LIGHT_BLUE_CARPET_POOLS,
 };
 static BLOCKS_LIGHT_BLUE_CONCRETE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11389,6 +11902,7 @@ static BLOCKS_LIGHT_BLUE_CONCRETE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LIGHT_BLUE_CONCRETE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/light_blue_concrete"),
     pools: BLOCKS_LIGHT_BLUE_CONCRETE_POOLS,
 };
 static BLOCKS_LIGHT_BLUE_CONCRETE_POWDER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11408,6 +11922,7 @@ static BLOCKS_LIGHT_BLUE_CONCRETE_POWDER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LIGHT_BLUE_CONCRETE_POWDER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/light_blue_concrete_powder"),
     pools: BLOCKS_LIGHT_BLUE_CONCRETE_POWDER_POOLS,
 };
 static BLOCKS_LIGHT_BLUE_CONCRETE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11427,6 +11942,7 @@ static BLOCKS_LIGHT_BLUE_CONCRETE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_LIGHT_BLUE_CONCRETE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/light_blue_concrete_slab"),
     pools: BLOCKS_LIGHT_BLUE_CONCRETE_SLAB_POOLS,
 };
 static BLOCKS_LIGHT_BLUE_CONCRETE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11446,6 +11962,7 @@ static BLOCKS_LIGHT_BLUE_CONCRETE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LIGHT_BLUE_CONCRETE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/light_blue_concrete_stairs"),
     pools: BLOCKS_LIGHT_BLUE_CONCRETE_STAIRS_POOLS,
 };
 static BLOCKS_LIGHT_BLUE_GLAZED_TERRACOTTA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11465,6 +11982,7 @@ static BLOCKS_LIGHT_BLUE_GLAZED_TERRACOTTA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LIGHT_BLUE_GLAZED_TERRACOTTA: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/light_blue_glazed_terracotta"),
     pools: BLOCKS_LIGHT_BLUE_GLAZED_TERRACOTTA_POOLS,
 };
 static BLOCKS_LIGHT_BLUE_SHULKER_BOX_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11484,6 +12002,7 @@ static BLOCKS_LIGHT_BLUE_SHULKER_BOX_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_LIGHT_BLUE_SHULKER_BOX: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/light_blue_shulker_box"),
     pools: BLOCKS_LIGHT_BLUE_SHULKER_BOX_POOLS,
 };
 static BLOCKS_LIGHT_BLUE_STAINED_GLASS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11503,6 +12022,7 @@ static BLOCKS_LIGHT_BLUE_STAINED_GLASS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_LIGHT_BLUE_STAINED_GLASS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/light_blue_stained_glass"),
     pools: BLOCKS_LIGHT_BLUE_STAINED_GLASS_POOLS,
 };
 static BLOCKS_LIGHT_BLUE_STAINED_GLASS_PANE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11522,6 +12042,7 @@ static BLOCKS_LIGHT_BLUE_STAINED_GLASS_PANE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_LIGHT_BLUE_STAINED_GLASS_PANE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/light_blue_stained_glass_pane"),
     pools: BLOCKS_LIGHT_BLUE_STAINED_GLASS_PANE_POOLS,
 };
 static BLOCKS_LIGHT_BLUE_TERRACOTTA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11541,6 +12062,7 @@ static BLOCKS_LIGHT_BLUE_TERRACOTTA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LIGHT_BLUE_TERRACOTTA: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/light_blue_terracotta"),
     pools: BLOCKS_LIGHT_BLUE_TERRACOTTA_POOLS,
 };
 static BLOCKS_LIGHT_BLUE_WOOL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11560,6 +12082,7 @@ static BLOCKS_LIGHT_BLUE_WOOL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LIGHT_BLUE_WOOL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/light_blue_wool"),
     pools: BLOCKS_LIGHT_BLUE_WOOL_POOLS,
 };
 static BLOCKS_LIGHT_BLUE_WOOL_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11579,6 +12102,7 @@ static BLOCKS_LIGHT_BLUE_WOOL_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_LIGHT_BLUE_WOOL_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/light_blue_wool_slab"),
     pools: BLOCKS_LIGHT_BLUE_WOOL_SLAB_POOLS,
 };
 static BLOCKS_LIGHT_BLUE_WOOL_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11598,6 +12122,7 @@ static BLOCKS_LIGHT_BLUE_WOOL_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LIGHT_BLUE_WOOL_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/light_blue_wool_stairs"),
     pools: BLOCKS_LIGHT_BLUE_WOOL_STAIRS_POOLS,
 };
 static BLOCKS_LIGHT_GRAY_BANNER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11617,6 +12142,7 @@ static BLOCKS_LIGHT_GRAY_BANNER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LIGHT_GRAY_BANNER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/light_gray_banner"),
     pools: BLOCKS_LIGHT_GRAY_BANNER_POOLS,
 };
 static BLOCKS_LIGHT_GRAY_BED_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11636,6 +12162,7 @@ static BLOCKS_LIGHT_GRAY_BED_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LIGHT_GRAY_BED: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/light_gray_bed"),
     pools: BLOCKS_LIGHT_GRAY_BED_POOLS,
 };
 static BLOCKS_LIGHT_GRAY_CANDLE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11655,6 +12182,7 @@ static BLOCKS_LIGHT_GRAY_CANDLE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_LIGHT_GRAY_CANDLE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/light_gray_candle"),
     pools: BLOCKS_LIGHT_GRAY_CANDLE_POOLS,
 };
 static BLOCKS_LIGHT_GRAY_CANDLE_CAKE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11674,6 +12202,7 @@ static BLOCKS_LIGHT_GRAY_CANDLE_CAKE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_LIGHT_GRAY_CANDLE_CAKE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/light_gray_candle_cake"),
     pools: BLOCKS_LIGHT_GRAY_CANDLE_CAKE_POOLS,
 };
 static BLOCKS_LIGHT_GRAY_CARPET_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11693,6 +12222,7 @@ static BLOCKS_LIGHT_GRAY_CARPET_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LIGHT_GRAY_CARPET: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/light_gray_carpet"),
     pools: BLOCKS_LIGHT_GRAY_CARPET_POOLS,
 };
 static BLOCKS_LIGHT_GRAY_CONCRETE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11712,6 +12242,7 @@ static BLOCKS_LIGHT_GRAY_CONCRETE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LIGHT_GRAY_CONCRETE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/light_gray_concrete"),
     pools: BLOCKS_LIGHT_GRAY_CONCRETE_POOLS,
 };
 static BLOCKS_LIGHT_GRAY_CONCRETE_POWDER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11731,6 +12262,7 @@ static BLOCKS_LIGHT_GRAY_CONCRETE_POWDER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LIGHT_GRAY_CONCRETE_POWDER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/light_gray_concrete_powder"),
     pools: BLOCKS_LIGHT_GRAY_CONCRETE_POWDER_POOLS,
 };
 static BLOCKS_LIGHT_GRAY_CONCRETE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11750,6 +12282,7 @@ static BLOCKS_LIGHT_GRAY_CONCRETE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_LIGHT_GRAY_CONCRETE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/light_gray_concrete_slab"),
     pools: BLOCKS_LIGHT_GRAY_CONCRETE_SLAB_POOLS,
 };
 static BLOCKS_LIGHT_GRAY_CONCRETE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11769,6 +12302,7 @@ static BLOCKS_LIGHT_GRAY_CONCRETE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LIGHT_GRAY_CONCRETE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/light_gray_concrete_stairs"),
     pools: BLOCKS_LIGHT_GRAY_CONCRETE_STAIRS_POOLS,
 };
 static BLOCKS_LIGHT_GRAY_GLAZED_TERRACOTTA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11788,6 +12322,7 @@ static BLOCKS_LIGHT_GRAY_GLAZED_TERRACOTTA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LIGHT_GRAY_GLAZED_TERRACOTTA: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/light_gray_glazed_terracotta"),
     pools: BLOCKS_LIGHT_GRAY_GLAZED_TERRACOTTA_POOLS,
 };
 static BLOCKS_LIGHT_GRAY_SHULKER_BOX_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11807,6 +12342,7 @@ static BLOCKS_LIGHT_GRAY_SHULKER_BOX_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_LIGHT_GRAY_SHULKER_BOX: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/light_gray_shulker_box"),
     pools: BLOCKS_LIGHT_GRAY_SHULKER_BOX_POOLS,
 };
 static BLOCKS_LIGHT_GRAY_STAINED_GLASS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11826,6 +12362,7 @@ static BLOCKS_LIGHT_GRAY_STAINED_GLASS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_LIGHT_GRAY_STAINED_GLASS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/light_gray_stained_glass"),
     pools: BLOCKS_LIGHT_GRAY_STAINED_GLASS_POOLS,
 };
 static BLOCKS_LIGHT_GRAY_STAINED_GLASS_PANE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11845,6 +12382,7 @@ static BLOCKS_LIGHT_GRAY_STAINED_GLASS_PANE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_LIGHT_GRAY_STAINED_GLASS_PANE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/light_gray_stained_glass_pane"),
     pools: BLOCKS_LIGHT_GRAY_STAINED_GLASS_PANE_POOLS,
 };
 static BLOCKS_LIGHT_GRAY_TERRACOTTA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11864,6 +12402,7 @@ static BLOCKS_LIGHT_GRAY_TERRACOTTA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LIGHT_GRAY_TERRACOTTA: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/light_gray_terracotta"),
     pools: BLOCKS_LIGHT_GRAY_TERRACOTTA_POOLS,
 };
 static BLOCKS_LIGHT_GRAY_WOOL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11883,6 +12422,7 @@ static BLOCKS_LIGHT_GRAY_WOOL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LIGHT_GRAY_WOOL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/light_gray_wool"),
     pools: BLOCKS_LIGHT_GRAY_WOOL_POOLS,
 };
 static BLOCKS_LIGHT_GRAY_WOOL_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11902,6 +12442,7 @@ static BLOCKS_LIGHT_GRAY_WOOL_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_LIGHT_GRAY_WOOL_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/light_gray_wool_slab"),
     pools: BLOCKS_LIGHT_GRAY_WOOL_SLAB_POOLS,
 };
 static BLOCKS_LIGHT_GRAY_WOOL_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11921,6 +12462,7 @@ static BLOCKS_LIGHT_GRAY_WOOL_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LIGHT_GRAY_WOOL_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/light_gray_wool_stairs"),
     pools: BLOCKS_LIGHT_GRAY_WOOL_STAIRS_POOLS,
 };
 static BLOCKS_LIGHT_WEIGHTED_PRESSURE_PLATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11940,6 +12482,7 @@ static BLOCKS_LIGHT_WEIGHTED_PRESSURE_PLATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LIGHT_WEIGHTED_PRESSURE_PLATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/light_weighted_pressure_plate"),
     pools: BLOCKS_LIGHT_WEIGHTED_PRESSURE_PLATE_POOLS,
 };
 static BLOCKS_LIGHTNING_ROD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11959,6 +12502,7 @@ static BLOCKS_LIGHTNING_ROD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LIGHTNING_ROD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/lightning_rod"),
     pools: BLOCKS_LIGHTNING_ROD_POOLS,
 };
 static BLOCKS_LILAC_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11978,6 +12522,7 @@ static BLOCKS_LILAC_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LILAC: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/lilac"),
     pools: BLOCKS_LILAC_POOLS,
 };
 static BLOCKS_LILY_OF_THE_VALLEY_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -11997,6 +12542,7 @@ static BLOCKS_LILY_OF_THE_VALLEY_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LILY_OF_THE_VALLEY: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/lily_of_the_valley"),
     pools: BLOCKS_LILY_OF_THE_VALLEY_POOLS,
 };
 static BLOCKS_LILY_PAD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12016,6 +12562,7 @@ static BLOCKS_LILY_PAD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LILY_PAD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/lily_pad"),
     pools: BLOCKS_LILY_PAD_POOLS,
 };
 static BLOCKS_LIME_BANNER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12035,6 +12582,7 @@ static BLOCKS_LIME_BANNER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LIME_BANNER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/lime_banner"),
     pools: BLOCKS_LIME_BANNER_POOLS,
 };
 static BLOCKS_LIME_BED_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12054,6 +12602,7 @@ static BLOCKS_LIME_BED_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LIME_BED: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/lime_bed"),
     pools: BLOCKS_LIME_BED_POOLS,
 };
 static BLOCKS_LIME_CANDLE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12073,6 +12622,7 @@ static BLOCKS_LIME_CANDLE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_LIME_CANDLE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/lime_candle"),
     pools: BLOCKS_LIME_CANDLE_POOLS,
 };
 static BLOCKS_LIME_CANDLE_CAKE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12092,6 +12642,7 @@ static BLOCKS_LIME_CANDLE_CAKE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_LIME_CANDLE_CAKE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/lime_candle_cake"),
     pools: BLOCKS_LIME_CANDLE_CAKE_POOLS,
 };
 static BLOCKS_LIME_CARPET_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12111,6 +12662,7 @@ static BLOCKS_LIME_CARPET_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LIME_CARPET: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/lime_carpet"),
     pools: BLOCKS_LIME_CARPET_POOLS,
 };
 static BLOCKS_LIME_CONCRETE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12130,6 +12682,7 @@ static BLOCKS_LIME_CONCRETE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LIME_CONCRETE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/lime_concrete"),
     pools: BLOCKS_LIME_CONCRETE_POOLS,
 };
 static BLOCKS_LIME_CONCRETE_POWDER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12149,6 +12702,7 @@ static BLOCKS_LIME_CONCRETE_POWDER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LIME_CONCRETE_POWDER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/lime_concrete_powder"),
     pools: BLOCKS_LIME_CONCRETE_POWDER_POOLS,
 };
 static BLOCKS_LIME_CONCRETE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12168,6 +12722,7 @@ static BLOCKS_LIME_CONCRETE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_LIME_CONCRETE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/lime_concrete_slab"),
     pools: BLOCKS_LIME_CONCRETE_SLAB_POOLS,
 };
 static BLOCKS_LIME_CONCRETE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12187,6 +12742,7 @@ static BLOCKS_LIME_CONCRETE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LIME_CONCRETE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/lime_concrete_stairs"),
     pools: BLOCKS_LIME_CONCRETE_STAIRS_POOLS,
 };
 static BLOCKS_LIME_GLAZED_TERRACOTTA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12206,6 +12762,7 @@ static BLOCKS_LIME_GLAZED_TERRACOTTA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LIME_GLAZED_TERRACOTTA: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/lime_glazed_terracotta"),
     pools: BLOCKS_LIME_GLAZED_TERRACOTTA_POOLS,
 };
 static BLOCKS_LIME_SHULKER_BOX_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12225,6 +12782,7 @@ static BLOCKS_LIME_SHULKER_BOX_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_LIME_SHULKER_BOX: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/lime_shulker_box"),
     pools: BLOCKS_LIME_SHULKER_BOX_POOLS,
 };
 static BLOCKS_LIME_STAINED_GLASS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12244,6 +12802,7 @@ static BLOCKS_LIME_STAINED_GLASS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_LIME_STAINED_GLASS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/lime_stained_glass"),
     pools: BLOCKS_LIME_STAINED_GLASS_POOLS,
 };
 static BLOCKS_LIME_STAINED_GLASS_PANE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12263,6 +12822,7 @@ static BLOCKS_LIME_STAINED_GLASS_PANE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_LIME_STAINED_GLASS_PANE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/lime_stained_glass_pane"),
     pools: BLOCKS_LIME_STAINED_GLASS_PANE_POOLS,
 };
 static BLOCKS_LIME_TERRACOTTA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12282,6 +12842,7 @@ static BLOCKS_LIME_TERRACOTTA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LIME_TERRACOTTA: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/lime_terracotta"),
     pools: BLOCKS_LIME_TERRACOTTA_POOLS,
 };
 static BLOCKS_LIME_WOOL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12301,6 +12862,7 @@ static BLOCKS_LIME_WOOL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LIME_WOOL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/lime_wool"),
     pools: BLOCKS_LIME_WOOL_POOLS,
 };
 static BLOCKS_LIME_WOOL_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12320,6 +12882,7 @@ static BLOCKS_LIME_WOOL_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_LIME_WOOL_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/lime_wool_slab"),
     pools: BLOCKS_LIME_WOOL_SLAB_POOLS,
 };
 static BLOCKS_LIME_WOOL_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12339,6 +12902,7 @@ static BLOCKS_LIME_WOOL_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LIME_WOOL_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/lime_wool_stairs"),
     pools: BLOCKS_LIME_WOOL_STAIRS_POOLS,
 };
 static BLOCKS_LODESTONE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12358,6 +12922,7 @@ static BLOCKS_LODESTONE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LODESTONE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/lodestone"),
     pools: BLOCKS_LODESTONE_POOLS,
 };
 static BLOCKS_LOOM_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12377,6 +12942,7 @@ static BLOCKS_LOOM_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_LOOM: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/loom"),
     pools: BLOCKS_LOOM_POOLS,
 };
 static BLOCKS_MAGENTA_BANNER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12396,6 +12962,7 @@ static BLOCKS_MAGENTA_BANNER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MAGENTA_BANNER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/magenta_banner"),
     pools: BLOCKS_MAGENTA_BANNER_POOLS,
 };
 static BLOCKS_MAGENTA_BED_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12415,6 +12982,7 @@ static BLOCKS_MAGENTA_BED_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MAGENTA_BED: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/magenta_bed"),
     pools: BLOCKS_MAGENTA_BED_POOLS,
 };
 static BLOCKS_MAGENTA_CANDLE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12434,6 +13002,7 @@ static BLOCKS_MAGENTA_CANDLE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_MAGENTA_CANDLE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/magenta_candle"),
     pools: BLOCKS_MAGENTA_CANDLE_POOLS,
 };
 static BLOCKS_MAGENTA_CANDLE_CAKE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12453,6 +13022,7 @@ static BLOCKS_MAGENTA_CANDLE_CAKE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_MAGENTA_CANDLE_CAKE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/magenta_candle_cake"),
     pools: BLOCKS_MAGENTA_CANDLE_CAKE_POOLS,
 };
 static BLOCKS_MAGENTA_CARPET_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12472,6 +13042,7 @@ static BLOCKS_MAGENTA_CARPET_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MAGENTA_CARPET: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/magenta_carpet"),
     pools: BLOCKS_MAGENTA_CARPET_POOLS,
 };
 static BLOCKS_MAGENTA_CONCRETE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12491,6 +13062,7 @@ static BLOCKS_MAGENTA_CONCRETE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MAGENTA_CONCRETE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/magenta_concrete"),
     pools: BLOCKS_MAGENTA_CONCRETE_POOLS,
 };
 static BLOCKS_MAGENTA_CONCRETE_POWDER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12510,6 +13082,7 @@ static BLOCKS_MAGENTA_CONCRETE_POWDER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MAGENTA_CONCRETE_POWDER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/magenta_concrete_powder"),
     pools: BLOCKS_MAGENTA_CONCRETE_POWDER_POOLS,
 };
 static BLOCKS_MAGENTA_CONCRETE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12529,6 +13102,7 @@ static BLOCKS_MAGENTA_CONCRETE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_MAGENTA_CONCRETE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/magenta_concrete_slab"),
     pools: BLOCKS_MAGENTA_CONCRETE_SLAB_POOLS,
 };
 static BLOCKS_MAGENTA_CONCRETE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12548,6 +13122,7 @@ static BLOCKS_MAGENTA_CONCRETE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MAGENTA_CONCRETE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/magenta_concrete_stairs"),
     pools: BLOCKS_MAGENTA_CONCRETE_STAIRS_POOLS,
 };
 static BLOCKS_MAGENTA_GLAZED_TERRACOTTA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12567,6 +13142,7 @@ static BLOCKS_MAGENTA_GLAZED_TERRACOTTA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MAGENTA_GLAZED_TERRACOTTA: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/magenta_glazed_terracotta"),
     pools: BLOCKS_MAGENTA_GLAZED_TERRACOTTA_POOLS,
 };
 static BLOCKS_MAGENTA_SHULKER_BOX_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12586,6 +13162,7 @@ static BLOCKS_MAGENTA_SHULKER_BOX_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_MAGENTA_SHULKER_BOX: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/magenta_shulker_box"),
     pools: BLOCKS_MAGENTA_SHULKER_BOX_POOLS,
 };
 static BLOCKS_MAGENTA_STAINED_GLASS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12605,6 +13182,7 @@ static BLOCKS_MAGENTA_STAINED_GLASS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_MAGENTA_STAINED_GLASS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/magenta_stained_glass"),
     pools: BLOCKS_MAGENTA_STAINED_GLASS_POOLS,
 };
 static BLOCKS_MAGENTA_STAINED_GLASS_PANE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12624,6 +13202,7 @@ static BLOCKS_MAGENTA_STAINED_GLASS_PANE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_MAGENTA_STAINED_GLASS_PANE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/magenta_stained_glass_pane"),
     pools: BLOCKS_MAGENTA_STAINED_GLASS_PANE_POOLS,
 };
 static BLOCKS_MAGENTA_TERRACOTTA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12643,6 +13222,7 @@ static BLOCKS_MAGENTA_TERRACOTTA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MAGENTA_TERRACOTTA: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/magenta_terracotta"),
     pools: BLOCKS_MAGENTA_TERRACOTTA_POOLS,
 };
 static BLOCKS_MAGENTA_WOOL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12662,6 +13242,7 @@ static BLOCKS_MAGENTA_WOOL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MAGENTA_WOOL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/magenta_wool"),
     pools: BLOCKS_MAGENTA_WOOL_POOLS,
 };
 static BLOCKS_MAGENTA_WOOL_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12681,6 +13262,7 @@ static BLOCKS_MAGENTA_WOOL_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_MAGENTA_WOOL_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/magenta_wool_slab"),
     pools: BLOCKS_MAGENTA_WOOL_SLAB_POOLS,
 };
 static BLOCKS_MAGENTA_WOOL_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12700,6 +13282,7 @@ static BLOCKS_MAGENTA_WOOL_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MAGENTA_WOOL_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/magenta_wool_stairs"),
     pools: BLOCKS_MAGENTA_WOOL_STAIRS_POOLS,
 };
 static BLOCKS_MAGMA_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12719,6 +13302,7 @@ static BLOCKS_MAGMA_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MAGMA_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/magma_block"),
     pools: BLOCKS_MAGMA_BLOCK_POOLS,
 };
 static BLOCKS_MANGROVE_BUTTON_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12738,6 +13322,7 @@ static BLOCKS_MANGROVE_BUTTON_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MANGROVE_BUTTON: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/mangrove_button"),
     pools: BLOCKS_MANGROVE_BUTTON_POOLS,
 };
 static BLOCKS_MANGROVE_DOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12757,6 +13342,7 @@ static BLOCKS_MANGROVE_DOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MANGROVE_DOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/mangrove_door"),
     pools: BLOCKS_MANGROVE_DOOR_POOLS,
 };
 static BLOCKS_MANGROVE_FENCE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12776,6 +13362,7 @@ static BLOCKS_MANGROVE_FENCE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MANGROVE_FENCE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/mangrove_fence"),
     pools: BLOCKS_MANGROVE_FENCE_POOLS,
 };
 static BLOCKS_MANGROVE_FENCE_GATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12795,6 +13382,7 @@ static BLOCKS_MANGROVE_FENCE_GATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MANGROVE_FENCE_GATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/mangrove_fence_gate"),
     pools: BLOCKS_MANGROVE_FENCE_GATE_POOLS,
 };
 static BLOCKS_MANGROVE_HANGING_SIGN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12814,6 +13402,7 @@ static BLOCKS_MANGROVE_HANGING_SIGN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MANGROVE_HANGING_SIGN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/mangrove_hanging_sign"),
     pools: BLOCKS_MANGROVE_HANGING_SIGN_POOLS,
 };
 static BLOCKS_MANGROVE_LEAVES_POOL0_ENTRIES: &[LootEntry] = &[
@@ -12849,6 +13438,7 @@ static BLOCKS_MANGROVE_LEAVES_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_MANGROVE_LEAVES: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/mangrove_leaves"),
     pools: BLOCKS_MANGROVE_LEAVES_POOLS,
 };
 static BLOCKS_MANGROVE_LOG_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12868,6 +13458,7 @@ static BLOCKS_MANGROVE_LOG_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MANGROVE_LOG: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/mangrove_log"),
     pools: BLOCKS_MANGROVE_LOG_POOLS,
 };
 static BLOCKS_MANGROVE_PLANKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12887,6 +13478,7 @@ static BLOCKS_MANGROVE_PLANKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MANGROVE_PLANKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/mangrove_planks"),
     pools: BLOCKS_MANGROVE_PLANKS_POOLS,
 };
 static BLOCKS_MANGROVE_PRESSURE_PLATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12906,6 +13498,7 @@ static BLOCKS_MANGROVE_PRESSURE_PLATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MANGROVE_PRESSURE_PLATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/mangrove_pressure_plate"),
     pools: BLOCKS_MANGROVE_PRESSURE_PLATE_POOLS,
 };
 static BLOCKS_MANGROVE_PROPAGULE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12925,6 +13518,7 @@ static BLOCKS_MANGROVE_PROPAGULE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_MANGROVE_PROPAGULE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/mangrove_propagule"),
     pools: BLOCKS_MANGROVE_PROPAGULE_POOLS,
 };
 static BLOCKS_MANGROVE_ROOTS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12944,6 +13538,7 @@ static BLOCKS_MANGROVE_ROOTS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MANGROVE_ROOTS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/mangrove_roots"),
     pools: BLOCKS_MANGROVE_ROOTS_POOLS,
 };
 static BLOCKS_MANGROVE_SHELF_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12963,6 +13558,7 @@ static BLOCKS_MANGROVE_SHELF_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MANGROVE_SHELF: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/mangrove_shelf"),
     pools: BLOCKS_MANGROVE_SHELF_POOLS,
 };
 static BLOCKS_MANGROVE_SIGN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -12982,6 +13578,7 @@ static BLOCKS_MANGROVE_SIGN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MANGROVE_SIGN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/mangrove_sign"),
     pools: BLOCKS_MANGROVE_SIGN_POOLS,
 };
 static BLOCKS_MANGROVE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13001,6 +13598,7 @@ static BLOCKS_MANGROVE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_MANGROVE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/mangrove_slab"),
     pools: BLOCKS_MANGROVE_SLAB_POOLS,
 };
 static BLOCKS_MANGROVE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13020,6 +13618,7 @@ static BLOCKS_MANGROVE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MANGROVE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/mangrove_stairs"),
     pools: BLOCKS_MANGROVE_STAIRS_POOLS,
 };
 static BLOCKS_MANGROVE_TRAPDOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13039,6 +13638,7 @@ static BLOCKS_MANGROVE_TRAPDOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MANGROVE_TRAPDOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/mangrove_trapdoor"),
     pools: BLOCKS_MANGROVE_TRAPDOOR_POOLS,
 };
 static BLOCKS_MANGROVE_WOOD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13058,6 +13658,7 @@ static BLOCKS_MANGROVE_WOOD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MANGROVE_WOOD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/mangrove_wood"),
     pools: BLOCKS_MANGROVE_WOOD_POOLS,
 };
 static BLOCKS_MEDIUM_AMETHYST_BUD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13077,6 +13678,7 @@ static BLOCKS_MEDIUM_AMETHYST_BUD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_MEDIUM_AMETHYST_BUD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/medium_amethyst_bud"),
     pools: BLOCKS_MEDIUM_AMETHYST_BUD_POOLS,
 };
 static BLOCKS_MELON_POOL0_ENTRIES: &[LootEntry] = &[
@@ -13107,6 +13709,7 @@ static BLOCKS_MELON_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_MELON: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/melon"),
     pools: BLOCKS_MELON_POOLS,
 };
 static BLOCKS_MELON_STEM_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13126,6 +13729,7 @@ static BLOCKS_MELON_STEM_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_MELON_STEM: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/melon_stem"),
     pools: BLOCKS_MELON_STEM_POOLS,
 };
 static BLOCKS_MOSS_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13145,6 +13749,7 @@ static BLOCKS_MOSS_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MOSS_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/moss_block"),
     pools: BLOCKS_MOSS_BLOCK_POOLS,
 };
 static BLOCKS_MOSS_CARPET_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13164,6 +13769,7 @@ static BLOCKS_MOSS_CARPET_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MOSS_CARPET: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/moss_carpet"),
     pools: BLOCKS_MOSS_CARPET_POOLS,
 };
 static BLOCKS_MOSSY_COBBLESTONE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13183,6 +13789,7 @@ static BLOCKS_MOSSY_COBBLESTONE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MOSSY_COBBLESTONE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/mossy_cobblestone"),
     pools: BLOCKS_MOSSY_COBBLESTONE_POOLS,
 };
 static BLOCKS_MOSSY_COBBLESTONE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13202,6 +13809,7 @@ static BLOCKS_MOSSY_COBBLESTONE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_MOSSY_COBBLESTONE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/mossy_cobblestone_slab"),
     pools: BLOCKS_MOSSY_COBBLESTONE_SLAB_POOLS,
 };
 static BLOCKS_MOSSY_COBBLESTONE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13221,6 +13829,7 @@ static BLOCKS_MOSSY_COBBLESTONE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MOSSY_COBBLESTONE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/mossy_cobblestone_stairs"),
     pools: BLOCKS_MOSSY_COBBLESTONE_STAIRS_POOLS,
 };
 static BLOCKS_MOSSY_COBBLESTONE_WALL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13240,6 +13849,7 @@ static BLOCKS_MOSSY_COBBLESTONE_WALL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MOSSY_COBBLESTONE_WALL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/mossy_cobblestone_wall"),
     pools: BLOCKS_MOSSY_COBBLESTONE_WALL_POOLS,
 };
 static BLOCKS_MOSSY_STONE_BRICK_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13259,6 +13869,7 @@ static BLOCKS_MOSSY_STONE_BRICK_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_MOSSY_STONE_BRICK_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/mossy_stone_brick_slab"),
     pools: BLOCKS_MOSSY_STONE_BRICK_SLAB_POOLS,
 };
 static BLOCKS_MOSSY_STONE_BRICK_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13278,6 +13889,7 @@ static BLOCKS_MOSSY_STONE_BRICK_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MOSSY_STONE_BRICK_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/mossy_stone_brick_stairs"),
     pools: BLOCKS_MOSSY_STONE_BRICK_STAIRS_POOLS,
 };
 static BLOCKS_MOSSY_STONE_BRICK_WALL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13297,6 +13909,7 @@ static BLOCKS_MOSSY_STONE_BRICK_WALL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MOSSY_STONE_BRICK_WALL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/mossy_stone_brick_wall"),
     pools: BLOCKS_MOSSY_STONE_BRICK_WALL_POOLS,
 };
 static BLOCKS_MOSSY_STONE_BRICKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13316,6 +13929,7 @@ static BLOCKS_MOSSY_STONE_BRICKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MOSSY_STONE_BRICKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/mossy_stone_bricks"),
     pools: BLOCKS_MOSSY_STONE_BRICKS_POOLS,
 };
 static BLOCKS_MUD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13335,6 +13949,7 @@ static BLOCKS_MUD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MUD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/mud"),
     pools: BLOCKS_MUD_POOLS,
 };
 static BLOCKS_MUD_BRICK_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13354,6 +13969,7 @@ static BLOCKS_MUD_BRICK_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_MUD_BRICK_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/mud_brick_slab"),
     pools: BLOCKS_MUD_BRICK_SLAB_POOLS,
 };
 static BLOCKS_MUD_BRICK_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13373,6 +13989,7 @@ static BLOCKS_MUD_BRICK_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MUD_BRICK_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/mud_brick_stairs"),
     pools: BLOCKS_MUD_BRICK_STAIRS_POOLS,
 };
 static BLOCKS_MUD_BRICK_WALL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13392,6 +14009,7 @@ static BLOCKS_MUD_BRICK_WALL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MUD_BRICK_WALL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/mud_brick_wall"),
     pools: BLOCKS_MUD_BRICK_WALL_POOLS,
 };
 static BLOCKS_MUD_BRICKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13411,6 +14029,7 @@ static BLOCKS_MUD_BRICKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MUD_BRICKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/mud_bricks"),
     pools: BLOCKS_MUD_BRICKS_POOLS,
 };
 static BLOCKS_MUDDY_MANGROVE_ROOTS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13430,6 +14049,7 @@ static BLOCKS_MUDDY_MANGROVE_ROOTS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_MUDDY_MANGROVE_ROOTS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/muddy_mangrove_roots"),
     pools: BLOCKS_MUDDY_MANGROVE_ROOTS_POOLS,
 };
 static BLOCKS_MUSHROOM_STEM_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13449,6 +14069,7 @@ static BLOCKS_MUSHROOM_STEM_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_MUSHROOM_STEM: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/mushroom_stem"),
     pools: BLOCKS_MUSHROOM_STEM_POOLS,
 };
 static BLOCKS_MYCELIUM_POOL0_ENTRIES: &[LootEntry] = &[
@@ -13482,6 +14103,7 @@ static BLOCKS_MYCELIUM_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_MYCELIUM: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/mycelium"),
     pools: BLOCKS_MYCELIUM_POOLS,
 };
 static BLOCKS_NETHER_BRICK_FENCE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13501,6 +14123,7 @@ static BLOCKS_NETHER_BRICK_FENCE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_NETHER_BRICK_FENCE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/nether_brick_fence"),
     pools: BLOCKS_NETHER_BRICK_FENCE_POOLS,
 };
 static BLOCKS_NETHER_BRICK_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13520,6 +14143,7 @@ static BLOCKS_NETHER_BRICK_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_NETHER_BRICK_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/nether_brick_slab"),
     pools: BLOCKS_NETHER_BRICK_SLAB_POOLS,
 };
 static BLOCKS_NETHER_BRICK_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13539,6 +14163,7 @@ static BLOCKS_NETHER_BRICK_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_NETHER_BRICK_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/nether_brick_stairs"),
     pools: BLOCKS_NETHER_BRICK_STAIRS_POOLS,
 };
 static BLOCKS_NETHER_BRICK_WALL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13558,6 +14183,7 @@ static BLOCKS_NETHER_BRICK_WALL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_NETHER_BRICK_WALL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/nether_brick_wall"),
     pools: BLOCKS_NETHER_BRICK_WALL_POOLS,
 };
 static BLOCKS_NETHER_BRICKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13577,6 +14203,7 @@ static BLOCKS_NETHER_BRICKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_NETHER_BRICKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/nether_bricks"),
     pools: BLOCKS_NETHER_BRICKS_POOLS,
 };
 static BLOCKS_NETHER_GOLD_ORE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -13607,10 +14234,12 @@ static BLOCKS_NETHER_GOLD_ORE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_NETHER_GOLD_ORE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/nether_gold_ore"),
     pools: BLOCKS_NETHER_GOLD_ORE_POOLS,
 };
 static BLOCKS_NETHER_PORTAL_POOLS: &[LootPool] = &[];
 pub static BLOCKS_NETHER_PORTAL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/nether_portal"),
     pools: BLOCKS_NETHER_PORTAL_POOLS,
 };
 static BLOCKS_NETHER_QUARTZ_ORE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -13641,6 +14270,7 @@ static BLOCKS_NETHER_QUARTZ_ORE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_NETHER_QUARTZ_ORE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/nether_quartz_ore"),
     pools: BLOCKS_NETHER_QUARTZ_ORE_POOLS,
 };
 static BLOCKS_NETHER_SPROUTS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13660,6 +14290,7 @@ static BLOCKS_NETHER_SPROUTS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::Shears,
 }];
 pub static BLOCKS_NETHER_SPROUTS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/nether_sprouts"),
     pools: BLOCKS_NETHER_SPROUTS_POOLS,
 };
 static BLOCKS_NETHER_WART_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13679,6 +14310,7 @@ static BLOCKS_NETHER_WART_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_NETHER_WART: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/nether_wart"),
     pools: BLOCKS_NETHER_WART_POOLS,
 };
 static BLOCKS_NETHER_WART_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13698,6 +14330,7 @@ static BLOCKS_NETHER_WART_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_NETHER_WART_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/nether_wart_block"),
     pools: BLOCKS_NETHER_WART_BLOCK_POOLS,
 };
 static BLOCKS_NETHERITE_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13717,6 +14350,7 @@ static BLOCKS_NETHERITE_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_NETHERITE_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/netherite_block"),
     pools: BLOCKS_NETHERITE_BLOCK_POOLS,
 };
 static BLOCKS_NETHERRACK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13736,6 +14370,7 @@ static BLOCKS_NETHERRACK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_NETHERRACK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/netherrack"),
     pools: BLOCKS_NETHERRACK_POOLS,
 };
 static BLOCKS_NOTE_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13755,6 +14390,7 @@ static BLOCKS_NOTE_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_NOTE_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/note_block"),
     pools: BLOCKS_NOTE_BLOCK_POOLS,
 };
 static BLOCKS_OAK_BUTTON_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13774,6 +14410,7 @@ static BLOCKS_OAK_BUTTON_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_OAK_BUTTON: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/oak_button"),
     pools: BLOCKS_OAK_BUTTON_POOLS,
 };
 static BLOCKS_OAK_DOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13793,6 +14430,7 @@ static BLOCKS_OAK_DOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_OAK_DOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/oak_door"),
     pools: BLOCKS_OAK_DOOR_POOLS,
 };
 static BLOCKS_OAK_FENCE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13812,6 +14450,7 @@ static BLOCKS_OAK_FENCE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_OAK_FENCE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/oak_fence"),
     pools: BLOCKS_OAK_FENCE_POOLS,
 };
 static BLOCKS_OAK_FENCE_GATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13831,6 +14470,7 @@ static BLOCKS_OAK_FENCE_GATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_OAK_FENCE_GATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/oak_fence_gate"),
     pools: BLOCKS_OAK_FENCE_GATE_POOLS,
 };
 static BLOCKS_OAK_HANGING_SIGN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13850,6 +14490,7 @@ static BLOCKS_OAK_HANGING_SIGN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_OAK_HANGING_SIGN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/oak_hanging_sign"),
     pools: BLOCKS_OAK_HANGING_SIGN_POOLS,
 };
 static BLOCKS_OAK_LEAVES_POOL0_ENTRIES: &[LootEntry] = &[
@@ -13935,6 +14576,7 @@ static BLOCKS_OAK_LEAVES_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_OAK_LEAVES: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/oak_leaves"),
     pools: BLOCKS_OAK_LEAVES_POOLS,
 };
 static BLOCKS_OAK_LOG_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13954,6 +14596,7 @@ static BLOCKS_OAK_LOG_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_OAK_LOG: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/oak_log"),
     pools: BLOCKS_OAK_LOG_POOLS,
 };
 static BLOCKS_OAK_PLANKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13973,6 +14616,7 @@ static BLOCKS_OAK_PLANKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_OAK_PLANKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/oak_planks"),
     pools: BLOCKS_OAK_PLANKS_POOLS,
 };
 static BLOCKS_OAK_PRESSURE_PLATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -13992,6 +14636,7 @@ static BLOCKS_OAK_PRESSURE_PLATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_OAK_PRESSURE_PLATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/oak_pressure_plate"),
     pools: BLOCKS_OAK_PRESSURE_PLATE_POOLS,
 };
 static BLOCKS_OAK_SAPLING_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14011,6 +14656,7 @@ static BLOCKS_OAK_SAPLING_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_OAK_SAPLING: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/oak_sapling"),
     pools: BLOCKS_OAK_SAPLING_POOLS,
 };
 static BLOCKS_OAK_SHELF_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14030,6 +14676,7 @@ static BLOCKS_OAK_SHELF_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_OAK_SHELF: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/oak_shelf"),
     pools: BLOCKS_OAK_SHELF_POOLS,
 };
 static BLOCKS_OAK_SIGN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14049,6 +14696,7 @@ static BLOCKS_OAK_SIGN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_OAK_SIGN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/oak_sign"),
     pools: BLOCKS_OAK_SIGN_POOLS,
 };
 static BLOCKS_OAK_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14068,6 +14716,7 @@ static BLOCKS_OAK_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_OAK_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/oak_slab"),
     pools: BLOCKS_OAK_SLAB_POOLS,
 };
 static BLOCKS_OAK_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14087,6 +14736,7 @@ static BLOCKS_OAK_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_OAK_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/oak_stairs"),
     pools: BLOCKS_OAK_STAIRS_POOLS,
 };
 static BLOCKS_OAK_TRAPDOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14106,6 +14756,7 @@ static BLOCKS_OAK_TRAPDOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_OAK_TRAPDOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/oak_trapdoor"),
     pools: BLOCKS_OAK_TRAPDOOR_POOLS,
 };
 static BLOCKS_OAK_WOOD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14125,6 +14776,7 @@ static BLOCKS_OAK_WOOD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_OAK_WOOD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/oak_wood"),
     pools: BLOCKS_OAK_WOOD_POOLS,
 };
 static BLOCKS_OBSERVER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14144,6 +14796,7 @@ static BLOCKS_OBSERVER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_OBSERVER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/observer"),
     pools: BLOCKS_OBSERVER_POOLS,
 };
 static BLOCKS_OBSIDIAN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14163,6 +14816,7 @@ static BLOCKS_OBSIDIAN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_OBSIDIAN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/obsidian"),
     pools: BLOCKS_OBSIDIAN_POOLS,
 };
 static BLOCKS_OCHRE_FROGLIGHT_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14182,6 +14836,7 @@ static BLOCKS_OCHRE_FROGLIGHT_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_OCHRE_FROGLIGHT: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/ochre_froglight"),
     pools: BLOCKS_OCHRE_FROGLIGHT_POOLS,
 };
 static BLOCKS_OPEN_EYEBLOSSOM_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14201,6 +14856,7 @@ static BLOCKS_OPEN_EYEBLOSSOM_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_OPEN_EYEBLOSSOM: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/open_eyeblossom"),
     pools: BLOCKS_OPEN_EYEBLOSSOM_POOLS,
 };
 static BLOCKS_ORANGE_BANNER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14220,6 +14876,7 @@ static BLOCKS_ORANGE_BANNER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_ORANGE_BANNER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/orange_banner"),
     pools: BLOCKS_ORANGE_BANNER_POOLS,
 };
 static BLOCKS_ORANGE_BED_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14239,6 +14896,7 @@ static BLOCKS_ORANGE_BED_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_ORANGE_BED: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/orange_bed"),
     pools: BLOCKS_ORANGE_BED_POOLS,
 };
 static BLOCKS_ORANGE_CANDLE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14258,6 +14916,7 @@ static BLOCKS_ORANGE_CANDLE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_ORANGE_CANDLE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/orange_candle"),
     pools: BLOCKS_ORANGE_CANDLE_POOLS,
 };
 static BLOCKS_ORANGE_CANDLE_CAKE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14277,6 +14936,7 @@ static BLOCKS_ORANGE_CANDLE_CAKE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_ORANGE_CANDLE_CAKE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/orange_candle_cake"),
     pools: BLOCKS_ORANGE_CANDLE_CAKE_POOLS,
 };
 static BLOCKS_ORANGE_CARPET_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14296,6 +14956,7 @@ static BLOCKS_ORANGE_CARPET_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_ORANGE_CARPET: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/orange_carpet"),
     pools: BLOCKS_ORANGE_CARPET_POOLS,
 };
 static BLOCKS_ORANGE_CONCRETE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14315,6 +14976,7 @@ static BLOCKS_ORANGE_CONCRETE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_ORANGE_CONCRETE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/orange_concrete"),
     pools: BLOCKS_ORANGE_CONCRETE_POOLS,
 };
 static BLOCKS_ORANGE_CONCRETE_POWDER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14334,6 +14996,7 @@ static BLOCKS_ORANGE_CONCRETE_POWDER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_ORANGE_CONCRETE_POWDER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/orange_concrete_powder"),
     pools: BLOCKS_ORANGE_CONCRETE_POWDER_POOLS,
 };
 static BLOCKS_ORANGE_CONCRETE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14353,6 +15016,7 @@ static BLOCKS_ORANGE_CONCRETE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_ORANGE_CONCRETE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/orange_concrete_slab"),
     pools: BLOCKS_ORANGE_CONCRETE_SLAB_POOLS,
 };
 static BLOCKS_ORANGE_CONCRETE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14372,6 +15036,7 @@ static BLOCKS_ORANGE_CONCRETE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_ORANGE_CONCRETE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/orange_concrete_stairs"),
     pools: BLOCKS_ORANGE_CONCRETE_STAIRS_POOLS,
 };
 static BLOCKS_ORANGE_GLAZED_TERRACOTTA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14391,6 +15056,7 @@ static BLOCKS_ORANGE_GLAZED_TERRACOTTA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_ORANGE_GLAZED_TERRACOTTA: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/orange_glazed_terracotta"),
     pools: BLOCKS_ORANGE_GLAZED_TERRACOTTA_POOLS,
 };
 static BLOCKS_ORANGE_POPLAR_LEAVES_POOL0_ENTRIES: &[LootEntry] = &[
@@ -14449,6 +15115,7 @@ static BLOCKS_ORANGE_POPLAR_LEAVES_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_ORANGE_POPLAR_LEAVES: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/orange_poplar_leaves"),
     pools: BLOCKS_ORANGE_POPLAR_LEAVES_POOLS,
 };
 static BLOCKS_ORANGE_SHULKER_BOX_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14468,6 +15135,7 @@ static BLOCKS_ORANGE_SHULKER_BOX_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_ORANGE_SHULKER_BOX: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/orange_shulker_box"),
     pools: BLOCKS_ORANGE_SHULKER_BOX_POOLS,
 };
 static BLOCKS_ORANGE_STAINED_GLASS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14487,6 +15155,7 @@ static BLOCKS_ORANGE_STAINED_GLASS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_ORANGE_STAINED_GLASS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/orange_stained_glass"),
     pools: BLOCKS_ORANGE_STAINED_GLASS_POOLS,
 };
 static BLOCKS_ORANGE_STAINED_GLASS_PANE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14506,6 +15175,7 @@ static BLOCKS_ORANGE_STAINED_GLASS_PANE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_ORANGE_STAINED_GLASS_PANE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/orange_stained_glass_pane"),
     pools: BLOCKS_ORANGE_STAINED_GLASS_PANE_POOLS,
 };
 static BLOCKS_ORANGE_TERRACOTTA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14525,6 +15195,7 @@ static BLOCKS_ORANGE_TERRACOTTA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_ORANGE_TERRACOTTA: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/orange_terracotta"),
     pools: BLOCKS_ORANGE_TERRACOTTA_POOLS,
 };
 static BLOCKS_ORANGE_TULIP_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14544,6 +15215,7 @@ static BLOCKS_ORANGE_TULIP_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_ORANGE_TULIP: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/orange_tulip"),
     pools: BLOCKS_ORANGE_TULIP_POOLS,
 };
 static BLOCKS_ORANGE_WOOL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14563,6 +15235,7 @@ static BLOCKS_ORANGE_WOOL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_ORANGE_WOOL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/orange_wool"),
     pools: BLOCKS_ORANGE_WOOL_POOLS,
 };
 static BLOCKS_ORANGE_WOOL_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14582,6 +15255,7 @@ static BLOCKS_ORANGE_WOOL_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_ORANGE_WOOL_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/orange_wool_slab"),
     pools: BLOCKS_ORANGE_WOOL_SLAB_POOLS,
 };
 static BLOCKS_ORANGE_WOOL_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14601,6 +15275,7 @@ static BLOCKS_ORANGE_WOOL_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_ORANGE_WOOL_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/orange_wool_stairs"),
     pools: BLOCKS_ORANGE_WOOL_STAIRS_POOLS,
 };
 static BLOCKS_OXEYE_DAISY_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14620,6 +15295,7 @@ static BLOCKS_OXEYE_DAISY_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_OXEYE_DAISY: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/oxeye_daisy"),
     pools: BLOCKS_OXEYE_DAISY_POOLS,
 };
 static BLOCKS_OXIDIZED_CHISELED_COPPER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14639,6 +15315,7 @@ static BLOCKS_OXIDIZED_CHISELED_COPPER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_OXIDIZED_CHISELED_COPPER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/oxidized_chiseled_copper"),
     pools: BLOCKS_OXIDIZED_CHISELED_COPPER_POOLS,
 };
 static BLOCKS_OXIDIZED_COPPER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14658,6 +15335,7 @@ static BLOCKS_OXIDIZED_COPPER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_OXIDIZED_COPPER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/oxidized_copper"),
     pools: BLOCKS_OXIDIZED_COPPER_POOLS,
 };
 static BLOCKS_OXIDIZED_COPPER_BARS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14677,6 +15355,7 @@ static BLOCKS_OXIDIZED_COPPER_BARS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_OXIDIZED_COPPER_BARS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/oxidized_copper_bars"),
     pools: BLOCKS_OXIDIZED_COPPER_BARS_POOLS,
 };
 static BLOCKS_OXIDIZED_COPPER_BULB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14696,6 +15375,7 @@ static BLOCKS_OXIDIZED_COPPER_BULB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_OXIDIZED_COPPER_BULB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/oxidized_copper_bulb"),
     pools: BLOCKS_OXIDIZED_COPPER_BULB_POOLS,
 };
 static BLOCKS_OXIDIZED_COPPER_CHAIN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14715,6 +15395,7 @@ static BLOCKS_OXIDIZED_COPPER_CHAIN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_OXIDIZED_COPPER_CHAIN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/oxidized_copper_chain"),
     pools: BLOCKS_OXIDIZED_COPPER_CHAIN_POOLS,
 };
 static BLOCKS_OXIDIZED_COPPER_CHEST_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14734,6 +15415,7 @@ static BLOCKS_OXIDIZED_COPPER_CHEST_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_OXIDIZED_COPPER_CHEST: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/oxidized_copper_chest"),
     pools: BLOCKS_OXIDIZED_COPPER_CHEST_POOLS,
 };
 static BLOCKS_OXIDIZED_COPPER_DOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14753,6 +15435,7 @@ static BLOCKS_OXIDIZED_COPPER_DOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_OXIDIZED_COPPER_DOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/oxidized_copper_door"),
     pools: BLOCKS_OXIDIZED_COPPER_DOOR_POOLS,
 };
 static BLOCKS_OXIDIZED_COPPER_GOLEM_STATUE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14772,6 +15455,7 @@ static BLOCKS_OXIDIZED_COPPER_GOLEM_STATUE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_OXIDIZED_COPPER_GOLEM_STATUE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/oxidized_copper_golem_statue"),
     pools: BLOCKS_OXIDIZED_COPPER_GOLEM_STATUE_POOLS,
 };
 static BLOCKS_OXIDIZED_COPPER_GRATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14791,6 +15475,7 @@ static BLOCKS_OXIDIZED_COPPER_GRATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_OXIDIZED_COPPER_GRATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/oxidized_copper_grate"),
     pools: BLOCKS_OXIDIZED_COPPER_GRATE_POOLS,
 };
 static BLOCKS_OXIDIZED_COPPER_LANTERN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14810,6 +15495,7 @@ static BLOCKS_OXIDIZED_COPPER_LANTERN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_OXIDIZED_COPPER_LANTERN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/oxidized_copper_lantern"),
     pools: BLOCKS_OXIDIZED_COPPER_LANTERN_POOLS,
 };
 static BLOCKS_OXIDIZED_COPPER_TRAPDOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14829,6 +15515,7 @@ static BLOCKS_OXIDIZED_COPPER_TRAPDOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_OXIDIZED_COPPER_TRAPDOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/oxidized_copper_trapdoor"),
     pools: BLOCKS_OXIDIZED_COPPER_TRAPDOOR_POOLS,
 };
 static BLOCKS_OXIDIZED_CUT_COPPER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14848,6 +15535,7 @@ static BLOCKS_OXIDIZED_CUT_COPPER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_OXIDIZED_CUT_COPPER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/oxidized_cut_copper"),
     pools: BLOCKS_OXIDIZED_CUT_COPPER_POOLS,
 };
 static BLOCKS_OXIDIZED_CUT_COPPER_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14867,6 +15555,7 @@ static BLOCKS_OXIDIZED_CUT_COPPER_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_OXIDIZED_CUT_COPPER_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/oxidized_cut_copper_slab"),
     pools: BLOCKS_OXIDIZED_CUT_COPPER_SLAB_POOLS,
 };
 static BLOCKS_OXIDIZED_CUT_COPPER_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14886,6 +15575,7 @@ static BLOCKS_OXIDIZED_CUT_COPPER_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_OXIDIZED_CUT_COPPER_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/oxidized_cut_copper_stairs"),
     pools: BLOCKS_OXIDIZED_CUT_COPPER_STAIRS_POOLS,
 };
 static BLOCKS_OXIDIZED_LIGHTNING_ROD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14905,6 +15595,7 @@ static BLOCKS_OXIDIZED_LIGHTNING_ROD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_OXIDIZED_LIGHTNING_ROD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/oxidized_lightning_rod"),
     pools: BLOCKS_OXIDIZED_LIGHTNING_ROD_POOLS,
 };
 static BLOCKS_PACKED_ICE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14924,6 +15615,7 @@ static BLOCKS_PACKED_ICE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_PACKED_ICE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/packed_ice"),
     pools: BLOCKS_PACKED_ICE_POOLS,
 };
 static BLOCKS_PACKED_MUD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14943,6 +15635,7 @@ static BLOCKS_PACKED_MUD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PACKED_MUD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/packed_mud"),
     pools: BLOCKS_PACKED_MUD_POOLS,
 };
 static BLOCKS_PALE_HANGING_MOSS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14962,6 +15655,7 @@ static BLOCKS_PALE_HANGING_MOSS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouchOrShears,
 }];
 pub static BLOCKS_PALE_HANGING_MOSS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pale_hanging_moss"),
     pools: BLOCKS_PALE_HANGING_MOSS_POOLS,
 };
 static BLOCKS_PALE_MOSS_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -14981,6 +15675,7 @@ static BLOCKS_PALE_MOSS_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PALE_MOSS_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pale_moss_block"),
     pools: BLOCKS_PALE_MOSS_BLOCK_POOLS,
 };
 static BLOCKS_PALE_MOSS_CARPET_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15000,6 +15695,7 @@ static BLOCKS_PALE_MOSS_CARPET_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_PALE_MOSS_CARPET: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pale_moss_carpet"),
     pools: BLOCKS_PALE_MOSS_CARPET_POOLS,
 };
 static BLOCKS_PALE_OAK_BUTTON_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15019,6 +15715,7 @@ static BLOCKS_PALE_OAK_BUTTON_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PALE_OAK_BUTTON: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pale_oak_button"),
     pools: BLOCKS_PALE_OAK_BUTTON_POOLS,
 };
 static BLOCKS_PALE_OAK_DOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15038,6 +15735,7 @@ static BLOCKS_PALE_OAK_DOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PALE_OAK_DOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pale_oak_door"),
     pools: BLOCKS_PALE_OAK_DOOR_POOLS,
 };
 static BLOCKS_PALE_OAK_FENCE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15057,6 +15755,7 @@ static BLOCKS_PALE_OAK_FENCE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PALE_OAK_FENCE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pale_oak_fence"),
     pools: BLOCKS_PALE_OAK_FENCE_POOLS,
 };
 static BLOCKS_PALE_OAK_FENCE_GATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15076,6 +15775,7 @@ static BLOCKS_PALE_OAK_FENCE_GATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PALE_OAK_FENCE_GATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pale_oak_fence_gate"),
     pools: BLOCKS_PALE_OAK_FENCE_GATE_POOLS,
 };
 static BLOCKS_PALE_OAK_HANGING_SIGN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15095,6 +15795,7 @@ static BLOCKS_PALE_OAK_HANGING_SIGN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PALE_OAK_HANGING_SIGN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pale_oak_hanging_sign"),
     pools: BLOCKS_PALE_OAK_HANGING_SIGN_POOLS,
 };
 static BLOCKS_PALE_OAK_LEAVES_POOL0_ENTRIES: &[LootEntry] = &[
@@ -15153,6 +15854,7 @@ static BLOCKS_PALE_OAK_LEAVES_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_PALE_OAK_LEAVES: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pale_oak_leaves"),
     pools: BLOCKS_PALE_OAK_LEAVES_POOLS,
 };
 static BLOCKS_PALE_OAK_LOG_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15172,6 +15874,7 @@ static BLOCKS_PALE_OAK_LOG_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PALE_OAK_LOG: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pale_oak_log"),
     pools: BLOCKS_PALE_OAK_LOG_POOLS,
 };
 static BLOCKS_PALE_OAK_PLANKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15191,6 +15894,7 @@ static BLOCKS_PALE_OAK_PLANKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PALE_OAK_PLANKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pale_oak_planks"),
     pools: BLOCKS_PALE_OAK_PLANKS_POOLS,
 };
 static BLOCKS_PALE_OAK_PRESSURE_PLATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15210,6 +15914,7 @@ static BLOCKS_PALE_OAK_PRESSURE_PLATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PALE_OAK_PRESSURE_PLATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pale_oak_pressure_plate"),
     pools: BLOCKS_PALE_OAK_PRESSURE_PLATE_POOLS,
 };
 static BLOCKS_PALE_OAK_SAPLING_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15229,6 +15934,7 @@ static BLOCKS_PALE_OAK_SAPLING_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PALE_OAK_SAPLING: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pale_oak_sapling"),
     pools: BLOCKS_PALE_OAK_SAPLING_POOLS,
 };
 static BLOCKS_PALE_OAK_SHELF_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15248,6 +15954,7 @@ static BLOCKS_PALE_OAK_SHELF_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PALE_OAK_SHELF: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pale_oak_shelf"),
     pools: BLOCKS_PALE_OAK_SHELF_POOLS,
 };
 static BLOCKS_PALE_OAK_SIGN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15267,6 +15974,7 @@ static BLOCKS_PALE_OAK_SIGN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PALE_OAK_SIGN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pale_oak_sign"),
     pools: BLOCKS_PALE_OAK_SIGN_POOLS,
 };
 static BLOCKS_PALE_OAK_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15286,6 +15994,7 @@ static BLOCKS_PALE_OAK_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_PALE_OAK_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pale_oak_slab"),
     pools: BLOCKS_PALE_OAK_SLAB_POOLS,
 };
 static BLOCKS_PALE_OAK_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15305,6 +16014,7 @@ static BLOCKS_PALE_OAK_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PALE_OAK_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pale_oak_stairs"),
     pools: BLOCKS_PALE_OAK_STAIRS_POOLS,
 };
 static BLOCKS_PALE_OAK_TRAPDOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15324,6 +16034,7 @@ static BLOCKS_PALE_OAK_TRAPDOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PALE_OAK_TRAPDOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pale_oak_trapdoor"),
     pools: BLOCKS_PALE_OAK_TRAPDOOR_POOLS,
 };
 static BLOCKS_PALE_OAK_WOOD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15343,6 +16054,7 @@ static BLOCKS_PALE_OAK_WOOD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PALE_OAK_WOOD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pale_oak_wood"),
     pools: BLOCKS_PALE_OAK_WOOD_POOLS,
 };
 static BLOCKS_PEARLESCENT_FROGLIGHT_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15362,6 +16074,7 @@ static BLOCKS_PEARLESCENT_FROGLIGHT_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PEARLESCENT_FROGLIGHT: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pearlescent_froglight"),
     pools: BLOCKS_PEARLESCENT_FROGLIGHT_POOLS,
 };
 static BLOCKS_PEONY_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15381,6 +16094,7 @@ static BLOCKS_PEONY_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PEONY: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/peony"),
     pools: BLOCKS_PEONY_POOLS,
 };
 static BLOCKS_PETRIFIED_OAK_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15400,6 +16114,7 @@ static BLOCKS_PETRIFIED_OAK_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_PETRIFIED_OAK_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/petrified_oak_slab"),
     pools: BLOCKS_PETRIFIED_OAK_SLAB_POOLS,
 };
 static BLOCKS_PIGLIN_HEAD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15419,6 +16134,7 @@ static BLOCKS_PIGLIN_HEAD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_PIGLIN_HEAD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/piglin_head"),
     pools: BLOCKS_PIGLIN_HEAD_POOLS,
 };
 static BLOCKS_PINK_BANNER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15438,6 +16154,7 @@ static BLOCKS_PINK_BANNER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PINK_BANNER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pink_banner"),
     pools: BLOCKS_PINK_BANNER_POOLS,
 };
 static BLOCKS_PINK_BED_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15457,6 +16174,7 @@ static BLOCKS_PINK_BED_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PINK_BED: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pink_bed"),
     pools: BLOCKS_PINK_BED_POOLS,
 };
 static BLOCKS_PINK_CANDLE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15476,6 +16194,7 @@ static BLOCKS_PINK_CANDLE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_PINK_CANDLE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pink_candle"),
     pools: BLOCKS_PINK_CANDLE_POOLS,
 };
 static BLOCKS_PINK_CANDLE_CAKE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15495,6 +16214,7 @@ static BLOCKS_PINK_CANDLE_CAKE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_PINK_CANDLE_CAKE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pink_candle_cake"),
     pools: BLOCKS_PINK_CANDLE_CAKE_POOLS,
 };
 static BLOCKS_PINK_CARPET_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15514,6 +16234,7 @@ static BLOCKS_PINK_CARPET_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PINK_CARPET: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pink_carpet"),
     pools: BLOCKS_PINK_CARPET_POOLS,
 };
 static BLOCKS_PINK_CONCRETE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15533,6 +16254,7 @@ static BLOCKS_PINK_CONCRETE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PINK_CONCRETE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pink_concrete"),
     pools: BLOCKS_PINK_CONCRETE_POOLS,
 };
 static BLOCKS_PINK_CONCRETE_POWDER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15552,6 +16274,7 @@ static BLOCKS_PINK_CONCRETE_POWDER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PINK_CONCRETE_POWDER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pink_concrete_powder"),
     pools: BLOCKS_PINK_CONCRETE_POWDER_POOLS,
 };
 static BLOCKS_PINK_CONCRETE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15571,6 +16294,7 @@ static BLOCKS_PINK_CONCRETE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_PINK_CONCRETE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pink_concrete_slab"),
     pools: BLOCKS_PINK_CONCRETE_SLAB_POOLS,
 };
 static BLOCKS_PINK_CONCRETE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15590,6 +16314,7 @@ static BLOCKS_PINK_CONCRETE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PINK_CONCRETE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pink_concrete_stairs"),
     pools: BLOCKS_PINK_CONCRETE_STAIRS_POOLS,
 };
 static BLOCKS_PINK_GLAZED_TERRACOTTA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15609,6 +16334,7 @@ static BLOCKS_PINK_GLAZED_TERRACOTTA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PINK_GLAZED_TERRACOTTA: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pink_glazed_terracotta"),
     pools: BLOCKS_PINK_GLAZED_TERRACOTTA_POOLS,
 };
 static BLOCKS_PINK_PETALS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15628,6 +16354,7 @@ static BLOCKS_PINK_PETALS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_PINK_PETALS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pink_petals"),
     pools: BLOCKS_PINK_PETALS_POOLS,
 };
 static BLOCKS_PINK_SHULKER_BOX_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15647,6 +16374,7 @@ static BLOCKS_PINK_SHULKER_BOX_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_PINK_SHULKER_BOX: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pink_shulker_box"),
     pools: BLOCKS_PINK_SHULKER_BOX_POOLS,
 };
 static BLOCKS_PINK_STAINED_GLASS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15666,6 +16394,7 @@ static BLOCKS_PINK_STAINED_GLASS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_PINK_STAINED_GLASS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pink_stained_glass"),
     pools: BLOCKS_PINK_STAINED_GLASS_POOLS,
 };
 static BLOCKS_PINK_STAINED_GLASS_PANE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15685,6 +16414,7 @@ static BLOCKS_PINK_STAINED_GLASS_PANE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_PINK_STAINED_GLASS_PANE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pink_stained_glass_pane"),
     pools: BLOCKS_PINK_STAINED_GLASS_PANE_POOLS,
 };
 static BLOCKS_PINK_TERRACOTTA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15704,6 +16434,7 @@ static BLOCKS_PINK_TERRACOTTA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PINK_TERRACOTTA: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pink_terracotta"),
     pools: BLOCKS_PINK_TERRACOTTA_POOLS,
 };
 static BLOCKS_PINK_TULIP_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15723,6 +16454,7 @@ static BLOCKS_PINK_TULIP_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PINK_TULIP: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pink_tulip"),
     pools: BLOCKS_PINK_TULIP_POOLS,
 };
 static BLOCKS_PINK_WOOL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15742,6 +16474,7 @@ static BLOCKS_PINK_WOOL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PINK_WOOL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pink_wool"),
     pools: BLOCKS_PINK_WOOL_POOLS,
 };
 static BLOCKS_PINK_WOOL_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15761,6 +16494,7 @@ static BLOCKS_PINK_WOOL_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_PINK_WOOL_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pink_wool_slab"),
     pools: BLOCKS_PINK_WOOL_SLAB_POOLS,
 };
 static BLOCKS_PINK_WOOL_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15780,6 +16514,7 @@ static BLOCKS_PINK_WOOL_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PINK_WOOL_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pink_wool_stairs"),
     pools: BLOCKS_PINK_WOOL_STAIRS_POOLS,
 };
 static BLOCKS_PISTON_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15799,6 +16534,7 @@ static BLOCKS_PISTON_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PISTON: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/piston"),
     pools: BLOCKS_PISTON_POOLS,
 };
 static BLOCKS_PITCHER_CROP_POOL0_ENTRIES: &[LootEntry] = &[
@@ -15856,6 +16592,7 @@ static BLOCKS_PITCHER_CROP_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_PITCHER_CROP: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pitcher_crop"),
     pools: BLOCKS_PITCHER_CROP_POOLS,
 };
 static BLOCKS_PITCHER_PLANT_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15875,6 +16612,7 @@ static BLOCKS_PITCHER_PLANT_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_PITCHER_PLANT: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pitcher_plant"),
     pools: BLOCKS_PITCHER_PLANT_POOLS,
 };
 static BLOCKS_PLAYER_HEAD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15894,6 +16632,7 @@ static BLOCKS_PLAYER_HEAD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_PLAYER_HEAD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/player_head"),
     pools: BLOCKS_PLAYER_HEAD_POOLS,
 };
 static BLOCKS_PODZOL_POOL0_ENTRIES: &[LootEntry] = &[
@@ -15927,6 +16666,7 @@ static BLOCKS_PODZOL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_PODZOL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/podzol"),
     pools: BLOCKS_PODZOL_POOLS,
 };
 static BLOCKS_POINTED_DRIPSTONE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15946,6 +16686,7 @@ static BLOCKS_POINTED_DRIPSTONE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POINTED_DRIPSTONE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pointed_dripstone"),
     pools: BLOCKS_POINTED_DRIPSTONE_POOLS,
 };
 static BLOCKS_POLISHED_ANDESITE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15965,6 +16706,7 @@ static BLOCKS_POLISHED_ANDESITE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POLISHED_ANDESITE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/polished_andesite"),
     pools: BLOCKS_POLISHED_ANDESITE_POOLS,
 };
 static BLOCKS_POLISHED_ANDESITE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -15984,6 +16726,7 @@ static BLOCKS_POLISHED_ANDESITE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_POLISHED_ANDESITE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/polished_andesite_slab"),
     pools: BLOCKS_POLISHED_ANDESITE_SLAB_POOLS,
 };
 static BLOCKS_POLISHED_ANDESITE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16003,6 +16746,7 @@ static BLOCKS_POLISHED_ANDESITE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POLISHED_ANDESITE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/polished_andesite_stairs"),
     pools: BLOCKS_POLISHED_ANDESITE_STAIRS_POOLS,
 };
 static BLOCKS_POLISHED_BASALT_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16022,6 +16766,7 @@ static BLOCKS_POLISHED_BASALT_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POLISHED_BASALT: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/polished_basalt"),
     pools: BLOCKS_POLISHED_BASALT_POOLS,
 };
 static BLOCKS_POLISHED_BLACKSTONE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16041,6 +16786,7 @@ static BLOCKS_POLISHED_BLACKSTONE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POLISHED_BLACKSTONE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/polished_blackstone"),
     pools: BLOCKS_POLISHED_BLACKSTONE_POOLS,
 };
 static BLOCKS_POLISHED_BLACKSTONE_BRICK_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16060,6 +16806,7 @@ static BLOCKS_POLISHED_BLACKSTONE_BRICK_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_POLISHED_BLACKSTONE_BRICK_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/polished_blackstone_brick_slab"),
     pools: BLOCKS_POLISHED_BLACKSTONE_BRICK_SLAB_POOLS,
 };
 static BLOCKS_POLISHED_BLACKSTONE_BRICK_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16079,6 +16826,7 @@ static BLOCKS_POLISHED_BLACKSTONE_BRICK_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POLISHED_BLACKSTONE_BRICK_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/polished_blackstone_brick_stairs"),
     pools: BLOCKS_POLISHED_BLACKSTONE_BRICK_STAIRS_POOLS,
 };
 static BLOCKS_POLISHED_BLACKSTONE_BRICK_WALL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16098,6 +16846,7 @@ static BLOCKS_POLISHED_BLACKSTONE_BRICK_WALL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POLISHED_BLACKSTONE_BRICK_WALL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/polished_blackstone_brick_wall"),
     pools: BLOCKS_POLISHED_BLACKSTONE_BRICK_WALL_POOLS,
 };
 static BLOCKS_POLISHED_BLACKSTONE_BRICKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16117,6 +16866,7 @@ static BLOCKS_POLISHED_BLACKSTONE_BRICKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POLISHED_BLACKSTONE_BRICKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/polished_blackstone_bricks"),
     pools: BLOCKS_POLISHED_BLACKSTONE_BRICKS_POOLS,
 };
 static BLOCKS_POLISHED_BLACKSTONE_BUTTON_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16136,6 +16886,7 @@ static BLOCKS_POLISHED_BLACKSTONE_BUTTON_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POLISHED_BLACKSTONE_BUTTON: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/polished_blackstone_button"),
     pools: BLOCKS_POLISHED_BLACKSTONE_BUTTON_POOLS,
 };
 static BLOCKS_POLISHED_BLACKSTONE_PRESSURE_PLATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16155,6 +16906,7 @@ static BLOCKS_POLISHED_BLACKSTONE_PRESSURE_PLATE_POOLS: &[LootPool] = &[LootPool
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POLISHED_BLACKSTONE_PRESSURE_PLATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/polished_blackstone_pressure_plate"),
     pools: BLOCKS_POLISHED_BLACKSTONE_PRESSURE_PLATE_POOLS,
 };
 static BLOCKS_POLISHED_BLACKSTONE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16174,6 +16926,7 @@ static BLOCKS_POLISHED_BLACKSTONE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_POLISHED_BLACKSTONE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/polished_blackstone_slab"),
     pools: BLOCKS_POLISHED_BLACKSTONE_SLAB_POOLS,
 };
 static BLOCKS_POLISHED_BLACKSTONE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16193,6 +16946,7 @@ static BLOCKS_POLISHED_BLACKSTONE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POLISHED_BLACKSTONE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/polished_blackstone_stairs"),
     pools: BLOCKS_POLISHED_BLACKSTONE_STAIRS_POOLS,
 };
 static BLOCKS_POLISHED_BLACKSTONE_WALL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16212,6 +16966,7 @@ static BLOCKS_POLISHED_BLACKSTONE_WALL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POLISHED_BLACKSTONE_WALL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/polished_blackstone_wall"),
     pools: BLOCKS_POLISHED_BLACKSTONE_WALL_POOLS,
 };
 static BLOCKS_POLISHED_CINNABAR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16231,6 +16986,7 @@ static BLOCKS_POLISHED_CINNABAR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POLISHED_CINNABAR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/polished_cinnabar"),
     pools: BLOCKS_POLISHED_CINNABAR_POOLS,
 };
 static BLOCKS_POLISHED_CINNABAR_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16250,6 +17006,7 @@ static BLOCKS_POLISHED_CINNABAR_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_POLISHED_CINNABAR_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/polished_cinnabar_slab"),
     pools: BLOCKS_POLISHED_CINNABAR_SLAB_POOLS,
 };
 static BLOCKS_POLISHED_CINNABAR_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16269,6 +17026,7 @@ static BLOCKS_POLISHED_CINNABAR_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POLISHED_CINNABAR_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/polished_cinnabar_stairs"),
     pools: BLOCKS_POLISHED_CINNABAR_STAIRS_POOLS,
 };
 static BLOCKS_POLISHED_CINNABAR_WALL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16288,6 +17046,7 @@ static BLOCKS_POLISHED_CINNABAR_WALL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POLISHED_CINNABAR_WALL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/polished_cinnabar_wall"),
     pools: BLOCKS_POLISHED_CINNABAR_WALL_POOLS,
 };
 static BLOCKS_POLISHED_DEEPSLATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16307,6 +17066,7 @@ static BLOCKS_POLISHED_DEEPSLATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POLISHED_DEEPSLATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/polished_deepslate"),
     pools: BLOCKS_POLISHED_DEEPSLATE_POOLS,
 };
 static BLOCKS_POLISHED_DEEPSLATE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16326,6 +17086,7 @@ static BLOCKS_POLISHED_DEEPSLATE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_POLISHED_DEEPSLATE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/polished_deepslate_slab"),
     pools: BLOCKS_POLISHED_DEEPSLATE_SLAB_POOLS,
 };
 static BLOCKS_POLISHED_DEEPSLATE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16345,6 +17106,7 @@ static BLOCKS_POLISHED_DEEPSLATE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POLISHED_DEEPSLATE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/polished_deepslate_stairs"),
     pools: BLOCKS_POLISHED_DEEPSLATE_STAIRS_POOLS,
 };
 static BLOCKS_POLISHED_DEEPSLATE_WALL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16364,6 +17126,7 @@ static BLOCKS_POLISHED_DEEPSLATE_WALL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POLISHED_DEEPSLATE_WALL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/polished_deepslate_wall"),
     pools: BLOCKS_POLISHED_DEEPSLATE_WALL_POOLS,
 };
 static BLOCKS_POLISHED_DIORITE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16383,6 +17146,7 @@ static BLOCKS_POLISHED_DIORITE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POLISHED_DIORITE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/polished_diorite"),
     pools: BLOCKS_POLISHED_DIORITE_POOLS,
 };
 static BLOCKS_POLISHED_DIORITE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16402,6 +17166,7 @@ static BLOCKS_POLISHED_DIORITE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_POLISHED_DIORITE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/polished_diorite_slab"),
     pools: BLOCKS_POLISHED_DIORITE_SLAB_POOLS,
 };
 static BLOCKS_POLISHED_DIORITE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16421,6 +17186,7 @@ static BLOCKS_POLISHED_DIORITE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POLISHED_DIORITE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/polished_diorite_stairs"),
     pools: BLOCKS_POLISHED_DIORITE_STAIRS_POOLS,
 };
 static BLOCKS_POLISHED_GRANITE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16440,6 +17206,7 @@ static BLOCKS_POLISHED_GRANITE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POLISHED_GRANITE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/polished_granite"),
     pools: BLOCKS_POLISHED_GRANITE_POOLS,
 };
 static BLOCKS_POLISHED_GRANITE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16459,6 +17226,7 @@ static BLOCKS_POLISHED_GRANITE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_POLISHED_GRANITE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/polished_granite_slab"),
     pools: BLOCKS_POLISHED_GRANITE_SLAB_POOLS,
 };
 static BLOCKS_POLISHED_GRANITE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16478,6 +17246,7 @@ static BLOCKS_POLISHED_GRANITE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POLISHED_GRANITE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/polished_granite_stairs"),
     pools: BLOCKS_POLISHED_GRANITE_STAIRS_POOLS,
 };
 static BLOCKS_POLISHED_SULFUR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16497,6 +17266,7 @@ static BLOCKS_POLISHED_SULFUR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POLISHED_SULFUR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/polished_sulfur"),
     pools: BLOCKS_POLISHED_SULFUR_POOLS,
 };
 static BLOCKS_POLISHED_SULFUR_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16516,6 +17286,7 @@ static BLOCKS_POLISHED_SULFUR_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_POLISHED_SULFUR_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/polished_sulfur_slab"),
     pools: BLOCKS_POLISHED_SULFUR_SLAB_POOLS,
 };
 static BLOCKS_POLISHED_SULFUR_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16535,6 +17306,7 @@ static BLOCKS_POLISHED_SULFUR_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POLISHED_SULFUR_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/polished_sulfur_stairs"),
     pools: BLOCKS_POLISHED_SULFUR_STAIRS_POOLS,
 };
 static BLOCKS_POLISHED_SULFUR_WALL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16554,6 +17326,7 @@ static BLOCKS_POLISHED_SULFUR_WALL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POLISHED_SULFUR_WALL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/polished_sulfur_wall"),
     pools: BLOCKS_POLISHED_SULFUR_WALL_POOLS,
 };
 static BLOCKS_POLISHED_TUFF_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16573,6 +17346,7 @@ static BLOCKS_POLISHED_TUFF_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POLISHED_TUFF: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/polished_tuff"),
     pools: BLOCKS_POLISHED_TUFF_POOLS,
 };
 static BLOCKS_POLISHED_TUFF_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16592,6 +17366,7 @@ static BLOCKS_POLISHED_TUFF_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_POLISHED_TUFF_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/polished_tuff_slab"),
     pools: BLOCKS_POLISHED_TUFF_SLAB_POOLS,
 };
 static BLOCKS_POLISHED_TUFF_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16611,6 +17386,7 @@ static BLOCKS_POLISHED_TUFF_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POLISHED_TUFF_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/polished_tuff_stairs"),
     pools: BLOCKS_POLISHED_TUFF_STAIRS_POOLS,
 };
 static BLOCKS_POLISHED_TUFF_WALL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16630,6 +17406,7 @@ static BLOCKS_POLISHED_TUFF_WALL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POLISHED_TUFF_WALL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/polished_tuff_wall"),
     pools: BLOCKS_POLISHED_TUFF_WALL_POOLS,
 };
 static BLOCKS_POPLAR_BUTTON_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16649,6 +17426,7 @@ static BLOCKS_POPLAR_BUTTON_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POPLAR_BUTTON: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/poplar_button"),
     pools: BLOCKS_POPLAR_BUTTON_POOLS,
 };
 static BLOCKS_POPLAR_DOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16668,6 +17446,7 @@ static BLOCKS_POPLAR_DOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POPLAR_DOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/poplar_door"),
     pools: BLOCKS_POPLAR_DOOR_POOLS,
 };
 static BLOCKS_POPLAR_FENCE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16687,6 +17466,7 @@ static BLOCKS_POPLAR_FENCE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POPLAR_FENCE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/poplar_fence"),
     pools: BLOCKS_POPLAR_FENCE_POOLS,
 };
 static BLOCKS_POPLAR_FENCE_GATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16706,6 +17486,7 @@ static BLOCKS_POPLAR_FENCE_GATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POPLAR_FENCE_GATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/poplar_fence_gate"),
     pools: BLOCKS_POPLAR_FENCE_GATE_POOLS,
 };
 static BLOCKS_POPLAR_HANGING_SIGN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16725,6 +17506,7 @@ static BLOCKS_POPLAR_HANGING_SIGN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POPLAR_HANGING_SIGN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/poplar_hanging_sign"),
     pools: BLOCKS_POPLAR_HANGING_SIGN_POOLS,
 };
 static BLOCKS_POPLAR_LOG_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16744,6 +17526,7 @@ static BLOCKS_POPLAR_LOG_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POPLAR_LOG: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/poplar_log"),
     pools: BLOCKS_POPLAR_LOG_POOLS,
 };
 static BLOCKS_POPLAR_PLANKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16763,6 +17546,7 @@ static BLOCKS_POPLAR_PLANKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POPLAR_PLANKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/poplar_planks"),
     pools: BLOCKS_POPLAR_PLANKS_POOLS,
 };
 static BLOCKS_POPLAR_PRESSURE_PLATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16782,6 +17566,7 @@ static BLOCKS_POPLAR_PRESSURE_PLATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POPLAR_PRESSURE_PLATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/poplar_pressure_plate"),
     pools: BLOCKS_POPLAR_PRESSURE_PLATE_POOLS,
 };
 static BLOCKS_POPLAR_SAPLING_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16801,6 +17586,7 @@ static BLOCKS_POPLAR_SAPLING_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POPLAR_SAPLING: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/poplar_sapling"),
     pools: BLOCKS_POPLAR_SAPLING_POOLS,
 };
 static BLOCKS_POPLAR_SHELF_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16820,6 +17606,7 @@ static BLOCKS_POPLAR_SHELF_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POPLAR_SHELF: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/poplar_shelf"),
     pools: BLOCKS_POPLAR_SHELF_POOLS,
 };
 static BLOCKS_POPLAR_SIGN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16839,6 +17626,7 @@ static BLOCKS_POPLAR_SIGN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POPLAR_SIGN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/poplar_sign"),
     pools: BLOCKS_POPLAR_SIGN_POOLS,
 };
 static BLOCKS_POPLAR_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16858,6 +17646,7 @@ static BLOCKS_POPLAR_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_POPLAR_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/poplar_slab"),
     pools: BLOCKS_POPLAR_SLAB_POOLS,
 };
 static BLOCKS_POPLAR_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16877,6 +17666,7 @@ static BLOCKS_POPLAR_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POPLAR_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/poplar_stairs"),
     pools: BLOCKS_POPLAR_STAIRS_POOLS,
 };
 static BLOCKS_POPLAR_TRAPDOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16896,6 +17686,7 @@ static BLOCKS_POPLAR_TRAPDOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POPLAR_TRAPDOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/poplar_trapdoor"),
     pools: BLOCKS_POPLAR_TRAPDOOR_POOLS,
 };
 static BLOCKS_POPLAR_WOOD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16915,6 +17706,7 @@ static BLOCKS_POPLAR_WOOD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POPLAR_WOOD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/poplar_wood"),
     pools: BLOCKS_POPLAR_WOOD_POOLS,
 };
 static BLOCKS_POPPY_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16934,6 +17726,7 @@ static BLOCKS_POPPY_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POPPY: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/poppy"),
     pools: BLOCKS_POPPY_POOLS,
 };
 static BLOCKS_POTATOES_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -16990,6 +17783,7 @@ static BLOCKS_POTATOES_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTATOES: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potatoes"),
     pools: BLOCKS_POTATOES_POOLS,
 };
 static BLOCKS_POTENT_SULFUR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -17009,6 +17803,7 @@ static BLOCKS_POTENT_SULFUR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POTENT_SULFUR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potent_sulfur"),
     pools: BLOCKS_POTENT_SULFUR_POOLS,
 };
 static BLOCKS_POTTED_ACACIA_SAPLING_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -17046,6 +17841,7 @@ static BLOCKS_POTTED_ACACIA_SAPLING_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_ACACIA_SAPLING: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_acacia_sapling"),
     pools: BLOCKS_POTTED_ACACIA_SAPLING_POOLS,
 };
 static BLOCKS_POTTED_ALLIUM_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -17083,6 +17879,7 @@ static BLOCKS_POTTED_ALLIUM_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_ALLIUM: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_allium"),
     pools: BLOCKS_POTTED_ALLIUM_POOLS,
 };
 static BLOCKS_POTTED_AZALEA_BUSH_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -17120,6 +17917,7 @@ static BLOCKS_POTTED_AZALEA_BUSH_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_AZALEA_BUSH: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_azalea_bush"),
     pools: BLOCKS_POTTED_AZALEA_BUSH_POOLS,
 };
 static BLOCKS_POTTED_AZURE_BLUET_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -17157,6 +17955,7 @@ static BLOCKS_POTTED_AZURE_BLUET_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_AZURE_BLUET: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_azure_bluet"),
     pools: BLOCKS_POTTED_AZURE_BLUET_POOLS,
 };
 static BLOCKS_POTTED_BAMBOO_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -17194,6 +17993,7 @@ static BLOCKS_POTTED_BAMBOO_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_BAMBOO: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_bamboo"),
     pools: BLOCKS_POTTED_BAMBOO_POOLS,
 };
 static BLOCKS_POTTED_BIRCH_SAPLING_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -17231,6 +18031,7 @@ static BLOCKS_POTTED_BIRCH_SAPLING_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_BIRCH_SAPLING: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_birch_sapling"),
     pools: BLOCKS_POTTED_BIRCH_SAPLING_POOLS,
 };
 static BLOCKS_POTTED_BLUE_ORCHID_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -17268,6 +18069,7 @@ static BLOCKS_POTTED_BLUE_ORCHID_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_BLUE_ORCHID: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_blue_orchid"),
     pools: BLOCKS_POTTED_BLUE_ORCHID_POOLS,
 };
 static BLOCKS_POTTED_BROWN_MUSHROOM_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -17305,6 +18107,7 @@ static BLOCKS_POTTED_BROWN_MUSHROOM_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_BROWN_MUSHROOM: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_brown_mushroom"),
     pools: BLOCKS_POTTED_BROWN_MUSHROOM_POOLS,
 };
 static BLOCKS_POTTED_CACTUS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -17342,6 +18145,7 @@ static BLOCKS_POTTED_CACTUS_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_CACTUS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_cactus"),
     pools: BLOCKS_POTTED_CACTUS_POOLS,
 };
 static BLOCKS_POTTED_CHERRY_SAPLING_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -17379,6 +18183,7 @@ static BLOCKS_POTTED_CHERRY_SAPLING_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_CHERRY_SAPLING: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_cherry_sapling"),
     pools: BLOCKS_POTTED_CHERRY_SAPLING_POOLS,
 };
 static BLOCKS_POTTED_CLOSED_EYEBLOSSOM_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -17416,6 +18221,7 @@ static BLOCKS_POTTED_CLOSED_EYEBLOSSOM_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_CLOSED_EYEBLOSSOM: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_closed_eyeblossom"),
     pools: BLOCKS_POTTED_CLOSED_EYEBLOSSOM_POOLS,
 };
 static BLOCKS_POTTED_CORNFLOWER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -17453,6 +18259,7 @@ static BLOCKS_POTTED_CORNFLOWER_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_CORNFLOWER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_cornflower"),
     pools: BLOCKS_POTTED_CORNFLOWER_POOLS,
 };
 static BLOCKS_POTTED_CRIMSON_FUNGUS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -17490,6 +18297,7 @@ static BLOCKS_POTTED_CRIMSON_FUNGUS_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_CRIMSON_FUNGUS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_crimson_fungus"),
     pools: BLOCKS_POTTED_CRIMSON_FUNGUS_POOLS,
 };
 static BLOCKS_POTTED_CRIMSON_ROOTS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -17527,6 +18335,7 @@ static BLOCKS_POTTED_CRIMSON_ROOTS_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_CRIMSON_ROOTS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_crimson_roots"),
     pools: BLOCKS_POTTED_CRIMSON_ROOTS_POOLS,
 };
 static BLOCKS_POTTED_DANDELION_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -17564,6 +18373,7 @@ static BLOCKS_POTTED_DANDELION_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_DANDELION: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_dandelion"),
     pools: BLOCKS_POTTED_DANDELION_POOLS,
 };
 static BLOCKS_POTTED_DARK_OAK_SAPLING_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -17601,6 +18411,7 @@ static BLOCKS_POTTED_DARK_OAK_SAPLING_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_DARK_OAK_SAPLING: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_dark_oak_sapling"),
     pools: BLOCKS_POTTED_DARK_OAK_SAPLING_POOLS,
 };
 static BLOCKS_POTTED_DEAD_BUSH_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -17638,6 +18449,7 @@ static BLOCKS_POTTED_DEAD_BUSH_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_DEAD_BUSH: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_dead_bush"),
     pools: BLOCKS_POTTED_DEAD_BUSH_POOLS,
 };
 static BLOCKS_POTTED_FERN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -17675,6 +18487,7 @@ static BLOCKS_POTTED_FERN_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_FERN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_fern"),
     pools: BLOCKS_POTTED_FERN_POOLS,
 };
 static BLOCKS_POTTED_FLOWERING_AZALEA_BUSH_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -17712,6 +18525,7 @@ static BLOCKS_POTTED_FLOWERING_AZALEA_BUSH_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_FLOWERING_AZALEA_BUSH: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_flowering_azalea_bush"),
     pools: BLOCKS_POTTED_FLOWERING_AZALEA_BUSH_POOLS,
 };
 static BLOCKS_POTTED_GOLDEN_DANDELION_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -17749,6 +18563,7 @@ static BLOCKS_POTTED_GOLDEN_DANDELION_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_GOLDEN_DANDELION: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_golden_dandelion"),
     pools: BLOCKS_POTTED_GOLDEN_DANDELION_POOLS,
 };
 static BLOCKS_POTTED_JUNGLE_SAPLING_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -17786,6 +18601,7 @@ static BLOCKS_POTTED_JUNGLE_SAPLING_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_JUNGLE_SAPLING: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_jungle_sapling"),
     pools: BLOCKS_POTTED_JUNGLE_SAPLING_POOLS,
 };
 static BLOCKS_POTTED_LILY_OF_THE_VALLEY_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -17823,6 +18639,7 @@ static BLOCKS_POTTED_LILY_OF_THE_VALLEY_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_LILY_OF_THE_VALLEY: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_lily_of_the_valley"),
     pools: BLOCKS_POTTED_LILY_OF_THE_VALLEY_POOLS,
 };
 static BLOCKS_POTTED_MANGROVE_PROPAGULE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -17860,6 +18677,7 @@ static BLOCKS_POTTED_MANGROVE_PROPAGULE_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_MANGROVE_PROPAGULE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_mangrove_propagule"),
     pools: BLOCKS_POTTED_MANGROVE_PROPAGULE_POOLS,
 };
 static BLOCKS_POTTED_OAK_SAPLING_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -17897,6 +18715,7 @@ static BLOCKS_POTTED_OAK_SAPLING_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_OAK_SAPLING: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_oak_sapling"),
     pools: BLOCKS_POTTED_OAK_SAPLING_POOLS,
 };
 static BLOCKS_POTTED_OPEN_EYEBLOSSOM_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -17934,6 +18753,7 @@ static BLOCKS_POTTED_OPEN_EYEBLOSSOM_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_OPEN_EYEBLOSSOM: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_open_eyeblossom"),
     pools: BLOCKS_POTTED_OPEN_EYEBLOSSOM_POOLS,
 };
 static BLOCKS_POTTED_ORANGE_TULIP_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -17971,6 +18791,7 @@ static BLOCKS_POTTED_ORANGE_TULIP_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_ORANGE_TULIP: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_orange_tulip"),
     pools: BLOCKS_POTTED_ORANGE_TULIP_POOLS,
 };
 static BLOCKS_POTTED_OXEYE_DAISY_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18008,6 +18829,7 @@ static BLOCKS_POTTED_OXEYE_DAISY_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_OXEYE_DAISY: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_oxeye_daisy"),
     pools: BLOCKS_POTTED_OXEYE_DAISY_POOLS,
 };
 static BLOCKS_POTTED_PALE_OAK_SAPLING_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18045,6 +18867,7 @@ static BLOCKS_POTTED_PALE_OAK_SAPLING_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_PALE_OAK_SAPLING: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_pale_oak_sapling"),
     pools: BLOCKS_POTTED_PALE_OAK_SAPLING_POOLS,
 };
 static BLOCKS_POTTED_PINK_TULIP_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18082,6 +18905,7 @@ static BLOCKS_POTTED_PINK_TULIP_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_PINK_TULIP: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_pink_tulip"),
     pools: BLOCKS_POTTED_PINK_TULIP_POOLS,
 };
 static BLOCKS_POTTED_POPLAR_SAPLING_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18119,6 +18943,7 @@ static BLOCKS_POTTED_POPLAR_SAPLING_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_POPLAR_SAPLING: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_poplar_sapling"),
     pools: BLOCKS_POTTED_POPLAR_SAPLING_POOLS,
 };
 static BLOCKS_POTTED_POPPY_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18156,6 +18981,7 @@ static BLOCKS_POTTED_POPPY_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_POPPY: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_poppy"),
     pools: BLOCKS_POTTED_POPPY_POOLS,
 };
 static BLOCKS_POTTED_RED_MUSHROOM_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18193,6 +19019,7 @@ static BLOCKS_POTTED_RED_MUSHROOM_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_RED_MUSHROOM: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_red_mushroom"),
     pools: BLOCKS_POTTED_RED_MUSHROOM_POOLS,
 };
 static BLOCKS_POTTED_RED_TULIP_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18230,6 +19057,7 @@ static BLOCKS_POTTED_RED_TULIP_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_RED_TULIP: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_red_tulip"),
     pools: BLOCKS_POTTED_RED_TULIP_POOLS,
 };
 static BLOCKS_POTTED_SPRUCE_SAPLING_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18267,6 +19095,7 @@ static BLOCKS_POTTED_SPRUCE_SAPLING_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_SPRUCE_SAPLING: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_spruce_sapling"),
     pools: BLOCKS_POTTED_SPRUCE_SAPLING_POOLS,
 };
 static BLOCKS_POTTED_TORCHFLOWER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18304,6 +19133,7 @@ static BLOCKS_POTTED_TORCHFLOWER_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_TORCHFLOWER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_torchflower"),
     pools: BLOCKS_POTTED_TORCHFLOWER_POOLS,
 };
 static BLOCKS_POTTED_WARPED_FUNGUS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18341,6 +19171,7 @@ static BLOCKS_POTTED_WARPED_FUNGUS_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_WARPED_FUNGUS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_warped_fungus"),
     pools: BLOCKS_POTTED_WARPED_FUNGUS_POOLS,
 };
 static BLOCKS_POTTED_WARPED_ROOTS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18378,6 +19209,7 @@ static BLOCKS_POTTED_WARPED_ROOTS_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_WARPED_ROOTS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_warped_roots"),
     pools: BLOCKS_POTTED_WARPED_ROOTS_POOLS,
 };
 static BLOCKS_POTTED_WHITE_TULIP_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18415,6 +19247,7 @@ static BLOCKS_POTTED_WHITE_TULIP_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_WHITE_TULIP: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_white_tulip"),
     pools: BLOCKS_POTTED_WHITE_TULIP_POOLS,
 };
 static BLOCKS_POTTED_WITHER_ROSE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18452,10 +19285,12 @@ static BLOCKS_POTTED_WITHER_ROSE_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_POTTED_WITHER_ROSE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/potted_wither_rose"),
     pools: BLOCKS_POTTED_WITHER_ROSE_POOLS,
 };
 static BLOCKS_POWDER_SNOW_POOLS: &[LootPool] = &[];
 pub static BLOCKS_POWDER_SNOW: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/powder_snow"),
     pools: BLOCKS_POWDER_SNOW_POOLS,
 };
 static BLOCKS_POWDER_SNOW_CAULDRON_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18475,6 +19310,7 @@ static BLOCKS_POWDER_SNOW_CAULDRON_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POWDER_SNOW_CAULDRON: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/powder_snow_cauldron"),
     pools: BLOCKS_POWDER_SNOW_CAULDRON_POOLS,
 };
 static BLOCKS_POWERED_RAIL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18494,6 +19330,7 @@ static BLOCKS_POWERED_RAIL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_POWERED_RAIL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/powered_rail"),
     pools: BLOCKS_POWERED_RAIL_POOLS,
 };
 static BLOCKS_PRISMARINE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18513,6 +19350,7 @@ static BLOCKS_PRISMARINE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PRISMARINE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/prismarine"),
     pools: BLOCKS_PRISMARINE_POOLS,
 };
 static BLOCKS_PRISMARINE_BRICK_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18532,6 +19370,7 @@ static BLOCKS_PRISMARINE_BRICK_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_PRISMARINE_BRICK_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/prismarine_brick_slab"),
     pools: BLOCKS_PRISMARINE_BRICK_SLAB_POOLS,
 };
 static BLOCKS_PRISMARINE_BRICK_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18551,6 +19390,7 @@ static BLOCKS_PRISMARINE_BRICK_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PRISMARINE_BRICK_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/prismarine_brick_stairs"),
     pools: BLOCKS_PRISMARINE_BRICK_STAIRS_POOLS,
 };
 static BLOCKS_PRISMARINE_BRICKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18570,6 +19410,7 @@ static BLOCKS_PRISMARINE_BRICKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PRISMARINE_BRICKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/prismarine_bricks"),
     pools: BLOCKS_PRISMARINE_BRICKS_POOLS,
 };
 static BLOCKS_PRISMARINE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18589,6 +19430,7 @@ static BLOCKS_PRISMARINE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_PRISMARINE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/prismarine_slab"),
     pools: BLOCKS_PRISMARINE_SLAB_POOLS,
 };
 static BLOCKS_PRISMARINE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18608,6 +19450,7 @@ static BLOCKS_PRISMARINE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PRISMARINE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/prismarine_stairs"),
     pools: BLOCKS_PRISMARINE_STAIRS_POOLS,
 };
 static BLOCKS_PRISMARINE_WALL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18627,6 +19470,7 @@ static BLOCKS_PRISMARINE_WALL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PRISMARINE_WALL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/prismarine_wall"),
     pools: BLOCKS_PRISMARINE_WALL_POOLS,
 };
 static BLOCKS_PUMPKIN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18646,6 +19490,7 @@ static BLOCKS_PUMPKIN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PUMPKIN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pumpkin"),
     pools: BLOCKS_PUMPKIN_POOLS,
 };
 static BLOCKS_PUMPKIN_STEM_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18665,6 +19510,7 @@ static BLOCKS_PUMPKIN_STEM_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_PUMPKIN_STEM: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/pumpkin_stem"),
     pools: BLOCKS_PUMPKIN_STEM_POOLS,
 };
 static BLOCKS_PURPLE_BANNER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18684,6 +19530,7 @@ static BLOCKS_PURPLE_BANNER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PURPLE_BANNER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/purple_banner"),
     pools: BLOCKS_PURPLE_BANNER_POOLS,
 };
 static BLOCKS_PURPLE_BED_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18703,6 +19550,7 @@ static BLOCKS_PURPLE_BED_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PURPLE_BED: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/purple_bed"),
     pools: BLOCKS_PURPLE_BED_POOLS,
 };
 static BLOCKS_PURPLE_CANDLE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18722,6 +19570,7 @@ static BLOCKS_PURPLE_CANDLE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_PURPLE_CANDLE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/purple_candle"),
     pools: BLOCKS_PURPLE_CANDLE_POOLS,
 };
 static BLOCKS_PURPLE_CANDLE_CAKE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18741,6 +19590,7 @@ static BLOCKS_PURPLE_CANDLE_CAKE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_PURPLE_CANDLE_CAKE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/purple_candle_cake"),
     pools: BLOCKS_PURPLE_CANDLE_CAKE_POOLS,
 };
 static BLOCKS_PURPLE_CARPET_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18760,6 +19610,7 @@ static BLOCKS_PURPLE_CARPET_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PURPLE_CARPET: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/purple_carpet"),
     pools: BLOCKS_PURPLE_CARPET_POOLS,
 };
 static BLOCKS_PURPLE_CONCRETE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18779,6 +19630,7 @@ static BLOCKS_PURPLE_CONCRETE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PURPLE_CONCRETE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/purple_concrete"),
     pools: BLOCKS_PURPLE_CONCRETE_POOLS,
 };
 static BLOCKS_PURPLE_CONCRETE_POWDER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18798,6 +19650,7 @@ static BLOCKS_PURPLE_CONCRETE_POWDER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PURPLE_CONCRETE_POWDER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/purple_concrete_powder"),
     pools: BLOCKS_PURPLE_CONCRETE_POWDER_POOLS,
 };
 static BLOCKS_PURPLE_CONCRETE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18817,6 +19670,7 @@ static BLOCKS_PURPLE_CONCRETE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_PURPLE_CONCRETE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/purple_concrete_slab"),
     pools: BLOCKS_PURPLE_CONCRETE_SLAB_POOLS,
 };
 static BLOCKS_PURPLE_CONCRETE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18836,6 +19690,7 @@ static BLOCKS_PURPLE_CONCRETE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PURPLE_CONCRETE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/purple_concrete_stairs"),
     pools: BLOCKS_PURPLE_CONCRETE_STAIRS_POOLS,
 };
 static BLOCKS_PURPLE_GLAZED_TERRACOTTA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18855,6 +19710,7 @@ static BLOCKS_PURPLE_GLAZED_TERRACOTTA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PURPLE_GLAZED_TERRACOTTA: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/purple_glazed_terracotta"),
     pools: BLOCKS_PURPLE_GLAZED_TERRACOTTA_POOLS,
 };
 static BLOCKS_PURPLE_SHULKER_BOX_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18874,6 +19730,7 @@ static BLOCKS_PURPLE_SHULKER_BOX_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_PURPLE_SHULKER_BOX: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/purple_shulker_box"),
     pools: BLOCKS_PURPLE_SHULKER_BOX_POOLS,
 };
 static BLOCKS_PURPLE_STAINED_GLASS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18893,6 +19750,7 @@ static BLOCKS_PURPLE_STAINED_GLASS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_PURPLE_STAINED_GLASS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/purple_stained_glass"),
     pools: BLOCKS_PURPLE_STAINED_GLASS_POOLS,
 };
 static BLOCKS_PURPLE_STAINED_GLASS_PANE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18912,6 +19770,7 @@ static BLOCKS_PURPLE_STAINED_GLASS_PANE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_PURPLE_STAINED_GLASS_PANE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/purple_stained_glass_pane"),
     pools: BLOCKS_PURPLE_STAINED_GLASS_PANE_POOLS,
 };
 static BLOCKS_PURPLE_TERRACOTTA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18931,6 +19790,7 @@ static BLOCKS_PURPLE_TERRACOTTA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PURPLE_TERRACOTTA: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/purple_terracotta"),
     pools: BLOCKS_PURPLE_TERRACOTTA_POOLS,
 };
 static BLOCKS_PURPLE_WOOL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18950,6 +19810,7 @@ static BLOCKS_PURPLE_WOOL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PURPLE_WOOL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/purple_wool"),
     pools: BLOCKS_PURPLE_WOOL_POOLS,
 };
 static BLOCKS_PURPLE_WOOL_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18969,6 +19830,7 @@ static BLOCKS_PURPLE_WOOL_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_PURPLE_WOOL_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/purple_wool_slab"),
     pools: BLOCKS_PURPLE_WOOL_SLAB_POOLS,
 };
 static BLOCKS_PURPLE_WOOL_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -18988,6 +19850,7 @@ static BLOCKS_PURPLE_WOOL_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PURPLE_WOOL_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/purple_wool_stairs"),
     pools: BLOCKS_PURPLE_WOOL_STAIRS_POOLS,
 };
 static BLOCKS_PURPUR_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19007,6 +19870,7 @@ static BLOCKS_PURPUR_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PURPUR_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/purpur_block"),
     pools: BLOCKS_PURPUR_BLOCK_POOLS,
 };
 static BLOCKS_PURPUR_PILLAR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19026,6 +19890,7 @@ static BLOCKS_PURPUR_PILLAR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PURPUR_PILLAR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/purpur_pillar"),
     pools: BLOCKS_PURPUR_PILLAR_POOLS,
 };
 static BLOCKS_PURPUR_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19045,6 +19910,7 @@ static BLOCKS_PURPUR_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_PURPUR_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/purpur_slab"),
     pools: BLOCKS_PURPUR_SLAB_POOLS,
 };
 static BLOCKS_PURPUR_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19064,6 +19930,7 @@ static BLOCKS_PURPUR_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_PURPUR_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/purpur_stairs"),
     pools: BLOCKS_PURPUR_STAIRS_POOLS,
 };
 static BLOCKS_QUARTZ_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19083,6 +19950,7 @@ static BLOCKS_QUARTZ_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_QUARTZ_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/quartz_block"),
     pools: BLOCKS_QUARTZ_BLOCK_POOLS,
 };
 static BLOCKS_QUARTZ_BRICKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19102,6 +19970,7 @@ static BLOCKS_QUARTZ_BRICKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_QUARTZ_BRICKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/quartz_bricks"),
     pools: BLOCKS_QUARTZ_BRICKS_POOLS,
 };
 static BLOCKS_QUARTZ_PILLAR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19121,6 +19990,7 @@ static BLOCKS_QUARTZ_PILLAR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_QUARTZ_PILLAR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/quartz_pillar"),
     pools: BLOCKS_QUARTZ_PILLAR_POOLS,
 };
 static BLOCKS_QUARTZ_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19140,6 +20010,7 @@ static BLOCKS_QUARTZ_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_QUARTZ_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/quartz_slab"),
     pools: BLOCKS_QUARTZ_SLAB_POOLS,
 };
 static BLOCKS_QUARTZ_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19159,6 +20030,7 @@ static BLOCKS_QUARTZ_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_QUARTZ_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/quartz_stairs"),
     pools: BLOCKS_QUARTZ_STAIRS_POOLS,
 };
 static BLOCKS_RAIL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19178,6 +20050,7 @@ static BLOCKS_RAIL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_RAIL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/rail"),
     pools: BLOCKS_RAIL_POOLS,
 };
 static BLOCKS_RAW_COPPER_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19197,6 +20070,7 @@ static BLOCKS_RAW_COPPER_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_RAW_COPPER_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/raw_copper_block"),
     pools: BLOCKS_RAW_COPPER_BLOCK_POOLS,
 };
 static BLOCKS_RAW_GOLD_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19216,6 +20090,7 @@ static BLOCKS_RAW_GOLD_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_RAW_GOLD_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/raw_gold_block"),
     pools: BLOCKS_RAW_GOLD_BLOCK_POOLS,
 };
 static BLOCKS_RAW_IRON_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19235,6 +20110,7 @@ static BLOCKS_RAW_IRON_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_RAW_IRON_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/raw_iron_block"),
     pools: BLOCKS_RAW_IRON_BLOCK_POOLS,
 };
 static BLOCKS_RED_BANNER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19254,6 +20130,7 @@ static BLOCKS_RED_BANNER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_RED_BANNER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/red_banner"),
     pools: BLOCKS_RED_BANNER_POOLS,
 };
 static BLOCKS_RED_BED_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19273,6 +20150,7 @@ static BLOCKS_RED_BED_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_RED_BED: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/red_bed"),
     pools: BLOCKS_RED_BED_POOLS,
 };
 static BLOCKS_RED_CANDLE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19292,6 +20170,7 @@ static BLOCKS_RED_CANDLE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_RED_CANDLE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/red_candle"),
     pools: BLOCKS_RED_CANDLE_POOLS,
 };
 static BLOCKS_RED_CANDLE_CAKE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19311,6 +20190,7 @@ static BLOCKS_RED_CANDLE_CAKE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_RED_CANDLE_CAKE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/red_candle_cake"),
     pools: BLOCKS_RED_CANDLE_CAKE_POOLS,
 };
 static BLOCKS_RED_CARPET_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19330,6 +20210,7 @@ static BLOCKS_RED_CARPET_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_RED_CARPET: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/red_carpet"),
     pools: BLOCKS_RED_CARPET_POOLS,
 };
 static BLOCKS_RED_CONCRETE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19349,6 +20230,7 @@ static BLOCKS_RED_CONCRETE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_RED_CONCRETE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/red_concrete"),
     pools: BLOCKS_RED_CONCRETE_POOLS,
 };
 static BLOCKS_RED_CONCRETE_POWDER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19368,6 +20250,7 @@ static BLOCKS_RED_CONCRETE_POWDER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_RED_CONCRETE_POWDER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/red_concrete_powder"),
     pools: BLOCKS_RED_CONCRETE_POWDER_POOLS,
 };
 static BLOCKS_RED_CONCRETE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19387,6 +20270,7 @@ static BLOCKS_RED_CONCRETE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_RED_CONCRETE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/red_concrete_slab"),
     pools: BLOCKS_RED_CONCRETE_SLAB_POOLS,
 };
 static BLOCKS_RED_CONCRETE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19406,6 +20290,7 @@ static BLOCKS_RED_CONCRETE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_RED_CONCRETE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/red_concrete_stairs"),
     pools: BLOCKS_RED_CONCRETE_STAIRS_POOLS,
 };
 static BLOCKS_RED_GLAZED_TERRACOTTA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19425,6 +20310,7 @@ static BLOCKS_RED_GLAZED_TERRACOTTA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_RED_GLAZED_TERRACOTTA: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/red_glazed_terracotta"),
     pools: BLOCKS_RED_GLAZED_TERRACOTTA_POOLS,
 };
 static BLOCKS_RED_MUSHROOM_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19444,6 +20330,7 @@ static BLOCKS_RED_MUSHROOM_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_RED_MUSHROOM: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/red_mushroom"),
     pools: BLOCKS_RED_MUSHROOM_POOLS,
 };
 static BLOCKS_RED_MUSHROOM_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[
@@ -19474,6 +20361,7 @@ static BLOCKS_RED_MUSHROOM_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_RED_MUSHROOM_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/red_mushroom_block"),
     pools: BLOCKS_RED_MUSHROOM_BLOCK_POOLS,
 };
 static BLOCKS_RED_NETHER_BRICK_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19493,6 +20381,7 @@ static BLOCKS_RED_NETHER_BRICK_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_RED_NETHER_BRICK_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/red_nether_brick_slab"),
     pools: BLOCKS_RED_NETHER_BRICK_SLAB_POOLS,
 };
 static BLOCKS_RED_NETHER_BRICK_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19512,6 +20401,7 @@ static BLOCKS_RED_NETHER_BRICK_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_RED_NETHER_BRICK_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/red_nether_brick_stairs"),
     pools: BLOCKS_RED_NETHER_BRICK_STAIRS_POOLS,
 };
 static BLOCKS_RED_NETHER_BRICK_WALL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19531,6 +20421,7 @@ static BLOCKS_RED_NETHER_BRICK_WALL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_RED_NETHER_BRICK_WALL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/red_nether_brick_wall"),
     pools: BLOCKS_RED_NETHER_BRICK_WALL_POOLS,
 };
 static BLOCKS_RED_NETHER_BRICKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19550,6 +20441,7 @@ static BLOCKS_RED_NETHER_BRICKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_RED_NETHER_BRICKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/red_nether_bricks"),
     pools: BLOCKS_RED_NETHER_BRICKS_POOLS,
 };
 static BLOCKS_RED_POPLAR_LEAVES_POOL0_ENTRIES: &[LootEntry] = &[
@@ -19608,6 +20500,7 @@ static BLOCKS_RED_POPLAR_LEAVES_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_RED_POPLAR_LEAVES: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/red_poplar_leaves"),
     pools: BLOCKS_RED_POPLAR_LEAVES_POOLS,
 };
 static BLOCKS_RED_SAND_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19627,6 +20520,7 @@ static BLOCKS_RED_SAND_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_RED_SAND: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/red_sand"),
     pools: BLOCKS_RED_SAND_POOLS,
 };
 static BLOCKS_RED_SANDSTONE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19646,6 +20540,7 @@ static BLOCKS_RED_SANDSTONE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_RED_SANDSTONE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/red_sandstone"),
     pools: BLOCKS_RED_SANDSTONE_POOLS,
 };
 static BLOCKS_RED_SANDSTONE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19665,6 +20560,7 @@ static BLOCKS_RED_SANDSTONE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_RED_SANDSTONE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/red_sandstone_slab"),
     pools: BLOCKS_RED_SANDSTONE_SLAB_POOLS,
 };
 static BLOCKS_RED_SANDSTONE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19684,6 +20580,7 @@ static BLOCKS_RED_SANDSTONE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_RED_SANDSTONE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/red_sandstone_stairs"),
     pools: BLOCKS_RED_SANDSTONE_STAIRS_POOLS,
 };
 static BLOCKS_RED_SANDSTONE_WALL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19703,6 +20600,7 @@ static BLOCKS_RED_SANDSTONE_WALL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_RED_SANDSTONE_WALL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/red_sandstone_wall"),
     pools: BLOCKS_RED_SANDSTONE_WALL_POOLS,
 };
 static BLOCKS_RED_SHRUB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19722,6 +20620,7 @@ static BLOCKS_RED_SHRUB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_RED_SHRUB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/red_shrub"),
     pools: BLOCKS_RED_SHRUB_POOLS,
 };
 static BLOCKS_RED_SHULKER_BOX_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19741,6 +20640,7 @@ static BLOCKS_RED_SHULKER_BOX_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_RED_SHULKER_BOX: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/red_shulker_box"),
     pools: BLOCKS_RED_SHULKER_BOX_POOLS,
 };
 static BLOCKS_RED_STAINED_GLASS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19760,6 +20660,7 @@ static BLOCKS_RED_STAINED_GLASS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_RED_STAINED_GLASS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/red_stained_glass"),
     pools: BLOCKS_RED_STAINED_GLASS_POOLS,
 };
 static BLOCKS_RED_STAINED_GLASS_PANE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19779,6 +20680,7 @@ static BLOCKS_RED_STAINED_GLASS_PANE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_RED_STAINED_GLASS_PANE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/red_stained_glass_pane"),
     pools: BLOCKS_RED_STAINED_GLASS_PANE_POOLS,
 };
 static BLOCKS_RED_TERRACOTTA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19798,6 +20700,7 @@ static BLOCKS_RED_TERRACOTTA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_RED_TERRACOTTA: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/red_terracotta"),
     pools: BLOCKS_RED_TERRACOTTA_POOLS,
 };
 static BLOCKS_RED_TULIP_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19817,6 +20720,7 @@ static BLOCKS_RED_TULIP_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_RED_TULIP: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/red_tulip"),
     pools: BLOCKS_RED_TULIP_POOLS,
 };
 static BLOCKS_RED_WOOL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19836,6 +20740,7 @@ static BLOCKS_RED_WOOL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_RED_WOOL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/red_wool"),
     pools: BLOCKS_RED_WOOL_POOLS,
 };
 static BLOCKS_RED_WOOL_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19855,6 +20760,7 @@ static BLOCKS_RED_WOOL_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_RED_WOOL_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/red_wool_slab"),
     pools: BLOCKS_RED_WOOL_SLAB_POOLS,
 };
 static BLOCKS_RED_WOOL_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19874,6 +20780,7 @@ static BLOCKS_RED_WOOL_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_RED_WOOL_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/red_wool_stairs"),
     pools: BLOCKS_RED_WOOL_STAIRS_POOLS,
 };
 static BLOCKS_REDSTONE_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19893,6 +20800,7 @@ static BLOCKS_REDSTONE_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_REDSTONE_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/redstone_block"),
     pools: BLOCKS_REDSTONE_BLOCK_POOLS,
 };
 static BLOCKS_REDSTONE_LAMP_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19912,6 +20820,7 @@ static BLOCKS_REDSTONE_LAMP_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_REDSTONE_LAMP: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/redstone_lamp"),
     pools: BLOCKS_REDSTONE_LAMP_POOLS,
 };
 static BLOCKS_REDSTONE_ORE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -19942,6 +20851,7 @@ static BLOCKS_REDSTONE_ORE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_REDSTONE_ORE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/redstone_ore"),
     pools: BLOCKS_REDSTONE_ORE_POOLS,
 };
 static BLOCKS_REDSTONE_TORCH_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19961,6 +20871,7 @@ static BLOCKS_REDSTONE_TORCH_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_REDSTONE_TORCH: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/redstone_torch"),
     pools: BLOCKS_REDSTONE_TORCH_POOLS,
 };
 static BLOCKS_REDSTONE_WIRE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -19980,10 +20891,12 @@ static BLOCKS_REDSTONE_WIRE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_REDSTONE_WIRE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/redstone_wire"),
     pools: BLOCKS_REDSTONE_WIRE_POOLS,
 };
 static BLOCKS_REINFORCED_DEEPSLATE_POOLS: &[LootPool] = &[];
 pub static BLOCKS_REINFORCED_DEEPSLATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/reinforced_deepslate"),
     pools: BLOCKS_REINFORCED_DEEPSLATE_POOLS,
 };
 static BLOCKS_REPEATER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20003,6 +20916,7 @@ static BLOCKS_REPEATER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_REPEATER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/repeater"),
     pools: BLOCKS_REPEATER_POOLS,
 };
 static BLOCKS_RESIN_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20022,6 +20936,7 @@ static BLOCKS_RESIN_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_RESIN_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/resin_block"),
     pools: BLOCKS_RESIN_BLOCK_POOLS,
 };
 static BLOCKS_RESIN_BRICK_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20041,6 +20956,7 @@ static BLOCKS_RESIN_BRICK_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_RESIN_BRICK_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/resin_brick_slab"),
     pools: BLOCKS_RESIN_BRICK_SLAB_POOLS,
 };
 static BLOCKS_RESIN_BRICK_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20060,6 +20976,7 @@ static BLOCKS_RESIN_BRICK_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_RESIN_BRICK_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/resin_brick_stairs"),
     pools: BLOCKS_RESIN_BRICK_STAIRS_POOLS,
 };
 static BLOCKS_RESIN_BRICK_WALL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20079,6 +20996,7 @@ static BLOCKS_RESIN_BRICK_WALL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_RESIN_BRICK_WALL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/resin_brick_wall"),
     pools: BLOCKS_RESIN_BRICK_WALL_POOLS,
 };
 static BLOCKS_RESIN_BRICKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20098,6 +21016,7 @@ static BLOCKS_RESIN_BRICKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_RESIN_BRICKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/resin_bricks"),
     pools: BLOCKS_RESIN_BRICKS_POOLS,
 };
 static BLOCKS_RESIN_CLUMP_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20117,6 +21036,7 @@ static BLOCKS_RESIN_CLUMP_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_RESIN_CLUMP: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/resin_clump"),
     pools: BLOCKS_RESIN_CLUMP_POOLS,
 };
 static BLOCKS_RESPAWN_ANCHOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20136,6 +21056,7 @@ static BLOCKS_RESPAWN_ANCHOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_RESPAWN_ANCHOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/respawn_anchor"),
     pools: BLOCKS_RESPAWN_ANCHOR_POOLS,
 };
 static BLOCKS_ROOTED_DIRT_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20155,6 +21076,7 @@ static BLOCKS_ROOTED_DIRT_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_ROOTED_DIRT: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/rooted_dirt"),
     pools: BLOCKS_ROOTED_DIRT_POOLS,
 };
 static BLOCKS_ROSE_BUSH_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20174,6 +21096,7 @@ static BLOCKS_ROSE_BUSH_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_ROSE_BUSH: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/rose_bush"),
     pools: BLOCKS_ROSE_BUSH_POOLS,
 };
 static BLOCKS_SAND_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20193,6 +21116,7 @@ static BLOCKS_SAND_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SAND: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/sand"),
     pools: BLOCKS_SAND_POOLS,
 };
 static BLOCKS_SANDSTONE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20212,6 +21136,7 @@ static BLOCKS_SANDSTONE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SANDSTONE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/sandstone"),
     pools: BLOCKS_SANDSTONE_POOLS,
 };
 static BLOCKS_SANDSTONE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20231,6 +21156,7 @@ static BLOCKS_SANDSTONE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_SANDSTONE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/sandstone_slab"),
     pools: BLOCKS_SANDSTONE_SLAB_POOLS,
 };
 static BLOCKS_SANDSTONE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20250,6 +21176,7 @@ static BLOCKS_SANDSTONE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SANDSTONE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/sandstone_stairs"),
     pools: BLOCKS_SANDSTONE_STAIRS_POOLS,
 };
 static BLOCKS_SANDSTONE_WALL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20269,6 +21196,7 @@ static BLOCKS_SANDSTONE_WALL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SANDSTONE_WALL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/sandstone_wall"),
     pools: BLOCKS_SANDSTONE_WALL_POOLS,
 };
 static BLOCKS_SCAFFOLDING_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20288,6 +21216,7 @@ static BLOCKS_SCAFFOLDING_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SCAFFOLDING: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/scaffolding"),
     pools: BLOCKS_SCAFFOLDING_POOLS,
 };
 static BLOCKS_SCULK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20307,6 +21236,7 @@ static BLOCKS_SCULK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_SCULK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/sculk"),
     pools: BLOCKS_SCULK_POOLS,
 };
 static BLOCKS_SCULK_CATALYST_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20326,6 +21256,7 @@ static BLOCKS_SCULK_CATALYST_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_SCULK_CATALYST: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/sculk_catalyst"),
     pools: BLOCKS_SCULK_CATALYST_POOLS,
 };
 static BLOCKS_SCULK_SENSOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20345,6 +21276,7 @@ static BLOCKS_SCULK_SENSOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_SCULK_SENSOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/sculk_sensor"),
     pools: BLOCKS_SCULK_SENSOR_POOLS,
 };
 static BLOCKS_SCULK_SHRIEKER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20364,6 +21296,7 @@ static BLOCKS_SCULK_SHRIEKER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_SCULK_SHRIEKER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/sculk_shrieker"),
     pools: BLOCKS_SCULK_SHRIEKER_POOLS,
 };
 static BLOCKS_SCULK_VEIN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20383,6 +21316,7 @@ static BLOCKS_SCULK_VEIN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_SCULK_VEIN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/sculk_vein"),
     pools: BLOCKS_SCULK_VEIN_POOLS,
 };
 static BLOCKS_SEA_LANTERN_POOL0_ENTRIES: &[LootEntry] = &[
@@ -20413,6 +21347,7 @@ static BLOCKS_SEA_LANTERN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_SEA_LANTERN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/sea_lantern"),
     pools: BLOCKS_SEA_LANTERN_POOLS,
 };
 static BLOCKS_SEA_PICKLE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20432,6 +21367,7 @@ static BLOCKS_SEA_PICKLE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_SEA_PICKLE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/sea_pickle"),
     pools: BLOCKS_SEA_PICKLE_POOLS,
 };
 static BLOCKS_SEAGRASS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20451,6 +21387,7 @@ static BLOCKS_SEAGRASS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::Shears,
 }];
 pub static BLOCKS_SEAGRASS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/seagrass"),
     pools: BLOCKS_SEAGRASS_POOLS,
 };
 static BLOCKS_SHELF_MUSHROOM_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20470,6 +21407,7 @@ static BLOCKS_SHELF_MUSHROOM_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_SHELF_MUSHROOM: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/shelf_mushroom"),
     pools: BLOCKS_SHELF_MUSHROOM_POOLS,
 };
 static BLOCKS_SHORT_DRY_GRASS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20489,6 +21427,7 @@ static BLOCKS_SHORT_DRY_GRASS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouchOrShears,
 }];
 pub static BLOCKS_SHORT_DRY_GRASS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/short_dry_grass"),
     pools: BLOCKS_SHORT_DRY_GRASS_POOLS,
 };
 static BLOCKS_SHORT_GRASS_POOL0_ENTRIES: &[LootEntry] = &[
@@ -20522,6 +21461,7 @@ static BLOCKS_SHORT_GRASS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_SHORT_GRASS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/short_grass"),
     pools: BLOCKS_SHORT_GRASS_POOLS,
 };
 static BLOCKS_SHROOMLIGHT_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20541,6 +21481,7 @@ static BLOCKS_SHROOMLIGHT_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SHROOMLIGHT: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/shroomlight"),
     pools: BLOCKS_SHROOMLIGHT_POOLS,
 };
 static BLOCKS_SHULKER_BOX_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20560,6 +21501,7 @@ static BLOCKS_SHULKER_BOX_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_SHULKER_BOX: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/shulker_box"),
     pools: BLOCKS_SHULKER_BOX_POOLS,
 };
 static BLOCKS_SKELETON_SKULL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20579,6 +21521,7 @@ static BLOCKS_SKELETON_SKULL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_SKELETON_SKULL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/skeleton_skull"),
     pools: BLOCKS_SKELETON_SKULL_POOLS,
 };
 static BLOCKS_SLIME_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20598,6 +21541,7 @@ static BLOCKS_SLIME_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SLIME_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/slime_block"),
     pools: BLOCKS_SLIME_BLOCK_POOLS,
 };
 static BLOCKS_SMALL_AMETHYST_BUD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20617,6 +21561,7 @@ static BLOCKS_SMALL_AMETHYST_BUD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_SMALL_AMETHYST_BUD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/small_amethyst_bud"),
     pools: BLOCKS_SMALL_AMETHYST_BUD_POOLS,
 };
 static BLOCKS_SMALL_DRIPLEAF_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20636,6 +21581,7 @@ static BLOCKS_SMALL_DRIPLEAF_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::Shears,
 }];
 pub static BLOCKS_SMALL_DRIPLEAF: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/small_dripleaf"),
     pools: BLOCKS_SMALL_DRIPLEAF_POOLS,
 };
 static BLOCKS_SMITHING_TABLE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20655,6 +21601,7 @@ static BLOCKS_SMITHING_TABLE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SMITHING_TABLE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/smithing_table"),
     pools: BLOCKS_SMITHING_TABLE_POOLS,
 };
 static BLOCKS_SMOKER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20674,6 +21621,7 @@ static BLOCKS_SMOKER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SMOKER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/smoker"),
     pools: BLOCKS_SMOKER_POOLS,
 };
 static BLOCKS_SMOOTH_BASALT_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20693,6 +21641,7 @@ static BLOCKS_SMOOTH_BASALT_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SMOOTH_BASALT: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/smooth_basalt"),
     pools: BLOCKS_SMOOTH_BASALT_POOLS,
 };
 static BLOCKS_SMOOTH_QUARTZ_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20712,6 +21661,7 @@ static BLOCKS_SMOOTH_QUARTZ_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SMOOTH_QUARTZ: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/smooth_quartz"),
     pools: BLOCKS_SMOOTH_QUARTZ_POOLS,
 };
 static BLOCKS_SMOOTH_QUARTZ_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20731,6 +21681,7 @@ static BLOCKS_SMOOTH_QUARTZ_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_SMOOTH_QUARTZ_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/smooth_quartz_slab"),
     pools: BLOCKS_SMOOTH_QUARTZ_SLAB_POOLS,
 };
 static BLOCKS_SMOOTH_QUARTZ_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20750,6 +21701,7 @@ static BLOCKS_SMOOTH_QUARTZ_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SMOOTH_QUARTZ_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/smooth_quartz_stairs"),
     pools: BLOCKS_SMOOTH_QUARTZ_STAIRS_POOLS,
 };
 static BLOCKS_SMOOTH_RED_SANDSTONE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20769,6 +21721,7 @@ static BLOCKS_SMOOTH_RED_SANDSTONE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SMOOTH_RED_SANDSTONE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/smooth_red_sandstone"),
     pools: BLOCKS_SMOOTH_RED_SANDSTONE_POOLS,
 };
 static BLOCKS_SMOOTH_RED_SANDSTONE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20788,6 +21741,7 @@ static BLOCKS_SMOOTH_RED_SANDSTONE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_SMOOTH_RED_SANDSTONE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/smooth_red_sandstone_slab"),
     pools: BLOCKS_SMOOTH_RED_SANDSTONE_SLAB_POOLS,
 };
 static BLOCKS_SMOOTH_RED_SANDSTONE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20807,6 +21761,7 @@ static BLOCKS_SMOOTH_RED_SANDSTONE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SMOOTH_RED_SANDSTONE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/smooth_red_sandstone_stairs"),
     pools: BLOCKS_SMOOTH_RED_SANDSTONE_STAIRS_POOLS,
 };
 static BLOCKS_SMOOTH_SANDSTONE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20826,6 +21781,7 @@ static BLOCKS_SMOOTH_SANDSTONE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SMOOTH_SANDSTONE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/smooth_sandstone"),
     pools: BLOCKS_SMOOTH_SANDSTONE_POOLS,
 };
 static BLOCKS_SMOOTH_SANDSTONE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20845,6 +21801,7 @@ static BLOCKS_SMOOTH_SANDSTONE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_SMOOTH_SANDSTONE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/smooth_sandstone_slab"),
     pools: BLOCKS_SMOOTH_SANDSTONE_SLAB_POOLS,
 };
 static BLOCKS_SMOOTH_SANDSTONE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20864,6 +21821,7 @@ static BLOCKS_SMOOTH_SANDSTONE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SMOOTH_SANDSTONE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/smooth_sandstone_stairs"),
     pools: BLOCKS_SMOOTH_SANDSTONE_STAIRS_POOLS,
 };
 static BLOCKS_SMOOTH_STONE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20883,6 +21841,7 @@ static BLOCKS_SMOOTH_STONE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SMOOTH_STONE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/smooth_stone"),
     pools: BLOCKS_SMOOTH_STONE_POOLS,
 };
 static BLOCKS_SMOOTH_STONE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20902,6 +21861,7 @@ static BLOCKS_SMOOTH_STONE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_SMOOTH_STONE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/smooth_stone_slab"),
     pools: BLOCKS_SMOOTH_STONE_SLAB_POOLS,
 };
 static BLOCKS_SNIFFER_EGG_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -20921,6 +21881,7 @@ static BLOCKS_SNIFFER_EGG_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SNIFFER_EGG: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/sniffer_egg"),
     pools: BLOCKS_SNIFFER_EGG_POOLS,
 };
 static BLOCKS_SNOW_POOL0_ENTRIES: &[LootEntry] = &[
@@ -21077,6 +22038,7 @@ static BLOCKS_SNOW_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_SNOW: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/snow"),
     pools: BLOCKS_SNOW_POOLS,
 };
 static BLOCKS_SNOW_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[
@@ -21107,6 +22069,7 @@ static BLOCKS_SNOW_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_SNOW_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/snow_block"),
     pools: BLOCKS_SNOW_BLOCK_POOLS,
 };
 static BLOCKS_SOUL_CAMPFIRE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -21140,10 +22103,12 @@ static BLOCKS_SOUL_CAMPFIRE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_SOUL_CAMPFIRE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/soul_campfire"),
     pools: BLOCKS_SOUL_CAMPFIRE_POOLS,
 };
 static BLOCKS_SOUL_FIRE_POOLS: &[LootPool] = &[];
 pub static BLOCKS_SOUL_FIRE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/soul_fire"),
     pools: BLOCKS_SOUL_FIRE_POOLS,
 };
 static BLOCKS_SOUL_LANTERN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21163,6 +22128,7 @@ static BLOCKS_SOUL_LANTERN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SOUL_LANTERN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/soul_lantern"),
     pools: BLOCKS_SOUL_LANTERN_POOLS,
 };
 static BLOCKS_SOUL_SAND_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21182,6 +22148,7 @@ static BLOCKS_SOUL_SAND_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SOUL_SAND: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/soul_sand"),
     pools: BLOCKS_SOUL_SAND_POOLS,
 };
 static BLOCKS_SOUL_SOIL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21201,6 +22168,7 @@ static BLOCKS_SOUL_SOIL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SOUL_SOIL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/soul_soil"),
     pools: BLOCKS_SOUL_SOIL_POOLS,
 };
 static BLOCKS_SOUL_TORCH_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21220,10 +22188,12 @@ static BLOCKS_SOUL_TORCH_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SOUL_TORCH: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/soul_torch"),
     pools: BLOCKS_SOUL_TORCH_POOLS,
 };
 static BLOCKS_SPAWNER_POOLS: &[LootPool] = &[];
 pub static BLOCKS_SPAWNER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/spawner"),
     pools: BLOCKS_SPAWNER_POOLS,
 };
 static BLOCKS_SPONGE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21243,6 +22213,7 @@ static BLOCKS_SPONGE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SPONGE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/sponge"),
     pools: BLOCKS_SPONGE_POOLS,
 };
 static BLOCKS_SPORE_BLOSSOM_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21262,6 +22233,7 @@ static BLOCKS_SPORE_BLOSSOM_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SPORE_BLOSSOM: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/spore_blossom"),
     pools: BLOCKS_SPORE_BLOSSOM_POOLS,
 };
 static BLOCKS_SPRUCE_BUTTON_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21281,6 +22253,7 @@ static BLOCKS_SPRUCE_BUTTON_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SPRUCE_BUTTON: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/spruce_button"),
     pools: BLOCKS_SPRUCE_BUTTON_POOLS,
 };
 static BLOCKS_SPRUCE_DOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21300,6 +22273,7 @@ static BLOCKS_SPRUCE_DOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SPRUCE_DOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/spruce_door"),
     pools: BLOCKS_SPRUCE_DOOR_POOLS,
 };
 static BLOCKS_SPRUCE_FENCE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21319,6 +22293,7 @@ static BLOCKS_SPRUCE_FENCE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SPRUCE_FENCE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/spruce_fence"),
     pools: BLOCKS_SPRUCE_FENCE_POOLS,
 };
 static BLOCKS_SPRUCE_FENCE_GATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21338,6 +22313,7 @@ static BLOCKS_SPRUCE_FENCE_GATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SPRUCE_FENCE_GATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/spruce_fence_gate"),
     pools: BLOCKS_SPRUCE_FENCE_GATE_POOLS,
 };
 static BLOCKS_SPRUCE_HANGING_SIGN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21357,6 +22333,7 @@ static BLOCKS_SPRUCE_HANGING_SIGN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SPRUCE_HANGING_SIGN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/spruce_hanging_sign"),
     pools: BLOCKS_SPRUCE_HANGING_SIGN_POOLS,
 };
 static BLOCKS_SPRUCE_LEAVES_POOL0_ENTRIES: &[LootEntry] = &[
@@ -21415,6 +22392,7 @@ static BLOCKS_SPRUCE_LEAVES_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_SPRUCE_LEAVES: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/spruce_leaves"),
     pools: BLOCKS_SPRUCE_LEAVES_POOLS,
 };
 static BLOCKS_SPRUCE_LOG_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21434,6 +22412,7 @@ static BLOCKS_SPRUCE_LOG_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SPRUCE_LOG: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/spruce_log"),
     pools: BLOCKS_SPRUCE_LOG_POOLS,
 };
 static BLOCKS_SPRUCE_PLANKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21453,6 +22432,7 @@ static BLOCKS_SPRUCE_PLANKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SPRUCE_PLANKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/spruce_planks"),
     pools: BLOCKS_SPRUCE_PLANKS_POOLS,
 };
 static BLOCKS_SPRUCE_PRESSURE_PLATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21472,6 +22452,7 @@ static BLOCKS_SPRUCE_PRESSURE_PLATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SPRUCE_PRESSURE_PLATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/spruce_pressure_plate"),
     pools: BLOCKS_SPRUCE_PRESSURE_PLATE_POOLS,
 };
 static BLOCKS_SPRUCE_SAPLING_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21491,6 +22472,7 @@ static BLOCKS_SPRUCE_SAPLING_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SPRUCE_SAPLING: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/spruce_sapling"),
     pools: BLOCKS_SPRUCE_SAPLING_POOLS,
 };
 static BLOCKS_SPRUCE_SHELF_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21510,6 +22492,7 @@ static BLOCKS_SPRUCE_SHELF_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SPRUCE_SHELF: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/spruce_shelf"),
     pools: BLOCKS_SPRUCE_SHELF_POOLS,
 };
 static BLOCKS_SPRUCE_SIGN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21529,6 +22512,7 @@ static BLOCKS_SPRUCE_SIGN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SPRUCE_SIGN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/spruce_sign"),
     pools: BLOCKS_SPRUCE_SIGN_POOLS,
 };
 static BLOCKS_SPRUCE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21548,6 +22532,7 @@ static BLOCKS_SPRUCE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_SPRUCE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/spruce_slab"),
     pools: BLOCKS_SPRUCE_SLAB_POOLS,
 };
 static BLOCKS_SPRUCE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21567,6 +22552,7 @@ static BLOCKS_SPRUCE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SPRUCE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/spruce_stairs"),
     pools: BLOCKS_SPRUCE_STAIRS_POOLS,
 };
 static BLOCKS_SPRUCE_TRAPDOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21586,6 +22572,7 @@ static BLOCKS_SPRUCE_TRAPDOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SPRUCE_TRAPDOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/spruce_trapdoor"),
     pools: BLOCKS_SPRUCE_TRAPDOOR_POOLS,
 };
 static BLOCKS_SPRUCE_WOOD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21605,6 +22592,7 @@ static BLOCKS_SPRUCE_WOOD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SPRUCE_WOOD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/spruce_wood"),
     pools: BLOCKS_SPRUCE_WOOD_POOLS,
 };
 static BLOCKS_STICKY_PISTON_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21624,6 +22612,7 @@ static BLOCKS_STICKY_PISTON_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_STICKY_PISTON: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/sticky_piston"),
     pools: BLOCKS_STICKY_PISTON_POOLS,
 };
 static BLOCKS_STONE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -21657,6 +22646,7 @@ static BLOCKS_STONE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_STONE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/stone"),
     pools: BLOCKS_STONE_POOLS,
 };
 static BLOCKS_STONE_BRICK_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21676,6 +22666,7 @@ static BLOCKS_STONE_BRICK_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_STONE_BRICK_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/stone_brick_slab"),
     pools: BLOCKS_STONE_BRICK_SLAB_POOLS,
 };
 static BLOCKS_STONE_BRICK_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21695,6 +22686,7 @@ static BLOCKS_STONE_BRICK_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_STONE_BRICK_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/stone_brick_stairs"),
     pools: BLOCKS_STONE_BRICK_STAIRS_POOLS,
 };
 static BLOCKS_STONE_BRICK_WALL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21714,6 +22706,7 @@ static BLOCKS_STONE_BRICK_WALL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_STONE_BRICK_WALL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/stone_brick_wall"),
     pools: BLOCKS_STONE_BRICK_WALL_POOLS,
 };
 static BLOCKS_STONE_BRICKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21733,6 +22726,7 @@ static BLOCKS_STONE_BRICKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_STONE_BRICKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/stone_bricks"),
     pools: BLOCKS_STONE_BRICKS_POOLS,
 };
 static BLOCKS_STONE_BUTTON_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21752,6 +22746,7 @@ static BLOCKS_STONE_BUTTON_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_STONE_BUTTON: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/stone_button"),
     pools: BLOCKS_STONE_BUTTON_POOLS,
 };
 static BLOCKS_STONE_PRESSURE_PLATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21771,6 +22766,7 @@ static BLOCKS_STONE_PRESSURE_PLATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_STONE_PRESSURE_PLATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/stone_pressure_plate"),
     pools: BLOCKS_STONE_PRESSURE_PLATE_POOLS,
 };
 static BLOCKS_STONE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21790,6 +22786,7 @@ static BLOCKS_STONE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_STONE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/stone_slab"),
     pools: BLOCKS_STONE_SLAB_POOLS,
 };
 static BLOCKS_STONE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21809,6 +22806,7 @@ static BLOCKS_STONE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_STONE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/stone_stairs"),
     pools: BLOCKS_STONE_STAIRS_POOLS,
 };
 static BLOCKS_STONECUTTER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21828,6 +22826,7 @@ static BLOCKS_STONECUTTER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_STONECUTTER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/stonecutter"),
     pools: BLOCKS_STONECUTTER_POOLS,
 };
 static BLOCKS_STRAW_BED_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21847,6 +22846,7 @@ static BLOCKS_STRAW_BED_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_STRAW_BED: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/straw_bed"),
     pools: BLOCKS_STRAW_BED_POOLS,
 };
 static BLOCKS_STRIPPED_ACACIA_LOG_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21866,6 +22866,7 @@ static BLOCKS_STRIPPED_ACACIA_LOG_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_STRIPPED_ACACIA_LOG: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/stripped_acacia_log"),
     pools: BLOCKS_STRIPPED_ACACIA_LOG_POOLS,
 };
 static BLOCKS_STRIPPED_ACACIA_WOOD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21885,6 +22886,7 @@ static BLOCKS_STRIPPED_ACACIA_WOOD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_STRIPPED_ACACIA_WOOD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/stripped_acacia_wood"),
     pools: BLOCKS_STRIPPED_ACACIA_WOOD_POOLS,
 };
 static BLOCKS_STRIPPED_BAMBOO_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21904,6 +22906,7 @@ static BLOCKS_STRIPPED_BAMBOO_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_STRIPPED_BAMBOO_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/stripped_bamboo_block"),
     pools: BLOCKS_STRIPPED_BAMBOO_BLOCK_POOLS,
 };
 static BLOCKS_STRIPPED_BIRCH_LOG_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21923,6 +22926,7 @@ static BLOCKS_STRIPPED_BIRCH_LOG_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_STRIPPED_BIRCH_LOG: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/stripped_birch_log"),
     pools: BLOCKS_STRIPPED_BIRCH_LOG_POOLS,
 };
 static BLOCKS_STRIPPED_BIRCH_WOOD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21942,6 +22946,7 @@ static BLOCKS_STRIPPED_BIRCH_WOOD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_STRIPPED_BIRCH_WOOD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/stripped_birch_wood"),
     pools: BLOCKS_STRIPPED_BIRCH_WOOD_POOLS,
 };
 static BLOCKS_STRIPPED_CHERRY_LOG_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21961,6 +22966,7 @@ static BLOCKS_STRIPPED_CHERRY_LOG_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_STRIPPED_CHERRY_LOG: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/stripped_cherry_log"),
     pools: BLOCKS_STRIPPED_CHERRY_LOG_POOLS,
 };
 static BLOCKS_STRIPPED_CHERRY_WOOD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21980,6 +22986,7 @@ static BLOCKS_STRIPPED_CHERRY_WOOD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_STRIPPED_CHERRY_WOOD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/stripped_cherry_wood"),
     pools: BLOCKS_STRIPPED_CHERRY_WOOD_POOLS,
 };
 static BLOCKS_STRIPPED_CRIMSON_HYPHAE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -21999,6 +23006,7 @@ static BLOCKS_STRIPPED_CRIMSON_HYPHAE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_STRIPPED_CRIMSON_HYPHAE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/stripped_crimson_hyphae"),
     pools: BLOCKS_STRIPPED_CRIMSON_HYPHAE_POOLS,
 };
 static BLOCKS_STRIPPED_CRIMSON_STEM_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22018,6 +23026,7 @@ static BLOCKS_STRIPPED_CRIMSON_STEM_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_STRIPPED_CRIMSON_STEM: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/stripped_crimson_stem"),
     pools: BLOCKS_STRIPPED_CRIMSON_STEM_POOLS,
 };
 static BLOCKS_STRIPPED_DARK_OAK_LOG_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22037,6 +23046,7 @@ static BLOCKS_STRIPPED_DARK_OAK_LOG_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_STRIPPED_DARK_OAK_LOG: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/stripped_dark_oak_log"),
     pools: BLOCKS_STRIPPED_DARK_OAK_LOG_POOLS,
 };
 static BLOCKS_STRIPPED_DARK_OAK_WOOD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22056,6 +23066,7 @@ static BLOCKS_STRIPPED_DARK_OAK_WOOD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_STRIPPED_DARK_OAK_WOOD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/stripped_dark_oak_wood"),
     pools: BLOCKS_STRIPPED_DARK_OAK_WOOD_POOLS,
 };
 static BLOCKS_STRIPPED_JUNGLE_LOG_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22075,6 +23086,7 @@ static BLOCKS_STRIPPED_JUNGLE_LOG_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_STRIPPED_JUNGLE_LOG: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/stripped_jungle_log"),
     pools: BLOCKS_STRIPPED_JUNGLE_LOG_POOLS,
 };
 static BLOCKS_STRIPPED_JUNGLE_WOOD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22094,6 +23106,7 @@ static BLOCKS_STRIPPED_JUNGLE_WOOD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_STRIPPED_JUNGLE_WOOD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/stripped_jungle_wood"),
     pools: BLOCKS_STRIPPED_JUNGLE_WOOD_POOLS,
 };
 static BLOCKS_STRIPPED_MANGROVE_LOG_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22113,6 +23126,7 @@ static BLOCKS_STRIPPED_MANGROVE_LOG_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_STRIPPED_MANGROVE_LOG: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/stripped_mangrove_log"),
     pools: BLOCKS_STRIPPED_MANGROVE_LOG_POOLS,
 };
 static BLOCKS_STRIPPED_MANGROVE_WOOD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22132,6 +23146,7 @@ static BLOCKS_STRIPPED_MANGROVE_WOOD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_STRIPPED_MANGROVE_WOOD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/stripped_mangrove_wood"),
     pools: BLOCKS_STRIPPED_MANGROVE_WOOD_POOLS,
 };
 static BLOCKS_STRIPPED_OAK_LOG_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22151,6 +23166,7 @@ static BLOCKS_STRIPPED_OAK_LOG_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_STRIPPED_OAK_LOG: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/stripped_oak_log"),
     pools: BLOCKS_STRIPPED_OAK_LOG_POOLS,
 };
 static BLOCKS_STRIPPED_OAK_WOOD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22170,6 +23186,7 @@ static BLOCKS_STRIPPED_OAK_WOOD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_STRIPPED_OAK_WOOD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/stripped_oak_wood"),
     pools: BLOCKS_STRIPPED_OAK_WOOD_POOLS,
 };
 static BLOCKS_STRIPPED_PALE_OAK_LOG_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22189,6 +23206,7 @@ static BLOCKS_STRIPPED_PALE_OAK_LOG_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_STRIPPED_PALE_OAK_LOG: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/stripped_pale_oak_log"),
     pools: BLOCKS_STRIPPED_PALE_OAK_LOG_POOLS,
 };
 static BLOCKS_STRIPPED_PALE_OAK_WOOD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22208,6 +23226,7 @@ static BLOCKS_STRIPPED_PALE_OAK_WOOD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_STRIPPED_PALE_OAK_WOOD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/stripped_pale_oak_wood"),
     pools: BLOCKS_STRIPPED_PALE_OAK_WOOD_POOLS,
 };
 static BLOCKS_STRIPPED_POPLAR_LOG_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22227,6 +23246,7 @@ static BLOCKS_STRIPPED_POPLAR_LOG_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_STRIPPED_POPLAR_LOG: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/stripped_poplar_log"),
     pools: BLOCKS_STRIPPED_POPLAR_LOG_POOLS,
 };
 static BLOCKS_STRIPPED_POPLAR_WOOD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22246,6 +23266,7 @@ static BLOCKS_STRIPPED_POPLAR_WOOD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_STRIPPED_POPLAR_WOOD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/stripped_poplar_wood"),
     pools: BLOCKS_STRIPPED_POPLAR_WOOD_POOLS,
 };
 static BLOCKS_STRIPPED_SPRUCE_LOG_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22265,6 +23286,7 @@ static BLOCKS_STRIPPED_SPRUCE_LOG_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_STRIPPED_SPRUCE_LOG: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/stripped_spruce_log"),
     pools: BLOCKS_STRIPPED_SPRUCE_LOG_POOLS,
 };
 static BLOCKS_STRIPPED_SPRUCE_WOOD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22284,6 +23306,7 @@ static BLOCKS_STRIPPED_SPRUCE_WOOD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_STRIPPED_SPRUCE_WOOD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/stripped_spruce_wood"),
     pools: BLOCKS_STRIPPED_SPRUCE_WOOD_POOLS,
 };
 static BLOCKS_STRIPPED_WARPED_HYPHAE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22303,6 +23326,7 @@ static BLOCKS_STRIPPED_WARPED_HYPHAE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_STRIPPED_WARPED_HYPHAE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/stripped_warped_hyphae"),
     pools: BLOCKS_STRIPPED_WARPED_HYPHAE_POOLS,
 };
 static BLOCKS_STRIPPED_WARPED_STEM_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22322,6 +23346,7 @@ static BLOCKS_STRIPPED_WARPED_STEM_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_STRIPPED_WARPED_STEM: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/stripped_warped_stem"),
     pools: BLOCKS_STRIPPED_WARPED_STEM_POOLS,
 };
 static BLOCKS_SUGAR_CANE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22341,6 +23366,7 @@ static BLOCKS_SUGAR_CANE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SUGAR_CANE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/sugar_cane"),
     pools: BLOCKS_SUGAR_CANE_POOLS,
 };
 static BLOCKS_SULFUR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22360,6 +23386,7 @@ static BLOCKS_SULFUR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SULFUR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/sulfur"),
     pools: BLOCKS_SULFUR_POOLS,
 };
 static BLOCKS_SULFUR_BRICK_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22379,6 +23406,7 @@ static BLOCKS_SULFUR_BRICK_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_SULFUR_BRICK_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/sulfur_brick_slab"),
     pools: BLOCKS_SULFUR_BRICK_SLAB_POOLS,
 };
 static BLOCKS_SULFUR_BRICK_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22398,6 +23426,7 @@ static BLOCKS_SULFUR_BRICK_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SULFUR_BRICK_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/sulfur_brick_stairs"),
     pools: BLOCKS_SULFUR_BRICK_STAIRS_POOLS,
 };
 static BLOCKS_SULFUR_BRICK_WALL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22417,6 +23446,7 @@ static BLOCKS_SULFUR_BRICK_WALL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SULFUR_BRICK_WALL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/sulfur_brick_wall"),
     pools: BLOCKS_SULFUR_BRICK_WALL_POOLS,
 };
 static BLOCKS_SULFUR_BRICKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22436,6 +23466,7 @@ static BLOCKS_SULFUR_BRICKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SULFUR_BRICKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/sulfur_bricks"),
     pools: BLOCKS_SULFUR_BRICKS_POOLS,
 };
 static BLOCKS_SULFUR_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22455,6 +23486,7 @@ static BLOCKS_SULFUR_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_SULFUR_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/sulfur_slab"),
     pools: BLOCKS_SULFUR_SLAB_POOLS,
 };
 static BLOCKS_SULFUR_SPIKE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22474,6 +23506,7 @@ static BLOCKS_SULFUR_SPIKE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SULFUR_SPIKE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/sulfur_spike"),
     pools: BLOCKS_SULFUR_SPIKE_POOLS,
 };
 static BLOCKS_SULFUR_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22493,6 +23526,7 @@ static BLOCKS_SULFUR_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SULFUR_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/sulfur_stairs"),
     pools: BLOCKS_SULFUR_STAIRS_POOLS,
 };
 static BLOCKS_SULFUR_WALL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22512,6 +23546,7 @@ static BLOCKS_SULFUR_WALL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SULFUR_WALL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/sulfur_wall"),
     pools: BLOCKS_SULFUR_WALL_POOLS,
 };
 static BLOCKS_SUNFLOWER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22531,14 +23566,17 @@ static BLOCKS_SUNFLOWER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_SUNFLOWER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/sunflower"),
     pools: BLOCKS_SUNFLOWER_POOLS,
 };
 static BLOCKS_SUSPICIOUS_GRAVEL_POOLS: &[LootPool] = &[];
 pub static BLOCKS_SUSPICIOUS_GRAVEL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/suspicious_gravel"),
     pools: BLOCKS_SUSPICIOUS_GRAVEL_POOLS,
 };
 static BLOCKS_SUSPICIOUS_SAND_POOLS: &[LootPool] = &[];
 pub static BLOCKS_SUSPICIOUS_SAND: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/suspicious_sand"),
     pools: BLOCKS_SUSPICIOUS_SAND_POOLS,
 };
 static BLOCKS_SWEET_BERRY_BUSH_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22576,6 +23614,7 @@ static BLOCKS_SWEET_BERRY_BUSH_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_SWEET_BERRY_BUSH: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/sweet_berry_bush"),
     pools: BLOCKS_SWEET_BERRY_BUSH_POOLS,
 };
 static BLOCKS_TALL_DRY_GRASS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22595,6 +23634,7 @@ static BLOCKS_TALL_DRY_GRASS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouchOrShears,
 }];
 pub static BLOCKS_TALL_DRY_GRASS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/tall_dry_grass"),
     pools: BLOCKS_TALL_DRY_GRASS_POOLS,
 };
 static BLOCKS_TALL_GRASS_POOL0_ENTRIES: &[LootEntry] = &[
@@ -22666,6 +23706,7 @@ static BLOCKS_TALL_GRASS_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_TALL_GRASS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/tall_grass"),
     pools: BLOCKS_TALL_GRASS_POOLS,
 };
 static BLOCKS_TALL_SEAGRASS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22685,6 +23726,7 @@ static BLOCKS_TALL_SEAGRASS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::Shears,
 }];
 pub static BLOCKS_TALL_SEAGRASS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/tall_seagrass"),
     pools: BLOCKS_TALL_SEAGRASS_POOLS,
 };
 static BLOCKS_TARGET_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22704,6 +23746,7 @@ static BLOCKS_TARGET_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_TARGET: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/target"),
     pools: BLOCKS_TARGET_POOLS,
 };
 static BLOCKS_TERRACOTTA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22723,6 +23766,7 @@ static BLOCKS_TERRACOTTA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_TERRACOTTA: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/terracotta"),
     pools: BLOCKS_TERRACOTTA_POOLS,
 };
 static BLOCKS_TINTED_GLASS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22742,6 +23786,7 @@ static BLOCKS_TINTED_GLASS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_TINTED_GLASS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/tinted_glass"),
     pools: BLOCKS_TINTED_GLASS_POOLS,
 };
 static BLOCKS_TNT_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22761,6 +23806,7 @@ static BLOCKS_TNT_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_TNT: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/tnt"),
     pools: BLOCKS_TNT_POOLS,
 };
 static BLOCKS_TORCH_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22780,6 +23826,7 @@ static BLOCKS_TORCH_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_TORCH: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/torch"),
     pools: BLOCKS_TORCH_POOLS,
 };
 static BLOCKS_TORCHFLOWER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22799,6 +23846,7 @@ static BLOCKS_TORCHFLOWER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_TORCHFLOWER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/torchflower"),
     pools: BLOCKS_TORCHFLOWER_POOLS,
 };
 static BLOCKS_TORCHFLOWER_CROP_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22818,6 +23866,7 @@ static BLOCKS_TORCHFLOWER_CROP_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_TORCHFLOWER_CROP: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/torchflower_crop"),
     pools: BLOCKS_TORCHFLOWER_CROP_POOLS,
 };
 static BLOCKS_TRAPPED_CHEST_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22837,10 +23886,12 @@ static BLOCKS_TRAPPED_CHEST_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_TRAPPED_CHEST: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/trapped_chest"),
     pools: BLOCKS_TRAPPED_CHEST_POOLS,
 };
 static BLOCKS_TRIAL_SPAWNER_POOLS: &[LootPool] = &[];
 pub static BLOCKS_TRIAL_SPAWNER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/trial_spawner"),
     pools: BLOCKS_TRIAL_SPAWNER_POOLS,
 };
 static BLOCKS_TRIPWIRE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22860,6 +23911,7 @@ static BLOCKS_TRIPWIRE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_TRIPWIRE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/tripwire"),
     pools: BLOCKS_TRIPWIRE_POOLS,
 };
 static BLOCKS_TRIPWIRE_HOOK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22879,6 +23931,7 @@ static BLOCKS_TRIPWIRE_HOOK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_TRIPWIRE_HOOK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/tripwire_hook"),
     pools: BLOCKS_TRIPWIRE_HOOK_POOLS,
 };
 static BLOCKS_TUBE_CORAL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22898,6 +23951,7 @@ static BLOCKS_TUBE_CORAL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_TUBE_CORAL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/tube_coral"),
     pools: BLOCKS_TUBE_CORAL_POOLS,
 };
 static BLOCKS_TUBE_CORAL_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[
@@ -22931,6 +23985,7 @@ static BLOCKS_TUBE_CORAL_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_TUBE_CORAL_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/tube_coral_block"),
     pools: BLOCKS_TUBE_CORAL_BLOCK_POOLS,
 };
 static BLOCKS_TUBE_CORAL_FAN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22950,6 +24005,7 @@ static BLOCKS_TUBE_CORAL_FAN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_TUBE_CORAL_FAN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/tube_coral_fan"),
     pools: BLOCKS_TUBE_CORAL_FAN_POOLS,
 };
 static BLOCKS_TUFF_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22969,6 +24025,7 @@ static BLOCKS_TUFF_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_TUFF: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/tuff"),
     pools: BLOCKS_TUFF_POOLS,
 };
 static BLOCKS_TUFF_BRICK_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -22988,6 +24045,7 @@ static BLOCKS_TUFF_BRICK_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_TUFF_BRICK_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/tuff_brick_slab"),
     pools: BLOCKS_TUFF_BRICK_SLAB_POOLS,
 };
 static BLOCKS_TUFF_BRICK_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23007,6 +24065,7 @@ static BLOCKS_TUFF_BRICK_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_TUFF_BRICK_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/tuff_brick_stairs"),
     pools: BLOCKS_TUFF_BRICK_STAIRS_POOLS,
 };
 static BLOCKS_TUFF_BRICK_WALL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23026,6 +24085,7 @@ static BLOCKS_TUFF_BRICK_WALL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_TUFF_BRICK_WALL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/tuff_brick_wall"),
     pools: BLOCKS_TUFF_BRICK_WALL_POOLS,
 };
 static BLOCKS_TUFF_BRICKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23045,6 +24105,7 @@ static BLOCKS_TUFF_BRICKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_TUFF_BRICKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/tuff_bricks"),
     pools: BLOCKS_TUFF_BRICKS_POOLS,
 };
 static BLOCKS_TUFF_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23064,6 +24125,7 @@ static BLOCKS_TUFF_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_TUFF_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/tuff_slab"),
     pools: BLOCKS_TUFF_SLAB_POOLS,
 };
 static BLOCKS_TUFF_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23083,6 +24145,7 @@ static BLOCKS_TUFF_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_TUFF_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/tuff_stairs"),
     pools: BLOCKS_TUFF_STAIRS_POOLS,
 };
 static BLOCKS_TUFF_WALL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23102,6 +24165,7 @@ static BLOCKS_TUFF_WALL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_TUFF_WALL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/tuff_wall"),
     pools: BLOCKS_TUFF_WALL_POOLS,
 };
 static BLOCKS_TURTLE_EGG_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23121,6 +24185,7 @@ static BLOCKS_TURTLE_EGG_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_TURTLE_EGG: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/turtle_egg"),
     pools: BLOCKS_TURTLE_EGG_POOLS,
 };
 static BLOCKS_TWISTING_VINES_POOL0_ENTRIES: &[LootEntry] = &[
@@ -23156,6 +24221,7 @@ static BLOCKS_TWISTING_VINES_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_TWISTING_VINES: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/twisting_vines"),
     pools: BLOCKS_TWISTING_VINES_POOLS,
 };
 static BLOCKS_TWISTING_VINES_PLANT_POOL0_ENTRIES: &[LootEntry] = &[
@@ -23191,10 +24257,12 @@ static BLOCKS_TWISTING_VINES_PLANT_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_TWISTING_VINES_PLANT: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/twisting_vines_plant"),
     pools: BLOCKS_TWISTING_VINES_PLANT_POOLS,
 };
 static BLOCKS_VAULT_POOLS: &[LootPool] = &[];
 pub static BLOCKS_VAULT: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/vault"),
     pools: BLOCKS_VAULT_POOLS,
 };
 static BLOCKS_VERDANT_FROGLIGHT_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23214,6 +24282,7 @@ static BLOCKS_VERDANT_FROGLIGHT_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_VERDANT_FROGLIGHT: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/verdant_froglight"),
     pools: BLOCKS_VERDANT_FROGLIGHT_POOLS,
 };
 static BLOCKS_VINE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23233,6 +24302,7 @@ static BLOCKS_VINE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::Shears,
 }];
 pub static BLOCKS_VINE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/vine"),
     pools: BLOCKS_VINE_POOLS,
 };
 static BLOCKS_WARPED_BUTTON_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23252,6 +24322,7 @@ static BLOCKS_WARPED_BUTTON_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WARPED_BUTTON: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/warped_button"),
     pools: BLOCKS_WARPED_BUTTON_POOLS,
 };
 static BLOCKS_WARPED_DOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23271,6 +24342,7 @@ static BLOCKS_WARPED_DOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WARPED_DOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/warped_door"),
     pools: BLOCKS_WARPED_DOOR_POOLS,
 };
 static BLOCKS_WARPED_FENCE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23290,6 +24362,7 @@ static BLOCKS_WARPED_FENCE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WARPED_FENCE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/warped_fence"),
     pools: BLOCKS_WARPED_FENCE_POOLS,
 };
 static BLOCKS_WARPED_FENCE_GATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23309,6 +24382,7 @@ static BLOCKS_WARPED_FENCE_GATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WARPED_FENCE_GATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/warped_fence_gate"),
     pools: BLOCKS_WARPED_FENCE_GATE_POOLS,
 };
 static BLOCKS_WARPED_FUNGUS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23328,6 +24402,7 @@ static BLOCKS_WARPED_FUNGUS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WARPED_FUNGUS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/warped_fungus"),
     pools: BLOCKS_WARPED_FUNGUS_POOLS,
 };
 static BLOCKS_WARPED_HANGING_SIGN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23347,6 +24422,7 @@ static BLOCKS_WARPED_HANGING_SIGN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WARPED_HANGING_SIGN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/warped_hanging_sign"),
     pools: BLOCKS_WARPED_HANGING_SIGN_POOLS,
 };
 static BLOCKS_WARPED_HYPHAE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23366,6 +24442,7 @@ static BLOCKS_WARPED_HYPHAE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WARPED_HYPHAE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/warped_hyphae"),
     pools: BLOCKS_WARPED_HYPHAE_POOLS,
 };
 static BLOCKS_WARPED_NYLIUM_POOL0_ENTRIES: &[LootEntry] = &[
@@ -23399,6 +24476,7 @@ static BLOCKS_WARPED_NYLIUM_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_WARPED_NYLIUM: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/warped_nylium"),
     pools: BLOCKS_WARPED_NYLIUM_POOLS,
 };
 static BLOCKS_WARPED_PLANKS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23418,6 +24496,7 @@ static BLOCKS_WARPED_PLANKS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WARPED_PLANKS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/warped_planks"),
     pools: BLOCKS_WARPED_PLANKS_POOLS,
 };
 static BLOCKS_WARPED_PRESSURE_PLATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23437,6 +24516,7 @@ static BLOCKS_WARPED_PRESSURE_PLATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WARPED_PRESSURE_PLATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/warped_pressure_plate"),
     pools: BLOCKS_WARPED_PRESSURE_PLATE_POOLS,
 };
 static BLOCKS_WARPED_ROOTS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23456,6 +24536,7 @@ static BLOCKS_WARPED_ROOTS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WARPED_ROOTS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/warped_roots"),
     pools: BLOCKS_WARPED_ROOTS_POOLS,
 };
 static BLOCKS_WARPED_SHELF_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23475,6 +24556,7 @@ static BLOCKS_WARPED_SHELF_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WARPED_SHELF: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/warped_shelf"),
     pools: BLOCKS_WARPED_SHELF_POOLS,
 };
 static BLOCKS_WARPED_SIGN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23494,6 +24576,7 @@ static BLOCKS_WARPED_SIGN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WARPED_SIGN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/warped_sign"),
     pools: BLOCKS_WARPED_SIGN_POOLS,
 };
 static BLOCKS_WARPED_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23513,6 +24596,7 @@ static BLOCKS_WARPED_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_WARPED_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/warped_slab"),
     pools: BLOCKS_WARPED_SLAB_POOLS,
 };
 static BLOCKS_WARPED_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23532,6 +24616,7 @@ static BLOCKS_WARPED_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WARPED_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/warped_stairs"),
     pools: BLOCKS_WARPED_STAIRS_POOLS,
 };
 static BLOCKS_WARPED_STEM_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23551,6 +24636,7 @@ static BLOCKS_WARPED_STEM_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WARPED_STEM: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/warped_stem"),
     pools: BLOCKS_WARPED_STEM_POOLS,
 };
 static BLOCKS_WARPED_TRAPDOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23570,6 +24656,7 @@ static BLOCKS_WARPED_TRAPDOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WARPED_TRAPDOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/warped_trapdoor"),
     pools: BLOCKS_WARPED_TRAPDOOR_POOLS,
 };
 static BLOCKS_WARPED_WART_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23589,6 +24676,7 @@ static BLOCKS_WARPED_WART_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WARPED_WART_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/warped_wart_block"),
     pools: BLOCKS_WARPED_WART_BLOCK_POOLS,
 };
 static BLOCKS_WATER_CAULDRON_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23608,6 +24696,7 @@ static BLOCKS_WATER_CAULDRON_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WATER_CAULDRON: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/water_cauldron"),
     pools: BLOCKS_WATER_CAULDRON_POOLS,
 };
 static BLOCKS_WAXED_CHISELED_COPPER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23627,6 +24716,7 @@ static BLOCKS_WAXED_CHISELED_COPPER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_CHISELED_COPPER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_chiseled_copper"),
     pools: BLOCKS_WAXED_CHISELED_COPPER_POOLS,
 };
 static BLOCKS_WAXED_COPPER_BARS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23646,6 +24736,7 @@ static BLOCKS_WAXED_COPPER_BARS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_COPPER_BARS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_copper_bars"),
     pools: BLOCKS_WAXED_COPPER_BARS_POOLS,
 };
 static BLOCKS_WAXED_COPPER_BLOCK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23665,6 +24756,7 @@ static BLOCKS_WAXED_COPPER_BLOCK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_COPPER_BLOCK: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_copper_block"),
     pools: BLOCKS_WAXED_COPPER_BLOCK_POOLS,
 };
 static BLOCKS_WAXED_COPPER_BULB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23684,6 +24776,7 @@ static BLOCKS_WAXED_COPPER_BULB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_COPPER_BULB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_copper_bulb"),
     pools: BLOCKS_WAXED_COPPER_BULB_POOLS,
 };
 static BLOCKS_WAXED_COPPER_CHAIN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23703,6 +24796,7 @@ static BLOCKS_WAXED_COPPER_CHAIN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_COPPER_CHAIN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_copper_chain"),
     pools: BLOCKS_WAXED_COPPER_CHAIN_POOLS,
 };
 static BLOCKS_WAXED_COPPER_CHEST_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23722,6 +24816,7 @@ static BLOCKS_WAXED_COPPER_CHEST_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_COPPER_CHEST: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_copper_chest"),
     pools: BLOCKS_WAXED_COPPER_CHEST_POOLS,
 };
 static BLOCKS_WAXED_COPPER_DOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23741,6 +24836,7 @@ static BLOCKS_WAXED_COPPER_DOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_COPPER_DOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_copper_door"),
     pools: BLOCKS_WAXED_COPPER_DOOR_POOLS,
 };
 static BLOCKS_WAXED_COPPER_GOLEM_STATUE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23760,6 +24856,7 @@ static BLOCKS_WAXED_COPPER_GOLEM_STATUE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_COPPER_GOLEM_STATUE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_copper_golem_statue"),
     pools: BLOCKS_WAXED_COPPER_GOLEM_STATUE_POOLS,
 };
 static BLOCKS_WAXED_COPPER_GRATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23779,6 +24876,7 @@ static BLOCKS_WAXED_COPPER_GRATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_COPPER_GRATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_copper_grate"),
     pools: BLOCKS_WAXED_COPPER_GRATE_POOLS,
 };
 static BLOCKS_WAXED_COPPER_LANTERN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23798,6 +24896,7 @@ static BLOCKS_WAXED_COPPER_LANTERN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_COPPER_LANTERN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_copper_lantern"),
     pools: BLOCKS_WAXED_COPPER_LANTERN_POOLS,
 };
 static BLOCKS_WAXED_COPPER_TRAPDOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23817,6 +24916,7 @@ static BLOCKS_WAXED_COPPER_TRAPDOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_COPPER_TRAPDOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_copper_trapdoor"),
     pools: BLOCKS_WAXED_COPPER_TRAPDOOR_POOLS,
 };
 static BLOCKS_WAXED_CUT_COPPER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23836,6 +24936,7 @@ static BLOCKS_WAXED_CUT_COPPER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_CUT_COPPER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_cut_copper"),
     pools: BLOCKS_WAXED_CUT_COPPER_POOLS,
 };
 static BLOCKS_WAXED_CUT_COPPER_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23855,6 +24956,7 @@ static BLOCKS_WAXED_CUT_COPPER_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_WAXED_CUT_COPPER_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_cut_copper_slab"),
     pools: BLOCKS_WAXED_CUT_COPPER_SLAB_POOLS,
 };
 static BLOCKS_WAXED_CUT_COPPER_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23874,6 +24976,7 @@ static BLOCKS_WAXED_CUT_COPPER_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_CUT_COPPER_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_cut_copper_stairs"),
     pools: BLOCKS_WAXED_CUT_COPPER_STAIRS_POOLS,
 };
 static BLOCKS_WAXED_EXPOSED_CHISELED_COPPER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23893,6 +24996,7 @@ static BLOCKS_WAXED_EXPOSED_CHISELED_COPPER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_EXPOSED_CHISELED_COPPER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_exposed_chiseled_copper"),
     pools: BLOCKS_WAXED_EXPOSED_CHISELED_COPPER_POOLS,
 };
 static BLOCKS_WAXED_EXPOSED_COPPER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23912,6 +25016,7 @@ static BLOCKS_WAXED_EXPOSED_COPPER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_EXPOSED_COPPER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_exposed_copper"),
     pools: BLOCKS_WAXED_EXPOSED_COPPER_POOLS,
 };
 static BLOCKS_WAXED_EXPOSED_COPPER_BARS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23931,6 +25036,7 @@ static BLOCKS_WAXED_EXPOSED_COPPER_BARS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_EXPOSED_COPPER_BARS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_exposed_copper_bars"),
     pools: BLOCKS_WAXED_EXPOSED_COPPER_BARS_POOLS,
 };
 static BLOCKS_WAXED_EXPOSED_COPPER_BULB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23950,6 +25056,7 @@ static BLOCKS_WAXED_EXPOSED_COPPER_BULB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_EXPOSED_COPPER_BULB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_exposed_copper_bulb"),
     pools: BLOCKS_WAXED_EXPOSED_COPPER_BULB_POOLS,
 };
 static BLOCKS_WAXED_EXPOSED_COPPER_CHAIN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23969,6 +25076,7 @@ static BLOCKS_WAXED_EXPOSED_COPPER_CHAIN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_EXPOSED_COPPER_CHAIN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_exposed_copper_chain"),
     pools: BLOCKS_WAXED_EXPOSED_COPPER_CHAIN_POOLS,
 };
 static BLOCKS_WAXED_EXPOSED_COPPER_CHEST_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -23988,6 +25096,7 @@ static BLOCKS_WAXED_EXPOSED_COPPER_CHEST_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_EXPOSED_COPPER_CHEST: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_exposed_copper_chest"),
     pools: BLOCKS_WAXED_EXPOSED_COPPER_CHEST_POOLS,
 };
 static BLOCKS_WAXED_EXPOSED_COPPER_DOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24007,6 +25116,7 @@ static BLOCKS_WAXED_EXPOSED_COPPER_DOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_EXPOSED_COPPER_DOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_exposed_copper_door"),
     pools: BLOCKS_WAXED_EXPOSED_COPPER_DOOR_POOLS,
 };
 static BLOCKS_WAXED_EXPOSED_COPPER_GOLEM_STATUE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24026,6 +25136,7 @@ static BLOCKS_WAXED_EXPOSED_COPPER_GOLEM_STATUE_POOLS: &[LootPool] = &[LootPool 
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_EXPOSED_COPPER_GOLEM_STATUE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_exposed_copper_golem_statue"),
     pools: BLOCKS_WAXED_EXPOSED_COPPER_GOLEM_STATUE_POOLS,
 };
 static BLOCKS_WAXED_EXPOSED_COPPER_GRATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24045,6 +25156,7 @@ static BLOCKS_WAXED_EXPOSED_COPPER_GRATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_EXPOSED_COPPER_GRATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_exposed_copper_grate"),
     pools: BLOCKS_WAXED_EXPOSED_COPPER_GRATE_POOLS,
 };
 static BLOCKS_WAXED_EXPOSED_COPPER_LANTERN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24064,6 +25176,7 @@ static BLOCKS_WAXED_EXPOSED_COPPER_LANTERN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_EXPOSED_COPPER_LANTERN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_exposed_copper_lantern"),
     pools: BLOCKS_WAXED_EXPOSED_COPPER_LANTERN_POOLS,
 };
 static BLOCKS_WAXED_EXPOSED_COPPER_TRAPDOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24083,6 +25196,7 @@ static BLOCKS_WAXED_EXPOSED_COPPER_TRAPDOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_EXPOSED_COPPER_TRAPDOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_exposed_copper_trapdoor"),
     pools: BLOCKS_WAXED_EXPOSED_COPPER_TRAPDOOR_POOLS,
 };
 static BLOCKS_WAXED_EXPOSED_CUT_COPPER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24102,6 +25216,7 @@ static BLOCKS_WAXED_EXPOSED_CUT_COPPER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_EXPOSED_CUT_COPPER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_exposed_cut_copper"),
     pools: BLOCKS_WAXED_EXPOSED_CUT_COPPER_POOLS,
 };
 static BLOCKS_WAXED_EXPOSED_CUT_COPPER_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24121,6 +25236,7 @@ static BLOCKS_WAXED_EXPOSED_CUT_COPPER_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_WAXED_EXPOSED_CUT_COPPER_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_exposed_cut_copper_slab"),
     pools: BLOCKS_WAXED_EXPOSED_CUT_COPPER_SLAB_POOLS,
 };
 static BLOCKS_WAXED_EXPOSED_CUT_COPPER_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24140,6 +25256,7 @@ static BLOCKS_WAXED_EXPOSED_CUT_COPPER_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_EXPOSED_CUT_COPPER_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_exposed_cut_copper_stairs"),
     pools: BLOCKS_WAXED_EXPOSED_CUT_COPPER_STAIRS_POOLS,
 };
 static BLOCKS_WAXED_EXPOSED_LIGHTNING_ROD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24159,6 +25276,7 @@ static BLOCKS_WAXED_EXPOSED_LIGHTNING_ROD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_EXPOSED_LIGHTNING_ROD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_exposed_lightning_rod"),
     pools: BLOCKS_WAXED_EXPOSED_LIGHTNING_ROD_POOLS,
 };
 static BLOCKS_WAXED_LIGHTNING_ROD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24178,6 +25296,7 @@ static BLOCKS_WAXED_LIGHTNING_ROD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_LIGHTNING_ROD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_lightning_rod"),
     pools: BLOCKS_WAXED_LIGHTNING_ROD_POOLS,
 };
 static BLOCKS_WAXED_OXIDIZED_CHISELED_COPPER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24197,6 +25316,7 @@ static BLOCKS_WAXED_OXIDIZED_CHISELED_COPPER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_OXIDIZED_CHISELED_COPPER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_oxidized_chiseled_copper"),
     pools: BLOCKS_WAXED_OXIDIZED_CHISELED_COPPER_POOLS,
 };
 static BLOCKS_WAXED_OXIDIZED_COPPER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24216,6 +25336,7 @@ static BLOCKS_WAXED_OXIDIZED_COPPER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_OXIDIZED_COPPER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_oxidized_copper"),
     pools: BLOCKS_WAXED_OXIDIZED_COPPER_POOLS,
 };
 static BLOCKS_WAXED_OXIDIZED_COPPER_BARS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24235,6 +25356,7 @@ static BLOCKS_WAXED_OXIDIZED_COPPER_BARS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_OXIDIZED_COPPER_BARS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_oxidized_copper_bars"),
     pools: BLOCKS_WAXED_OXIDIZED_COPPER_BARS_POOLS,
 };
 static BLOCKS_WAXED_OXIDIZED_COPPER_BULB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24254,6 +25376,7 @@ static BLOCKS_WAXED_OXIDIZED_COPPER_BULB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_OXIDIZED_COPPER_BULB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_oxidized_copper_bulb"),
     pools: BLOCKS_WAXED_OXIDIZED_COPPER_BULB_POOLS,
 };
 static BLOCKS_WAXED_OXIDIZED_COPPER_CHAIN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24273,6 +25396,7 @@ static BLOCKS_WAXED_OXIDIZED_COPPER_CHAIN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_OXIDIZED_COPPER_CHAIN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_oxidized_copper_chain"),
     pools: BLOCKS_WAXED_OXIDIZED_COPPER_CHAIN_POOLS,
 };
 static BLOCKS_WAXED_OXIDIZED_COPPER_CHEST_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24292,6 +25416,7 @@ static BLOCKS_WAXED_OXIDIZED_COPPER_CHEST_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_OXIDIZED_COPPER_CHEST: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_oxidized_copper_chest"),
     pools: BLOCKS_WAXED_OXIDIZED_COPPER_CHEST_POOLS,
 };
 static BLOCKS_WAXED_OXIDIZED_COPPER_DOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24311,6 +25436,7 @@ static BLOCKS_WAXED_OXIDIZED_COPPER_DOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_OXIDIZED_COPPER_DOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_oxidized_copper_door"),
     pools: BLOCKS_WAXED_OXIDIZED_COPPER_DOOR_POOLS,
 };
 static BLOCKS_WAXED_OXIDIZED_COPPER_GOLEM_STATUE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24330,6 +25456,7 @@ static BLOCKS_WAXED_OXIDIZED_COPPER_GOLEM_STATUE_POOLS: &[LootPool] = &[LootPool
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_OXIDIZED_COPPER_GOLEM_STATUE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_oxidized_copper_golem_statue"),
     pools: BLOCKS_WAXED_OXIDIZED_COPPER_GOLEM_STATUE_POOLS,
 };
 static BLOCKS_WAXED_OXIDIZED_COPPER_GRATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24349,6 +25476,7 @@ static BLOCKS_WAXED_OXIDIZED_COPPER_GRATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_OXIDIZED_COPPER_GRATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_oxidized_copper_grate"),
     pools: BLOCKS_WAXED_OXIDIZED_COPPER_GRATE_POOLS,
 };
 static BLOCKS_WAXED_OXIDIZED_COPPER_LANTERN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24368,6 +25496,7 @@ static BLOCKS_WAXED_OXIDIZED_COPPER_LANTERN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_OXIDIZED_COPPER_LANTERN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_oxidized_copper_lantern"),
     pools: BLOCKS_WAXED_OXIDIZED_COPPER_LANTERN_POOLS,
 };
 static BLOCKS_WAXED_OXIDIZED_COPPER_TRAPDOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24387,6 +25516,7 @@ static BLOCKS_WAXED_OXIDIZED_COPPER_TRAPDOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_OXIDIZED_COPPER_TRAPDOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_oxidized_copper_trapdoor"),
     pools: BLOCKS_WAXED_OXIDIZED_COPPER_TRAPDOOR_POOLS,
 };
 static BLOCKS_WAXED_OXIDIZED_CUT_COPPER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24406,6 +25536,7 @@ static BLOCKS_WAXED_OXIDIZED_CUT_COPPER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_OXIDIZED_CUT_COPPER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_oxidized_cut_copper"),
     pools: BLOCKS_WAXED_OXIDIZED_CUT_COPPER_POOLS,
 };
 static BLOCKS_WAXED_OXIDIZED_CUT_COPPER_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24425,6 +25556,7 @@ static BLOCKS_WAXED_OXIDIZED_CUT_COPPER_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_WAXED_OXIDIZED_CUT_COPPER_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_oxidized_cut_copper_slab"),
     pools: BLOCKS_WAXED_OXIDIZED_CUT_COPPER_SLAB_POOLS,
 };
 static BLOCKS_WAXED_OXIDIZED_CUT_COPPER_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24444,6 +25576,7 @@ static BLOCKS_WAXED_OXIDIZED_CUT_COPPER_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_OXIDIZED_CUT_COPPER_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_oxidized_cut_copper_stairs"),
     pools: BLOCKS_WAXED_OXIDIZED_CUT_COPPER_STAIRS_POOLS,
 };
 static BLOCKS_WAXED_OXIDIZED_LIGHTNING_ROD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24463,6 +25596,7 @@ static BLOCKS_WAXED_OXIDIZED_LIGHTNING_ROD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_OXIDIZED_LIGHTNING_ROD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_oxidized_lightning_rod"),
     pools: BLOCKS_WAXED_OXIDIZED_LIGHTNING_ROD_POOLS,
 };
 static BLOCKS_WAXED_WEATHERED_CHISELED_COPPER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24482,6 +25616,7 @@ static BLOCKS_WAXED_WEATHERED_CHISELED_COPPER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_WEATHERED_CHISELED_COPPER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_weathered_chiseled_copper"),
     pools: BLOCKS_WAXED_WEATHERED_CHISELED_COPPER_POOLS,
 };
 static BLOCKS_WAXED_WEATHERED_COPPER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24501,6 +25636,7 @@ static BLOCKS_WAXED_WEATHERED_COPPER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_WEATHERED_COPPER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_weathered_copper"),
     pools: BLOCKS_WAXED_WEATHERED_COPPER_POOLS,
 };
 static BLOCKS_WAXED_WEATHERED_COPPER_BARS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24520,6 +25656,7 @@ static BLOCKS_WAXED_WEATHERED_COPPER_BARS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_WEATHERED_COPPER_BARS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_weathered_copper_bars"),
     pools: BLOCKS_WAXED_WEATHERED_COPPER_BARS_POOLS,
 };
 static BLOCKS_WAXED_WEATHERED_COPPER_BULB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24539,6 +25676,7 @@ static BLOCKS_WAXED_WEATHERED_COPPER_BULB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_WEATHERED_COPPER_BULB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_weathered_copper_bulb"),
     pools: BLOCKS_WAXED_WEATHERED_COPPER_BULB_POOLS,
 };
 static BLOCKS_WAXED_WEATHERED_COPPER_CHAIN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24558,6 +25696,7 @@ static BLOCKS_WAXED_WEATHERED_COPPER_CHAIN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_WEATHERED_COPPER_CHAIN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_weathered_copper_chain"),
     pools: BLOCKS_WAXED_WEATHERED_COPPER_CHAIN_POOLS,
 };
 static BLOCKS_WAXED_WEATHERED_COPPER_CHEST_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24577,6 +25716,7 @@ static BLOCKS_WAXED_WEATHERED_COPPER_CHEST_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_WEATHERED_COPPER_CHEST: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_weathered_copper_chest"),
     pools: BLOCKS_WAXED_WEATHERED_COPPER_CHEST_POOLS,
 };
 static BLOCKS_WAXED_WEATHERED_COPPER_DOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24596,6 +25736,7 @@ static BLOCKS_WAXED_WEATHERED_COPPER_DOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_WEATHERED_COPPER_DOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_weathered_copper_door"),
     pools: BLOCKS_WAXED_WEATHERED_COPPER_DOOR_POOLS,
 };
 static BLOCKS_WAXED_WEATHERED_COPPER_GOLEM_STATUE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24615,6 +25756,7 @@ static BLOCKS_WAXED_WEATHERED_COPPER_GOLEM_STATUE_POOLS: &[LootPool] = &[LootPoo
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_WEATHERED_COPPER_GOLEM_STATUE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_weathered_copper_golem_statue"),
     pools: BLOCKS_WAXED_WEATHERED_COPPER_GOLEM_STATUE_POOLS,
 };
 static BLOCKS_WAXED_WEATHERED_COPPER_GRATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24634,6 +25776,7 @@ static BLOCKS_WAXED_WEATHERED_COPPER_GRATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_WEATHERED_COPPER_GRATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_weathered_copper_grate"),
     pools: BLOCKS_WAXED_WEATHERED_COPPER_GRATE_POOLS,
 };
 static BLOCKS_WAXED_WEATHERED_COPPER_LANTERN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24653,6 +25796,7 @@ static BLOCKS_WAXED_WEATHERED_COPPER_LANTERN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_WEATHERED_COPPER_LANTERN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_weathered_copper_lantern"),
     pools: BLOCKS_WAXED_WEATHERED_COPPER_LANTERN_POOLS,
 };
 static BLOCKS_WAXED_WEATHERED_COPPER_TRAPDOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24672,6 +25816,7 @@ static BLOCKS_WAXED_WEATHERED_COPPER_TRAPDOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_WEATHERED_COPPER_TRAPDOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_weathered_copper_trapdoor"),
     pools: BLOCKS_WAXED_WEATHERED_COPPER_TRAPDOOR_POOLS,
 };
 static BLOCKS_WAXED_WEATHERED_CUT_COPPER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24691,6 +25836,7 @@ static BLOCKS_WAXED_WEATHERED_CUT_COPPER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_WEATHERED_CUT_COPPER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_weathered_cut_copper"),
     pools: BLOCKS_WAXED_WEATHERED_CUT_COPPER_POOLS,
 };
 static BLOCKS_WAXED_WEATHERED_CUT_COPPER_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24710,6 +25856,7 @@ static BLOCKS_WAXED_WEATHERED_CUT_COPPER_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_WAXED_WEATHERED_CUT_COPPER_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_weathered_cut_copper_slab"),
     pools: BLOCKS_WAXED_WEATHERED_CUT_COPPER_SLAB_POOLS,
 };
 static BLOCKS_WAXED_WEATHERED_CUT_COPPER_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24729,6 +25876,7 @@ static BLOCKS_WAXED_WEATHERED_CUT_COPPER_STAIRS_POOLS: &[LootPool] = &[LootPool 
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_WEATHERED_CUT_COPPER_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_weathered_cut_copper_stairs"),
     pools: BLOCKS_WAXED_WEATHERED_CUT_COPPER_STAIRS_POOLS,
 };
 static BLOCKS_WAXED_WEATHERED_LIGHTNING_ROD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24748,6 +25896,7 @@ static BLOCKS_WAXED_WEATHERED_LIGHTNING_ROD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WAXED_WEATHERED_LIGHTNING_ROD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/waxed_weathered_lightning_rod"),
     pools: BLOCKS_WAXED_WEATHERED_LIGHTNING_ROD_POOLS,
 };
 static BLOCKS_WEATHERED_CHISELED_COPPER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24767,6 +25916,7 @@ static BLOCKS_WEATHERED_CHISELED_COPPER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WEATHERED_CHISELED_COPPER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/weathered_chiseled_copper"),
     pools: BLOCKS_WEATHERED_CHISELED_COPPER_POOLS,
 };
 static BLOCKS_WEATHERED_COPPER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24786,6 +25936,7 @@ static BLOCKS_WEATHERED_COPPER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WEATHERED_COPPER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/weathered_copper"),
     pools: BLOCKS_WEATHERED_COPPER_POOLS,
 };
 static BLOCKS_WEATHERED_COPPER_BARS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24805,6 +25956,7 @@ static BLOCKS_WEATHERED_COPPER_BARS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WEATHERED_COPPER_BARS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/weathered_copper_bars"),
     pools: BLOCKS_WEATHERED_COPPER_BARS_POOLS,
 };
 static BLOCKS_WEATHERED_COPPER_BULB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24824,6 +25976,7 @@ static BLOCKS_WEATHERED_COPPER_BULB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WEATHERED_COPPER_BULB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/weathered_copper_bulb"),
     pools: BLOCKS_WEATHERED_COPPER_BULB_POOLS,
 };
 static BLOCKS_WEATHERED_COPPER_CHAIN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24843,6 +25996,7 @@ static BLOCKS_WEATHERED_COPPER_CHAIN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WEATHERED_COPPER_CHAIN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/weathered_copper_chain"),
     pools: BLOCKS_WEATHERED_COPPER_CHAIN_POOLS,
 };
 static BLOCKS_WEATHERED_COPPER_CHEST_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24862,6 +26016,7 @@ static BLOCKS_WEATHERED_COPPER_CHEST_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WEATHERED_COPPER_CHEST: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/weathered_copper_chest"),
     pools: BLOCKS_WEATHERED_COPPER_CHEST_POOLS,
 };
 static BLOCKS_WEATHERED_COPPER_DOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24881,6 +26036,7 @@ static BLOCKS_WEATHERED_COPPER_DOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WEATHERED_COPPER_DOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/weathered_copper_door"),
     pools: BLOCKS_WEATHERED_COPPER_DOOR_POOLS,
 };
 static BLOCKS_WEATHERED_COPPER_GOLEM_STATUE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24900,6 +26056,7 @@ static BLOCKS_WEATHERED_COPPER_GOLEM_STATUE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WEATHERED_COPPER_GOLEM_STATUE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/weathered_copper_golem_statue"),
     pools: BLOCKS_WEATHERED_COPPER_GOLEM_STATUE_POOLS,
 };
 static BLOCKS_WEATHERED_COPPER_GRATE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24919,6 +26076,7 @@ static BLOCKS_WEATHERED_COPPER_GRATE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WEATHERED_COPPER_GRATE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/weathered_copper_grate"),
     pools: BLOCKS_WEATHERED_COPPER_GRATE_POOLS,
 };
 static BLOCKS_WEATHERED_COPPER_LANTERN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24938,6 +26096,7 @@ static BLOCKS_WEATHERED_COPPER_LANTERN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WEATHERED_COPPER_LANTERN: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/weathered_copper_lantern"),
     pools: BLOCKS_WEATHERED_COPPER_LANTERN_POOLS,
 };
 static BLOCKS_WEATHERED_COPPER_TRAPDOOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24957,6 +26116,7 @@ static BLOCKS_WEATHERED_COPPER_TRAPDOOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WEATHERED_COPPER_TRAPDOOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/weathered_copper_trapdoor"),
     pools: BLOCKS_WEATHERED_COPPER_TRAPDOOR_POOLS,
 };
 static BLOCKS_WEATHERED_CUT_COPPER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24976,6 +26136,7 @@ static BLOCKS_WEATHERED_CUT_COPPER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WEATHERED_CUT_COPPER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/weathered_cut_copper"),
     pools: BLOCKS_WEATHERED_CUT_COPPER_POOLS,
 };
 static BLOCKS_WEATHERED_CUT_COPPER_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -24995,6 +26156,7 @@ static BLOCKS_WEATHERED_CUT_COPPER_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_WEATHERED_CUT_COPPER_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/weathered_cut_copper_slab"),
     pools: BLOCKS_WEATHERED_CUT_COPPER_SLAB_POOLS,
 };
 static BLOCKS_WEATHERED_CUT_COPPER_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25014,6 +26176,7 @@ static BLOCKS_WEATHERED_CUT_COPPER_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WEATHERED_CUT_COPPER_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/weathered_cut_copper_stairs"),
     pools: BLOCKS_WEATHERED_CUT_COPPER_STAIRS_POOLS,
 };
 static BLOCKS_WEATHERED_LIGHTNING_ROD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25033,6 +26196,7 @@ static BLOCKS_WEATHERED_LIGHTNING_ROD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WEATHERED_LIGHTNING_ROD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/weathered_lightning_rod"),
     pools: BLOCKS_WEATHERED_LIGHTNING_ROD_POOLS,
 };
 static BLOCKS_WEEPING_VINES_POOL0_ENTRIES: &[LootEntry] = &[
@@ -25068,6 +26232,7 @@ static BLOCKS_WEEPING_VINES_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_WEEPING_VINES: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/weeping_vines"),
     pools: BLOCKS_WEEPING_VINES_POOLS,
 };
 static BLOCKS_WEEPING_VINES_PLANT_POOL0_ENTRIES: &[LootEntry] = &[
@@ -25103,6 +26268,7 @@ static BLOCKS_WEEPING_VINES_PLANT_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_WEEPING_VINES_PLANT: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/weeping_vines_plant"),
     pools: BLOCKS_WEEPING_VINES_PLANT_POOLS,
 };
 static BLOCKS_WET_SPONGE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25122,6 +26288,7 @@ static BLOCKS_WET_SPONGE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WET_SPONGE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/wet_sponge"),
     pools: BLOCKS_WET_SPONGE_POOLS,
 };
 static BLOCKS_WHEAT_POOL0_ENTRIES: &[LootEntry] = &[
@@ -25173,6 +26340,7 @@ static BLOCKS_WHEAT_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_WHEAT: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/wheat"),
     pools: BLOCKS_WHEAT_POOLS,
 };
 static BLOCKS_WHITE_BANNER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25192,6 +26360,7 @@ static BLOCKS_WHITE_BANNER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WHITE_BANNER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/white_banner"),
     pools: BLOCKS_WHITE_BANNER_POOLS,
 };
 static BLOCKS_WHITE_BED_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25211,6 +26380,7 @@ static BLOCKS_WHITE_BED_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WHITE_BED: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/white_bed"),
     pools: BLOCKS_WHITE_BED_POOLS,
 };
 static BLOCKS_WHITE_CANDLE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25230,6 +26400,7 @@ static BLOCKS_WHITE_CANDLE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_WHITE_CANDLE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/white_candle"),
     pools: BLOCKS_WHITE_CANDLE_POOLS,
 };
 static BLOCKS_WHITE_CANDLE_CAKE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25249,6 +26420,7 @@ static BLOCKS_WHITE_CANDLE_CAKE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_WHITE_CANDLE_CAKE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/white_candle_cake"),
     pools: BLOCKS_WHITE_CANDLE_CAKE_POOLS,
 };
 static BLOCKS_WHITE_CARPET_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25268,6 +26440,7 @@ static BLOCKS_WHITE_CARPET_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WHITE_CARPET: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/white_carpet"),
     pools: BLOCKS_WHITE_CARPET_POOLS,
 };
 static BLOCKS_WHITE_CONCRETE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25287,6 +26460,7 @@ static BLOCKS_WHITE_CONCRETE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WHITE_CONCRETE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/white_concrete"),
     pools: BLOCKS_WHITE_CONCRETE_POOLS,
 };
 static BLOCKS_WHITE_CONCRETE_POWDER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25306,6 +26480,7 @@ static BLOCKS_WHITE_CONCRETE_POWDER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WHITE_CONCRETE_POWDER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/white_concrete_powder"),
     pools: BLOCKS_WHITE_CONCRETE_POWDER_POOLS,
 };
 static BLOCKS_WHITE_CONCRETE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25325,6 +26500,7 @@ static BLOCKS_WHITE_CONCRETE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_WHITE_CONCRETE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/white_concrete_slab"),
     pools: BLOCKS_WHITE_CONCRETE_SLAB_POOLS,
 };
 static BLOCKS_WHITE_CONCRETE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25344,6 +26520,7 @@ static BLOCKS_WHITE_CONCRETE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WHITE_CONCRETE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/white_concrete_stairs"),
     pools: BLOCKS_WHITE_CONCRETE_STAIRS_POOLS,
 };
 static BLOCKS_WHITE_GLAZED_TERRACOTTA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25363,6 +26540,7 @@ static BLOCKS_WHITE_GLAZED_TERRACOTTA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WHITE_GLAZED_TERRACOTTA: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/white_glazed_terracotta"),
     pools: BLOCKS_WHITE_GLAZED_TERRACOTTA_POOLS,
 };
 static BLOCKS_WHITE_SHULKER_BOX_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25382,6 +26560,7 @@ static BLOCKS_WHITE_SHULKER_BOX_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_WHITE_SHULKER_BOX: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/white_shulker_box"),
     pools: BLOCKS_WHITE_SHULKER_BOX_POOLS,
 };
 static BLOCKS_WHITE_STAINED_GLASS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25401,6 +26580,7 @@ static BLOCKS_WHITE_STAINED_GLASS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_WHITE_STAINED_GLASS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/white_stained_glass"),
     pools: BLOCKS_WHITE_STAINED_GLASS_POOLS,
 };
 static BLOCKS_WHITE_STAINED_GLASS_PANE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25420,6 +26600,7 @@ static BLOCKS_WHITE_STAINED_GLASS_PANE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_WHITE_STAINED_GLASS_PANE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/white_stained_glass_pane"),
     pools: BLOCKS_WHITE_STAINED_GLASS_PANE_POOLS,
 };
 static BLOCKS_WHITE_TERRACOTTA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25439,6 +26620,7 @@ static BLOCKS_WHITE_TERRACOTTA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WHITE_TERRACOTTA: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/white_terracotta"),
     pools: BLOCKS_WHITE_TERRACOTTA_POOLS,
 };
 static BLOCKS_WHITE_TULIP_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25458,6 +26640,7 @@ static BLOCKS_WHITE_TULIP_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WHITE_TULIP: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/white_tulip"),
     pools: BLOCKS_WHITE_TULIP_POOLS,
 };
 static BLOCKS_WHITE_WOOL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25477,6 +26660,7 @@ static BLOCKS_WHITE_WOOL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WHITE_WOOL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/white_wool"),
     pools: BLOCKS_WHITE_WOOL_POOLS,
 };
 static BLOCKS_WHITE_WOOL_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25496,6 +26680,7 @@ static BLOCKS_WHITE_WOOL_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_WHITE_WOOL_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/white_wool_slab"),
     pools: BLOCKS_WHITE_WOOL_SLAB_POOLS,
 };
 static BLOCKS_WHITE_WOOL_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25515,6 +26700,7 @@ static BLOCKS_WHITE_WOOL_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WHITE_WOOL_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/white_wool_stairs"),
     pools: BLOCKS_WHITE_WOOL_STAIRS_POOLS,
 };
 static BLOCKS_WILDFLOWERS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25534,6 +26720,7 @@ static BLOCKS_WILDFLOWERS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_WILDFLOWERS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/wildflowers"),
     pools: BLOCKS_WILDFLOWERS_POOLS,
 };
 static BLOCKS_WITHER_ROSE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25553,6 +26740,7 @@ static BLOCKS_WITHER_ROSE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_WITHER_ROSE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/wither_rose"),
     pools: BLOCKS_WITHER_ROSE_POOLS,
 };
 static BLOCKS_WITHER_SKELETON_SKULL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25572,6 +26760,7 @@ static BLOCKS_WITHER_SKELETON_SKULL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_WITHER_SKELETON_SKULL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/wither_skeleton_skull"),
     pools: BLOCKS_WITHER_SKELETON_SKULL_POOLS,
 };
 static BLOCKS_YELLOW_BANNER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25591,6 +26780,7 @@ static BLOCKS_YELLOW_BANNER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_YELLOW_BANNER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/yellow_banner"),
     pools: BLOCKS_YELLOW_BANNER_POOLS,
 };
 static BLOCKS_YELLOW_BED_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25610,6 +26800,7 @@ static BLOCKS_YELLOW_BED_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_YELLOW_BED: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/yellow_bed"),
     pools: BLOCKS_YELLOW_BED_POOLS,
 };
 static BLOCKS_YELLOW_CANDLE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25629,6 +26820,7 @@ static BLOCKS_YELLOW_CANDLE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_YELLOW_CANDLE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/yellow_candle"),
     pools: BLOCKS_YELLOW_CANDLE_POOLS,
 };
 static BLOCKS_YELLOW_CANDLE_CAKE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25648,6 +26840,7 @@ static BLOCKS_YELLOW_CANDLE_CAKE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_YELLOW_CANDLE_CAKE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/yellow_candle_cake"),
     pools: BLOCKS_YELLOW_CANDLE_CAKE_POOLS,
 };
 static BLOCKS_YELLOW_CARPET_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25667,6 +26860,7 @@ static BLOCKS_YELLOW_CARPET_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_YELLOW_CARPET: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/yellow_carpet"),
     pools: BLOCKS_YELLOW_CARPET_POOLS,
 };
 static BLOCKS_YELLOW_CONCRETE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25686,6 +26880,7 @@ static BLOCKS_YELLOW_CONCRETE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_YELLOW_CONCRETE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/yellow_concrete"),
     pools: BLOCKS_YELLOW_CONCRETE_POOLS,
 };
 static BLOCKS_YELLOW_CONCRETE_POWDER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25705,6 +26900,7 @@ static BLOCKS_YELLOW_CONCRETE_POWDER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_YELLOW_CONCRETE_POWDER: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/yellow_concrete_powder"),
     pools: BLOCKS_YELLOW_CONCRETE_POWDER_POOLS,
 };
 static BLOCKS_YELLOW_CONCRETE_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25724,6 +26920,7 @@ static BLOCKS_YELLOW_CONCRETE_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_YELLOW_CONCRETE_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/yellow_concrete_slab"),
     pools: BLOCKS_YELLOW_CONCRETE_SLAB_POOLS,
 };
 static BLOCKS_YELLOW_CONCRETE_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25743,6 +26940,7 @@ static BLOCKS_YELLOW_CONCRETE_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_YELLOW_CONCRETE_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/yellow_concrete_stairs"),
     pools: BLOCKS_YELLOW_CONCRETE_STAIRS_POOLS,
 };
 static BLOCKS_YELLOW_GLAZED_TERRACOTTA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25762,6 +26960,7 @@ static BLOCKS_YELLOW_GLAZED_TERRACOTTA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_YELLOW_GLAZED_TERRACOTTA: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/yellow_glazed_terracotta"),
     pools: BLOCKS_YELLOW_GLAZED_TERRACOTTA_POOLS,
 };
 static BLOCKS_YELLOW_POPLAR_LEAVES_POOL0_ENTRIES: &[LootEntry] = &[
@@ -25820,6 +27019,7 @@ static BLOCKS_YELLOW_POPLAR_LEAVES_POOLS: &[LootPool] = &[
     },
 ];
 pub static BLOCKS_YELLOW_POPLAR_LEAVES: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/yellow_poplar_leaves"),
     pools: BLOCKS_YELLOW_POPLAR_LEAVES_POOLS,
 };
 static BLOCKS_YELLOW_SHULKER_BOX_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25839,6 +27039,7 @@ static BLOCKS_YELLOW_SHULKER_BOX_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_YELLOW_SHULKER_BOX: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/yellow_shulker_box"),
     pools: BLOCKS_YELLOW_SHULKER_BOX_POOLS,
 };
 static BLOCKS_YELLOW_STAINED_GLASS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25858,6 +27059,7 @@ static BLOCKS_YELLOW_STAINED_GLASS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_YELLOW_STAINED_GLASS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/yellow_stained_glass"),
     pools: BLOCKS_YELLOW_STAINED_GLASS_POOLS,
 };
 static BLOCKS_YELLOW_STAINED_GLASS_PANE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25877,6 +27079,7 @@ static BLOCKS_YELLOW_STAINED_GLASS_PANE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SilkTouch,
 }];
 pub static BLOCKS_YELLOW_STAINED_GLASS_PANE: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/yellow_stained_glass_pane"),
     pools: BLOCKS_YELLOW_STAINED_GLASS_PANE_POOLS,
 };
 static BLOCKS_YELLOW_TERRACOTTA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25896,6 +27099,7 @@ static BLOCKS_YELLOW_TERRACOTTA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_YELLOW_TERRACOTTA: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/yellow_terracotta"),
     pools: BLOCKS_YELLOW_TERRACOTTA_POOLS,
 };
 static BLOCKS_YELLOW_WOOL_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25915,6 +27119,7 @@ static BLOCKS_YELLOW_WOOL_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_YELLOW_WOOL: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/yellow_wool"),
     pools: BLOCKS_YELLOW_WOOL_POOLS,
 };
 static BLOCKS_YELLOW_WOOL_SLAB_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25934,6 +27139,7 @@ static BLOCKS_YELLOW_WOOL_SLAB_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_YELLOW_WOOL_SLAB: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/yellow_wool_slab"),
     pools: BLOCKS_YELLOW_WOOL_SLAB_POOLS,
 };
 static BLOCKS_YELLOW_WOOL_STAIRS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25953,6 +27159,7 @@ static BLOCKS_YELLOW_WOOL_STAIRS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::SurvivesExplosion,
 }];
 pub static BLOCKS_YELLOW_WOOL_STAIRS: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/yellow_wool_stairs"),
     pools: BLOCKS_YELLOW_WOOL_STAIRS_POOLS,
 };
 static BLOCKS_ZOMBIE_HEAD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25972,6 +27179,7 @@ static BLOCKS_ZOMBIE_HEAD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BLOCKS_ZOMBIE_HEAD: LootTable = LootTable {
+    random_sequence: Some("minecraft:blocks/zombie_head"),
     pools: BLOCKS_ZOMBIE_HEAD_POOLS,
 };
 static BRUSH_ARMADILLO_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -25991,6 +27199,7 @@ static BRUSH_ARMADILLO_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static BRUSH_ARMADILLO: LootTable = LootTable {
+    random_sequence: Some("minecraft:brush/armadillo"),
     pools: BRUSH_ARMADILLO_POOLS,
 };
 static CARVE_PUMPKIN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -26010,6 +27219,7 @@ static CARVE_PUMPKIN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static CARVE_PUMPKIN: LootTable = LootTable {
+    random_sequence: Some("minecraft:carve/pumpkin"),
     pools: CARVE_PUMPKIN_POOLS,
 };
 static CHARGED_CREEPER_CREEPER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -26029,6 +27239,7 @@ static CHARGED_CREEPER_CREEPER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static CHARGED_CREEPER_CREEPER: LootTable = LootTable {
+    random_sequence: Some("minecraft:charged_creeper/creeper"),
     pools: CHARGED_CREEPER_CREEPER_POOLS,
 };
 static CHARGED_CREEPER_PIGLIN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -26048,6 +27259,7 @@ static CHARGED_CREEPER_PIGLIN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static CHARGED_CREEPER_PIGLIN: LootTable = LootTable {
+    random_sequence: Some("minecraft:charged_creeper/piglin"),
     pools: CHARGED_CREEPER_PIGLIN_POOLS,
 };
 static CHARGED_CREEPER_ROOT_POOL0_ENTRIES: &[LootEntry] = &[
@@ -26105,6 +27317,7 @@ static CHARGED_CREEPER_ROOT_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static CHARGED_CREEPER_ROOT: LootTable = LootTable {
+    random_sequence: Some("minecraft:charged_creeper/root"),
     pools: CHARGED_CREEPER_ROOT_POOLS,
 };
 static CHARGED_CREEPER_SKELETON_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -26124,6 +27337,7 @@ static CHARGED_CREEPER_SKELETON_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static CHARGED_CREEPER_SKELETON: LootTable = LootTable {
+    random_sequence: Some("minecraft:charged_creeper/skeleton"),
     pools: CHARGED_CREEPER_SKELETON_POOLS,
 };
 static CHARGED_CREEPER_WITHER_SKELETON_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -26143,6 +27357,7 @@ static CHARGED_CREEPER_WITHER_SKELETON_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static CHARGED_CREEPER_WITHER_SKELETON: LootTable = LootTable {
+    random_sequence: Some("minecraft:charged_creeper/wither_skeleton"),
     pools: CHARGED_CREEPER_WITHER_SKELETON_POOLS,
 };
 static CHARGED_CREEPER_ZOMBIE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -26162,6 +27377,7 @@ static CHARGED_CREEPER_ZOMBIE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static CHARGED_CREEPER_ZOMBIE: LootTable = LootTable {
+    random_sequence: Some("minecraft:charged_creeper/zombie"),
     pools: CHARGED_CREEPER_ZOMBIE_POOLS,
 };
 static CHESTS_ABANDONED_CAMP_COMMON_CHEST_POOL0_ENTRIES: &[LootEntry] = &[
@@ -26500,6 +27716,7 @@ static CHESTS_ABANDONED_CAMP_COMMON_CHEST_POOLS: &[LootPool] = &[
     },
 ];
 pub static CHESTS_ABANDONED_CAMP_COMMON_CHEST: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/abandoned_camp_common_chest"),
     pools: CHESTS_ABANDONED_CAMP_COMMON_CHEST_POOLS,
 };
 static CHESTS_ABANDONED_CAMP_SECRET_CHEST_POOL0_ENTRIES: &[LootEntry] = &[
@@ -26721,6 +27938,7 @@ static CHESTS_ABANDONED_CAMP_SECRET_CHEST_POOLS: &[LootPool] = &[
     },
 ];
 pub static CHESTS_ABANDONED_CAMP_SECRET_CHEST: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/abandoned_camp_secret_chest"),
     pools: CHESTS_ABANDONED_CAMP_SECRET_CHEST_POOLS,
 };
 static CHESTS_ABANDONED_MINESHAFT_POOL0_ENTRIES: &[LootEntry] = &[
@@ -26951,6 +28169,7 @@ static CHESTS_ABANDONED_MINESHAFT_POOLS: &[LootPool] = &[
     },
 ];
 pub static CHESTS_ABANDONED_MINESHAFT: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/abandoned_mineshaft"),
     pools: CHESTS_ABANDONED_MINESHAFT_POOLS,
 };
 static CHESTS_ANCIENT_CITY_POOL0_ENTRIES: &[LootEntry] = &[
@@ -27235,6 +28454,7 @@ static CHESTS_ANCIENT_CITY_POOLS: &[LootPool] = &[
     },
 ];
 pub static CHESTS_ANCIENT_CITY: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/ancient_city"),
     pools: CHESTS_ANCIENT_CITY_POOLS,
 };
 static CHESTS_ANCIENT_CITY_ICE_BOX_POOL0_ENTRIES: &[LootEntry] = &[
@@ -27292,6 +28512,7 @@ static CHESTS_ANCIENT_CITY_ICE_BOX_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static CHESTS_ANCIENT_CITY_ICE_BOX: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/ancient_city_ice_box"),
     pools: CHESTS_ANCIENT_CITY_ICE_BOX_POOLS,
 };
 static CHESTS_BASTION_BRIDGE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -27525,6 +28746,7 @@ static CHESTS_BASTION_BRIDGE_POOLS: &[LootPool] = &[
     },
 ];
 pub static CHESTS_BASTION_BRIDGE: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/bastion_bridge"),
     pools: CHESTS_BASTION_BRIDGE_POOLS,
 };
 static CHESTS_BASTION_HOGLIN_STABLE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -27787,6 +29009,7 @@ static CHESTS_BASTION_HOGLIN_STABLE_POOLS: &[LootPool] = &[
     },
 ];
 pub static CHESTS_BASTION_HOGLIN_STABLE: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/bastion_hoglin_stable"),
     pools: CHESTS_BASTION_HOGLIN_STABLE_POOLS,
 };
 static CHESTS_BASTION_OTHER_POOL0_ENTRIES: &[LootEntry] = &[
@@ -28166,6 +29389,7 @@ static CHESTS_BASTION_OTHER_POOLS: &[LootPool] = &[
     },
 ];
 pub static CHESTS_BASTION_OTHER: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/bastion_other"),
     pools: CHESTS_BASTION_OTHER_POOLS,
 };
 static CHESTS_BASTION_TREASURE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -28464,6 +29688,7 @@ static CHESTS_BASTION_TREASURE_POOLS: &[LootPool] = &[
     },
 ];
 pub static CHESTS_BASTION_TREASURE: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/bastion_treasure"),
     pools: CHESTS_BASTION_TREASURE_POOLS,
 };
 static CHESTS_BURIED_TREASURE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -28681,6 +29906,7 @@ static CHESTS_BURIED_TREASURE_POOLS: &[LootPool] = &[
     },
 ];
 pub static CHESTS_BURIED_TREASURE: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/buried_treasure"),
     pools: CHESTS_BURIED_TREASURE_POOLS,
 };
 static CHESTS_DESERT_PYRAMID_POOL0_ENTRIES: &[LootEntry] = &[
@@ -28900,6 +30126,7 @@ static CHESTS_DESERT_PYRAMID_POOLS: &[LootPool] = &[
     },
 ];
 pub static CHESTS_DESERT_PYRAMID: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/desert_pyramid"),
     pools: CHESTS_DESERT_PYRAMID_POOLS,
 };
 static CHESTS_END_CITY_TREASURE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -29155,6 +30382,7 @@ static CHESTS_END_CITY_TREASURE_POOLS: &[LootPool] = &[
     },
 ];
 pub static CHESTS_END_CITY_TREASURE: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/end_city_treasure"),
     pools: CHESTS_END_CITY_TREASURE_POOLS,
 };
 static CHESTS_IGLOO_CHEST_POOL0_ENTRIES: &[LootEntry] = &[
@@ -29248,6 +30476,7 @@ static CHESTS_IGLOO_CHEST_POOLS: &[LootPool] = &[
     },
 ];
 pub static CHESTS_IGLOO_CHEST: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/igloo_chest"),
     pools: CHESTS_IGLOO_CHEST_POOLS,
 };
 static CHESTS_JUNGLE_TEMPLE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -29395,6 +30624,7 @@ static CHESTS_JUNGLE_TEMPLE_POOLS: &[LootPool] = &[
     },
 ];
 pub static CHESTS_JUNGLE_TEMPLE: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/jungle_temple"),
     pools: CHESTS_JUNGLE_TEMPLE_POOLS,
 };
 static CHESTS_JUNGLE_TEMPLE_DISPENSER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -29414,6 +30644,7 @@ static CHESTS_JUNGLE_TEMPLE_DISPENSER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static CHESTS_JUNGLE_TEMPLE_DISPENSER: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/jungle_temple_dispenser"),
     pools: CHESTS_JUNGLE_TEMPLE_DISPENSER_POOLS,
 };
 static CHESTS_NETHER_BRIDGE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -29561,6 +30792,7 @@ static CHESTS_NETHER_BRIDGE_POOLS: &[LootPool] = &[
     },
 ];
 pub static CHESTS_NETHER_BRIDGE: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/nether_bridge"),
     pools: CHESTS_NETHER_BRIDGE_POOLS,
 };
 static CHESTS_PILLAGER_OUTPOST_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -29729,6 +30961,7 @@ static CHESTS_PILLAGER_OUTPOST_POOLS: &[LootPool] = &[
     },
 ];
 pub static CHESTS_PILLAGER_OUTPOST: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/pillager_outpost"),
     pools: CHESTS_PILLAGER_OUTPOST_POOLS,
 };
 static CHESTS_RUINED_PORTAL_POOL0_ENTRIES: &[LootEntry] = &[
@@ -29984,6 +31217,7 @@ static CHESTS_RUINED_PORTAL_POOLS: &[LootPool] = &[
     },
 ];
 pub static CHESTS_RUINED_PORTAL: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/ruined_portal"),
     pools: CHESTS_RUINED_PORTAL_POOLS,
 };
 static CHESTS_SHIPWRECK_MAP_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -30129,6 +31363,7 @@ static CHESTS_SHIPWRECK_MAP_POOLS: &[LootPool] = &[
     },
 ];
 pub static CHESTS_SHIPWRECK_MAP: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/shipwreck_map"),
     pools: CHESTS_SHIPWRECK_MAP_POOLS,
 };
 static CHESTS_SHIPWRECK_SUPPLY_POOL0_ENTRIES: &[LootEntry] = &[
@@ -30357,6 +31592,7 @@ static CHESTS_SHIPWRECK_SUPPLY_POOLS: &[LootPool] = &[
     },
 ];
 pub static CHESTS_SHIPWRECK_SUPPLY: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/shipwreck_supply"),
     pools: CHESTS_SHIPWRECK_SUPPLY_POOLS,
 };
 static CHESTS_SHIPWRECK_TREASURE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -30513,6 +31749,7 @@ static CHESTS_SHIPWRECK_TREASURE_POOLS: &[LootPool] = &[
     },
 ];
 pub static CHESTS_SHIPWRECK_TREASURE: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/shipwreck_treasure"),
     pools: CHESTS_SHIPWRECK_TREASURE_POOLS,
 };
 static CHESTS_SIMPLE_DUNGEON_POOL0_ENTRIES: &[LootEntry] = &[
@@ -30779,6 +32016,7 @@ static CHESTS_SIMPLE_DUNGEON_POOLS: &[LootPool] = &[
     },
 ];
 pub static CHESTS_SIMPLE_DUNGEON: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/simple_dungeon"),
     pools: CHESTS_SIMPLE_DUNGEON_POOLS,
 };
 static CHESTS_SPAWN_BONUS_CHEST_POOL0_ENTRIES: &[LootEntry] = &[
@@ -30964,6 +32202,7 @@ static CHESTS_SPAWN_BONUS_CHEST_POOLS: &[LootPool] = &[
     },
 ];
 pub static CHESTS_SPAWN_BONUS_CHEST: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/spawn_bonus_chest"),
     pools: CHESTS_SPAWN_BONUS_CHEST_POOLS,
 };
 static CHESTS_STRONGHOLD_CORRIDOR_POOL0_ENTRIES: &[LootEntry] = &[
@@ -31183,6 +32422,7 @@ static CHESTS_STRONGHOLD_CORRIDOR_POOLS: &[LootPool] = &[
     },
 ];
 pub static CHESTS_STRONGHOLD_CORRIDOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/stronghold_corridor"),
     pools: CHESTS_STRONGHOLD_CORRIDOR_POOLS,
 };
 static CHESTS_STRONGHOLD_CROSSING_POOL0_ENTRIES: &[LootEntry] = &[
@@ -31267,6 +32507,7 @@ static CHESTS_STRONGHOLD_CROSSING_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static CHESTS_STRONGHOLD_CROSSING: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/stronghold_crossing"),
     pools: CHESTS_STRONGHOLD_CROSSING_POOLS,
 };
 static CHESTS_STRONGHOLD_LIBRARY_POOL0_ENTRIES: &[LootEntry] = &[
@@ -31342,6 +32583,7 @@ static CHESTS_STRONGHOLD_LIBRARY_POOLS: &[LootPool] = &[
     },
 ];
 pub static CHESTS_STRONGHOLD_LIBRARY: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/stronghold_library"),
     pools: CHESTS_STRONGHOLD_LIBRARY_POOLS,
 };
 static CHESTS_TRIAL_CHAMBERS_CORRIDOR_POOL0_ENTRIES: &[LootEntry] = &[
@@ -31444,6 +32686,7 @@ static CHESTS_TRIAL_CHAMBERS_CORRIDOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static CHESTS_TRIAL_CHAMBERS_CORRIDOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/trial_chambers/corridor"),
     pools: CHESTS_TRIAL_CHAMBERS_CORRIDOR_POOLS,
 };
 static CHESTS_TRIAL_CHAMBERS_ENTRANCE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -31501,6 +32744,7 @@ static CHESTS_TRIAL_CHAMBERS_ENTRANCE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static CHESTS_TRIAL_CHAMBERS_ENTRANCE: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/trial_chambers/entrance"),
     pools: CHESTS_TRIAL_CHAMBERS_ENTRANCE_POOLS,
 };
 static CHESTS_TRIAL_CHAMBERS_INTERSECTION_POOL0_ENTRIES: &[LootEntry] = &[
@@ -31585,6 +32829,7 @@ static CHESTS_TRIAL_CHAMBERS_INTERSECTION_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static CHESTS_TRIAL_CHAMBERS_INTERSECTION: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/trial_chambers/intersection"),
     pools: CHESTS_TRIAL_CHAMBERS_INTERSECTION_POOLS,
 };
 static CHESTS_TRIAL_CHAMBERS_INTERSECTION_BARREL_POOL0_ENTRIES: &[LootEntry] = &[
@@ -31678,6 +32923,7 @@ static CHESTS_TRIAL_CHAMBERS_INTERSECTION_BARREL_POOLS: &[LootPool] = &[LootPool
     condition: LootCondition::None,
 }];
 pub static CHESTS_TRIAL_CHAMBERS_INTERSECTION_BARREL: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/trial_chambers/intersection_barrel"),
     pools: CHESTS_TRIAL_CHAMBERS_INTERSECTION_BARREL_POOLS,
 };
 static CHESTS_TRIAL_CHAMBERS_REWARD_POOL0_ENTRIES: &[LootEntry] = &[
@@ -32016,6 +33262,7 @@ static CHESTS_TRIAL_CHAMBERS_REWARD_POOLS: &[LootPool] = &[
     },
 ];
 pub static CHESTS_TRIAL_CHAMBERS_REWARD: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/trial_chambers/reward"),
     pools: CHESTS_TRIAL_CHAMBERS_REWARD_POOLS,
 };
 static CHESTS_TRIAL_CHAMBERS_REWARD_COMMON_POOL0_ENTRIES: &[LootEntry] = &[
@@ -32109,6 +33356,7 @@ static CHESTS_TRIAL_CHAMBERS_REWARD_COMMON_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static CHESTS_TRIAL_CHAMBERS_REWARD_COMMON: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/trial_chambers/reward_common"),
     pools: CHESTS_TRIAL_CHAMBERS_REWARD_COMMON_POOLS,
 };
 static CHESTS_TRIAL_CHAMBERS_REWARD_OMINOUS_POOL0_ENTRIES: &[LootEntry] = &[
@@ -32366,6 +33614,7 @@ static CHESTS_TRIAL_CHAMBERS_REWARD_OMINOUS_POOLS: &[LootPool] = &[
     },
 ];
 pub static CHESTS_TRIAL_CHAMBERS_REWARD_OMINOUS: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/trial_chambers/reward_ominous"),
     pools: CHESTS_TRIAL_CHAMBERS_REWARD_OMINOUS_POOLS,
 };
 static CHESTS_TRIAL_CHAMBERS_REWARD_OMINOUS_COMMON_POOL0_ENTRIES: &[LootEntry] = &[
@@ -32423,6 +33672,7 @@ static CHESTS_TRIAL_CHAMBERS_REWARD_OMINOUS_COMMON_POOLS: &[LootPool] = &[LootPo
     condition: LootCondition::None,
 }];
 pub static CHESTS_TRIAL_CHAMBERS_REWARD_OMINOUS_COMMON: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/trial_chambers/reward_ominous_common"),
     pools: CHESTS_TRIAL_CHAMBERS_REWARD_OMINOUS_COMMON_POOLS,
 };
 static CHESTS_TRIAL_CHAMBERS_REWARD_OMINOUS_RARE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -32525,6 +33775,7 @@ static CHESTS_TRIAL_CHAMBERS_REWARD_OMINOUS_RARE_POOLS: &[LootPool] = &[LootPool
     condition: LootCondition::None,
 }];
 pub static CHESTS_TRIAL_CHAMBERS_REWARD_OMINOUS_RARE: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/trial_chambers/reward_ominous_rare"),
     pools: CHESTS_TRIAL_CHAMBERS_REWARD_OMINOUS_RARE_POOLS,
 };
 static CHESTS_TRIAL_CHAMBERS_REWARD_OMINOUS_UNIQUE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -32582,6 +33833,7 @@ static CHESTS_TRIAL_CHAMBERS_REWARD_OMINOUS_UNIQUE_POOLS: &[LootPool] = &[LootPo
     condition: LootCondition::None,
 }];
 pub static CHESTS_TRIAL_CHAMBERS_REWARD_OMINOUS_UNIQUE: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/trial_chambers/reward_ominous_unique"),
     pools: CHESTS_TRIAL_CHAMBERS_REWARD_OMINOUS_UNIQUE_POOLS,
 };
 static CHESTS_TRIAL_CHAMBERS_REWARD_RARE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -32693,6 +33945,7 @@ static CHESTS_TRIAL_CHAMBERS_REWARD_RARE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static CHESTS_TRIAL_CHAMBERS_REWARD_RARE: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/trial_chambers/reward_rare"),
     pools: CHESTS_TRIAL_CHAMBERS_REWARD_RARE_POOLS,
 };
 static CHESTS_TRIAL_CHAMBERS_REWARD_UNIQUE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -32750,6 +34003,7 @@ static CHESTS_TRIAL_CHAMBERS_REWARD_UNIQUE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static CHESTS_TRIAL_CHAMBERS_REWARD_UNIQUE: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/trial_chambers/reward_unique"),
     pools: CHESTS_TRIAL_CHAMBERS_REWARD_UNIQUE_POOLS,
 };
 static CHESTS_TRIAL_CHAMBERS_SUPPLY_POOL0_ENTRIES: &[LootEntry] = &[
@@ -32888,6 +34142,7 @@ static CHESTS_TRIAL_CHAMBERS_SUPPLY_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static CHESTS_TRIAL_CHAMBERS_SUPPLY: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/trial_chambers/supply"),
     pools: CHESTS_TRIAL_CHAMBERS_SUPPLY_POOLS,
 };
 static CHESTS_UNDERWATER_RUIN_BIG_POOL0_ENTRIES: &[LootEntry] = &[
@@ -33055,6 +34310,7 @@ static CHESTS_UNDERWATER_RUIN_BIG_POOLS: &[LootPool] = &[
     },
 ];
 pub static CHESTS_UNDERWATER_RUIN_BIG: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/underwater_ruin_big"),
     pools: CHESTS_UNDERWATER_RUIN_BIG_POOLS,
 };
 static CHESTS_UNDERWATER_RUIN_SMALL_POOL0_ENTRIES: &[LootEntry] = &[
@@ -33213,6 +34469,7 @@ static CHESTS_UNDERWATER_RUIN_SMALL_POOLS: &[LootPool] = &[
     },
 ];
 pub static CHESTS_UNDERWATER_RUIN_SMALL: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/underwater_ruin_small"),
     pools: CHESTS_UNDERWATER_RUIN_SMALL_POOLS,
 };
 static CHESTS_VILLAGE_VILLAGE_ARMORER_POOL0_ENTRIES: &[LootEntry] = &[
@@ -33261,6 +34518,7 @@ static CHESTS_VILLAGE_VILLAGE_ARMORER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static CHESTS_VILLAGE_VILLAGE_ARMORER: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/village/village_armorer"),
     pools: CHESTS_VILLAGE_VILLAGE_ARMORER_POOLS,
 };
 static CHESTS_VILLAGE_VILLAGE_BUTCHER_POOL0_ENTRIES: &[LootEntry] = &[
@@ -33327,6 +34585,7 @@ static CHESTS_VILLAGE_VILLAGE_BUTCHER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static CHESTS_VILLAGE_VILLAGE_BUTCHER: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/village/village_butcher"),
     pools: CHESTS_VILLAGE_VILLAGE_BUTCHER_POOLS,
 };
 static CHESTS_VILLAGE_VILLAGE_CARTOGRAPHER_POOL0_ENTRIES: &[LootEntry] = &[
@@ -33402,6 +34661,7 @@ static CHESTS_VILLAGE_VILLAGE_CARTOGRAPHER_POOLS: &[LootPool] = &[
     },
 ];
 pub static CHESTS_VILLAGE_VILLAGE_CARTOGRAPHER: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/village/village_cartographer"),
     pools: CHESTS_VILLAGE_VILLAGE_CARTOGRAPHER_POOLS,
 };
 static CHESTS_VILLAGE_VILLAGE_DESERT_HOUSE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -33504,6 +34764,7 @@ static CHESTS_VILLAGE_VILLAGE_DESERT_HOUSE_POOLS: &[LootPool] = &[
     },
 ];
 pub static CHESTS_VILLAGE_VILLAGE_DESERT_HOUSE: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/village/village_desert_house"),
     pools: CHESTS_VILLAGE_VILLAGE_DESERT_HOUSE_POOLS,
 };
 static CHESTS_VILLAGE_VILLAGE_FISHER_POOL0_ENTRIES: &[LootEntry] = &[
@@ -33579,6 +34840,7 @@ static CHESTS_VILLAGE_VILLAGE_FISHER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static CHESTS_VILLAGE_VILLAGE_FISHER: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/village/village_fisher"),
     pools: CHESTS_VILLAGE_VILLAGE_FISHER_POOLS,
 };
 static CHESTS_VILLAGE_VILLAGE_FLETCHER_POOL0_ENTRIES: &[LootEntry] = &[
@@ -33645,6 +34907,7 @@ static CHESTS_VILLAGE_VILLAGE_FLETCHER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static CHESTS_VILLAGE_VILLAGE_FLETCHER: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/village/village_fletcher"),
     pools: CHESTS_VILLAGE_VILLAGE_FLETCHER_POOLS,
 };
 static CHESTS_VILLAGE_VILLAGE_MASON_POOL0_ENTRIES: &[LootEntry] = &[
@@ -33729,6 +34992,7 @@ static CHESTS_VILLAGE_VILLAGE_MASON_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static CHESTS_VILLAGE_VILLAGE_MASON: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/village/village_mason"),
     pools: CHESTS_VILLAGE_VILLAGE_MASON_POOLS,
 };
 static CHESTS_VILLAGE_VILLAGE_PLAINS_HOUSE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -33849,6 +35113,7 @@ static CHESTS_VILLAGE_VILLAGE_PLAINS_HOUSE_POOLS: &[LootPool] = &[
     },
 ];
 pub static CHESTS_VILLAGE_VILLAGE_PLAINS_HOUSE: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/village/village_plains_house"),
     pools: CHESTS_VILLAGE_VILLAGE_PLAINS_HOUSE_POOLS,
 };
 static CHESTS_VILLAGE_VILLAGE_SAVANNA_HOUSE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -33969,6 +35234,7 @@ static CHESTS_VILLAGE_VILLAGE_SAVANNA_HOUSE_POOLS: &[LootPool] = &[
     },
 ];
 pub static CHESTS_VILLAGE_VILLAGE_SAVANNA_HOUSE: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/village/village_savanna_house"),
     pools: CHESTS_VILLAGE_VILLAGE_SAVANNA_HOUSE_POOLS,
 };
 static CHESTS_VILLAGE_VILLAGE_SHEPHERD_POOL0_ENTRIES: &[LootEntry] = &[
@@ -34053,6 +35319,7 @@ static CHESTS_VILLAGE_VILLAGE_SHEPHERD_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static CHESTS_VILLAGE_VILLAGE_SHEPHERD: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/village/village_shepherd"),
     pools: CHESTS_VILLAGE_VILLAGE_SHEPHERD_POOLS,
 };
 static CHESTS_VILLAGE_VILLAGE_SNOWY_HOUSE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -34173,6 +35440,7 @@ static CHESTS_VILLAGE_VILLAGE_SNOWY_HOUSE_POOLS: &[LootPool] = &[
     },
 ];
 pub static CHESTS_VILLAGE_VILLAGE_SNOWY_HOUSE: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/village/village_snowy_house"),
     pools: CHESTS_VILLAGE_VILLAGE_SNOWY_HOUSE_POOLS,
 };
 static CHESTS_VILLAGE_VILLAGE_TAIGA_HOUSE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -34311,6 +35579,7 @@ static CHESTS_VILLAGE_VILLAGE_TAIGA_HOUSE_POOLS: &[LootPool] = &[
     },
 ];
 pub static CHESTS_VILLAGE_VILLAGE_TAIGA_HOUSE: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/village/village_taiga_house"),
     pools: CHESTS_VILLAGE_VILLAGE_TAIGA_HOUSE_POOLS,
 };
 static CHESTS_VILLAGE_VILLAGE_TANNERY_POOL0_ENTRIES: &[LootEntry] = &[
@@ -34413,6 +35682,7 @@ static CHESTS_VILLAGE_VILLAGE_TANNERY_POOLS: &[LootPool] = &[
     },
 ];
 pub static CHESTS_VILLAGE_VILLAGE_TANNERY: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/village/village_tannery"),
     pools: CHESTS_VILLAGE_VILLAGE_TANNERY_POOLS,
 };
 static CHESTS_VILLAGE_VILLAGE_TEMPLE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -34479,6 +35749,7 @@ static CHESTS_VILLAGE_VILLAGE_TEMPLE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static CHESTS_VILLAGE_VILLAGE_TEMPLE: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/village/village_temple"),
     pools: CHESTS_VILLAGE_VILLAGE_TEMPLE_POOLS,
 };
 static CHESTS_VILLAGE_VILLAGE_TOOLSMITH_POOL0_ENTRIES: &[LootEntry] = &[
@@ -34563,6 +35834,7 @@ static CHESTS_VILLAGE_VILLAGE_TOOLSMITH_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static CHESTS_VILLAGE_VILLAGE_TOOLSMITH: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/village/village_toolsmith"),
     pools: CHESTS_VILLAGE_VILLAGE_TOOLSMITH_POOLS,
 };
 static CHESTS_VILLAGE_VILLAGE_WEAPONSMITH_POOL0_ENTRIES: &[LootEntry] = &[
@@ -34773,6 +36045,7 @@ static CHESTS_VILLAGE_VILLAGE_WEAPONSMITH_POOLS: &[LootPool] = &[
     },
 ];
 pub static CHESTS_VILLAGE_VILLAGE_WEAPONSMITH: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/village/village_weaponsmith"),
     pools: CHESTS_VILLAGE_VILLAGE_WEAPONSMITH_POOLS,
 };
 static CHESTS_WOODLAND_MANSION_POOL0_ENTRIES: &[LootEntry] = &[
@@ -35037,6 +36310,7 @@ static CHESTS_WOODLAND_MANSION_POOLS: &[LootPool] = &[
     },
 ];
 pub static CHESTS_WOODLAND_MANSION: LootTable = LootTable {
+    random_sequence: Some("minecraft:chests/woodland_mansion"),
     pools: CHESTS_WOODLAND_MANSION_POOLS,
 };
 static DISPENSERS_TRIAL_CHAMBERS_CHAMBER_POOL0_ENTRIES: &[LootEntry] = &[
@@ -35157,6 +36431,7 @@ static DISPENSERS_TRIAL_CHAMBERS_CHAMBER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static DISPENSERS_TRIAL_CHAMBERS_CHAMBER: LootTable = LootTable {
+    random_sequence: Some("minecraft:dispensers/trial_chambers/chamber"),
     pools: DISPENSERS_TRIAL_CHAMBERS_CHAMBER_POOLS,
 };
 static DISPENSERS_TRIAL_CHAMBERS_CORRIDOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -35176,6 +36451,7 @@ static DISPENSERS_TRIAL_CHAMBERS_CORRIDOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static DISPENSERS_TRIAL_CHAMBERS_CORRIDOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:dispensers/trial_chambers/corridor"),
     pools: DISPENSERS_TRIAL_CHAMBERS_CORRIDOR_POOLS,
 };
 static DISPENSERS_TRIAL_CHAMBERS_WATER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -35195,30 +36471,37 @@ static DISPENSERS_TRIAL_CHAMBERS_WATER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static DISPENSERS_TRIAL_CHAMBERS_WATER: LootTable = LootTable {
+    random_sequence: Some("minecraft:dispensers/trial_chambers/water"),
     pools: DISPENSERS_TRIAL_CHAMBERS_WATER_POOLS,
 };
 static ENTITIES_ALLAY_POOLS: &[LootPool] = &[];
 pub static ENTITIES_ALLAY: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/allay"),
     pools: ENTITIES_ALLAY_POOLS,
 };
 static ENTITIES_ARMADILLO_POOLS: &[LootPool] = &[];
 pub static ENTITIES_ARMADILLO: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/armadillo"),
     pools: ENTITIES_ARMADILLO_POOLS,
 };
 static ENTITIES_ARMOR_STAND_POOLS: &[LootPool] = &[];
 pub static ENTITIES_ARMOR_STAND: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/armor_stand"),
     pools: ENTITIES_ARMOR_STAND_POOLS,
 };
 static ENTITIES_AXOLOTL_POOLS: &[LootPool] = &[];
 pub static ENTITIES_AXOLOTL: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/axolotl"),
     pools: ENTITIES_AXOLOTL_POOLS,
 };
 static ENTITIES_BAT_POOLS: &[LootPool] = &[];
 pub static ENTITIES_BAT: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/bat"),
     pools: ENTITIES_BAT_POOLS,
 };
 static ENTITIES_BEE_POOLS: &[LootPool] = &[];
 pub static ENTITIES_BEE: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/bee"),
     pools: ENTITIES_BEE_POOLS,
 };
 static ENTITIES_BLAZE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -35238,6 +36521,7 @@ static ENTITIES_BLAZE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::KilledByPlayer,
 }];
 pub static ENTITIES_BLAZE: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/blaze"),
     pools: ENTITIES_BLAZE_POOLS,
 };
 static ENTITIES_BOGGED_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -35291,6 +36575,7 @@ static ENTITIES_BOGGED_POOLS: &[LootPool] = &[
     },
 ];
 pub static ENTITIES_BOGGED: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/bogged"),
     pools: ENTITIES_BOGGED_POOLS,
 };
 static ENTITIES_BREEZE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -35310,10 +36595,12 @@ static ENTITIES_BREEZE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::KilledByPlayer,
 }];
 pub static ENTITIES_BREEZE: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/breeze"),
     pools: ENTITIES_BREEZE_POOLS,
 };
 static ENTITIES_CAMEL_POOLS: &[LootPool] = &[];
 pub static ENTITIES_CAMEL: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/camel"),
     pools: ENTITIES_CAMEL_POOLS,
 };
 static ENTITIES_CAMEL_HUSK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -35333,6 +36620,7 @@ static ENTITIES_CAMEL_HUSK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_CAMEL_HUSK: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/camel_husk"),
     pools: ENTITIES_CAMEL_HUSK_POOLS,
 };
 static ENTITIES_CAT_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -35352,6 +36640,7 @@ static ENTITIES_CAT_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_CAT: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/cat"),
     pools: ENTITIES_CAT_POOLS,
 };
 static ENTITIES_CAVE_SPIDER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -35389,6 +36678,7 @@ static ENTITIES_CAVE_SPIDER_POOLS: &[LootPool] = &[
     },
 ];
 pub static ENTITIES_CAVE_SPIDER: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/cave_spider"),
     pools: ENTITIES_CAVE_SPIDER_POOLS,
 };
 static ENTITIES_CHICKEN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -35429,6 +36719,7 @@ static ENTITIES_CHICKEN_POOLS: &[LootPool] = &[
     },
 ];
 pub static ENTITIES_CHICKEN: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/chicken"),
     pools: ENTITIES_CHICKEN_POOLS,
 };
 static ENTITIES_COD_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -35469,6 +36760,7 @@ static ENTITIES_COD_POOLS: &[LootPool] = &[
     },
 ];
 pub static ENTITIES_COD: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/cod"),
     pools: ENTITIES_COD_POOLS,
 };
 static ENTITIES_COPPER_GOLEM_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -35488,6 +36780,7 @@ static ENTITIES_COPPER_GOLEM_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_COPPER_GOLEM: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/copper_golem"),
     pools: ENTITIES_COPPER_GOLEM_POOLS,
 };
 static ENTITIES_COW_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -35528,10 +36821,12 @@ static ENTITIES_COW_POOLS: &[LootPool] = &[
     },
 ];
 pub static ENTITIES_COW: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/cow"),
     pools: ENTITIES_COW_POOLS,
 };
 static ENTITIES_CREAKING_POOLS: &[LootPool] = &[];
 pub static ENTITIES_CREAKING: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/creaking"),
     pools: ENTITIES_CREAKING_POOLS,
 };
 static ENTITIES_CREEPER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -35670,6 +36965,7 @@ static ENTITIES_CREEPER_POOLS: &[LootPool] = &[
     },
 ];
 pub static ENTITIES_CREEPER: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/creeper"),
     pools: ENTITIES_CREEPER_POOLS,
 };
 static ENTITIES_DOLPHIN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -35692,6 +36988,7 @@ static ENTITIES_DOLPHIN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_DOLPHIN: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/dolphin"),
     pools: ENTITIES_DOLPHIN_POOLS,
 };
 static ENTITIES_DONKEY_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -35711,6 +37008,7 @@ static ENTITIES_DONKEY_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_DONKEY: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/donkey"),
     pools: ENTITIES_DONKEY_POOLS,
 };
 static ENTITIES_DROWNED_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -35755,6 +37053,7 @@ static ENTITIES_DROWNED_POOLS: &[LootPool] = &[
     },
 ];
 pub static ENTITIES_DROWNED: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/drowned"),
     pools: ENTITIES_DROWNED_POOLS,
 };
 static ENTITIES_ELDER_GUARDIAN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -35902,10 +37201,12 @@ static ENTITIES_ELDER_GUARDIAN_POOLS: &[LootPool] = &[
     },
 ];
 pub static ENTITIES_ELDER_GUARDIAN: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/elder_guardian"),
     pools: ENTITIES_ELDER_GUARDIAN_POOLS,
 };
 static ENTITIES_ENDER_DRAGON_POOLS: &[LootPool] = &[];
 pub static ENTITIES_ENDER_DRAGON: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/ender_dragon"),
     pools: ENTITIES_ENDER_DRAGON_POOLS,
 };
 static ENTITIES_ENDERMAN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -35925,10 +37226,12 @@ static ENTITIES_ENDERMAN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_ENDERMAN: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/enderman"),
     pools: ENTITIES_ENDERMAN_POOLS,
 };
 static ENTITIES_ENDERMITE_POOLS: &[LootPool] = &[];
 pub static ENTITIES_ENDERMITE: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/endermite"),
     pools: ENTITIES_ENDERMITE_POOLS,
 };
 static ENTITIES_EVOKER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -35966,14 +37269,17 @@ static ENTITIES_EVOKER_POOLS: &[LootPool] = &[
     },
 ];
 pub static ENTITIES_EVOKER: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/evoker"),
     pools: ENTITIES_EVOKER_POOLS,
 };
 static ENTITIES_FOX_POOLS: &[LootPool] = &[];
 pub static ENTITIES_FOX: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/fox"),
     pools: ENTITIES_FOX_POOLS,
 };
 static ENTITIES_FROG_POOLS: &[LootPool] = &[];
 pub static ENTITIES_FROG: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/frog"),
     pools: ENTITIES_FROG_POOLS,
 };
 static ENTITIES_GHAST_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -36027,10 +37333,12 @@ static ENTITIES_GHAST_POOLS: &[LootPool] = &[
     },
 ];
 pub static ENTITIES_GHAST: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/ghast"),
     pools: ENTITIES_GHAST_POOLS,
 };
 static ENTITIES_GIANT_POOLS: &[LootPool] = &[];
 pub static ENTITIES_GIANT: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/giant"),
     pools: ENTITIES_GIANT_POOLS,
 };
 static ENTITIES_GLOW_SQUID_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -36050,10 +37358,12 @@ static ENTITIES_GLOW_SQUID_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_GLOW_SQUID: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/glow_squid"),
     pools: ENTITIES_GLOW_SQUID_POOLS,
 };
 static ENTITIES_GOAT_POOLS: &[LootPool] = &[];
 pub static ENTITIES_GOAT: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/goat"),
     pools: ENTITIES_GOAT_POOLS,
 };
 static ENTITIES_GUARDIAN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -36169,10 +37479,12 @@ static ENTITIES_GUARDIAN_POOLS: &[LootPool] = &[
     },
 ];
 pub static ENTITIES_GUARDIAN: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/guardian"),
     pools: ENTITIES_GUARDIAN_POOLS,
 };
 static ENTITIES_HAPPY_GHAST_POOLS: &[LootPool] = &[];
 pub static ENTITIES_HAPPY_GHAST: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/happy_ghast"),
     pools: ENTITIES_HAPPY_GHAST_POOLS,
 };
 static ENTITIES_HOGLIN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -36213,6 +37525,7 @@ static ENTITIES_HOGLIN_POOLS: &[LootPool] = &[
     },
 ];
 pub static ENTITIES_HOGLIN: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/hoglin"),
     pools: ENTITIES_HOGLIN_POOLS,
 };
 static ENTITIES_HORSE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -36232,6 +37545,7 @@ static ENTITIES_HORSE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_HORSE: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/horse"),
     pools: ENTITIES_HORSE_POOLS,
 };
 static ENTITIES_HUSK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -36315,10 +37629,12 @@ static ENTITIES_HUSK_POOLS: &[LootPool] = &[
     },
 ];
 pub static ENTITIES_HUSK: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/husk"),
     pools: ENTITIES_HUSK_POOLS,
 };
 static ENTITIES_ILLUSIONER_POOLS: &[LootPool] = &[];
 pub static ENTITIES_ILLUSIONER: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/illusioner"),
     pools: ENTITIES_ILLUSIONER_POOLS,
 };
 static ENTITIES_IRON_GOLEM_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -36356,6 +37672,7 @@ static ENTITIES_IRON_GOLEM_POOLS: &[LootPool] = &[
     },
 ];
 pub static ENTITIES_IRON_GOLEM: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/iron_golem"),
     pools: ENTITIES_IRON_GOLEM_POOLS,
 };
 static ENTITIES_LLAMA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -36375,6 +37692,7 @@ static ENTITIES_LLAMA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_LLAMA: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/llama"),
     pools: ENTITIES_LLAMA_POOLS,
 };
 static ENTITIES_MAGMA_CUBE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -36441,10 +37759,12 @@ static ENTITIES_MAGMA_CUBE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_MAGMA_CUBE: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/magma_cube"),
     pools: ENTITIES_MAGMA_CUBE_POOLS,
 };
 static ENTITIES_MANNEQUIN_POOLS: &[LootPool] = &[];
 pub static ENTITIES_MANNEQUIN: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/mannequin"),
     pools: ENTITIES_MANNEQUIN_POOLS,
 };
 static ENTITIES_MOOSHROOM_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -36485,6 +37805,7 @@ static ENTITIES_MOOSHROOM_POOLS: &[LootPool] = &[
     },
 ];
 pub static ENTITIES_MOOSHROOM: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/mooshroom"),
     pools: ENTITIES_MOOSHROOM_POOLS,
 };
 static ENTITIES_MULE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -36504,6 +37825,7 @@ static ENTITIES_MULE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_MULE: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/mule"),
     pools: ENTITIES_MULE_POOLS,
 };
 static ENTITIES_NAUTILUS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -36530,10 +37852,12 @@ static ENTITIES_NAUTILUS_POOLS: &[LootPool] = &[LootPool {
     ]),
 }];
 pub static ENTITIES_NAUTILUS: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/nautilus"),
     pools: ENTITIES_NAUTILUS_POOLS,
 };
 static ENTITIES_OCELOT_POOLS: &[LootPool] = &[];
 pub static ENTITIES_OCELOT: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/ocelot"),
     pools: ENTITIES_OCELOT_POOLS,
 };
 static ENTITIES_PANDA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -36553,6 +37877,7 @@ static ENTITIES_PANDA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_PANDA: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/panda"),
     pools: ENTITIES_PANDA_POOLS,
 };
 static ENTITIES_PARCHED_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -36606,6 +37931,7 @@ static ENTITIES_PARCHED_POOLS: &[LootPool] = &[
     },
 ];
 pub static ENTITIES_PARCHED: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/parched"),
     pools: ENTITIES_PARCHED_POOLS,
 };
 static ENTITIES_PARROT_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -36625,6 +37951,7 @@ static ENTITIES_PARROT_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_PARROT: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/parrot"),
     pools: ENTITIES_PARROT_POOLS,
 };
 static ENTITIES_PHANTOM_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -36644,6 +37971,7 @@ static ENTITIES_PHANTOM_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::KilledByPlayer,
 }];
 pub static ENTITIES_PHANTOM: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/phantom"),
     pools: ENTITIES_PHANTOM_POOLS,
 };
 static ENTITIES_PIG_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -36666,14 +37994,17 @@ static ENTITIES_PIG_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_PIG: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/pig"),
     pools: ENTITIES_PIG_POOLS,
 };
 static ENTITIES_PIGLIN_POOLS: &[LootPool] = &[];
 pub static ENTITIES_PIGLIN: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/piglin"),
     pools: ENTITIES_PIGLIN_POOLS,
 };
 static ENTITIES_PIGLIN_BRUTE_POOLS: &[LootPool] = &[];
 pub static ENTITIES_PIGLIN_BRUTE: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/piglin_brute"),
     pools: ENTITIES_PIGLIN_BRUTE_POOLS,
 };
 static ENTITIES_PILLAGER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -36693,10 +38024,12 @@ static ENTITIES_PILLAGER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_PILLAGER: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/pillager"),
     pools: ENTITIES_PILLAGER_POOLS,
 };
 static ENTITIES_PLAYER_POOLS: &[LootPool] = &[];
 pub static ENTITIES_PLAYER: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/player"),
     pools: ENTITIES_PLAYER_POOLS,
 };
 static ENTITIES_POLAR_BEAR_POOL0_ENTRIES: &[LootEntry] = &[
@@ -36733,6 +38066,7 @@ static ENTITIES_POLAR_BEAR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_POLAR_BEAR: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/polar_bear"),
     pools: ENTITIES_POLAR_BEAR_POOLS,
 };
 static ENTITIES_PUFFERFISH_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -36770,6 +38104,7 @@ static ENTITIES_PUFFERFISH_POOLS: &[LootPool] = &[
     },
 ];
 pub static ENTITIES_PUFFERFISH: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/pufferfish"),
     pools: ENTITIES_PUFFERFISH_POOLS,
 };
 static ENTITIES_RABBIT_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -36833,6 +38168,7 @@ static ENTITIES_RABBIT_POOLS: &[LootPool] = &[
     },
 ];
 pub static ENTITIES_RABBIT: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/rabbit"),
     pools: ENTITIES_RABBIT_POOLS,
 };
 static ENTITIES_RAVAGER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -36852,6 +38188,7 @@ static ENTITIES_RAVAGER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_RAVAGER: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/ravager"),
     pools: ENTITIES_RAVAGER_POOLS,
 };
 static ENTITIES_SALMON_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -36892,6 +38229,7 @@ static ENTITIES_SALMON_POOLS: &[LootPool] = &[
     },
 ];
 pub static ENTITIES_SALMON: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/salmon"),
     pools: ENTITIES_SALMON_POOLS,
 };
 static ENTITIES_SHEEP_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -37069,6 +38407,7 @@ static ENTITIES_SHEEP_POOLS: &[LootPool] = &[
     },
 ];
 pub static ENTITIES_SHEEP: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/sheep"),
     pools: ENTITIES_SHEEP_POOLS,
 };
 static ENTITIES_SHEEP_BLACK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -37088,6 +38427,7 @@ static ENTITIES_SHEEP_BLACK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_SHEEP_BLACK: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/sheep/black"),
     pools: ENTITIES_SHEEP_BLACK_POOLS,
 };
 static ENTITIES_SHEEP_BLUE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -37107,6 +38447,7 @@ static ENTITIES_SHEEP_BLUE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_SHEEP_BLUE: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/sheep/blue"),
     pools: ENTITIES_SHEEP_BLUE_POOLS,
 };
 static ENTITIES_SHEEP_BROWN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -37126,6 +38467,7 @@ static ENTITIES_SHEEP_BROWN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_SHEEP_BROWN: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/sheep/brown"),
     pools: ENTITIES_SHEEP_BROWN_POOLS,
 };
 static ENTITIES_SHEEP_CYAN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -37145,6 +38487,7 @@ static ENTITIES_SHEEP_CYAN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_SHEEP_CYAN: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/sheep/cyan"),
     pools: ENTITIES_SHEEP_CYAN_POOLS,
 };
 static ENTITIES_SHEEP_GRAY_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -37164,6 +38507,7 @@ static ENTITIES_SHEEP_GRAY_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_SHEEP_GRAY: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/sheep/gray"),
     pools: ENTITIES_SHEEP_GRAY_POOLS,
 };
 static ENTITIES_SHEEP_GREEN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -37183,6 +38527,7 @@ static ENTITIES_SHEEP_GREEN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_SHEEP_GREEN: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/sheep/green"),
     pools: ENTITIES_SHEEP_GREEN_POOLS,
 };
 static ENTITIES_SHEEP_LIGHT_BLUE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -37202,6 +38547,7 @@ static ENTITIES_SHEEP_LIGHT_BLUE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_SHEEP_LIGHT_BLUE: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/sheep/light_blue"),
     pools: ENTITIES_SHEEP_LIGHT_BLUE_POOLS,
 };
 static ENTITIES_SHEEP_LIGHT_GRAY_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -37221,6 +38567,7 @@ static ENTITIES_SHEEP_LIGHT_GRAY_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_SHEEP_LIGHT_GRAY: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/sheep/light_gray"),
     pools: ENTITIES_SHEEP_LIGHT_GRAY_POOLS,
 };
 static ENTITIES_SHEEP_LIME_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -37240,6 +38587,7 @@ static ENTITIES_SHEEP_LIME_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_SHEEP_LIME: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/sheep/lime"),
     pools: ENTITIES_SHEEP_LIME_POOLS,
 };
 static ENTITIES_SHEEP_MAGENTA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -37259,6 +38607,7 @@ static ENTITIES_SHEEP_MAGENTA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_SHEEP_MAGENTA: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/sheep/magenta"),
     pools: ENTITIES_SHEEP_MAGENTA_POOLS,
 };
 static ENTITIES_SHEEP_ORANGE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -37278,6 +38627,7 @@ static ENTITIES_SHEEP_ORANGE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_SHEEP_ORANGE: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/sheep/orange"),
     pools: ENTITIES_SHEEP_ORANGE_POOLS,
 };
 static ENTITIES_SHEEP_PINK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -37297,6 +38647,7 @@ static ENTITIES_SHEEP_PINK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_SHEEP_PINK: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/sheep/pink"),
     pools: ENTITIES_SHEEP_PINK_POOLS,
 };
 static ENTITIES_SHEEP_PURPLE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -37316,6 +38667,7 @@ static ENTITIES_SHEEP_PURPLE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_SHEEP_PURPLE: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/sheep/purple"),
     pools: ENTITIES_SHEEP_PURPLE_POOLS,
 };
 static ENTITIES_SHEEP_RED_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -37335,6 +38687,7 @@ static ENTITIES_SHEEP_RED_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_SHEEP_RED: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/sheep/red"),
     pools: ENTITIES_SHEEP_RED_POOLS,
 };
 static ENTITIES_SHEEP_WHITE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -37354,6 +38707,7 @@ static ENTITIES_SHEEP_WHITE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_SHEEP_WHITE: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/sheep/white"),
     pools: ENTITIES_SHEEP_WHITE_POOLS,
 };
 static ENTITIES_SHEEP_YELLOW_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -37373,6 +38727,7 @@ static ENTITIES_SHEEP_YELLOW_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_SHEEP_YELLOW: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/sheep/yellow"),
     pools: ENTITIES_SHEEP_YELLOW_POOLS,
 };
 static ENTITIES_SHULKER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -37396,10 +38751,12 @@ static ENTITIES_SHULKER_POOLS: &[LootPool] = &[LootPool {
     },
 }];
 pub static ENTITIES_SHULKER: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/shulker"),
     pools: ENTITIES_SHULKER_POOLS,
 };
 static ENTITIES_SILVERFISH_POOLS: &[LootPool] = &[];
 pub static ENTITIES_SILVERFISH: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/silverfish"),
     pools: ENTITIES_SILVERFISH_POOLS,
 };
 static ENTITIES_SKELETON_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -37437,6 +38794,7 @@ static ENTITIES_SKELETON_POOLS: &[LootPool] = &[
     },
 ];
 pub static ENTITIES_SKELETON: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/skeleton"),
     pools: ENTITIES_SKELETON_POOLS,
 };
 static ENTITIES_SKELETON_HORSE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -37456,6 +38814,7 @@ static ENTITIES_SKELETON_HORSE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_SKELETON_HORSE: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/skeleton_horse"),
     pools: ENTITIES_SKELETON_HORSE_POOLS,
 };
 static ENTITIES_SLIME_POOL0_ENTRIES: &[LootEntry] = &[
@@ -37495,10 +38854,12 @@ static ENTITIES_SLIME_POOLS: &[LootPool] = &[LootPool {
     },
 }];
 pub static ENTITIES_SLIME: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/slime"),
     pools: ENTITIES_SLIME_POOLS,
 };
 static ENTITIES_SNIFFER_POOLS: &[LootPool] = &[];
 pub static ENTITIES_SNIFFER: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/sniffer"),
     pools: ENTITIES_SNIFFER_POOLS,
 };
 static ENTITIES_SNOW_GOLEM_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -37518,6 +38879,7 @@ static ENTITIES_SNOW_GOLEM_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_SNOW_GOLEM: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/snow_golem"),
     pools: ENTITIES_SNOW_GOLEM_POOLS,
 };
 static ENTITIES_SPIDER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -37555,6 +38917,7 @@ static ENTITIES_SPIDER_POOLS: &[LootPool] = &[
     },
 ];
 pub static ENTITIES_SPIDER: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/spider"),
     pools: ENTITIES_SPIDER_POOLS,
 };
 static ENTITIES_SQUID_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -37574,6 +38937,7 @@ static ENTITIES_SQUID_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_SQUID: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/squid"),
     pools: ENTITIES_SQUID_POOLS,
 };
 static ENTITIES_STRAY_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -37627,6 +38991,7 @@ static ENTITIES_STRAY_POOLS: &[LootPool] = &[
     },
 ];
 pub static ENTITIES_STRAY: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/stray"),
     pools: ENTITIES_STRAY_POOLS,
 };
 static ENTITIES_STRIDER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -37646,14 +39011,17 @@ static ENTITIES_STRIDER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_STRIDER: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/strider"),
     pools: ENTITIES_STRIDER_POOLS,
 };
 static ENTITIES_SULFUR_CUBE_POOLS: &[LootPool] = &[];
 pub static ENTITIES_SULFUR_CUBE: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/sulfur_cube"),
     pools: ENTITIES_SULFUR_CUBE_POOLS,
 };
 static ENTITIES_TADPOLE_POOLS: &[LootPool] = &[];
 pub static ENTITIES_TADPOLE: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/tadpole"),
     pools: ENTITIES_TADPOLE_POOLS,
 };
 static ENTITIES_TRADER_LLAMA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -37673,6 +39041,7 @@ static ENTITIES_TRADER_LLAMA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_TRADER_LLAMA: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/trader_llama"),
     pools: ENTITIES_TRADER_LLAMA_POOLS,
 };
 static ENTITIES_TROPICAL_FISH_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -37710,6 +39079,7 @@ static ENTITIES_TROPICAL_FISH_POOLS: &[LootPool] = &[
     },
 ];
 pub static ENTITIES_TROPICAL_FISH: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/tropical_fish"),
     pools: ENTITIES_TROPICAL_FISH_POOLS,
 };
 static ENTITIES_TURTLE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -37747,14 +39117,17 @@ static ENTITIES_TURTLE_POOLS: &[LootPool] = &[
     },
 ];
 pub static ENTITIES_TURTLE: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/turtle"),
     pools: ENTITIES_TURTLE_POOLS,
 };
 static ENTITIES_VEX_POOLS: &[LootPool] = &[];
 pub static ENTITIES_VEX: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/vex"),
     pools: ENTITIES_VEX_POOLS,
 };
 static ENTITIES_VILLAGER_POOLS: &[LootPool] = &[];
 pub static ENTITIES_VILLAGER: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/villager"),
     pools: ENTITIES_VILLAGER_POOLS,
 };
 static ENTITIES_VINDICATOR_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -37774,10 +39147,12 @@ static ENTITIES_VINDICATOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::KilledByPlayer,
 }];
 pub static ENTITIES_VINDICATOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/vindicator"),
     pools: ENTITIES_VINDICATOR_POOLS,
 };
 static ENTITIES_WANDERING_TRADER_POOLS: &[LootPool] = &[];
 pub static ENTITIES_WANDERING_TRADER: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/wandering_trader"),
     pools: ENTITIES_WANDERING_TRADER_POOLS,
 };
 static ENTITIES_WARDEN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -37797,6 +39172,7 @@ static ENTITIES_WARDEN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_WARDEN: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/warden"),
     pools: ENTITIES_WARDEN_POOLS,
 };
 static ENTITIES_WITCH_POOL0_ENTRIES: &[LootEntry] = &[
@@ -37881,10 +39257,12 @@ static ENTITIES_WITCH_POOLS: &[LootPool] = &[
     },
 ];
 pub static ENTITIES_WITCH: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/witch"),
     pools: ENTITIES_WITCH_POOLS,
 };
 static ENTITIES_WITHER_POOLS: &[LootPool] = &[];
 pub static ENTITIES_WITHER: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/wither"),
     pools: ENTITIES_WITHER_POOLS,
 };
 static ENTITIES_WITHER_SKELETON_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -37945,10 +39323,12 @@ static ENTITIES_WITHER_SKELETON_POOLS: &[LootPool] = &[
     },
 ];
 pub static ENTITIES_WITHER_SKELETON: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/wither_skeleton"),
     pools: ENTITIES_WITHER_SKELETON_POOLS,
 };
 static ENTITIES_WOLF_POOLS: &[LootPool] = &[];
 pub static ENTITIES_WOLF: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/wolf"),
     pools: ENTITIES_WOLF_POOLS,
 };
 static ENTITIES_ZOGLIN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -37968,6 +39348,7 @@ static ENTITIES_ZOGLIN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_ZOGLIN: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/zoglin"),
     pools: ENTITIES_ZOGLIN_POOLS,
 };
 static ENTITIES_ZOMBIE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -38067,6 +39448,7 @@ static ENTITIES_ZOMBIE_POOLS: &[LootPool] = &[
     },
 ];
 pub static ENTITIES_ZOMBIE: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/zombie"),
     pools: ENTITIES_ZOMBIE_POOLS,
 };
 static ENTITIES_ZOMBIE_HORSE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -38086,6 +39468,7 @@ static ENTITIES_ZOMBIE_HORSE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static ENTITIES_ZOMBIE_HORSE: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/zombie_horse"),
     pools: ENTITIES_ZOMBIE_HORSE_POOLS,
 };
 static ENTITIES_ZOMBIE_NAUTILUS_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -38105,6 +39488,7 @@ static ENTITIES_ZOMBIE_NAUTILUS_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::KilledByPlayer,
 }];
 pub static ENTITIES_ZOMBIE_NAUTILUS: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/zombie_nautilus"),
     pools: ENTITIES_ZOMBIE_NAUTILUS_POOLS,
 };
 static ENTITIES_ZOMBIE_VILLAGER_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -38172,6 +39556,7 @@ static ENTITIES_ZOMBIE_VILLAGER_POOLS: &[LootPool] = &[
     },
 ];
 pub static ENTITIES_ZOMBIE_VILLAGER: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/zombie_villager"),
     pools: ENTITIES_ZOMBIE_VILLAGER_POOLS,
 };
 static ENTITIES_ZOMBIFIED_PIGLIN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -38232,6 +39617,7 @@ static ENTITIES_ZOMBIFIED_PIGLIN_POOLS: &[LootPool] = &[
     },
 ];
 pub static ENTITIES_ZOMBIFIED_PIGLIN: LootTable = LootTable {
+    random_sequence: Some("minecraft:entities/zombified_piglin"),
     pools: ENTITIES_ZOMBIFIED_PIGLIN_POOLS,
 };
 static EQUIPMENT_TRIAL_CHAMBER_POOL0_ENTRIES: &[LootEntry] = &[
@@ -38298,6 +39684,7 @@ static EQUIPMENT_TRIAL_CHAMBER_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static EQUIPMENT_TRIAL_CHAMBER: LootTable = LootTable {
+    random_sequence: Some("minecraft:equipment/trial_chamber"),
     pools: EQUIPMENT_TRIAL_CHAMBER_POOLS,
 };
 static EQUIPMENT_TRIAL_CHAMBER_MELEE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -38411,6 +39798,7 @@ static EQUIPMENT_TRIAL_CHAMBER_MELEE_POOLS: &[LootPool] = &[
     },
 ];
 pub static EQUIPMENT_TRIAL_CHAMBER_MELEE: LootTable = LootTable {
+    random_sequence: Some("minecraft:equipment/trial_chamber_melee"),
     pools: EQUIPMENT_TRIAL_CHAMBER_MELEE_POOLS,
 };
 static EQUIPMENT_TRIAL_CHAMBER_RANGED_POOL0_ENTRIES: &[LootEntry] = &[
@@ -38515,6 +39903,7 @@ static EQUIPMENT_TRIAL_CHAMBER_RANGED_POOLS: &[LootPool] = &[
     },
 ];
 pub static EQUIPMENT_TRIAL_CHAMBER_RANGED: LootTable = LootTable {
+    random_sequence: Some("minecraft:equipment/trial_chamber_ranged"),
     pools: EQUIPMENT_TRIAL_CHAMBER_RANGED_POOLS,
 };
 static GAMEPLAY_ARMADILLO_SHED_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -38534,6 +39923,7 @@ static GAMEPLAY_ARMADILLO_SHED_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static GAMEPLAY_ARMADILLO_SHED: LootTable = LootTable {
+    random_sequence: Some("minecraft:gameplay/armadillo_shed"),
     pools: GAMEPLAY_ARMADILLO_SHED_POOLS,
 };
 static GAMEPLAY_CAT_MORNING_GIFT_POOL0_ENTRIES: &[LootEntry] = &[
@@ -38609,6 +39999,7 @@ static GAMEPLAY_CAT_MORNING_GIFT_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static GAMEPLAY_CAT_MORNING_GIFT: LootTable = LootTable {
+    random_sequence: Some("minecraft:gameplay/cat_morning_gift"),
     pools: GAMEPLAY_CAT_MORNING_GIFT_POOLS,
 };
 static GAMEPLAY_CHICKEN_LAY_POOL0_ENTRIES: &[LootEntry] = &[
@@ -38648,6 +40039,7 @@ static GAMEPLAY_CHICKEN_LAY_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static GAMEPLAY_CHICKEN_LAY: LootTable = LootTable {
+    random_sequence: Some("minecraft:gameplay/chicken_lay"),
     pools: GAMEPLAY_CHICKEN_LAY_POOLS,
 };
 static GAMEPLAY_FISHING_POOL0_ENTRIES: &[LootEntry] = &[
@@ -38867,6 +40259,7 @@ static GAMEPLAY_FISHING_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static GAMEPLAY_FISHING: LootTable = LootTable {
+    random_sequence: Some("minecraft:gameplay/fishing"),
     pools: GAMEPLAY_FISHING_POOLS,
 };
 static GAMEPLAY_FISHING_FISH_POOL0_ENTRIES: &[LootEntry] = &[
@@ -38915,6 +40308,7 @@ static GAMEPLAY_FISHING_FISH_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static GAMEPLAY_FISHING_FISH: LootTable = LootTable {
+    random_sequence: Some("minecraft:gameplay/fishing/fish"),
     pools: GAMEPLAY_FISHING_FISH_POOLS,
 };
 static GAMEPLAY_FISHING_JUNK_POOL0_ENTRIES: &[LootEntry] = &[
@@ -39044,6 +40438,7 @@ static GAMEPLAY_FISHING_JUNK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static GAMEPLAY_FISHING_JUNK: LootTable = LootTable {
+    random_sequence: Some("minecraft:gameplay/fishing/junk"),
     pools: GAMEPLAY_FISHING_JUNK_POOLS,
 };
 static GAMEPLAY_FISHING_TREASURE_POOL0_ENTRIES: &[LootEntry] = &[
@@ -39110,6 +40505,7 @@ static GAMEPLAY_FISHING_TREASURE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static GAMEPLAY_FISHING_TREASURE: LootTable = LootTable {
+    random_sequence: Some("minecraft:gameplay/fishing/treasure"),
     pools: GAMEPLAY_FISHING_TREASURE_POOLS,
 };
 static GAMEPLAY_HERO_OF_THE_VILLAGE_ARMORER_GIFT_POOL0_ENTRIES: &[LootEntry] = &[
@@ -39158,6 +40554,7 @@ static GAMEPLAY_HERO_OF_THE_VILLAGE_ARMORER_GIFT_POOLS: &[LootPool] = &[LootPool
     condition: LootCondition::None,
 }];
 pub static GAMEPLAY_HERO_OF_THE_VILLAGE_ARMORER_GIFT: LootTable = LootTable {
+    random_sequence: Some("minecraft:gameplay/hero_of_the_village/armorer_gift"),
     pools: GAMEPLAY_HERO_OF_THE_VILLAGE_ARMORER_GIFT_POOLS,
 };
 static GAMEPLAY_HERO_OF_THE_VILLAGE_BABY_GIFT_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -39177,6 +40574,7 @@ static GAMEPLAY_HERO_OF_THE_VILLAGE_BABY_GIFT_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static GAMEPLAY_HERO_OF_THE_VILLAGE_BABY_GIFT: LootTable = LootTable {
+    random_sequence: Some("minecraft:gameplay/hero_of_the_village/baby_gift"),
     pools: GAMEPLAY_HERO_OF_THE_VILLAGE_BABY_GIFT_POOLS,
 };
 static GAMEPLAY_HERO_OF_THE_VILLAGE_BUTCHER_GIFT_POOL0_ENTRIES: &[LootEntry] = &[
@@ -39234,6 +40632,7 @@ static GAMEPLAY_HERO_OF_THE_VILLAGE_BUTCHER_GIFT_POOLS: &[LootPool] = &[LootPool
     condition: LootCondition::None,
 }];
 pub static GAMEPLAY_HERO_OF_THE_VILLAGE_BUTCHER_GIFT: LootTable = LootTable {
+    random_sequence: Some("minecraft:gameplay/hero_of_the_village/butcher_gift"),
     pools: GAMEPLAY_HERO_OF_THE_VILLAGE_BUTCHER_GIFT_POOLS,
 };
 static GAMEPLAY_HERO_OF_THE_VILLAGE_CARTOGRAPHER_GIFT_POOL0_ENTRIES: &[LootEntry] = &[
@@ -39264,6 +40663,7 @@ static GAMEPLAY_HERO_OF_THE_VILLAGE_CARTOGRAPHER_GIFT_POOLS: &[LootPool] = &[Loo
     condition: LootCondition::None,
 }];
 pub static GAMEPLAY_HERO_OF_THE_VILLAGE_CARTOGRAPHER_GIFT: LootTable = LootTable {
+    random_sequence: Some("minecraft:gameplay/hero_of_the_village/cartographer_gift"),
     pools: GAMEPLAY_HERO_OF_THE_VILLAGE_CARTOGRAPHER_GIFT_POOLS,
 };
 static GAMEPLAY_HERO_OF_THE_VILLAGE_CLERIC_GIFT_POOL0_ENTRIES: &[LootEntry] = &[
@@ -39294,6 +40694,7 @@ static GAMEPLAY_HERO_OF_THE_VILLAGE_CLERIC_GIFT_POOLS: &[LootPool] = &[LootPool 
     condition: LootCondition::None,
 }];
 pub static GAMEPLAY_HERO_OF_THE_VILLAGE_CLERIC_GIFT: LootTable = LootTable {
+    random_sequence: Some("minecraft:gameplay/hero_of_the_village/cleric_gift"),
     pools: GAMEPLAY_HERO_OF_THE_VILLAGE_CLERIC_GIFT_POOLS,
 };
 static GAMEPLAY_HERO_OF_THE_VILLAGE_FARMER_GIFT_POOL0_ENTRIES: &[LootEntry] = &[
@@ -39333,6 +40734,7 @@ static GAMEPLAY_HERO_OF_THE_VILLAGE_FARMER_GIFT_POOLS: &[LootPool] = &[LootPool 
     condition: LootCondition::None,
 }];
 pub static GAMEPLAY_HERO_OF_THE_VILLAGE_FARMER_GIFT: LootTable = LootTable {
+    random_sequence: Some("minecraft:gameplay/hero_of_the_village/farmer_gift"),
     pools: GAMEPLAY_HERO_OF_THE_VILLAGE_FARMER_GIFT_POOLS,
 };
 static GAMEPLAY_HERO_OF_THE_VILLAGE_FISHERMAN_GIFT_POOL0_ENTRIES: &[LootEntry] = &[
@@ -39363,6 +40765,7 @@ static GAMEPLAY_HERO_OF_THE_VILLAGE_FISHERMAN_GIFT_POOLS: &[LootPool] = &[LootPo
     condition: LootCondition::None,
 }];
 pub static GAMEPLAY_HERO_OF_THE_VILLAGE_FISHERMAN_GIFT: LootTable = LootTable {
+    random_sequence: Some("minecraft:gameplay/hero_of_the_village/fisherman_gift"),
     pools: GAMEPLAY_HERO_OF_THE_VILLAGE_FISHERMAN_GIFT_POOLS,
 };
 static GAMEPLAY_HERO_OF_THE_VILLAGE_FLETCHER_GIFT_POOL0_ENTRIES: &[LootEntry] = &[
@@ -39501,6 +40904,7 @@ static GAMEPLAY_HERO_OF_THE_VILLAGE_FLETCHER_GIFT_POOLS: &[LootPool] = &[LootPoo
     condition: LootCondition::None,
 }];
 pub static GAMEPLAY_HERO_OF_THE_VILLAGE_FLETCHER_GIFT: LootTable = LootTable {
+    random_sequence: Some("minecraft:gameplay/hero_of_the_village/fletcher_gift"),
     pools: GAMEPLAY_HERO_OF_THE_VILLAGE_FLETCHER_GIFT_POOLS,
 };
 static GAMEPLAY_HERO_OF_THE_VILLAGE_LEATHERWORKER_GIFT_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -39520,6 +40924,7 @@ static GAMEPLAY_HERO_OF_THE_VILLAGE_LEATHERWORKER_GIFT_POOLS: &[LootPool] = &[Lo
     condition: LootCondition::None,
 }];
 pub static GAMEPLAY_HERO_OF_THE_VILLAGE_LEATHERWORKER_GIFT: LootTable = LootTable {
+    random_sequence: Some("minecraft:gameplay/hero_of_the_village/leatherworker_gift"),
     pools: GAMEPLAY_HERO_OF_THE_VILLAGE_LEATHERWORKER_GIFT_POOLS,
 };
 static GAMEPLAY_HERO_OF_THE_VILLAGE_LIBRARIAN_GIFT_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -39539,6 +40944,7 @@ static GAMEPLAY_HERO_OF_THE_VILLAGE_LIBRARIAN_GIFT_POOLS: &[LootPool] = &[LootPo
     condition: LootCondition::None,
 }];
 pub static GAMEPLAY_HERO_OF_THE_VILLAGE_LIBRARIAN_GIFT: LootTable = LootTable {
+    random_sequence: Some("minecraft:gameplay/hero_of_the_village/librarian_gift"),
     pools: GAMEPLAY_HERO_OF_THE_VILLAGE_LIBRARIAN_GIFT_POOLS,
 };
 static GAMEPLAY_HERO_OF_THE_VILLAGE_MASON_GIFT_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -39558,6 +40964,7 @@ static GAMEPLAY_HERO_OF_THE_VILLAGE_MASON_GIFT_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static GAMEPLAY_HERO_OF_THE_VILLAGE_MASON_GIFT: LootTable = LootTable {
+    random_sequence: Some("minecraft:gameplay/hero_of_the_village/mason_gift"),
     pools: GAMEPLAY_HERO_OF_THE_VILLAGE_MASON_GIFT_POOLS,
 };
 static GAMEPLAY_HERO_OF_THE_VILLAGE_SHEPHERD_GIFT_POOL0_ENTRIES: &[LootEntry] = &[
@@ -39714,6 +41121,7 @@ static GAMEPLAY_HERO_OF_THE_VILLAGE_SHEPHERD_GIFT_POOLS: &[LootPool] = &[LootPoo
     condition: LootCondition::None,
 }];
 pub static GAMEPLAY_HERO_OF_THE_VILLAGE_SHEPHERD_GIFT: LootTable = LootTable {
+    random_sequence: Some("minecraft:gameplay/hero_of_the_village/shepherd_gift"),
     pools: GAMEPLAY_HERO_OF_THE_VILLAGE_SHEPHERD_GIFT_POOLS,
 };
 static GAMEPLAY_HERO_OF_THE_VILLAGE_TOOLSMITH_GIFT_POOL0_ENTRIES: &[LootEntry] = &[
@@ -39762,6 +41170,7 @@ static GAMEPLAY_HERO_OF_THE_VILLAGE_TOOLSMITH_GIFT_POOLS: &[LootPool] = &[LootPo
     condition: LootCondition::None,
 }];
 pub static GAMEPLAY_HERO_OF_THE_VILLAGE_TOOLSMITH_GIFT: LootTable = LootTable {
+    random_sequence: Some("minecraft:gameplay/hero_of_the_village/toolsmith_gift"),
     pools: GAMEPLAY_HERO_OF_THE_VILLAGE_TOOLSMITH_GIFT_POOLS,
 };
 static GAMEPLAY_HERO_OF_THE_VILLAGE_UNEMPLOYED_GIFT_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -39781,6 +41190,7 @@ static GAMEPLAY_HERO_OF_THE_VILLAGE_UNEMPLOYED_GIFT_POOLS: &[LootPool] = &[LootP
     condition: LootCondition::None,
 }];
 pub static GAMEPLAY_HERO_OF_THE_VILLAGE_UNEMPLOYED_GIFT: LootTable = LootTable {
+    random_sequence: Some("minecraft:gameplay/hero_of_the_village/unemployed_gift"),
     pools: GAMEPLAY_HERO_OF_THE_VILLAGE_UNEMPLOYED_GIFT_POOLS,
 };
 static GAMEPLAY_HERO_OF_THE_VILLAGE_WEAPONSMITH_GIFT_POOL0_ENTRIES: &[LootEntry] = &[
@@ -39820,6 +41230,7 @@ static GAMEPLAY_HERO_OF_THE_VILLAGE_WEAPONSMITH_GIFT_POOLS: &[LootPool] = &[Loot
     condition: LootCondition::None,
 }];
 pub static GAMEPLAY_HERO_OF_THE_VILLAGE_WEAPONSMITH_GIFT: LootTable = LootTable {
+    random_sequence: Some("minecraft:gameplay/hero_of_the_village/weaponsmith_gift"),
     pools: GAMEPLAY_HERO_OF_THE_VILLAGE_WEAPONSMITH_GIFT_POOLS,
 };
 static GAMEPLAY_PANDA_SNEEZE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -39839,6 +41250,7 @@ static GAMEPLAY_PANDA_SNEEZE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static GAMEPLAY_PANDA_SNEEZE: LootTable = LootTable {
+    random_sequence: Some("minecraft:gameplay/panda_sneeze"),
     pools: GAMEPLAY_PANDA_SNEEZE_POOLS,
 };
 static GAMEPLAY_PIGLIN_BARTERING_POOL0_ENTRIES: &[LootEntry] = &[
@@ -40022,6 +41434,7 @@ static GAMEPLAY_PIGLIN_BARTERING_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static GAMEPLAY_PIGLIN_BARTERING: LootTable = LootTable {
+    random_sequence: Some("minecraft:gameplay/piglin_bartering"),
     pools: GAMEPLAY_PIGLIN_BARTERING_POOLS,
 };
 static GAMEPLAY_SNIFFER_DIGGING_POOL0_ENTRIES: &[LootEntry] = &[
@@ -40052,6 +41465,7 @@ static GAMEPLAY_SNIFFER_DIGGING_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static GAMEPLAY_SNIFFER_DIGGING: LootTable = LootTable {
+    random_sequence: Some("minecraft:gameplay/sniffer_digging"),
     pools: GAMEPLAY_SNIFFER_DIGGING_POOLS,
 };
 static GAMEPLAY_TURTLE_GROW_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -40071,6 +41485,7 @@ static GAMEPLAY_TURTLE_GROW_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static GAMEPLAY_TURTLE_GROW: LootTable = LootTable {
+    random_sequence: Some("minecraft:gameplay/turtle_grow"),
     pools: GAMEPLAY_TURTLE_GROW_POOLS,
 };
 static HARVEST_BEEHIVE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -40090,6 +41505,7 @@ static HARVEST_BEEHIVE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static HARVEST_BEEHIVE: LootTable = LootTable {
+    random_sequence: Some("minecraft:harvest/beehive"),
     pools: HARVEST_BEEHIVE_POOLS,
 };
 static HARVEST_CAVE_VINE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -40109,6 +41525,7 @@ static HARVEST_CAVE_VINE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static HARVEST_CAVE_VINE: LootTable = LootTable {
+    random_sequence: Some("minecraft:harvest/cave_vine"),
     pools: HARVEST_CAVE_VINE_POOLS,
 };
 static HARVEST_SWEET_BERRY_BUSH_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -40146,6 +41563,7 @@ static HARVEST_SWEET_BERRY_BUSH_POOLS: &[LootPool] = &[
     },
 ];
 pub static HARVEST_SWEET_BERRY_BUSH: LootTable = LootTable {
+    random_sequence: Some("minecraft:harvest/sweet_berry_bush"),
     pools: HARVEST_SWEET_BERRY_BUSH_POOLS,
 };
 static POTS_TRIAL_CHAMBERS_CORRIDOR_POOL0_ENTRIES: &[LootEntry] = &[
@@ -40230,6 +41648,7 @@ static POTS_TRIAL_CHAMBERS_CORRIDOR_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static POTS_TRIAL_CHAMBERS_CORRIDOR: LootTable = LootTable {
+    random_sequence: Some("minecraft:pots/trial_chambers/corridor"),
     pools: POTS_TRIAL_CHAMBERS_CORRIDOR_POOLS,
 };
 static SHEARING_BOGGED_POOL0_ENTRIES: &[LootEntry] = &[
@@ -40260,6 +41679,7 @@ static SHEARING_BOGGED_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static SHEARING_BOGGED: LootTable = LootTable {
+    random_sequence: Some("minecraft:shearing/bogged"),
     pools: SHEARING_BOGGED_POOLS,
 };
 static SHEARING_MOOSHROOM_POOL0_ENTRIES: &[LootEntry] = &[
@@ -40290,6 +41710,7 @@ static SHEARING_MOOSHROOM_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static SHEARING_MOOSHROOM: LootTable = LootTable {
+    random_sequence: Some("minecraft:shearing/mooshroom"),
     pools: SHEARING_MOOSHROOM_POOLS,
 };
 static SHEARING_MOOSHROOM_BROWN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -40309,6 +41730,7 @@ static SHEARING_MOOSHROOM_BROWN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static SHEARING_MOOSHROOM_BROWN: LootTable = LootTable {
+    random_sequence: Some("minecraft:shearing/mooshroom/brown"),
     pools: SHEARING_MOOSHROOM_BROWN_POOLS,
 };
 static SHEARING_MOOSHROOM_RED_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -40328,6 +41750,7 @@ static SHEARING_MOOSHROOM_RED_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static SHEARING_MOOSHROOM_RED: LootTable = LootTable {
+    random_sequence: Some("minecraft:shearing/mooshroom/red"),
     pools: SHEARING_MOOSHROOM_RED_POOLS,
 };
 static SHEARING_SHEEP_POOL0_ENTRIES: &[LootEntry] = &[
@@ -40484,6 +41907,7 @@ static SHEARING_SHEEP_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static SHEARING_SHEEP: LootTable = LootTable {
+    random_sequence: Some("minecraft:shearing/sheep"),
     pools: SHEARING_SHEEP_POOLS,
 };
 static SHEARING_SHEEP_BLACK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -40503,6 +41927,7 @@ static SHEARING_SHEEP_BLACK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static SHEARING_SHEEP_BLACK: LootTable = LootTable {
+    random_sequence: Some("minecraft:shearing/sheep/black"),
     pools: SHEARING_SHEEP_BLACK_POOLS,
 };
 static SHEARING_SHEEP_BLUE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -40522,6 +41947,7 @@ static SHEARING_SHEEP_BLUE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static SHEARING_SHEEP_BLUE: LootTable = LootTable {
+    random_sequence: Some("minecraft:shearing/sheep/blue"),
     pools: SHEARING_SHEEP_BLUE_POOLS,
 };
 static SHEARING_SHEEP_BROWN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -40541,6 +41967,7 @@ static SHEARING_SHEEP_BROWN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static SHEARING_SHEEP_BROWN: LootTable = LootTable {
+    random_sequence: Some("minecraft:shearing/sheep/brown"),
     pools: SHEARING_SHEEP_BROWN_POOLS,
 };
 static SHEARING_SHEEP_CYAN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -40560,6 +41987,7 @@ static SHEARING_SHEEP_CYAN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static SHEARING_SHEEP_CYAN: LootTable = LootTable {
+    random_sequence: Some("minecraft:shearing/sheep/cyan"),
     pools: SHEARING_SHEEP_CYAN_POOLS,
 };
 static SHEARING_SHEEP_GRAY_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -40579,6 +42007,7 @@ static SHEARING_SHEEP_GRAY_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static SHEARING_SHEEP_GRAY: LootTable = LootTable {
+    random_sequence: Some("minecraft:shearing/sheep/gray"),
     pools: SHEARING_SHEEP_GRAY_POOLS,
 };
 static SHEARING_SHEEP_GREEN_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -40598,6 +42027,7 @@ static SHEARING_SHEEP_GREEN_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static SHEARING_SHEEP_GREEN: LootTable = LootTable {
+    random_sequence: Some("minecraft:shearing/sheep/green"),
     pools: SHEARING_SHEEP_GREEN_POOLS,
 };
 static SHEARING_SHEEP_LIGHT_BLUE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -40617,6 +42047,7 @@ static SHEARING_SHEEP_LIGHT_BLUE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static SHEARING_SHEEP_LIGHT_BLUE: LootTable = LootTable {
+    random_sequence: Some("minecraft:shearing/sheep/light_blue"),
     pools: SHEARING_SHEEP_LIGHT_BLUE_POOLS,
 };
 static SHEARING_SHEEP_LIGHT_GRAY_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -40636,6 +42067,7 @@ static SHEARING_SHEEP_LIGHT_GRAY_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static SHEARING_SHEEP_LIGHT_GRAY: LootTable = LootTable {
+    random_sequence: Some("minecraft:shearing/sheep/light_gray"),
     pools: SHEARING_SHEEP_LIGHT_GRAY_POOLS,
 };
 static SHEARING_SHEEP_LIME_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -40655,6 +42087,7 @@ static SHEARING_SHEEP_LIME_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static SHEARING_SHEEP_LIME: LootTable = LootTable {
+    random_sequence: Some("minecraft:shearing/sheep/lime"),
     pools: SHEARING_SHEEP_LIME_POOLS,
 };
 static SHEARING_SHEEP_MAGENTA_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -40674,6 +42107,7 @@ static SHEARING_SHEEP_MAGENTA_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static SHEARING_SHEEP_MAGENTA: LootTable = LootTable {
+    random_sequence: Some("minecraft:shearing/sheep/magenta"),
     pools: SHEARING_SHEEP_MAGENTA_POOLS,
 };
 static SHEARING_SHEEP_ORANGE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -40693,6 +42127,7 @@ static SHEARING_SHEEP_ORANGE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static SHEARING_SHEEP_ORANGE: LootTable = LootTable {
+    random_sequence: Some("minecraft:shearing/sheep/orange"),
     pools: SHEARING_SHEEP_ORANGE_POOLS,
 };
 static SHEARING_SHEEP_PINK_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -40712,6 +42147,7 @@ static SHEARING_SHEEP_PINK_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static SHEARING_SHEEP_PINK: LootTable = LootTable {
+    random_sequence: Some("minecraft:shearing/sheep/pink"),
     pools: SHEARING_SHEEP_PINK_POOLS,
 };
 static SHEARING_SHEEP_PURPLE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -40731,6 +42167,7 @@ static SHEARING_SHEEP_PURPLE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static SHEARING_SHEEP_PURPLE: LootTable = LootTable {
+    random_sequence: Some("minecraft:shearing/sheep/purple"),
     pools: SHEARING_SHEEP_PURPLE_POOLS,
 };
 static SHEARING_SHEEP_RED_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -40750,6 +42187,7 @@ static SHEARING_SHEEP_RED_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static SHEARING_SHEEP_RED: LootTable = LootTable {
+    random_sequence: Some("minecraft:shearing/sheep/red"),
     pools: SHEARING_SHEEP_RED_POOLS,
 };
 static SHEARING_SHEEP_WHITE_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -40769,6 +42207,7 @@ static SHEARING_SHEEP_WHITE_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static SHEARING_SHEEP_WHITE: LootTable = LootTable {
+    random_sequence: Some("minecraft:shearing/sheep/white"),
     pools: SHEARING_SHEEP_WHITE_POOLS,
 };
 static SHEARING_SHEEP_YELLOW_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -40788,6 +42227,7 @@ static SHEARING_SHEEP_YELLOW_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static SHEARING_SHEEP_YELLOW: LootTable = LootTable {
+    random_sequence: Some("minecraft:shearing/sheep/yellow"),
     pools: SHEARING_SHEEP_YELLOW_POOLS,
 };
 static SHEARING_SNOW_GOLEM_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -40807,6 +42247,7 @@ static SHEARING_SNOW_GOLEM_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static SHEARING_SNOW_GOLEM: LootTable = LootTable {
+    random_sequence: Some("minecraft:shearing/snow_golem"),
     pools: SHEARING_SNOW_GOLEM_POOLS,
 };
 static SPAWNERS_OMINOUS_TRIAL_CHAMBER_CONSUMABLES_POOL0_ENTRIES: &[LootEntry] = &[
@@ -40864,6 +42305,7 @@ static SPAWNERS_OMINOUS_TRIAL_CHAMBER_CONSUMABLES_POOLS: &[LootPool] = &[LootPoo
     condition: LootCondition::None,
 }];
 pub static SPAWNERS_OMINOUS_TRIAL_CHAMBER_CONSUMABLES: LootTable = LootTable {
+    random_sequence: Some("minecraft:spawners/ominous/trial_chamber/consumables"),
     pools: SPAWNERS_OMINOUS_TRIAL_CHAMBER_CONSUMABLES_POOLS,
 };
 static SPAWNERS_OMINOUS_TRIAL_CHAMBER_KEY_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -40883,6 +42325,7 @@ static SPAWNERS_OMINOUS_TRIAL_CHAMBER_KEY_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static SPAWNERS_OMINOUS_TRIAL_CHAMBER_KEY: LootTable = LootTable {
+    random_sequence: Some("minecraft:spawners/ominous/trial_chamber/key"),
     pools: SPAWNERS_OMINOUS_TRIAL_CHAMBER_KEY_POOLS,
 };
 static SPAWNERS_TRIAL_CHAMBER_CONSUMABLES_POOL0_ENTRIES: &[LootEntry] = &[
@@ -40940,6 +42383,7 @@ static SPAWNERS_TRIAL_CHAMBER_CONSUMABLES_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static SPAWNERS_TRIAL_CHAMBER_CONSUMABLES: LootTable = LootTable {
+    random_sequence: Some("minecraft:spawners/trial_chamber/consumables"),
     pools: SPAWNERS_TRIAL_CHAMBER_CONSUMABLES_POOLS,
 };
 static SPAWNERS_TRIAL_CHAMBER_ITEMS_TO_DROP_WHEN_OMINOUS_POOL0_ENTRIES: &[LootEntry] = &[
@@ -41071,6 +42515,7 @@ static SPAWNERS_TRIAL_CHAMBER_ITEMS_TO_DROP_WHEN_OMINOUS_POOLS: &[LootPool] = &[
     },
 ];
 pub static SPAWNERS_TRIAL_CHAMBER_ITEMS_TO_DROP_WHEN_OMINOUS: LootTable = LootTable {
+    random_sequence: Some("minecraft:spawners/trial_chamber/items_to_drop_when_ominous"),
     pools: SPAWNERS_TRIAL_CHAMBER_ITEMS_TO_DROP_WHEN_OMINOUS_POOLS,
 };
 static SPAWNERS_TRIAL_CHAMBER_KEY_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -41090,6 +42535,7 @@ static SPAWNERS_TRIAL_CHAMBER_KEY_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static SPAWNERS_TRIAL_CHAMBER_KEY: LootTable = LootTable {
+    random_sequence: Some("minecraft:spawners/trial_chamber/key"),
     pools: SPAWNERS_TRIAL_CHAMBER_KEY_POOLS,
 };
 static TILL_ROOTED_DIRT_POOL0_ENTRIES: &[LootEntry] = &[LootEntry {
@@ -41109,6 +42555,7 @@ static TILL_ROOTED_DIRT_POOLS: &[LootPool] = &[LootPool {
     condition: LootCondition::None,
 }];
 pub static TILL_ROOTED_DIRT: LootTable = LootTable {
+    random_sequence: Some("minecraft:till/rooted_dirt"),
     pools: TILL_ROOTED_DIRT_POOLS,
 };
 static LOOT_TABLES_BY_KEY: [(&str, &LootTable); 2894usize] = [

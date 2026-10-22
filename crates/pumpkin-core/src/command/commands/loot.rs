@@ -357,8 +357,12 @@ impl CommandExecutor for LootExecutor {
                     tool: tool_stack,
                     ..Default::default()
                 };
-                let seed: i64 = rand::random();
-                drops = crate::world::loot::generate_loot_from_handle(&loot_table, seed, &params);
+                drops = crate::world::loot::generate_loot_from_handle(
+                    &loot_table,
+                    context.world(),
+                    0,
+                    &params,
+                );
             }
             Source::Loot => {
                 let key = IdentifierArgumentType::get(context, "loot_table")?.to_string();
@@ -376,8 +380,12 @@ impl CommandExecutor for LootExecutor {
                     position: context.source.as_player().map(|p| p.position()),
                     ..Default::default()
                 };
-                let seed: i64 = rand::random();
-                drops = crate::world::loot::generate_loot_from_handle(&loot_table, seed, &params);
+                drops = crate::world::loot::generate_loot_from_handle(
+                    &loot_table,
+                    context.world(),
+                    0,
+                    &params,
+                );
             }
             Source::Kill => {
                 let target_entities = EntityArgumentType::get_entities(context, "target_entity")?;
@@ -399,10 +407,10 @@ impl CommandExecutor for LootExecutor {
                     let key = format!("minecraft:entities/{resource_name}");
                     if let Some(loot_table) = context.server().datapack_manager.get_loot_table(&key)
                     {
-                        let seed: i64 = rand::random();
                         drops.extend(crate::world::loot::generate_loot_from_handle(
                             &loot_table,
-                            seed,
+                            context.world(),
+                            0,
                             &params,
                         ));
                         last_key = Some(key);
@@ -454,8 +462,8 @@ impl CommandExecutor for LootExecutor {
                     )),
                     ..Default::default()
                 };
-                let seed: i64 = rand::random();
-                drops = crate::world::loot::generate_loot_from_handle(&loot_table, seed, &params);
+                drops =
+                    crate::world::loot::generate_loot_from_handle(&loot_table, world, 0, &params);
                 table_id_for_callback = Some(key.to_string());
             }
         }

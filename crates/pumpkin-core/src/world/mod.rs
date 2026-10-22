@@ -34,6 +34,8 @@ pub mod portal;
 pub mod raid;
 pub mod random_sequences;
 pub mod stopwatches;
+#[cfg(test)]
+pub(crate) mod test_support;
 pub mod time;
 pub mod villager_poi;
 

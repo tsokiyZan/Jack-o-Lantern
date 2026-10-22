@@ -830,8 +830,7 @@ impl CatRelaxOnOwnerGoal {
             f64::from(cat_pos.0.y),
             f64::from(cat_pos.0.z) + f64::from(pumpkin_util::math::cos(body_yaw)),
         );
-        for stack in
-            crate::world::loot::generate_loot_from_handle(&loot_table, rand::random(), &params)
+        for stack in crate::world::loot::generate_loot_from_handle(&loot_table, &world, 0, &params)
         {
             // `new ItemEntity(level, x, y, z, stack)` keeps the default pickup delay of 0.
             let item = ItemEntity::new(

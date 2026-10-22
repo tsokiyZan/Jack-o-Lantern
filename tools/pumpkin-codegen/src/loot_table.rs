@@ -460,6 +460,8 @@ fn default_rolls() -> RollsStruct {
 #[derive(Deserialize, Clone, Debug)]
 struct ChestLootTableJson {
     #[serde(default)]
+    random_sequence: Option<String>,
+    #[serde(default)]
     pools: Vec<PoolStruct>,
 }
 
@@ -968,9 +970,16 @@ pub fn build() -> TokenStream {
         let pool_tokens = emit_table(&prefix, table, &mut all_tokens);
 
         let pools_ident = format_ident!("{}_POOLS", prefix);
+        let random_sequence = table
+            .random_sequence
+            .as_ref()
+            .map_or_else(|| quote! { None }, |key| quote! { Some(#key) });
         all_tokens.extend(quote! {
             static #pools_ident: &[LootPool] = &[#(#pool_tokens),*];
-            pub static #table_ident: LootTable = LootTable { pools: #pools_ident };
+            pub static #table_ident: LootTable = LootTable {
+                random_sequence: #random_sequence,
+                pools: #pools_ident,
+            };
         });
 
         lookup_rows.push((key, table_ident.clone()));

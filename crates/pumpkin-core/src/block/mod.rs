@@ -541,8 +541,8 @@ pub fn block_loot_stacks(
     let Some(loot_table) = block.loot_table.and_then(|key| world.get_loot_table(key)) else {
         return Vec::new();
     };
-    let seed: i64 = rand::random();
-    let items = crate::world::loot::generate_loot_from_handle(&loot_table, seed, params);
+    // Vanilla `BlockBehaviour.getDrops`: `getRandomItems(params)`, no seed.
+    let items = crate::world::loot::generate_loot_from_handle(&loot_table, world, 0, params);
     if items.is_empty() {
         return Vec::new();
     }

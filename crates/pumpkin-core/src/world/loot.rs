@@ -6,11 +6,15 @@ use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::recipes::{CookingRecipeKind, get_cooking_recipe_with_ingredient};
 use pumpkin_data::tag::Taggable;
+use pumpkin_util::identifier::Identifier;
 pub use pumpkin_util::loot_table::{
     DynamicLootCondition, DynamicLootEntry, DynamicLootPool, DynamicLootTable, LootBonusFormula,
     LootCondition, LootEntry, LootPool, LootTable,
 };
-use pumpkin_util::random::{RandomImpl, xoroshiro128::Xoroshiro};
+use pumpkin_util::random::legacy_rand::LegacyRand;
+use pumpkin_util::random::{RandomImpl, shuffle};
+
+use crate::world::World;
 
 #[derive(Default, Clone)]
 pub struct LootContextParameters {
@@ -108,13 +112,13 @@ fn smelt(stack: ItemStack) -> ItemStack {
     result
 }
 
-fn check_dynamic_condition(
+fn check_dynamic_condition<R: RandomImpl>(
     cond: &DynamicLootCondition,
     has_silk_touch: bool,
     has_shears: bool,
     fortune_level: i32,
     params: &LootContextParameters,
-    rng: &mut Xoroshiro,
+    rng: &mut R,
 ) -> bool {
     match cond {
         DynamicLootCondition::None => true,
@@ -189,13 +193,13 @@ fn check_dynamic_condition(
     }
 }
 
-fn check_condition(
+fn check_condition<R: RandomImpl>(
     cond: LootCondition,
     has_silk_touch: bool,
     has_shears: bool,
     fortune_level: i32,
     params: &LootContextParameters,
-    rng: &mut Xoroshiro,
+    rng: &mut R,
 ) -> bool {
     match cond {
         LootCondition::None => true,
@@ -255,11 +259,11 @@ fn check_condition(
     }
 }
 
-fn apply_bonus_formula(
+fn apply_bonus_formula<R: RandomImpl>(
     base_count: i32,
     bonus: LootBonusFormula,
     fortune_level: i32,
-    rng: &mut Xoroshiro,
+    rng: &mut R,
 ) -> i32 {
     match bonus {
         LootBonusFormula::OreDrops => {
@@ -292,19 +296,12 @@ fn apply_bonus_formula(
     }
 }
 
-#[must_use]
-pub fn generate_loot(table: &LootTable, seed: i64) -> Vec<ItemStack> {
-    generate_loot_with_context(table, seed, &LootContextParameters::default())
-}
-
-#[must_use]
 #[expect(clippy::too_many_lines)]
-pub fn generate_loot_with_context(
+fn evaluate_static<R: RandomImpl>(
     table: &LootTable,
-    seed: i64,
+    random: &mut R,
     params: &LootContextParameters,
 ) -> Vec<ItemStack> {
-    let mut rng = Xoroshiro::from_seed(seed as u64);
     let mut items_to_place: Vec<ItemStack> = Vec::new();
 
     let has_silk_touch = params.tool.as_ref().is_some_and(|tool| {
@@ -336,7 +333,7 @@ pub fn generate_loot_with_context(
             has_shears,
             fortune_level,
             params,
-            &mut rng,
+            random,
         ) {
             continue;
         }
@@ -351,7 +348,7 @@ pub fn generate_loot_with_context(
                     has_shears,
                     fortune_level,
                     params,
-                    &mut rng,
+                    random,
                 )
             })
             .collect();
@@ -363,7 +360,7 @@ pub fn generate_loot_with_context(
         let range = pool.max_rolls - pool.min_rolls;
         let rolls = pool.min_rolls
             + if range > 0 {
-                rng.next_bounded_i32(range + 1)
+                random.next_bounded_i32(range + 1)
             } else {
                 0
             };
@@ -375,7 +372,7 @@ pub fn generate_loot_with_context(
                 continue;
             }
 
-            let mut pick = rng.next_bounded_i32(total_weight);
+            let mut pick = random.next_bounded_i32(total_weight);
 
             pick -= pool.empty_weight;
             if pick < 0 {
@@ -388,7 +385,7 @@ pub fn generate_loot_with_context(
                     let count_range = entry.max_count - entry.min_count;
                     let base_count = entry.min_count
                         + if count_range > 0 {
-                            rng.next_bounded_i32(count_range + 1)
+                            random.next_bounded_i32(count_range + 1)
                         } else {
                             0
                         };
@@ -396,7 +393,7 @@ pub fn generate_loot_with_context(
                     let mut final_count = base_count;
                     if let Some(bonus) = entry.bonus_formula {
                         final_count =
-                            apply_bonus_formula(final_count, bonus, fortune_level, &mut rng);
+                            apply_bonus_formula(final_count, bonus, fortune_level, random);
                     }
 
                     if final_count > 0 {
@@ -411,7 +408,7 @@ pub fn generate_loot_with_context(
                                     has_shears,
                                     fortune_level,
                                     params,
-                                    &mut rng,
+                                    random,
                                 )
                             });
                             items_to_place.push(if smelts { smelt(stack) } else { stack });
@@ -426,20 +423,11 @@ pub fn generate_loot_with_context(
     items_to_place
 }
 
-pub use generate_loot as generate_chest_loot;
-
-#[must_use]
-pub fn generate_dynamic_loot(table: &DynamicLootTable, seed: i64) -> Vec<ItemStack> {
-    generate_dynamic_loot_with_context(table, seed, &LootContextParameters::default())
-}
-
-#[must_use]
-pub fn generate_dynamic_loot_with_context(
+fn evaluate_dynamic<R: RandomImpl>(
     table: &DynamicLootTable,
-    seed: i64,
+    random: &mut R,
     params: &LootContextParameters,
 ) -> Vec<ItemStack> {
-    let mut rng = Xoroshiro::from_seed(seed as u64);
     let mut items_to_place: Vec<ItemStack> = Vec::new();
 
     let has_silk_touch = params.tool.as_ref().is_some_and(|tool| {
@@ -471,7 +459,7 @@ pub fn generate_dynamic_loot_with_context(
             has_shears,
             fortune_level,
             params,
-            &mut rng,
+            random,
         ) {
             continue;
         }
@@ -486,7 +474,7 @@ pub fn generate_dynamic_loot_with_context(
                     has_shears,
                     fortune_level,
                     params,
-                    &mut rng,
+                    random,
                 )
             })
             .collect();
@@ -498,7 +486,7 @@ pub fn generate_dynamic_loot_with_context(
         let range = pool.max_rolls - pool.min_rolls;
         let rolls = pool.min_rolls
             + if range > 0 {
-                rng.next_bounded_i32(range + 1)
+                random.next_bounded_i32(range + 1)
             } else {
                 0
             };
@@ -508,7 +496,7 @@ pub fn generate_dynamic_loot_with_context(
             pool.empty_weight,
             &eligible_entries,
             fortune_level,
-            &mut rng,
+            random,
             &mut items_to_place,
         );
     }
@@ -516,12 +504,12 @@ pub fn generate_dynamic_loot_with_context(
     items_to_place
 }
 
-fn roll_dynamic_entries(
+fn roll_dynamic_entries<R: RandomImpl>(
     rolls: i32,
     empty_weight: i32,
     eligible_entries: &[&DynamicLootEntry],
     fortune_level: i32,
-    rng: &mut Xoroshiro,
+    rng: &mut R,
     items_to_place: &mut Vec<ItemStack>,
 ) {
     for _ in 0..rolls {
@@ -585,18 +573,24 @@ impl From<std::sync::Arc<DynamicLootTable>> for LootTableHandle {
 }
 
 impl LootTableHandle {
+    /// Vanilla `LootTable.randomSequence`.
     #[must_use]
-    pub fn generate_loot(&self, seed: i64) -> Vec<ItemStack> {
-        self.generate_loot_with_context(seed, &LootContextParameters::default())
+    pub fn random_sequence(&self) -> Option<&str> {
+        match self {
+            Self::Static(table) => table.random_sequence,
+            Self::Dynamic(table) => table.random_sequence.as_deref(),
+        }
     }
 
-    #[must_use]
-    pub fn generate_loot_with_context(
+    fn evaluate<R: RandomImpl>(
         &self,
-        seed: i64,
+        random: &mut R,
         params: &LootContextParameters,
     ) -> Vec<ItemStack> {
-        generate_loot_from_handle(self, seed, params)
+        match self {
+            Self::Static(table) => evaluate_static(table, random, params),
+            Self::Dynamic(table) => evaluate_dynamic(table, random, params),
+        }
     }
 }
 
@@ -612,42 +606,74 @@ pub fn get_loot_table(key: &str) -> Option<LootTableHandle> {
         .map(LootTableHandle::Static)
 }
 
+/// Vanilla `LootContext.Builder.create`: a nonzero seed gets its own `LegacyRandomSource`
+/// (`withOptionalRandomSeed`), else the table's random sequence, else the level's random. Runs
+/// `$body` with `$random` bound to the chosen source, which stays locked until `$body` returns.
+macro_rules! with_loot_random {
+    ($handle:expr, $world:expr, $seed:expr, |$random:ident| $body:expr) => {{
+        let handle: &LootTableHandle = $handle;
+        let world: &World = $world;
+        let seed: i64 = $seed;
+        if seed != 0 {
+            let $random = &mut LegacyRand::from_seed(seed as u64);
+            $body
+        } else if let Some((server, key)) = handle.random_sequence().and_then(|key| {
+            let key = Identifier::parse(key).ok()?;
+            Some((world.server.upgrade()?, key))
+        }) {
+            let world_seed = server.level_info.load().world_gen_settings.seed;
+            let mut sequences = server
+                .random_sequences
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let $random = sequences.get(&key, world_seed);
+            $body
+        } else {
+            let mut level_random = world
+                .random
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let $random = &mut *level_random;
+            $body
+        }
+    }};
+}
+
+/// Vanilla `LootTable.getRandomItems(params, optionalLootTableSeed)`; a seed of 0 is
+/// `getRandomItems(params)`.
 #[must_use]
 pub fn generate_loot_from_handle(
     handle: &LootTableHandle,
+    world: &World,
     seed: i64,
     params: &LootContextParameters,
 ) -> Vec<ItemStack> {
-    match handle {
-        LootTableHandle::Static(table) => generate_loot_with_context(table, seed, params),
-        LootTableHandle::Dynamic(table) => generate_dynamic_loot_with_context(table, seed, params),
-    }
+    with_loot_random!(handle, world, seed, |random| handle
+        .evaluate(random, params))
 }
 
-fn place_items_in_chest(
+/// Vanilla `LootTable.fill`: the slot shuffle and stack splitting draw from the random the
+/// items were rolled on.
+pub fn fill_chest_inventory_handle(
     inventory: &std::sync::Arc<dyn pumpkin_inventory::Inventory>,
-    mut items_to_place: Vec<ItemStack>,
+    handle: &LootTableHandle,
+    world: &World,
     seed: i64,
 ) {
-    if items_to_place.is_empty() {
-        return;
-    }
+    with_loot_random!(handle, world, seed, |random| fill(
+        inventory, handle, random
+    ));
+}
 
-    let inv_size = inventory.size();
-    let mut rng = Xoroshiro::from_seed(seed as u64);
-
-    let mut available_slots: Vec<usize> = (0..inv_size)
-        .filter(|&slot| inventory.get_stack(slot).is_empty())
-        .collect();
-
-    for i in (1..available_slots.len()).rev() {
-        let j = rng.next_bounded_i32((i + 1) as i32) as usize;
-        available_slots.swap(i, j);
-    }
-
-    shuffle_and_split_items(&mut items_to_place, available_slots.len(), &mut rng);
-
-    for item in items_to_place {
+fn fill<R: RandomImpl>(
+    inventory: &std::sync::Arc<dyn pumpkin_inventory::Inventory>,
+    handle: &LootTableHandle,
+    random: &mut R,
+) {
+    let mut items = handle.evaluate(random, &LootContextParameters::default());
+    let mut available_slots = get_available_slots(inventory, random);
+    shuffle_and_split_items(&mut items, available_slots.len(), random);
+    for item in items {
         let Some(slot) = available_slots.pop() else {
             tracing::warn!("Tried to over-fill a container");
             return;
@@ -656,79 +682,73 @@ fn place_items_in_chest(
     }
 }
 
-pub fn fill_chest_inventory_handle(
+/// Vanilla `LootTable.getAvailableSlots`.
+fn get_available_slots<R: RandomImpl>(
     inventory: &std::sync::Arc<dyn pumpkin_inventory::Inventory>,
-    handle: &LootTableHandle,
-    seed: i64,
-) {
-    let items_to_place = generate_loot_from_handle(handle, seed, &LootContextParameters::default());
-    place_items_in_chest(inventory, items_to_place, seed);
+    random: &mut R,
+) -> Vec<usize> {
+    let mut slots: Vec<usize> = (0..inventory.size())
+        .filter(|&slot| inventory.get_stack(slot).is_empty())
+        .collect();
+    shuffle(&mut slots, random);
+    slots
 }
 
-pub fn fill_chest_inventory(
-    inventory: &std::sync::Arc<dyn pumpkin_inventory::Inventory>,
-    table: &LootTable,
-    seed: i64,
-) {
-    let items_to_place = generate_loot(table, seed);
-    place_items_in_chest(inventory, items_to_place, seed);
-}
-
-fn shuffle_and_split_items(
+/// Vanilla `LootTable.shuffleAndSplitItems`.
+fn shuffle_and_split_items<R: RandomImpl>(
     result: &mut Vec<ItemStack>,
     available_slots: usize,
-    rng: &mut Xoroshiro,
+    random: &mut R,
 ) {
     let mut splittable: Vec<ItemStack> = Vec::new();
-    let mut i = 0;
-    while i < result.len() {
-        if result[i].is_empty() {
-            result.swap_remove(i);
-        } else if result[i].item_count > 1 {
-            splittable.push(result.swap_remove(i));
+    let mut kept = Vec::with_capacity(result.len());
+    for stack in result.drain(..) {
+        if stack.is_empty() {
+            continue;
+        }
+        if stack.item_count > 1 {
+            splittable.push(stack);
         } else {
-            i += 1;
+            kept.push(stack);
         }
     }
+    *result = kept;
 
     while available_slots > result.len() + splittable.len() && !splittable.is_empty() {
-        let idx = rng.next_bounded_i32(splittable.len() as i32) as usize;
-        let mut stack = splittable.swap_remove(idx);
+        let index = random.next_inbetween_i32(0, splittable.len() as i32 - 1) as usize;
+        let mut stack = splittable.remove(index);
+        let remove = random.next_inbetween_i32(1, i32::from(stack.item_count) / 2);
+        let copy = stack.split(remove as u8);
 
-        let count = stack.item_count as i32;
-        let split_off = 1 + rng.next_bounded_i32(count / 2);
-        stack.item_count = (count - split_off) as u8;
-        let mut copy = stack.clone();
-        copy.item_count = split_off as u8;
-
-        if stack.item_count > 1 && rng.next_bool() {
+        if stack.item_count > 1 && random.next_bool() {
             splittable.push(stack);
         } else {
             result.push(stack);
         }
-        if copy.item_count > 1 && rng.next_bool() {
+        if copy.item_count > 1 && random.next_bool() {
             splittable.push(copy);
         } else {
             result.push(copy);
         }
     }
 
-    result.extend(splittable);
-
-    let n = result.len();
-    for i in (1..n).rev() {
-        let j = rng.next_bounded_i32((i + 1) as i32) as usize;
-        result.swap(i, j);
-    }
+    result.append(&mut splittable);
+    shuffle(result, random);
 }
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use pumpkin_data::entity::EntityType;
     use pumpkin_data::item::Item;
     use pumpkin_data::loot_table::ENTITIES_MAGMA_CUBE;
+    use pumpkin_inventory::{Inventory, SimpleInventory};
+    use pumpkin_util::loot_table::{LootCondition, LootEntry, LootPool, LootTable};
+    use pumpkin_util::random::legacy_rand::LegacyRand;
+    use pumpkin_util::random::trace::{Draw, TraceRandom};
 
-    use super::{LootContextParameters, generate_loot_with_context};
+    use super::{LootContextParameters, LootTableHandle, evaluate_static, fill};
 
     fn magma_cube_drops(
         killer: &'static EntityType,
@@ -736,9 +756,9 @@ mod tests {
     ) -> Vec<&'static Item> {
         (0..64)
             .flat_map(|seed| {
-                generate_loot_with_context(
+                evaluate_static(
                     &ENTITIES_MAGMA_CUBE,
-                    seed,
+                    &mut LegacyRand::from_seed(seed),
                     &LootContextParameters {
                         this_entity: Some(&EntityType::MAGMA_CUBE),
                         damage_source_entity: Some(killer),
@@ -766,5 +786,61 @@ mod tests {
     #[test]
     fn a_tiny_magma_cube_killed_by_anything_else_drops_nothing() {
         assert!(magma_cube_drops(&EntityType::ZOMBIE, None).is_empty());
+    }
+
+    static EMPTY_TABLE: LootTable = LootTable {
+        random_sequence: None,
+        pools: &[],
+    };
+
+    static TWO_DIAMONDS: LootTable = LootTable {
+        random_sequence: None,
+        pools: &[LootPool {
+            entries: &[LootEntry {
+                item: "minecraft:diamond",
+                weight: 1,
+                min_count: 2,
+                max_count: 2,
+                condition: LootCondition::None,
+                bonus_formula: None,
+                furnace_smelt: None,
+            }],
+            min_rolls: 1,
+            max_rolls: 1,
+            empty_weight: 0,
+            condition: LootCondition::None,
+        }],
+    };
+
+    fn fill_draws(table: &'static LootTable, slots: usize) -> Vec<Draw> {
+        let inventory: Arc<dyn Inventory> = Arc::new(SimpleInventory::new(slots));
+        let mut random = TraceRandom::from_seed(0);
+        fill(&inventory, &LootTableHandle::Static(table), &mut random);
+        random.draws
+    }
+
+    /// Vanilla `LootTable.fill` shuffles the empty slots even when nothing rolled.
+    #[test]
+    fn fill_shuffles_the_slots_when_the_table_rolls_nothing() {
+        assert_eq!(
+            fill_draws(&EMPTY_TABLE, 3),
+            [Draw::NextIntBounded(3), Draw::NextIntBounded(2)]
+        );
+    }
+
+    /// `shuffleAndSplitItems` picks and splits with `Mth.nextInt`, which skips the draw for a
+    /// single splittable stack and a split of exactly one.
+    #[test]
+    fn fill_splits_a_pair_without_drawing() {
+        assert_eq!(
+            fill_draws(&TWO_DIAMONDS, 3),
+            [
+                // The pool's roll picks its only entry; Task 9 owns that draw.
+                Draw::NextIntBounded(1),
+                Draw::NextIntBounded(3),
+                Draw::NextIntBounded(2),
+                Draw::NextIntBounded(2),
+            ]
+        );
     }
 }

@@ -82,9 +82,7 @@ impl BoggedSkeletonEntity {
             ..Default::default()
         };
         let drop_pos = pos.add(&Vector3::new(0.0, f64::from(entity.height()), 0.0));
-        for stack in
-            crate::world::loot::generate_loot_from_handle(&loot_table, rand::random(), &params)
-        {
+        for stack in crate::world::loot::generate_loot_from_handle(&loot_table, world, 0, &params) {
             if stack.is_empty() {
                 continue;
             }

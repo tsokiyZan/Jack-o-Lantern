@@ -674,7 +674,7 @@ impl PandaEntity {
                 ..Default::default()
             };
             for stack in
-                crate::world::loot::generate_loot_from_handle(&loot_table, rand::random(), &params)
+                crate::world::loot::generate_loot_from_handle(&loot_table, &world, 0, &params)
             {
                 entity.spawn_at_location(stack);
             }

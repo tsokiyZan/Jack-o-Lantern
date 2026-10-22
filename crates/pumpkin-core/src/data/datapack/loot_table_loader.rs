@@ -15,8 +15,15 @@ pub fn parse_loot_table(json_content: &str) -> Option<DynamicLootTable> {
     let pools_val = root.get("pools").and_then(Value::as_array)?;
 
     let pools = pools_val.iter().map(parse_pool).collect();
+    let random_sequence = root
+        .get("random_sequence")
+        .and_then(Value::as_str)
+        .map(ToString::to_string);
 
-    Some(DynamicLootTable { pools })
+    Some(DynamicLootTable {
+        random_sequence,
+        pools,
+    })
 }
 
 fn parse_pool(val: &Value) -> DynamicLootPool {

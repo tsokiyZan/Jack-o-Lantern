@@ -33,7 +33,7 @@ use crate::entity::ai::util::goal_utils;
 use crate::entity::mob::Mob;
 use crate::entity::player::Player;
 use crate::world::World;
-use crate::world::loot::fill_chest_inventory;
+use crate::world::loot::fill_chest_inventory_handle;
 use pumpkin_data::BlockState;
 
 struct ChestScreenFactory {
@@ -210,7 +210,7 @@ fn get_chest_screen_handler_factory(
             && let Some(table) = get_loot_table(&loot_key)
             && let Some(inv) = entity.clone().get_inventory()
         {
-            fill_chest_inventory(&inv, table, seed);
+            fill_chest_inventory_handle(&inv, &table.into(), args.world, seed);
             inv.mark_dirty();
         }
     };
