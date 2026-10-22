@@ -118,6 +118,7 @@ const MOB_ACTION_FACTOR: f32 = 0.2;
 impl SpearItem {
     const USE_DURATION: i32 = 72_000;
 
+    #[expect(clippy::too_many_lines)]
     fn stab_attack(
         player: &Player,
         server: &Server,

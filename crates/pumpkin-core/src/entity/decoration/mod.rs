@@ -8,9 +8,10 @@ pub mod painting;
 
 use crate::entity::EntityBase;
 
-/// Vanilla `BlockAttachedEntity.skipAttackInteraction`: a player who may not interact at the
-/// entity's block is stopped; else the entity takes a 0 damage player attack, and a hit ends
-/// the player's attack there.
+/// Vanilla `BlockAttachedEntity.skipAttackInteraction`.
+///
+/// A player who may not interact at the entity's block is stopped; else the entity takes a 0
+/// damage player attack, and a hit ends the player's attack there.
 pub fn block_attached_skip_attack_interaction(
     this: &dyn EntityBase,
     source: &dyn EntityBase,

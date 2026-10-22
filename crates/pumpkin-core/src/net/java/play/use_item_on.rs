@@ -343,12 +343,12 @@ impl JavaClient {
                 ));
                 Ok(true)
             }
-            Ok(None) => Ok(false),
             Err(crate::block::registry::BlockPlacingError::InvalidGamemode) => {
                 Err(BlockPlacingError::InvalidGamemode)
             }
-            // `BlockItem.place` fails; the build limit message follows in `handle_use_item_on`.
-            Err(crate::block::registry::BlockPlacingError::BlockOutOfWorld) => Ok(false),
+            // Out of the world, `BlockItem.place` fails; the build limit message follows in
+            // `handle_use_item_on`.
+            Ok(None) | Err(crate::block::registry::BlockPlacingError::BlockOutOfWorld) => Ok(false),
         }
     }
 }

@@ -3848,25 +3848,28 @@ impl Player {
         bounding_box: &pumpkin_util::math::boundingbox::BoundingBox,
         buffer: f64,
     ) -> bool {
-        let (min_reach, max_reach, hitbox_margin) = if let Some(range) =
-            weapon.get_data_component::<pumpkin_data::data_component_impl::AttackRangeImpl>()
-        {
-            if self.is_creative() {
-                (
-                    range.min_creative_reach,
-                    range.max_creative_reach,
-                    range.hitbox_margin,
-                )
-            } else {
-                (range.min_reach, range.max_reach, range.hitbox_margin)
-            }
-        } else {
-            let interaction_range = self
-                .living_entity
-                .get_attribute_value(&Attributes::ENTITY_INTERACTION_RANGE)
-                as f32;
-            (0.0, interaction_range, 0.0)
-        };
+        let (min_reach, max_reach, hitbox_margin) = weapon
+            .get_data_component::<pumpkin_data::data_component_impl::AttackRangeImpl>()
+            .map_or_else(
+                || {
+                    let interaction_range = self
+                        .living_entity
+                        .get_attribute_value(&Attributes::ENTITY_INTERACTION_RANGE)
+                        as f32;
+                    (0.0, interaction_range, 0.0)
+                },
+                |range| {
+                    if self.is_creative() {
+                        (
+                            range.min_creative_reach,
+                            range.max_creative_reach,
+                            range.hitbox_margin,
+                        )
+                    } else {
+                        (range.min_reach, range.max_reach, range.hitbox_margin)
+                    }
+                },
+            );
         let distance = bounding_box.squared_magnitude(self.eye_position()).sqrt();
         let min_reach = f64::from(min_reach) - f64::from(hitbox_margin) - buffer;
         let max_reach = f64::from(max_reach) + f64::from(hitbox_margin) + buffer;

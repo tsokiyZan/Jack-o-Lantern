@@ -119,9 +119,10 @@ pub fn drop_leash(leashable: &dyn EntityBase, drop_lead: bool) {
     }
 }
 
-/// Vanilla `Entity.shearOffAllLeashConnections(player)` through `dropAllLeashConnections`:
-/// every leash this entity holds and its own, with a `shear` game event and the snip sound.
-/// `None` when a plugin cancelled the player's shearing.
+/// Vanilla `Entity.shearOffAllLeashConnections(player)` through `dropAllLeashConnections`.
+///
+/// Every leash this entity holds and its own drop, with a `shear` game event and the snip
+/// sound. `None` when a plugin cancelled the player's shearing.
 pub fn shear_off_all_leash_connections(
     this: &dyn EntityBase,
     player: Option<(&Arc<Player>, Hand)>,
@@ -137,11 +138,12 @@ pub fn shear_off_all_leash_connections(
     {
         return None;
     }
-    let mut dropped = !leashables.is_empty();
-    if this_leashed {
+    let dropped = if this_leashed {
         drop_leash(this, true);
-        dropped = true;
-    }
+        true
+    } else {
+        !leashables.is_empty()
+    };
     for leashable in &leashables {
         drop_leash(leashable.as_ref(), true);
     }
@@ -165,9 +167,11 @@ pub fn shear_off_all_leash_connections(
     Some(true)
 }
 
-/// Vanilla `Entity.interact`: a sneaking player hands the leashables it leads over to this
-/// leashable, shears cut the leashes on and of this entity or shear off a mob's equipment, the
-/// holder takes its lead back, and a lead ties up a leashable that isn't held by a player.
+/// Vanilla `Entity.interact`.
+///
+/// A sneaking player hands the leashables it leads over to this leashable, shears cut the
+/// leashes on and of this entity or shear off a mob's equipment, the holder takes its lead
+/// back, and a lead ties up a leashable that isn't held by a player.
 pub fn entity_interact(
     this: &Arc<dyn EntityBase>,
     player: &Arc<Player>,

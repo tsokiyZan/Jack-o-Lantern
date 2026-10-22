@@ -1802,7 +1802,6 @@ impl World {
         self.play_sound_expect(player, sound, category, &new_vec);
     }
 
-    #[expect(clippy::too_many_lines)]
     /// Each player's position, touch box and chunk, for the entities that touch players.
     fn player_collision_cache(players: &[Arc<Player>]) -> Vec<PlayerCollisionEntry<'_>> {
         players
@@ -1885,6 +1884,7 @@ impl World {
         });
     }
 
+    #[expect(clippy::too_many_lines)]
     pub fn tick(self: &Arc<Self>, server: &Arc<Server>) {
         const ENTITY_TICK_BATCH_SIZE: usize = 16;
 
