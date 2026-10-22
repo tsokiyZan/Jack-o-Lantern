@@ -12,7 +12,7 @@ use std::sync::{
 
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
-use pumpkin_data::sound::{Sound, SoundCategory};
+use pumpkin_data::sound::Sound;
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::codec::var_int::VarInt;
@@ -197,6 +197,19 @@ impl AxolotlEntity {
     pub fn rehydrate(&self) {
         let breath = &self.mob_entity.living_entity.breath;
         breath.set_air_supply(self, breath.air() + 1800);
+    }
+}
+
+impl AxolotlEntity {
+    /// Vanilla `Axolotl.saveToBucketTag`, short of the variant component and the hunting
+    /// cooldown Pumpkin doesn't keep.
+    fn save_to_bucket_tag(&self, bucket: &mut ItemStack) {
+        let mut tag = crate::entity::bucketable::save_default_data_to_bucket_tag(self, bucket);
+        tag.put_int("Age", self.get_age());
+        tag.put_bool("AgeLocked", self.is_age_locked());
+        bucket.set_data_component(pumpkin_data::data_component_impl::BucketEntityDataImpl {
+            nbt: Some(tag),
+        });
     }
 }
 
@@ -426,33 +439,15 @@ impl Mob for AxolotlEntity {
         _hand: Hand,
         item_stack: &mut ItemStack,
     ) -> InteractionResult {
-        let item = item_stack.get_item();
-
-        if item == &Item::WATER_BUCKET {
-            let entity = self.get_entity();
-            let world = entity.world.load();
-            if let Some(server) = world.server.upgrade() {
-                let mut event = crate::plugin::api::events::player::player_bucket_entity::PlayerBucketEntityEvent {
-                    player: player.clone(),
-                    entity_id: entity.entity_id,
-                    bucket_item: "axolotl_bucket".to_string(),
-                    cancelled: false,
-                };
-                server.plugin_manager.fire_blocking(&server, &mut event);
-                if event.cancelled {
-                    return InteractionResult::PASS;
-                }
-            }
-            let pos = entity.pos.load();
-            world.play_sound(Sound::ItemBucketFillAxolotl, SoundCategory::Neutral, &pos);
-            crate::item::create_filled_result(
-                item_stack,
-                player,
-                ItemStack::new(1, &Item::AXOLOTL_BUCKET),
-                false,
-            );
-            entity.remove();
-            // `bucketMobPickup`.
+        // `Bucketable.bucketMobPickup`, else `Animal.mobInteract`.
+        if crate::entity::bucketable::bucket_mob_pickup(
+            self,
+            player,
+            item_stack,
+            &Item::AXOLOTL_BUCKET,
+            Sound::ItemBucketFillAxolotl,
+            |bucket| self.save_to_bucket_tag(bucket),
+        ) {
             return InteractionResult::SUCCESS;
         }
 

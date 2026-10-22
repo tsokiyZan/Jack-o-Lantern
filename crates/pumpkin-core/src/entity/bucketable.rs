@@ -1,12 +1,17 @@
 //! Vanilla `Bucketable`'s shared helpers, for mobs that can be carried in a bucket.
 
+use std::sync::Arc;
 use std::sync::atomic::Ordering::Relaxed;
 
-use pumpkin_data::data_component_impl::CustomNameImpl;
+use pumpkin_data::data_component_impl::{BucketEntityDataImpl, CustomNameImpl};
+use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
+use pumpkin_data::sound::Sound;
 use pumpkin_nbt::compound::NbtCompound;
 
 use crate::entity::mob::Mob;
+use crate::entity::player::Player;
+use crate::item::interaction_result::InteractionResult;
 
 /// Vanilla `Bucketable.saveDefaultDataToBucketTag`: copies the custom name onto `bucket`
 /// and returns the start of its `bucket_entity_data`, for the mob to add its own keys.
@@ -63,5 +68,75 @@ pub fn load_default_data_from_bucket_tag(mob: &dyn Mob, tag: &NbtCompound) {
     }
     if let Some(health) = tag.get_float("Health") {
         mob_entity.living_entity.set_health(health);
+    }
+}
+
+/// Vanilla `Bucketable.bucketMobPickup` for a mob picked up with a water bucket.
+///
+/// The plugin event (whose cancellation leaves the mob be), the pickup sound, a `bucket_item`
+/// filled by `save_to_bucket_tag` replacing the used bucket (`createFilledResult`), the lead
+/// dropped and the mob gone. Returns whether it picked the mob up, `Optional.of(SUCCESS)`.
+pub fn bucket_mob_pickup(
+    mob: &dyn Mob,
+    player: &Arc<Player>,
+    item_stack: &mut ItemStack,
+    bucket_item: &'static Item,
+    pickup_sound: Sound,
+    save_to_bucket_tag: impl FnOnce(&mut ItemStack),
+) -> bool {
+    let entity = mob.get_entity();
+    if item_stack.item != &Item::WATER_BUCKET || !entity.is_alive() {
+        return false;
+    }
+    let world = entity.world.load();
+    if let Some(server) = world.server.upgrade() {
+        let mut event =
+            crate::plugin::api::events::player::player_bucket_entity::PlayerBucketEntityEvent {
+                player: player.clone(),
+                entity_id: entity.entity_id,
+                bucket_item: bucket_item.registry_key.to_string(),
+                cancelled: false,
+            };
+        server.plugin_manager.fire_blocking(&server, &mut event);
+        if event.cancelled {
+            return false;
+        }
+    }
+    mob.play_sound_at_self(pickup_sound, 1.0, 1.0);
+    let mut bucket = ItemStack::new(1, bucket_item);
+    save_to_bucket_tag(&mut bucket);
+    crate::item::create_filled_result(item_stack, player, bucket, false);
+    if entity.is_leashed() {
+        entity.unleash();
+        entity.spawn_at_location(ItemStack::new(1, &Item::LEAD));
+    }
+    entity.remove();
+    true
+}
+
+/// Vanilla `AbstractFish.saveToBucketTag`: only `saveDefaultDataToBucketTag`.
+pub fn save_fish_to_bucket_tag(mob: &dyn Mob, bucket: &mut ItemStack) {
+    let tag = save_default_data_to_bucket_tag(mob, bucket);
+    bucket.set_data_component(BucketEntityDataImpl { nbt: Some(tag) });
+}
+
+/// Vanilla `AbstractFish.mobInteract`: `bucketMobPickup`, else `Mob.mobInteract`'s pass.
+pub fn fish_mob_interact(
+    mob: &dyn Mob,
+    player: &Arc<Player>,
+    item_stack: &mut ItemStack,
+    bucket_item: &'static Item,
+) -> InteractionResult {
+    if bucket_mob_pickup(
+        mob,
+        player,
+        item_stack,
+        bucket_item,
+        Sound::ItemBucketFillFish,
+        |bucket| save_fish_to_bucket_tag(mob, bucket),
+    ) {
+        InteractionResult::SUCCESS
+    } else {
+        InteractionResult::PASS
     }
 }

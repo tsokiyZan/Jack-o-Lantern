@@ -1,5 +1,3 @@
-use crate::item::interaction_result::InteractionResult;
-use pumpkin_util::Hand;
 use std::sync::Arc;
 
 use crate::{
@@ -538,49 +536,6 @@ impl ItemBehaviour for FilledBucketItem {
                 .inventory
                 .set_slot(player.inventory.get_selected_slot() as usize, item_stack);
         }
-    }
-
-    fn use_on_entity(
-        &self,
-        item: &mut ItemStack,
-        player: &Player,
-        _hand: Hand,
-        entity: Arc<dyn EntityBase>,
-    ) -> InteractionResult {
-        if item.item.id == Item::WATER_BUCKET.id {
-            let entity_type = entity.get_entity().entity_type;
-            let result_item = if entity_type == &EntityType::AXOLOTL {
-                Some((&Item::AXOLOTL_BUCKET, Sound::ItemBucketFillAxolotl))
-            } else if entity_type == &EntityType::COD {
-                Some((&Item::COD_BUCKET, Sound::ItemBucketFillFish))
-            } else if entity_type == &EntityType::SALMON {
-                Some((&Item::SALMON_BUCKET, Sound::ItemBucketFillFish))
-            } else if entity_type == &EntityType::TROPICAL_FISH {
-                Some((&Item::TROPICAL_FISH_BUCKET, Sound::ItemBucketFillFish))
-            } else if entity_type == &EntityType::PUFFERFISH {
-                Some((&Item::PUFFERFISH_BUCKET, Sound::ItemBucketFillFish))
-            } else if entity_type == &EntityType::TADPOLE {
-                Some((&Item::TADPOLE_BUCKET, Sound::ItemBucketFillTadpole))
-            } else {
-                None
-            };
-
-            if let Some((mob_bucket, sound)) = result_item {
-                let ent = entity.get_entity();
-                let world = ent.world.load();
-                world.play_sound(sound, SoundCategory::Neutral, &ent.pos.load());
-                // `Bucketable.bucketMobPickup`: the filled bucket replaces the one used.
-                crate::item::create_filled_result(
-                    item,
-                    player,
-                    ItemStack::new(1, mob_bucket),
-                    false,
-                );
-                ent.remove();
-                return InteractionResult::SUCCESS;
-            }
-        }
-        InteractionResult::PASS
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

@@ -205,6 +205,20 @@ impl Mob for PufferfishEntity {
             .scale(Self::get_scale(self.get_puff_state()))
     }
 
+    fn mob_interact(
+        &self,
+        player: &Arc<crate::entity::player::Player>,
+        _hand: pumpkin_util::Hand,
+        item_stack: &mut pumpkin_data::item_stack::ItemStack,
+    ) -> crate::item::interaction_result::InteractionResult {
+        crate::entity::bucketable::fish_mob_interact(
+            self,
+            player,
+            item_stack,
+            &pumpkin_data::item::Item::PUFFERFISH_BUCKET,
+        )
+    }
+
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
     }

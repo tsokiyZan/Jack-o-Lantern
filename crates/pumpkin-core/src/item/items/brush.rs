@@ -1,13 +1,11 @@
-use crate::item::interaction_result::InteractionResult;
-use pumpkin_util::Hand;
 use std::any::Any;
 use std::sync::Arc;
 
 use crate::block::entities::brushable_block::BrushableBlockBlockEntity;
 use crate::block::registry::BlockActionResult;
+use crate::entity::Entity;
 use crate::entity::item::ItemEntity;
 use crate::entity::player::Player;
-use crate::entity::{Entity, EntityBase};
 use crate::item::{ItemBehaviour, ItemMetadata};
 use crate::server::Server;
 use crate::world::World;
@@ -175,46 +173,6 @@ impl ItemBehaviour for BrushItem {
             .set_active_hand(pumpkin_util::Hand::Right, stack, Self::USE_DURATION);
 
         BlockActionResult::Success
-    }
-
-    fn use_on_entity(
-        &self,
-        _item: &mut ItemStack,
-        player: &Player,
-        hand: Hand,
-        entity: Arc<dyn EntityBase>,
-    ) -> InteractionResult {
-        let ent = entity.get_entity();
-        if ent.entity_type == &EntityType::ARMADILLO {
-            let world = player.world();
-            world.play_sound(
-                Sound::EntityArmadilloBrush,
-                SoundCategory::Neutral,
-                &ent.pos.load(),
-            );
-
-            let item_entity = Arc::new(ItemEntity::new(
-                Entity::new(world.clone(), ent.pos.load(), &EntityType::ITEM),
-                ItemStack::new(1, &Item::ARMADILLO_SCUTE),
-            ));
-            world.spawn_entity(item_entity);
-
-            player.damage_item_in_hand(hand, 16);
-        } else {
-            let world = player.world();
-            world.play_sound(
-                Sound::ItemBrushBrushingGeneric,
-                SoundCategory::Neutral,
-                &ent.pos.load(),
-            );
-        }
-
-        let stack = player.inventory().get_stack_in_hand(hand);
-        player
-            .living_entity
-            .set_active_hand(hand, stack, Self::USE_DURATION);
-        // Vanilla `BrushItem` has no `interactLivingEntity`: the interaction passes.
-        InteractionResult::PASS
     }
 
     fn get_use_duration(&self) -> i32 {

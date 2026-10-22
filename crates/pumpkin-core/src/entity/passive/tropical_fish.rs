@@ -40,6 +40,20 @@ impl Mob for TropicalFishEntity {
         world.is_unobstructed(Some(entity), &entity.bounding_box.load())
     }
 
+    fn mob_interact(
+        &self,
+        player: &Arc<crate::entity::player::Player>,
+        _hand: pumpkin_util::Hand,
+        item_stack: &mut pumpkin_data::item_stack::ItemStack,
+    ) -> crate::item::interaction_result::InteractionResult {
+        crate::entity::bucketable::fish_mob_interact(
+            self,
+            player,
+            item_stack,
+            &pumpkin_data::item::Item::TROPICAL_FISH_BUCKET,
+        )
+    }
+
     fn get_mob_entity(&self) -> &MobEntity {
         &self.mob_entity
     }
