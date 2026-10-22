@@ -1513,170 +1513,171 @@ impl Player {
         // Weakness are already in `ATTACK_DAMAGE` through their attribute modifiers.
         let mut damage = base_damage * damage_multiplier;
         let magic_boost = extra_ench_damage * attack_cooldown_progress;
-        // Vanilla skips the whole hit (and its no-damage sound) when neither part is positive.
-        if damage <= 0.0 && magic_boost <= 0.0 {
-            return;
-        }
+        // Vanilla `baseDamage > 0.0F || magicBoost > 0.0F`; `postPiercingAttack` runs either way.
+        if damage > 0.0 || magic_boost > 0.0 {
+            let pos = victim_entity.pos.load();
+            let attack_type = AttackType::new(self, attack_cooldown_progress as f32);
 
-        let pos = victim_entity.pos.load();
-        let attack_type = AttackType::new(self, attack_cooldown_progress as f32);
+            // Vanilla `Item.getAttackDamageBonus`, before the critical hit multiplies it; only the
+            // mace has one. Its damage source is `mace` while it can smash.
+            if is_mace_smash {
+                damage += f64::from(MaceItem::get_attack_damage_bonus(
+                    &self.living_entity,
+                    &item_stack,
+                    victim.as_ref(),
+                    &damage_source,
+                ));
+            }
 
-        // Vanilla `Item.getAttackDamageBonus`, before the critical hit multiplies it; only the
-        // mace has one. Its damage source is `mace` while it can smash.
-        if is_mace_smash {
-            damage += f64::from(MaceItem::get_attack_damage_bonus(
-                &self.living_entity,
-                &item_stack,
+            // The critical hit multiplies `baseDamage` only, not `magicBoost`.
+            if matches!(attack_type, AttackType::Critical) {
+                damage *= 1.5;
+            }
+            let total_damage = damage + magic_boost;
+
+            let old_living_entity_health = victim
+                .get_living_entity()
+                .map_or(0.0, |living| living.health.load());
+            let old_movement = victim_entity.velocity.load();
+            if victim.damage_with_context(
                 victim.as_ref(),
-                &damage_source,
-            ));
-        }
+                total_damage as f32,
+                damage_source.damage_type,
+                None,
+                damage_source.direct,
+                damage_source.causing,
+            ) {
+                if is_mace_smash && total_damage >= 100.0 {
+                    self.trigger_advancement(crate::entity::player::advancement::trigger::AdvancementTrigger::DealtOverkillDamage);
+                }
 
-        // The critical hit multiplies `baseDamage` only, not `magicBoost`.
-        if matches!(attack_type, AttackType::Critical) {
-            damage *= 1.5;
-        }
-        let total_damage = damage + magic_boost;
-
-        let old_living_entity_health = victim
-            .get_living_entity()
-            .map_or(0.0, |living| living.health.load());
-        let old_movement = victim_entity.velocity.load();
-        if !victim.damage_with_context(
-            victim.as_ref(),
-            total_damage as f32,
-            damage_source.damage_type,
-            None,
-            damage_source.direct,
-            damage_source.causing,
-        ) {
-            world.play_sound(
-                Sound::EntityPlayerAttackNodamage,
-                SoundCategory::Players,
-                &self.living_entity.entity.pos.load(),
-            );
-            return;
-        }
-
-        if is_mace_smash && total_damage >= 100.0 {
-            self.trigger_advancement(crate::entity::player::advancement::trigger::AdvancementTrigger::DealtOverkillDamage);
-        }
-
-        // `pvp.knockback` only turns off the extra knockback; the victim's own still syncs.
-        let knockback = if config.knockback {
-            self.living_entity
-                .get_knockback(self, &world, victim.as_ref(), &damage_source)
-                + if matches!(attack_type, AttackType::Knockback) {
-                    0.5
+                // `pvp.knockback` only turns off the extra knockback; the victim's own still syncs.
+                let knockback = if config.knockback {
+                    self.living_entity
+                        .get_knockback(self, &world, victim.as_ref(), &damage_source)
+                        + if matches!(attack_type, AttackType::Knockback) {
+                            0.5
+                        } else {
+                            0.0
+                        }
                 } else {
                     0.0
-                }
-        } else {
-            0.0
-        };
-        self.cause_extra_knockback(
-            victim.as_ref(),
-            knockback,
-            old_movement,
-            total_damage as f32,
-        );
+                };
+                self.cause_extra_knockback(
+                    victim.as_ref(),
+                    knockback,
+                    old_movement,
+                    total_damage as f32,
+                );
 
-        // Vanilla `doSweepAttack`, after the extra knockback. It reuses the attack's
-        // damage source.
-        if matches!(attack_type, AttackType::Sweeping) {
-            combat::spawn_sweep_particle(attacker_entity, &world, &pos);
+                // Vanilla `doSweepAttack`, after the extra knockback. It reuses the attack's
+                // damage source.
+                if matches!(attack_type, AttackType::Sweeping) {
+                    combat::spawn_sweep_particle(attacker_entity, &world, &pos);
 
-            let sweep_damage = 1.0
-                + self
-                    .living_entity
-                    .get_attribute_value(&Attributes::SWEEPING_DAMAGE_RATIO)
-                    as f32
-                    * damage as f32;
+                    let sweep_damage = 1.0
+                        + self
+                            .living_entity
+                            .get_attribute_value(&Attributes::SWEEPING_DAMAGE_RATIO)
+                            as f32
+                            * damage as f32;
 
-            let search_box = BoundingBox::new(
-                Vector3::new(pos.x - 1.0, pos.y - 0.5, pos.z - 1.0),
-                Vector3::new(pos.x + 1.0, pos.y + 0.5, pos.z + 1.0),
-            );
-            let victims = world.get_all_at_box(&search_box);
-            for other_victim in victims {
-                if other_victim.get_entity().entity_id != victim_entity.entity_id
-                    && other_victim.get_entity().entity_id != attacker_entity.entity_id
-                    && other_victim.damage_with_context(
-                        other_victim.as_ref(),
-                        sweep_damage,
-                        damage_source.damage_type,
-                        None,
-                        damage_source.direct,
-                        damage_source.causing,
-                    )
-                {
-                    EnchantmentHelper::do_post_attack_effects(
-                        &world,
-                        other_victim.as_ref(),
-                        &damage_source,
+                    let search_box = BoundingBox::new(
+                        Vector3::new(pos.x - 1.0, pos.y - 0.5, pos.z - 1.0),
+                        Vector3::new(pos.x + 1.0, pos.y + 0.5, pos.z + 1.0),
                     );
+                    let victims = world.get_all_at_box(&search_box);
+                    for other_victim in victims {
+                        if other_victim.get_entity().entity_id != victim_entity.entity_id
+                            && other_victim.get_entity().entity_id != attacker_entity.entity_id
+                            && other_victim.damage_with_context(
+                                other_victim.as_ref(),
+                                sweep_damage,
+                                damage_source.damage_type,
+                                None,
+                                damage_source.direct,
+                                damage_source.causing,
+                            )
+                        {
+                            EnchantmentHelper::do_post_attack_effects(
+                                &world,
+                                other_victim.as_ref(),
+                                &damage_source,
+                            );
+                        }
+                    }
                 }
-            }
-        }
 
-        // Vanilla `attackVisualEffects`.
-        player_attack_sound(&self.living_entity.entity.pos.load(), &world, attack_type);
+                // Vanilla `attackVisualEffects`.
+                player_attack_sound(&self.living_entity.entity.pos.load(), &world, attack_type);
 
-        if matches!(attack_type, AttackType::Critical) {
-            let je_packet =
-                CEntityAnimation::new(victim_entity.entity_id.into(), Animation::CriticalEffect);
-            let be_packet = pumpkin_protocol::bedrock::server::animate::SAnimate {
-                action: pumpkin_protocol::bedrock::server::animate::AnimateAction::CriticalHit,
-                target_actor_runtime_id: VarULong(victim_entity.entity_id as u64),
-                data: 0.0,
-                swing_source: None,
-            };
-            world.broadcast_editioned(&je_packet, &be_packet);
-        }
+                if matches!(attack_type, AttackType::Critical) {
+                    let je_packet = CEntityAnimation::new(
+                        victim_entity.entity_id.into(),
+                        Animation::CriticalEffect,
+                    );
+                    let be_packet = pumpkin_protocol::bedrock::server::animate::SAnimate {
+                        action:
+                            pumpkin_protocol::bedrock::server::animate::AnimateAction::CriticalHit,
+                        target_actor_runtime_id: VarULong(victim_entity.entity_id as u64),
+                        data: 0.0,
+                        swing_source: None,
+                    };
+                    world.broadcast_editioned(&je_packet, &be_packet);
+                }
 
-        self.living_entity.last_attacking_id.store(
-            victim_entity.entity_id,
-            std::sync::atomic::Ordering::Relaxed,
-        );
-        self.living_entity.last_attack_time.store(
-            self.living_entity
-                .entity
-                .tick_count
-                .load(std::sync::atomic::Ordering::Relaxed),
-            std::sync::atomic::Ordering::Relaxed,
-        );
+                self.living_entity.last_attacking_id.store(
+                    victim_entity.entity_id,
+                    std::sync::atomic::Ordering::Relaxed,
+                );
+                self.living_entity.last_attack_time.store(
+                    self.living_entity
+                        .entity
+                        .tick_count
+                        .load(std::sync::atomic::Ordering::Relaxed),
+                    std::sync::atomic::Ordering::Relaxed,
+                );
 
-        self.item_attack_interaction(victim.as_ref(), &item_stack, &damage_source);
+                self.item_attack_interaction(victim.as_ref(), &item_stack, &damage_source);
 
-        // Vanilla `damageStatsAndHearts`.
-        if let Some(living) = victim.get_living_entity() {
-            let actual_damage = old_living_entity_health - living.health.load();
-            self.increment_stat(
-                statistics::StatisticCategory::Custom,
-                statistics::CustomStatistic::DamageDealt as i32,
-                (actual_damage * 10.0).round() as i32,
-            );
-            if actual_damage > 2.0 {
-                let count = (actual_damage * 0.5) as i32;
-                let pos = victim_entity.pos.load();
-                world.spawn_particle(
-                    Vector3::new(
-                        pos.x,
-                        pos.y + f64::from(victim_entity.height()) * 0.5,
-                        pos.z,
-                    ),
-                    Vector3::new(0.1, 0.0, 0.1),
-                    0.2,
-                    count,
-                    pumpkin_data::particle::Particle::DamageIndicator,
+                // Vanilla `damageStatsAndHearts`.
+                if let Some(living) = victim.get_living_entity() {
+                    let actual_damage = old_living_entity_health - living.health.load();
+                    self.increment_stat(
+                        statistics::StatisticCategory::Custom,
+                        statistics::CustomStatistic::DamageDealt as i32,
+                        (actual_damage * 10.0).round() as i32,
+                    );
+                    if actual_damage > 2.0 {
+                        let count = (actual_damage * 0.5) as i32;
+                        let pos = victim_entity.pos.load();
+                        world.spawn_particle(
+                            Vector3::new(
+                                pos.x,
+                                pos.y + f64::from(victim_entity.height()) * 0.5,
+                                pos.z,
+                            ),
+                            Vector3::new(0.1, 0.0, 0.1),
+                            0.2,
+                            count,
+                            pumpkin_data::particle::Particle::DamageIndicator,
+                        );
+                    }
+                }
+
+                // Vanilla `Player#attack` ends the successful-hit branch with
+                // `causeFoodExhaustion(0.1F)`. Only landed hits exhaust.
+                self.add_exhaustion(0.1);
+            } else {
+                world.play_sound(
+                    Sound::EntityPlayerAttackNodamage,
+                    SoundCategory::Players,
+                    &self.living_entity.entity.pos.load(),
                 );
             }
         }
 
-        // Vanilla `Player#attack` ends the successful-hit branch with
-        // `causeFoodExhaustion(0.1F)`. Only landed hits exhaust; the miss/no-damage
-        // case returned early above.
-        self.add_exhaustion(0.1);
+        self.living_entity.post_piercing_attack(self);
 
         if config.swing {}
     }

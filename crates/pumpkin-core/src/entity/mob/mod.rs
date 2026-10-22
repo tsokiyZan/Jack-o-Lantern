@@ -1098,8 +1098,7 @@ impl MobEntity {
                 mob.play_attack_sound();
             }
         }
-        // TODO: `postPiercingAttack` runs `EnchantmentHelper.doPostPiercingAttackEffects`,
-        // which Pumpkin has no port of; no vanilla enchantment applies it to a melee hit.
+        living.post_piercing_attack(caller);
         damaged
     }
 

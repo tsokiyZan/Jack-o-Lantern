@@ -1626,6 +1626,12 @@ impl LivingEntity {
         EnchantmentHelper::modify_knockback(world, &weapon, target, damage_source, knockback) / 2.0
     }
 
+    /// Vanilla `LivingEntity.postPiercingAttack`.
+    pub fn post_piercing_attack(&self, caller: &dyn EntityBase) {
+        let world = self.entity.world.load_full();
+        EnchantmentHelper::do_post_piercing_attack_effects(&world, caller, self);
+    }
+
     /// The `xd`/`zd` of vanilla `dealDefaultKnockback`: a projectile pushes along its own
     /// motion (fireworks and thrown potions from where they are), anything else from the
     /// damage source's position.

@@ -1635,6 +1635,8 @@ pub fn build() -> TokenStream {
         let damage_immunity =
             parse_conditional_unit_effects(effects_map.get("minecraft:damage_immunity"));
         let tick = parse_conditional_entity_effects(effects_map.get("minecraft:tick"));
+        let post_piercing_attack =
+            parse_conditional_entity_effects(effects_map.get("minecraft:post_piercing_attack"));
         let attributes = parse_attribute_effects(effects_map.get("minecraft:attributes"));
         let prevent_armor_change = effects_map.contains_key("minecraft:prevent_armor_change");
         let prevent_equipment_drop = effects_map.contains_key("minecraft:prevent_equipment_drop");
@@ -1665,6 +1667,7 @@ pub fn build() -> TokenStream {
                 crossbow_charge_time: #crossbow_charge_time,
                 location_changed: #location_changed,
                 tick: #tick,
+                post_piercing_attack: #post_piercing_attack,
                 attributes: #attributes,
                 damage_immunity: #damage_immunity,
                 prevent_armor_change: #prevent_armor_change,
@@ -2324,6 +2327,8 @@ pub fn build() -> TokenStream {
             pub location_changed: &'static [ConditionalEffect<EnchantmentEntityEffect>],
             /// `minecraft:tick`: entity effects run every tick on the wearer.
             pub tick: &'static [ConditionalEffect<EnchantmentEntityEffect>],
+            /// `minecraft:post_piercing_attack`: entity effects run on the attacker after a piercing attack.
+            pub post_piercing_attack: &'static [ConditionalEffect<EnchantmentEntityEffect>],
             /// `minecraft:attributes`: modifiers applied while the item is in a matching slot.
             pub attributes: &'static [EnchantmentAttributeEffect],
             /// `minecraft:damage_immunity`, whose effect carries no data.

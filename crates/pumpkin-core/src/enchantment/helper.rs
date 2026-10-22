@@ -755,6 +755,34 @@ impl EnchantmentHelper {
         });
     }
 
+    /// Vanilla `EnchantmentHelper.doPostPiercingAttackEffects`: the weapon's
+    /// `post_piercing_attack` effects, run on the user.
+    pub fn do_post_piercing_attack_effects(
+        world: &Arc<World>,
+        user: &dyn EntityBase,
+        living: &LivingEntity,
+    ) {
+        // `user.getWeaponItem()`, the main hand for every living entity.
+        let weapon = living.held_item(user);
+        let item = EnchantedItemInUse::in_slot(&weapon, EquipmentSlot::MAIN_HAND, user);
+        Self::run_iteration_on_item_in_slot(
+            &item,
+            &EquipmentSlot::MAIN_HAND,
+            |enchantment, level, item| {
+                // `Enchantment.doPostPiercingAttack`, with `entityContext` at the user.
+                let position = user.get_entity().pos.load();
+                let context = EnchantmentLootContext::entity(world, level, user, position);
+                for conditional_effect in enchantment.effects.post_piercing_attack {
+                    if matches(conditional_effect, &context) {
+                        conditional_effect
+                            .effect
+                            .apply(world, level, item, user, position);
+                    }
+                }
+            },
+        );
+    }
+
     /// Vanilla `EnchantmentHelper.onHitBlock`.
     pub fn on_hit_block(
         weapon: &ItemStack,

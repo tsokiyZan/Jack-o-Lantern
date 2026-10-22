@@ -100,6 +100,7 @@ impl ItemBehaviour for SpearItem {
         }
         // `onAttack`.
         player.reset_attack_strength_ticker();
+        player.living_entity.post_piercing_attack(player);
 
         let position = player.position();
         if hit_something && let Some(sound) = piercing.hit_sound.as_ref() {
