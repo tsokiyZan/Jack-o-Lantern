@@ -1,23 +1,18 @@
 use std::any::Any;
-use std::sync::Arc;
 
 use crate::block::entities::brushable_block::BrushableBlockBlockEntity;
 use crate::block::registry::BlockActionResult;
-use crate::entity::Entity;
-use crate::entity::item::ItemEntity;
 use crate::entity::player::Player;
 use crate::item::{ItemBehaviour, ItemMetadata};
 use crate::server::Server;
-use crate::world::World;
-use pumpkin_data::block_properties::SuspiciousSandLikeProperties;
-use pumpkin_data::entity::EntityType;
+use pumpkin_data::attributes::Attributes;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::{Sound, SoundCategory};
-use pumpkin_data::{Block, BlockDirection, BlockId};
+use pumpkin_data::{Block, BlockDirection};
+use pumpkin_util::Hand;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
-use pumpkin_world::world::BlockFlags;
 
 pub struct BrushItem;
 
@@ -26,141 +21,93 @@ impl ItemMetadata for BrushItem {
         Box::new([Item::BRUSH.id])
     }
 }
-/// Vanilla `BrushableBlockEntity.unpackLootTable`, for the brushable block at `location`.
-fn unpack_loot_table(world: &World, location: &BlockPos, player: &Player, brush: &ItemStack) {
-    if let Some(block_entity) = world.get_block_entity(location)
-        && let Some(brushable) = block_entity
-            .as_any()
-            .downcast_ref::<BrushableBlockBlockEntity>()
-    {
-        brushable.unpack_loot_table(world, &player.living_entity, brush);
-    }
-}
-
-/// The item `dropContent` drops: the unpacked loot, if any.
-fn take_brushed_item(world: &World, location: &BlockPos) -> Option<ItemStack> {
-    let block_entity = world.get_block_entity(location)?;
-    let brushable = block_entity
-        .as_any()
-        .downcast_ref::<BrushableBlockBlockEntity>()?;
-    brushable
-        .item
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .take()
-        .filter(|item| !item.is_empty())
-}
 
 impl ItemBehaviour for BrushItem {
+    /// Vanilla `BrushItem.useOn`: aimed at a block, the brush starts being used; brushing
+    /// happens in `onUseTick`.
     fn use_on_block(
         &self,
-        _item: &mut ItemStack,
+        item: &mut ItemStack,
         player: &Player,
-        location: BlockPos,
+        _location: BlockPos,
         _face: BlockDirection,
         _cursor_pos: Vector3<f32>,
-        block: &Block,
+        _block: &Block,
         _server: &Server,
     ) -> BlockActionResult {
-        let world = player.world();
-        let is_sand = block.id == BlockId::SUSPICIOUS_SAND;
-        let is_gravel = block.id == BlockId::SUSPICIOUS_GRAVEL;
-        let block_center = location.to_centered_f64();
-
-        if !(is_sand || is_gravel) {
-            world.play_sound(
-                Sound::ItemBrushBrushingGeneric,
-                SoundCategory::Blocks,
-                &block_center,
-            );
-            let stack = player.inventory().held_item();
-            player.living_entity.set_active_hand(
-                pumpkin_util::Hand::Right,
-                stack,
-                Self::USE_DURATION,
-            );
-            return BlockActionResult::Success;
+        if Self::hit_block(player).is_some() {
+            // The hand holding this brush: `useOn` gets the clicked hand, which this
+            // signature doesn't carry; the main hand wins when both hold the same stack.
+            let hand = if player.inventory.held_item().are_equal(item) {
+                Hand::Right
+            } else {
+                Hand::Left
+            };
+            crate::item::start_using_item(player, hand, item.clone(), Self::USE_DURATION);
         }
+        BlockActionResult::Consume
+    }
 
-        if let Some(player_arc) = player.world().get_player_by_uuid(player.gameprofile.id)
-            && let Some(server) = player.world().server.upgrade()
+    /// Vanilla `BrushItem.onUseTick`: every tenth tick (the fifth of each stroke) the aimed
+    /// block is brushed; aiming away stops the use.
+    fn on_use_tick(&self, stack: &ItemStack, player: &Player, remaining_use_ticks: i32) {
+        if remaining_use_ticks < 0 {
+            player.living_entity.clear_active_hand();
+            return;
+        }
+        let Some((pos, direction)) = Self::hit_block(player) else {
+            player.living_entity.clear_active_hand();
+            return;
+        };
+        let time_elapsed = Self::USE_DURATION - remaining_use_ticks + 1;
+        if time_elapsed % 10 != 5 {
+            return;
+        }
+        let world = player.world();
+        let block = world.get_block(&pos);
+        let sound = if block == &Block::SUSPICIOUS_SAND {
+            Sound::ItemBrushBrushingSand
+        } else if block == &Block::SUSPICIOUS_GRAVEL {
+            Sound::ItemBrushBrushingGravel
+        } else {
+            Sound::ItemBrushBrushingGeneric
+        };
+        // `level.playSound(player, pos, ...)`: everyone near but the brushing player.
+        world.play_sound_raw_expect(
+            player,
+            sound as u16,
+            SoundCategory::Blocks,
+            &pos.to_centered_f64(),
+            1.0,
+            1.0,
+        );
+        let Some(block_entity) = world.get_block_entity(&pos) else {
+            return;
+        };
+        let Some(brushable) = block_entity
+            .as_any()
+            .downcast_ref::<BrushableBlockBlockEntity>()
+        else {
+            return;
+        };
+        if let Some(player_arc) = world.get_player_by_uuid(player.gameprofile.id)
+            && let Some(server) = world.server.upgrade()
         {
             let mut event = crate::plugin::api::events::block::block_brush::BlockBrushEvent::new(
-                location,
+                pos,
                 world.clone(),
                 player_arc,
-                player.inventory().held_item(),
+                stack.clone(),
             );
             server.plugin_manager.fire_blocking(&server, &mut event);
             if event.cancelled {
-                return BlockActionResult::Fail;
+                return;
             }
         }
-
-        // `BrushableBlockEntity.brush` unpacks the loot table on every brush.
-        let brush = player.inventory().held_item();
-        unpack_loot_table(&world, &location, player, &brush);
-
-        let current_state_id = world.get_block_state_id(&location);
-        let mut props = SuspiciousSandLikeProperties::from_state_id(current_state_id);
-
-        if props.dusted < 3 {
-            props.dusted += 1;
-            let next_stage_id = props.to_state_id(block);
-            world.set_block_state(&location, next_stage_id, BlockFlags::NOTIFY_ALL);
-
-            world.play_sound(
-                if is_sand {
-                    Sound::ItemBrushBrushingSand
-                } else {
-                    Sound::ItemBrushBrushingGravel
-                },
-                SoundCategory::Blocks,
-                &block_center,
-            );
-        } else {
-            // `brushingCompleted` drops the content before the block turns into sand or gravel.
-            let loot_item = take_brushed_item(&world, &location);
-            let replacement_state_id = if is_sand {
-                Block::SAND.default_state.id
-            } else {
-                Block::GRAVEL.default_state.id
-            };
-
-            world.set_block_state(&location, replacement_state_id, BlockFlags::NOTIFY_ALL);
-
-            world.play_sound(
-                if is_sand {
-                    Sound::ItemBrushBrushingSandComplete
-                } else {
-                    Sound::ItemBrushBrushingGravelComplete
-                },
-                SoundCategory::Blocks,
-                &block_center,
-            );
-
-            if let Some(loot_item) = loot_item {
-                let spawn_pos = Vector3::new(
-                    f64::from(location.0.x) + 0.5,
-                    f64::from(location.0.y) + 1.0,
-                    f64::from(location.0.z) + 0.5,
-                );
-                let item_entity = Arc::new(ItemEntity::new(
-                    Entity::new(world.clone(), spawn_pos, &EntityType::ITEM),
-                    loot_item,
-                ));
-                world.spawn_entity(item_entity);
-            }
+        if brushable.brush(&world, &player.living_entity, direction, stack) {
+            // The brush wears in the hand it is used from.
+            player.damage_item_in_hand(player.living_entity.used_item_hand(), 1);
         }
-
-        player.damage_held_item(1);
-
-        let stack = player.inventory().held_item();
-        player
-            .living_entity
-            .set_active_hand(pumpkin_util::Hand::Right, stack, Self::USE_DURATION);
-
-        BlockActionResult::Success
     }
 
     fn get_use_duration(&self) -> i32 {
@@ -174,4 +121,23 @@ impl ItemBehaviour for BrushItem {
 
 impl BrushItem {
     pub const USE_DURATION: i32 = 200;
+
+    /// Vanilla `calculateHitResult` when it hits a block: the block and the face, along the
+    /// view within the block interaction range.
+    /// TODO: entities in the way (`getHitResultOnViewVector`'s entity pick).
+    fn hit_block(player: &Player) -> Option<(BlockPos, BlockDirection)> {
+        let (yaw, pitch) = player.rotation();
+        let range = player
+            .living_entity
+            .get_attribute_value(&Attributes::BLOCK_INTERACTION_RANGE);
+        let from = player.eye_position();
+        let to = from.add(&(Vector3::rotation_vector(f64::from(pitch), f64::from(yaw)) * range));
+        let hit = player.world().clip(&pumpkin_world::clip::ClipContext::new(
+            from,
+            to,
+            pumpkin_world::clip::ClipBlock::Collider,
+            pumpkin_world::clip::ClipFluid::None,
+        ));
+        (!hit.is_miss).then_some((hit.block_pos, hit.direction))
+    }
 }

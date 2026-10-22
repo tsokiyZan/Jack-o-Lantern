@@ -1,12 +1,23 @@
 use super::BlockEntity;
+use crate::entity::Entity;
+use crate::entity::item::ItemEntity;
 use crate::entity::living::LivingEntity;
 use crate::world::World;
 use crate::world::loot::{LootContextParameters, container_unpack_params};
 use pumpkin_data::attributes::Attributes;
+use pumpkin_data::block_properties::SuspiciousSandLikeProperties;
+use pumpkin_data::entity::EntityType;
 use pumpkin_data::item_stack::ItemStack;
+use pumpkin_data::world::WorldEvent;
+use pumpkin_data::{Block, BlockDirection};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_util::math::position::BlockPos;
-use std::sync::Mutex;
+use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
+use pumpkin_world::tick::TickPriority;
+use pumpkin_world::world::BlockFlags;
+use std::sync::atomic::{AtomicI64, Ordering};
+use std::sync::{Arc, Mutex};
 
 pub struct BrushableBlockBlockEntity {
     pub position: BlockPos,
@@ -15,6 +26,10 @@ pub struct BrushableBlockBlockEntity {
     pub hit_direction: Mutex<Option<u8>>,
     pub loot_table: Mutex<Option<String>>,
     pub loot_table_seed: Mutex<i64>,
+    /// Vanilla `coolDownEndsAtTick`.
+    pub cooldown_ends_at_tick: AtomicI64,
+    /// Vanilla `brushCountResetsAtTick`.
+    pub brush_count_resets_at_tick: AtomicI64,
 }
 
 impl BlockEntity for BrushableBlockBlockEntity {
@@ -47,6 +62,8 @@ impl BlockEntity for BrushableBlockBlockEntity {
             hit_direction: Mutex::new(hit_direction),
             loot_table: Mutex::new(loot_table),
             loot_table_seed: Mutex::new(loot_table_seed),
+            cooldown_ends_at_tick: AtomicI64::new(0),
+            brush_count_resets_at_tick: AtomicI64::new(0),
         }
     }
 
@@ -149,6 +166,176 @@ impl BrushableBlockBlockEntity {
             hit_direction: Mutex::new(None),
             loot_table: Mutex::new(None),
             loot_table_seed: Mutex::new(0),
+            cooldown_ends_at_tick: AtomicI64::new(0),
+            brush_count_resets_at_tick: AtomicI64::new(0),
+        }
+    }
+
+    fn game_time(world: &World) -> i64 {
+        world
+            .level_time
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .world_age
+    }
+
+    /// Vanilla `getCompletionState`: the `dusted` stage the brush count shows.
+    const fn completion_state(brush_count: i32) -> u8 {
+        match brush_count {
+            0 => 0,
+            1..3 => 1,
+            3..6 => 2,
+            _ => 3,
+        }
+    }
+
+    fn set_dusted(world: &Arc<World>, pos: &BlockPos, dusted: u8) {
+        let (block, state) = world.get_block_and_state_id(pos);
+        let mut props = SuspiciousSandLikeProperties::from_state_id(state);
+        props.dusted = dusted;
+        world.set_block_state(pos, props.to_state_id(block), BlockFlags::NOTIFY_ALL);
+    }
+
+    /// Vanilla `BrushableBlockEntity.brush`: a brush stroke from `direction`, at most one every
+    /// 10 ticks; the tenth finishes the block. Returns whether it finished.
+    pub fn brush(
+        &self,
+        world: &Arc<World>,
+        user: &LivingEntity,
+        direction: BlockDirection,
+        brush: &ItemStack,
+    ) -> bool {
+        let game_time = Self::game_time(world);
+        self.hit_direction
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get_or_insert(direction.to_index());
+        self.brush_count_resets_at_tick
+            .store(game_time + 40, Ordering::Relaxed);
+        if game_time < self.cooldown_ends_at_tick.load(Ordering::Relaxed) {
+            return false;
+        }
+        self.cooldown_ends_at_tick
+            .store(game_time + 10, Ordering::Relaxed);
+        self.unpack_loot_table(world, user, brush);
+        let (previous, count) = {
+            let mut hits = self
+                .hits
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let previous = Self::completion_state(*hits);
+            *hits += 1;
+            (previous, *hits)
+        };
+        if count >= 10 {
+            self.brushing_completed(world, user, brush);
+            return true;
+        }
+        let block = world.get_block(&self.position);
+        world.schedule_block_tick(block, self.position, 2, TickPriority::Normal);
+        let current = Self::completion_state(count);
+        if previous != current {
+            Self::set_dusted(world, &self.position, current);
+        }
+        false
+    }
+
+    /// Vanilla `brushingCompleted`: the content drops, then the block turns into what it
+    /// hides in.
+    fn brushing_completed(&self, world: &Arc<World>, user: &LivingEntity, brush: &ItemStack) {
+        self.drop_content(world, user, brush);
+        let (block, state) = world.get_block_and_state_id(&self.position);
+        world.sync_world_event(
+            WorldEvent::ParticlesAndSoundBrushBlockComplete,
+            self.position,
+            i32::from(state.as_u16()),
+        );
+        let turns_into = if block == &Block::SUSPICIOUS_SAND {
+            &Block::SAND
+        } else if block == &Block::SUSPICIOUS_GRAVEL {
+            &Block::GRAVEL
+        } else {
+            &Block::AIR
+        };
+        world.set_block_state(
+            &self.position,
+            turns_into.default_state.id,
+            BlockFlags::NOTIFY_ALL,
+        );
+    }
+
+    /// Vanilla `dropContent`: the item comes out a block away on the brushed side, standing
+    /// still, 10 to 30 of it.
+    fn drop_content(&self, world: &Arc<World>, user: &LivingEntity, brush: &ItemStack) {
+        self.unpack_loot_table(world, user, brush);
+        let Some(mut item) = self
+            .item
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .take()
+            .filter(|item| !item.is_empty())
+        else {
+            return;
+        };
+        let size = f64::from(EntityType::ITEM.dimension[0]);
+        let center_range = 1.0 - size;
+        let half_size = size / 2.0;
+        let direction = self
+            .hit_direction
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .and_then(BlockDirection::from_index)
+            .unwrap_or(BlockDirection::Up);
+        let drop_pos = self.position.offset(direction.to_offset());
+        let position = Vector3::new(
+            f64::from(drop_pos.0.x) + 0.5 * center_range + half_size,
+            f64::from(drop_pos.0.y) + 0.5 + f64::from(EntityType::ITEM.dimension[1] / 2.0),
+            f64::from(drop_pos.0.z) + 0.5 * center_range + half_size,
+        );
+        let amount = world
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .next_bounded_i32(21)
+            + 10;
+        let stack = item.split_off(amount as u8);
+        let entity = Entity::new(world.clone(), position, &EntityType::ITEM);
+        let item_entity = ItemEntity::new(entity, stack);
+        item_entity
+            .get_entity()
+            .velocity
+            .store(Vector3::new(0.0, 0.0, 0.0));
+        world.spawn_entity(Arc::new(item_entity));
+    }
+
+    /// Vanilla `checkReset`, from the block's scheduled tick: an unbrushed block loses two
+    /// strokes every 4 ticks from 40 ticks after the last one.
+    pub fn check_reset(&self, world: &Arc<World>) {
+        let game_time = Self::game_time(world);
+        let mut hits = self
+            .hits
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if *hits != 0 && game_time >= self.brush_count_resets_at_tick.load(Ordering::Relaxed) {
+            let previous = Self::completion_state(*hits);
+            *hits = (*hits - 2).max(0);
+            let current = Self::completion_state(*hits);
+            if previous != current {
+                Self::set_dusted(world, &self.position, current);
+            }
+            self.brush_count_resets_at_tick
+                .store(game_time + 4, Ordering::Relaxed);
+        }
+        if *hits == 0 {
+            *self
+                .hit_direction
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
+            self.brush_count_resets_at_tick.store(0, Ordering::Relaxed);
+            self.cooldown_ends_at_tick.store(0, Ordering::Relaxed);
+        } else {
+            let block = world.get_block(&self.position);
+            world.schedule_block_tick(block, self.position, 2, TickPriority::Normal);
         }
     }
 }
