@@ -166,11 +166,8 @@ impl DrownedEntity {
     fn close_to_next_pos(&self) -> bool {
         let entity = self.get_entity();
         let pos = entity.pos.load();
-        self.entity
-            .mob_entity
-            .own_navigation()
-            .get_path()
-            .is_some_and(|path| {
+        self.entity.mob_entity.with_navigation(|navigation, _| {
+            navigation.get_path().is_some_and(|path| {
                 let target = path.get_target().0;
                 pos.squared_distance_to(
                     f64::from(target.x),
@@ -178,6 +175,7 @@ impl DrownedEntity {
                     f64::from(target.z),
                 ) < 4.0
             })
+        })
     }
 }
 
@@ -503,7 +501,7 @@ impl MoveControlTrait for DrownedMoveControl {
                     .store(entity.velocity.load() + Vector3::new(0.0, 0.002, 0.0));
             }
 
-            let navigation_done = mob_entity.own_navigation().is_done();
+            let navigation_done = mob_entity.with_navigation(|navigation, _| navigation.is_done());
             if self.base.operation != Operation::MoveTo || navigation_done {
                 mob_entity.set_speed(0.0);
                 return;
@@ -615,13 +613,11 @@ impl Goal for DrownedGoToWaterGoal {
     }
 
     fn start(&mut self, mob: &dyn Mob) {
-        mob.get_mob_entity()
-            .own_navigation()
-            .set_progress(NavigatorGoal::new(
-                mob.get_entity().pos.load(),
-                self.wanted,
-                self.speed_modifier,
-            ));
+        let (wanted, speed_modifier) = (self.wanted, self.speed_modifier);
+        mob.get_mob_entity().with_navigation(|navigation, owner| {
+            let owner_pos = owner.living_entity.entity.pos.load();
+            navigation.set_progress(NavigatorGoal::new(owner_pos, wanted, speed_modifier));
+        });
     }
 
     fn controls(&self) -> Controls {
@@ -811,9 +807,11 @@ impl Goal for DrownedSwimUpGoal {
                 self.stuck = true;
                 return;
             };
-            mob.get_mob_entity()
-                .own_navigation()
-                .set_progress(NavigatorGoal::new(pos, next_pos, self.speed_modifier));
+            let speed_modifier = self.speed_modifier;
+            mob.get_mob_entity().with_navigation(|navigation, owner| {
+                let owner_pos = owner.living_entity.entity.pos.load();
+                navigation.set_progress(NavigatorGoal::new(owner_pos, next_pos, speed_modifier));
+            });
         }
     }
 

@@ -277,8 +277,11 @@ impl MobEntity {
     }
 
     /// Vanilla `Mob.stopInPlace`. Pumpkin's leash has no angular momentum to reset.
+    ///
+    /// Stops `getNavigation()`, so it locks the controlled vehicle's navigation while riding:
+    /// never call it inside a `with_navigation` closure.
     pub fn stop_in_place(&self) {
-        self.own_navigation().stop();
+        self.with_navigation(|navigation, _| navigation.stop());
         let living = &self.living_entity;
         living.movement_input.store(Vector3::new(0.0, 0.0, 0.0));
         self.set_speed(0.0);
@@ -590,7 +593,7 @@ impl MobEntity {
 
     /// Vanilla `Mob.jumpInLiquid`: a mob whose navigation can't float leaps out.
     pub fn jump_in_liquid(&self) {
-        let can_float = self.own_navigation().can_float();
+        let can_float = self.with_navigation(|navigation, _| navigation.can_float());
         if can_float {
             self.living_entity.jump_in_liquid_base();
         } else {

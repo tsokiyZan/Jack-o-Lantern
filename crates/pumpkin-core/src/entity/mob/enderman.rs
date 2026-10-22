@@ -241,7 +241,8 @@ impl EndermanEntity {
 
         entity.teleport(new_pos, None, None, &world);
 
-        self.mob_entity.own_navigation().stop();
+        self.mob_entity
+            .with_navigation(|navigation, _| navigation.stop());
 
         true
     }

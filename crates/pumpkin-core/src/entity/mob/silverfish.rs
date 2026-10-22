@@ -201,7 +201,9 @@ impl SilverfishMergeWithStoneGoal {
 impl Goal for SilverfishMergeWithStoneGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
         let mob_entity = mob.get_mob_entity();
-        if mob.get_target().is_some() || !mob_entity.own_navigation().is_done() {
+        if mob.get_target().is_some()
+            || !mob_entity.with_navigation(|navigation, _| navigation.is_done())
+        {
             return false;
         }
         if mob

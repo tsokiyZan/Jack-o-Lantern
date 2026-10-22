@@ -101,8 +101,10 @@ impl CubeMobEntity {
 
     /// Vanilla `registerGoals`, which `SulfurCube` runs again when its body empties.
     fn register_goals(&self) {
-        // `CubeMobFloatGoal`'s constructor.
-        self.mob_entity.own_navigation().set_can_float(true);
+        // `CubeMobFloatGoal`'s constructor, `mob.getNavigation().setCanFloat(true)`. `SulfurCube`
+        // reruns this mid-life, when the vehicle's navigation is the one it reaches.
+        self.mob_entity
+            .with_navigation(|navigation, _| navigation.set_can_float(true));
         let weak = &self.weak;
         let mut goals = self
             .mob_entity

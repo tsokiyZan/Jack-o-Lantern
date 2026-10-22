@@ -549,7 +549,7 @@ pub fn get_random_nearby_pos(mob: &dyn Mob) -> Vector3<f64> {
 
 pub fn stop_walking(brain: &mut Brain, mob_entity: &MobEntity) {
     brain.erase(types::WALK_TARGET.id());
-    mob_entity.own_navigation().stop();
+    mob_entity.with_navigation(|navigation, _| navigation.stop());
 }
 
 #[must_use]

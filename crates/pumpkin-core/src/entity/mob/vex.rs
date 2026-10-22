@@ -163,10 +163,13 @@ fn as_vex(mob: &dyn Mob) -> Option<&VexEntity> {
     mob.cast_any().downcast_ref::<VexEntity>()
 }
 
+/// `Vex.this.getMoveControl().hasWanted()` (Vex.java:230, 237, 336).
 fn move_control_has_wanted(mob: &dyn Mob) -> bool {
-    mob.get_mob_entity().own_move_control().has_wanted()
+    mob.get_mob_entity()
+        .with_move_control(|control| control.has_wanted())
 }
 
+/// `Vex.this.moveControl.setWantedPosition` (Vex.java:245, 273, 354): the field, not the getter.
 fn set_wanted_position(mob: &dyn Mob, pos: Vector3<f64>, speed_modifier: f64) {
     mob.get_mob_entity().own_move_control().set_wanted_position(
         pos.x,

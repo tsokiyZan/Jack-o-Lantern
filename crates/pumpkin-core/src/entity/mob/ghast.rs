@@ -571,12 +571,14 @@ impl RandomFloatAroundGoal {
 
 impl Goal for RandomFloatAroundGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
-        let move_control = mob.get_mob_entity().own_move_control();
-        if !move_control.has_wanted() {
+        // `this.ghast.getMoveControl()`.
+        let Some(wanted) = mob
+            .get_mob_entity()
+            .with_move_control(|control| control.has_wanted().then(|| control.wanted_position()))
+        else {
             return true;
-        }
+        };
 
-        let wanted = move_control.wanted_position();
         let pos = mob.get_entity().pos.load();
         let xd = wanted.x - pos.x;
         let yd = wanted.y - pos.y;
@@ -591,9 +593,9 @@ impl Goal for RandomFloatAroundGoal {
 
     fn start(&mut self, mob: &dyn Mob) {
         let result = Self::get_suitable_fly_to_position(mob, self.distance_to_blocks);
-        mob.get_mob_entity()
-            .own_move_control()
-            .set_wanted_position(result.x, result.y, result.z, 1.0);
+        mob.get_mob_entity().with_move_control(|control| {
+            control.set_wanted_position(result.x, result.y, result.z, 1.0);
+        });
     }
 
     fn controls(&self) -> Controls {

@@ -407,7 +407,7 @@ impl Goal for GuardianAttackGoal {
     fn start(&mut self, mob: &dyn Mob) {
         self.attack_time = -10;
         let mob_entity = mob.get_mob_entity();
-        mob_entity.own_navigation().stop();
+        mob_entity.with_navigation(|navigation, _| navigation.stop());
         if let Some(target) = mob.get_target() {
             mob_entity
                 .look_control
@@ -440,7 +440,7 @@ impl Goal for GuardianAttackGoal {
         let Some(target) = mob.get_target() else {
             return;
         };
-        mob_entity.own_navigation().stop();
+        mob_entity.with_navigation(|navigation, _| navigation.stop());
         mob_entity
             .look_control
             .lock()

@@ -174,7 +174,8 @@ impl Goal for HoldGroundAttackGoal {
     }
 
     fn start(&mut self, mob: &dyn Mob) {
-        mob.get_mob_entity().own_navigation().stop();
+        mob.get_mob_entity()
+            .with_navigation(|navigation, _| navigation.stop());
 
         let target = mob.get_target().clone();
         if let Some(target) = target {
@@ -321,11 +322,10 @@ impl Goal for ObtainRaidLeaderBannerGoal {
                 temp_cache.insert(banner_id, unreachable_until);
                 continue;
             }
-            let path = mob_entity.own_navigation().create_path(
-                &mob_entity.living_entity,
-                banner.get_entity().pos.load(),
-                1,
-            );
+            let banner_pos = banner.get_entity().pos.load();
+            let path = mob_entity.with_navigation(|navigation, owner| {
+                navigation.create_path(&owner.living_entity, banner_pos, 1)
+            });
             if let Some(path) = path.filter(Path::can_reach) {
                 self.path_to_banner = Some(path);
                 self.pursued_banner = Some(banner);
@@ -345,17 +345,17 @@ impl Goal for ObtainRaidLeaderBannerGoal {
             return false;
         }
         // `pathToBanner.isDone()`: the navigation follows that path.
-        let path_done = mob.get_mob_entity().own_navigation().is_done();
+        let path_done = mob
+            .get_mob_entity()
+            .with_navigation(|navigation, _| navigation.is_done());
         !path_done && !cannot_pick_up_banner(mob)
     }
 
     fn start(&mut self, mob: &dyn Mob) {
-        let mob_entity = mob.get_mob_entity();
-        mob_entity.own_navigation().move_to_path(
-            self.path_to_banner.clone(),
-            1.15,
-            &mob_entity.living_entity,
-        );
+        let path = self.path_to_banner.clone();
+        mob.get_mob_entity().with_navigation(|navigation, owner| {
+            navigation.move_to_path(path, 1.15, &owner.living_entity);
+        });
     }
 
     fn stop(&mut self, _mob: &dyn Mob) {
@@ -557,13 +557,11 @@ impl RaiderMoveThroughVillageGoal {
 
     /// Vanilla `navigation.moveTo(x, y, z, speedModifier)`.
     fn move_to(&self, mob: &dyn Mob, target: Vector3<f64>) {
-        mob.get_mob_entity()
-            .own_navigation()
-            .set_progress(NavigatorGoal::new(
-                mob.get_entity().pos.load(),
-                target,
-                self.speed_modifier,
-            ));
+        let speed_modifier = self.speed_modifier;
+        mob.get_mob_entity().with_navigation(|navigation, owner| {
+            let owner_pos = owner.living_entity.entity.pos.load();
+            navigation.set_progress(NavigatorGoal::new(owner_pos, target, speed_modifier));
+        });
     }
 }
 

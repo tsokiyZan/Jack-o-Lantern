@@ -666,10 +666,11 @@ impl ZombieEntityBase {
                     operation: ModifierOperation::MultiplyTotal,
                 });
             });
-            // Vanilla `Mob.onAttributeUpdated`.
-            self.mob_entity
-                .own_navigation()
-                .update_pathfinder_max_visited_nodes(living);
+            // Vanilla `Mob.onAttributeUpdated`: `getNavigation()`, which is the chicken's once
+            // `finalizeSpawn` has mounted a jockey (Zombie.java:464 runs before :483).
+            self.mob_entity.with_navigation(|navigation, owner| {
+                navigation.update_pathfinder_max_visited_nodes(&owner.living_entity);
+            });
         }
 
         if entity.random().next_f32() < difficulty_modifier * ZOMBIE_LEADER_CHANCE {

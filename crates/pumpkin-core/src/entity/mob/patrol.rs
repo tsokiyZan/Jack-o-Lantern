@@ -209,8 +209,14 @@ impl Goal for LongDistancePatrolGoal {
             } else {
                 self.speed_modifier
             };
-            let mut nav = mob.get_mob_entity().own_navigation();
-            nav.set_progress(NavigatorGoal::new(pos, patrol_target.to_f64(), speed));
+            mob.get_mob_entity().with_navigation(|navigation, owner| {
+                let owner_pos = owner.living_entity.entity.pos.load();
+                navigation.set_progress(NavigatorGoal::new(
+                    owner_pos,
+                    patrol_target.to_f64(),
+                    speed,
+                ));
+            });
         }
     }
 }
