@@ -94,6 +94,7 @@ pub mod interaction;
 pub mod item;
 pub mod item_steerable;
 pub mod leash;
+pub mod leashable;
 pub mod lightning;
 pub mod living;
 pub mod marker;
