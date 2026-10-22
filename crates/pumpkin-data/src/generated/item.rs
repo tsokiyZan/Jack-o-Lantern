@@ -6961,7 +6961,13 @@ impl Item {
                     sound: IdOr::Id(Sound::EntityItemBreak),
                 },
             ),
-            (BundleContents, &BundleContentsImpl { items: Vec::new() }),
+            (
+                BundleContents,
+                &BundleContentsImpl {
+                    items: Vec::new(),
+                    selected_item: -1,
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -8850,7 +8856,13 @@ impl Item {
                     sound: IdOr::Id(Sound::EntityItemBreak),
                 },
             ),
-            (BundleContents, &BundleContentsImpl { items: Vec::new() }),
+            (
+                BundleContents,
+                &BundleContentsImpl {
+                    items: Vec::new(),
+                    selected_item: -1,
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -11836,7 +11848,13 @@ impl Item {
                     sound: IdOr::Id(Sound::EntityItemBreak),
                 },
             ),
-            (BundleContents, &BundleContentsImpl { items: Vec::new() }),
+            (
+                BundleContents,
+                &BundleContentsImpl {
+                    items: Vec::new(),
+                    selected_item: -1,
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -13593,7 +13611,13 @@ impl Item {
                     sound: IdOr::Id(Sound::EntityItemBreak),
                 },
             ),
-            (BundleContents, &BundleContentsImpl { items: Vec::new() }),
+            (
+                BundleContents,
+                &BundleContentsImpl {
+                    items: Vec::new(),
+                    selected_item: -1,
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -26125,7 +26149,13 @@ impl Item {
                     sound: IdOr::Id(Sound::EntityItemBreak),
                 },
             ),
-            (BundleContents, &BundleContentsImpl { items: Vec::new() }),
+            (
+                BundleContents,
+                &BundleContentsImpl {
+                    items: Vec::new(),
+                    selected_item: -1,
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -42239,7 +42269,13 @@ impl Item {
                     sound: IdOr::Id(Sound::EntityItemBreak),
                 },
             ),
-            (BundleContents, &BundleContentsImpl { items: Vec::new() }),
+            (
+                BundleContents,
+                &BundleContentsImpl {
+                    items: Vec::new(),
+                    selected_item: -1,
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -43559,7 +43595,13 @@ impl Item {
                     sound: IdOr::Id(Sound::EntityItemBreak),
                 },
             ),
-            (BundleContents, &BundleContentsImpl { items: Vec::new() }),
+            (
+                BundleContents,
+                &BundleContentsImpl {
+                    items: Vec::new(),
+                    selected_item: -1,
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -52118,7 +52160,13 @@ impl Item {
                     sound: IdOr::Id(Sound::EntityItemBreak),
                 },
             ),
-            (BundleContents, &BundleContentsImpl { items: Vec::new() }),
+            (
+                BundleContents,
+                &BundleContentsImpl {
+                    items: Vec::new(),
+                    selected_item: -1,
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -53438,7 +53486,13 @@ impl Item {
                     sound: IdOr::Id(Sound::EntityItemBreak),
                 },
             ),
-            (BundleContents, &BundleContentsImpl { items: Vec::new() }),
+            (
+                BundleContents,
+                &BundleContentsImpl {
+                    items: Vec::new(),
+                    selected_item: -1,
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -55081,7 +55135,13 @@ impl Item {
                     sound: IdOr::Id(Sound::EntityItemBreak),
                 },
             ),
-            (BundleContents, &BundleContentsImpl { items: Vec::new() }),
+            (
+                BundleContents,
+                &BundleContentsImpl {
+                    items: Vec::new(),
+                    selected_item: -1,
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -56769,7 +56829,13 @@ impl Item {
                     sound: IdOr::Id(Sound::EntityItemBreak),
                 },
             ),
-            (BundleContents, &BundleContentsImpl { items: Vec::new() }),
+            (
+                BundleContents,
+                &BundleContentsImpl {
+                    items: Vec::new(),
+                    selected_item: -1,
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -67714,7 +67780,13 @@ impl Item {
                     sound: IdOr::Id(Sound::EntityItemBreak),
                 },
             ),
-            (BundleContents, &BundleContentsImpl { items: Vec::new() }),
+            (
+                BundleContents,
+                &BundleContentsImpl {
+                    items: Vec::new(),
+                    selected_item: -1,
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -72772,7 +72844,13 @@ impl Item {
                     sound: IdOr::Id(Sound::EntityItemBreak),
                 },
             ),
-            (BundleContents, &BundleContentsImpl { items: Vec::new() }),
+            (
+                BundleContents,
+                &BundleContentsImpl {
+                    items: Vec::new(),
+                    selected_item: -1,
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -79939,7 +80017,13 @@ impl Item {
                     sound: IdOr::Id(Sound::EntityItemBreak),
                 },
             ),
-            (BundleContents, &BundleContentsImpl { items: Vec::new() }),
+            (
+                BundleContents,
+                &BundleContentsImpl {
+                    items: Vec::new(),
+                    selected_item: -1,
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -82834,7 +82918,13 @@ impl Item {
                     sound: IdOr::Id(Sound::EntityItemBreak),
                 },
             ),
-            (BundleContents, &BundleContentsImpl { items: Vec::new() }),
+            (
+                BundleContents,
+                &BundleContentsImpl {
+                    items: Vec::new(),
+                    selected_item: -1,
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -107471,7 +107561,13 @@ impl Item {
                     sound: IdOr::Id(Sound::EntityItemBreak),
                 },
             ),
-            (BundleContents, &BundleContentsImpl { items: Vec::new() }),
+            (
+                BundleContents,
+                &BundleContentsImpl {
+                    items: Vec::new(),
+                    selected_item: -1,
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {
@@ -110530,7 +110626,13 @@ impl Item {
                     sound: IdOr::Id(Sound::EntityItemBreak),
                 },
             ),
-            (BundleContents, &BundleContentsImpl { items: Vec::new() }),
+            (
+                BundleContents,
+                &BundleContentsImpl {
+                    items: Vec::new(),
+                    selected_item: -1,
+                },
+            ),
             (
                 Enchantments,
                 &EnchantmentsImpl {

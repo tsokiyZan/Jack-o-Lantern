@@ -584,6 +584,9 @@ impl DataComponentImpl for ChargedProjectilesImpl {
 #[derive(Clone)]
 pub struct BundleContentsImpl {
     pub items: Vec<crate::item_stack::ItemStack>,
+    /// Vanilla `BundleContents.selectedItem`: the item the player picked in the bundle's
+    /// tooltip, -1 for none. Neither saved nor sent, nor part of equality.
+    pub selected_item: i32,
 }
 impl PartialEq for BundleContentsImpl {
     fn eq(&self, _other: &Self) -> bool {
@@ -608,8 +611,29 @@ impl BundleContentsImpl {
                 }
             }
         }
-        Some(Self { items })
+        Some(Self {
+            items,
+            selected_item: -1,
+        })
     }
+
+    /// Vanilla `indexIsOutsideAllowedBounds`.
+    const fn index_is_outside_allowed_bounds(&self, index: i32) -> bool {
+        index < 0 || index as usize >= self.items.len()
+    }
+
+    /// Vanilla `BundleContents.Mutable.toggleSelectedItem`: picking the selected item again,
+    /// or one that isn't there, clears the selection.
+    pub const fn toggle_selected_item(&mut self, selected_item: i32) {
+        self.selected_item = if self.selected_item != selected_item
+            && !self.index_is_outside_allowed_bounds(selected_item)
+        {
+            selected_item
+        } else {
+            -1
+        };
+    }
+
     pub fn get_weight(&self) -> u32 {
         self.items
             .iter()
@@ -638,12 +662,20 @@ impl BundleContentsImpl {
         }
         inserted_anything
     }
+    /// Vanilla `BundleContents.Mutable.removeOne`: the selected item, else the first; the
+    /// selection is cleared.
     pub fn try_extract(&mut self) -> Option<crate::item_stack::ItemStack> {
         if self.items.is_empty() {
-            None
-        } else {
-            Some(self.items.remove(0))
+            return None;
         }
+        let index = if self.index_is_outside_allowed_bounds(self.selected_item) {
+            0
+        } else {
+            self.selected_item as usize
+        };
+        let stack = self.items.remove(index);
+        self.toggle_selected_item(-1);
+        Some(stack)
     }
 }
 impl DataComponentImpl for BundleContentsImpl {
