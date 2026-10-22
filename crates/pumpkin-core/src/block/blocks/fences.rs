@@ -1,5 +1,6 @@
+use crate::block::registry::BlockActionResult;
 use crate::block::{
-    BlockBehaviour, GetStateForNeighborUpdateArgs, OnPlaceArgs, PathComputationType,
+    BlockBehaviour, GetStateForNeighborUpdateArgs, NormalUseArgs, OnPlaceArgs, PathComputationType,
 };
 use crate::world::World;
 use pumpkin_data::block_properties::HorizontalFacing;
@@ -32,6 +33,12 @@ impl BlockBehaviour for FenceBlock {
 
     fn is_pathfindable(&self, _state: &BlockState, _computation_type: PathComputationType) -> bool {
         false
+    }
+
+    /// Vanilla `FenceBlock.useWithoutItem`: on the server, `LeadItem.bindPlayerMobs` ties the
+    /// player's leashed mobs to the fence's knot.
+    fn normal_use(&self, args: NormalUseArgs<'_>) -> BlockActionResult {
+        crate::item::items::lead::bind_player_mobs(args.player, *args.position)
     }
 }
 
