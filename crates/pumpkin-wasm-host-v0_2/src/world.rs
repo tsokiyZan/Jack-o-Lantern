@@ -1397,7 +1397,7 @@ impl pumpkin::plugin::world::HostChunk for PluginHostState {
             chunk_data.mark_dirty(true);
             let absolute_pos =
                 BlockPos::new(chunk_data.x * 16 + pos.x, pos.y, chunk_data.z * 16 + pos.z);
-            world.register_block_change(absolute_pos, state);
+            world.register_block_change(absolute_pos);
         }
 
         Ok(())

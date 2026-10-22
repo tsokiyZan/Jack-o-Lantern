@@ -18,6 +18,7 @@ use living::LivingEntity;
 use player::Player;
 use pumpkin_data::BlockState;
 use pumpkin_data::biome::Biome;
+use pumpkin_data::block_state::PistonBehavior;
 use pumpkin_data::data_component_impl::EquipmentSlot;
 use pumpkin_data::dimension::Dimension;
 use pumpkin_data::entity::EntityStatus;
@@ -1056,6 +1057,13 @@ pub trait EntityBase: Send + Sync + std::any::Any {
     /// and what follows it, for the entities whose `move` override takes the piston too.
     fn move_by_piston(&self, caller: &dyn EntityBase, delta: Vector3<f64>) {
         self.get_entity().move_by_piston(caller, delta);
+    }
+
+    /// Vanilla `Entity.getPistonPushReaction`: how a moving piston block treats this entity.
+    /// The mapping onto [`PistonBehavior`] is `Normal` = `PUSH_PULL`, `PushOnly` = `PUSH`,
+    /// `Destroy` = `POPPED`, `Block` = `IMMOVEABLE`, `Ignore` = `IGNORE_ENTITY`.
+    fn piston_push_reaction(&self) -> PistonBehavior {
+        PistonBehavior::Normal
     }
 
     /// Vanilla `Entity.getKnownMovement`: a player steering this entity knows its movement best.
@@ -2269,6 +2277,13 @@ impl Entity {
         } else {
             300
         }
+    }
+
+    /// Vanilla `Entity.isSupportedBy`: whether `pos` is this entity's main supporting block.
+    /// Reads `mainSupportingBlockPos` as is, without [`Self::get_supporting_block_pos`]'s
+    /// on-ground check.
+    pub fn is_supported_by(&self, pos: BlockPos) -> bool {
+        self.supporting_block_pos.load() == Some(pos)
     }
 
     /// Returns the block position of the block the (non-player) entity is standing on, if any.

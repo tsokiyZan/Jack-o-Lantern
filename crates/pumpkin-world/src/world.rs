@@ -25,8 +25,10 @@ bitflags! {
         /// Prevents the previous block from dropping items when it is replaced
         /// Commonly used when a block is "transformed" rather than destroyed
         const SKIP_DROPS                            = 0b000_0000_1000;
-        /// Signals that the block is being moved (usually by a piston)
-        /// This prevents certain "on-break" logic from firing until the move is complete
+        /// Vanilla `Block.UPDATE_MOVE_BY_PISTON` (64): the change is part of a piston move.
+        /// The removed block's `affectNeighborsAfterRemoval` runs even without
+        /// `NOTIFY_NEIGHBORS`, and both callbacks are told the block moved. It does not skip
+        /// the neighbour shape updates; only `UPDATE_KNOWN_SHAPE` does.
         const MOVED                                 = 0b000_0001_0000;
         /// Prevents redstone wire from re-calculating its shape/power immediately
         /// Used during massive redstone updates to reduce calculation lag

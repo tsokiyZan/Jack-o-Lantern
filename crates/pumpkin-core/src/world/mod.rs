@@ -1,3 +1,4 @@
+use crate::block::entities::piston::PistonBlockEntity;
 use crate::block::entities::{BlockEntity, block_entity_from_nbt};
 use dashmap::DashMap;
 use pumpkin_data::chunk::Biome;
@@ -281,9 +282,16 @@ pub struct World {
     /// Block Behaviour
     pub block_registry: Arc<BlockRegistry>,
     pub server: Weak<Server>,
-    synced_block_event_queue: std::sync::Mutex<Vec<BlockEvent>>,
+    /// Vanilla `ServerLevel.blockEvents`, an `ObjectLinkedOpenHashSet`: queued in order, an
+    /// event already waiting is not queued twice.
+    synced_block_event_queue: std::sync::Mutex<indexmap::IndexSet<BlockEvent>>,
+    /// Vanilla `ServerLevel.handlingTick`: set from the start of the level tick through the
+    /// block events, cleared before entities and block entities tick.
+    handling_tick: std::sync::atomic::AtomicBool,
     /// A map of unsent block changes, keyed by block position.
-    unsent_block_changes: std::sync::Mutex<HashMap<BlockPos, BlockStateId>>,
+    /// Vanilla `ChunkHolder.changedBlocksPerSection`: positions only; the state sent is the
+    /// one the block holds when the changes are broadcast.
+    unsent_block_changes: std::sync::Mutex<FxHashSet<BlockPos>>,
     /// Persisted vanilla POI storage for portal and villager lookups.
     pub portal_poi: std::sync::Mutex<portal::PortalPoiStorage>,
     /// Villager job sites and their current owners.
@@ -441,8 +449,9 @@ impl World {
             block_registry,
             sea_level: generation_settings.sea_level,
             min_y: i32::from(generation_settings.shape.min_y),
-            synced_block_event_queue: std::sync::Mutex::new(Vec::new()),
-            unsent_block_changes: std::sync::Mutex::new(HashMap::new()),
+            synced_block_event_queue: std::sync::Mutex::new(indexmap::IndexSet::new()),
+            handling_tick: std::sync::atomic::AtomicBool::new(false),
+            unsent_block_changes: std::sync::Mutex::new(FxHashSet::default()),
             portal_poi: std::sync::Mutex::new(portal_poi),
             villager_poi: std::sync::Mutex::new(villager_poi::VillagerPoiStorage::default()),
             raids: std::sync::Mutex::new(raid::Raids::default()),
@@ -1013,34 +1022,44 @@ impl World {
         }
     }
 
+    /// Vanilla `ServerLevel.blockEvent`, with the block at `pos` as the event's block.
     pub fn add_synced_block_event(&self, pos: BlockPos, r#type: u8, data: u8) {
-        let mut queue = self
-            .synced_block_event_queue
+        let block = self.get_block(&pos).id;
+        self.synced_block_event_queue
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        queue.push(BlockEvent { pos, r#type, data });
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .insert(BlockEvent {
+                pos,
+                block,
+                r#type,
+                data,
+            });
     }
 
+    /// Vanilla `ServerLevel.runBlockEvents`: runs events until the queue is empty, including
+    /// those queued by the events themselves; an event whose block has changed is dropped.
     pub fn flush_synced_block_events(self: &Arc<Self>) {
-        // THIS IS IMPORTANT
-        // it prevents deadlocks and also removes the need to wait for a lock when adding a new synced block
-        let events = {
-            let mut queue = self
+        loop {
+            // The lock is released before the event runs: it may queue more events.
+            let Some(event) = self
                 .synced_block_event_queue
                 .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            std::mem::take(&mut *queue)
-        };
-
-        for event in events {
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .shift_remove_index(0)
+            else {
+                break;
+            };
             let block = self.get_block(&event.pos);
-            if !self.block_registry.on_synced_block_event(
-                block,
-                self,
-                &event.pos,
-                event.r#type,
-                event.data,
-            ) {
+            // `doBlockEvent`: `state.is(eventData.block())`.
+            if block.id != event.block
+                || !self.block_registry.on_synced_block_event(
+                    block,
+                    self,
+                    &event.pos,
+                    event.r#type,
+                    event.data,
+                )
+            {
                 continue;
             }
             let chunk_pos = event.pos.chunk_position();
@@ -1960,8 +1979,7 @@ impl World {
 
         let start = std::time::Instant::now();
 
-        self.flush_block_updates();
-        self.flush_synced_block_events();
+        self.handling_tick.store(true, Relaxed);
         self.update_active_chunks();
         self.tick_environment();
         let mut raids = {
@@ -1987,9 +2005,17 @@ impl World {
         let t_chunks = std::time::Instant::now();
         self.tick_chunks(server);
         let chunk_elapsed = t_chunks.elapsed();
-        // Vanilla `ServerChunkCache.tick` ends with `chunkMap.tick`, every tracked entity's
-        // `sendChanges`: what changed last tick and between ticks goes out before entities tick.
+        // Vanilla `ServerChunkCache.tickChunks` ends with `broadcastChangedChunks`: the block
+        // changes so far go out before the tracker and the block events.
+        self.flush_block_updates();
+        // `chunkMap.tick`, every tracked entity's `sendChanges`: what changed last tick and
+        // between ticks goes out before entities tick.
         self.entity_tracker.update_all(self);
+        // Vanilla `runBlockEvents`, last in the `handlingTick` window: after the block, fluid
+        // and chunk ticks, so an event queued by a scheduled tick runs (and a piston starts
+        // moving) in the same game tick, and after this tick's broadcasts.
+        self.flush_synced_block_events();
+        self.handling_tick.store(false, Relaxed);
 
         let handle = server.runtime.clone();
 
@@ -2088,17 +2114,33 @@ impl World {
                 }
             }
         }
-        let block_entity_count = block_entities.len();
+        // Vanilla `LevelChunk.isTicking`: a block entity outside the world border doesn't tick.
+        let border = self
+            .worldborder
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let ticking: Vec<Arc<dyn BlockEntity>> = block_entities
+            .iter()
+            .filter(|be| {
+                let pos = be.get_position();
+                border.contains_block(pos.0.x, pos.0.z)
+            })
+            .cloned()
+            .collect();
+        drop(border);
+        let block_entity_count = ticking.len();
 
         let t_be = std::time::Instant::now();
         let be_handle = handle;
-        block_entities.par_chunks(16).for_each(|batch| {
+        ticking.par_chunks(16).for_each(|batch| {
             let _guard = be_handle.enter();
             for be in batch {
                 be.tick(self);
             }
         });
-        // Drained after all ticks, so changes (hopper -> chest) land in the same tick.
+        // Drained after all ticks, so changes (hopper -> chest) land in the same tick. Vanilla's
+        // `setChanged` sends the update whether or not the block entity ticks, so drain the
+        // unfiltered list.
         let guard = be_handle.enter();
         self.flush_comparator_updates(&block_entities);
         drop(guard);
@@ -2138,14 +2180,17 @@ impl World {
         }
     }
 
-    pub fn register_block_change(&self, position: BlockPos, block_state_id: BlockStateId) {
+    /// Vanilla `ChunkHolder.blockChanged`: the block at `position` is sent with the next
+    /// [`flush_block_updates`](Self::flush_block_updates), as it is then.
+    pub fn register_block_change(&self, position: BlockPos) {
         self.unsent_block_changes
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .insert(position, block_state_id);
+            .insert(position);
     }
 
-    /// Queues block state changes for broadcast to nearby players.
+    /// Queues the changed positions for broadcast to nearby players; the states are read
+    /// again when they are sent.
     ///
     /// Call [`flush_block_updates`](Self::flush_block_updates) afterward to send the packets.
     pub fn queue_block_updates(&self, changes: &[(BlockPos, BlockStateId)]) {
@@ -2153,8 +2198,8 @@ impl World {
             .unsent_block_changes
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        for (pos, state_id) in changes {
-            guard.insert(*pos, *state_id);
+        for (pos, _) in changes {
+            guard.insert(*pos);
         }
     }
 
@@ -2171,7 +2216,13 @@ impl World {
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             std::mem::take(&mut *guard)
         };
-        for (position, block_state_id) in changes {
+        // Vanilla `ChunkHolder.broadcastChanges` reads each changed block when it sends, so a
+        // cell written several times (a piston's 18 then its 324, which doesn't notify) goes
+        // out as it is now, not as it was at the last notifying write.
+        for position in changes {
+            let Some(block_state_id) = self.get_block_state_id_if_loaded(&position) else {
+                continue;
+            };
             let chunk_section = chunk_section_from_pos(&position);
             block_state_updates_by_chunk_section
                 .entry(chunk_section)
@@ -2793,6 +2844,14 @@ impl World {
                         collisions.push(shape);
                     }
                 }
+            } else if block == &Block::MOVING_PISTON {
+                for shape in self.moving_piston_collision_shape(&pos) {
+                    let shape = shape.at_pos(pos);
+                    if shape.intersects(&bounding_box) {
+                        collided = true;
+                        collisions.push(shape);
+                    }
+                }
             } else {
                 for shape in state.get_block_collision_shapes_at(&pos) {
                     let shape = shape.at_pos(pos);
@@ -2808,7 +2867,68 @@ impl World {
             }
         }
 
+        for pos in self.moving_pistons_beyond(&bounding_box, min, max) {
+            let mut collided = false;
+            for shape in self.moving_piston_collision_shape(&pos) {
+                let shape = shape.at_pos(pos);
+                if shape.intersects(&bounding_box) {
+                    collided = true;
+                    collisions.push(shape);
+                }
+            }
+            if collided {
+                positions.push((collisions.len(), pos));
+            }
+        }
+
         (collisions, positions)
+    }
+
+    /// Vanilla `MovingPistonBlock.getCollisionShape`: the block entity's shape, or none.
+    pub fn moving_piston_collision_shape(&self, pos: &BlockPos) -> Vec<BoundingBox> {
+        self.get_block_entity(pos)
+            .and_then(|block_entity| {
+                block_entity
+                    .as_any()
+                    .downcast_ref::<PistonBlockEntity>()
+                    .map(PistonBlockEntity::get_collision_shape)
+            })
+            .unwrap_or_default()
+    }
+
+    /// The `MOVING_PISTON` cells of vanilla's `BlockCollisions` cursor outside `inner_min..=inner_max`.
+    /// The cursor reaches one block past the box; a moving piston collides on its face and edge
+    /// cells (`cursorFaceType` 1 and 2) but never its corners (3), since its shape can stick up to
+    /// a block out of its cell.
+    fn moving_pistons_beyond(
+        &self,
+        bounding_box: &BoundingBox,
+        inner_min: BlockPos,
+        inner_max: BlockPos,
+    ) -> impl Iterator<Item = BlockPos> + '_ {
+        let cursor_min = BlockPos::new(
+            (bounding_box.min.x - 1.0E-7).floor() as i32 - 1,
+            (bounding_box.min.y - 1.0E-7).floor() as i32 - 1,
+            (bounding_box.min.z - 1.0E-7).floor() as i32 - 1,
+        );
+        let cursor_max = BlockPos::new(
+            (bounding_box.max.x + 1.0E-7).floor() as i32 + 1,
+            (bounding_box.max.y + 1.0E-7).floor() as i32 + 1,
+            (bounding_box.max.z + 1.0E-7).floor() as i32 + 1,
+        );
+        BlockPos::iterate(cursor_min, cursor_max).filter(move |pos| {
+            let (p, lo, hi) = (pos.0, inner_min.0, inner_max.0);
+            let inner = (lo.x..=hi.x).contains(&p.x)
+                && (lo.y..=hi.y).contains(&p.y)
+                && (lo.z..=hi.z).contains(&p.z);
+            if inner {
+                return false;
+            }
+            let face_type = u8::from(p.x == cursor_min.0.x || p.x == cursor_max.0.x)
+                + u8::from(p.y == cursor_min.0.y || p.y == cursor_max.0.y)
+                + u8::from(p.z == cursor_min.0.z || p.z == cursor_max.0.z);
+            face_type != 3 && self.get_block(pos) == &Block::MOVING_PISTON
+        })
     }
 
     /// Vanilla `CollisionGetter.noCollision(AABB)`: no block shape and no collidable entity in
@@ -2856,13 +2976,25 @@ impl World {
 
         for pos in BlockPos::iterate(min, max) {
             let state = self.get_block_state(&pos);
-            let collided = Self::check_collision(&bounding_box, pos, state, false, |_| ());
+            let collided = if Block::from_state_id(state.id) == &Block::MOVING_PISTON {
+                self.moving_piston_collides(&bounding_box, &pos)
+            } else {
+                Self::check_collision(&bounding_box, pos, state, false, |_| ())
+            };
 
             if collided {
                 return false;
             }
         }
-        true
+        !self
+            .moving_pistons_beyond(&bounding_box, min, max)
+            .any(|pos| self.moving_piston_collides(&bounding_box, &pos))
+    }
+
+    fn moving_piston_collides(&self, bounding_box: &BoundingBox, pos: &BlockPos) -> bool {
+        self.moving_piston_collision_shape(pos)
+            .iter()
+            .any(|shape| shape.at_pos(*pos).intersects(bounding_box))
     }
 
     /// Vanilla's `BlockView.getDismountHeight()`.
@@ -2979,6 +3111,11 @@ impl World {
         for entity in entities {
             self.spawn_entity_non_save(entity);
         }
+    }
+
+    /// Vanilla `ServerLevel.isHandlingTick`.
+    pub fn is_handling_tick(&self) -> bool {
+        self.handling_tick.load(Relaxed)
     }
 
     pub fn get_world_age(&self) -> i64 {
@@ -5972,10 +6109,7 @@ impl World {
         // Level.java setBlock
         if self.get_block_state_id(position) == block_state_id {
             if flags.contains(BlockFlags::NOTIFY_LISTENERS) {
-                self.unsent_block_changes
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .insert(*position, block_state_id);
+                self.register_block_change(*position);
             }
 
             if flags.contains(BlockFlags::NOTIFY_NEIGHBORS) {
@@ -5985,7 +6119,10 @@ impl World {
                 }
             }
 
-            if !flags.intersects(BlockFlags::MOVED | BlockFlags::UPDATE_KNOWN_SHAPE) {
+            // Only `UPDATE_KNOWN_SHAPE` (vanilla 16) skips the shape updates; a piston's
+            // `MOVED` (vanilla 64) still sends them.
+            if !flags.contains(BlockFlags::UPDATE_KNOWN_SHAPE) {
+                // Vanilla `updateFlags & -34`: without `UPDATE_NEIGHBORS` and `UPDATE_SUPPRESS_DROPS`.
                 let mut neighbour_update_flags = flags;
                 neighbour_update_flags.remove(BlockFlags::NOTIFY_NEIGHBORS);
                 neighbour_update_flags.remove(BlockFlags::SKIP_DROPS);
@@ -7136,11 +7273,24 @@ impl World {
             neighbor_state_id,
         );
 
+        // Vanilla `Block.updateOrDestroy`.
         if new_state_id != block_state_id {
             if is_air(new_state_id) {
-                self.break_block(block_pos, None, flags | BlockFlags::NOTIFY_ALL);
+                // `destroyBlock(pos, (flags & 32) == 0, null)`: the write is a plain
+                // `UPDATE_ALL`. The caller's other flags (a piston's `MOVED`, its skipped
+                // block-entity side effects) belong to the neighbour's write, not this one.
+                self.break_block(
+                    block_pos,
+                    None,
+                    BlockFlags::NOTIFY_ALL | (flags & BlockFlags::SKIP_DROPS),
+                );
             } else {
-                self.set_block_state(block_pos, new_state_id, flags);
+                // `setBlock(pos, newState, flags & -33)`.
+                self.set_block_state(
+                    block_pos,
+                    new_state_id,
+                    flags.difference(BlockFlags::SKIP_DROPS),
+                );
             }
         }
     }

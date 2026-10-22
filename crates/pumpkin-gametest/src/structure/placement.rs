@@ -194,9 +194,12 @@ pub async fn place_structure_with_controller_rotation(
 
     // StructureTemplate.placeInWorld rotates both relative positions and block
     // states before loading block-entity NBT at the transformed absolute position.
+    // `TestInstanceBlockEntity` places with 818: clients, known shape, no drops, no block
+    // entity side effects, no `onPlace`.
     let place_flags = BlockFlags::NOTIFY_LISTENERS
-        | BlockFlags::MOVED
-        | BlockFlags::SKIP_REDSTONE_WIRE_STATE_REPLACEMENT
+        | BlockFlags::UPDATE_KNOWN_SHAPE
+        | BlockFlags::SKIP_DROPS
+        | BlockFlags::SKIP_BLOCK_ENTITY_REPLACED_CALLBACK
         | BlockFlags::SKIP_BLOCK_ADDED_CALLBACK;
 
     for block in template.blocks() {

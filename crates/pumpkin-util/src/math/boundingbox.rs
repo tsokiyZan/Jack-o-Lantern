@@ -168,6 +168,24 @@ impl BoundingBox {
         }
     }
 
+    /// Vanilla `AABB.intersect`: the overlap of both boxes (component-wise max of the mins,
+    /// min of the maxes).
+    #[must_use]
+    pub const fn intersect(&self, other: &Self) -> Self {
+        Self {
+            min: Vector3::new(
+                self.min.x.max(other.min.x),
+                self.min.y.max(other.min.y),
+                self.min.z.max(other.min.z),
+            ),
+            max: Vector3::new(
+                self.max.x.min(other.max.x),
+                self.max.y.min(other.max.y),
+                self.max.z.min(other.max.z),
+            ),
+        }
+    }
+
     /// Creates a bounding box from arrays of min and max coordinates.
     ///
     /// # Arguments
