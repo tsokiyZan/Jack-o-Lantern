@@ -1910,7 +1910,6 @@ impl World {
         let start = std::time::Instant::now();
 
         self.handling_tick.store(true, Relaxed);
-        self.flush_block_updates();
         self.update_active_chunks();
         self.tick_environment();
         let mut raids = {
@@ -1936,13 +1935,17 @@ impl World {
         let t_chunks = std::time::Instant::now();
         self.tick_chunks(server);
         let chunk_elapsed = t_chunks.elapsed();
-        // Vanilla `runBlockEvents`: after the block, fluid and chunk ticks, so an event queued
-        // by a scheduled tick runs (and a piston starts moving) in the same game tick.
+        // Vanilla `ServerChunkCache.tickChunks` ends with `broadcastChangedChunks`: the block
+        // changes so far go out before the tracker and the block events.
+        self.flush_block_updates();
+        // `chunkMap.tick`, every tracked entity's `sendChanges`: what changed last tick and
+        // between ticks goes out before entities tick.
+        self.entity_tracker.update_all(self);
+        // Vanilla `runBlockEvents`, last in the `handlingTick` window: after the block, fluid
+        // and chunk ticks, so an event queued by a scheduled tick runs (and a piston starts
+        // moving) in the same game tick, and after this tick's broadcasts.
         self.flush_synced_block_events();
         self.handling_tick.store(false, Relaxed);
-        // Vanilla `ServerChunkCache.tick` ends with `chunkMap.tick`, every tracked entity's
-        // `sendChanges`: what changed last tick and between ticks goes out before entities tick.
-        self.entity_tracker.update_all(self);
 
         let handle = server.runtime.clone();
 
