@@ -294,6 +294,8 @@ impl EntityBase for MinecartEntity {
     #[allow(clippy::too_many_lines)]
     fn tick(&self, caller: &dyn EntityBase, _server: &Server) {
         self.vehicle.tick();
+        // `AbstractMinecart.tick`: `handlePortal` after the hurt and damage decrement.
+        self.vehicle.entity.handle_portal(caller);
         if let MinecartKind::Furnace(minecart) = &self.kind {
             minecart.tick(&self.vehicle.entity);
         }

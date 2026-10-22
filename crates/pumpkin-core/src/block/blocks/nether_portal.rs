@@ -17,7 +17,10 @@ use crate::{
         RandomTickArgs,
     },
     entity::{EntityBase, r#type::from_type},
-    world::{World, portal::nether::NetherPortal},
+    world::{
+        World,
+        portal::{PortalType, nether::NetherPortal},
+    },
 };
 
 #[pumpkin_block("minecraft:nether_portal")]
@@ -116,9 +119,16 @@ impl BlockBehaviour for NetherPortalBlock {
                 args.world,
                 Uuid::new_v4(),
             );
+            // `setPortalCooldown`, on the piglin and on its vehicle.
             mob.get_entity()
                 .portal_cooldown
-                .store(300, Ordering::Relaxed);
+                .store(mob.dimension_changing_delay(), Ordering::Relaxed);
+            if let Some(vehicle) = mob.get_entity().get_vehicle() {
+                vehicle
+                    .get_entity()
+                    .portal_cooldown
+                    .store(vehicle.dimension_changing_delay(), Ordering::Relaxed);
+            }
             args.world.spawn_entity_non_save(mob);
         }
     }
@@ -143,9 +153,12 @@ impl BlockBehaviour for NetherPortalBlock {
             args.position,
             target_world.dimension.minecraft_name
         );
-        args.entity
-            .get_entity()
-            .try_use_portal(args.entity, target_world, *args.position);
+        args.entity.get_entity().try_use_portal(
+            args.entity,
+            PortalType::Nether,
+            target_world,
+            *args.position,
+        );
     }
 
     fn on_state_replaced(&self, args: OnStateReplacedArgs<'_>) {

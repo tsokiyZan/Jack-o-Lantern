@@ -7,7 +7,7 @@ use crate::{
     world::{
         World,
         game_event::DynamicGameEventListener,
-        portal::{NetherPortal, PortalProcessor, PortalType, SourcePortalInfo},
+        portal::{NetherPortal, PortalProcessor, PortalType, SourcePortalInfo, TeleportTransition},
     },
 };
 use arc_swap::ArcSwap;
@@ -1659,9 +1659,6 @@ pub struct Entity {
     pub portal_cooldown: AtomicU32,
 
     pub portal_manager: std::sync::Mutex<Option<PortalProcessor>>,
-    /// A portal destination found off the tick, applied on the entity's next tick so the
-    /// copy into the new dimension never races the world tick.
-    pending_portal_transition: std::sync::Mutex<Option<TeleportTarget>>,
     /// Custom name for the entity
     pub custom_name: ArcSwap<Option<TextComponent>>,
     /// Indicates whether the entity's custom name is visible
@@ -1844,7 +1841,6 @@ impl Entity {
             last_biome_update_pos: AtomicCell::new(BlockPos::new(floor_x, floor_y, floor_z)),
             portal_cooldown: AtomicU32::new(0),
             portal_manager: std::sync::Mutex::new(None),
-            pending_portal_transition: std::sync::Mutex::new(None),
             custom_name: ArcSwap::new(Arc::new(None)),
             custom_name_visible: AtomicBool::new(false),
             silent: AtomicBool::new(false),
@@ -3652,91 +3648,46 @@ impl Entity {
         self.velocity.store(velo);
     }
 
-    /// Vanilla `Entity.handlePortal`. The destination is searched for off the tick, like
-    /// before; the entity then changes place with [`teleport_transition`].
-    fn tick_portal(&self, caller: &dyn EntityBase) {
+    /// Vanilla `Entity.handlePortal`: the destination is searched for, and the entity changes
+    /// place, inside its own tick.
+    pub(crate) fn handle_portal(&self, caller: &dyn EntityBase) {
+        // `processPortalCooldown`.
         if self.portal_cooldown.load(Ordering::Relaxed) > 0 {
             self.portal_cooldown.fetch_sub(1, Ordering::Relaxed);
         }
-        let pending = self
-            .pending_portal_transition
+        let world = self.world.load_full();
+        let mut guard = self
+            .portal_manager
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .take();
-        if let Some(target) = pending
-            && let Some(entity_arc) = self.world.load().get_entity_by_id(self.entity_id)
-        {
-            teleport_transition(&entity_arc, &target);
-            return;
-        }
-        let Ok(mut manager_guard) = self.portal_manager.try_lock() else {
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let Some(processor) = guard.as_mut() else {
             return;
         };
-        let mut should_remove = false;
-        if let Some(portal_processor) = manager_guard.as_mut() {
-            if portal_processor.process_portal_teleportation(
-                &self.world.load(),
-                caller,
-                caller.can_use_portal(false),
-            ) {
-                self.portal_cooldown
-                    .store(caller.dimension_changing_delay(), Ordering::Relaxed);
-
-                let world_clone = self.world.load_full();
-                let portal_type = portal_processor.portal_type;
-                let dest_world_opt = portal_processor.destination_world.clone();
-                let src_portal = portal_processor.source_portal.clone();
-                let entity_id = self.entity_id;
-
-                let rt_handle = world_clone.server.upgrade().map(|s| s.runtime.clone());
-                rayon::spawn(move || {
-                    let _guard = rt_handle.as_ref().map(tokio::runtime::Handle::enter);
-                    let Some(entity_arc) = world_clone.get_entity_by_id(entity_id) else {
-                        return;
-                    };
-                    let transition = portal_type.get_portal_destination(
-                        &world_clone,
-                        dest_world_opt,
-                        entity_arc.as_ref(),
-                        src_portal.as_ref(),
-                    );
-
-                    if let Some(transition) = transition {
-                        if entity_arc.get_player().is_some() {
-                            entity_arc.teleport(
-                                transition.position,
-                                transition.yaw,
-                                transition.pitch,
-                                transition.new_world,
-                            );
-                        } else {
-                            // Portals keep the entity's speed (`Relative.DELTA`).
-                            *entity_arc
-                                .get_entity()
-                                .pending_portal_transition
-                                .lock()
-                                .unwrap_or_else(std::sync::PoisonError::into_inner) =
-                                Some(TeleportTarget {
-                                    world: transition.new_world,
-                                    position: transition.position,
-                                    yaw: transition.yaw,
-                                    pitch: transition.pitch,
-                                    keep_velocity: true,
-                                    as_passenger: false,
-                                });
-                        }
-                    }
-                });
-            } else if portal_processor.portal_time == 0 {
-                should_remove = true;
+        if processor.process_portal_teleportation(&world, caller, caller.can_use_portal(false)) {
+            // `setPortalCooldown`.
+            self.portal_cooldown
+                .store(caller.dimension_changing_delay(), Ordering::Relaxed);
+            let transition = processor.get_portal_destination(&world, caller);
+            // `restoreFrom` moves the processor to the entity in the new dimension.
+            drop(guard);
+            if let Some(transition) = transition
+                && let Some(this) = world.get_entity_by_id(self.entity_id)
+            {
+                teleport_to_portal_destination(&this, &world, transition);
             }
-        }
-        if should_remove {
-            *manager_guard = None;
+        } else if processor.has_expired() {
+            *guard = None;
         }
     }
 
-    pub fn try_use_portal(&self, caller: &dyn EntityBase, portal_world: Arc<World>, pos: BlockPos) {
+    /// Vanilla `Entity.setAsInsidePortal`, for the portal block of `portal`'s type.
+    pub fn try_use_portal(
+        &self,
+        caller: &dyn EntityBase,
+        portal: PortalType,
+        portal_world: Arc<World>,
+        pos: BlockPos,
+    ) {
         let mut portal_event =
             crate::plugin::api::events::entity::entity_portal::EntityPortalEvent::new(
                 self.entity_id,
@@ -3773,16 +3724,12 @@ impl Entity {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let world = self.world.load();
-        if manager.is_none() {
-            let portal_type = if portal_world.dimension == Dimension::THE_END
-                || self.world.load().dimension == Dimension::THE_END
-            {
-                PortalType::End
-            } else {
-                PortalType::Nether
-            };
-
-            let mut new_manager = PortalProcessor::new(portal_type, pos, portal_world);
+        // `isSamePortal`: a processor of the other portal is replaced.
+        if manager
+            .as_ref()
+            .is_none_or(|manager| !manager.is_same_portal(portal))
+        {
+            let mut new_manager = PortalProcessor::new(portal, pos, portal_world);
 
             let (block, state) = world.get_block_and_state(&pos);
             let source_axis = (block == &pumpkin_data::Block::NETHER_PORTAL).then(|| {
@@ -6243,7 +6190,7 @@ impl EntityBase for Entity {
             self.riding_cooldown
                 .store(riding_cooldown - 1, Ordering::Relaxed);
         }
-        self.tick_portal(caller);
+        self.handle_portal(caller);
         // Recomputed during movement/block-collision handling in the same tick.
         let was_in_powder_snow = self.is_in_powder_snow.load(Ordering::Relaxed);
         self.was_in_powder_snow
@@ -6637,6 +6584,42 @@ pub struct TeleportTarget {
     pub keep_velocity: bool,
     /// Vanilla `asPassenger`: the entity keeps riding and nobody is sent the teleport.
     pub as_passenger: bool,
+}
+
+/// Vanilla `Entity.teleportToPortalDestination`.
+pub fn teleport_to_portal_destination(
+    entity: &Arc<dyn EntityBase>,
+    world: &World,
+    transition: TeleportTransition,
+) {
+    let new_world = transition.new_world;
+    if !(world.is_allowed_to_enter_portal(&new_world)
+        && (new_world.dimension == world.dimension || entity.can_teleport(world, &new_world)))
+    {
+        return;
+    }
+    if entity.get_player().is_some() {
+        // TODO: a player goes through `teleport_transition` too once it handles players.
+        entity.teleport(
+            transition.position,
+            transition.yaw,
+            transition.pitch,
+            new_world,
+        );
+        return;
+    }
+    // Portals keep the entity's speed (`Relative.DELTA`).
+    teleport_transition(
+        entity,
+        &TeleportTarget {
+            world: new_world,
+            position: transition.position,
+            yaw: transition.yaw,
+            pitch: transition.pitch,
+            keep_velocity: true,
+            as_passenger: false,
+        },
+    );
 }
 
 /// Vanilla `Entity.teleport(TeleportTransition)` for an entity other than a player. Returns

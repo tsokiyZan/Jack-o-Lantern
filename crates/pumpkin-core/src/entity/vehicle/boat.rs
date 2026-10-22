@@ -204,10 +204,10 @@ impl EntityBase for BoatEntity {
         None
     }
 
-    fn tick(&self, caller: &dyn EntityBase, _server: &Server) {
+    fn tick(&self, caller: &dyn EntityBase, server: &Server) {
         self.vehicle.tick();
-        // The end of `Entity.baseTick`: `Leashable.tickLeash`. Boats don't run `Entity::tick`.
-        crate::entity::leashable::tick_leash(caller);
+        // `super.tick()`: `Entity.baseTick`, which ends with `Leashable.tickLeash`.
+        self.vehicle.entity.tick(caller, server);
 
         let underwater = self.ticks_underwater.load();
         if self.vehicle.entity.touching_water.load(Ordering::Relaxed) {
