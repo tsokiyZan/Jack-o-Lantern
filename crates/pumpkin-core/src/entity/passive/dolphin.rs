@@ -193,17 +193,16 @@ impl DolphinEntity {
         if !self.can_hold_item(&stack) {
             return;
         }
-        // `take` tells the clients before the item goes.
-        if !self
-            .mob_entity
-            .living_entity
-            .pickup(item.get_entity(), u32::from(stack.item_count))
-        {
+        let living = &self.mob_entity.living_entity;
+        let count = u32::from(stack.item_count);
+        if !living.fire_pickup_event(item.get_entity(), count) {
             return;
         }
+        living.on_item_pickup(item);
         self.set_item_slot_and_notify(&EquipmentSlot::MAIN_HAND, stack);
         self.mob_entity
             .set_guaranteed_drop(&EquipmentSlot::MAIN_HAND);
+        living.take(item.get_entity(), count);
         item.get_entity().remove();
     }
 

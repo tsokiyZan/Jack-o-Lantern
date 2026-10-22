@@ -249,6 +249,15 @@ impl PlayerInventory {
         stack_count as usize
     }
 
+    /// Whether `insert_stack_anywhere` could take any of `stack`: a stack of it with room, or
+    /// an empty slot. Changes nothing.
+    #[must_use]
+    pub fn has_room_for(&self, stack: &ItemStack) -> bool {
+        !stack.is_empty()
+            && (self.get_occupied_slot_with_room_for_stack(stack) != -1
+                || self.get_empty_slot() != -1)
+    }
+
     /// Finds an empty slot in the inventory.
     ///
     /// # Returns

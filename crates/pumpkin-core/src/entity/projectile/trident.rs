@@ -435,13 +435,19 @@ impl EntityBase for TridentEntity {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone();
+        // Pumpkin's pickup event, before the inventory changes, when the arrow could go in.
+        if !player.is_creative() && !player.inventory.has_room_for(&stack)
+            || !player.living_entity.fire_pickup_event(&self.entity, 1)
+        {
+            return;
+        }
         if player.is_creative() || player.inventory.insert_stack_anywhere(&mut stack) {
             player.increment_stat(
                 pumpkin_data::statistic::StatisticCategory::PickedUp,
                 stack.item.id as i32,
                 1,
             );
-            player.living_entity.pickup(&self.entity, 1);
+            player.living_entity.take(&self.entity, 1);
             self.get_entity().remove();
         }
     }

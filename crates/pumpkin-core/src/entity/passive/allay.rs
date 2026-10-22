@@ -388,16 +388,17 @@ impl AllayEntity {
             return;
         }
         let count = stack.item_count;
+        // Worked out on a copy first: the pickup event goes before the inventory changes.
         let mut slot = self.inventory.slot().clone();
         let remainder = AllayInventory::add_item_to(&mut slot, &stack);
-        // Vanilla `Mob.take`; Pumpkin's lets plugins cancel the pickup.
-        if !self.mob_entity.living_entity.pickup(
-            item_entity.get_entity(),
-            u32::from(count - remainder.item_count),
-        ) {
+        let taken = u32::from(count - remainder.item_count);
+        let living = &self.mob_entity.living_entity;
+        if !living.fire_pickup_event(item_entity.get_entity(), taken) {
             return;
         }
+        living.on_item_pickup(item_entity);
         *self.inventory.slot() = slot;
+        living.take(item_entity.get_entity(), taken);
         if remainder.is_empty() {
             item_entity.get_entity().remove();
         } else {

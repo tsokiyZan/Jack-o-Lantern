@@ -332,6 +332,8 @@ impl EntityBase for ExperienceOrbEntity {
         if player.living_entity.health.load() > 0.0 {
             let can_pickup = if let Ok(mut delay) = player.experience_pick_up_delay.try_lock()
                 && *delay == 0
+                // Pumpkin's pickup event, before anything changes.
+                && player.living_entity.fire_pickup_event(&self.entity, 1)
             {
                 *delay = 2;
                 true
@@ -339,7 +341,7 @@ impl EntityBase for ExperienceOrbEntity {
                 false
             };
             if can_pickup {
-                player.living_entity.pickup(&self.entity, 1);
+                player.living_entity.take(&self.entity, 1);
                 let remaining = player.apply_mending_from_xp(self.get_value());
                 if remaining > 0 {
                     player.add_experience_points(remaining);

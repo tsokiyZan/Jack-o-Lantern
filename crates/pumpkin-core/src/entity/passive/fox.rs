@@ -609,19 +609,22 @@ impl FoxEntity {
         if !self.fox_can_hold_item(&item_stack) {
             return;
         }
+        // Vanilla takes the count left after the splits: none.
+        let living = &self.mob_entity.living_entity;
+        if !living.fire_pickup_event(item_entity.get_entity(), 0) {
+            return;
+        }
         let count = item_stack.item_count;
         if count > 1 {
             self.drop_item_stack(item_stack.split(count - 1));
         }
         self.spit_out_item(self.main_hand());
+        living.on_item_pickup(item_entity);
         let held = item_stack.split(1);
         self.set_item_slot_and_notify(&EquipmentSlot::MAIN_HAND, held);
         self.mob_entity
             .set_guaranteed_drop(&EquipmentSlot::MAIN_HAND);
-        // Vanilla takes the count left after the split: none.
-        self.mob_entity
-            .living_entity
-            .pickup(item_entity.get_entity(), u32::from(item_stack.item_count));
+        living.take(item_entity.get_entity(), u32::from(item_stack.item_count));
         item_entity.get_entity().remove();
         self.ticks_since_eaten.store(0, Ordering::Relaxed);
     }

@@ -730,62 +730,58 @@ impl EntityBase for ItemEntity {
             return;
         }
 
-        let (item_id, count_before) = {
+        let (item_id, org_count, mut stack) = {
             let stack = self
                 .item_stack
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
-            (stack.item.id, stack.item_count)
+            (stack.item.id, stack.item_count, stack.clone())
         };
+        let creative = player.is_creative();
+        // Pumpkin's pickup event goes before the inventory changes, when any of it could go in.
+        if !creative && !player.inventory.has_room_for(&stack) {
+            return;
+        }
+        let living = &player.living_entity;
+        if !living.fire_pickup_event(&self.entity, org_count.into()) {
+            return;
+        }
 
-        let mut local_stack = self
-            .item_stack
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone();
-        let inserted = player.inventory.insert_stack_anywhere(&mut local_stack);
-        let count_after = local_stack.item_count;
-        let is_empty = local_stack.is_empty();
+        // Vanilla `Inventory.add`: true only once all of it went in; with infinite materials
+        // whatever didn't fit is gone.
+        let mut added = player.inventory.insert_stack_anywhere(&mut stack);
+        if creative && !added {
+            stack.set_count(0);
+            added = true;
+        }
+        let is_empty = stack.is_empty();
         *self
             .item_stack
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) = local_stack;
-
-        if inserted || player.is_creative() {
-            player.inventory_changed.store(true, Ordering::Relaxed);
-
-            let amount_picked_up = if player.is_creative() {
-                count_before
-            } else {
-                count_before - count_after
-            };
-
-            if amount_picked_up > 0 {
-                player.increment_stat(
-                    StatisticCategory::PickedUp,
-                    item_id as i32,
-                    amount_picked_up as i32,
-                );
-            }
-
-            player
-                .living_entity
-                .pickup(&self.entity, amount_picked_up.into());
-
-            player
-                .current_screen_handler
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .send_content_updates();
-
-            if is_empty {
-                self.entity.remove();
-            } else {
-                self.on_count_changed();
-            }
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = stack;
+        if !added {
+            return;
         }
+
+        player.inventory_changed.store(true, Ordering::Relaxed);
+        living.take(&self.entity, org_count.into());
+        if is_empty {
+            self.entity.remove();
+        }
+        player.increment_stat(
+            StatisticCategory::PickedUp,
+            item_id as i32,
+            i32::from(org_count),
+        );
+        living.on_item_pickup(self);
+
+        player
+            .current_screen_handler
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .send_content_updates();
     }
 
     /// Vanilla `ItemEntity.shouldPlayLavaHurtSound`.

@@ -713,13 +713,14 @@ impl LivingEntity {
         true
     }
 
-    /// Picks up an Item entity or XP Orb
-    pub fn pickup(&self, item: &Entity, stack_amount: u32) -> bool {
+    /// Pumpkin's `EntityPickupItemEvent` for picking `amount` of `item` (an item entity, arrow
+    /// or experience orb) up; false when a plugin cancelled it. Fired before anything changes.
+    pub fn fire_pickup_event(&self, item: &Entity, amount: u32) -> bool {
         let mut pickup_event =
             crate::plugin::api::events::entity::entity_pickup_item::EntityPickupItemEvent::new(
                 self.entity.entity_id,
                 item.entity_type.id.to_string(),
-                stack_amount as u8,
+                amount as u8,
             );
         if let Some(server) = self.entity.world.load().server.upgrade() {
             server
@@ -729,25 +730,31 @@ impl LivingEntity {
                 return false;
             }
         }
+        true
+    }
 
-        // Vanilla `take`: to the players tracking the picked-up entity, while it's still there.
+    /// Vanilla `LivingEntity.take`: to the players tracking the picked-up entity, while it's
+    /// still there.
+    pub fn take(&self, item: &Entity, amount: u32) {
         if item.removed.load(Relaxed) {
-            return true;
+            return;
         }
         self.entity.world.load().send_to_tracking_players_editioned(
             item,
             &CTakeItemEntity::new(
                 item.entity_id.into(),
                 self.entity.entity_id.into(),
-                VarInt(stack_amount as i32),
+                VarInt(amount as i32),
             ),
             &CTakeItemActor {
                 item_runtime_id: VarULong(item.entity_id as u64),
                 actor_runtime_id: VarULong(self.entity.entity_id as u64),
             },
         );
-        true
     }
+
+    /// Vanilla `LivingEntity.onItemPickup`, with `ServerPlayer`'s override.
+    pub const fn on_item_pickup(&self, _item: &super::item::ItemEntity) {}
 
     /// Vanilla `ItemStack.causeUseVibration`: the use game event, for items whose
     /// `use_effects` make vibrations.
