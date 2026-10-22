@@ -535,10 +535,6 @@ pub struct Player {
     pub client_loaded_timeout: AtomicU32,
     /// Counter for tracking chat and command spam. Decays each server tick.
     pub chat_spam_tick_count: AtomicU32,
-    /// Item usage tracking for bows, crossbows, etc.
-    pub using_item: AtomicBool,
-    pub item_use_start_time: AtomicI32,
-    pub using_hand: AtomicCell<Option<Hand>>,
     /// The player's experience level.
     pub experience_level: AtomicI32,
     /// The player's experience progress (`0.0` to `1.0`)
@@ -835,9 +831,6 @@ impl Player {
             client_loaded_timeout: AtomicU32::new(if initially_loaded { 0 } else { 60 }),
             chat_spam_tick_count: AtomicU32::new(0),
             // Item usage tracking
-            using_item: AtomicBool::new(false),
-            item_use_start_time: AtomicI32::new(0),
-            using_hand: AtomicCell::new(None),
             // Minecraft has no way to change the default permission level of new players.
             // Minecraft's default permission level is 0.
             permission_lvl: server
@@ -7203,14 +7196,6 @@ impl Player {
             && self.world().level_info.load().difficulty != Difficulty::Peaceful
     }
 
-    /// Start using an item (e.g. drawing a bow)
-    pub fn start_using_item(&self, hand: Hand) {
-        self.using_item.store(true, Ordering::Relaxed);
-        self.item_use_start_time
-            .store(self.tick_counter.load(Ordering::Relaxed), Ordering::Relaxed);
-        self.using_hand.store(Some(hand));
-    }
-
     /// Vanilla `Player.startAutoSpinAttack`; inventory `slot` holds `stack`.
     pub fn start_auto_spin_attack(&self, ticks: i32, dmg: f32, stack: ItemStack, slot: usize) {
         let living = &self.living_entity;
@@ -7224,20 +7209,6 @@ impl Player {
             .unwrap_or_else(std::sync::PoisonError::into_inner) = Some((stack, slot));
         // TODO: `removeEntitiesOnShoulder`; shoulder parrots aren't ported.
         living.set_living_flag(LivingEntity::AUTO_SPIN_ATTACK_FLAG, true);
-    }
-
-    /// Stop using an item
-    pub fn stop_using_item(&self) {
-        self.using_item.store(false, Ordering::Relaxed);
-        self.using_hand.store(None);
-    }
-
-    /// Get the number of ticks the item has been in use
-    pub fn get_item_use_ticks(&self) -> i32 {
-        if !self.using_item.load(Ordering::Relaxed) {
-            return 0;
-        }
-        self.tick_counter.load(Ordering::Relaxed) - self.item_use_start_time.load(Ordering::Relaxed)
     }
 
     /// Find arrow in inventory (main hand, offhand, or inventory slots)

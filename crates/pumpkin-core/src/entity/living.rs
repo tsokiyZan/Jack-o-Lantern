@@ -5558,6 +5558,11 @@ impl LivingEntity {
     }
 
     /// Vanilla `getUsedItemHand`: the hand of the item in use, the main hand when none is.
+    ///
+    /// Vanilla reads the off-hand bit (2) of the living flags, which only `startUsingItem`
+    /// writes and `stopUsingItem` leaves as it was, so after a use ends it still answers that
+    /// use's hand. Pumpkin's `active_hand` is cleared with the use, so outside a use (as for
+    /// `BreakDoorGoal`'s swing) this answers the main hand even after an off-hand use.
     pub fn used_item_hand(&self) -> Hand {
         self.active_hand
             .lock()
