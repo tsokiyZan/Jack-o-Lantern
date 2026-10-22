@@ -6777,10 +6777,7 @@ fn teleport_cross_dimension(
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .clone();
-    // `ejectPassengers`, last first.
-    for passenger in old_passengers.iter().rev() {
-        base.remove_passenger(passenger.get_entity().entity_id);
-    }
+    base.eject_passengers();
     let mut new_passengers = Vec::with_capacity(old_passengers.len());
     for passenger in &old_passengers {
         let transition = passenger_transition(base, passenger.get_entity(), target);

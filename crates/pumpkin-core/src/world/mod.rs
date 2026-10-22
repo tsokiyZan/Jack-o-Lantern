@@ -1817,7 +1817,6 @@ impl World {
     fn player_collision_cache(players: &[Arc<Player>]) -> Vec<PlayerCollisionEntry<'_>> {
         players
             .par_iter()
-            .filter(|player| !player.won_game.load(Ordering::Relaxed))
             .map(|player| {
                 let entity = player.get_entity();
                 let pos = entity.pos.load();
@@ -1859,12 +1858,6 @@ impl World {
         let player_handle = handle.clone();
         players.par_iter().for_each(|player| {
             let _guard = player_handle.enter();
-            // Out of the level while the End credits roll (`showEndCredits`): only its
-            // connection is served.
-            if player.won_game.load(Ordering::Relaxed) {
-                player.process_inbound_packets();
-                return;
-            }
             player.get_entity().common_tick();
             player.tick(server);
         });
@@ -1897,9 +1890,6 @@ impl World {
 
         players.par_iter().for_each(|player| {
             let _guard = player_handle.enter();
-            if player.won_game.load(Ordering::Relaxed) {
-                return;
-            }
             player.tick_server_travel();
             player.track_steered_vehicle();
         });
@@ -1952,12 +1942,6 @@ impl World {
         let player_handle = handle.clone();
         players.par_iter().for_each(|player| {
             let _guard = player_handle.enter();
-            // Out of the level while the End credits roll (`showEndCredits`): only its
-            // connection is served.
-            if player.won_game.load(Ordering::Relaxed) {
-                player.process_inbound_packets();
-                return;
-            }
             player.get_entity().common_tick();
             player.tick(server);
         });
@@ -2075,9 +2059,6 @@ impl World {
         // the level, so the travel sees this tick's hits and knockback before they are sent.
         players.par_iter().for_each(|player| {
             let _guard = player_handle.enter();
-            if player.won_game.load(Ordering::Relaxed) {
-                return;
-            }
             player.tick_server_travel();
             player.track_steered_vehicle();
         });
@@ -4428,6 +4409,8 @@ impl World {
         ));
 
         let data_kept = u8::from(alive);
+        // Back from the End credits: the player is in no level (`showEndCredits`).
+        let from_credits = player.won_game.load(Ordering::SeqCst);
 
         let server = self.server.upgrade();
         let keep_inventory = server.as_ref().map_or_else(
@@ -4526,8 +4509,11 @@ impl World {
 
                         // Detach from the old world before publishing into the new one, so no
                         // observer sees the player in a world whose chunk manager doesn't match.
-                        self.remove_player(player, false).await;
-                        player.unload_watched_chunks(self).await;
+                        // A player back from the End credits left its level already.
+                        if !from_credits {
+                            self.remove_player(player, false).await;
+                            player.unload_watched_chunks(self).await;
+                        }
                         player.change_world_chunks(&self.level, &destination);
                         player.living_entity.entity.set_world(destination.clone());
                         destination.players.rcu(|current_list| {
@@ -4559,6 +4545,32 @@ impl World {
             || (self.clone(), position, yaw, pitch),
             |new_world| (new_world.clone(), position, yaw, pitch),
         );
+
+        // The level takes the player back (`level.addRespawnedPlayer`); only then is it out of
+        // the credits, so nothing can tick it in its old level meanwhile.
+        if from_credits {
+            if !target_world
+                .players
+                .load()
+                .iter()
+                .any(|p| p.gameprofile.id == player.gameprofile.id)
+            {
+                target_world.players.rcu(|current_list| {
+                    let mut new_list = (**current_list).clone();
+                    new_list.push(player.clone());
+                    new_list
+                });
+            }
+            if let Some(server) = &server {
+                server.take_levelless_player(player.gameprofile.id);
+            }
+            player.living_entity.entity.removal_reason.store(None);
+            player.won_game.store(false, Ordering::SeqCst);
+            player.ending_credits.store(false, Ordering::SeqCst);
+        }
+        // Vanilla respawns a fresh `ServerPlayer`: standing, no fall, fire, speed or portal
+        // cooldown (sent in `CRespawn`) whatever `restoreFrom` keeps.
+        player.living_entity.reset_fresh_entity_state();
 
         // Notify plugins that the player has respawned (non-cancellable).
         if let Some(server) = self.server.upgrade() {
@@ -5362,6 +5374,14 @@ impl World {
             }
             new_list
         });
+        // A player of this level watching the End credits is in no level's list: the server
+        // holds it (`PlayerList`), and it leaves from there.
+        if removed_player.is_none()
+            && player.world().uuid == self.uuid
+            && let Some(server) = self.server.upgrade()
+        {
+            removed_player = server.take_levelless_player(player.gameprofile.id);
+        }
         if let Some(ref player) = removed_player {
             self.entity_tracker
                 .remove_entity(player.as_ref() as &dyn EntityBase, self);

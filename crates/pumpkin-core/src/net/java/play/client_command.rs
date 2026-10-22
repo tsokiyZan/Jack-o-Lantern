@@ -10,8 +10,11 @@ impl JavaClient {
             SClientCommand::PERFORM_RESPAWN => {
                 // Vanilla: after the End credits (`wonGame`) the player comes back keeping
                 // everything; otherwise only a dead player respawns.
-                let won_game = player.won_game.swap(false, Ordering::SeqCst);
-                if !won_game && player.living_entity.health.load() > 0.0 {
+                if player.won_game.load(Ordering::SeqCst) {
+                    player.end_credits();
+                    return;
+                }
+                if player.living_entity.health.load() > 0.0 {
                     return;
                 }
                 let player_c = player.clone();
@@ -23,16 +26,9 @@ impl JavaClient {
                     player_c
                         .world()
                         .clone()
-                        .respawn_player(&player_c, won_game)
+                        .respawn_player(&player_c, false)
                         .await;
-                    if won_game {
-                        // `CriteriaTriggers.CHANGED_DIMENSION.trigger(player, END, OVERWORLD)`.
-                        player_c.trigger_advancement(
-                            crate::entity::player::advancement::trigger::AdvancementTrigger::EnterDimension {
-                                dimension: "overworld".to_string(),
-                            },
-                        );
-                    } else if hardcore {
+                    if hardcore {
                         player_c.set_gamemode(GameMode::Spectator);
                     }
 

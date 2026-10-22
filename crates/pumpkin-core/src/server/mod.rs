@@ -99,6 +99,10 @@ pub struct Server {
     pub item_registry: Arc<ItemRegistry>,
     /// Manages multiple worlds within the server.
     pub worlds: ArcSwap<Vec<Arc<World>>>,
+    /// Players in no level: vanilla's `PlayerList` keeps a player removed from its level while
+    /// the End credits roll (`showEndCredits`) until its client asks to respawn. The server
+    /// counts them as online and serves their connection; no level sees them.
+    pub levelless_players: ArcSwap<Vec<Arc<Player>>>,
     /// All the dimensions that exist on the server.
     pub dimensions: Vec<Dimension>,
     /// Assigns unique IDs to containers.
@@ -293,6 +297,7 @@ impl Server {
             enchantment_manager: Arc::new(enchantment::EnchantmentManager::new()),
             map_id: level_info.load().map_id.into(),
             worlds: ArcSwap::from_pointee(vec![]),
+            levelless_players: ArcSwap::from_pointee(vec![]),
             dimensions,
             command_dispatcher,
             block_registry: block_registry.clone(),
@@ -1033,19 +1038,21 @@ impl Server {
                 return Some(player);
             }
         }
-        None
+        self.levelless_players
+            .load()
+            .iter()
+            .find(|player| player.gameprofile.name.eq_ignore_ascii_case(name))
+            .cloned()
     }
 
     pub fn get_players_by_ip(&self, ip: IpAddr) -> Vec<Arc<Player>> {
         let mut players = Vec::<Arc<Player>>::new();
 
-        for world in self.worlds.load().iter() {
-            for player in world.players.load().iter() {
-                if player.client.address().ip() == ip {
-                    players.push(player.clone());
-                }
+        self.for_each_player(|player| {
+            if player.client.address().ip() == ip {
+                players.push(player.clone());
             }
-        }
+        });
 
         players
     }
@@ -1057,6 +1064,7 @@ impl Server {
         for world in self.worlds.load().iter() {
             players.extend(world.players.load().iter().cloned());
         }
+        players.extend(self.levelless_players.load().iter().cloned());
 
         players
     }
@@ -1072,6 +1080,9 @@ impl Server {
             for player in players.iter() {
                 f(player);
             }
+        }
+        for player in self.levelless_players.load().iter() {
+            f(player);
         }
     }
 
@@ -1099,7 +1110,48 @@ impl Server {
                 return Some(player);
             }
         }
-        None
+        self.levelless_players
+            .load()
+            .iter()
+            .find(|player| player.gameprofile.id == id)
+            .cloned()
+    }
+
+    /// Holds `player` outside any level (see [`Server::levelless_players`]).
+    pub fn add_levelless_player(&self, player: &Arc<Player>) {
+        self.levelless_players.rcu(|current| {
+            let mut list = (**current).clone();
+            if !list
+                .iter()
+                .any(|p| p.gameprofile.id == player.gameprofile.id)
+            {
+                list.push(player.clone());
+            }
+            list
+        });
+    }
+
+    /// Takes the player with `id` off the level-less list, if it is there.
+    pub fn take_levelless_player(&self, id: uuid::Uuid) -> Option<Arc<Player>> {
+        let mut taken = None;
+        self.levelless_players.rcu(|current| {
+            let mut list = (**current).clone();
+            taken = list
+                .iter()
+                .position(|p| p.gameprofile.id == id)
+                .map(|i| list.remove(i));
+            list
+        });
+        taken
+    }
+
+    /// Vanilla `ServerGamePacketListenerImpl.tick` for a player in no level: its packets are
+    /// still handled (the credits end with a respawn request).
+    fn tick_levelless_players(&self) {
+        let _guard = self.runtime.enter();
+        for player in self.levelless_players.load().iter() {
+            player.process_inbound_packets();
+        }
     }
 
     /// Counts the total number of players across all worlds.
@@ -1110,7 +1162,7 @@ impl Server {
     ///
     /// The total number of players connected to the server.
     pub fn get_player_count(&self) -> usize {
-        let mut count = 0;
+        let mut count = self.levelless_players.load().len();
         for world in self.worlds.load().iter() {
             count += world.players.load().len();
         }
@@ -1119,7 +1171,10 @@ impl Server {
 
     /// Similar to [`Server::get_player_count`] >= n, but may be more efficient since it stops its iteration through all worlds as soon as n players were found.
     pub fn has_n_players(&self, n: usize) -> bool {
-        let mut count = 0;
+        let mut count = self.levelless_players.load().len();
+        if count >= n {
+            return true;
+        }
         for world in self.worlds.load().iter() {
             count += world.players.load().len();
             if count >= n {
@@ -1240,6 +1295,7 @@ impl Server {
             self.sync_game_time();
             self.tick_players_and_network();
         }
+        self.tick_levelless_players();
         // Vanilla `tickConnection`: console commands run between ticks, after the worlds.
         self.handle_console_inputs();
         self.flush_pending_block_updates();

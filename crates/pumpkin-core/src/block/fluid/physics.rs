@@ -9,6 +9,13 @@ pub fn can_be_replaced(block_state: &BlockState, block: &Block, fluid: &Fluid) -
     if block.is_waterlogged(block_state.id) {
         return false;
     }
+    // Nor a bubble column, which holds a water source (vanilla `BubbleColumnBlock.getFluidState`;
+    // `WaterFluid.canBeReplacedWith` refuses water).
+    if block == &Block::BUBBLE_COLUMN
+        && (fluid.id == Fluid::WATER.id || fluid.id == Fluid::FLOWING_WATER.id)
+    {
+        return false;
+    }
 
     // Fluid Logic
     if let Some(other_fluid) = Fluid::from_state_id(block_state.id) {

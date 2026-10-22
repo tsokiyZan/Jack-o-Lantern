@@ -601,6 +601,8 @@ pub struct Player {
     /// Vanilla `ServerPlayer.wonGame` (not saved): the End credits are rolling, and the
     /// player is out of its level until the client asks to respawn.
     pub won_game: AtomicBool,
+    /// The client asked to leave the credits and its respawn is under way.
+    pub ending_credits: AtomicBool,
     pub warden_spawn_tracker: std::sync::Mutex<WardenSpawnTracker>,
     pub score: AtomicI32,
     pub spawn_extra_particles_on_fall: AtomicBool,
@@ -911,6 +913,7 @@ impl Player {
             bedrock_skin: ArcSwap::new(Arc::new(bedrock_skin)),
             seen_credits: AtomicBool::new(false),
             won_game: AtomicBool::new(false),
+            ending_credits: AtomicBool::new(false),
             warden_spawn_tracker: std::sync::Mutex::new(WardenSpawnTracker::default()),
             score: AtomicI32::new(0),
             spawn_extra_particles_on_fall: AtomicBool::new(false),
@@ -2673,7 +2676,8 @@ impl Player {
         if sprinting { 0.025_999_999 } else { 0.02 }
     }
 
-    /// `getAbilities().flying`, waiting for the lock.
+    /// `getAbilities().flying`, waiting for the lock: a missed `try_lock` (`is_flying`) would
+    /// let a bubble column push a flying player. Block collisions run with `abilities` unlocked.
     fn abilities_flying(&self) -> bool {
         self.abilities
             .lock()
@@ -3244,10 +3248,11 @@ impl Player {
             }
         }
 
-        let Some(player_arc) = self.world().get_player_by_uuid(self.gameprofile.id) else {
+        let Some(server_arc) = self.world().server.upgrade() else {
             return;
         };
-        let Some(server_arc) = self.world().server.upgrade() else {
+        // The server's lookup: a player in no level (End credits) is served too.
+        let Some(player_arc) = server_arc.get_player_by_uuid(self.gameprofile.id) else {
             return;
         };
 
@@ -5274,18 +5279,14 @@ impl Player {
     }
 
     /// Vanilla `ServerPlayer.showEndCredits`: the player leaves its level
-    /// (`removePlayerImmediately(CHANGED_DIMENSION)`: no longer ticked by it nor tracked by
-    /// anyone, though still in the player list) and, the first time, the client rolls the
-    /// credits. It comes back when the client asks to respawn (`PERFORM_RESPAWN`).
+    /// (`removePlayerImmediately(CHANGED_DIMENSION)`) and, the first time, the client rolls the
+    /// credits. It stays online in no level until the client asks to respawn
+    /// (`PERFORM_RESPAWN`).
     pub fn show_end_credits(self: &Arc<Self>) {
         self.un_ride();
-        // Set before the removal, so the tracker can't pair the player again in between.
-        let first = !self.won_game.swap(true, Ordering::SeqCst);
-        let world = self.world();
-        world
-            .entity_tracker
-            .remove_entity(self.as_ref() as &dyn EntityBase, &world);
-        if first {
+        self.remove_from_level(&self.world());
+        if !self.won_game.load(Ordering::SeqCst) {
+            self.won_game.store(true, Ordering::SeqCst);
             self.try_enqueue_packet_editioned(
                 &CGameEvent::new(GameEvent::WinGame, 0.0),
                 &pumpkin_protocol::bedrock::client::CShowCredits {
@@ -5294,6 +5295,89 @@ impl Player {
                 },
             );
             self.seen_credits.store(true, Ordering::Relaxed);
+        }
+    }
+
+    /// The `wonGame` branch of vanilla `handleClientCommand(PERFORM_RESPAWN)`: the client is
+    /// done with the credits, and the player respawns keeping everything
+    /// (`PlayerList.respawn(player, true, CHANGED_DIMENSION)`). `won_game` stays set until the
+    /// new level has the player; a second request meanwhile does nothing.
+    pub fn end_credits(self: &Arc<Self>) {
+        if !self.won_game.load(Ordering::SeqCst) || self.ending_credits.swap(true, Ordering::SeqCst)
+        {
+            return;
+        }
+        let player = self.clone();
+        self.spawn_task(async move {
+            player.world().respawn_player(&player, true).await;
+            // `CriteriaTriggers.CHANGED_DIMENSION.trigger(player, END, OVERWORLD)`.
+            player.trigger_advancement(
+                crate::entity::player::advancement::trigger::AdvancementTrigger::EnterDimension {
+                    dimension: "overworld".to_string(),
+                },
+            );
+            {
+                let screen_handler = player
+                    .current_screen_handler
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                let mut screen_handler = screen_handler
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                screen_handler.sync_state();
+            };
+            {
+                let mut abilities = player
+                    .abilities
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                abilities.set_for_gamemode(player.gamemode.load());
+            };
+            player.send_abilities_update();
+        });
+    }
+
+    /// Vanilla `ServerLevel.removePlayerImmediately(player, CHANGED_DIMENSION)`: the player is
+    /// marked removed and leaves the level's players, entity tracking (`ChunkMap.removeEntity`)
+    /// and chunk map (its tickets dropped, its chunks forgotten), and the server holds it in
+    /// no level ([`Server::levelless_players`]).
+    fn remove_from_level(self: &Arc<Self>, world: &Arc<World>) {
+        let entity = &self.living_entity.entity;
+        entity
+            .removal_reason
+            .store(Some(crate::entity::RemovalReason::ChangedDimension));
+        if let Some(server) = world.server.upgrade() {
+            server.add_levelless_player(self);
+        }
+        world.players.rcu(|current| {
+            let mut list = (**current).clone();
+            list.retain(|p| p.gameprofile.id != self.gameprofile.id);
+            list
+        });
+        world
+            .entity_tracker
+            .remove_entity(self.as_ref() as &dyn EntityBase, world);
+
+        // `updatePlayerStatus(player, false)`: tickets dropped, every tracked chunk forgotten.
+        self.clean_up_chunk_tickets(&world.level);
+        if let Ok(mut sender) = self.chunk_sender.lock() {
+            sender.reset();
+        }
+        let watched = self.watched_section.load().all_chunks_within();
+        self.watched_section.store(Cylindrical::new(
+            Vector2::new(0, 0),
+            NonZero::new(1).unwrap_or(NonZero::<u8>::MIN),
+        ));
+        let chunks_to_clean = world.level.mark_chunks_as_not_watched(watched);
+        for chunk in &chunks_to_clean {
+            self.try_send_client_packet(&CUnloadChunk::new(chunk.x, chunk.y));
+        }
+        if !chunks_to_clean.is_empty() {
+            let world = world.clone();
+            self.spawn_task(async move {
+                world.remove_entities_in_chunks(&chunks_to_clean).await;
+                world.level.clean_entity_chunks(&chunks_to_clean);
+            });
         }
     }
 

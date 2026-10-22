@@ -183,10 +183,8 @@ impl EntitySelector {
             Ok(player.map_or_else(Vec::new, |p| vec![p]))
         } else if let Some(uuid) = self.entity_uuid.as_ref() {
             // Try to get an entity by UUID.
-            for world in source.server().worlds.load().iter() {
-                if let Some(player) = world.get_player_by_uuid(*uuid) {
-                    return Ok(vec![player]);
-                }
+            if let Some(player) = source.server().get_player_by_uuid(*uuid) {
+                return Ok(vec![player]);
             }
             Ok(Vec::new())
         } else {
@@ -211,13 +209,15 @@ impl EntitySelector {
                     if self.is_world_limited {
                         Self::add_players_from_world(source.world(), &mut list, &predicate, limit);
                     } else {
-                        for world in source.server().worlds.load().iter() {
-                            Self::add_players_from_world(
-                                world.as_ref(),
-                                &mut list,
-                                &predicate,
-                                limit,
-                            );
+                        // Vanilla `server.getPlayerList().getPlayers()`: also a player in no
+                        // level (watching the End credits).
+                        for player in source.server().get_all_players() {
+                            if predicate.test(player.as_ref()) {
+                                list.push(player);
+                                if list.len() >= limit {
+                                    break;
+                                }
+                            }
                         }
                     }
                 }

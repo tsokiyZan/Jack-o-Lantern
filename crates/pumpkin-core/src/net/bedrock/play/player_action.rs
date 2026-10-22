@@ -218,12 +218,10 @@ impl BedrockClient {
             PlayerAction::DropItem => {
                 player.drop_held_item(false);
             }
-            // After the End credits (`wonGame`), the player comes back keeping everything.
-            PlayerAction::Respawn if player.won_game.swap(false, Ordering::SeqCst) => {
-                let player_c = player.clone();
-                player.spawn_task(async move {
-                    player_c.world().respawn_player(&player_c, true).await;
-                });
+            // A respawn request while the credits roll ends them too, so a client that skips
+            // the serverbound `ShowCredits` can't be stranded out of every level.
+            PlayerAction::Respawn if player.won_game.load(Ordering::SeqCst) => {
+                player.end_credits();
             }
             PlayerAction::Respawn
                 if player.living_entity.dead.load(Ordering::Relaxed)

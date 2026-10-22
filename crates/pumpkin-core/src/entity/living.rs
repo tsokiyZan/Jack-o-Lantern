@@ -3714,7 +3714,7 @@ impl LivingEntity {
     }
 
     pub fn reset_state(&self) {
-        self.entity.reset_state();
+        self.reset_fresh_entity_state();
 
         // Restore to maximum health for this entity type
         let max_health = self.get_max_health();
@@ -3731,31 +3731,32 @@ impl LivingEntity {
         self.hurt_cooldown.store(20, Relaxed);
         self.last_damage_taken.store(0f32);
 
-        self.entity.portal_cooldown.store(0, Relaxed);
         *self
             .entity
             .portal_manager
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
 
-        // Clear fall/fire state
-        self.entity.fall_distance.store(0.0);
-        self.death_time.store(0, Relaxed);
-        self.entity.extinguish();
-        self.entity.fire_ticks.store(0, Relaxed);
-
-        // Clear velocity and movement input to remove persisted momentum
-        self.entity.velocity.store(Vector3::default());
-        self.entity.velocity_dirty.store(true, SeqCst);
-        self.movement_input.store(Vector3::default());
-        self.jumping.store(false, Relaxed);
-
         // If this LivingEntity corresponds to a Player, reset their hunger manager
         let world = self.entity.world.load();
         if let Some(player) = world.get_player_by_id(self.entity.entity_id) {
             player.hunger_manager.restart();
         }
+    }
 
+    /// What a respawned player (vanilla's fresh `ServerPlayer`) starts with whatever
+    /// `restoreFrom` copies: standing, not fall-flying or burning, no fall, speed, input or
+    /// portal cooldown, not dead.
+    pub fn reset_fresh_entity_state(&self) {
+        self.entity.reset_state();
+        self.entity.portal_cooldown.store(0, Relaxed);
+        self.entity.fall_distance.store(0.0);
+        self.death_time.store(0, Relaxed);
+        self.entity.fire_ticks.store(0, Relaxed);
+        self.entity.velocity.store(Vector3::default());
+        self.entity.velocity_dirty.store(true, SeqCst);
+        self.movement_input.store(Vector3::default());
+        self.jumping.store(false, Relaxed);
         self.dead.store(false, Relaxed);
     }
 

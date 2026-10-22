@@ -41,7 +41,8 @@ use pumpkin_protocol::{
             request_network_settings::SRequestNetworkSettings,
             resource_pack_client_response::SResourcePackClientResponse, respawn::SRespawn,
             set_local_player_as_initialized::SSetLocalPlayerAsInitialized,
-            set_player_inventory_options::SSetPlayerInventoryOptions, text::SText,
+            set_player_inventory_options::SSetPlayerInventoryOptions, show_credits::SShowCredits,
+            text::SText,
         },
     },
     packet::Packet,
@@ -790,6 +791,12 @@ impl BedrockClient {
             SPlayerAction::PACKET_ID => {
                 let packet = SPlayerAction::read(reader)?;
                 self.handle_player_action(player, server, &packet);
+            }
+            SShowCredits::PACKET_ID => {
+                // The credits are over: as Java's `PERFORM_RESPAWN` after `WIN_GAME`.
+                if SShowCredits::read(reader)?.credits_state.0 == SShowCredits::STATE_END {
+                    player.end_credits();
+                }
             }
             SRespawn::PACKET_ID => {
                 let packet = SRespawn::read(reader)?;
