@@ -9,8 +9,10 @@ use crate::entity::mob::ghast::{
 };
 use crate::entity::mob::{first_passenger_player, mob_controlling_passenger, set_ridden_rotation};
 use crate::entity::passive::happy_ghast_ai;
+use crate::item::interaction_result::InteractionResult;
 use pumpkin_data::attributes::Attributes;
 use pumpkin_data::data_component_impl::EquipmentSlot;
+use pumpkin_util::Hand;
 use pumpkin_util::math::boundingbox::BoundingBox;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
@@ -537,7 +539,12 @@ impl Mob for HappyGhastEntity {
         );
     }
 
-    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+    fn mob_interact(
+        &self,
+        player: &Arc<Player>,
+        _hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         if self.is_baby() {
             return self.animal_interact(player, item_stack, Sound::EntityGhastlingAmbient);
         }

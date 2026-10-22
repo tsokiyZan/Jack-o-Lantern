@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -376,9 +378,14 @@ impl EntityBase for ItemFrameEntity {
         }
     }
 
-    fn interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+    fn interact(
+        &self,
+        player: &Arc<Player>,
+        _hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         if self.is_fixed() {
-            return false;
+            return InteractionResult::PASS;
         }
 
         let frame_has_item = !self.get_item().is_empty();
@@ -388,7 +395,7 @@ impl EntityBase for ItemFrameEntity {
             let new_rot = self.get_rotation() + 1;
             self.set_rotation(new_rot, true);
             self.entity.play_sound(self.get_rotate_item_sound());
-            true
+            InteractionResult::SUCCESS
         } else if has_held_item && !self.entity.removed.load(Ordering::Relaxed) {
             let mut new_stack = item_stack.clone();
             new_stack.item_count = 1;
@@ -397,9 +404,9 @@ impl EntityBase for ItemFrameEntity {
             if !player.is_creative() {
                 item_stack.decrement(1);
             }
-            true
+            InteractionResult::SUCCESS
         } else {
-            false
+            InteractionResult::PASS
         }
     }
 

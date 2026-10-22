@@ -302,41 +302,45 @@ impl ItemBehaviour for SpawnEggItem {
         }
     }
 
-    fn use_on_entity(
-        &self,
-        item: &mut ItemStack,
-        player: &Player,
-        entity: Arc<dyn EntityBase>,
-    ) -> bool {
-        if let Some(entity_type) = entity_from_egg(item.item.id)
-            && entity.get_entity().entity_type.id == entity_type.id
-        {
-            let world = player.world();
-            let pos = entity.get_entity().pos.load();
-            let mob = from_type(entity_type, pos, &world, Uuid::new_v4());
-            // no baby form, no offspring.
-            if !mob
-                .get_mob()
-                .is_some_and(crate::entity::mob::Mob::spawn_as_baby)
-            {
-                return false;
-            }
-            mob.get_entity()
-                .set_rotation(rand::random::<f32>() * 360.0, 0.0);
-            apply_entity_variant(item, mob.as_ref(), Some(player));
-            if world.spawn_creature(
-                mob,
-                CreatureSpawnReason::SpawnerEgg,
-                world.get_player_by_uuid(player.gameprofile.id),
-            ) {
-                item.decrement_unless_creative(player.gamemode.load(), 1);
-                return true;
-            }
-        }
-        false
-    }
-
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
+}
+
+/// Vanilla `SpawnEggItem.spawnOffspringFromSpawnEgg`: returns whether a baby spawned.
+///
+/// It is the spawn egg step of `Mob.checkAndHandleImportantInteractions`: an egg of the mob's
+/// own type spawns a baby of it. `SpawnEggItem` has no `interactLivingEntity`, so the egg does
+/// nothing as an item used on an entity.
+pub fn spawn_offspring_from_spawn_egg(
+    item: &mut ItemStack,
+    player: &Player,
+    entity: &Arc<dyn EntityBase>,
+) -> bool {
+    if let Some(entity_type) = entity_from_egg(item.item.id)
+        && entity.get_entity().entity_type.id == entity_type.id
+    {
+        let world = player.world();
+        let pos = entity.get_entity().pos.load();
+        let mob = from_type(entity_type, pos, &world, Uuid::new_v4());
+        // no baby form, no offspring.
+        if !mob
+            .get_mob()
+            .is_some_and(crate::entity::mob::Mob::spawn_as_baby)
+        {
+            return false;
+        }
+        mob.get_entity()
+            .set_rotation(rand::random::<f32>() * 360.0, 0.0);
+        apply_entity_variant(item, mob.as_ref(), Some(player));
+        if world.spawn_creature(
+            mob,
+            CreatureSpawnReason::SpawnerEgg,
+            world.get_player_by_uuid(player.gameprofile.id),
+        ) {
+            item.decrement_unless_creative(player.gamemode.load(), 1);
+            return true;
+        }
+    }
+    false
 }

@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -244,13 +246,18 @@ impl EntityBase for BoatEntity {
         self.vehicle.damage_with_context(amount, source, drop_item)
     }
 
-    fn interact(&self, player: &Arc<Player>, _item_stack: &mut ItemStack) -> bool {
+    fn interact(
+        &self,
+        player: &Arc<Player>,
+        _hand: Hand,
+        _item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         if player.get_entity().is_sneaking() {
-            return false;
+            return InteractionResult::PASS;
         }
 
         if self.ticks_underwater.load() >= 60.0 {
-            return false;
+            return InteractionResult::PASS;
         }
 
         if self
@@ -262,27 +269,27 @@ impl EntityBase for BoatEntity {
             .len()
             >= 2
         {
-            return false;
+            return InteractionResult::PASS;
         }
 
         if player.get_entity().has_vehicle() {
-            return false;
+            return InteractionResult::PASS;
         }
 
         let world = self.vehicle.entity.world.load();
         let Some(vehicle) = world.get_entity_by_id(self.vehicle.entity.entity_id) else {
-            return false;
+            return InteractionResult::PASS;
         };
 
         let Some(passenger) = world.get_player_by_id(player.entity_id()) else {
-            return false;
+            return InteractionResult::PASS;
         };
 
         self.vehicle
             .entity
             .add_passenger(vehicle, passenger as Arc<dyn EntityBase>);
 
-        true
+        InteractionResult::SUCCESS
     }
 
     /// Vanilla `AbstractBoat.getControllingPassenger`.

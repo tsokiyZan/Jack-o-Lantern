@@ -5,6 +5,8 @@ mod hopper;
 mod rideable;
 mod tnt;
 
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
@@ -910,23 +912,31 @@ impl EntityBase for MinecartEntity {
         damaged
     }
 
-    fn interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+    fn interact(
+        &self,
+        player: &Arc<Player>,
+        _hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
+        // `interactWithContainerVehicle` opens the container and answers `SUCCESS`, as does
+        // the furnace minecart whether or not it took fuel.
         match &self.kind {
             MinecartKind::Chest(minecart) => {
                 let custom_name = self.vehicle.entity.custom_name.load().as_ref().clone();
                 minecart.interact(custom_name, player, self.vehicle.entity.pos.load());
-                true
+                InteractionResult::SUCCESS
             }
             MinecartKind::Furnace(minecart) => {
-                minecart.interact(&self.vehicle.entity, player, item_stack)
+                minecart.interact(&self.vehicle.entity, player, item_stack);
+                InteractionResult::SUCCESS
             }
             MinecartKind::Hopper(minecart) => {
                 let custom_name = self.vehicle.entity.custom_name.load().as_ref().clone();
                 minecart.interact(custom_name, player, self.vehicle.entity.pos.load());
-                true
+                InteractionResult::SUCCESS
             }
             MinecartKind::Rideable(_) => RideableMinecart::interact(&self.vehicle.entity, player),
-            MinecartKind::Tnt(_) | MinecartKind::Other => false,
+            MinecartKind::Tnt(_) | MinecartKind::Other => InteractionResult::PASS,
         }
     }
 

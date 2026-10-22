@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::{
     Arc, Mutex, PoisonError, Weak,
     atomic::{AtomicBool, AtomicI32, Ordering},
@@ -367,7 +369,12 @@ impl Mob for TurtleEntity {
         );
     }
 
-    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+    fn mob_interact(
+        &self,
+        player: &Arc<Player>,
+        _hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         self.animal_interact(player, item_stack, Sound::EntityTurtleAmbientLand)
     }
 }

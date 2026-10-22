@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::{
     Arc, Mutex,
     atomic::{AtomicBool, AtomicI32, Ordering},
@@ -610,7 +612,12 @@ impl Mob for PiglinEntity {
         }
     }
 
-    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+    fn mob_interact(
+        &self,
+        player: &Arc<Player>,
+        _hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         let can_admire = self.mob_entity.with_brain(self, |tick| {
             piglin_ai::can_admire(tick.brain, self, item_stack)
         });
@@ -619,9 +626,9 @@ impl Mob for PiglinEntity {
             self.mob_entity.with_brain(self, |tick| {
                 piglin_ai::start_admiring(tick, self, taken);
             });
-            return true;
+            return InteractionResult::SUCCESS;
         }
-        false
+        InteractionResult::PASS
     }
 
     fn make_brain(

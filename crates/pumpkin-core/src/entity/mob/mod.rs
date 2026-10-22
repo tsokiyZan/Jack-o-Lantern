@@ -21,6 +21,7 @@ use crate::entity::movement_emission::MovementEmission;
 use crate::entity::player::Player;
 use crate::entity::predicate::EntityPredicate;
 use crate::entity::projectile_deflection::ProjectileDeflectionType;
+use crate::item::interaction_result::InteractionResult;
 use crate::item::item_stack_hurt_enemy;
 use crate::server::Server;
 use crate::world::World;
@@ -38,12 +39,12 @@ use pumpkin_data::tag::{self, Taggable};
 use pumpkin_data::tracked_data;
 use pumpkin_data::{Block, BlockState};
 use pumpkin_nbt::compound::NbtCompound;
-use pumpkin_util::Difficulty;
 use pumpkin_util::math::boundingbox::{BoundingBox, EntityDimensions};
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
 use pumpkin_util::random::RandomImpl;
 use pumpkin_util::version::JavaMinecraftVersion;
+use pumpkin_util::{Difficulty, Hand};
 use std::sync::Arc;
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicI64, AtomicU8, Ordering};
@@ -2344,9 +2345,14 @@ pub trait Mob: EntityBase + Send + Sync {
     }
 
     /// Vanilla `Mob.mobInteract`, which runs after the name tag, the spawn egg and the leash
-    /// had their turn. Returns whether it consumed the interaction.
-    fn mob_interact(&self, _player: &Arc<Player>, _item_stack: &mut ItemStack) -> bool {
-        false
+    /// had their turn; `item_stack` is the stack in `hand`.
+    fn mob_interact(
+        &self,
+        _player: &Arc<Player>,
+        _hand: Hand,
+        _item_stack: &mut ItemStack,
+    ) -> InteractionResult {
+        InteractionResult::PASS
     }
 
     /// The start of a vanilla `interact` override before `super.interact`, which runs even on
@@ -2620,24 +2626,28 @@ pub fn ai_step_looting(mob: &dyn Mob) {
 pub fn mob_interact_entry<M: Mob + ?Sized>(
     mob: &M,
     player: &Arc<Player>,
+    hand: Hand,
     item_stack: &mut ItemStack,
-) -> bool {
+) -> InteractionResult {
     mob.before_interact();
     if !mob.get_mob_entity().living_entity.is_alive() {
-        return false;
+        return InteractionResult::PASS;
     }
-    if check_and_handle_important_interactions(mob, player, item_stack) {
+    let result = check_and_handle_important_interactions(mob, player, hand, item_stack);
+    if result.consumes_action() {
         entity_interact_game_event(mob, player);
-        return true;
+        return result;
     }
-    if entity_interact(mob, player, item_stack) {
-        return true;
+    let super_reaction = entity_interact(mob, player, hand, item_stack);
+    if super_reaction != InteractionResult::PASS {
+        return super_reaction;
     }
-    if mob.mob_interact(player, item_stack) {
+    let result = mob.mob_interact(player, hand, item_stack);
+    if result.consumes_action() {
         entity_interact_game_event(mob, player);
-        return true;
+        return result;
     }
-    false
+    InteractionResult::PASS
 }
 
 /// `this.gameEvent(GameEvent.ENTITY_INTERACT, player)`.
@@ -2655,26 +2665,39 @@ fn entity_interact_game_event<M: Mob + ?Sized>(mob: &M, player: &Arc<Player>) {
 fn check_and_handle_important_interactions<M: Mob + ?Sized>(
     mob: &M,
     player: &Arc<Player>,
+    hand: Hand,
     item_stack: &mut ItemStack,
-) -> bool {
+) -> InteractionResult {
     let is_name_tag = item_stack.item == &Item::NAME_TAG;
     let is_spawn_egg = pumpkin_data::entity::entity_from_egg(item_stack.item.id).is_some();
     if !is_name_tag && !is_spawn_egg {
-        return false;
+        return InteractionResult::PASS;
     }
     let entity = mob.get_entity();
     let world = entity.world.load();
-    let (Some(server), Some(target)) = (
-        world.server.upgrade(),
-        world.get_entity_by_id(entity.entity_id),
-    ) else {
-        return false;
+    let Some(target) = world.get_entity_by_id(entity.entity_id) else {
+        return InteractionResult::PASS;
     };
-    // `itemStack.interactLivingEntity` for the name tag, `spawnOffspringFromSpawnEgg` for the
-    // egg; both pass when they did nothing.
-    server
-        .item_registry
-        .use_on_entity(item_stack, player, target)
+    if is_name_tag {
+        let Some(server) = world.server.upgrade() else {
+            return InteractionResult::PASS;
+        };
+        let result = server
+            .item_registry
+            .use_on_entity(item_stack, player, hand, target);
+        // A name tag that names nothing falls through to the spawn egg check, which it isn't.
+        return if result.consumes_action() {
+            result
+        } else {
+            InteractionResult::PASS
+        };
+    }
+    // `spawnOffspringFromSpawnEgg`: `SUCCESS_SERVER` once a baby spawned.
+    if crate::item::items::spawn_egg::spawn_offspring_from_spawn_egg(item_stack, player, &target) {
+        InteractionResult::SUCCESS_SERVER
+    } else {
+        InteractionResult::PASS
+    }
 }
 
 /// Vanilla `Entity.interact` for a mob: a sneaking player hands the mobs it leads over to this
@@ -2683,8 +2706,9 @@ fn check_and_handle_important_interactions<M: Mob + ?Sized>(
 fn entity_interact<M: Mob + ?Sized>(
     mob: &M,
     player: &Arc<Player>,
+    hand: Hand,
     item_stack: &mut ItemStack,
-) -> bool {
+) -> InteractionResult {
     let entity = mob.get_entity();
     let world = entity.world.load_full();
     let player_base: &dyn EntityBase = player.as_ref();
@@ -2714,20 +2738,21 @@ fn entity_interact<M: Mob + ?Sized>(
                 entity.block_pos.load().to_centered_f64(),
             );
             mob.play_sound_at_self(Sound::ItemLeadTied, 1.0, 1.0);
-            return true;
+            // `SUCCESS_SERVER.withoutItem()`.
+            return InteractionResult::SUCCESS_SERVER;
         }
     }
 
     if item_stack.item == &Item::SHEARS && shear_off_all_leash_connections(mob, player) {
-        player.damage_held_item(1);
-        return true;
+        player.damage_item_in_hand(hand, 1);
+        return InteractionResult::SUCCESS;
     }
     if item_stack.item == &Item::SHEARS
         && mob.can_shear_equipment(player)
         && !sneaking
-        && attempt_to_shear_equipment(mob, player)
+        && attempt_to_shear_equipment(mob, player, hand)
     {
-        return true;
+        return InteractionResult::SUCCESS;
     }
 
     let holder = entity
@@ -2746,20 +2771,21 @@ fn entity_interact<M: Mob + ?Sized>(
         );
         entity_interact_game_event(mob, player);
         mob.play_sound_at_self(Sound::ItemLeadUntied, 1.0, 1.0);
-        return true;
+        // `SUCCESS.withoutItem()`.
+        return InteractionResult::SUCCESS;
     }
     if item_stack.item != &Item::LEAD
         || holder
             .as_ref()
             .is_some_and(|holder| holder.get_player().is_some())
     {
-        return false;
+        return InteractionResult::PASS;
     }
     let Some(this) = world.get_entity_by_id(entity.entity_id) else {
-        return false;
+        return InteractionResult::PASS;
     };
     if !can_have_a_leash_attached_to(this.as_ref(), player.get_entity()) {
-        return false;
+        return InteractionResult::PASS;
     }
     if holder.is_some() {
         drop_leash(mob, true);
@@ -2771,7 +2797,7 @@ fn entity_interact<M: Mob + ?Sized>(
     }
     mob.play_sound_at_self(Sound::ItemLeadTied, 1.0, 1.0);
     item_stack.decrement_unless_creative(player.gamemode.load(), 1);
-    true
+    InteractionResult::SUCCESS_SERVER
 }
 
 /// Vanilla `Leashable.leashableInArea`: entities in the 32-block box around `entity` that are
@@ -2855,7 +2881,7 @@ fn shear_off_all_leash_connections<M: Mob + ?Sized>(mob: &M, player: &Arc<Player
 /// Vanilla `Mob.attemptToShearEquipment`: the first equipped item, in `EquipmentSlot.VALUES`
 /// order, that can be sheared off and isn't held on by `prevent_armor_change` (creative
 /// ignores it).
-fn attempt_to_shear_equipment<M: Mob + ?Sized>(mob: &M, player: &Arc<Player>) -> bool {
+fn attempt_to_shear_equipment<M: Mob + ?Sized>(mob: &M, player: &Arc<Player>, hand: Hand) -> bool {
     let mob_entity = mob.get_mob_entity();
     for slot in &EquipmentSlot::VALUES {
         let stack = mob_entity.get_item_slot(slot);
@@ -2869,7 +2895,7 @@ fn attempt_to_shear_equipment<M: Mob + ?Sized>(mob: &M, player: &Arc<Player>) ->
             continue;
         }
         let shearing_sound = equippable.shearing_sound.clone();
-        shear_item(mob, player, slot, stack.clone());
+        shear_item(mob, player, hand, slot, stack.clone());
         // `this.playSound(equippable.shearingSound().value())`.
         let entity = mob.get_entity();
         if !entity.is_silent() {
@@ -2890,10 +2916,11 @@ fn attempt_to_shear_equipment<M: Mob + ?Sized>(mob: &M, player: &Arc<Player>) ->
 fn shear_item<M: Mob + ?Sized>(
     mob: &M,
     player: &Arc<Player>,
+    hand: Hand,
     slot: &EquipmentSlot,
     sheared: ItemStack,
 ) {
-    player.damage_held_item(1);
+    player.damage_item_in_hand(hand, 1);
     let entity = mob.get_entity();
     let offset = entity
         .entity_dimension
@@ -3593,8 +3620,13 @@ impl<T: Mob + Send + 'static> EntityBase for T {
         self.hurt_server(caller, amount, damage_type, position, source, cause)
     }
 
-    fn interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
-        mob_interact_entry(self, player, item_stack)
+    fn interact(
+        &self,
+        player: &Arc<Player>,
+        hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
+        mob_interact_entry(self, player, hand, item_stack)
     }
 
     fn on_player_collision(&self, player: &Arc<Player>) {

@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::any::Any;
 use std::sync::Arc;
 
@@ -22,11 +24,18 @@ impl ItemBehaviour for SaddleItem {
         &self,
         item: &mut ItemStack,
         player: &Player,
+        _hand: Hand,
         entity: Arc<dyn EntityBase>,
-    ) -> bool {
-        entity
+    ) -> InteractionResult {
+        // `Equippable.equipOnTarget`.
+        if entity
             .get_mob()
             .is_some_and(|mob| mob.equip_on_target(player, item))
+        {
+            InteractionResult::SUCCESS
+        } else {
+            InteractionResult::PASS
+        }
     }
 
     fn as_any(&self) -> &dyn Any {

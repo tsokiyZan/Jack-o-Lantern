@@ -2,6 +2,8 @@ use crate::entity::mob::mount_inventory::MountInventory;
 use crate::entity::mob::{first_passenger_player, horse_tick_ridden, mob_controlling_passenger};
 use crate::entity::passive::abstract_horse::add_abstract_horse_goals;
 use crate::entity::passive::abstract_horse::{AbstractHorse, horse_mob_interact};
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::{
     Arc, Weak,
     atomic::{AtomicBool, AtomicI32, AtomicU8, Ordering},
@@ -289,7 +291,12 @@ impl Mob for MuleEntity {
         );
     }
 
-    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+    fn mob_interact(
+        &self,
+        player: &Arc<Player>,
+        _hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         horse_mob_interact(self, player, item_stack, Sound::EntityMuleAmbient)
     }
 }

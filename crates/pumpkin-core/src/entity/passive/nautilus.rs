@@ -1,5 +1,7 @@
 //! Vanilla `AbstractNautilus` and its two kinds, `Nautilus` and `ZombieNautilus`.
 
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::{
     Arc, PoisonError,
     atomic::{AtomicBool, AtomicI32, AtomicU8, Ordering},
@@ -317,8 +319,16 @@ impl NautilusEntity {
     }
 
     /// Vanilla `Animal.mobInteract`, the `super.mobInteract` of the nautilus's.
-    fn animal_mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
-        self.is_food(item_stack) && self.animal_interact(player, item_stack, self.eat_sound())
+    fn animal_mob_interact(
+        &self,
+        player: &Arc<Player>,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
+        if self.is_food(item_stack) {
+            self.animal_interact(player, item_stack, self.eat_sound())
+        } else {
+            InteractionResult::PASS
+        }
     }
 
     /// Vanilla `getDashSound`.
@@ -792,34 +802,39 @@ impl Mob for NautilusEntity {
     }
 
     /// Vanilla `AbstractNautilus.mobInteract`.
-    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+    fn mob_interact(
+        &self,
+        player: &Arc<Player>,
+        _hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         if self.is_baby() {
             return self.animal_mob_interact(player, item_stack);
         }
         let secondary_use = player.get_entity().is_sneaking();
         if self.is_tame() && secondary_use {
             self.open_custom_inventory_screen(player);
-            return true;
+            return InteractionResult::SUCCESS;
         }
         if !item_stack.is_empty() {
             if !self.is_tame() && self.is_food(item_stack) {
                 self.use_player_item(player, item_stack);
                 self.try_to_tame(player);
-                return true;
+                return InteractionResult::SUCCESS_SERVER;
             }
             let living = &self.mob_entity.living_entity;
             if self.is_food(item_stack) && living.health.load() < living.get_max_health() {
                 self.feed(player, item_stack, FEED_HEALING_FACTOR, FEED_DEFAULT_HEAL);
                 self.play_eating_sound(self.eat_sound());
-                return true;
+                return InteractionResult::SUCCESS;
             }
             if self.equip_on_target(player, item_stack) {
-                return true;
+                return InteractionResult::SUCCESS;
             }
         }
         if self.is_tame() && !secondary_use && !self.is_food(item_stack) {
             self.do_player_ride(player);
-            return true;
+            return InteractionResult::SUCCESS;
         }
         self.animal_mob_interact(player, item_stack)
     }

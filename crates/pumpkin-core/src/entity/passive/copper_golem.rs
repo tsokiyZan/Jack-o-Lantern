@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::{
     Arc, Weak,
     atomic::{AtomicI32, AtomicI64, Ordering},
@@ -264,7 +266,12 @@ impl Mob for CopperGolemEntity {
         );
     }
 
-    fn mob_interact(&self, _player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+    fn mob_interact(
+        &self,
+        _player: &Arc<Player>,
+        _hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         let entity = self.get_entity();
         let world = entity.world.load();
 
@@ -275,7 +282,7 @@ impl Mob for CopperGolemEntity {
             self.next_weathering_tick.store(-2, Ordering::Relaxed);
             let pos = entity.pos.load();
             world.play_sound(Sound::ItemHoneycombWaxOn, SoundCategory::Blocks, &pos);
-            return true;
+            return InteractionResult::SUCCESS_SERVER;
         }
 
         // Axe scraping
@@ -285,7 +292,7 @@ impl Mob for CopperGolemEntity {
                 self.next_weathering_tick.store(-1, Ordering::Relaxed);
                 let pos = entity.pos.load();
                 world.play_sound(Sound::ItemAxeScrape, SoundCategory::Blocks, &pos);
-                return true;
+                return InteractionResult::SUCCESS_SERVER;
             }
 
             let weather_state = self.get_weather_state();
@@ -294,10 +301,10 @@ impl Mob for CopperGolemEntity {
                 self.next_weathering_tick.store(-1, Ordering::Relaxed);
                 let pos = entity.pos.load();
                 world.play_sound(Sound::ItemAxeScrape, SoundCategory::Blocks, &pos);
-                return true;
+                return InteractionResult::SUCCESS_SERVER;
             }
         }
 
-        false
+        InteractionResult::PASS
     }
 }

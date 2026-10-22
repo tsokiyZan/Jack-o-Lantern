@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::any::Any;
 use std::sync::Arc;
 
@@ -179,8 +181,9 @@ impl ItemBehaviour for BrushItem {
         &self,
         _item: &mut ItemStack,
         player: &Player,
+        hand: Hand,
         entity: Arc<dyn EntityBase>,
-    ) -> bool {
+    ) -> InteractionResult {
         let ent = entity.get_entity();
         if ent.entity_type == &EntityType::ARMADILLO {
             let world = player.world();
@@ -196,7 +199,7 @@ impl ItemBehaviour for BrushItem {
             ));
             world.spawn_entity(item_entity);
 
-            player.damage_held_item(16);
+            player.damage_item_in_hand(hand, 16);
         } else {
             let world = player.world();
             world.play_sound(
@@ -206,12 +209,12 @@ impl ItemBehaviour for BrushItem {
             );
         }
 
-        let stack = player.inventory().held_item();
+        let stack = player.inventory().get_stack_in_hand(hand);
         player
             .living_entity
-            .set_active_hand(pumpkin_util::Hand::Right, stack, Self::USE_DURATION);
+            .set_active_hand(hand, stack, Self::USE_DURATION);
         // Vanilla `BrushItem` has no `interactLivingEntity`: the interaction passes.
-        false
+        InteractionResult::PASS
     }
 
     fn get_use_duration(&self) -> i32 {

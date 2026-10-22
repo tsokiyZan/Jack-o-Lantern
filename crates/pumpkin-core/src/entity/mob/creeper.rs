@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::{
     Arc, Weak,
     atomic::{AtomicBool, AtomicI32, Ordering},
@@ -303,12 +305,17 @@ impl Mob for CreeperEntity {
     }
 
     /// Vanilla `Creeper.mobInteract`.
-    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+    fn mob_interact(
+        &self,
+        player: &Arc<Player>,
+        _hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         if !item_stack
             .item
             .has_tag(&tag::Item::MINECRAFT_CREEPER_IGNITERS)
         {
-            return false;
+            return InteractionResult::PASS;
         }
 
         let sound = if item_stack.item.id == Item::FIRE_CHARGE.id {
@@ -337,7 +344,7 @@ impl Mob for CreeperEntity {
             let _ = item_stack.hurt_and_break(&world, 1);
         }
 
-        true
+        InteractionResult::SUCCESS
     }
 
     /// Vanilla `Creeper.setTarget`: creepers never target goats.

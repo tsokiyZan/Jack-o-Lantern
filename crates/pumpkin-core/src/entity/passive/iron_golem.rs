@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::{
     Arc, Weak,
     atomic::{AtomicBool, AtomicI32, Ordering},
@@ -233,7 +235,12 @@ impl Mob for IronGolemEntity {
         entity.set_synced_data(pumpkin_data::tracked_data::iron_golem::FLAGS_ID, flag);
     }
 
-    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+    fn mob_interact(
+        &self,
+        player: &Arc<Player>,
+        _hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         if item_stack.item.id == Item::IRON_INGOT.id {
             let living = &self.mob_entity.living_entity;
             let current_health = living.health.load();
@@ -247,9 +254,9 @@ impl Mob for IronGolemEntity {
                 if player.gamemode.load() != GameMode::Creative {
                     item_stack.item_count = item_stack.item_count.saturating_sub(1);
                 }
-                return true;
+                return InteractionResult::SUCCESS;
             }
         }
-        false
+        InteractionResult::PASS
     }
 }

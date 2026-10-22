@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::borrow::Cow;
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 use std::sync::{Arc, Weak};
@@ -805,20 +807,27 @@ impl Mob for WanderingTraderEntity {
         }
     }
 
-    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+    fn mob_interact(
+        &self,
+        player: &Arc<Player>,
+        hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         if item_stack.item == &Item::VILLAGER_SPAWN_EGG
             || self.mob_entity.living_entity.health.load() <= 0.0
             || self.is_trading.load(Ordering::Relaxed)
             || self.is_baby()
         {
-            return false;
+            return InteractionResult::PASS;
         }
 
-        player.increment_stat(
-            StatisticCategory::Custom,
-            CustomStatistic::TalkedToVillager as i32,
-            1,
-        );
+        if hand == Hand::Right {
+            player.increment_stat(
+                StatisticCategory::Custom,
+                CustomStatistic::TalkedToVillager as i32,
+                1,
+            );
+        }
 
         let has_offers = {
             let mut offers = self
@@ -837,7 +846,7 @@ impl Mob for WanderingTraderEntity {
         };
 
         if !has_offers {
-            return true;
+            return InteractionResult::CONSUME;
         }
 
         let trader = self
@@ -849,7 +858,7 @@ impl Mob for WanderingTraderEntity {
         if let Some(trader) = trader {
             trader.open_trading_screen(player);
         }
-        true
+        InteractionResult::SUCCESS_SERVER
     }
 
     fn mob_tick(&self, _caller: &dyn EntityBase) {

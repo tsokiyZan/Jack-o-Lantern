@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::Arc;
 
 use crate::entity::EntityBase;
@@ -21,14 +23,15 @@ impl ItemBehaviour for NameTagItem {
         &self,
         item: &mut ItemStack,
         player: &Player,
+        _hand: Hand,
         target: Arc<dyn EntityBase>,
-    ) -> bool {
+    ) -> InteractionResult {
         let entity = target.get_entity();
         let Some(name) = item.get_data_component::<CustomNameImpl>() else {
-            return false;
+            return InteractionResult::PASS;
         };
         if !entity.entity_type.saveable {
-            return false;
+            return InteractionResult::PASS;
         }
         if target
             .get_living_entity()
@@ -42,7 +45,7 @@ impl ItemBehaviour for NameTagItem {
             }
             item.decrement_unless_creative(player.gamemode.load(), 1);
         }
-        true
+        InteractionResult::SUCCESS
     }
     fn as_any(&self) -> &dyn std::any::Any {
         self

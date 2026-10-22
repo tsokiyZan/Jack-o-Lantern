@@ -5,7 +5,9 @@ use crate::entity::mob::{
     read_legacy_saddle,
 };
 use crate::entity::passive::animal::horse_can_parent;
+use crate::item::interaction_result::InteractionResult;
 use pumpkin_inventory::inventory::SimpleInventory;
+use pumpkin_util::Hand;
 use std::sync::{
     Arc, Weak,
     atomic::{AtomicBool, AtomicI32, AtomicU8, Ordering},
@@ -378,17 +380,30 @@ impl Mob for CamelEntity {
     }
 
     /// Vanilla `Camel.mobInteract`.
-    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+    fn mob_interact(
+        &self,
+        player: &Arc<Player>,
+        _hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         if player.get_entity().is_sneaking() && !self.is_baby() {
             self.open_custom_inventory_screen(player);
-            return true;
+            return InteractionResult::SUCCESS;
         }
         if self.equip_on_target(player, item_stack) {
-            return true;
+            return InteractionResult::SUCCESS;
         }
         // TODO: vanilla `Camel.handleEating`; Pumpkin feeds camels like other animals.
+        // `fedFood` answers `SUCCESS_SERVER` when the camel ate, else `PASS`.
         if self.is_food(item_stack) {
-            return self.animal_interact(player, item_stack, Sound::EntityCamelAmbient);
+            return if self
+                .animal_interact(player, item_stack, Sound::EntityCamelAmbient)
+                .consumes_action()
+            {
+                InteractionResult::SUCCESS_SERVER
+            } else {
+                InteractionResult::PASS
+            };
         }
         let entity = self.get_entity();
         if entity
@@ -411,10 +426,12 @@ impl Mob for CamelEntity {
             {
                 entity.add_passenger(vehicle, passenger as Arc<dyn EntityBase>);
             }
-            return true;
+            return InteractionResult::CONSUME;
         }
-        self.is_baby()
-            && is_player_holding(player.as_ref(), &Item::GOLDEN_DANDELION)
-            && self.animal_interact(player, item_stack, Sound::EntityCamelAmbient)
+        if self.is_baby() && is_player_holding(player.as_ref(), &Item::GOLDEN_DANDELION) {
+            self.animal_interact(player, item_stack, Sound::EntityCamelAmbient)
+        } else {
+            InteractionResult::FAIL
+        }
     }
 }

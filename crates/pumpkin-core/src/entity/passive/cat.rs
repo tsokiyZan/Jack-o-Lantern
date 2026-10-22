@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::any::Any;
 use std::sync::{
     Arc, Weak,
@@ -625,7 +627,12 @@ impl Mob for CatEntity {
     }
 
     /// Vanilla `Cat.mobInteract`.
-    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+    fn mob_interact(
+        &self,
+        player: &Arc<Player>,
+        _hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         let eat_sound = self
             .get_sound_variant()
             .eat_sound(self.get_entity().is_baby());
@@ -644,7 +651,7 @@ impl Mob for CatEntity {
                         self.set_collar_color(color.id());
                         item_stack.decrement_unless_creative(player.gamemode.load(), 1);
                         self.set_persistence_required();
-                        return true;
+                        return InteractionResult::SUCCESS;
                     }
                 } else if self.is_food(item_stack)
                     && self.mob_entity.living_entity.health.load()
@@ -652,13 +659,13 @@ impl Mob for CatEntity {
                 {
                     self.feed(player, item_stack, 1.0, 1.0);
                     self.play_eating_sound();
-                    return true;
+                    return InteractionResult::SUCCESS;
                 }
 
                 let parent_interaction = self.animal_interact(player, item_stack, eat_sound);
-                if !parent_interaction {
+                if !parent_interaction.consumes_action() {
                     self.set_ordered_to_sit(!self.is_ordered_to_sit());
-                    return true;
+                    return InteractionResult::SUCCESS;
                 }
                 return parent_interaction;
             }
@@ -667,11 +674,11 @@ impl Mob for CatEntity {
             self.try_to_tame(player);
             self.set_persistence_required();
             self.play_eating_sound();
-            return true;
+            return InteractionResult::SUCCESS;
         }
 
         let interact = self.animal_interact(player, item_stack, eat_sound);
-        if interact {
+        if interact.consumes_action() {
             self.set_persistence_required();
         }
         interact

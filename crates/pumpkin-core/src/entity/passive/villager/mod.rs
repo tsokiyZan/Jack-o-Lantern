@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use pumpkin_util::math::boundingbox::EntityDimensions;
 use rustc_hash::FxHashMap;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicI64, Ordering};
@@ -2375,13 +2377,23 @@ impl Mob for VillagerEntity {
         self.villager_mob_tick();
     }
 
-    fn mob_interact(&self, player: &Arc<Player>, _item_stack: &mut ItemStack) -> bool {
-        if self.is_trading.load(Ordering::Relaxed) {
-            return false;
+    fn mob_interact(
+        &self,
+        player: &Arc<Player>,
+        hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
+        if item_stack.item == &Item::VILLAGER_SPAWN_EGG
+            || !self.get_entity().is_alive()
+            || self.is_trading.load(Ordering::Relaxed)
+            || self.get_entity().pose.load() == EntityPose::Sleeping
+        {
+            // TODO: `AgeableMob.mobInteract`'s golden dandelion.
+            return InteractionResult::PASS;
         }
         if self.get_entity().age.load(Ordering::Relaxed) < 0 {
             self.set_unhappy();
-            return true;
+            return InteractionResult::SUCCESS;
         }
 
         let trade_params = {
@@ -2410,16 +2422,20 @@ impl Mob for VillagerEntity {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .is_empty();
-        if !has_offers {
-            self.set_unhappy();
-            return true;
+        // Only the main hand makes the villager shake its head and counts as talking to it.
+        if hand == Hand::Right {
+            if !has_offers {
+                self.set_unhappy();
+            }
+            player.increment_stat(
+                pumpkin_data::statistic::StatisticCategory::Custom,
+                pumpkin_data::statistic::CustomStatistic::TalkedToVillager as i32,
+                1,
+            );
         }
-
-        player.increment_stat(
-            pumpkin_data::statistic::StatisticCategory::Custom,
-            pumpkin_data::statistic::CustomStatistic::TalkedToVillager as i32,
-            1,
-        );
+        if !has_offers {
+            return InteractionResult::CONSUME;
+        }
 
         let villager = self
             .self_weak
@@ -2431,7 +2447,7 @@ impl Mob for VillagerEntity {
             villager.open_trading_screen(player);
         }
 
-        true
+        InteractionResult::SUCCESS
     }
 }
 

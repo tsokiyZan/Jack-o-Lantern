@@ -3,6 +3,8 @@ use crate::entity::mob::mount_inventory::MountInventory;
 use crate::entity::mob::{first_passenger_player, horse_tick_ridden, mob_controlling_passenger};
 use crate::entity::passive::abstract_horse::add_abstract_horse_goals;
 use crate::entity::passive::abstract_horse::{AbstractHorse, abstract_horse_mob_interact};
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::{
     Arc, Weak,
     atomic::{AtomicI32, AtomicU8, Ordering},
@@ -287,17 +289,30 @@ impl Mob for ZombieHorseEntity {
     }
 
     /// Vanilla `ZombieHorse.mobInteract`.
-    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+    fn mob_interact(
+        &self,
+        player: &Arc<Player>,
+        _hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         let should_open_inventory =
             !self.is_baby() && self.is_tame() && player.get_entity().is_sneaking();
         if !self.is_vehicle() && !should_open_inventory && !item_stack.is_empty() {
             // TODO: vanilla `AbstractHorse.fedFood`; Pumpkin feeds horses like other animals.
+            // `fedFood` answers `SUCCESS_SERVER` when the horse ate, else `PASS`.
             if self.is_food(item_stack) {
-                return self.animal_interact(player, item_stack, Sound::EntityZombieHorseAmbient);
+                return if self
+                    .animal_interact(player, item_stack, Sound::EntityZombieHorseAmbient)
+                    .consumes_action()
+                {
+                    InteractionResult::SUCCESS_SERVER
+                } else {
+                    InteractionResult::PASS
+                };
             }
             if !self.is_tame() {
                 self.make_mad();
-                return true;
+                return InteractionResult::SUCCESS;
             }
         }
         abstract_horse_mob_interact(self, player, item_stack, Sound::EntityZombieHorseAmbient)

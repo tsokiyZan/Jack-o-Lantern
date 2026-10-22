@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::{
     Arc, Mutex, PoisonError, Weak,
     atomic::{AtomicBool, AtomicI64, Ordering},
@@ -619,7 +621,12 @@ impl Mob for AllayEntity {
     }
 
     /// Vanilla `Allay.mobInteract`, after `Entity.interact`'s leash handling.
-    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+    fn mob_interact(
+        &self,
+        player: &Arc<Player>,
+        hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         let item_in_hand = self.main_hand_item();
         if self.is_dancing()
             && item_stack
@@ -636,7 +643,7 @@ impl Mob for AllayEntity {
             );
             self.play_sound_except(player, Sound::BlockAmethystBlockChime, 2.0);
             item_stack.decrement_unless_creative(player.gamemode.load(), 1);
-            return true;
+            return InteractionResult::SUCCESS;
         }
 
         if item_in_hand.is_empty() && !item_stack.is_empty() {
@@ -648,11 +655,11 @@ impl Mob for AllayEntity {
             self.mob_entity.with_brain(self, |tick| {
                 self.set_liked_player(tick.brain, Some(player.gameprofile.id));
             });
-            return true;
+            return InteractionResult::SUCCESS;
         }
 
-        // Pumpkin only interacts with the main hand.
-        if !item_in_hand.is_empty() && item_stack.is_empty() {
+        // Only an empty main hand takes the allay's item back.
+        if !item_in_hand.is_empty() && hand == Hand::Right && item_stack.is_empty() {
             self.mob_entity
                 .set_item_slot(&EquipmentSlot::MAIN_HAND, ItemStack::EMPTY.clone());
             self.play_sound_except(player, Sound::EntityAllayItemTaken, 2.0);
@@ -678,10 +685,10 @@ impl Mob for AllayEntity {
             let mut returned = item_in_hand;
             player.inventory.insert_stack_anywhere(&mut returned);
             *item_stack = player.inventory.held_item();
-            return true;
+            return InteractionResult::SUCCESS;
         }
 
-        false
+        InteractionResult::PASS
     }
 
     /// Vanilla `Allay.dropEquipment`.

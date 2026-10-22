@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::{Arc, Weak};
 
 use crate::entity::ai::control::flying_move_control::FlyingMoveControl;
@@ -374,7 +376,12 @@ impl Mob for ParrotEntity {
     }
 
     /// Vanilla `Parrot.mobInteract`.
-    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+    fn mob_interact(
+        &self,
+        player: &Arc<Player>,
+        _hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         let item = item_stack.get_item();
         if !self.is_tame() && item.has_tag(&tag::Item::MINECRAFT_PARROT_FOOD) {
             item_stack.decrement_unless_creative(player.gamemode.load(), 1);
@@ -403,7 +410,7 @@ impl Mob for ParrotEntity {
                 .world
                 .load()
                 .send_entity_status(entity, status, Some(bedrock));
-            return true;
+            return InteractionResult::SUCCESS;
         }
         if !item.has_tag(&tag::Item::MINECRAFT_PARROT_POISONOUS_FOOD) {
             // `isFlying`: off the ground.
@@ -413,13 +420,13 @@ impl Mob for ParrotEntity {
                 .load(std::sync::atomic::Ordering::Relaxed);
             if !flying && self.is_tame() && self.is_owned_by(&player.gameprofile.id) {
                 self.set_ordered_to_sit(!self.is_ordered_to_sit());
-                return true;
+                return InteractionResult::SUCCESS;
             }
-            return false;
+            return InteractionResult::PASS;
         }
 
         self.eat_cookie(player, item_stack);
-        true
+        InteractionResult::SUCCESS
     }
 }
 

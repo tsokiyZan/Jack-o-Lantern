@@ -96,12 +96,7 @@ impl FurnaceMinecart {
         next
     }
 
-    pub(super) fn interact(
-        &self,
-        entity: &Entity,
-        player: &Player,
-        item_stack: &mut ItemStack,
-    ) -> bool {
+    pub(super) fn interact(&self, entity: &Entity, player: &Player, item_stack: &mut ItemStack) {
         let fuel = self.fuel.load(Ordering::Relaxed);
         if item_stack
             .get_item()
@@ -125,7 +120,6 @@ impl FurnaceMinecart {
                 cart_pos.z - player_pos.z,
             ));
         }
-        true
     }
 
     pub(super) fn init_data_tracker(&self, entity: &Entity) {

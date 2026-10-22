@@ -1,4 +1,6 @@
 use crate::enchantment::HurtAndBreak;
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -148,9 +150,14 @@ impl Mob for BoggedSkeletonEntity {
     }
 
     /// Vanilla `Bogged.mobInteract`.
-    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+    fn mob_interact(
+        &self,
+        player: &Arc<Player>,
+        _hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         if item_stack.item != &Item::SHEARS || !self.ready_for_shearing() {
-            return false;
+            return InteractionResult::PASS;
         }
         self.shear(SoundCategory::Players, item_stack);
         let entity = self.get_entity();
@@ -162,6 +169,6 @@ impl Mob for BoggedSkeletonEntity {
         if player.gamemode.load() != GameMode::Creative {
             let _ = item_stack.hurt_and_break(&entity.world.load(), 1);
         }
-        true
+        InteractionResult::SUCCESS
     }
 }

@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::{
     Arc, Mutex, PoisonError, Weak,
     atomic::{AtomicBool, AtomicI32, AtomicU8, Ordering},
@@ -1035,18 +1037,23 @@ impl Mob for PandaEntity {
 
     /// Vanilla `Panda.mobInteract`. Pandas cannot be leashed, so the leash handling of the
     /// base interaction never applies.
-    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+    fn mob_interact(
+        &self,
+        player: &Arc<Player>,
+        _hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         if self.is_scared() {
-            return false;
+            return InteractionResult::PASS;
         }
         if self.is_on_back() {
             self.set_on_back(false);
-            return true;
+            return InteractionResult::SUCCESS;
         }
         if !self.is_food(item_stack) {
             // TODO: `super.mobInteract` for a baby and a golden dandelion, once age locking
             // with it is ported.
-            return false;
+            return InteractionResult::PASS;
         }
 
         if self.get_target().is_some() {
@@ -1057,7 +1064,7 @@ impl Mob for PandaEntity {
             item_stack.decrement_unless_creative(gamemode, 1);
             self.age_up(((-self.get_age() / 20) as f32 * 0.1) as i32, true);
         } else if self.is_baby() {
-            return false;
+            return InteractionResult::PASS;
         } else if self.get_age() == 0
             && self.mob_entity.is_breeding_ready()
             && !self.mob_entity.is_in_love()
@@ -1066,7 +1073,7 @@ impl Mob for PandaEntity {
             self.set_in_love(player);
         } else {
             if self.is_sitting() || self.get_entity().is_in_water() {
-                return false;
+                return InteractionResult::PASS;
             }
             self.try_to_sit();
             self.eat(true);
@@ -1080,7 +1087,7 @@ impl Mob for PandaEntity {
             );
             item_stack.decrement_unless_creative(gamemode, 1);
         }
-        true
+        InteractionResult::SUCCESS_SERVER
     }
 }
 

@@ -1,10 +1,12 @@
 use crate::entity::player::Player;
 use crate::entity::{Entity, EntityBase, living::LivingEntity};
+use crate::item::interaction_result::InteractionResult;
 use crate::world::World;
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_data::tag::Taggable;
+use pumpkin_util::Hand;
 use pumpkin_util::math::boundingbox::{BoundingBox, EntityDimensions};
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
@@ -132,7 +134,12 @@ impl EntityBase for LeashKnotEntity {
         }
     }
 
-    fn interact(&self, player: &Arc<Player>, _item_stack: &mut ItemStack) -> bool {
+    fn interact(
+        &self,
+        player: &Arc<Player>,
+        _hand: Hand,
+        _item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         let world = player.world();
         let knot_id = self.entity.entity_id;
         let player_id = player.entity_id();
@@ -178,9 +185,9 @@ impl EntityBase for LeashKnotEntity {
 
         if attached_mob || any_dropped {
             self.play_placement_sound(&world);
-            true
+            InteractionResult::SUCCESS
         } else {
-            false
+            InteractionResult::PASS
         }
     }
     fn cast_any(&self) -> &dyn std::any::Any {

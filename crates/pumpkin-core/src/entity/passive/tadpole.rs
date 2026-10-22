@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::{
     Arc, PoisonError,
     atomic::{AtomicBool, AtomicI32, Ordering},
@@ -285,10 +287,15 @@ impl Mob for TadpoleEntity {
     }
 
     /// Vanilla `Tadpole.mobInteract`.
-    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+    fn mob_interact(
+        &self,
+        player: &Arc<Player>,
+        _hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         if Self::is_food(item_stack) && !self.is_age_locked() {
             self.feed(player, item_stack);
-            return true;
+            return InteractionResult::SUCCESS;
         }
         if ageable::can_use_golden_dandelion(
             item_stack,
@@ -303,8 +310,13 @@ impl Mob for TadpoleEntity {
                 item_stack,
                 || self.set_age_locked_data(),
             );
-            return true;
+            return InteractionResult::SUCCESS;
         }
-        self.bucket_mob_pickup(player, item_stack)
+        // `bucketMobPickup` answers `SUCCESS`, else `super.mobInteract` passes.
+        if self.bucket_mob_pickup(player, item_stack) {
+            InteractionResult::SUCCESS
+        } else {
+            InteractionResult::PASS
+        }
     }
 }

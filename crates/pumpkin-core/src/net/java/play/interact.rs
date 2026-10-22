@@ -24,6 +24,13 @@ impl JavaClient {
             self.try_kick(&TextComponent::text("Invalid action type"));
             return;
         };
+        // The packet's hand: the client tries the main hand and sends the off hand only when
+        // that didn't consume the click.
+        let hand =
+            interact.hand.map_or(
+                Hand::Right,
+                |h| if h.0 == 1 { Hand::Left } else { Hand::Right },
+            );
 
         // Resolve the target entity for the event
         let world = player_entity.world.load_full();
@@ -103,52 +110,16 @@ impl JavaClient {
                                     pos.x,
                                     pos.y,
                                     pos.z,
-                                    u8::from(interact.hand.map_or(0, |h| h.0) != 0),
+                                    u8::from(hand == Hand::Left),
                                 );
                                 server.plugin_manager.fire_blocking(server, &mut at_event);
                                 if at_event.cancelled {
                                     return;
                                 }
                             }
-                            let mut stack = player.inventory().held_item();
-
-                            let item_id = stack.item.id;
-                            let before = stack.clone();
-                            // Vanilla `Player.interactOn`: the entity's own `interact` first
-                            // (for a mob, `Mob.interact`), then the item's
-                            // `interactLivingEntity`. A mob already had the spawn egg.
-                            let interacted = event.target.interact(player, &mut stack);
-                            let is_mob_spawn_egg = event.target.get_mob().is_some()
-                                && pumpkin_data::entity::entity_from_egg(stack.item.id).is_some();
-                            if !interacted
-                                && !stack.is_empty()
-                                && !is_mob_spawn_egg
-                                && server.item_registry.use_on_entity(
-                                    &mut stack,
-                                    player,
-                                    Arc::clone(&event.target),
-                                )
-                                && event.target.get_living_entity().is_some()
-                            {
-                                world.game_event_from(
-                                    Some(player.as_ref()),
-                                    pumpkin_data::game_event::GameEvent::EntityInteract,
-                                    event.target.get_entity().pos.load(),
-                                );
-                            }
-                            if !stack.are_equal(&before) && before.is_damageable() && stack.is_empty() {
-                                player.increment_stat(
-                                    StatisticCategory::Broken,
-                                    item_id as i32,
-                                    1,
-                                );
-                                player.world().send_entity_status(
-                                    player.get_entity(),
-                                    equipment_break_status(&EquipmentSlot::MAIN_HAND),
-                                    None,
-                                );
-                            }
-                            player.inventory().set_held_item(stack);
+                            // `ServerGamePacketListenerImpl.handleInteract`: `interactOn`
+                            // with the packet's hand.
+                            player.interact_on(&event.target, hand, server);
                         }
                     }
                 }

@@ -1,7 +1,9 @@
 use crate::entity::ai::pathfinder::node::PathType;
 use crate::entity::breath::BreathManager;
+use crate::item::interaction_result::InteractionResult;
 use pumpkin_data::damage::DamageType;
 use pumpkin_data::entity::EntityPose;
+use pumpkin_util::Hand;
 use pumpkin_util::math::boundingbox::EntityDimensions;
 use std::sync::{
     Arc,
@@ -418,7 +420,12 @@ impl Mob for AxolotlEntity {
         );
     }
 
-    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+    fn mob_interact(
+        &self,
+        player: &Arc<Player>,
+        _hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         let item = item_stack.get_item();
 
         if item == &Item::WATER_BUCKET {
@@ -433,14 +440,20 @@ impl Mob for AxolotlEntity {
                 };
                 server.plugin_manager.fire_blocking(&server, &mut event);
                 if event.cancelled {
-                    return false;
+                    return InteractionResult::PASS;
                 }
             }
-            item_stack.decrement_unless_creative(player.gamemode.load(), 1);
             let pos = entity.pos.load();
             world.play_sound(Sound::ItemBucketFillAxolotl, SoundCategory::Neutral, &pos);
+            crate::item::create_filled_result(
+                item_stack,
+                player,
+                ItemStack::new(1, &Item::AXOLOTL_BUCKET),
+                false,
+            );
             entity.remove();
-            return true;
+            // `bucketMobPickup`.
+            return InteractionResult::SUCCESS;
         }
 
         self.animal_interact(player, item_stack, Sound::EntityAxolotlIdleAir)

@@ -1,5 +1,6 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::Arc;
-use std::sync::atomic::Ordering;
 
 use crate::{
     entity::{
@@ -442,40 +443,6 @@ impl ItemBehaviour for EmptyBucketItem {
         give_player_bucket_item(player, item);
     }
 
-    fn use_on_entity(
-        &self,
-        _item: &mut ItemStack,
-        player: &Player,
-        entity: Arc<dyn EntityBase>,
-    ) -> bool {
-        let ent = entity.get_entity();
-        let entity_type = ent.entity_type;
-        if (entity_type == &EntityType::COW
-            || entity_type == &EntityType::MOOSHROOM
-            || entity_type == &EntityType::GOAT)
-            && ent.age.load(Ordering::Relaxed) >= 0
-        {
-            let world = ent.world.load();
-            let sound = if entity_type == &EntityType::GOAT {
-                if let Some(goat) = entity
-                    .cast_any()
-                    .downcast_ref::<crate::entity::passive::goat::GoatEntity>()
-                    && goat.is_screaming()
-                {
-                    Sound::EntityGoatScreamingMilk
-                } else {
-                    Sound::EntityGoatMilk
-                }
-            } else {
-                Sound::EntityCowMilk
-            };
-            world.play_sound(sound, SoundCategory::Neutral, &ent.pos.load());
-            give_player_bucket_item(player, &Item::MILK_BUCKET);
-            return true;
-        }
-        false
-    }
-
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
@@ -577,8 +544,9 @@ impl ItemBehaviour for FilledBucketItem {
         &self,
         item: &mut ItemStack,
         player: &Player,
+        _hand: Hand,
         entity: Arc<dyn EntityBase>,
-    ) -> bool {
+    ) -> InteractionResult {
         if item.item.id == Item::WATER_BUCKET.id {
             let entity_type = entity.get_entity().entity_type;
             let result_item = if entity_type == &EntityType::AXOLOTL {
@@ -601,12 +569,18 @@ impl ItemBehaviour for FilledBucketItem {
                 let ent = entity.get_entity();
                 let world = ent.world.load();
                 world.play_sound(sound, SoundCategory::Neutral, &ent.pos.load());
-                give_player_bucket_item(player, mob_bucket);
+                // `Bucketable.bucketMobPickup`: the filled bucket replaces the one used.
+                crate::item::create_filled_result(
+                    item,
+                    player,
+                    ItemStack::new(1, mob_bucket),
+                    false,
+                );
                 ent.remove();
-                return true;
+                return InteractionResult::SUCCESS;
             }
         }
-        false
+        InteractionResult::PASS
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

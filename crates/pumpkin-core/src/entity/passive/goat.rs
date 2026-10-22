@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
@@ -480,7 +482,12 @@ impl Mob for GoatEntity {
     }
 
     /// Vanilla `Goat.mobInteract`.
-    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+    fn mob_interact(
+        &self,
+        player: &Arc<Player>,
+        _hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         if item_stack.get_item() == &Item::BUCKET && !self.is_baby() {
             // Vanilla `Player.playSound`: everyone but the milking player, who plays it itself.
             let world = self.get_entity().world.load();
@@ -498,7 +505,7 @@ impl Mob for GoatEntity {
                 ItemStack::new(1, &Item::MILK_BUCKET),
                 true,
             );
-            return true;
+            return InteractionResult::SUCCESS;
         }
 
         let eat_sound = if self.is_screaming() {
@@ -508,7 +515,7 @@ impl Mob for GoatEntity {
         };
         let consumed = self.animal_interact(player, item_stack, eat_sound);
         // The fed stack may be used up by now, and an empty stack is no food.
-        if consumed && !item_stack.is_empty() && self.is_food(item_stack) {
+        if consumed.consumes_action() && !item_stack.is_empty() && self.is_food(item_stack) {
             self.play_eating_sound(eat_sound);
         }
         consumed

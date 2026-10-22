@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use crate::item::interaction_result::InteractionResult;
+
 use pumpkin_data::data_component_impl::DyeImpl;
 use pumpkin_data::dye_color::DyeColor;
 use pumpkin_data::item::Item;
@@ -118,12 +120,14 @@ pub trait Animal: Mob {
         mob_entity.set_love_ticks(in_love, love_cause);
     }
 
+    /// Vanilla `Animal.mobInteract`: food breeds a ready adult (`SUCCESS_SERVER`) or grows a
+    /// baby up (`SUCCESS`).
     fn animal_interact(
         &self,
         player: &Arc<Player>,
         item_stack: &mut ItemStack,
         ambient_sound: Sound,
-    ) -> bool {
+    ) -> InteractionResult {
         let mob_entity = self.get_mob_entity();
         if self.is_food(item_stack) {
             let age = mob_entity
@@ -154,7 +158,7 @@ pub trait Animal: Mob {
                     Particle::Heart,
                 );
                 self.play_eating_sound(ambient_sound);
-                return true;
+                return InteractionResult::SUCCESS_SERVER;
             }
 
             if let Some(ageable) = self.as_ageable()
@@ -163,11 +167,11 @@ pub trait Animal: Mob {
                 self.use_player_item(player, item_stack);
                 ageable.age_up(get_speed_up_seconds_when_feeding(-age), true);
                 self.play_eating_sound(ambient_sound);
-                return true;
+                return InteractionResult::SUCCESS;
             }
         }
 
-        false
+        InteractionResult::PASS
     }
 }
 

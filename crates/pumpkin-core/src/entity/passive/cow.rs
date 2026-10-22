@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::{
     Arc, Weak,
     atomic::{AtomicU8, Ordering},
@@ -242,17 +244,30 @@ impl Mob for CowEntity {
         }
     }
 
-    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+    fn mob_interact(
+        &self,
+        player: &Arc<Player>,
+        _hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         if item_stack.get_item() == &Item::BUCKET && !self.is_baby() {
-            item_stack.decrement_unless_creative(player.gamemode.load(), 1);
-            let entity = &self.mob_entity.living_entity.entity;
-            let world = entity.world.load();
-            world.play_sound(
-                Sound::EntityCowMilk,
-                pumpkin_data::sound::SoundCategory::Neutral,
-                &entity.pos.load(),
+            // Vanilla `Player.playSound`: everyone but the milking player, who plays it itself.
+            let world = self.get_entity().world.load();
+            world.play_sound_raw_expect(
+                player,
+                Sound::EntityCowMilk as u16,
+                pumpkin_data::sound::SoundCategory::Players,
+                &player.get_entity().pos.load(),
+                1.0,
+                1.0,
             );
-            return true;
+            crate::item::create_filled_result(
+                item_stack,
+                player,
+                ItemStack::new(1, &Item::MILK_BUCKET),
+                true,
+            );
+            return InteractionResult::SUCCESS;
         }
         let sound_variant = CowSoundVariant::from_id(self.sound_variant.load(Ordering::Relaxed))
             .unwrap_or_default();

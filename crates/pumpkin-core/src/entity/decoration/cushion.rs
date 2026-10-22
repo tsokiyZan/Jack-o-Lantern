@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::{
     Arc,
     atomic::{AtomicU8, Ordering},
@@ -149,12 +151,18 @@ impl EntityBase for CushionEntity {
         }
     }
 
-    fn interact(&self, player: &Arc<Player>, _item_stack: &mut ItemStack) -> bool {
+    fn interact(
+        &self,
+        player: &Arc<Player>,
+        _hand: Hand,
+        _item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         if player.get_entity().is_sneaking() {
-            return false;
+            return InteractionResult::PASS;
         }
+        // Pumpkin rides nothing while riding; vanilla `startRiding` would switch.
         if player.get_entity().has_vehicle() {
-            return false;
+            return InteractionResult::CONSUME;
         }
         if !self
             .entity
@@ -163,15 +171,15 @@ impl EntityBase for CushionEntity {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .is_empty()
         {
-            return false;
+            return InteractionResult::PASS;
         }
 
         let world = self.entity.world.load();
         let Some(vehicle) = world.get_entity_by_id(self.entity.entity_id) else {
-            return false;
+            return InteractionResult::CONSUME;
         };
         let Some(passenger) = world.get_player_by_id(player.entity_id()) else {
-            return false;
+            return InteractionResult::CONSUME;
         };
 
         world.play_sound(
@@ -181,7 +189,7 @@ impl EntityBase for CushionEntity {
         );
         self.entity
             .add_passenger(vehicle, passenger as Arc<dyn EntityBase>);
-        true
+        InteractionResult::SUCCESS_SERVER
     }
 
     fn damage_with_context(

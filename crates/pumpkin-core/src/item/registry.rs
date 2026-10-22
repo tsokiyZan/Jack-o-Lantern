@@ -1,6 +1,7 @@
 use crate::block::registry::BlockActionResult;
 use crate::entity::EntityBase;
 use crate::entity::player::{Player, cooldown_group};
+use crate::item::interaction_result::InteractionResult;
 use crate::server::Server;
 use pumpkin_data::Block;
 use pumpkin_data::BlockDirection;
@@ -120,28 +121,19 @@ impl ItemRegistry {
         result
     }
 
-    /// Uses `stack` on `entity`, returning whether the item consumed the interaction.
+    /// Vanilla `ItemStack.interactLivingEntity`: uses `stack`, the stack in `hand`, on `entity`.
+    /// Unlike a plain use, this starts no item cooldown and ignores a running one.
     pub fn use_on_entity(
         &self,
         stack: &mut ItemStack,
         player: &Player,
+        hand: Hand,
         entity: Arc<dyn EntityBase>,
-    ) -> bool {
-        let cooldown = stack.get_use_cooldown().cloned();
-        let cooldown_group = cooldown_group(stack);
-
-        if player.is_on_cooldown(&cooldown_group) {
-            return false;
-        }
-
-        let used = self
-            .get_pumpkin_item(stack.item.id)
-            .is_some_and(|pumpkin_item| pumpkin_item.use_on_entity(stack, player, entity));
-
-        if let Some(cooldown) = cooldown {
-            player.start_cooldown(cooldown_group, (cooldown.seconds * 20.0) as i32);
-        }
-        used
+    ) -> InteractionResult {
+        self.get_pumpkin_item(stack.item.id)
+            .map_or(InteractionResult::PASS, |pumpkin_item| {
+                pumpkin_item.use_on_entity(stack, player, hand, entity)
+            })
     }
 
     pub fn can_mine(&self, item: &Item, player: &Player) -> bool {

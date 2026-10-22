@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::{
     Arc, Weak,
     atomic::{AtomicBool, Ordering},
@@ -255,7 +257,12 @@ impl Mob for OcelotEntity {
     }
 
     /// Vanilla `Ocelot.mobInteract`.
-    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+    fn mob_interact(
+        &self,
+        player: &Arc<Player>,
+        _hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         let tempted = self
             .mob_entity
             .goals_selector
@@ -288,7 +295,7 @@ impl Mob for OcelotEntity {
                 );
             }
 
-            return true;
+            return InteractionResult::SUCCESS;
         }
 
         // TODO: vanilla `Animal.mobInteract` plays `Ocelot.playEatingSound`, which is silent.

@@ -5,6 +5,7 @@ use crate::enchantment::EnchantmentHelper;
 use crate::enchantment::HurtAndBreak;
 use crate::entity::damage_source::DamageSource;
 use crate::entity::movement_emission::MovementEmission;
+use crate::item::interaction_result::InteractionResult;
 use crate::item::item_stack_hurt_enemy;
 use crate::item::items::mace::MaceItem;
 use core::f32;
@@ -400,6 +401,15 @@ pub fn cooldown_group(stack: &ItemStack) -> String {
         .get_use_cooldown()
         .and_then(|cooldown| cooldown.cooldown_group.clone())
         .unwrap_or_else(|| stack.item.registry_key.to_string())
+}
+
+/// Vanilla `InteractionHand.asEquipmentSlot`: the main hand or the off hand.
+#[must_use]
+pub const fn hand_equipment_slot(hand: Hand) -> EquipmentSlot {
+    match hand {
+        Hand::Right => EquipmentSlot::MAIN_HAND,
+        Hand::Left => EquipmentSlot::OFF_HAND,
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1899,6 +1909,11 @@ impl Player {
     /// Convenience wrapper – damages the currently held (main-hand) item.
     pub fn damage_held_item(&self, amount: i32) -> bool {
         self.damage_item_in_slot(&EquipmentSlot::MAIN_HAND, amount)
+    }
+
+    /// Vanilla `itemStack.hurtAndBreak(amount, player, hand)`: damages the item in `hand`.
+    pub fn damage_item_in_hand(&self, hand: Hand, amount: i32) -> bool {
+        self.damage_item_in_slot(&hand_equipment_slot(hand), amount)
     }
 
     /// Vanilla `ItemStack.mineBlock` for the main hand, which `preventsBlockDrops` skips: a
@@ -3559,6 +3574,76 @@ impl Player {
             .last_item_in_main_hand
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner) = ItemStack::EMPTY.clone();
+    }
+
+    /// Vanilla `Player.interactOn`: right-clicking `target` with the stack in `hand`. The
+    /// entity's own `interact` goes first; when it passes, the stack is used on a living
+    /// target (`ItemStack.interactLivingEntity`). A player with infinite materials keeps a
+    /// stack the entity shrank, and uses only a copy of it on the target.
+    pub fn interact_on(
+        self: &Arc<Self>,
+        target: &Arc<dyn EntityBase>,
+        hand: Hand,
+        server: &Server,
+    ) -> InteractionResult {
+        if self.gamemode.load() == GameMode::Spectator {
+            return InteractionResult::PASS;
+        }
+        let inventory = self.inventory();
+        let before = inventory.get_stack_in_hand(hand);
+        let mut stack = before.clone();
+        let infinite_materials = self.has_infinite_materials();
+        let interact = target.interact(self, hand, &mut stack);
+        let result = if interact.consumes_action() {
+            // `itemStack == getItemInHand(hand)`: the same stack, only shrunk.
+            if infinite_materials
+                && stack.item == before.item
+                && stack.item_count < before.item_count
+            {
+                stack.item_count = before.item_count;
+            }
+            interact
+        } else if !stack.is_empty() && target.get_living_entity().is_some() {
+            let mut copy;
+            let item_stack = if infinite_materials {
+                copy = stack.clone();
+                &mut copy
+            } else {
+                &mut stack
+            };
+            let result =
+                server
+                    .item_registry
+                    .use_on_entity(item_stack, self, hand, Arc::clone(target));
+            if result.consumes_action() {
+                self.world().game_event_from(
+                    Some(self.as_ref()),
+                    pumpkin_data::game_event::GameEvent::EntityInteract,
+                    target.get_entity().pos.load(),
+                );
+                result
+            } else {
+                InteractionResult::PASS
+            }
+        } else {
+            InteractionResult::PASS
+        };
+
+        // `setItemInHand`, only for a stack the interaction changed; behaviours that write
+        // the hand slot themselves (wear, `addItem`) leave it as they put it.
+        if !stack.are_equal(&before) {
+            // The stack broke: `hurtAndBreak`'s `onEquippedItemBroken`.
+            if before.is_damageable() && stack.is_empty() {
+                self.increment_stat(StatisticCategory::Broken, before.item.id as i32, 1);
+                self.world().send_entity_status(
+                    self.get_entity(),
+                    crate::entity::equipment_break_status(&hand_equipment_slot(hand)),
+                    None,
+                );
+            }
+            inventory.set_stack_in_hand(hand, stack);
+        }
+        result
     }
 
     /// Vanilla `ServerPlayer.swingAndResetAttackStrength`: resets only when the swing starts.

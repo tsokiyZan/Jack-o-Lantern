@@ -3,6 +3,8 @@ use crate::entity::ai::util::goal_utils;
 use crate::entity::mob::mount_inventory::MountInventory;
 use crate::entity::passive::abstract_horse::AbstractHorse;
 use crate::entity::passive::animal::horse_can_parent;
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::{
     Arc, Mutex, PoisonError, Weak,
     atomic::{AtomicBool, AtomicI32, AtomicU8, Ordering},
@@ -430,7 +432,12 @@ impl Mob for LlamaEntity {
         );
     }
 
-    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+    fn mob_interact(
+        &self,
+        player: &Arc<Player>,
+        _hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         let item = item_stack.get_item();
 
         // Vanilla `AbstractChestedHorse.mobInteract` and `AbstractHorse.mobInteract`.
@@ -440,7 +447,7 @@ impl Mob for LlamaEntity {
             && player.get_entity().is_sneaking()
         {
             self.open_custom_inventory_screen(player);
-            return true;
+            return InteractionResult::SUCCESS;
         }
         if self.is_tame()
             && item == &Item::CHEST
@@ -448,7 +455,7 @@ impl Mob for LlamaEntity {
             && !self.is_baby()
             && self.equip_chest(player, item_stack)
         {
-            return true;
+            return InteractionResult::SUCCESS;
         }
 
         if self.is_tame()
@@ -464,7 +471,7 @@ impl Mob for LlamaEntity {
                 SoundCategory::Neutral,
                 &entity.pos.load(),
             );
-            return true;
+            return InteractionResult::SUCCESS;
         }
 
         if !self.is_baby() && !self.is_food(item_stack) {
@@ -474,7 +481,7 @@ impl Mob for LlamaEntity {
                 && let Some(passenger) = world.get_player_by_id(player.entity_id())
             {
                 ent.add_passenger(vehicle, passenger as Arc<dyn EntityBase>);
-                return true;
+                return InteractionResult::SUCCESS;
             }
         }
 

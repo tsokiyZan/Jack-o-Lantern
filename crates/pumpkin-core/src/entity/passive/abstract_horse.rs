@@ -1,3 +1,4 @@
+use crate::item::interaction_result::InteractionResult;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering::Relaxed};
 
@@ -306,7 +307,7 @@ pub fn horse_mob_interact<H: AbstractHorse + Animal + ?Sized>(
     player: &Arc<Player>,
     item_stack: &mut ItemStack,
     ambient_sound: Sound,
-) -> bool {
+) -> InteractionResult {
     let is_baby = horse.get_entity().is_baby();
     let should_open_inventory =
         !is_baby && horse.is_horse_tamed() && player.get_entity().is_sneaking();
@@ -316,41 +317,49 @@ pub fn horse_mob_interact<H: AbstractHorse + Animal + ?Sized>(
         && !item_stack.is_empty()
     {
         // TODO: vanilla `AbstractHorse.fedFood`; Pumpkin feeds horses like other animals.
+        // `fedFood` answers `SUCCESS_SERVER` when the horse ate, else `PASS`.
         if horse.is_food(item_stack) {
-            return horse.animal_interact(player, item_stack, ambient_sound);
+            return if horse
+                .animal_interact(player, item_stack, ambient_sound)
+                .consumes_action()
+            {
+                InteractionResult::SUCCESS_SERVER
+            } else {
+                InteractionResult::PASS
+            };
         }
         if !horse.is_horse_tamed() {
             horse.make_mad();
-            return true;
+            return InteractionResult::SUCCESS;
         }
         if !horse.has_chest()
             && item_stack.item == &Item::CHEST
             && horse.equip_chest(player, item_stack)
         {
-            return true;
+            return InteractionResult::SUCCESS;
         }
     }
     abstract_horse_mob_interact(horse, player, item_stack, ambient_sound)
 }
 
 /// Vanilla `AbstractHorse.mobInteract`. Of `ItemStack.interactLivingEntity` it runs the
-/// equipping of saddles; other items are used on the horse after it returns `false`.
+/// equipping of saddles; other items are used on the horse after it passes.
 pub fn abstract_horse_mob_interact<H: AbstractHorse + Animal + ?Sized>(
     horse: &H,
     player: &Arc<Player>,
     item_stack: &mut ItemStack,
     ambient_sound: Sound,
-) -> bool {
+) -> InteractionResult {
     if horse.is_vehicle() || horse.get_entity().is_baby() {
         return horse.animal_interact(player, item_stack, ambient_sound);
     }
     if horse.is_horse_tamed() && player.get_entity().is_sneaking() {
         horse.open_custom_inventory_screen(player);
-        return true;
+        return InteractionResult::SUCCESS;
     }
     if !item_stack.is_empty() {
         if horse.equip_on_target(player, item_stack) {
-            return true;
+            return InteractionResult::SUCCESS;
         }
         let mob_entity = horse.get_mob_entity();
         if horse.is_equippable_in_slot(item_stack, &EquipmentSlot::BODY)
@@ -360,11 +369,11 @@ pub fn abstract_horse_mob_interact<H: AbstractHorse + Animal + ?Sized>(
             let armor = item_stack.split_unless_creative(player.gamemode.load(), 1);
             horse.set_item_slot_and_notify(&EquipmentSlot::BODY, armor);
             mob_entity.set_guaranteed_drop(&EquipmentSlot::BODY);
-            return true;
+            return InteractionResult::SUCCESS;
         }
     }
     horse.do_player_ride(player);
-    true
+    InteractionResult::SUCCESS
 }
 
 /// Vanilla `AbstractHorse.registerGoals`, before each kind's `addBehaviourGoals`.

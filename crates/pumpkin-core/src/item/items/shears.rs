@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::any::Any;
 use std::sync::Arc;
 
@@ -84,8 +86,9 @@ impl ItemBehaviour for ShearsItem {
         &self,
         _item: &mut ItemStack,
         player: &Player,
+        hand: Hand,
         entity: Arc<dyn EntityBase>,
-    ) -> bool {
+    ) -> InteractionResult {
         if let Some(sheep) = entity
             .cast_any()
             .downcast_ref::<crate::entity::passive::sheep::SheepEntity>()
@@ -97,12 +100,12 @@ impl ItemBehaviour for ShearsItem {
                 let mut event = crate::plugin::api::events::player::player_shear_entity::PlayerShearEntityEvent {
                     player: player_arc,
                     entity_id: sheep.mob_entity.living_entity.entity.entity_id,
-                    hand: 0,
+                    hand: u8::from(hand == Hand::Left),
                     cancelled: false,
                 };
                 server.plugin_manager.fire_blocking(&server, &mut event);
                 if event.cancelled {
-                    return false;
+                    return InteractionResult::PASS;
                 }
             }
             sheep.set_sheared(true);
@@ -117,10 +120,10 @@ impl ItemBehaviour for ShearsItem {
                 ItemStack::new(wool_count, wool_item),
             ));
             world.spawn_entity(item_entity);
-            player.damage_held_item(1);
-            return true;
+            player.damage_item_in_hand(hand, 1);
+            return InteractionResult::SUCCESS;
         }
-        false
+        InteractionResult::PASS
     }
 
     fn as_any(&self) -> &dyn Any {

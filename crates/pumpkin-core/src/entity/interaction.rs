@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::{
     Arc, Mutex,
     atomic::{AtomicBool, Ordering},
@@ -299,7 +301,12 @@ impl EntityBase for InteractionEntity {
         false
     }
 
-    fn interact(&self, player: &Arc<Player>, _item_stack: &mut ItemStack) -> bool {
+    fn interact(
+        &self,
+        player: &Arc<Player>,
+        _hand: Hand,
+        _item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         let timestamp = self.entity.world.load().get_world_age();
         *self
             .interaction
@@ -308,6 +315,6 @@ impl EntityBase for InteractionEntity {
             player: player.gameprofile.id,
             timestamp,
         });
-        true
+        InteractionResult::CONSUME
     }
 }

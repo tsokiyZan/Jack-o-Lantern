@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use pumpkin_util::math::boundingbox::EntityDimensions;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
@@ -444,7 +446,12 @@ impl Mob for ZombieVillagerEntity {
         Some(metadata.into_boxed_slice())
     }
 
-    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+    fn mob_interact(
+        &self,
+        player: &Arc<Player>,
+        _hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         if item_stack.get_item() == &Item::GOLDEN_APPLE {
             if self
                 .mob_entity
@@ -460,10 +467,11 @@ impl Mob for ZombieVillagerEntity {
                         Self::VILLAGER_CONVERSION_WAIT_MAX - Self::VILLAGER_CONVERSION_WAIT_MIN + 1,
                     ) + Self::VILLAGER_CONVERSION_WAIT_MIN,
                 );
+                return InteractionResult::SUCCESS_SERVER;
             }
-            return true;
+            return InteractionResult::CONSUME;
         }
-        false
+        InteractionResult::PASS
     }
 
     /// Vanilla `ZombieVillager.tick` before `super.tick()`.

@@ -8,12 +8,14 @@ use crate::entity::mob::{
     first_passenger_player, is_player_holding, mob_controlling_passenger, read_legacy_saddle,
     set_ridden_rotation,
 };
+use crate::item::interaction_result::InteractionResult;
 use crate::world::World;
 use pumpkin_data::Block;
 use pumpkin_data::BlockState;
 use pumpkin_data::attributes::Attributes;
 use pumpkin_data::data_component_impl::EquipmentSlot;
 use pumpkin_data::entity::EntityPose;
+use pumpkin_util::Hand;
 use pumpkin_util::math::boundingbox::EntityDimensions;
 use pumpkin_util::math::position::BlockPos;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -331,7 +333,12 @@ impl Mob for StriderEntity {
     }
 
     /// Vanilla `Strider.mobInteract`. A saddle goes on through the item's own use on the strider.
-    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+    fn mob_interact(
+        &self,
+        player: &Arc<Player>,
+        _hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         if !self.is_food(item_stack)
             && self.is_saddled()
             && !self.is_vehicle()
@@ -343,7 +350,7 @@ impl Mob for StriderEntity {
                 && let Some(passenger) = world.get_player_by_id(player.entity_id())
             {
                 ent.add_passenger(vehicle, passenger as Arc<dyn EntityBase>);
-                return true;
+                return InteractionResult::SUCCESS;
             }
         }
 

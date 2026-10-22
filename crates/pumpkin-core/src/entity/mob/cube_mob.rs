@@ -2,6 +2,8 @@
 
 mod sulfur_cube;
 
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering::Relaxed};
 use std::sync::{Arc, Weak};
 
@@ -753,11 +755,16 @@ impl Mob for CubeMobEntity {
             && self.sulfur_knockback(power, xd, zd, attacker, damage, comes_from_effect)
     }
 
-    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+    fn mob_interact(
+        &self,
+        player: &Arc<Player>,
+        _hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         if self.kind == CubeKind::SulfurCube {
             return self.sulfur_mob_interact(player, item_stack);
         }
-        false
+        InteractionResult::PASS
     }
 
     /// Vanilla `SulfurCube.canBeLeashed`: only while it carries a body item. Slimes and

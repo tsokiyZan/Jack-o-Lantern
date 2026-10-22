@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 
@@ -349,10 +351,15 @@ impl Mob for HoglinEntity {
     }
 
     /// Vanilla `Hoglin.mobInteract`.
-    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+    fn mob_interact(
+        &self,
+        player: &Arc<Player>,
+        _hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         let interaction_succeeded =
             self.animal_interact(player, item_stack, Sound::EntityHoglinAmbient);
-        if interaction_succeeded {
+        if interaction_succeeded.consumes_action() {
             self.mob_entity
                 .persistence_required
                 .store(true, Ordering::Relaxed);

@@ -1,3 +1,4 @@
+use crate::item::interaction_result::InteractionResult;
 use crate::{
     command::argument_types::entity_anchor::{EntityAnchor, EntityAnchorExt},
     entity::{item::ItemEntity, projectile_deflection::ProjectileDeflectionType},
@@ -48,6 +49,7 @@ use pumpkin_protocol::{
         CTeleportEntity, Metadata, MetadataSerializer,
     },
 };
+use pumpkin_util::Hand;
 use pumpkin_util::math::quaternion::Quaternionf;
 use pumpkin_util::math::vector3::Axis;
 use pumpkin_util::math::{
@@ -835,11 +837,15 @@ pub trait EntityBase: Send + Sync + std::any::Any {
         false
     }
 
-    /// Called when a player right-clicks this entity with an item.
-    /// Called when a player right-clicks this entity with an item.
-    /// Returns true if the interaction was handled.
-    fn interact(&self, _player: &Arc<Player>, _item_stack: &mut ItemStack) -> bool {
-        false
+    /// Vanilla `Entity.interact`: `player` right-clicks this entity with `item_stack`, the
+    /// stack in `hand`.
+    fn interact(
+        &self,
+        _player: &Arc<Player>,
+        _hand: Hand,
+        _item_stack: &mut ItemStack,
+    ) -> InteractionResult {
+        InteractionResult::PASS
     }
 
     /// Vanilla `Entity.igniteForSeconds`.

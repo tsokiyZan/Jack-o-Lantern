@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
 
@@ -156,7 +158,12 @@ impl Mob for SnowGolemEntity {
         );
     }
 
-    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+    fn mob_interact(
+        &self,
+        player: &Arc<Player>,
+        hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         if item_stack.get_item() == &Item::SHEARS && self.has_pumpkin() {
             self.set_has_pumpkin(false);
             let entity = self.get_entity();
@@ -168,10 +175,10 @@ impl Mob for SnowGolemEntity {
                 ItemStack::new(1, &Item::CARVED_PUMPKIN),
             ));
             world.spawn_entity(item_entity);
-            player.damage_held_item(1);
-            return true;
+            player.damage_item_in_hand(hand, 1);
+            return InteractionResult::SUCCESS;
         }
-        false
+        InteractionResult::PASS
     }
 }
 

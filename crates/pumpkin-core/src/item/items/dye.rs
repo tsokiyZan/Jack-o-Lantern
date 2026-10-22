@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::Arc;
 
 use crate::block::entities::{
@@ -29,11 +31,13 @@ impl ItemBehaviour for DyeItem {
         &self,
         item: &mut ItemStack,
         player: &Player,
+        _hand: Hand,
         entity: Arc<dyn EntityBase>,
-    ) -> bool {
+    ) -> InteractionResult {
         if let Some(sheep) = entity
             .cast_any()
             .downcast_ref::<crate::entity::passive::sheep::SheepEntity>()
+            && sheep.get_entity().is_alive()
             && let Some(color) =
                 crate::entity::passive::animal::get_dye_color_from_item(item.get_item())
             && !sheep.is_sheared()
@@ -48,26 +52,9 @@ impl ItemBehaviour for DyeItem {
                 &ent.pos.load(),
             );
             item.decrement_unless_creative(player.gamemode.load(), 1);
-            true
-        } else if let Some(cushion) = entity
-            .cast_any()
-            .downcast_ref::<crate::entity::decoration::cushion::CushionEntity>(
-        ) && let Some(color) =
-            crate::entity::passive::animal::get_dye_color_from_item(item.get_item())
-            && color != cushion.color()
-        {
-            cushion.set_color(color);
-            let ent = entity.get_entity();
-            let world = ent.world.load();
-            world.play_sound(
-                pumpkin_data::sound::Sound::ItemDyeUse,
-                pumpkin_data::sound::SoundCategory::Players,
-                &ent.pos.load(),
-            );
-            item.decrement_unless_creative(player.gamemode.load(), 1);
-            true
+            InteractionResult::SUCCESS
         } else {
-            false
+            InteractionResult::PASS
         }
     }
 

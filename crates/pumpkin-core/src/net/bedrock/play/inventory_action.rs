@@ -448,31 +448,8 @@ impl BedrockClient {
 
                 match event.action {
                     ActionType::Interact | ActionType::InteractAt => {
-                        let mut stack = player.inventory().held_item();
-                        let item_id = stack.item.id;
-                        let before = stack.clone();
-                        if !event.target.interact(player, &mut stack) {
-                            server
-                                .item_registry
-                                .use_on_entity(&mut stack, player, event.target);
-                        }
-                        if !stack.are_equal(&before) {
-                            if before.is_damageable() && stack.is_empty() {
-                                player.increment_stat(
-                                    pumpkin_data::statistic::StatisticCategory::Broken,
-                                    item_id as i32,
-                                    1,
-                                );
-                                player.world().send_entity_status(
-                                    player.get_entity(),
-                                    crate::entity::equipment_break_status(
-                                        &EquipmentSlot::MAIN_HAND,
-                                    ),
-                                    None,
-                                );
-                            }
-                        }
-                        player.inventory().set_held_item(stack);
+                        // Bedrock's packet names no hand: the main hand interacts.
+                        player.interact_on(&event.target, pumpkin_util::Hand::Right, &server);
                     }
                     ActionType::Attack => player.attack(&event.target),
                 }

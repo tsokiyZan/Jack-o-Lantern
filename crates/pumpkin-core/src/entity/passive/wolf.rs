@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::{
     Arc, Weak,
     atomic::{AtomicU8, Ordering},
@@ -509,7 +511,12 @@ impl Mob for WolfEntity {
         );
     }
 
-    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+    fn mob_interact(
+        &self,
+        player: &Arc<Player>,
+        _hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         let item = item_stack.get_item();
         let sound_variant = WolfSoundVariant::from_id(self.sound_variant.load(Ordering::Relaxed))
             .unwrap_or_default();
@@ -522,7 +529,7 @@ impl Mob for WolfEntity {
                 item_stack.decrement_unless_creative(player.gamemode.load(), 1);
                 self.mob_entity.living_entity.heal(2.0);
                 self.play_eating_sound(ambient);
-                return true;
+                return InteractionResult::SUCCESS;
             }
 
             if self.is_owned_by(&player.gameprofile.id) {
@@ -531,13 +538,13 @@ impl Mob for WolfEntity {
                 {
                     self.set_collar_color(color);
                     item_stack.decrement_unless_creative(player.gamemode.load(), 1);
-                    return true;
+                    return InteractionResult::SUCCESS;
                 }
 
                 let parent_interaction = self.animal_interact(player, item_stack, ambient);
-                if !parent_interaction {
+                if !parent_interaction.consumes_action() {
                     self.set_ordered_to_sit(!self.is_ordered_to_sit());
-                    return true;
+                    return InteractionResult::SUCCESS;
                 }
                 return parent_interaction;
             }
@@ -551,7 +558,7 @@ impl Mob for WolfEntity {
             } else {
                 self.spawn_taming_particles(false);
             }
-            return true;
+            return InteractionResult::SUCCESS_SERVER;
         }
 
         self.animal_interact(player, item_stack, ambient)

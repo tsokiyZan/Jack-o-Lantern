@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::{
     Arc, PoisonError,
     atomic::{AtomicI32, AtomicU64, Ordering},
@@ -544,16 +546,21 @@ impl Mob for ArmadilloEntity {
     }
 
     /// Vanilla `Armadillo.mobInteract`.
-    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+    fn mob_interact(
+        &self,
+        player: &Arc<Player>,
+        _hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         if item_stack.item == &Item::BRUSH && self.brush_off_scute(item_stack) {
             // Vanilla `hurtAndBreak`: a player with infinite materials keeps the brush whole.
             if player.gamemode.load() != GameMode::Creative {
                 let _ = item_stack.hurt_and_break(&player.world(), BRUSH_DURABILITY_COST);
             }
-            return true;
+            return InteractionResult::SUCCESS;
         }
         if self.is_scared() {
-            return false;
+            return InteractionResult::FAIL;
         }
         self.animal_interact(player, item_stack, Sound::EntityArmadilloEat)
     }

@@ -2,6 +2,7 @@
 //! `SulfurCubeArchetype`.
 
 use crate::enchantment::HurtAndBreak;
+use crate::item::interaction_result::InteractionResult;
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering::Relaxed};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError, Weak};
 
@@ -896,7 +897,11 @@ impl CubeMobEntity {
     }
 
     /// Vanilla `SulfurCube.mobInteract`, after `Entity.interact`'s leash handling.
-    pub(super) fn sulfur_mob_interact(&self, player: &Arc<Player>, stack: &mut ItemStack) -> bool {
+    pub(super) fn sulfur_mob_interact(
+        &self,
+        player: &Arc<Player>,
+        stack: &mut ItemStack,
+    ) -> InteractionResult {
         let entity = self.get_entity();
         let game_mode = player.gamemode.load();
         if self.is_baby() {
@@ -905,13 +910,13 @@ impl CubeMobEntity {
                 stack.decrement_unless_creative(game_mode, 1);
                 self.age_up(Self::get_speed_up_seconds_when_feeding(-age), true);
                 self.make_sound(Sound::EntitySmallSulfurCubeEat);
-                return true;
+                return InteractionResult::SUCCESS;
             }
-            return false;
+            return InteractionResult::PASS;
         }
 
         if self.is_primed() {
-            return false;
+            return InteractionResult::PASS;
         }
 
         let igniter = stack.item == &Item::FLINT_AND_STEEL || stack.item == &Item::FIRE_CHARGE;
@@ -922,7 +927,7 @@ impl CubeMobEntity {
                     &TextComponent::translate(translation::java::BLOCK_MINECRAFT_TNT_DISABLED, []),
                     true,
                 );
-                return false;
+                return InteractionResult::PASS;
             }
             self.prime_time(false);
             if game_mode != GameMode::Creative {
@@ -934,7 +939,7 @@ impl CubeMobEntity {
                 }
             }
             player.award_item_used(stack.item);
-            return true;
+            return InteractionResult::SUCCESS_SERVER;
         }
 
         if stack.item == &Item::SHEARS && self.ready_for_shearing() {
@@ -947,7 +952,7 @@ impl CubeMobEntity {
             if game_mode != GameMode::Creative {
                 let _ = stack.hurt_and_break(&self.mob_entity.living_entity.entity.world.load(), 1);
             }
-            return true;
+            return InteractionResult::SUCCESS;
         }
 
         if is_swallowable_item(stack) {
@@ -960,10 +965,19 @@ impl CubeMobEntity {
                     entity.pos.load(),
                 );
             }
-            return worked;
+            return if worked {
+                InteractionResult::SUCCESS_SERVER
+            } else {
+                InteractionResult::PASS
+            };
         }
 
-        self.bucket_mob_pickup(player, stack)
+        // `bucketMobPickup` answers `SUCCESS`, else `super.mobInteract` passes.
+        if self.bucket_mob_pickup(player, stack) {
+            InteractionResult::SUCCESS
+        } else {
+            InteractionResult::PASS
+        }
     }
 
     /// Vanilla `Bucketable.bucketMobPickup`, for `canBePickedUpWithBucket`'s empty bucket.

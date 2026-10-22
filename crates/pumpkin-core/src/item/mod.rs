@@ -1,3 +1,4 @@
+pub mod interaction_result;
 pub mod items;
 pub mod potion;
 pub mod registry;
@@ -9,6 +10,7 @@ use crate::block::registry::BlockActionResult;
 use crate::entity::EntityBase;
 use crate::entity::player::Player;
 use crate::entity::player::statistics::StatisticCategory;
+use crate::item::interaction_result::InteractionResult;
 use crate::item::items::mace::MaceItem;
 use crate::server::Server;
 use pumpkin_data::Block;
@@ -108,15 +110,15 @@ pub trait ItemBehaviour: Send + Sync {
         BlockActionResult::Pass
     }
 
-    /// Vanilla `Item.interactLivingEntity`: whether using the item on `entity` consumed the
-    /// interaction.
+    /// Vanilla `Item.interactLivingEntity`: using the item in `hand` on `entity`.
     fn use_on_entity(
         &self,
         _item: &mut ItemStack,
         _player: &Player,
+        _hand: Hand,
         _entity: Arc<dyn EntityBase>,
-    ) -> bool {
-        false
+    ) -> InteractionResult {
+        InteractionResult::PASS
     }
 
     fn on_stopped_using(&self, _stack: &ItemStack, _player: &Player) {}

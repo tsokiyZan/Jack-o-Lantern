@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::{
     Arc, PoisonError,
     atomic::{AtomicI32, Ordering},
@@ -536,10 +538,15 @@ impl Mob for SnifferEntity {
     }
 
     /// Vanilla `Sniffer.mobInteract`: food is eaten loudly a second time.
-    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+    fn mob_interact(
+        &self,
+        player: &Arc<Player>,
+        _hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         let is_food = self.is_food(item_stack);
         let consumed = self.animal_interact(player, item_stack, Sound::EntitySnifferEat);
-        if consumed && is_food {
+        if consumed.consumes_action() && is_food {
             self.play_eating_sound(Sound::EntitySnifferEat);
         }
         consumed

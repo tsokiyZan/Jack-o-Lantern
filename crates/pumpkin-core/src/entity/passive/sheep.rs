@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::{
     Arc, Weak,
     atomic::{AtomicU8, Ordering},
@@ -174,11 +176,20 @@ impl Mob for SheepEntity {
         self.set_sheared(false);
     }
 
-    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
-        use super::animal::{Animal, get_dye_color_from_item, get_wool_item_for_color};
+    fn mob_interact(
+        &self,
+        player: &Arc<Player>,
+        hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
+        use super::animal::{Animal, get_wool_item_for_color};
         let item = item_stack.get_item();
 
-        if item == &Item::SHEARS && !self.is_sheared() && !self.is_baby() {
+        if item == &Item::SHEARS {
+            // `readyForShearing`: alive, unsheared and grown up.
+            if !self.get_entity().is_alive() || self.is_sheared() || self.is_baby() {
+                return InteractionResult::CONSUME;
+            }
             self.set_sheared(true);
             let entity = self.get_entity();
             let world = entity.world.load();
@@ -197,18 +208,12 @@ impl Mob for SheepEntity {
                 ItemStack::new(count, wool_item),
             ));
             world.spawn_entity(item_entity);
-            player.damage_held_item(1);
-            return true;
+            player.damage_item_in_hand(hand, 1);
+            return InteractionResult::SUCCESS_SERVER;
         }
 
-        if let Some(color) = get_dye_color_from_item(item)
-            && !self.is_sheared()
-            && color != self.get_color()
-        {
-            self.set_color(color);
-            item_stack.decrement_unless_creative(player.gamemode.load(), 1);
-            return true;
-        }
+        // A dye is no sheep food: `DyeItem.interactLivingEntity` colours the sheep after
+        // `mobInteract` passes.
 
         self.animal_interact(player, item_stack, Sound::EntitySheepAmbient)
     }

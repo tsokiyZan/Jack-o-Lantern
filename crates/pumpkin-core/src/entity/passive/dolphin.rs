@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::{
     Arc, PoisonError, Weak,
     atomic::{AtomicBool, AtomicI32, Ordering},
@@ -415,9 +417,14 @@ impl Mob for DolphinEntity {
 
     /// Vanilla `Dolphin.mobInteract`: any fish grows a baby up a little, or makes an
     /// adult remember it was fed.
-    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+    fn mob_interact(
+        &self,
+        player: &Arc<Player>,
+        _hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         if item_stack.is_empty() || !item_stack.get_item().has_tag(&tag::Item::MINECRAFT_FISHES) {
-            return false;
+            return InteractionResult::PASS;
         }
         self.get_entity().play_sound(Sound::EntityDolphinEat);
         item_stack.decrement_unless_creative(player.gamemode.load(), 1);
@@ -429,7 +436,7 @@ impl Mob for DolphinEntity {
         } else {
             self.set_got_fish(true);
         }
-        true
+        InteractionResult::SUCCESS
     }
 }
 

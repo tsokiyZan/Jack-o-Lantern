@@ -1,3 +1,5 @@
+use crate::item::interaction_result::InteractionResult;
+use pumpkin_util::Hand;
 use std::sync::{
     Arc, PoisonError,
     atomic::{AtomicI32, Ordering},
@@ -324,7 +326,12 @@ impl Mob for FrogEntity {
         entity.set_synced_data(tracked_data::frog::DATA_TONGUE_TARGET_ID, OptionalInt(None));
     }
 
-    fn mob_interact(&self, player: &Arc<Player>, item_stack: &mut ItemStack) -> bool {
+    fn mob_interact(
+        &self,
+        player: &Arc<Player>,
+        _hand: Hand,
+        item_stack: &mut ItemStack,
+    ) -> InteractionResult {
         self.animal_interact(player, item_stack, Sound::EntityFrogAmbient)
     }
 }
