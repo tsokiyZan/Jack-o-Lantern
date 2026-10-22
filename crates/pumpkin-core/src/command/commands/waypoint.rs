@@ -70,12 +70,12 @@ impl CommandExecutor for ColorExecutor {
         };
 
         if let Some(player) = context.source.as_player() {
-            let packet = CWaypoint::update_position(
+            let packet = CWaypoint::update_waypoint_position(
                 uuid,
-                Some(WaypointIcon {
-                    style: None,
-                    color: color_val,
-                }),
+                WaypointIcon {
+                    style: WaypointIcon::DEFAULT_STYLE.to_string(),
+                    color: Some(color_val),
+                },
                 block_pos,
             );
             player.try_send_client_packet(&packet);
@@ -148,12 +148,12 @@ impl CommandExecutor for StyleExecutor {
         };
 
         if let Some(player) = context.source.as_player() {
-            let packet = CWaypoint::update_position(
+            let packet = CWaypoint::update_waypoint_position(
                 uuid,
-                Some(WaypointIcon {
-                    style: style_owned.as_deref(),
-                    color: 0xFFFFFF,
-                }),
+                WaypointIcon {
+                    style: style_owned.unwrap_or_else(|| WaypointIcon::DEFAULT_STYLE.to_string()),
+                    color: None,
+                },
                 block_pos,
             );
             player.try_send_client_packet(&packet);

@@ -112,6 +112,7 @@ pub mod synched_entity_data;
 pub mod tnt;
 pub mod r#type;
 pub mod vehicle;
+pub mod waypoint;
 
 pub use lightning::LightningBoltEntity;
 

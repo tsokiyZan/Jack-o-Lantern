@@ -170,6 +170,8 @@ pub struct LivingEntity {
     /// Vanilla `AttributeMap.attributesToUpdate`: attribute ids changed since the last
     /// `refreshDirtyAttributes`.
     attributes_to_update: std::sync::Mutex<Vec<u8>>,
+    /// Vanilla `locatorBarIcon`: how this entity shows on other players' locator bars.
+    pub locator_bar_icon: std::sync::Mutex<crate::entity::waypoint::WaypointIconState>,
     pub entity_equipment: Arc<std::sync::Mutex<EntityEquipment>>,
     pub equipment_drop_chances: Arc<std::sync::Mutex<FxHashMap<EquipmentSlot, f32>>>,
     pub movement_input: AtomicCell<Vector3<f64>>,
@@ -412,6 +414,9 @@ impl LivingEntity {
             stinger_count: AtomicI32::new(0),
             remove_stinger_time: AtomicI32::new(0),
             attributes_to_update: std::sync::Mutex::new(Vec::new()),
+            locator_bar_icon: std::sync::Mutex::new(
+                crate::entity::waypoint::WaypointIconState::default(),
+            ),
             entity_equipment: Arc::new(std::sync::Mutex::new(EntityEquipment::new())),
             equipment_drop_chances: Arc::new(std::sync::Mutex::new(FxHashMap::default())),
             equipment_slots: Arc::new(build_equipment_slots()),
@@ -3969,6 +3974,13 @@ impl LivingEntity {
         if !equipment.child_tags.is_empty() {
             nbt.put("equipment", NbtTag::Compound(equipment));
         }
+        let icon = self
+            .locator_bar_icon
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if icon.has_data() {
+            nbt.put("locator_bar_icon", NbtTag::Compound(icon.to_nbt()));
+        }
     }
 
     /// Vanilla `AttributeMap.pack` under `attributes`: each instance's id, base value and
@@ -4164,7 +4176,20 @@ impl LivingEntity {
         } else {
             self.clear_sleeping_pos();
         }
+        self.read_locator_bar_icon(nbt);
         // todo more...
+    }
+
+    /// Vanilla `locatorBarIcon = input.read("locator_bar_icon", Icon.CODEC)
+    /// .orElseGet(Icon::new)`.
+    fn read_locator_bar_icon(&self, nbt: &NbtCompound) {
+        *self
+            .locator_bar_icon
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = nbt
+            .get_compound("locator_bar_icon")
+            .and_then(crate::entity::waypoint::WaypointIconState::from_nbt)
+            .unwrap_or_default();
     }
 
     /// Vanilla `LivingEntity.getDamageAfterArmorAbsorb`.
