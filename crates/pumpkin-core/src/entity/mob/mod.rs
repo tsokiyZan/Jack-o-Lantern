@@ -533,13 +533,15 @@ impl MobEntity {
 
         if !mob.skips_navigation_tick() {
             navigator.tick(&self.living_entity);
+            // Vanilla `followThePath` (and the flying and wall-climber versions) hands the waypoint
+            // to `mob.getMoveControl()`: a mob riding a controlled `Mob` vehicle steers the
+            // vehicle's move control. No guard is held here: the own navigation is taken out
+            // above, and the own move control is only locked inside `with_move_control` (when
+            // nothing redirects) or again for its own tick below.
             if let Some((target, speed_modifier)) = navigator.take_wanted_position() {
-                self.own_move_control().set_wanted_position(
-                    target.x,
-                    target.y,
-                    target.z,
-                    speed_modifier,
-                );
+                self.with_move_control(|control| {
+                    control.set_wanted_position(target.x, target.y, target.z, speed_modifier);
+                });
             }
             if navigator.take_jump() {
                 self.jump();
