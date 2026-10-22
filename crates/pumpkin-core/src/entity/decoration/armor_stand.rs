@@ -378,13 +378,17 @@ impl EntityBase for ArmorStandEntity {
     fn interact_at(
         &self,
         player: &std::sync::Arc<Player>,
-        _hand: pumpkin_util::Hand,
+        hand: pumpkin_util::Hand,
         location: Vector3<f64>,
         item_stack: &mut ItemStack,
     ) -> InteractionResult {
         if self.is_marker() || item_stack.item == &Item::NAME_TAG {
-            // `Entity.interact`: no leash on an armor stand.
-            return InteractionResult::PASS;
+            return crate::entity::leash::entity_interact_by_id(
+                &self.living_entity.entity,
+                player,
+                hand,
+                item_stack,
+            );
         }
         if player.gamemode.load() == pumpkin_util::GameMode::Spectator {
             return InteractionResult::SUCCESS;
@@ -411,7 +415,12 @@ impl EntityBase for ArmorStandEntity {
                 return InteractionResult::SUCCESS_SERVER;
             }
         }
-        InteractionResult::PASS
+        crate::entity::leash::entity_interact_by_id(
+            &self.living_entity.entity,
+            player,
+            hand,
+            item_stack,
+        )
     }
 
     /// Vanilla `ArmorStand.isPickable`.

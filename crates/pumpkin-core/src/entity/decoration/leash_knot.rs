@@ -1,5 +1,5 @@
 use crate::entity::player::Player;
-use crate::entity::{Entity, EntityBase, living::LivingEntity};
+use crate::entity::{Entity, EntityBase, leash, living::LivingEntity};
 use crate::item::interaction_result::InteractionResult;
 use crate::world::World;
 use pumpkin_data::entity::EntityType;
@@ -134,61 +134,58 @@ impl EntityBase for LeashKnotEntity {
         }
     }
 
+    /// Vanilla `LeashFenceKnotEntity.interact`: shears cut what the knot holds; else the
+    /// player's leashed mobs are tied to the knot, or the knot's mobs go to a player who isn't
+    /// sneaking.
     fn interact(
         &self,
         player: &Arc<Player>,
-        _hand: Hand,
-        _item_stack: &mut ItemStack,
+        hand: Hand,
+        item_stack: &mut ItemStack,
     ) -> InteractionResult {
-        let world = player.world();
-        let knot_id = self.entity.entity_id;
-        let player_id = player.entity_id();
-
-        let search_dim = EntityDimensions::new(32.0, 32.0, 16.0);
-        let pos = self.entity.pos.load();
-        let search_box = BoundingBox::new_from_pos(pos.x, pos.y, pos.z, &search_dim);
-        let entities = world.get_entities_at_box(&search_box);
-
-        let mut attached_mob = false;
-        let mut player_leashed_mobs = Vec::new();
-
-        for entity_base in &entities {
-            let ent = entity_base.get_entity();
-            if let Ok(guard) = ent.leashed_to.try_lock()
-                && let Some(holder) = guard.as_ref()
-                && holder.get_entity().entity_id == player_id
-            {
-                player_leashed_mobs.push(ent);
+        let world = self.entity.world.load_full();
+        let Some(this) = world.get_entity_by_id(self.entity.entity_id) else {
+            return InteractionResult::PASS;
+        };
+        if item_stack.item == &pumpkin_data::item::Item::SHEARS {
+            let result = leash::entity_interact(&this, player, hand, item_stack);
+            // `wasItemInteraction`: on a knot, only the shears' cut succeeds in
+            // `Entity.interact`, and that is an item interaction.
+            if result.consumes_action() {
+                return result;
             }
         }
 
-        if let Some(self_knot) = Self::get_knot(&world, self.pos) {
-            for mob in player_leashed_mobs {
-                mob.leash_to(self_knot.clone() as Arc<dyn EntityBase>);
+        let mut attached_mob = false;
+        for leashable in leash::leashable_leashed_to(&world, player.get_entity()) {
+            if leash::can_have_a_leash_attached_to(leashable.as_ref(), &self.entity) {
+                leash::set_leashed_to(leashable.as_ref(), this.clone());
                 attached_mob = true;
             }
         }
 
         let mut any_dropped = false;
-        if !attached_mob {
-            for entity_base in &entities {
-                let ent = entity_base.get_entity();
-                if let Ok(guard) = ent.leashed_to.try_lock()
-                    && let Some(holder) = guard.as_ref()
-                    && holder.get_entity().entity_id == knot_id
-                {
-                    ent.leash_to(player.clone() as Arc<dyn EntityBase>);
+        if !attached_mob && !player.get_entity().is_sneaking() {
+            for mob in leash::leashable_leashed_to(&world, &self.entity) {
+                if leash::can_have_a_leash_attached_to(mob.as_ref(), player.get_entity()) {
+                    leash::set_leashed_to(mob.as_ref(), player.clone());
                     any_dropped = true;
                 }
             }
         }
 
-        if attached_mob || any_dropped {
-            self.play_placement_sound(&world);
-            InteractionResult::SUCCESS
-        } else {
-            InteractionResult::PASS
+        if !attached_mob && !any_dropped {
+            return leash::entity_interact(&this, player, hand, item_stack);
         }
+
+        let player_base: &dyn EntityBase = player.as_ref();
+        world.game_event_from(
+            Some(player_base),
+            pumpkin_data::game_event::GameEvent::BlockAttach,
+            self.entity.pos.load(),
+        );
+        self.play_sound_at_self(Sound::ItemLeadTied, 1.0, 1.0);
+        InteractionResult::SUCCESS
     }
     fn cast_any(&self) -> &dyn std::any::Any {
         self

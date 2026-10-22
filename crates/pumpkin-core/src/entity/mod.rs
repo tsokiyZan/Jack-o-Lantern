@@ -93,6 +93,7 @@ pub mod inside_block_effect;
 pub mod interaction;
 pub mod item;
 pub mod item_steerable;
+pub mod leash;
 pub mod lightning;
 pub mod living;
 pub mod marker;
@@ -853,11 +854,16 @@ pub trait EntityBase: Send + Sync + std::any::Any {
     /// stack in `hand`.
     fn interact(
         &self,
-        _player: &Arc<Player>,
-        _hand: Hand,
-        _item_stack: &mut ItemStack,
+        player: &Arc<Player>,
+        hand: Hand,
+        item_stack: &mut ItemStack,
     ) -> InteractionResult {
-        InteractionResult::PASS
+        leash::entity_interact_by_id(self.get_entity(), player, hand, item_stack)
+    }
+
+    /// Whether this entity is a vanilla `Leashable` (mobs and boats).
+    fn is_leashable(&self) -> bool {
+        false
     }
 
     /// Vanilla `Entity.igniteForSeconds`.

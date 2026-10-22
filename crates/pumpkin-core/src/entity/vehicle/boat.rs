@@ -201,6 +201,8 @@ impl EntityBase for BoatEntity {
 
     fn tick(&self, _caller: &dyn EntityBase, _server: &Server) {
         self.vehicle.tick();
+        // The end of `Entity.baseTick`: `Leashable.tickLeash`.
+        self.vehicle.entity.tick_leash();
 
         let underwater = self.ticks_underwater.load();
         if self.vehicle.entity.touching_water.load(Ordering::Relaxed) {
@@ -246,12 +248,22 @@ impl EntityBase for BoatEntity {
         self.vehicle.damage_with_context(amount, source, drop_item)
     }
 
+    /// Vanilla `AbstractBoat.interact`: `Entity.interact`'s leashing first, then boarding.
     fn interact(
         &self,
         player: &Arc<Player>,
-        _hand: Hand,
-        _item_stack: &mut ItemStack,
+        hand: Hand,
+        item_stack: &mut ItemStack,
     ) -> InteractionResult {
+        let super_interaction = crate::entity::leash::entity_interact_by_id(
+            &self.vehicle.entity,
+            player,
+            hand,
+            item_stack,
+        );
+        if super_interaction != InteractionResult::PASS {
+            return super_interaction;
+        }
         if player.get_entity().is_sneaking() {
             return InteractionResult::PASS;
         }
@@ -310,6 +322,11 @@ impl EntityBase for BoatEntity {
     }
     fn cast_any(&self) -> &dyn std::any::Any {
         self
+    }
+
+    /// `AbstractBoat implements Leashable`.
+    fn is_leashable(&self) -> bool {
+        true
     }
 
     fn is_pushable(&self) -> bool {

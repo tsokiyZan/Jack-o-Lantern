@@ -171,10 +171,21 @@ impl VehicleEntity {
         );
     }
 
+    /// `remove(KILLED)`: `AbstractBoat.remove` drops its leash first. Only boats among the
+    /// vehicles are `Leashable`, so a leashed vehicle is a boat.
+    fn remove_destroyed(&self) {
+        if self.entity.is_leashed() {
+            self.entity.unleash();
+            self.entity
+                .spawn_at_location(ItemStack::new(1, &pumpkin_data::item::Item::LEAD));
+        }
+        self.entity.remove();
+    }
+
     /// Vanilla `VehicleEntity.destroy(level, dropItem)`: the vehicle dies and, with
     /// `entityDrops`, drops its item carrying its custom name.
     pub fn destroy(&self, drop_item: &'static Item) {
-        self.entity.remove();
+        self.remove_destroyed();
         let world = self.entity.world.load();
         if world.level_info.load().game_rules.entity_drops {
             let mut stack = ItemStack::new(1, drop_item);
@@ -237,7 +248,7 @@ impl VehicleEntity {
             }
 
             if is_creative {
-                self.entity.remove();
+                self.remove_destroyed();
             } else {
                 self.destroy(drop_item);
             }

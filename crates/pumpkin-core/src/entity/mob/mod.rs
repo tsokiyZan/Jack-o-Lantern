@@ -2650,7 +2650,8 @@ pub fn mob_interact_entry<M: Mob + ?Sized>(
         entity_interact_game_event(mob, player);
         return result;
     }
-    let super_reaction = entity_interact(mob, player, hand, item_stack);
+    let super_reaction =
+        crate::entity::leash::entity_interact_by_id(mob.get_entity(), player, hand, item_stack);
     if super_reaction != InteractionResult::PASS {
         return super_reaction;
     }
@@ -2729,207 +2730,14 @@ fn check_and_handle_important_interactions<M: Mob + ?Sized>(
     }
 }
 
-/// Vanilla `Entity.interact` for a mob: a sneaking player hands the mobs it leads over to this
-/// one, shears cut the leashes on this mob or shear off its equipment, the holder takes its lead
-/// back, and a lead ties up a mob that isn't held by a player.
-fn entity_interact<M: Mob + ?Sized>(
-    mob: &M,
-    player: &Arc<Player>,
-    hand: Hand,
-    item_stack: &mut ItemStack,
-) -> InteractionResult {
-    let entity = mob.get_entity();
-    let world = entity.world.load_full();
-    let player_base: &dyn EntityBase = player.as_ref();
-    let sneaking = player.get_entity().is_sneaking();
-    if sneaking && mob.can_be_leashed() && !entity.is_baby() {
-        // `leashableInArea(this, l -> l.getLeashHolder() == player)`.
-        let mut any_leashed = false;
-        let this = world.get_entity_by_id(entity.entity_id);
-        for leashed in leashed_in_area(&world, entity, player.entity_id()) {
-            if let Some(this) = &this
-                && can_have_a_leash_attached_to(leashed.as_ref(), entity)
-            {
-                let leashed_entity = leashed.get_entity();
-                leashed_entity.leash_to(this.clone());
-                if let Some(vehicle) = leashed_entity.get_vehicle() {
-                    vehicle
-                        .get_entity()
-                        .remove_passenger(leashed_entity.entity_id);
-                }
-                any_leashed = true;
-            }
-        }
-        if any_leashed {
-            world.game_event_from(
-                Some(player_base),
-                pumpkin_data::game_event::GameEvent::EntityAction,
-                entity.block_pos.load().to_centered_f64(),
-            );
-            mob.play_sound_at_self(Sound::ItemLeadTied, 1.0, 1.0);
-            // `SUCCESS_SERVER.withoutItem()`.
-            return InteractionResult::SUCCESS_SERVER;
-        }
-    }
-
-    let leash_cut = if item_stack.item == &Item::SHEARS {
-        shear_off_all_leash_connections(mob, player, hand)
-    } else {
-        Some(false)
-    };
-    // A plugin cancelled the cut: the click does nothing more.
-    let Some(leash_cut) = leash_cut else {
-        return InteractionResult::PASS;
-    };
-    if leash_cut {
-        player.damage_item_in_hand(hand, 1);
-        return InteractionResult::SUCCESS;
-    }
-    if item_stack.item == &Item::SHEARS
-        && mob.can_shear_equipment(player)
-        && !sneaking
-        && attempt_to_shear_equipment(mob, player, hand)
-    {
-        return InteractionResult::SUCCESS;
-    }
-
-    let holder = entity
-        .leashed_to
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .clone();
-    if holder
-        .as_ref()
-        .is_some_and(|holder| holder.get_entity().entity_id == player.entity_id())
-    {
-        // `removeLeash` in creative, else `dropLeash`.
-        drop_leash(
-            mob,
-            player.gamemode.load() != pumpkin_util::GameMode::Creative,
-        );
-        entity_interact_game_event(mob, player);
-        mob.play_sound_at_self(Sound::ItemLeadUntied, 1.0, 1.0);
-        // `SUCCESS.withoutItem()`.
-        return InteractionResult::SUCCESS;
-    }
-    if item_stack.item != &Item::LEAD
-        || holder
-            .as_ref()
-            .is_some_and(|holder| holder.get_player().is_some())
-    {
-        return InteractionResult::PASS;
-    }
-    let Some(this) = world.get_entity_by_id(entity.entity_id) else {
-        return InteractionResult::PASS;
-    };
-    if !can_have_a_leash_attached_to(this.as_ref(), player.get_entity()) {
-        return InteractionResult::PASS;
-    }
-    if holder.is_some() {
-        drop_leash(mob, true);
-    }
-    entity.leash_to(player.clone());
-    // `setLeashedTo`: a leashed mob gets off what it rides.
-    if let Some(vehicle) = entity.get_vehicle() {
-        vehicle.get_entity().remove_passenger(entity.entity_id);
-    }
-    mob.play_sound_at_self(Sound::ItemLeadTied, 1.0, 1.0);
-    item_stack.decrement_unless_creative(player.gamemode.load(), 1);
-    InteractionResult::SUCCESS_SERVER
-}
-
-/// Vanilla `Leashable.leashableInArea`: entities in the 32-block box around `entity` that are
-/// leashed to the entity with id `holder_id`.
-fn leashed_in_area(world: &World, entity: &Entity, holder_id: i32) -> Vec<Arc<dyn EntityBase>> {
-    let center = entity.bounding_box.load().get_center();
-    let area = BoundingBox::new(
-        Vector3::new(center.x - 16.0, center.y - 16.0, center.z - 16.0),
-        Vector3::new(center.x + 16.0, center.y + 16.0, center.z + 16.0),
-    );
-    world
-        .get_entities_at_box(&area)
-        .into_iter()
-        .filter(|candidate| {
-            candidate
-                .get_entity()
-                .leashed_to
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .as_ref()
-                .is_some_and(|holder| holder.get_entity().entity_id == holder_id)
-        })
-        .collect()
-}
-
-/// Vanilla `Leashable.canHaveALeashAttachedTo`: not itself, box centres within the snap
-/// distance, and `canBeLeashed`.
-fn can_have_a_leash_attached_to(leashable: &dyn EntityBase, holder: &Entity) -> bool {
-    let entity = leashable.get_entity();
-    if entity.entity_id == holder.entity_id {
-        return false;
-    }
-    let leash_distance = holder
-        .bounding_box
-        .load()
-        .get_center()
-        .squared_distance_to_vec(&entity.bounding_box.load().get_center())
-        .sqrt();
-    leash_distance <= Entity::LEASH_SNAP_DISTANCE
-        && leashable.get_mob().is_none_or(Mob::can_be_leashed)
-}
-
-/// Vanilla `Entity.shearOffAllLeashConnections` through `dropAllLeashConnections`: every leash
-/// held by this mob and its own drop, with a `shear` game event and the snip sound.
-fn shear_off_all_leash_connections<M: Mob + ?Sized>(
-    mob: &M,
-    player: &Arc<Player>,
-    hand: Hand,
-) -> Option<bool> {
-    let entity = mob.get_entity();
-    let world = entity.world.load_full();
-    let leashed = leashed_in_area(&world, entity, entity.entity_id);
-    // Something to cut: the plugin event may still call the shearing off (`None`).
-    if (entity.is_leashed() || !leashed.is_empty())
-        && shear_event_cancelled(player, entity.entity_id, hand)
-    {
-        return None;
-    }
-    let dropped = if entity.is_leashed() {
-        drop_leash(mob, true);
-        true
-    } else {
-        !leashed.is_empty()
-    };
-    for leashed in &leashed {
-        let leashed_entity = leashed.get_entity();
-        leashed_entity.unleash();
-        if let Some(leashed_mob) = leashed.get_mob() {
-            leashed_mob.on_leash_removed();
-        }
-        leashed_entity.spawn_at_location(ItemStack::new(1, &Item::LEAD));
-    }
-    if !dropped {
-        return Some(false);
-    }
-    let player_base: &dyn EntityBase = player.as_ref();
-    world.game_event_from(
-        Some(player_base),
-        pumpkin_data::game_event::GameEvent::Shear,
-        entity.pos.load(),
-    );
-    // `level.playSound(null, blockPosition(), SHEARS_SNIP, player.getSoundSource())`.
-    world.play_sound(
-        Sound::ItemShearsSnip,
-        SoundCategory::Players,
-        &entity.block_pos.load().to_centered_f64(),
-    );
-    Some(true)
-}
-
 /// Vanilla `Mob.attemptToShearEquipment`: the first equipped item, in `EquipmentSlot.VALUES`
 /// order, that can be sheared off and isn't held on by `prevent_armor_change` (creative
 /// ignores it).
-fn attempt_to_shear_equipment<M: Mob + ?Sized>(mob: &M, player: &Arc<Player>, hand: Hand) -> bool {
+pub(crate) fn attempt_to_shear_equipment<M: Mob + ?Sized>(
+    mob: &M,
+    player: &Arc<Player>,
+    hand: Hand,
+) -> bool {
     let mob_entity = mob.get_mob_entity();
     for slot in &EquipmentSlot::VALUES {
         let stack = mob_entity.get_item_slot(slot);
@@ -2988,16 +2796,6 @@ fn shear_item<M: Mob + ?Sized>(
     );
     // `spawnAtLocation(level, stack, offset)`.
     world.spawn_item_at(entity.pos.load() + offset, sheared);
-}
-
-/// Vanilla `Leashable.dropLeash` (`drop_lead`) and `removeLeash`.
-fn drop_leash<M: Mob + ?Sized>(mob: &M, drop_lead: bool) {
-    let entity = mob.get_entity();
-    entity.unleash();
-    mob.on_leash_removed();
-    if drop_lead {
-        entity.spawn_at_location(ItemStack::new(1, &Item::LEAD));
-    }
 }
 
 /// Vanilla `ItemStack.getDamageSource(attacker)`: the weapon's `damage_type` component, the
@@ -3694,6 +3492,10 @@ impl<T: Mob + Send + 'static> EntityBase for T {
 
     fn on_player_collision(&self, player: &Arc<Player>) {
         self.mob_player_collision(player);
+    }
+
+    fn is_leashable(&self) -> bool {
+        true
     }
 
     fn get_entity(&self) -> &Entity {
