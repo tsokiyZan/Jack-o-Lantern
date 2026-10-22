@@ -1,5 +1,3 @@
-use std::sync::{MutexGuard, PoisonError};
-
 use crate::command::argument_builder::{
     ArgumentBuilder, LiteralArgumentBuilder, RequiredArgumentBuilder, argument, command, literal,
 };
@@ -16,6 +14,7 @@ use crate::command::node::dispatcher::CommandDispatcher;
 use crate::command::node::{CommandExecutor, CommandExecutorResult};
 use crate::command::response_tracker::CommandResponseTracker;
 use crate::world::scoreboard::{CollisionRule, NameTagVisibility, Scoreboard, Team};
+use crate::world::waypoint_manager::ScoreboardGuard;
 use pumpkin_data::translation;
 use pumpkin_util::PermissionLvl;
 use pumpkin_util::permission::{Permission, PermissionDefault, PermissionRegistry};
@@ -86,12 +85,10 @@ fn count(value: usize) -> TextComponent {
     TextComponent::text(value.to_string())
 }
 
-fn lock_scoreboard<'a>(context: &'a CommandContext) -> MutexGuard<'a, Scoreboard> {
-    context
-        .world()
-        .scoreboard
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
+/// The world scoreboard, through `World::lock_scoreboard`: the waypoint remakes a team change
+/// queues run once the guard is dropped, outside the lock.
+fn lock_scoreboard<'a>(context: &'a CommandContext) -> ScoreboardGuard<'a> {
+    context.world().lock_scoreboard()
 }
 
 /// Applies `change` to a copy of the team and sends the copy out, like a `PlayerTeam` setter

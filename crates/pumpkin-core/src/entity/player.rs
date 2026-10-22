@@ -2990,8 +2990,6 @@ impl Player {
         }
     }
 
-    /// Vanilla `ServerPlayer.trackStartFallingPosition`: a fall starts, and one that starts
-    /// no lower than an explosion pushed the player counts for `fall_after_explosion`.
     /// The waypoint part of vanilla `ServerPlayer.updatePlayerAttributes`: a crouching player's
     /// transmit range is cut to nothing. Like `addOrUpdateTransientModifier` /
     /// `removeModifier`, only a real change marks the attribute updated.
@@ -3021,6 +3019,8 @@ impl Player {
         }
     }
 
+    /// Vanilla `ServerPlayer.trackStartFallingPosition`: a fall starts, and one that starts
+    /// no lower than an explosion pushed the player counts for `fall_after_explosion`.
     pub fn track_start_falling_position(&self) {
         let entity = &self.living_entity.entity;
         if entity.fall_distance.load() > 0.0 && self.starting_to_fall_position.load().is_none() {

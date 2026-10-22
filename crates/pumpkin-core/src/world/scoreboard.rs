@@ -28,13 +28,6 @@ pub trait ScoreboardTarget: Send + Sync {
         be_packet: &B,
     );
     fn send_je<J: ClientPacket + Sync>(&self, je_packet: &J);
-
-    /// Vanilla `ServerScoreboard.updatePlayerWaypoint`: the online player of that name remakes
-    /// its waypoint connections. `team_color` is its team's colour now.
-    fn update_player_waypoint(&self, _player: &str, _team_color: Option<NamedColor>) {}
-
-    /// Vanilla `ServerScoreboard.updateTeamWaypoints`.
-    fn update_team_waypoints(&self, _players: &[String], _team_color: Option<NamedColor>) {}
 }
 
 impl ScoreboardTarget for World {
@@ -48,14 +41,6 @@ impl ScoreboardTarget for World {
 
     fn send_je<J: ClientPacket + Sync>(&self, je_packet: &J) {
         self.broadcast_packet_all(je_packet);
-    }
-
-    fn update_player_waypoint(&self, player: &str, team_color: Option<NamedColor>) {
-        crate::world::waypoint_manager::update_player_waypoint(self, player, team_color);
-    }
-
-    fn update_team_waypoints(&self, players: &[String], team_color: Option<NamedColor>) {
-        crate::world::waypoint_manager::update_team_waypoints(self, players, team_color);
     }
 }
 
@@ -71,14 +56,6 @@ impl<T: ScoreboardTarget + ?Sized> ScoreboardTarget for &T {
     fn send_je<J: ClientPacket + Sync>(&self, je_packet: &J) {
         (*self).send_je(je_packet);
     }
-
-    fn update_player_waypoint(&self, player: &str, team_color: Option<NamedColor>) {
-        (*self).update_player_waypoint(player, team_color);
-    }
-
-    fn update_team_waypoints(&self, players: &[String], team_color: Option<NamedColor>) {
-        (*self).update_team_waypoints(players, team_color);
-    }
 }
 
 impl ScoreboardTarget for std::sync::Arc<World> {
@@ -92,14 +69,6 @@ impl ScoreboardTarget for std::sync::Arc<World> {
 
     fn send_je<J: ClientPacket + Sync>(&self, je_packet: &J) {
         self.broadcast_packet_all(je_packet);
-    }
-
-    fn update_player_waypoint(&self, player: &str, team_color: Option<NamedColor>) {
-        crate::world::waypoint_manager::update_player_waypoint(self, player, team_color);
-    }
-
-    fn update_team_waypoints(&self, players: &[String], team_color: Option<NamedColor>) {
-        crate::world::waypoint_manager::update_team_waypoints(self, players, team_color);
     }
 }
 
@@ -159,6 +128,20 @@ pub struct Scoreboard {
     tracked_players: OpenHashKeys,
     /// The names in vanilla's `Scoreboard.teamsByName`, in that map's order.
     team_names: OpenHashKeys,
+    /// `ServerScoreboard.updatePlayerWaypoint` / `updateTeamWaypoints` calls made since the
+    /// last [`Scoreboard::take_waypoint_updates`]. They run once the scoreboard lock is
+    /// dropped (see `World::lock_scoreboard`), never under it.
+    waypoint_updates: Vec<ScoreboardWaypointUpdate>,
+}
+
+/// A waypoint remake the scoreboard owes, with the team colour at the time of the change
+/// (a team switch remakes twice, first without the old team's colour, as vanilla).
+#[derive(Clone, Debug)]
+pub enum ScoreboardWaypointUpdate {
+    /// `updatePlayerWaypoint(name)`.
+    Player(String, Option<NamedColor>),
+    /// `updateTeamWaypoints(team)`: the team's players.
+    Team(Vec<String>, Option<NamedColor>),
 }
 
 impl Default for Scoreboard {
@@ -170,6 +153,7 @@ impl Default for Scoreboard {
             teams: FxHashMap::default(),
             tracked_players: OpenHashKeys::new(PLAYER_SCORES_EXPECTED, PLAYER_SCORES_LOAD_FACTOR),
             team_names: OpenHashKeys::default(),
+            waypoint_updates: Vec::new(),
         }
     }
 }
@@ -554,6 +538,12 @@ impl Scoreboard {
         self.tracked_players.remove(entity_name);
     }
 
+    /// The waypoint remakes queued since the last call. `World::lock_scoreboard`'s guard runs
+    /// them after the lock is released.
+    pub fn take_waypoint_updates(&mut self) -> Vec<ScoreboardWaypointUpdate> {
+        std::mem::take(&mut self.waypoint_updates)
+    }
+
     pub fn add_team(&mut self, target: &impl ScoreboardTarget, team: Team) {
         if self.teams.contains_key(&team.name) {
             warn!("Tried to create Team which already exists, {}", team.name);
@@ -591,7 +581,8 @@ impl Scoreboard {
         // `onTeamChanged`: the packet, then `updateTeamWaypoints`.
         let (players, color) = (team.players.clone(), team.color);
         self.teams.insert(team.name.clone(), team);
-        target.update_team_waypoints(&players, color);
+        self.waypoint_updates
+            .push(ScoreboardWaypointUpdate::Team(players, color));
     }
 
     pub fn remove_team(&mut self, target: &impl ScoreboardTarget, name: &str) {
@@ -611,7 +602,8 @@ impl Scoreboard {
         // `onTeamRemoved`: the packet, then `updateTeamWaypoints` with the players no longer
         // on any team.
         if let Some(team) = self.teams.remove(name) {
-            target.update_team_waypoints(&team.players, None);
+            self.waypoint_updates
+                .push(ScoreboardWaypointUpdate::Team(team.players, None));
         }
     }
 
@@ -640,10 +632,11 @@ impl Scoreboard {
             players: vec![player.clone()].into(),
         });
 
-        // `ServerScoreboard.addPlayerToTeam`: the packet, then `updatePlayerWaypoint` (which
-        // is handed the team's colour, so the order against the push doesn't matter).
+        // `ServerScoreboard.addPlayerToTeam`: the packet, then `updatePlayerWaypoint` (queued
+        // with the new team's colour).
         if let Some(team) = self.teams.get_mut(team_name) {
-            target.update_player_waypoint(&player, team.color);
+            self.waypoint_updates
+                .push(ScoreboardWaypointUpdate::Player(player.clone(), team.color));
             team.players.push(player);
         }
         true
@@ -689,7 +682,8 @@ impl Scoreboard {
 
         team.players.retain(|p| p != player);
         // `ServerScoreboard.removePlayerFromTeam`: the packet, then `updatePlayerWaypoint`.
-        target.update_player_waypoint(player, None);
+        self.waypoint_updates
+            .push(ScoreboardWaypointUpdate::Player(player.to_string(), None));
     }
 
     pub fn clear_team_players(&mut self, target: &impl ScoreboardTarget, team_name: &str) {
@@ -715,7 +709,8 @@ impl Scoreboard {
 
         team.players.clear();
         for player in &players_to_remove {
-            target.update_player_waypoint(player, None);
+            self.waypoint_updates
+                .push(ScoreboardWaypointUpdate::Player(player.clone(), None));
         }
     }
 

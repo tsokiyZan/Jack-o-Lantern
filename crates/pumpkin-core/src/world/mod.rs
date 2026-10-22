@@ -5141,6 +5141,22 @@ impl World {
     }
 
     /// Gets a `Player` by an entity id
+    /// Locks the world scoreboard for a change that may move players between teams. The
+    /// guard runs the waypoint remakes the change queued (`ServerScoreboard`'s
+    /// `updatePlayerWaypoint` / `updateTeamWaypoints`) after releasing the lock: the waypoint
+    /// manager reads the scoreboard under its own lock, so it must never be entered with the
+    /// scoreboard held.
+    pub fn lock_scoreboard(&self) -> waypoint_manager::ScoreboardGuard<'_> {
+        waypoint_manager::ScoreboardGuard {
+            world: self,
+            guard: Some(
+                self.scoreboard
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner),
+            ),
+        }
+    }
+
     pub fn get_player_by_id(&self, id: i32) -> Option<Arc<Player>> {
         for player in self.players.load().iter() {
             if player.entity_id() == id {

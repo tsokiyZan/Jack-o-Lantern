@@ -6,6 +6,7 @@
 //! order. Per connection the order is vanilla's: connect before update, disconnect before a
 //! remake.
 
+use std::sync::atomic::Ordering;
 use std::sync::{Arc, Weak};
 
 use pumpkin_util::text::color::NamedColor;
@@ -28,7 +29,7 @@ struct Cell {
 }
 
 #[derive(Default)]
-struct Inner {
+pub(crate) struct Inner {
     /// Vanilla `waypoints`, by entity id.
     waypoints: FxHashMap<i32, Weak<dyn EntityBase>>,
     /// Vanilla `players`, by entity id.
@@ -46,6 +47,12 @@ enum TeamColor {
     Given(Option<NamedColor>),
 }
 
+/// Vanilla `ServerWaypointManager`.
+///
+/// Lock order: the manager's mutex is taken first, and while it is held a connection may take
+/// a player's custom scoreboard and the world scoreboard (`getTeam`, for the icon's team
+/// colour). So nothing may take the manager while holding a scoreboard lock: the scoreboard
+/// queues its waypoint work and `World::lock_scoreboard`'s guard runs it after unlocking.
 #[derive(Default)]
 pub struct WaypointManager {
     inner: std::sync::Mutex<Inner>,
@@ -147,13 +154,26 @@ impl Inner {
                 cell.connection.disconnect(cell.source_uuid, &receiver);
             }
         }
-        self.waypoints.remove(&waypoint_id);
+        if let Some(waypoint) = self
+            .waypoints
+            .remove(&waypoint_id)
+            .and_then(|waypoint| waypoint.upgrade())
+        {
+            waypoint
+                .get_entity()
+                .waypoint_tracked
+                .store(false, Ordering::Relaxed);
+        }
     }
 
     /// Vanilla `trackWaypoint`.
     fn track_waypoint(&mut self, waypoint: &Arc<dyn EntityBase>) {
         self.waypoints
             .insert(waypoint.get_entity().entity_id, Arc::downgrade(waypoint));
+        waypoint
+            .get_entity()
+            .waypoint_tracked
+            .store(true, Ordering::Relaxed);
         for player in self.players() {
             self.create_connection(&player, waypoint, TeamColor::Lookup);
         }
@@ -161,7 +181,7 @@ impl Inner {
 }
 
 impl WaypointManager {
-    fn lock(&self) -> std::sync::MutexGuard<'_, Inner> {
+    pub(crate) fn lock(&self) -> std::sync::MutexGuard<'_, Inner> {
         self.inner
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -194,6 +214,8 @@ impl WaypointManager {
                 .get(key)
                 .and_then(|c| c.receiver.upgrade())
             else {
+                // The receiver is gone without a `removePlayer`: drop its cell.
+                inner.connections.remove(key);
                 continue;
             };
             inner.update_connection(&player, &waypoint, *key);
@@ -243,6 +265,8 @@ impl WaypointManager {
             .collect();
         for key in &connected {
             let Some(waypoint) = inner.connections.get(key).and_then(|c| c.source.upgrade()) else {
+                // The source is gone without an `untrackWaypoint`: drop its cell.
+                inner.connections.remove(key);
                 continue;
             };
             inner.update_connection(player, &waypoint, *key);
@@ -296,8 +320,9 @@ impl WaypointManager {
         }
     }
 
-    /// `remakeConnections` from the scoreboard, which holds its lock and passes the waypoint's
-    /// new team colour.
+    /// `remakeConnections` for a queued scoreboard change, with the team colour as it was at
+    /// that change (a team switch remakes first without a team, then with the new one, as
+    /// vanilla's immediate calls do).
     pub fn remake_connections_with_team_color(
         &self,
         waypoint: &Arc<dyn EntityBase>,
@@ -320,8 +345,12 @@ impl WaypointManager {
 
     /// The hook at the end of vanilla `Entity.setPosRaw`: once past its first tick and not
     /// removed, a transmitter updates its waypoint and a receiving player its connections.
+    /// The manager is only entered for a tracked waypoint or a receiving player, as vanilla
+    /// passes it nothing else; items and silent mobs never take its lock.
     pub fn on_entity_moved(&self, world: &super::World, entity: &crate::entity::Entity) {
-        self.update_waypoint(entity.entity_id);
+        if entity.waypoint_tracked.load(Ordering::Relaxed) {
+            self.update_waypoint(entity.entity_id);
+        }
         if entity.entity_type == &pumpkin_data::entity::EntityType::PLAYER
             && let Some(player) = world.get_player_by_id(entity.entity_id)
             && is_receiving_waypoints(&player)
@@ -350,37 +379,139 @@ impl WaypointManager {
     }
 }
 
-/// Vanilla `ServerScoreboard.updatePlayerWaypoint`: the online player with that name remakes
-/// its connections in its own level. `team_color` is its team's colour after the change.
-pub fn update_player_waypoint(world: &super::World, name: &str, team_color: Option<NamedColor>) {
+/// Runs the scoreboard's queued `updatePlayerWaypoint` / `updateTeamWaypoints`, in order.
+/// Must be called with no scoreboard lock held (see the lock order on [`WaypointManager`]).
+pub fn apply_scoreboard_updates(
+    world: &super::World,
+    updates: Vec<super::scoreboard::ScoreboardWaypointUpdate>,
+) {
+    use super::scoreboard::ScoreboardWaypointUpdate;
+    if updates.is_empty() {
+        return;
+    }
     let Some(server) = world.server.upgrade() else {
         return;
     };
-    if let Some(player) = server.get_player_by_name(name) {
-        player
-            .world()
-            .waypoint_manager
-            .remake_connections_with_team_color(&as_entity(&player), team_color);
+    for update in updates {
+        match update {
+            // `updatePlayerWaypoint`: the online player of that name, in its own level.
+            ScoreboardWaypointUpdate::Player(name, team_color) => {
+                if let Some(player) = server.get_player_by_name(&name) {
+                    player
+                        .world()
+                        .waypoint_manager
+                        .remake_connections_with_team_color(&as_entity(&player), team_color);
+                }
+            }
+            // `updateTeamWaypoints`: in every level, each online player of the team.
+            ScoreboardWaypointUpdate::Team(names, team_color) => {
+                for level in server.worlds.load().iter() {
+                    for name in &names {
+                        if let Some(player) = server.get_player_by_name(name) {
+                            level.waypoint_manager.remake_connections_with_team_color(
+                                &as_entity(&player),
+                                team_color,
+                            );
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
-/// Vanilla `ServerScoreboard.updateTeamWaypoints`: in every level, each online player of the
-/// team remakes its connections with that level's players.
-pub fn update_team_waypoints(
-    world: &super::World,
-    names: &[String],
-    team_color: Option<NamedColor>,
-) {
-    let Some(server) = world.server.upgrade() else {
-        return;
-    };
-    for level in server.worlds.load().iter() {
-        for name in names {
-            if let Some(player) = server.get_player_by_name(name) {
-                level
-                    .waypoint_manager
-                    .remake_connections_with_team_color(&as_entity(&player), team_color);
-            }
-        }
+/// [`World::lock_scoreboard`]'s guard.
+pub struct ScoreboardGuard<'a> {
+    pub(super) world: &'a super::World,
+    pub(super) guard: Option<std::sync::MutexGuard<'a, super::scoreboard::Scoreboard>>,
+}
+
+impl std::ops::Deref for ScoreboardGuard<'_> {
+    type Target = super::scoreboard::Scoreboard;
+
+    #[expect(clippy::expect_used, reason = "the guard is only taken in drop")]
+    fn deref(&self) -> &Self::Target {
+        self.guard.as_deref().expect("held until drop")
+    }
+}
+
+impl std::ops::DerefMut for ScoreboardGuard<'_> {
+    #[expect(clippy::expect_used, reason = "the guard is only taken in drop")]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.guard.as_deref_mut().expect("held until drop")
+    }
+}
+
+impl Drop for ScoreboardGuard<'_> {
+    fn drop(&mut self) {
+        let Some(mut guard) = self.guard.take() else {
+            return;
+        };
+        let updates = guard.take_waypoint_updates();
+        drop(guard);
+        apply_scoreboard_updates(self.world, updates);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::mpsc;
+    use std::time::Duration;
+
+    use pumpkin_util::text::color::NamedColor;
+
+    use crate::world::scoreboard::{NoTarget, ScoreboardWaypointUpdate, Team};
+
+    /// A team change under the scoreboard lock must not enter the waypoint manager (whose
+    /// connections take the scoreboard lock): with another thread holding the manager, the
+    /// change still completes, and its remakes are queued for after the unlock, in vanilla's
+    /// order and with the colour each one had.
+    #[tokio::test]
+    async fn team_changes_never_take_the_manager_under_the_scoreboard_lock() {
+        let (_folder, world) = crate::world::test_support::test_world();
+        let manager = world.waypoint_manager.lock();
+        let (done, finished) = mpsc::channel();
+        let changer = {
+            let world = world.clone();
+            std::thread::spawn(move || {
+                let mut scoreboard = world.lock_scoreboard();
+                let mut red = Team::new("red".to_string());
+                red.color = Some(NamedColor::Red);
+                scoreboard.add_team(&NoTarget, red);
+                scoreboard.add_team(&NoTarget, Team::new("plain".to_string()));
+                scoreboard.add_player_to_team(&NoTarget, "plain", "Bob".to_string());
+                scoreboard.add_player_to_team(&NoTarget, "red", "Bob".to_string());
+                let mut red = scoreboard.get_team("red").cloned().unwrap();
+                red.color = Some(NamedColor::Gold);
+                scoreboard.update_team(&NoTarget, red);
+                scoreboard.remove_team(&NoTarget, "red");
+                let updates = scoreboard.take_waypoint_updates();
+                done.send(()).unwrap();
+                updates
+            })
+        };
+        let completed = finished.recv_timeout(Duration::from_secs(10)).is_ok();
+        drop(manager);
+        let updates = changer.join().unwrap();
+        assert!(completed, "a team change waited for the waypoint manager");
+        let summary: Vec<String> = updates
+            .iter()
+            .map(|update| match update {
+                ScoreboardWaypointUpdate::Player(name, color) => format!("player {name} {color:?}"),
+                ScoreboardWaypointUpdate::Team(names, color) => format!("team {names:?} {color:?}"),
+            })
+            .collect();
+        assert_eq!(
+            summary,
+            [
+                "player Bob None",
+                "player Bob None",
+                "player Bob Some(Red)",
+                "team [\"Bob\"] Some(Gold)",
+                "team [\"Bob\"] None",
+            ]
+        );
+        // The guard drains the queue when it unlocks.
+        drop(world.lock_scoreboard());
     }
 }

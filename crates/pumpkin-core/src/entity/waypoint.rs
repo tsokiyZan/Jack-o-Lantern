@@ -3,6 +3,7 @@
 
 use pumpkin_data::attributes::Attributes;
 use pumpkin_nbt::compound::NbtCompound;
+use pumpkin_nbt::tag::NbtTag;
 use pumpkin_protocol::java::client::play::{CWaypoint, WaypointIcon};
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector2::Vector2;
@@ -98,10 +99,52 @@ impl WaypointIconState {
         };
         let color = match nbt.get("color") {
             None => None,
-            Some(_) => Some(nbt.get_int("color")?),
+            Some(tag) => Some(rgb_color_from_nbt(tag)?),
         };
         Some(Self { style, color })
     }
+}
+
+/// Vanilla `ExtraCodecs.RGB_COLOR_CODEC`: `Codec.INT` (any number, as `intValue`), else a
+/// list of three floats as `ARGB.colorFromFloat(1, r, g, b)`.
+fn rgb_color_from_nbt(tag: &NbtTag) -> Option<i32> {
+    let number = |tag: &NbtTag| -> Option<f64> {
+        Some(match tag {
+            NbtTag::Byte(v) => f64::from(*v),
+            NbtTag::Short(v) => f64::from(*v),
+            NbtTag::Int(v) => f64::from(*v),
+            NbtTag::Long(v) => *v as f64,
+            NbtTag::Float(v) => f64::from(*v),
+            NbtTag::Double(v) => *v,
+            _ => return None,
+        })
+    };
+    // `Number.intValue()`: a long truncates, a float or double saturates.
+    match tag {
+        NbtTag::Long(v) => return Some(*v as i32),
+        NbtTag::Float(v) => return Some(*v as i32),
+        NbtTag::Double(v) => return Some(*v as i32),
+        NbtTag::Byte(_) | NbtTag::Short(_) | NbtTag::Int(_) => {
+            return number(tag).map(|v| v as i32);
+        }
+        _ => {}
+    }
+    let floats: Vec<f32> = match tag {
+        NbtTag::List(list) => list
+            .iter()
+            .map(|t| number(t).map(|v| v as f32))
+            .collect::<Option<_>>()?,
+        NbtTag::ByteArray(a) => a.iter().map(|v| f32::from(*v)).collect(),
+        NbtTag::IntArray(a) => a.iter().map(|v| *v as f32).collect(),
+        NbtTag::LongArray(a) => a.iter().map(|v| *v as f32).collect(),
+        _ => return None,
+    };
+    let [r, g, b] = floats[..] else {
+        return None;
+    };
+    // `ARGB.as8BitChannel`: `Mth.floor(value * 255F)`, each masked to a byte.
+    let channel = |v: f32| ((v * 255.0).floor() as i32) & 0xFF;
+    Some((0xFF << 24) | (channel(r) << 16) | (channel(g) << 8) | channel(b))
 }
 
 /// `TeamColor.rgb()` (its `TextColor` value).
@@ -438,5 +481,27 @@ mod tests {
         };
         assert_eq!(WaypointIconState::from_nbt(&icon.to_nbt()), Some(icon));
         assert_eq!(WaypointIconState::from_nbt(&NbtCompound::new()), None);
+    }
+
+    #[test]
+    fn icon_colour_reads_like_rgb_color_codec() {
+        let mut nbt = NbtCompound::new();
+        nbt.put_string("style", "minecraft:default".to_string());
+        nbt.put("color", NbtTag::Double(255.9));
+        assert_eq!(WaypointIconState::from_nbt(&nbt).unwrap().color, Some(255));
+        nbt.put(
+            "color",
+            NbtTag::List(vec![
+                NbtTag::Float(1.0),
+                NbtTag::Float(0.5),
+                NbtTag::Float(0.0),
+            ]),
+        );
+        assert_eq!(
+            WaypointIconState::from_nbt(&nbt).unwrap().color,
+            Some(0xFFFF_7F00u32 as i32)
+        );
+        nbt.put("color", NbtTag::List(vec![NbtTag::Float(1.0)]));
+        assert_eq!(WaypointIconState::from_nbt(&nbt), None);
     }
 }

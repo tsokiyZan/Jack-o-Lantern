@@ -3524,10 +3524,7 @@ pub fn convert_common(from: &dyn Mob, to: &dyn Mob, params: &conversion::Convers
     if let Some(team) = &params.team {
         let from_team = from.get_team_name();
         let world = new_entity.world.load_full();
-        let mut scoreboard = world
-            .scoreboard
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut scoreboard = world.lock_scoreboard();
         scoreboard.add_player_to_team(&world, team, new_entity.entity_uuid.to_string());
         if from_team.as_ref() == Some(team) {
             scoreboard.remove_player_from_team(&world, team, &old_entity.entity_uuid.to_string());

@@ -1614,6 +1614,9 @@ pub struct Entity {
     pub tick_count: AtomicI32,
     /// Vanilla `Entity.firstTick`: cleared at the end of the first base tick.
     pub first_tick: AtomicBool,
+    /// Whether this world's waypoint manager tracks the entity as a waypoint, so `set_pos` only
+    /// enters the manager for transmitters (vanilla passes it nothing else).
+    pub waypoint_tracked: AtomicBool,
     /// Vanilla `pistonDeltas` and `pistonDeltasGameTime`.
     piston_deltas: std::sync::Mutex<([f64; 3], i64)>,
     /// Vanilla `movementThisTick`: the moves made since the last block-effect sweep.
@@ -1807,6 +1810,7 @@ impl Entity {
             age: AtomicI32::new(0),
             tick_count: AtomicI32::new(0),
             first_tick: AtomicBool::new(true),
+            waypoint_tracked: AtomicBool::new(false),
             movement_this_tick: std::sync::Mutex::new(Vec::new()),
             piston_deltas: std::sync::Mutex::new(([0.0; 3], 0)),
             final_movements_this_tick: std::sync::Mutex::new(Vec::new()),
@@ -6166,10 +6170,7 @@ impl Entity {
             return;
         };
         let world = self.world.load_full();
-        let mut scoreboard = world
-            .scoreboard
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut scoreboard = world.lock_scoreboard();
         if !scoreboard.add_player_to_team(&world, team_name, self.entity_uuid.to_string()) {
             tracing::warn!(
                 "Unable to add entity to team \"{team_name}\" (that team probably doesn't exist)"
