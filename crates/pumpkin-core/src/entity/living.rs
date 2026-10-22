@@ -2233,10 +2233,30 @@ impl LivingEntity {
             }
             return;
         }
-        // TODO: `LivingEntity.handleFallFlyingCollisions` (flying into a wall).
-        let movement = self.update_fall_flying_movement(caller, self.entity.velocity.load());
+        let last_movement = self.entity.velocity.load();
+        let last_speed = last_movement.horizontal_length();
+        let movement = self.update_fall_flying_movement(caller, last_movement);
         self.entity.velocity.store(movement);
         self.make_move(caller);
+        let new_speed = self.entity.velocity.load().horizontal_length();
+        self.handle_fall_flying_collisions(caller, last_speed, new_speed);
+    }
+
+    /// Vanilla `LivingEntity.handleFallFlyingCollisions`: hitting a wall while gliding hurts.
+    fn handle_fall_flying_collisions(
+        &self,
+        caller: &dyn EntityBase,
+        move_hor_length: f64,
+        new_move_hor_length: f64,
+    ) {
+        if self.entity.horizontal_collision.load(SeqCst) {
+            let diff = move_hor_length - new_move_hor_length;
+            let dmg = (diff * 10.0 - 3.0) as f32;
+            if dmg > 0.0 {
+                caller.play_sound_at_self(self.get_fall_damage_sound(dmg as i32), 1.0, 1.0);
+                caller.damage(caller, dmg, DamageType::FLY_INTO_WALL);
+            }
+        }
     }
 
     /// Vanilla `LivingEntity.updateFallFlyingMovement`.
