@@ -40,8 +40,14 @@ impl CommandExecutor for GiveExecutor {
                 let mut stack = parsed_stack.clone();
                 stack.item_count = take as u8;
                 target.inventory().insert_stack_anywhere(&mut stack);
-                if !stack.is_empty() {
-                    target.drop_item(stack);
+                // Vanilla `GiveCommand.giveItem`'s overflow: a drop with no thrower that only
+                // this player can pick up, at once.
+                if !stack.is_empty()
+                    && let Some(drop) = target.create_item_stack_to_drop(stack, false)
+                {
+                    drop.set_pickup_delay(0);
+                    drop.set_target(Some(target.get_entity().entity_uuid));
+                    target.world().spawn_entity(drop);
                 }
                 remaining -= take;
             }

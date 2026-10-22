@@ -5668,7 +5668,7 @@ impl LivingEntity {
                     // `ServerPlayer.handleExtraItemsCreatedOnUse`.
                     let mut remainder_stack = remainder_stack;
                     if !player.inventory.insert_stack_anywhere(&mut remainder_stack) {
-                        player.drop_from_hand(remainder_stack, false);
+                        player.drop_from_hand(remainder_stack, false, false);
                     }
                 }
             }

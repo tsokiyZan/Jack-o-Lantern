@@ -981,6 +981,7 @@ fn throw_items_toward_pos(piglin: &PiglinEntity, stacks: Vec<ItemStack>, target:
             Entity::new(world.clone(), hand_pos, &EntityType::ITEM),
             stack,
         );
+        item_entity.set_thrower(entity);
         item_entity.get_entity().velocity.store(velocity);
         item_entity.set_pickup_delay(ItemEntity::DEFAULT_PICKUP_DELAY);
         world.spawn_entity(Arc::new(item_entity));

@@ -5813,34 +5813,59 @@ impl Player {
         ));
     }
 
-    /// Vanilla `LivingEntity.drop`'s swing then the drop: the main hand swings for the
-    /// players tracking this one, and for this player too when `server_only` (vanilla's
-    /// `Prediction.SERVER_ONLY`, a drop the client didn't predict).
-    pub fn drop_from_hand(&self, item_stack: ItemStack, server_only: bool) {
+    /// Vanilla `LivingEntity.drop(stack, thrownFromHand, prediction)`: the main hand swings for
+    /// the players tracking this one, and for this player too when `server_only` (vanilla's
+    /// `Prediction.SERVER_ONLY`, a drop the client didn't predict), then the drop.
+    pub fn drop_from_hand(&self, item_stack: ItemStack, thrown_from_hand: bool, server_only: bool) {
         if item_stack.is_empty() {
             return;
         }
         self.living_entity
             .swing(Hand::Right, SwingAnimationImpl::DEFAULT, server_only);
-        self.drop_item(item_stack);
+        self.drop_item(item_stack, thrown_from_hand);
     }
 
-    pub fn drop_item(&self, item_stack: ItemStack) {
-        self.increment_stat(
-            statistics::StatisticCategory::Dropped,
-            item_stack.item.id as i32,
-            item_stack.item_count as i32,
-        );
-        self.increment_custom_stat(
-            statistics::CustomStatistic::Drop,
-            item_stack.item_count as i32,
-        );
+    /// The drop half of vanilla `ServerPlayer.drop`: the item entity, then the `Dropped` and
+    /// `Drop` stats only for an item thrown from the hand.
+    pub fn drop_item(&self, item_stack: ItemStack, thrown_from_hand: bool) {
+        let (item_id, count) = (item_stack.item.id, item_stack.item_count);
+        let Some(item_entity) = self.create_item_stack_to_drop(item_stack, thrown_from_hand) else {
+            return;
+        };
+        self.world().spawn_entity(item_entity);
+        if thrown_from_hand {
+            self.increment_stat(
+                statistics::StatisticCategory::Dropped,
+                item_id as i32,
+                count as i32,
+            );
+            self.increment_custom_stat(statistics::CustomStatistic::Drop, 1);
+        }
+    }
+
+    /// Vanilla `LivingEntity.createItemStackToDrop(stack, false, thrownFromHand)`.
+    #[must_use]
+    pub fn create_item_stack_to_drop(
+        &self,
+        item_stack: ItemStack,
+        thrown_from_hand: bool,
+    ) -> Option<Arc<ItemEntity>> {
+        if item_stack.is_empty() {
+            return None;
+        }
         let item_pos = self.living_entity.entity.pos.load()
             + Vector3::new(0.0, self.living_entity.entity.get_eye_height() - 0.3, 0.0);
         let entity = Entity::new(self.world(), item_pos, &EntityType::ITEM);
 
-        // Vanilla `LivingEntity.createItemStackToDrop(stack, false, ...)`, in its float
-        // arithmetic with `Mth.sin`/`Mth.cos`, drawing from the player's random.
+        // Vanilla `new ItemEntity(level, x, y, z, stack)` draws its own random velocity
+        // (two `nextDouble`s on the item's random) before `setDeltaMovement` replaces it.
+        let item_entity = ItemEntity::new(entity, item_stack);
+        item_entity.set_pickup_delay(40);
+        if thrown_from_hand {
+            item_entity.set_thrower(&self.living_entity.entity);
+        }
+
+        // In its float arithmetic with `Mth.sin`/`Mth.cos`, drawing from the player's random.
         let deg_to_rad = (std::f64::consts::PI / 180.0) as f32;
         let x_rot = self.living_entity.entity.pitch.load() * deg_to_rad;
         let y_rot = self.living_entity.entity.yaw.load() * deg_to_rad;
@@ -5862,14 +5887,8 @@ impl Player {
             f64::from(-sin_x * 0.3 + 0.1 + y_jitter * 0.1),
             f64::from(cos_y * cos_x * 0.3) + f64::from(dir).sin() * f64::from(pow2),
         );
-
-        // TODO: Merge stacks together
-        // Vanilla `new ItemEntity(level, x, y, z, stack)` draws its own random velocity
-        // (two `nextDouble`s on the item's random) before `setDeltaMovement` replaces it.
-        let item_entity = Arc::new(ItemEntity::new(entity, item_stack));
         item_entity.get_entity().velocity.store(velocity);
-        item_entity.set_pickup_delay(40);
-        self.world().spawn_entity(item_entity);
+        Some(Arc::new(item_entity))
     }
 
     pub fn drop_held_item(&self, drop_stack: bool) {
@@ -5903,7 +5922,7 @@ impl Player {
         let updated_stack = item_stack.clone();
         self.inventory().set_held_item(updated_stack.clone());
 
-        self.drop_from_hand(dropped_stack, false);
+        self.drop_from_hand(dropped_stack, true, false);
 
         let inv: Arc<dyn Inventory> = self.inventory.clone();
         let screen_binding = self
@@ -8537,12 +8556,12 @@ impl InventoryPlayer for Player {
         self
     }
 
-    fn drop_item(&self, item: ItemStack, _retain_ownership: bool) {
-        self.drop_from_hand(item, false);
+    fn drop_item(&self, item: ItemStack, thrown_from_hand: bool) {
+        self.drop_from_hand(item, thrown_from_hand, false);
     }
 
     fn drop_item_server_only(&self, item: ItemStack) {
-        self.drop_from_hand(item, true);
+        self.drop_from_hand(item, false, true);
     }
 
     fn has_infinite_materials(&self) -> bool {

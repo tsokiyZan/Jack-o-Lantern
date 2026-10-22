@@ -582,8 +582,7 @@ impl FoxEntity {
             stack,
         );
         item.set_pickup_delay(SPIT_PICKUP_DELAY);
-        // TODO: vanilla also records the fox as the item's thrower, which Pumpkin's item
-        // entities do not track yet.
+        item.set_thrower(entity);
         self.play_sound_at_self(Sound::EntityFoxSpit, 1.0, 1.0);
         world.spawn_entity(Arc::new(item));
     }
