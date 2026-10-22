@@ -1816,13 +1816,6 @@ impl Player {
     /// Applies `amount` durability damage to the item in `slot`.
     /// Broadcasts an [`EntityStatus`] break event and syncs the slot if the item is destroyed.
     pub fn damage_item_in_slot(&self, slot: &EquipmentSlot, amount: i32) -> bool {
-        if matches!(
-            self.gamemode.load(),
-            GameMode::Creative | GameMode::Spectator
-        ) {
-            return false;
-        }
-
         // Direct PlayerInventory slot indices (matches build_equipment_slots).
         let slot_index: usize = match slot {
             EquipmentSlot::MainHand(_) => self.inventory.get_selected_slot() as usize,
@@ -1923,7 +1916,15 @@ impl Player {
             return;
         };
         let damage = tool.damage_per_block as i32;
-        if state.hardness > 0.0 && damage > 0 {
+        // `ShearsItem.mineBlock` wears on anything but fire; `Item.mineBlock` on anything that
+        // takes time to break.
+        let wears = if held.item == &pumpkin_data::item::Item::SHEARS {
+            !pumpkin_data::Block::from_state_id(state.id)
+                .has_tag(&pumpkin_data::tag::Block::MINECRAFT_FIRE)
+        } else {
+            state.hardness != 0.0
+        };
+        if wears && damage > 0 {
             self.damage_held_item(damage);
         }
         self.award_item_used(held.item);

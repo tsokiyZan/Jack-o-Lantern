@@ -370,6 +370,8 @@ impl BedrockClient {
                                     !current_equipped.are_items_and_components_equal(&held)
                                 };
                                 if should_change {
+                                    // `Equippable.swapWithEquipmentSlot`.
+                                    player.award_item_used(held.item);
                                     player.enqueue_equipment_change(equippable.slot, &held);
 
                                     let inventory = player.inventory();

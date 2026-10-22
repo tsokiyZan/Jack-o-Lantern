@@ -50,6 +50,7 @@ impl ItemBehaviour for FishingRodItem {
 
             let bobber_arc: Arc<FishingBobberEntity> = Arc::new(bobber);
             world.spawn_entity(bobber_arc);
+            player.award_item_used(item);
         } else {
             // Reel in
             if let Some(bobber_base) = world.get_entity_by_id(bobber_id) {
@@ -67,7 +68,6 @@ impl ItemBehaviour for FishingRodItem {
                 &player.position(),
             );
         }
-        player.award_item_used(item);
     }
 
     fn as_any(&self) -> &dyn Any {

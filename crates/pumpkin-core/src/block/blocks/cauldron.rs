@@ -76,98 +76,114 @@ impl BlockBehaviour for CauldronBlock {
         let block_id = args.block.id;
         let gamemode = args.player.gamemode.load();
 
-        if block_id == BlockId::CAULDRON {
-            if item_id == Item::WATER_BUCKET.id {
-                if !fire_cauldron_change(
-                    args.world,
-                    *args.position,
-                    0,
-                    3,
-                    crate::plugin::block::cauldron_level_change::CauldronChangeReason::BucketEmpty,
-                    Some(Arc::clone(args.player) as Arc<dyn crate::entity::EntityBase>),
-                ) {
-                    return BlockActionResult::Pass;
-                }
-                let state_id = Block::WATER_CAULDRON
-                    .from_properties(&[pumpkin_data::Property::Level(3)])
-                    .to_state_id(&Block::WATER_CAULDRON);
-                args.world
-                    .set_block_state(args.position, state_id, BlockFlags::NOTIFY_ALL);
-                args.world.play_sound(
-                    Sound::ItemBucketEmpty,
-                    SoundCategory::Blocks,
-                    &args.position.to_f64(),
-                );
-                args.item_stack.decrement_unless_creative(gamemode, 1);
-                give_item_or_drop(args.player, args.world, &Item::BUCKET);
-                args.player.increment_stat(
-                    pumpkin_data::statistic::StatisticCategory::Custom,
-                    pumpkin_data::statistic::CustomStatistic::FillCauldron as i32,
-                    1,
-                );
-                args.player.award_item_used(used_item);
-                return BlockActionResult::Success;
-            } else if item_id == Item::LAVA_BUCKET.id {
-                args.world.set_block_state(
-                    args.position,
-                    Block::LAVA_CAULDRON.default_state.id,
-                    BlockFlags::NOTIFY_ALL,
-                );
-                args.world.play_sound(
-                    Sound::ItemBucketEmptyLava,
-                    SoundCategory::Blocks,
-                    &args.position.to_f64(),
-                );
-                args.item_stack.decrement_unless_creative(gamemode, 1);
-                give_item_or_drop(args.player, args.world, &Item::BUCKET);
-                args.player.increment_stat(
-                    pumpkin_data::statistic::StatisticCategory::Custom,
-                    pumpkin_data::statistic::CustomStatistic::FillCauldron as i32,
-                    1,
-                );
-                args.player.award_item_used(used_item);
-                return BlockActionResult::Success;
-            } else if item_id == Item::POWDER_SNOW_BUCKET.id {
-                let state_id = Block::POWDER_SNOW_CAULDRON
-                    .from_properties(&[pumpkin_data::Property::Level(3)])
-                    .to_state_id(&Block::POWDER_SNOW_CAULDRON);
-                args.world
-                    .set_block_state(args.position, state_id, BlockFlags::NOTIFY_ALL);
-                args.world.play_sound(
-                    Sound::ItemBucketEmptyPowderSnow,
-                    SoundCategory::Blocks,
-                    &args.position.to_f64(),
-                );
-                args.item_stack.decrement_unless_creative(gamemode, 1);
-                give_item_or_drop(args.player, args.world, &Item::BUCKET);
-                args.player.increment_stat(
-                    pumpkin_data::statistic::StatisticCategory::Custom,
-                    pumpkin_data::statistic::CustomStatistic::FillCauldron as i32,
-                    1,
-                );
-                args.player.award_item_used(used_item);
-                return BlockActionResult::Success;
-            } else if item_id == Item::POTION.id {
-                let state_id = Block::WATER_CAULDRON
-                    .from_properties(&[pumpkin_data::Property::Level(1)])
-                    .to_state_id(&Block::WATER_CAULDRON);
-                args.world
-                    .set_block_state(args.position, state_id, BlockFlags::NOTIFY_ALL);
-                args.world.play_sound(
-                    Sound::ItemBottleEmpty,
-                    SoundCategory::Blocks,
-                    &args.position.to_f64(),
-                );
-                args.item_stack.decrement_unless_creative(gamemode, 1);
-                give_item_or_drop(args.player, args.world, &Item::GLASS_BOTTLE);
-                args.player.increment_stat(
-                    pumpkin_data::statistic::StatisticCategory::Custom,
-                    pumpkin_data::statistic::CustomStatistic::UseCauldron as i32,
-                    1,
-                );
-                args.player.award_item_used(used_item);
-                return BlockActionResult::Success;
+        // `addDefaultInteractions`: every cauldron takes a filled bucket.
+        let under_water =
+            crate::entity::ai::util::goal_utils::is_water(args.world, &args.position.up());
+        if item_id == Item::WATER_BUCKET.id {
+            let old_level = if block_id == BlockId::WATER_CAULDRON {
+                i32::from(
+                    WaterCauldronLikeProperties::from_state_id(
+                        args.world.get_block_state_id(args.position),
+                    )
+                    .level,
+                )
+            } else {
+                0
+            };
+            if !fire_cauldron_change(
+                args.world,
+                *args.position,
+                old_level,
+                3,
+                crate::plugin::block::cauldron_level_change::CauldronChangeReason::BucketEmpty,
+                Some(Arc::clone(args.player) as Arc<dyn crate::entity::EntityBase>),
+            ) {
+                return BlockActionResult::Pass;
             }
+            let state_id = Block::WATER_CAULDRON
+                .from_properties(&[pumpkin_data::Property::Level(3)])
+                .to_state_id(&Block::WATER_CAULDRON);
+            args.world
+                .set_block_state(args.position, state_id, BlockFlags::NOTIFY_ALL);
+            args.world.play_sound(
+                Sound::ItemBucketEmpty,
+                SoundCategory::Blocks,
+                &args.position.to_f64(),
+            );
+            args.item_stack.decrement_unless_creative(gamemode, 1);
+            give_item_or_drop(args.player, args.world, &Item::BUCKET);
+            args.player.increment_stat(
+                pumpkin_data::statistic::StatisticCategory::Custom,
+                pumpkin_data::statistic::CustomStatistic::FillCauldron as i32,
+                1,
+            );
+            args.player.award_item_used(used_item);
+            return BlockActionResult::Success;
+        } else if (item_id == Item::LAVA_BUCKET.id || item_id == Item::POWDER_SNOW_BUCKET.id)
+            && under_water
+        {
+            // `isUnderWater`: the bucket does nothing.
+            return BlockActionResult::Consume;
+        } else if item_id == Item::LAVA_BUCKET.id {
+            args.world.set_block_state(
+                args.position,
+                Block::LAVA_CAULDRON.default_state.id,
+                BlockFlags::NOTIFY_ALL,
+            );
+            args.world.play_sound(
+                Sound::ItemBucketEmptyLava,
+                SoundCategory::Blocks,
+                &args.position.to_f64(),
+            );
+            args.item_stack.decrement_unless_creative(gamemode, 1);
+            give_item_or_drop(args.player, args.world, &Item::BUCKET);
+            args.player.increment_stat(
+                pumpkin_data::statistic::StatisticCategory::Custom,
+                pumpkin_data::statistic::CustomStatistic::FillCauldron as i32,
+                1,
+            );
+            args.player.award_item_used(used_item);
+            return BlockActionResult::Success;
+        } else if item_id == Item::POWDER_SNOW_BUCKET.id {
+            let state_id = Block::POWDER_SNOW_CAULDRON
+                .from_properties(&[pumpkin_data::Property::Level(3)])
+                .to_state_id(&Block::POWDER_SNOW_CAULDRON);
+            args.world
+                .set_block_state(args.position, state_id, BlockFlags::NOTIFY_ALL);
+            args.world.play_sound(
+                Sound::ItemBucketEmptyPowderSnow,
+                SoundCategory::Blocks,
+                &args.position.to_f64(),
+            );
+            args.item_stack.decrement_unless_creative(gamemode, 1);
+            give_item_or_drop(args.player, args.world, &Item::BUCKET);
+            args.player.increment_stat(
+                pumpkin_data::statistic::StatisticCategory::Custom,
+                pumpkin_data::statistic::CustomStatistic::FillCauldron as i32,
+                1,
+            );
+            args.player.award_item_used(used_item);
+            return BlockActionResult::Success;
+        } else if block_id == BlockId::CAULDRON && item_id == Item::POTION.id {
+            let state_id = Block::WATER_CAULDRON
+                .from_properties(&[pumpkin_data::Property::Level(1)])
+                .to_state_id(&Block::WATER_CAULDRON);
+            args.world
+                .set_block_state(args.position, state_id, BlockFlags::NOTIFY_ALL);
+            args.world.play_sound(
+                Sound::ItemBottleEmpty,
+                SoundCategory::Blocks,
+                &args.position.to_f64(),
+            );
+            args.item_stack.decrement_unless_creative(gamemode, 1);
+            give_item_or_drop(args.player, args.world, &Item::GLASS_BOTTLE);
+            args.player.increment_stat(
+                pumpkin_data::statistic::StatisticCategory::Custom,
+                pumpkin_data::statistic::CustomStatistic::UseCauldron as i32,
+                1,
+            );
+            args.player.award_item_used(used_item);
+            return BlockActionResult::Success;
         }
 
         if item_id == Item::BUCKET.id {

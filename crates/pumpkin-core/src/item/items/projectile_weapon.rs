@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use crate::enchantment::EnchantmentHelper;
 use crate::entity::projectile::arrow::{ArrowEntity, ArrowPickup};
-use crate::entity::projectile::rotation_shot_vector;
 use crate::entity::{Entity, EntityBase};
 use crate::world::World;
 use pumpkin_data::item::Item;
@@ -175,9 +174,9 @@ impl ProjectileWeaponItem {
                     uncertainty,
                 );
             } else {
-                // TODO: vanilla `CrossbowItem.shootProjectile` shoots along the view vector turned
-                // about the up vector, or at a target.
-                let direction = rotation_shot_vector(pitch, yaw + angle, 0.0);
+                // `CrossbowItem.shootProjectile` without a target.
+                let direction =
+                    super::crossbow::CrossbowItem::projectile_shot_vector(pitch, yaw, angle);
                 arrow.set_velocity(
                     direction.x,
                     direction.y,

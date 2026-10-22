@@ -9,7 +9,7 @@ use pumpkin_data::game_event::GameEvent;
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::java::client::play::CEntityVelocity;
 use pumpkin_util::math::boundingbox::BoundingBox;
-use pumpkin_util::math::{DEG_TO_RAD, cos, position::BlockPos, sin, vector3::Vector3};
+use pumpkin_util::math::{DEG_TO_RAD, atan2, cos, position::BlockPos, sin, vector3::Vector3};
 use pumpkin_util::random::RandomImpl;
 use std::{
     sync::Arc,
@@ -34,8 +34,8 @@ pub fn shoot(entity: &Entity, x: f64, y: f64, z: f64, power: f64, uncertainty: f
     // `(float)(Mth.atan2(..) * 180.0F / (float)Math.PI)`.
     let to_degrees = |radians: f64| (radians * 180.0 / f64::from(std::f32::consts::PI)) as f32;
     entity.set_rotation(
-        to_degrees(velocity.x.atan2(velocity.z)),
-        to_degrees(velocity.y.atan2(velocity.horizontal_length())),
+        to_degrees(atan2(velocity.x, velocity.z)),
+        to_degrees(atan2(velocity.y, velocity.horizontal_length())),
     );
 }
 

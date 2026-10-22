@@ -1,6 +1,7 @@
 use std::any::Any;
 use std::sync::atomic::Ordering;
 
+use crate::entity::Entity;
 use crate::entity::player::Player;
 use crate::item::items::projectile_weapon::ProjectileWeaponItem;
 use crate::item::{ItemBehaviour, ItemMetadata};
@@ -10,6 +11,9 @@ use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_util::GameMode;
+use pumpkin_util::math::DEG_TO_RAD;
+use pumpkin_util::math::quaternion::Quaternionf;
+use pumpkin_util::math::vector3::Vector3;
 
 pub struct CrossbowItem;
 
@@ -112,6 +116,20 @@ impl ItemBehaviour for CrossbowItem {
 }
 
 impl CrossbowItem {
+    /// Vanilla `CrossbowItem.shootProjectile`'s shot without a target: the view vector turned
+    /// by `angle` degrees about the up vector, in float.
+    #[must_use]
+    pub fn projectile_shot_vector(x_rot: f32, y_rot: f32, angle: f32) -> Vector3<f64> {
+        // `getUpVector`.
+        let up = Entity::calculate_view_vector(x_rot - 90.0, y_rot);
+        let up_quaternion =
+            Quaternionf::from_angle_axis(f64::from(angle * DEG_TO_RAD), up.x, up.y, up.z);
+        let view = Entity::calculate_view_vector(x_rot, y_rot);
+        let shot =
+            up_quaternion.transform_f32(Vector3::new(view.x as f32, view.y as f32, view.z as f32));
+        Vector3::new(f64::from(shot.x), f64::from(shot.y), f64::from(shot.z))
+    }
+
     pub const ARROW_POWER: f32 = 3.15;
 
     fn fire_projectiles(player: &Player) {
@@ -153,6 +171,40 @@ impl CrossbowItem {
                 player.damage_held_item(1);
                 player.award_item_used(&Item::CROSSBOW);
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Bits from vanilla's `Mth` view vectors and JOML 1.10.9 `Vector3f.rotate(new
+    /// Quaternionf().setAngleAxis(...))`.
+    #[test]
+    fn multishot_side_arrows_turn_about_the_up_vector() {
+        let cases: [(f32, f32, f32, [u32; 3]); 4] = [
+            (0.0, 0.0, 10.0, [0x3e31_d0d3, 0x0000_0000, 0x3f7c_1c5d]),
+            (
+                -35.5,
+                123.25,
+                -10.0,
+                [0xbf13_4826, 0x3f12_63e5, 0xbf15_b172],
+            ),
+            (80.0, -45.0, 10.0, [0x3e79_987e, 0xbf78_4745, 0xbaef_51c0]),
+            (-89.9, 170.5, 10.0, [0xbe2f_a99a, 0x3f7c_1c41, 0x3cdd_2483]),
+        ];
+        for (x_rot, y_rot, angle, bits) in cases {
+            let shot = CrossbowItem::projectile_shot_vector(x_rot, y_rot, angle);
+            assert_eq!(
+                [
+                    (shot.x as f32).to_bits(),
+                    (shot.y as f32).to_bits(),
+                    (shot.z as f32).to_bits()
+                ],
+                bits,
+                "{x_rot} {y_rot} {angle}"
+            );
         }
     }
 }
