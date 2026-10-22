@@ -1732,6 +1732,36 @@ impl World {
         self.broadcast_sound(&packet, &entity.pos.load(), sound_range(volume, None), None);
     }
 
+    /// Vanilla `Level.playSound(except, entity, sound, ...)`: a sound event that follows
+    /// `entity`, heard by everyone near it but `except`.
+    pub fn play_sound_event_from_entity(
+        &self,
+        except: Option<&Player>,
+        entity: &Entity,
+        sound: &pumpkin_data::data_component_impl::IdOr<
+            pumpkin_data::data_component_impl::SoundEvent,
+        >,
+        category: SoundCategory,
+        volume: f32,
+        pitch: f32,
+    ) {
+        let seed = rng().random::<i64>();
+        let packet = CEntitySoundEffect::new(
+            data_to_proto_sound(sound),
+            category,
+            VarInt(entity.entity_id),
+            volume,
+            pitch,
+            seed,
+        );
+        self.broadcast_sound(
+            &packet,
+            &entity.pos.load(),
+            sound_range(volume, event_fixed_range(sound)),
+            except,
+        );
+    }
+
     pub fn play_sound_raw_expect(
         &self,
         player: &Player,
