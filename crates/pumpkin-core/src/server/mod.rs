@@ -1284,7 +1284,7 @@ impl Server {
 
         for world in worlds.iter() {
             world.flush_block_updates();
-            world.flush_synced_block_events();
+            // No block events: vanilla runs them only when the level ticks.
             // A frozen level still runs `chunkSource.tick`, so tracked entities still send.
             world.entity_tracker.update_all(world);
 

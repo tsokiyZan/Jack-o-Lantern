@@ -284,7 +284,9 @@ pub struct World {
     /// Block Behaviour
     pub block_registry: Arc<BlockRegistry>,
     pub server: Weak<Server>,
-    synced_block_event_queue: std::sync::Mutex<Vec<BlockEvent>>,
+    /// Vanilla `ServerLevel.blockEvents`, an `ObjectLinkedOpenHashSet`: queued in order, an
+    /// event already waiting is not queued twice.
+    synced_block_event_queue: std::sync::Mutex<indexmap::IndexSet<BlockEvent>>,
     /// Vanilla `ServerLevel.handlingTick`: set from the start of the level tick through the
     /// block events, cleared before entities and block entities tick.
     handling_tick: std::sync::atomic::AtomicBool,
@@ -447,7 +449,7 @@ impl World {
             block_registry,
             sea_level: generation_settings.sea_level,
             min_y: i32::from(generation_settings.shape.min_y),
-            synced_block_event_queue: std::sync::Mutex::new(Vec::new()),
+            synced_block_event_queue: std::sync::Mutex::new(indexmap::IndexSet::new()),
             handling_tick: std::sync::atomic::AtomicBool::new(false),
             unsent_block_changes: std::sync::Mutex::new(HashMap::new()),
             portal_poi: std::sync::Mutex::new(portal_poi),
@@ -1020,34 +1022,44 @@ impl World {
         }
     }
 
+    /// Vanilla `ServerLevel.blockEvent`, with the block at `pos` as the event's block.
     pub fn add_synced_block_event(&self, pos: BlockPos, r#type: u8, data: u8) {
-        let mut queue = self
-            .synced_block_event_queue
+        let block = self.get_block(&pos).id;
+        self.synced_block_event_queue
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        queue.push(BlockEvent { pos, r#type, data });
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .insert(BlockEvent {
+                pos,
+                block,
+                r#type,
+                data,
+            });
     }
 
+    /// Vanilla `ServerLevel.runBlockEvents`: runs events until the queue is empty, including
+    /// those queued by the events themselves; an event whose block has changed is dropped.
     pub fn flush_synced_block_events(self: &Arc<Self>) {
-        // THIS IS IMPORTANT
-        // it prevents deadlocks and also removes the need to wait for a lock when adding a new synced block
-        let events = {
-            let mut queue = self
+        loop {
+            // The lock is released before the event runs: it may queue more events.
+            let Some(event) = self
                 .synced_block_event_queue
                 .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            std::mem::take(&mut *queue)
-        };
-
-        for event in events {
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .shift_remove_index(0)
+            else {
+                break;
+            };
             let block = self.get_block(&event.pos);
-            if !self.block_registry.on_synced_block_event(
-                block,
-                self,
-                &event.pos,
-                event.r#type,
-                event.data,
-            ) {
+            // `doBlockEvent`: `state.is(eventData.block())`.
+            if block.id != event.block
+                || !self.block_registry.on_synced_block_event(
+                    block,
+                    self,
+                    &event.pos,
+                    event.r#type,
+                    event.data,
+                )
+            {
                 continue;
             }
             let chunk_pos = event.pos.chunk_position();
@@ -1897,7 +1909,6 @@ impl World {
 
         self.handling_tick.store(true, Relaxed);
         self.flush_block_updates();
-        self.flush_synced_block_events();
         self.update_active_chunks();
         self.tick_environment();
         let mut raids = {
@@ -1923,6 +1934,9 @@ impl World {
         let t_chunks = std::time::Instant::now();
         self.tick_chunks(server);
         let chunk_elapsed = t_chunks.elapsed();
+        // Vanilla `runBlockEvents`: after the block, fluid and chunk ticks, so an event queued
+        // by a scheduled tick runs (and a piston starts moving) in the same game tick.
+        self.flush_synced_block_events();
         self.handling_tick.store(false, Relaxed);
         // Vanilla `ServerChunkCache.tick` ends with `chunkMap.tick`, every tracked entity's
         // `sendChanges`: what changed last tick and between ticks goes out before entities tick.
