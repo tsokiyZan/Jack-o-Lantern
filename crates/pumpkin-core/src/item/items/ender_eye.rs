@@ -85,8 +85,10 @@ impl ItemBehaviour for EnderEyeItem {
         if !hit.is_miss && world.get_block(&hit.block_pos) == &Block::END_PORTAL_FRAME {
             return InteractionResult::PASS;
         }
-        // TODO: `startUsingItem(hand)`, which marks the player as using an item with no
-        // use duration.
+        // `startUsingItem(hand)`: the eye has no use duration, so the use only ends when the
+        // client lets go or the hand stops holding an eye.
+        let stack = player.inventory.get_stack_in_hand(hand);
+        crate::item::start_using_item(player, hand, stack, 0);
 
         let origin = player.get_entity().block_pos.load();
         let target_block_pos = find_stronghold(&world, origin);
