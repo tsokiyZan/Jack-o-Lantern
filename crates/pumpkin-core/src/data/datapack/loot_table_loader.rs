@@ -30,11 +30,10 @@ fn parse_pool(val: &Value) -> DynamicLootPool {
     let (min_rolls, max_rolls) = val.get("rolls").map_or((1, 1), parse_rolls);
 
     let mut entries = Vec::new();
-    let mut empty_weight = 0;
 
     if let Some(entries_val) = val.get("entries").and_then(Value::as_array) {
         for entry_val in entries_val {
-            parse_entry(entry_val, &mut entries, &mut empty_weight);
+            parse_entry(entry_val, &mut entries);
         }
     }
 
@@ -45,7 +44,6 @@ fn parse_pool(val: &Value) -> DynamicLootPool {
         entries,
         min_rolls,
         max_rolls,
-        empty_weight,
         condition,
     }
 }
@@ -85,7 +83,7 @@ fn parse_rolls(val: &Value) -> (i32, i32) {
     (1, 1)
 }
 
-fn parse_entry(val: &Value, pool_entries: &mut Vec<DynamicLootEntry>, empty_weight: &mut i32) {
+fn parse_entry(val: &Value, pool_entries: &mut Vec<DynamicLootEntry>) {
     let entry_type = val
         .get("type")
         .and_then(Value::as_str)
@@ -95,7 +93,15 @@ fn parse_entry(val: &Value, pool_entries: &mut Vec<DynamicLootEntry>, empty_weig
 
     match entry_type {
         "empty" => {
-            *empty_weight += weight;
+            let conditions = val.get("conditions").map_or(Vec::new(), parse_conditions);
+            pool_entries.push(DynamicLootEntry {
+                item: None,
+                weight,
+                min_count: 1,
+                max_count: 1,
+                condition: combine_conditions(conditions),
+                bonus_formula: None,
+            });
         }
         "item" | "tag" => {
             if let Some(name) = val.get("name").and_then(Value::as_str) {
@@ -105,7 +111,7 @@ fn parse_entry(val: &Value, pool_entries: &mut Vec<DynamicLootEntry>, empty_weig
                 let condition = combine_conditions(conditions);
 
                 pool_entries.push(DynamicLootEntry {
-                    item: name.to_string(),
+                    item: Some(name.to_string()),
                     weight,
                     min_count,
                     max_count,
@@ -117,7 +123,7 @@ fn parse_entry(val: &Value, pool_entries: &mut Vec<DynamicLootEntry>, empty_weig
         "alternatives" | "group" | "sequence" => {
             if let Some(children) = val.get("children").and_then(Value::as_array) {
                 for child in children {
-                    parse_entry(child, pool_entries, empty_weight);
+                    parse_entry(child, pool_entries);
                 }
             }
         }
@@ -184,14 +190,22 @@ fn parse_functions(val: &Value) -> (i32, i32, Option<LootBonusFormula>) {
                     }
                 }
             }
-            "looting_enchant" => {
-                let max_bonus = func.get("count").map_or(1, |c| {
-                    c.get("max")
-                        .and_then(Value::as_i64)
-                        .or_else(|| c.as_i64())
-                        .unwrap_or(1) as i32
+            "looting_enchant" | "enchanted_count_increase" => {
+                let (min, max) = func.get("count").map_or((0.0, 1.0), |c| {
+                    c.as_f64().map_or_else(
+                        || {
+                            let bound = |key| c.get(key).and_then(Value::as_f64).unwrap_or(0.0);
+                            (bound("min") as f32, bound("max") as f32)
+                        },
+                        |constant| (constant as f32, constant as f32),
+                    )
                 });
-                bonus_formula = Some(LootBonusFormula::UniformBonusCount(max_bonus.max(1)));
+                let limit = func
+                    .get("limit")
+                    .and_then(Value::as_i64)
+                    .filter(|limit| *limit > 0)
+                    .map(|limit| limit as i32);
+                bonus_formula = Some(LootBonusFormula::EnchantedCountIncrease { min, max, limit });
             }
             _ => {}
         }
@@ -417,12 +431,13 @@ mod tests {
         let pool = &table.pools[0];
         assert_eq!(pool.min_rolls, 2);
         assert_eq!(pool.max_rolls, 2);
-        assert_eq!(pool.empty_weight, 10);
-        assert_eq!(pool.entries.len(), 1);
-        assert_eq!(pool.entries[0].item, "minecraft:diamond");
+        assert_eq!(pool.entries.len(), 2);
+        assert_eq!(pool.entries[0].item.as_deref(), Some("minecraft:diamond"));
         assert_eq!(pool.entries[0].weight, 5);
         assert_eq!(pool.entries[0].min_count, 1);
         assert_eq!(pool.entries[0].max_count, 3);
+        assert_eq!(pool.entries[1].item, None);
+        assert_eq!(pool.entries[1].weight, 10);
     }
 
     #[test]
@@ -478,9 +493,9 @@ mod tests {
         assert_eq!(table.pools.len(), 1);
         let pool = &table.pools[0];
         assert_eq!(pool.entries.len(), 2);
-        assert_eq!(pool.entries[0].item, "minecraft:coal_ore");
+        assert_eq!(pool.entries[0].item.as_deref(), Some("minecraft:coal_ore"));
         assert_eq!(pool.entries[0].condition, DynamicLootCondition::SilkTouch);
-        assert_eq!(pool.entries[1].item, "minecraft:coal");
+        assert_eq!(pool.entries[1].item.as_deref(), Some("minecraft:coal"));
         assert_eq!(
             pool.entries[1].bonus_formula,
             Some(LootBonusFormula::OreDrops)

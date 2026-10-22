@@ -56,6 +56,13 @@ enum CountStruct {
 }
 
 impl CountStruct {
+    /// The bounds as a float provider reads them.
+    fn float_bounds(&self) -> (f32, f32) {
+        match self {
+            Self::Constant(v) => (*v, *v),
+            Self::Provider { min, max, .. } => (*min, *max),
+        }
+    }
     fn min(&self) -> i32 {
         match self {
             Self::Constant(v) => v.round() as i32,
@@ -408,6 +415,9 @@ struct EntryFunctionStruct {
     #[serde(default)]
     parameters: Option<BonusParameterStruct>,
     count: Option<CountStruct>,
+    /// An int for `enchanted_count_increase`, a range for `limit_count`.
+    #[serde(default)]
+    limit: Option<serde_json::Value>,
     #[serde(default)]
     condition: Option<ConditionValue>,
 }
@@ -474,7 +484,7 @@ fn path_to_ident(relative: &str) -> String {
 }
 
 struct ParsedEntry {
-    item: String,
+    item: Option<String>,
     weight: i32,
     min_count: i32,
     max_count: i32,
@@ -487,9 +497,8 @@ fn extract_entries(
     entry: &PoolEntryStruct,
     inherited_condition: LootCondition,
     out: &mut Vec<ParsedEntry>,
-    empty_weight: &mut i32,
 ) {
-    extract_entries_with_depth(entry, inherited_condition, None, out, empty_weight, 0);
+    extract_entries_with_depth(entry, inherited_condition, None, out, 0);
 }
 
 fn extract_entries_with_depth(
@@ -497,7 +506,6 @@ fn extract_entries_with_depth(
     inherited_condition: LootCondition,
     inherited_smelt: Option<LootCondition>,
     out: &mut Vec<ParsedEntry>,
-    empty_weight: &mut i32,
     depth: usize,
 ) {
     if depth > 5 {
@@ -519,7 +527,15 @@ fn extract_entries_with_depth(
 
     match entry.entry_type.as_str() {
         "minecraft:empty" => {
-            *empty_weight += entry.weight;
+            out.push(ParsedEntry {
+                item: None,
+                weight: entry.weight,
+                min_count: 1,
+                max_count: 1,
+                condition: entry_cond,
+                bonus_formula: None,
+                furnace_smelt: None,
+            });
         }
         "minecraft:item" => {
             if let Some(name) = &entry.name {
@@ -559,15 +575,28 @@ fn extract_entries_with_depth(
                             _ => None,
                         }
                     } else if f.function == "minecraft:enchanted_count_increase" {
-                        let mult = f.count.as_ref().map_or(1, |c| c.max());
-                        Some(LootBonusFormula::UniformBonusCount(mult))
+                        let (min, max) = f
+                            .count
+                            .as_ref()
+                            .map_or((0.0, 0.0), CountStruct::float_bounds);
+                        Some(LootBonusFormula::EnchantedCountIncrease {
+                            min,
+                            max,
+                            // `NO_LIMIT` is 0.
+                            limit: f
+                                .limit
+                                .as_ref()
+                                .and_then(serde_json::Value::as_i64)
+                                .filter(|limit| *limit > 0)
+                                .map(|limit| limit as i32),
+                        })
                     } else {
                         None
                     }
                 });
 
                 out.push(ParsedEntry {
-                    item: name.clone(),
+                    item: Some(name.clone()),
                     weight: entry.weight,
                     min_count,
                     max_count,
@@ -599,7 +628,7 @@ fn extract_entries_with_depth(
                     if let Ok(tag_data) = serde_json::from_str::<TagJson>(&content) {
                         for item_name in tag_data.values {
                             out.push(ParsedEntry {
-                                item: item_name,
+                                item: Some(item_name),
                                 weight: entry.weight,
                                 min_count: 1,
                                 max_count: 1,
@@ -631,7 +660,6 @@ fn extract_entries_with_depth(
                                     pool_cond,
                                     furnace_smelt,
                                     out,
-                                    empty_weight,
                                     depth + 1,
                                 );
                             }
@@ -652,7 +680,6 @@ fn extract_entries_with_depth(
                             pool_cond,
                             furnace_smelt,
                             out,
-                            empty_weight,
                             depth + 1,
                         );
                     }
@@ -679,7 +706,6 @@ fn extract_entries_with_depth(
                                         pool_cond,
                                         furnace_smelt,
                                         out,
-                                        empty_weight,
                                         depth + 1,
                                     );
                                 }
@@ -716,26 +742,12 @@ fn extract_entries_with_depth(
                     entry_cond
                 };
 
-                extract_entries_with_depth(
-                    child,
-                    effective_cond,
-                    furnace_smelt,
-                    out,
-                    empty_weight,
-                    depth + 1,
-                );
+                extract_entries_with_depth(child, effective_cond, furnace_smelt, out, depth + 1);
             }
         }
         "minecraft:sequence" | "minecraft:group" => {
             for child in &entry.children {
-                extract_entries_with_depth(
-                    child,
-                    entry_cond,
-                    furnace_smelt,
-                    out,
-                    empty_weight,
-                    depth + 1,
-                );
+                extract_entries_with_depth(child, entry_cond, furnace_smelt, out, depth + 1);
             }
         }
         _ => {}
@@ -824,6 +836,13 @@ fn bonus_to_tokens(bonus: Option<LootBonusFormula>) -> TokenStream {
         Some(LootBonusFormula::BinomialWithBonusCount { extra, probability }) => {
             quote! { Some(LootBonusFormula::BinomialWithBonusCount { extra: #extra, probability: #probability }) }
         }
+        Some(LootBonusFormula::EnchantedCountIncrease { min, max, limit }) => {
+            let limit = match limit {
+                Some(limit) => quote! { Some(#limit) },
+                None => quote! { None },
+            };
+            quote! { Some(LootBonusFormula::EnchantedCountIncrease { min: #min, max: #max, limit: #limit }) }
+        }
     }
 }
 
@@ -843,21 +862,21 @@ fn emit_table(
         let pool_cond = condition_of(pool.condition.as_ref());
 
         let mut parsed_entries = Vec::new();
-        let mut empty_weight: i32 = 0;
 
         for entry in &pool.entries {
-            extract_entries(
-                entry,
-                LootCondition::None,
-                &mut parsed_entries,
-                &mut empty_weight,
-            );
+            extract_entries(entry, LootCondition::None, &mut parsed_entries);
         }
 
         let entry_literals: Vec<TokenStream> = parsed_entries
             .iter()
             .map(|e| {
-                let name_lit = LitStr::new(&e.item, Span::call_site());
+                let item = e.item.as_ref().map_or_else(
+                    || quote! { None },
+                    |item| {
+                        let item = LitStr::new(item, Span::call_site());
+                        quote! { Some(#item) }
+                    },
+                );
                 let weight = e.weight;
                 let min_count = e.min_count;
                 let max_count = e.max_count;
@@ -873,7 +892,7 @@ fn emit_table(
 
                 quote! {
                     LootEntry {
-                        item: #name_lit,
+                        item: #item,
                         weight: #weight,
                         min_count: #min_count,
                         max_count: #max_count,
@@ -898,7 +917,6 @@ fn emit_table(
                 entries: #entries_ident,
                 min_rolls: #min_rolls,
                 max_rolls: #max_rolls,
-                empty_weight: #empty_weight,
                 condition: #pool_cond_tokens,
             }
         });

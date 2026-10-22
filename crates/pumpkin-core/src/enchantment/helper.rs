@@ -147,6 +147,23 @@ impl EnchantmentHelper {
         }
     }
 
+    /// Vanilla `EnchantmentHelper.getEnchantmentLevel(Holder<Enchantment>, LivingEntity)`: the
+    /// best level among the items in the slots `enchantment` works from.
+    pub fn get_enchantment_level(
+        enchantment: &'static Enchantment,
+        caller: &dyn EntityBase,
+        living: &LivingEntity,
+    ) -> i32 {
+        EquipmentSlot::VALUES
+            .iter()
+            .filter(|slot| enchantment.matching_slot(slot))
+            .map(|slot| living.get_item_by_slot(caller, slot))
+            .filter(|stack| !stack.is_empty())
+            .map(|stack| stack.get_enchantment_level(enchantment))
+            .max()
+            .unwrap_or(0)
+    }
+
     /// Vanilla `EnchantmentHelper.forEachModifier(ItemStack, EquipmentSlot, BiConsumer)`: the
     /// `minecraft:attributes` modifiers of the enchantments active in `slot`.
     pub fn for_each_modifier<F>(stack: &ItemStack, slot: &EquipmentSlot, mut f: F)

@@ -1,4 +1,5 @@
 use pumpkin_data::BlockState;
+use pumpkin_data::Enchantment;
 use pumpkin_data::damage::DamageType;
 use pumpkin_data::data_component_impl::EnchantmentsImpl;
 use pumpkin_data::entity::EntityType;
@@ -11,6 +12,7 @@ pub use pumpkin_util::loot_table::{
     DynamicLootCondition, DynamicLootEntry, DynamicLootPool, DynamicLootTable, LootBonusFormula,
     LootCondition, LootEntry, LootPool, LootTable,
 };
+use pumpkin_util::math::java_round_f32;
 use pumpkin_util::random::legacy_rand::LegacyRand;
 use pumpkin_util::random::{RandomImpl, shuffle};
 
@@ -24,6 +26,9 @@ pub struct LootContextParameters {
     pub luck: f32,
     pub this_entity: Option<&'static EntityType>,
     pub killer_entity: Option<&'static EntityType>,
+    /// Vanilla `EnchantmentHelper.getEnchantmentLevel(LOOTING, ATTACKING_ENTITY)`: 0 unless the
+    /// attacker is a living entity with Looting in a slot Looting works from.
+    pub attacking_entity_looting_level: i32,
     pub direct_killer_entity: Option<&'static EntityType>,
     pub position: Option<pumpkin_util::math::vector3::Vector3<f64>>,
     pub world_time: u64,
@@ -137,9 +142,10 @@ fn check_dynamic_condition<R: RandomImpl>(
             enchanted_chance_base,
             enchanted_chance_per_level_above_first,
         } => {
-            let chance = if fortune_level > 0 {
-                enchanted_chance_base
-                    + enchanted_chance_per_level_above_first * (fortune_level - 1) as f32
+            // Vanilla reads the attacker's Looting, not the tool.
+            let level = params.attacking_entity_looting_level;
+            let chance = if level > 0 {
+                enchanted_chance_base + enchanted_chance_per_level_above_first * (level - 1) as f32
             } else {
                 *unenchanted_chance
             };
@@ -218,9 +224,10 @@ fn check_condition<R: RandomImpl>(
             enchanted_chance_base,
             enchanted_chance_per_level_above_first,
         } => {
-            let chance = if fortune_level > 0 {
-                enchanted_chance_base
-                    + enchanted_chance_per_level_above_first * (fortune_level - 1) as f32
+            // Vanilla reads the attacker's Looting, not the tool.
+            let level = params.attacking_entity_looting_level;
+            let chance = if level > 0 {
+                enchanted_chance_base + enchanted_chance_per_level_above_first * (level - 1) as f32
             } else {
                 unenchanted_chance
             };
@@ -259,19 +266,42 @@ fn check_condition<R: RandomImpl>(
     }
 }
 
+/// The tool's Fortune level, which `apply_bonus` and `table_bonus` read.
+fn tool_fortune_level(params: &LootContextParameters) -> i32 {
+    params
+        .tool
+        .as_ref()
+        .map_or(0, |tool| tool.get_enchantment_level(&Enchantment::FORTUNE))
+}
+
+fn tool_has_silk_touch(params: &LootContextParameters) -> bool {
+    params
+        .tool
+        .as_ref()
+        .is_some_and(|tool| tool.get_enchantment_level(&Enchantment::SILK_TOUCH) > 0)
+}
+
+fn tool_is_shears(params: &LootContextParameters) -> bool {
+    params
+        .tool
+        .as_ref()
+        .is_some_and(|tool| tool.item == &Item::SHEARS)
+}
+
 fn apply_bonus_formula<R: RandomImpl>(
-    base_count: i32,
+    count: i32,
     bonus: LootBonusFormula,
     fortune_level: i32,
+    params: &LootContextParameters,
     rng: &mut R,
 ) -> i32 {
     match bonus {
         LootBonusFormula::OreDrops => {
             if fortune_level > 0 {
                 let bonus = (rng.next_bounded_i32(fortune_level + 2) - 1).max(0);
-                base_count * (bonus + 1)
+                count * (bonus + 1)
             } else {
-                base_count
+                count
             }
         }
         LootBonusFormula::UniformBonusCount(bonus_multiplier) => {
@@ -281,7 +311,7 @@ fn apply_bonus_formula<R: RandomImpl>(
             } else {
                 0
             };
-            base_count + extra
+            count + extra
         }
         LootBonusFormula::BinomialWithBonusCount { extra, probability } => {
             let n = fortune_level + extra;
@@ -291,132 +321,138 @@ fn apply_bonus_formula<R: RandomImpl>(
                     bonus_count += 1;
                 }
             }
-            base_count + bonus_count
+            count + bonus_count
+        }
+        // Vanilla `EnchantedCountIncreaseFunction.run`.
+        LootBonusFormula::EnchantedCountIncrease { min, max, limit } => {
+            let level = params.attacking_entity_looting_level;
+            if level == 0 {
+                return count;
+            }
+            let count = count + java_round_f32(level as f32 * rng.mth_next_float(min, max));
+            limit.map_or(count, |limit| count.min(limit))
         }
     }
 }
 
-#[expect(clippy::too_many_lines)]
+/// Vanilla `LootPool.addRandomItem`'s pick among the entries that expanded with a positive
+/// weight: a lone entry is taken without a draw.
+fn pick_entry<'a, E, R: RandomImpl>(
+    valid_entries: &[&'a E],
+    weight: impl Fn(&E) -> i32,
+    random: &mut R,
+) -> Option<&'a E> {
+    let total_weight: i32 = valid_entries.iter().map(|entry| weight(entry)).sum();
+    if total_weight == 0 {
+        return None;
+    }
+    if let [entry] = valid_entries {
+        return Some(entry);
+    }
+    let mut index = random.next_bounded_i32(total_weight);
+    valid_entries.iter().copied().find(|entry| {
+        index -= weight(entry);
+        index < 0
+    })
+}
+
+/// Vanilla `LootTable.createStackSplitter`: a stack at or over its max size goes out in
+/// max-size pieces.
+fn split_stack(stack: ItemStack, output: &mut Vec<ItemStack>) {
+    if stack.is_empty() {
+        return;
+    }
+    let max = stack.get_max_stack_size();
+    if stack.item_count < max {
+        output.push(stack);
+        return;
+    }
+    let mut count = stack.item_count;
+    while count > 0 {
+        let piece = stack.copy_with_count(count.min(max));
+        count -= piece.item_count;
+        output.push(piece);
+    }
+}
+
+/// The item an entry names with its `set_count` and bonus count applied, before any
+/// `furnace_smelt`.
+fn roll_item_stack<R: RandomImpl>(
+    item: &str,
+    min_count: i32,
+    max_count: i32,
+    bonus_formula: Option<LootBonusFormula>,
+    fortune_level: i32,
+    params: &LootContextParameters,
+    random: &mut R,
+) -> Option<ItemStack> {
+    // `set_count`: `Mth.nextInt`, no draw for a constant.
+    let mut count = random.next_inbetween_i32(min_count, max_count);
+    if let Some(bonus) = bonus_formula {
+        count = apply_bonus_formula(count, bonus, fortune_level, params, random);
+    }
+    let item = Item::from_registry_key(item.strip_prefix("minecraft:").unwrap_or(item))?;
+    (count > 0).then(|| ItemStack::new(u8::try_from(count).unwrap_or(u8::MAX), item))
+}
+
 fn evaluate_static<R: RandomImpl>(
     table: &LootTable,
     random: &mut R,
     params: &LootContextParameters,
 ) -> Vec<ItemStack> {
     let mut items_to_place: Vec<ItemStack> = Vec::new();
-
-    let has_silk_touch = params.tool.as_ref().is_some_and(|tool| {
-        pumpkin_data::Enchantment::from_name("silk_touch")
-            .is_some_and(|e| tool.get_enchantment_level(e) > 0)
-    });
-
-    let has_shears = params.tool.as_ref().is_some_and(|tool| {
-        let name = tool
-            .item
-            .registry_key
-            .strip_prefix("minecraft:")
-            .unwrap_or(tool.item.registry_key);
-        name == "shears"
-    });
-
-    let fortune_level = params.tool.as_ref().map_or(0, |tool| {
-        let fortune = pumpkin_data::Enchantment::from_name("fortune")
-            .map_or(0, |e| tool.get_enchantment_level(e));
-        let looting = pumpkin_data::Enchantment::from_name("looting")
-            .map_or(0, |e| tool.get_enchantment_level(e));
-        fortune.max(looting)
-    });
-
-    for pool in table.pools {
-        if !check_condition(
-            pool.condition,
+    let has_silk_touch = tool_has_silk_touch(params);
+    let has_shears = tool_is_shears(params);
+    let fortune_level = tool_fortune_level(params);
+    let check = |cond: LootCondition, random: &mut R| {
+        check_condition(
+            cond,
             has_silk_touch,
             has_shears,
             fortune_level,
             params,
             random,
-        ) {
+        )
+    };
+
+    // Vanilla `LootPool.addRandomItems`; no vanilla table has `bonus_rolls`, so luck adds
+    // no rolls here.
+    for pool in table.pools {
+        if !check(pool.condition, random) {
             continue;
         }
-
-        let eligible_entries: Vec<&LootEntry> = pool
-            .entries
-            .iter()
-            .filter(|e| {
-                check_condition(
-                    e.condition,
-                    has_silk_touch,
-                    has_shears,
-                    fortune_level,
-                    params,
-                    random,
-                )
-            })
-            .collect();
-
-        if eligible_entries.is_empty() && pool.empty_weight == 0 {
-            continue;
-        }
-
-        let range = pool.max_rolls - pool.min_rolls;
-        let rolls = pool.min_rolls
-            + if range > 0 {
-                random.next_bounded_i32(range + 1)
-            } else {
-                0
-            };
-
+        let rolls = random.next_inbetween_i32(pool.min_rolls, pool.max_rolls);
         for _ in 0..rolls {
-            let entry_weight: i32 = eligible_entries.iter().map(|e| e.weight).sum();
-            let total_weight = entry_weight + pool.empty_weight;
-            if total_weight == 0 {
-                continue;
-            }
-
-            let mut pick = random.next_bounded_i32(total_weight);
-
-            pick -= pool.empty_weight;
-            if pick < 0 {
-                continue;
-            }
-
-            for entry in &eligible_entries {
-                pick -= entry.weight;
-                if pick < 0 {
-                    let count_range = entry.max_count - entry.min_count;
-                    let base_count = entry.min_count
-                        + if count_range > 0 {
-                            random.next_bounded_i32(count_range + 1)
-                        } else {
-                            0
-                        };
-
-                    let mut final_count = base_count;
-                    if let Some(bonus) = entry.bonus_formula {
-                        final_count =
-                            apply_bonus_formula(final_count, bonus, fortune_level, random);
-                    }
-
-                    if final_count > 0 {
-                        let item_key = entry.item.strip_prefix("minecraft:").unwrap_or(entry.item);
-
-                        if let Some(item) = Item::from_registry_key(item_key) {
-                            let stack = ItemStack::new(final_count as u8, item);
-                            let smelts = entry.furnace_smelt.is_some_and(|c| {
-                                check_condition(
-                                    c,
-                                    has_silk_touch,
-                                    has_shears,
-                                    fortune_level,
-                                    params,
-                                    random,
-                                )
-                            });
-                            items_to_place.push(if smelts { smelt(stack) } else { stack });
-                        }
-                    }
-                    break;
+            // Vanilla `LootPool.addRandomItem`: each roll expands the entries again, testing
+            // their conditions.
+            let mut valid_entries: Vec<&LootEntry> = Vec::new();
+            for entry in pool.entries {
+                if check(entry.condition, random) && entry.weight > 0 {
+                    valid_entries.push(entry);
                 }
             }
+            let Some(entry) = pick_entry(&valid_entries, |entry| entry.weight, random) else {
+                continue;
+            };
+            let Some(item) = entry.item else {
+                continue;
+            };
+            let Some(stack) = roll_item_stack(
+                item,
+                entry.min_count,
+                entry.max_count,
+                entry.bonus_formula,
+                fortune_level,
+                params,
+                random,
+            ) else {
+                continue;
+            };
+            let smelts = entry.furnace_smelt.is_some_and(|c| check(c, random));
+            split_stack(
+                if smelts { smelt(stack) } else { stack },
+                &mut items_to_place,
+            );
         }
     }
 
@@ -429,128 +465,53 @@ fn evaluate_dynamic<R: RandomImpl>(
     params: &LootContextParameters,
 ) -> Vec<ItemStack> {
     let mut items_to_place: Vec<ItemStack> = Vec::new();
-
-    let has_silk_touch = params.tool.as_ref().is_some_and(|tool| {
-        pumpkin_data::Enchantment::from_name("silk_touch")
-            .is_some_and(|e| tool.get_enchantment_level(e) > 0)
-    });
-
-    let has_shears = params.tool.as_ref().is_some_and(|tool| {
-        let name = tool
-            .item
-            .registry_key
-            .strip_prefix("minecraft:")
-            .unwrap_or(tool.item.registry_key);
-        name == "shears"
-    });
-
-    let fortune_level = params.tool.as_ref().map_or(0, |tool| {
-        let fortune = pumpkin_data::Enchantment::from_name("fortune")
-            .map_or(0, |e| tool.get_enchantment_level(e));
-        let looting = pumpkin_data::Enchantment::from_name("looting")
-            .map_or(0, |e| tool.get_enchantment_level(e));
-        fortune.max(looting)
-    });
-
-    for pool in &table.pools {
-        if !check_dynamic_condition(
-            &pool.condition,
+    let has_silk_touch = tool_has_silk_touch(params);
+    let has_shears = tool_is_shears(params);
+    let fortune_level = tool_fortune_level(params);
+    let check = |cond: &DynamicLootCondition, random: &mut R| {
+        check_dynamic_condition(
+            cond,
             has_silk_touch,
             has_shears,
             fortune_level,
             params,
             random,
-        ) {
+        )
+    };
+
+    for pool in &table.pools {
+        if !check(&pool.condition, random) {
             continue;
         }
-
-        let eligible_entries: Vec<&DynamicLootEntry> = pool
-            .entries
-            .iter()
-            .filter(|e| {
-                check_dynamic_condition(
-                    &e.condition,
-                    has_silk_touch,
-                    has_shears,
-                    fortune_level,
-                    params,
-                    random,
-                )
-            })
-            .collect();
-
-        if eligible_entries.is_empty() && pool.empty_weight == 0 {
-            continue;
-        }
-
-        let range = pool.max_rolls - pool.min_rolls;
-        let rolls = pool.min_rolls
-            + if range > 0 {
-                random.next_bounded_i32(range + 1)
-            } else {
-                0
+        let rolls = random.next_inbetween_i32(pool.min_rolls, pool.max_rolls);
+        for _ in 0..rolls {
+            let mut valid_entries: Vec<&DynamicLootEntry> = Vec::new();
+            for entry in &pool.entries {
+                if check(&entry.condition, random) && entry.weight > 0 {
+                    valid_entries.push(entry);
+                }
+            }
+            let Some(entry) = pick_entry(&valid_entries, |entry| entry.weight, random) else {
+                continue;
             };
-
-        roll_dynamic_entries(
-            rolls,
-            pool.empty_weight,
-            &eligible_entries,
-            fortune_level,
-            random,
-            &mut items_to_place,
-        );
-    }
-
-    items_to_place
-}
-
-fn roll_dynamic_entries<R: RandomImpl>(
-    rolls: i32,
-    empty_weight: i32,
-    eligible_entries: &[&DynamicLootEntry],
-    fortune_level: i32,
-    rng: &mut R,
-    items_to_place: &mut Vec<ItemStack>,
-) {
-    for _ in 0..rolls {
-        let entry_weight: i32 = eligible_entries.iter().map(|e| e.weight).sum();
-        let total_weight = entry_weight + empty_weight;
-        if total_weight == 0 {
-            continue;
-        }
-
-        let mut pick = rng.next_bounded_i32(total_weight);
-        pick -= empty_weight;
-        if pick < 0 {
-            continue;
-        }
-
-        for entry in eligible_entries {
-            pick -= entry.weight;
-            if pick < 0 {
-                let count_range = entry.max_count - entry.min_count;
-                let base_count = entry.min_count
-                    + if count_range > 0 {
-                        rng.next_bounded_i32(count_range + 1)
-                    } else {
-                        0
-                    };
-
-                let mut final_count = base_count;
-                if let Some(bonus) = entry.bonus_formula {
-                    final_count = apply_bonus_formula(final_count, bonus, fortune_level, rng);
-                }
-
-                if final_count > 0 {
-                    let item_key = entry.item.strip_prefix("minecraft:").unwrap_or(&entry.item);
-                    if let Some(item) = Item::from_registry_key(item_key) {
-                        items_to_place.push(ItemStack::new(final_count as u8, item));
-                    }
-                }
-                break;
+            let Some(item) = &entry.item else {
+                continue;
+            };
+            if let Some(stack) = roll_item_stack(
+                item,
+                entry.min_count,
+                entry.max_count,
+                entry.bonus_formula,
+                fortune_level,
+                params,
+                random,
+            ) {
+                split_stack(stack, &mut items_to_place);
             }
         }
     }
+
+    items_to_place
 }
 
 /// A handle to either a compile-time static loot table or a datapack dynamic loot table.
@@ -659,18 +620,40 @@ pub fn fill_chest_inventory_handle(
     handle: &LootTableHandle,
     world: &World,
     seed: i64,
+    params: &LootContextParameters,
 ) {
     with_loot_random!(handle, world, seed, |random| fill(
-        inventory, handle, random
+        inventory, handle, random, params
     ));
+}
+
+/// Vanilla `RandomizableContainer.unpackLootTable`'s and
+/// `ContainerEntity.unpackChestVehicleLootTable`'s parameters: `ORIGIN`, and with a player,
+/// its luck and `THIS_ENTITY`.
+#[must_use]
+pub fn container_unpack_params(
+    origin: pumpkin_util::math::vector3::Vector3<f64>,
+    player: Option<&crate::entity::player::Player>,
+) -> LootContextParameters {
+    LootContextParameters {
+        position: Some(origin),
+        luck: player.map_or(0.0, |player| {
+            player
+                .living_entity
+                .get_attribute_value(&pumpkin_data::attributes::Attributes::LUCK) as f32
+        }),
+        this_entity: player.map(|player| player.living_entity.entity.entity_type),
+        ..Default::default()
+    }
 }
 
 fn fill<R: RandomImpl>(
     inventory: &std::sync::Arc<dyn pumpkin_inventory::Inventory>,
     handle: &LootTableHandle,
     random: &mut R,
+    params: &LootContextParameters,
 ) {
-    let mut items = handle.evaluate(random, &LootContextParameters::default());
+    let mut items = handle.evaluate(random, params);
     let mut available_slots = get_available_slots(inventory, random);
     shuffle_and_split_items(&mut items, available_slots.len(), random);
     for item in items {
@@ -742,9 +725,10 @@ mod tests {
 
     use pumpkin_data::entity::EntityType;
     use pumpkin_data::item::Item;
-    use pumpkin_data::loot_table::ENTITIES_MAGMA_CUBE;
+    use pumpkin_data::loot_table::{ENTITIES_MAGMA_CUBE, ENTITIES_SKELETON};
     use pumpkin_inventory::{Inventory, SimpleInventory};
     use pumpkin_util::loot_table::{LootCondition, LootEntry, LootPool, LootTable};
+    use pumpkin_util::random::RandomImpl;
     use pumpkin_util::random::legacy_rand::LegacyRand;
     use pumpkin_util::random::trace::{Draw, TraceRandom};
 
@@ -788,6 +772,93 @@ mod tests {
         assert!(magma_cube_drops(&EntityType::ZOMBIE, None).is_empty());
     }
 
+    /// `LootPool.addRandomItem` skips the pick for a single entry, and
+    /// `EnchantedCountIncreaseFunction` skips its draw without a looting killer, so only each
+    /// pool's `set_count` draws.
+    #[test]
+    fn a_skeleton_without_a_killer_draws_only_its_two_counts() {
+        let mut random = TraceRandom::from_seed(0);
+        evaluate_static(
+            &ENTITIES_SKELETON,
+            &mut random,
+            &LootContextParameters {
+                this_entity: Some(&EntityType::SKELETON),
+                ..Default::default()
+            },
+        );
+        assert_eq!(
+            random.draws,
+            [Draw::NextIntBounded(3), Draw::NextIntBounded(3)]
+        );
+    }
+
+    /// `EnchantedCountIncreaseFunction` reads the killer's Looting and draws a float count.
+    #[test]
+    fn a_skeleton_killed_with_looting_draws_a_float_per_count() {
+        let mut random = TraceRandom::from_seed(0);
+        evaluate_static(
+            &ENTITIES_SKELETON,
+            &mut random,
+            &LootContextParameters {
+                this_entity: Some(&EntityType::SKELETON),
+                attacking_entity_looting_level: 2,
+                ..Default::default()
+            },
+        );
+        assert_eq!(
+            random.draws,
+            [
+                Draw::NextIntBounded(3),
+                Draw::NextFloat,
+                Draw::NextIntBounded(3),
+                Draw::NextFloat,
+            ]
+        );
+    }
+
+    /// Vanilla walks the entries in order, so an `empty` entry listed after an item takes the
+    /// upper part of the pick.
+    #[test]
+    fn an_empty_entry_keeps_its_place_in_the_pick() {
+        static DIAMOND_THEN_EMPTY: LootTable = LootTable {
+            random_sequence: None,
+            pools: &[LootPool {
+                entries: &[
+                    LootEntry {
+                        item: Some("minecraft:diamond"),
+                        weight: 1,
+                        min_count: 1,
+                        max_count: 1,
+                        condition: LootCondition::None,
+                        bonus_formula: None,
+                        furnace_smelt: None,
+                    },
+                    LootEntry {
+                        item: None,
+                        weight: 1,
+                        min_count: 1,
+                        max_count: 1,
+                        condition: LootCondition::None,
+                        bonus_formula: None,
+                        furnace_smelt: None,
+                    },
+                ],
+                min_rolls: 1,
+                max_rolls: 1,
+                condition: LootCondition::None,
+            }],
+        };
+        for seed in 0..32 {
+            let drops = evaluate_static(
+                &DIAMOND_THEN_EMPTY,
+                &mut LegacyRand::from_seed(seed),
+                &LootContextParameters::default(),
+            );
+            let picks_diamond = LegacyRand::from_seed(seed).next_bounded_i32(2) == 0;
+            assert_eq!(drops.len(), usize::from(picks_diamond), "seed {seed}");
+        }
+    }
+
     static EMPTY_TABLE: LootTable = LootTable {
         random_sequence: None,
         pools: &[],
@@ -797,7 +868,7 @@ mod tests {
         random_sequence: None,
         pools: &[LootPool {
             entries: &[LootEntry {
-                item: "minecraft:diamond",
+                item: Some("minecraft:diamond"),
                 weight: 1,
                 min_count: 2,
                 max_count: 2,
@@ -807,7 +878,6 @@ mod tests {
             }],
             min_rolls: 1,
             max_rolls: 1,
-            empty_weight: 0,
             condition: LootCondition::None,
         }],
     };
@@ -815,7 +885,12 @@ mod tests {
     fn fill_draws(table: &'static LootTable, slots: usize) -> Vec<Draw> {
         let inventory: Arc<dyn Inventory> = Arc::new(SimpleInventory::new(slots));
         let mut random = TraceRandom::from_seed(0);
-        fill(&inventory, &LootTableHandle::Static(table), &mut random);
+        fill(
+            &inventory,
+            &LootTableHandle::Static(table),
+            &mut random,
+            &LootContextParameters::default(),
+        );
         random.draws
     }
 
@@ -835,8 +910,6 @@ mod tests {
         assert_eq!(
             fill_draws(&TWO_DIAMONDS, 3),
             [
-                // The pool's roll picks its only entry; Task 9 owns that draw.
-                Draw::NextIntBounded(1),
                 Draw::NextIntBounded(3),
                 Draw::NextIntBounded(2),
                 Draw::NextIntBounded(2),

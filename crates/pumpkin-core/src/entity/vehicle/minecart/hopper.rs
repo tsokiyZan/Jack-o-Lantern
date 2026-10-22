@@ -118,10 +118,12 @@ impl HopperMinecart {
         &self,
         custom_name: Option<TextComponent>,
         player: &Arc<Player>,
+        origin: Vector3<f64>,
     ) -> bool {
         container::open(
             custom_name,
             player,
+            origin,
             &self.inventory,
             TextComponent::translate_cross(
                 translation::java::ENTITY_MINECRAFT_HOPPER_MINECART,

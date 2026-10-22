@@ -1,3 +1,4 @@
+use pumpkin_data::Enchantment;
 use pumpkin_data::data_component_impl::EquipmentSlot;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::translation;
@@ -32,6 +33,7 @@ use crate::command::node::dispatcher::CommandDispatcher;
 use crate::command::node::{CommandExecutor, CommandExecutorResult};
 use crate::command::suggestion::provider::{SuggestionProvider, SuggestionProviderResult};
 use crate::command::suggestion::suggestions::SuggestionsBuilder;
+use crate::enchantment::EnchantmentHelper;
 use crate::entity::EntityBase;
 use crate::world::loot::LootContextParameters;
 
@@ -396,6 +398,13 @@ impl CommandExecutor for LootExecutor {
                 });
                 let params = LootContextParameters {
                     killed_by_player: Some(killer.is_some()),
+                    attacking_entity_looting_level: killer.as_ref().map_or(0, |killer| {
+                        EnchantmentHelper::get_enchantment_level(
+                            &Enchantment::LOOTING,
+                            killer.as_ref(),
+                            &killer.living_entity,
+                        )
+                    }),
                     tool: killer_tool,
                     position: killer.as_ref().map(|p| p.position()),
                     ..Default::default()

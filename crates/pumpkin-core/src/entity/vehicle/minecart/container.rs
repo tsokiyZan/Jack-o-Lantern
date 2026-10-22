@@ -89,7 +89,12 @@ impl MinecartInventory {
     }
 
     /// Vanilla `ContainerEntity.unpackChestVehicleLootTable`.
-    pub(super) fn unpack_loot(self: &Arc<Self>, world: &World) {
+    pub(super) fn unpack_loot(
+        self: &Arc<Self>,
+        world: &World,
+        origin: Vector3<f64>,
+        player: Option<&Player>,
+    ) {
         let loot_table = self
             .loot_table
             .lock()
@@ -107,7 +112,13 @@ impl MinecartInventory {
         };
 
         let inventory: Arc<dyn Inventory> = self.clone();
-        crate::world::loot::fill_chest_inventory_handle(&inventory, &table, world, seed);
+        crate::world::loot::fill_chest_inventory_handle(
+            &inventory,
+            &table,
+            world,
+            seed,
+            &crate::world::loot::container_unpack_params(origin, player),
+        );
     }
 }
 
@@ -204,12 +215,13 @@ impl ScreenHandlerFactory for MinecartScreenFactory {
 pub(super) fn open(
     custom_name: Option<TextComponent>,
     player: &Arc<Player>,
+    origin: Vector3<f64>,
     inventory: &Arc<MinecartInventory>,
     title: TextComponent,
     hopper: bool,
 ) -> bool {
     if !player.is_spectator() {
-        inventory.unpack_loot(&player.world());
+        inventory.unpack_loot(&player.world(), origin, Some(player));
     }
 
     player
@@ -297,7 +309,11 @@ mod tests {
         assert!(deferred.get_list("Items").is_none());
 
         let (_folder, world) = crate::world::test_support::test_world();
-        inventory.unpack_loot(&world);
+        inventory.unpack_loot(
+            &world,
+            pumpkin_util::math::vector3::Vector3::new(0.0, 0.0, 0.0),
+            None,
+        );
         assert!(!inventory.is_empty());
 
         let mut unpacked = NbtCompound::new();

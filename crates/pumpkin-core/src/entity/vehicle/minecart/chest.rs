@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use pumpkin_data::translation;
 use pumpkin_nbt::compound::NbtCompound;
+use pumpkin_util::math::vector3::Vector3;
 use pumpkin_util::text::TextComponent;
 
 use crate::entity::player::Player;
@@ -28,10 +29,12 @@ impl ChestMinecart {
         &self,
         custom_name: Option<TextComponent>,
         player: &Arc<Player>,
+        origin: Vector3<f64>,
     ) -> bool {
         container::open(
             custom_name,
             player,
+            origin,
             &self.inventory,
             TextComponent::translate_cross(
                 translation::java::ENTITY_MINECRAFT_CHEST_MINECART,

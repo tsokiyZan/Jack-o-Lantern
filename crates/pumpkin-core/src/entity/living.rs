@@ -57,7 +57,7 @@ use pumpkin_data::game_event::GameEvent;
 use pumpkin_data::game_rules::{GameRule, GameRuleValue};
 use pumpkin_data::item_stack::{DamageResult, ItemStack};
 use pumpkin_data::sound::SoundCategory;
-use pumpkin_data::{damage::DamageType, sound::Sound};
+use pumpkin_data::{Enchantment, damage::DamageType, sound::Sound};
 use pumpkin_inventory::entity_equipment::EntityEquipment;
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_nbt::tag::NbtTag;
@@ -2742,6 +2742,17 @@ impl LivingEntity {
                 this_entity: Some(self.entity.entity_type),
                 // `ATTACKING_ENTITY`: `source.getEntity()`.
                 killer_entity: cause.map(|c| c.get_entity().entity_type),
+                attacking_entity_looting_level: cause
+                    .and_then(|cause| {
+                        cause.get_living_entity().map(|living| {
+                            EnchantmentHelper::get_enchantment_level(
+                                &Enchantment::LOOTING,
+                                cause,
+                                living,
+                            )
+                        })
+                    })
+                    .unwrap_or(0),
                 direct_killer_entity: source.map(|s| s.get_entity().entity_type),
                 position: Some(self.entity.pos.load()),
                 world_time: world.get_time_of_day() as u64,

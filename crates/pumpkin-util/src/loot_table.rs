@@ -43,19 +43,31 @@ pub enum LootCondition {
     Inverted(&'static Self),
 }
 
-/// Bonus count formulas when tools have fortune or looting enchantments.
+/// Count functions that scale with an enchantment level.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum LootBonusFormula {
+    /// `apply_bonus` formulas, on the tool's Fortune.
     OreDrops,
     UniformBonusCount(i32),
-    BinomialWithBonusCount { extra: i32, probability: f32 },
+    BinomialWithBonusCount {
+        extra: i32,
+        probability: f32,
+    },
+    /// Vanilla `EnchantedCountIncreaseFunction` on the killer's Looting: a uniform `count`
+    /// from `min` to `max` per level, then `limit` when one is set.
+    EnchantedCountIncrease {
+        min: f32,
+        max: f32,
+        limit: Option<i32>,
+    },
 }
 
 /// A single item entry inside a loot pool.
 #[derive(Clone, Copy, Debug)]
 pub struct LootEntry {
-    /// Registry name of the item (e.g. `"minecraft:diamond"`).
-    pub item: &'static str,
+    /// Registry name of the item (e.g. `"minecraft:diamond"`), or `None` for vanilla's
+    /// `EmptyLootItem`, which takes its share of the weight and adds nothing.
+    pub item: Option<&'static str>,
     /// Relative probability weight; higher values are more likely.
     pub weight: i32,
     /// Minimum stack size (inclusive).
@@ -78,9 +90,6 @@ pub struct LootPool {
     pub min_rolls: i32,
     /// Maximum number of roll attempts (inclusive).
     pub max_rolls: i32,
-    /// Weight of the implicit "empty" (no item) outcome per roll.
-    /// In vanilla this is modelled as a `minecraft:empty` entry with the given weight.
-    pub empty_weight: i32,
     /// Condition required for this entire pool to run.
     pub condition: LootCondition,
 }
@@ -194,8 +203,9 @@ impl From<LootCondition> for DynamicLootCondition {
 /// A single item entry inside a dynamic loot pool.
 #[derive(Clone, Debug)]
 pub struct DynamicLootEntry {
-    /// Registry name of the item (e.g. `"minecraft:diamond"`).
-    pub item: String,
+    /// Registry name of the item (e.g. `"minecraft:diamond"`), or `None` for vanilla's
+    /// `EmptyLootItem`.
+    pub item: Option<String>,
     /// Relative probability weight; higher values are more likely.
     pub weight: i32,
     /// Minimum stack size (inclusive).
@@ -211,7 +221,7 @@ pub struct DynamicLootEntry {
 impl From<LootEntry> for DynamicLootEntry {
     fn from(e: LootEntry) -> Self {
         Self {
-            item: e.item.to_string(),
+            item: e.item.map(str::to_string),
             weight: e.weight,
             min_count: e.min_count,
             max_count: e.max_count,
@@ -230,8 +240,6 @@ pub struct DynamicLootPool {
     pub min_rolls: i32,
     /// Maximum number of roll attempts (inclusive).
     pub max_rolls: i32,
-    /// Weight of the implicit "empty" (no item) outcome per roll.
-    pub empty_weight: i32,
     /// Condition required for this entire pool to run.
     pub condition: DynamicLootCondition,
 }
@@ -247,7 +255,6 @@ impl From<LootPool> for DynamicLootPool {
                 .collect(),
             min_rolls: p.min_rolls,
             max_rolls: p.max_rolls,
-            empty_weight: p.empty_weight,
             condition: DynamicLootCondition::from(p.condition),
         }
     }
