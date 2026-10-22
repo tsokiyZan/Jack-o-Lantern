@@ -418,18 +418,30 @@ impl CommandExecutor for LootExecutor {
 
                 let mut last_key = None;
                 for entity in &target_entities {
-                    let resource_name = entity.get_entity().entity_type.resource_name;
-                    let key = format!("minecraft:entities/{resource_name}");
-                    if let Some(loot_table) = context.server().datapack_manager.get_loot_table(&key)
-                    {
-                        drops.extend(crate::world::loot::generate_loot_from_handle(
-                            &loot_table,
-                            context.world(),
-                            0,
-                            &params,
-                        ));
-                        last_key = Some(key);
+                    // Vanilla `Entity.getLootTable`: a mob's `DeathLootTable` wins over its
+                    // type's. `dropKillLoot` rolls it without `getLootTableSeed`.
+                    let death_loot_table = entity
+                        .get_mob()
+                        .and_then(|mob| mob.get_mob_entity().death_loot_table().0);
+                    let has_death_loot_table = death_loot_table.is_some();
+                    let key = death_loot_table.unwrap_or_else(|| {
+                        let resource_name = entity.get_entity().entity_type.resource_name;
+                        format!("minecraft:entities/{resource_name}")
+                    });
+                    match context.server().datapack_manager.get_loot_table(&key) {
+                        Some(loot_table) => {
+                            drops.extend(crate::world::loot::generate_loot_from_handle(
+                                &loot_table,
+                                context.world(),
+                                0,
+                                &params,
+                            ));
+                        }
+                        // A missing table is `LootTable.EMPTY`; only a type without one fails.
+                        None if !has_death_loot_table => continue,
+                        None => {}
                     }
+                    last_key = Some(key);
                 }
 
                 if drops.is_empty() && last_key.is_none() {
