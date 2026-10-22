@@ -1319,6 +1319,15 @@ impl Player {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .increment_custom(statistics::CustomStatistic::LeaveGame, 1);
         let world = self.world();
+        // Vanilla `PlayerList.remove`: `removePlayerImmediately(player, UNLOADED_WITH_PLAYER)`.
+        // Set here, not in `World::remove_player`, which a change of world and a respawn also
+        // use for a player that stays. Entities leashed to the player see it gone and drop
+        // their lead on their next `tickLeash`. Pumpkin keeps the vehicle in its chunk (see
+        // `remove_passenger_on_disconnect`), so vanilla's mark on the root vehicle's stack
+        // has no counterpart here.
+        self.living_entity
+            .entity
+            .set_removed_reason(crate::entity::RemovalReason::UnloadedWithPlayer);
         world.remove_player(self, true).await;
 
         let cylindrical = self.watched_section.load();
@@ -3514,7 +3523,6 @@ impl Player {
         // experience handling
         self.tick_experience();
         self.tick_health();
-        self.tick_raid_omen();
         self.tick_maps(server);
 
         // Anti-spam counter decay
@@ -5324,55 +5332,6 @@ impl Player {
         }
     }
 
-    pub fn tick_raid_omen(&self) {
-        if self.is_spectator() {
-            return;
-        }
-
-        if let Some(bad_omen) = self.get_effect(&StatusEffect::BAD_OMEN)
-            && !self.has_effect(&StatusEffect::RAID_OMEN)
-        {
-            let world = self.world();
-            if !world.dimension.can_start_raid {
-                return;
-            }
-            let player_pos = self.living_entity.entity.block_pos.load();
-            let pos_f64 = self.living_entity.entity.pos.load();
-
-            let village_pos = world
-                .villager_poi
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .get_nearest_job_site(player_pos, 64)
-                .or_else(|| {
-                    world.raids.try_lock().ok().and_then(|raids| {
-                        raids
-                            .get_nearby_raid(&player_pos, 64.0 * 64.0)
-                            .map(|r| r.center)
-                    })
-                });
-
-            if let Some(pos) = village_pos {
-                if let Some(p) = self.world().get_player_by_uuid(self.gameprofile.id) {
-                    let bad_omen_amplifier = bad_omen.amplifier;
-                    p.living_entity.remove_effect(&StatusEffect::BAD_OMEN);
-                    p.set_raid_omen_position(pos);
-                    let effect = Effect {
-                        effect_type: &StatusEffect::RAID_OMEN,
-                        duration: 600,
-                        amplifier: bad_omen_amplifier,
-                        ambient: false,
-                        show_particles: true,
-                        show_icon: true,
-                        blend: true,
-                    };
-                    p.add_effect(effect);
-                }
-                world.play_sound(Sound::BlockBellResonate, SoundCategory::Neutral, &pos_f64);
-            }
-        }
-    }
-
     pub fn set_health(&self, health: f32) {
         self.living_entity.set_health(health);
         self.send_health();
@@ -5854,34 +5813,70 @@ impl Player {
         ));
     }
 
-    /// Vanilla `LivingEntity.drop`'s swing then the drop: the main hand swings for the
-    /// players tracking this one, and for this player too when `server_only` (vanilla's
-    /// `Prediction.SERVER_ONLY`, a drop the client didn't predict).
-    pub fn drop_from_hand(&self, item_stack: ItemStack, server_only: bool) {
+    /// Vanilla `LivingEntity.drop(stack, thrownFromHand, prediction)`: the main hand swings for
+    /// the players tracking this one, and for this player too when `server_only` (vanilla's
+    /// `Prediction.SERVER_ONLY`, a drop the client didn't predict), then the drop.
+    pub fn drop_from_hand(&self, item_stack: ItemStack, thrown_from_hand: bool, server_only: bool) {
         if item_stack.is_empty() {
             return;
         }
         self.living_entity
             .swing(Hand::Right, SwingAnimationImpl::DEFAULT, server_only);
-        self.drop_item(item_stack);
+        self.drop_item(item_stack, thrown_from_hand);
     }
 
-    pub fn drop_item(&self, item_stack: ItemStack) {
-        self.increment_stat(
-            statistics::StatisticCategory::Dropped,
-            item_stack.item.id as i32,
-            item_stack.item_count as i32,
-        );
-        self.increment_custom_stat(
-            statistics::CustomStatistic::Drop,
-            item_stack.item_count as i32,
-        );
+    /// Vanilla `ServerPlayer.take`: the take packet, then the open container's changes at once.
+    pub fn take(&self, item: &Entity, amount: u32) {
+        self.living_entity.take(item, amount);
+        self.current_screen_handler
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .send_content_updates();
+    }
+
+    /// The drop half of vanilla `ServerPlayer.drop`: the item entity, then the `Dropped` and
+    /// `Drop` stats only for an item thrown from the hand.
+    pub fn drop_item(&self, item_stack: ItemStack, thrown_from_hand: bool) {
+        let (item_id, count) = (item_stack.item.id, item_stack.item_count);
+        let Some(item_entity) = self.create_item_stack_to_drop(item_stack, thrown_from_hand) else {
+            return;
+        };
+        self.world().spawn_entity(item_entity);
+        if thrown_from_hand {
+            self.increment_stat(
+                statistics::StatisticCategory::Dropped,
+                item_id as i32,
+                count as i32,
+            );
+            self.increment_custom_stat(statistics::CustomStatistic::Drop, 1);
+        }
+    }
+
+    /// Vanilla `LivingEntity.createItemStackToDrop(stack, false, thrownFromHand)`.
+    #[must_use]
+    pub fn create_item_stack_to_drop(
+        &self,
+        item_stack: ItemStack,
+        thrown_from_hand: bool,
+    ) -> Option<Arc<ItemEntity>> {
+        if item_stack.is_empty() {
+            return None;
+        }
         let item_pos = self.living_entity.entity.pos.load()
             + Vector3::new(0.0, self.living_entity.entity.get_eye_height() - 0.3, 0.0);
         let entity = Entity::new(self.world(), item_pos, &EntityType::ITEM);
 
-        // Vanilla `LivingEntity.createItemStackToDrop(stack, false, ...)`, in its float
-        // arithmetic with `Mth.sin`/`Mth.cos`, drawing from the player's random.
+        // Vanilla `new ItemEntity(level, x, y, z, stack)` draws its own random velocity
+        // (two `nextDouble`s on the item's random) before `setDeltaMovement` replaces it.
+        let item_entity = ItemEntity::new(entity, item_stack);
+        item_entity.set_pickup_delay(40);
+        if thrown_from_hand {
+            item_entity.set_thrower(&self.living_entity.entity);
+        }
+
+        // In its float arithmetic with `Mth.sin`/`Mth.cos`, drawing from the player's random.
         let deg_to_rad = (std::f64::consts::PI / 180.0) as f32;
         let x_rot = self.living_entity.entity.pitch.load() * deg_to_rad;
         let y_rot = self.living_entity.entity.yaw.load() * deg_to_rad;
@@ -5903,14 +5898,8 @@ impl Player {
             f64::from(-sin_x * 0.3 + 0.1 + y_jitter * 0.1),
             f64::from(cos_y * cos_x * 0.3) + f64::from(dir).sin() * f64::from(pow2),
         );
-
-        // TODO: Merge stacks together
-        // Vanilla `new ItemEntity(level, x, y, z, stack)` draws its own random velocity
-        // (two `nextDouble`s on the item's random) before `setDeltaMovement` replaces it.
-        let item_entity = Arc::new(ItemEntity::new(entity, item_stack));
         item_entity.get_entity().velocity.store(velocity);
-        item_entity.set_pickup_delay(40);
-        self.world().spawn_entity(item_entity);
+        Some(Arc::new(item_entity))
     }
 
     pub fn drop_held_item(&self, drop_stack: bool) {
@@ -5944,7 +5933,7 @@ impl Player {
         let updated_stack = item_stack.clone();
         self.inventory().set_held_item(updated_stack.clone());
 
-        self.drop_from_hand(dropped_stack, false);
+        self.drop_from_hand(dropped_stack, true, false);
 
         let inv: Arc<dyn Inventory> = self.inventory.clone();
         let screen_binding = self
@@ -8578,12 +8567,12 @@ impl InventoryPlayer for Player {
         self
     }
 
-    fn drop_item(&self, item: ItemStack, _retain_ownership: bool) {
-        self.drop_from_hand(item, false);
+    fn drop_item(&self, item: ItemStack, thrown_from_hand: bool) {
+        self.drop_from_hand(item, thrown_from_hand, false);
     }
 
     fn drop_item_server_only(&self, item: ItemStack) {
-        self.drop_from_hand(item, true);
+        self.drop_from_hand(item, false, true);
     }
 
     fn has_infinite_materials(&self) -> bool {

@@ -493,9 +493,7 @@ impl ThrownItemEntity {
         // Vanilla `ProjectileUtil.getEntityHitResult` searches every entity, players included,
         // with `computeMargin`: target boxes grow from 0 to 0.3 over the first ticks.
         let candidates = world.get_all_at_box(&search_box);
-        let margin = f64::from(
-            ((entity.tick_count.load(Ordering::Relaxed) - 2) as f32 / 20.0).clamp(0.0, 0.3),
-        );
+        let margin = f64::from(compute_margin(entity));
         for cand in candidates {
             if self.should_skip_collision(entity, &cand) {
                 continue;
@@ -607,6 +605,12 @@ fn calculate_ray_intersection(
     }
 
     (t_min <= t_max && (0.0..=1.0).contains(&t_min)).then_some(t_min)
+}
+
+/// Vanilla `ProjectileUtil.computeMargin`: `max(0, min(0.3F, (tickCount - 2) / 20.0F))`.
+#[must_use]
+pub fn compute_margin(source: &Entity) -> f32 {
+    ((source.tick_count.load(Ordering::Relaxed) - 2) as f32 / 20.0).clamp(0.0, 0.3)
 }
 
 /// Vanilla `Projectile.onHit`: the projectile's own hit handling, then `projectile_land` at

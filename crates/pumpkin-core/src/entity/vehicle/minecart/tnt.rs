@@ -80,7 +80,7 @@ impl TntMinecart {
             self.fuse.store(fuse - 1, Ordering::Relaxed);
             let mut smoke_pos = entity.pos.load();
             smoke_pos.y += 0.5;
-            entity.world.load().spawn_particle(
+            entity.world.load().spawn_client_particle(
                 smoke_pos,
                 Vector3::new(0.0, 0.0, 0.0),
                 0.0,

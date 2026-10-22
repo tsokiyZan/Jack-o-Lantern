@@ -5,7 +5,7 @@ use crate::block::entities::sculk_shrieker::SculkShriekerBlockEntity;
 use crate::block::{
     BlockBehaviour, BlockMetadata, OnEntityStepArgs, OnPlaceArgs, OnScheduledTickArgs,
 };
-use crate::entity::Entity;
+use crate::entity::EntityBase;
 use crate::entity::mob::warden::WardenEntity;
 use crate::entity::mob::warden_spawn_tracker::{MAX_WARNING_LEVEL, WardenSpawnTracker};
 use crate::entity::player::Player;
@@ -41,16 +41,31 @@ impl BlockMetadata for SculkShriekerBlock {
 }
 
 impl SculkShriekerBlock {
-    fn try_get_player(world: &World, entity: &Entity) -> Option<Arc<Player>> {
-        if let Some(player) = world.get_player_by_id(entity.entity_id) {
+    /// Vanilla `SculkShriekerBlockEntity.tryGetPlayer`.
+    fn try_get_player(entity: &dyn EntityBase) -> Option<Arc<Player>> {
+        let player_of = |entity: &dyn EntityBase| {
+            let player = entity.get_player()?;
+            let world = player.world();
+            world.get_player_by_id(player.get_entity().entity_id)
+        };
+        if let Some(player) = player_of(entity) {
             return Some(player);
         }
-        let passengers = entity
-            .passengers
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let rider = passengers.first()?;
-        world.get_player_by_id(rider.get_entity().entity_id)
+        if let Some(player) = entity
+            .controlling_passenger()
+            .and_then(|passenger| player_of(passenger.as_ref()))
+        {
+            return Some(player);
+        }
+        if let Some(projectile) = entity.get_projectile() {
+            return projectile
+                .get_owner(entity.get_entity())
+                .and_then(|owner| player_of(owner.as_ref()));
+        }
+        entity
+            .get_item_entity()?
+            .get_owner()
+            .and_then(|owner| player_of(owner.as_ref()))
     }
 
     fn with_shrieker<R>(
@@ -194,7 +209,7 @@ impl BlockBehaviour for SculkShriekerBlock {
     }
 
     fn on_entity_step(&self, args: OnEntityStepArgs<'_>) {
-        if let Some(player) = Self::try_get_player(args.world, args.entity.get_entity()) {
+        if let Some(player) = Self::try_get_player(args.entity) {
             Self::try_shriek(args.world, args.position, &player);
         }
     }

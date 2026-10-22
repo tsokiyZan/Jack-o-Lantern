@@ -2,6 +2,7 @@ use crate::entity::player::statistics::StatisticCategory;
 use crate::server::Server;
 use crate::world::World;
 use core::f32;
+use crossbeam::atomic::AtomicCell;
 use pumpkin_data::damage::DamageType;
 use pumpkin_data::data_component_impl::{BundleContentsImpl, ContainerImpl};
 use pumpkin_data::entity::EntityType;
@@ -22,6 +23,7 @@ use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
 use pumpkin_util::random::RandomImpl;
 use std::sync::atomic::Ordering::{AcqRel, Relaxed};
+use uuid::Uuid;
 
 use std::sync::{
     Arc, Mutex,
@@ -31,7 +33,9 @@ use std::sync::{
     },
 };
 
-use super::{Entity, EntityBase, living::LivingEntity, player::Player};
+use super::{
+    Entity, EntityBase, entity_reference::EntityReference, living::LivingEntity, player::Player,
+};
 
 pub struct ItemEntity {
     entity: Entity,
@@ -44,6 +48,10 @@ pub struct ItemEntity {
     never_despawn: AtomicBool,
     never_pickup: AtomicBool,
     merge_reserved: AtomicBool,
+    /// Vanilla `ItemEntity.thrower` (NBT `Thrower`).
+    thrower: EntityReference,
+    /// Vanilla `ItemEntity.target` (NBT `Owner`): the only player that may pick it up.
+    target: AtomicCell<Option<Uuid>>,
 }
 
 struct ItemMergeReservation<'a> {
@@ -125,6 +133,8 @@ impl ItemEntity {
             never_despawn: AtomicBool::new(false),
             never_pickup: AtomicBool::new(false),
             merge_reserved: AtomicBool::new(false),
+            thrower: EntityReference::none(),
+            target: AtomicCell::new(None),
         }
     }
 
@@ -147,6 +157,8 @@ impl ItemEntity {
             never_despawn: AtomicBool::new(false),
             never_pickup: AtomicBool::new(false),
             merge_reserved: AtomicBool::new(false),
+            thrower: EntityReference::none(),
+            target: AtomicCell::new(None),
         }
     }
 
@@ -162,6 +174,8 @@ impl ItemEntity {
             never_despawn: AtomicBool::new(false),
             never_pickup: AtomicBool::new(false),
             merge_reserved: AtomicBool::new(false),
+            thrower: EntityReference::none(),
+            target: AtomicCell::new(None),
         }
     }
 
@@ -179,6 +193,22 @@ impl ItemEntity {
 
     pub const fn get_entity(&self) -> &Entity {
         &self.entity
+    }
+
+    /// Vanilla `ItemEntity.setThrower`.
+    pub fn set_thrower(&self, thrower: &Entity) {
+        self.thrower.set(Some(thrower));
+    }
+
+    /// Vanilla `ItemEntity.getOwner`: the thrower, in any dimension.
+    #[must_use]
+    pub fn get_owner(&self) -> Option<Arc<dyn EntityBase>> {
+        self.thrower.get(&self.entity.world.load())
+    }
+
+    /// Vanilla `ItemEntity.setTarget`.
+    pub fn set_target(&self, target: Option<Uuid>) {
+        self.target.store(target);
     }
 
     /// Vanilla `ItemEntity.fireImmune`, cached since the item only changes on load.
@@ -264,7 +294,9 @@ impl ItemEntity {
                 (&*high_stack, &*low_stack)
             };
 
-            if !Self::are_mergeable(self_stack, other_stack) {
+            if self.target.load() != other.target.load()
+                || !Self::are_mergeable(self_stack, other_stack)
+            {
                 return;
             }
 
@@ -690,66 +722,63 @@ impl EntityBase for ItemEntity {
         if self.pickup_delay.load(Ordering::Relaxed) > 0
             || player.living_entity.health.load() <= 0.0
             || player.is_spectator()
+            || self
+                .target
+                .load()
+                .is_some_and(|target| target != player.get_entity().entity_uuid)
         {
             return;
         }
 
-        let (item_id, count_before) = {
+        let (item_id, org_count, mut stack) = {
             let stack = self
                 .item_stack
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
-            (stack.item.id, stack.item_count)
+            (stack.item.id, stack.item_count, stack.clone())
         };
+        let creative = player.is_creative();
+        // Pumpkin's pickup event goes before the inventory changes, when any of it could go in.
+        if !creative && !player.inventory.has_room_for(&stack) {
+            return;
+        }
+        let living = &player.living_entity;
+        if !living.fire_pickup_event(&self.entity, org_count.into()) {
+            return;
+        }
 
-        let mut local_stack = self
-            .item_stack
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone();
-        let inserted = player.inventory.insert_stack_anywhere(&mut local_stack);
-        let count_after = local_stack.item_count;
-        let is_empty = local_stack.is_empty();
+        // Vanilla `Inventory.add`: true only once all of it went in; with infinite materials
+        // whatever didn't fit is gone.
+        let mut added = player.inventory.insert_stack_anywhere(&mut stack);
+        if creative && !added {
+            stack.set_count(0);
+            added = true;
+        }
+        let is_empty = stack.is_empty();
         *self
             .item_stack
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) = local_stack;
-
-        if inserted || player.is_creative() {
-            player.inventory_changed.store(true, Ordering::Relaxed);
-
-            let amount_picked_up = if player.is_creative() {
-                count_before
-            } else {
-                count_before - count_after
-            };
-
-            if amount_picked_up > 0 {
-                player.increment_stat(
-                    StatisticCategory::PickedUp,
-                    item_id as i32,
-                    amount_picked_up as i32,
-                );
-            }
-
-            player
-                .living_entity
-                .pickup(&self.entity, amount_picked_up.into());
-
-            player
-                .current_screen_handler
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .send_content_updates();
-
-            if is_empty {
-                self.entity.remove();
-            } else {
-                self.on_count_changed();
-            }
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = stack;
+        if !added {
+            return;
         }
+
+        player.inventory_changed.store(true, Ordering::Relaxed);
+        player.take(&self.entity, org_count.into());
+        if is_empty {
+            self.entity.remove();
+            // As vanilla, so `onItemPickup` sees what was picked up.
+            self.item_stack
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .set_count(org_count);
+        }
+        player.increment_stat(
+            StatisticCategory::PickedUp,
+            item_id as i32,
+            i32::from(org_count),
+        );
+        living.on_item_pickup(self);
     }
 
     /// Vanilla `ItemEntity.shouldPlayLavaHurtSound`.
@@ -793,6 +822,12 @@ impl EntityBase for ItemEntity {
             self.pickup_delay.load(Ordering::Relaxed) as i16,
         );
         nbt.put_short("Health", self.health.load(Relaxed) as i16);
+        if let Some(thrower) = self.thrower.uuid() {
+            nbt.put_uuid("Thrower", thrower);
+        }
+        if let Some(target) = self.target.load() {
+            nbt.put_uuid("Owner", target);
+        }
     }
 
     fn read_custom_nbt(&self, nbt: &NbtCompound) {
@@ -821,6 +856,9 @@ impl EntityBase for ItemEntity {
         if let Some(health) = nbt.get_short("Health") {
             self.health.store(health as f32, Relaxed);
         }
+
+        self.target.store(nbt.get_uuid("Owner"));
+        self.thrower.set_uuid(nbt.get_uuid("Thrower"));
     }
 
     fn cast_any(&self) -> &dyn std::any::Any {
@@ -945,6 +983,48 @@ mod tests {
         let mut tagged = plain.clone();
         tagged.set_data_component(CustomDataImpl::new(data));
         assert!(!ItemEntity::are_mergeable(&plain, &tagged));
+    }
+
+    #[tokio::test]
+    async fn thrower_and_owner_round_trip_through_nbt() {
+        use crate::entity::{Entity, EntityBase};
+        use pumpkin_data::entity::EntityType;
+        use pumpkin_util::math::vector3::Vector3;
+
+        let (_folder, world) = crate::world::test_support::test_world();
+        let new_item = || {
+            ItemEntity::new(
+                Entity::new(
+                    world.clone(),
+                    Vector3::new(0.0, 0.0, 0.0),
+                    &EntityType::ITEM,
+                ),
+                ItemStack::new(1, &Item::STONE),
+            )
+        };
+        let thrower = Entity::new(world.clone(), Vector3::new(0.0, 0.0, 0.0), &EntityType::PIG);
+        let owner = uuid::Uuid::from_u128(0x0123_4567_89ab_cdef_0123_4567_89ab_cdef);
+
+        let item = new_item();
+        let mut plain = NbtCompound::new();
+        item.write_custom_nbt(&mut plain);
+        assert!(plain.get_int_array("Thrower").is_none());
+        assert!(plain.get_int_array("Owner").is_none());
+
+        item.set_thrower(&thrower);
+        item.set_target(Some(owner));
+        let mut nbt = NbtCompound::new();
+        item.write_custom_nbt(&mut nbt);
+        assert_eq!(nbt.get_uuid("Thrower"), Some(thrower.entity_uuid));
+        assert_eq!(nbt.get_uuid("Owner"), Some(owner));
+
+        let loaded = new_item();
+        loaded.read_custom_nbt(&nbt);
+        assert_eq!(loaded.thrower.uuid(), Some(thrower.entity_uuid));
+        assert_eq!(loaded.target.load(), Some(owner));
+        loaded.read_custom_nbt(&plain);
+        assert_eq!(loaded.thrower.uuid(), None);
+        assert_eq!(loaded.target.load(), None);
     }
 
     #[test]

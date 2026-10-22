@@ -193,17 +193,16 @@ impl DolphinEntity {
         if !self.can_hold_item(&stack) {
             return;
         }
-        // `take` tells the clients before the item goes.
-        if !self
-            .mob_entity
-            .living_entity
-            .pickup(item.get_entity(), u32::from(stack.item_count))
-        {
+        let living = &self.mob_entity.living_entity;
+        let count = u32::from(stack.item_count);
+        if !living.fire_pickup_event(item.get_entity(), count) {
             return;
         }
+        living.on_item_pickup(item);
         self.set_item_slot_and_notify(&EquipmentSlot::MAIN_HAND, stack);
         self.mob_entity
             .set_guaranteed_drop(&EquipmentSlot::MAIN_HAND);
+        living.take(item.get_entity(), count);
         item.get_entity().remove();
     }
 
@@ -633,8 +632,6 @@ fn drop_item(mob: &dyn Mob) -> bool {
         f64::from(0.3 * pitch.sin() * 1.5),
         f64::from(0.3 * yaw.cos() * pitch.cos() + dir.sin() * pow),
     );
-    // TODO: vanilla also records the dolphin as the item's thrower, which Pumpkin's
-    // item entities do not track yet.
     let world = entity.world.load_full();
     // The 5-argument `new ItemEntity(level, x, y, z, stack)` takes its own random velocity
     // draws, then `setDeltaMovement` replaces the velocity (Dolphin.java:521-527).
@@ -644,6 +641,7 @@ fn drop_item(mob: &dyn Mob) -> bool {
     );
     item.get_entity().velocity.store(velocity);
     item.set_pickup_delay(THROWN_ITEM_PICKUP_DELAY);
+    item.set_thrower(entity);
     world.spawn_entity(Arc::new(item));
     true
 }

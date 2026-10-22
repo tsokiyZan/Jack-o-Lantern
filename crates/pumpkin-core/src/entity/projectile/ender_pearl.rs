@@ -79,7 +79,7 @@ impl EntityBase for EnderPearlEntity {
             let offset = Vector3::new(0.0, dy, 0.0);
             let speed = Vector3::new(speed_x, 0.0, speed_z);
 
-            world.spawn_particle(
+            world.spawn_client_particle(
                 hit_pos.add(&offset),
                 Vector3::new(speed.x as f32, speed.y as f32, speed.z as f32),
                 1.0,

@@ -20,6 +20,8 @@ use pumpkin_nbt::compound::NbtCompound;
 
 /// `AbstractHorse` data flag: tamed.
 pub const FLAG_TAME: u8 = 2;
+/// `AbstractHorse` data flag: bred.
+pub const FLAG_BRED: u8 = 8;
 /// `AbstractHorse` data flag: eating.
 pub const FLAG_EATING: u8 = 16;
 /// `AbstractHorse` data flag: standing (rearing).
@@ -205,6 +207,19 @@ pub trait AbstractHorse: Mob {
         {
             entity.add_passenger(vehicle, passenger as Arc<dyn EntityBase>);
         }
+    }
+
+    /// Vanilla `AbstractHorse.addAdditionalSaveData`'s flags, right after the ageable tags.
+    fn write_horse_flags_nbt(&self, nbt: &mut NbtCompound) {
+        nbt.put_bool("EatingHaystack", self.horse_flag(FLAG_EATING));
+        nbt.put_bool("Bred", self.horse_flag(FLAG_BRED));
+    }
+
+    /// Vanilla `AbstractHorse.readAdditionalSaveData`'s flags: `setEating` and `setBred`,
+    /// `false` when missing.
+    fn read_horse_flags_nbt(&self, nbt: &NbtCompound) {
+        self.set_horse_flag(FLAG_EATING, nbt.get_bool("EatingHaystack").unwrap_or(false));
+        self.set_horse_flag(FLAG_BRED, nbt.get_bool("Bred").unwrap_or(false));
     }
 
     /// Vanilla `AbstractHorse.onElasticLeashPull`.

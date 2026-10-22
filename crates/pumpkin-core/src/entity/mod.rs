@@ -2856,6 +2856,14 @@ impl Entity {
                         effect_applier,
                         is_precise,
                     );
+                    // Vanilla `onInsideBlock`, which only `ServerPlayer` overrides.
+                    if let Some(player) = caller.get_player() {
+                        player.trigger_advancement(
+                            crate::entity::player::advancement::trigger::AdvancementTrigger::EnterBlock {
+                                block,
+                            },
+                        );
+                    }
                 }
                 if inside_fluid {
                     effect_applier.advance_step(iteration);
@@ -5089,6 +5097,14 @@ impl Entity {
 
     pub fn is_removed(&self) -> bool {
         self.removal_reason.load().is_some()
+    }
+
+    /// Vanilla `Entity.setRemoved`'s bookkeeping for an entity leaving without being destroyed
+    /// (`UNLOADED_TO_CHUNK`, `UNLOADED_WITH_PLAYER`): the first reason sticks. The world's own
+    /// lists are the caller's business.
+    pub fn set_removed_reason(&self, reason: RemovalReason) {
+        let _ = self.removal_reason.compare_exchange(None, Some(reason));
+        self.removed.store(true, Ordering::Release);
     }
 
     pub fn is_alive(&self) -> bool {

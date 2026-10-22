@@ -273,14 +273,12 @@ impl PiglinEntity {
                 stack.item_count.min(1)
             }
         };
-        if count == 0
-            || !self
-                .mob_entity
-                .living_entity
-                .pickup(item.get_entity(), u32::from(count))
-        {
+        let living = &self.mob_entity.living_entity;
+        if count == 0 || !living.fire_pickup_event(item.get_entity(), u32::from(count)) {
             return;
         }
+        living.on_item_pickup(item);
+        living.take(item.get_entity(), u32::from(count));
 
         let taken = item
             .get_item_stack()

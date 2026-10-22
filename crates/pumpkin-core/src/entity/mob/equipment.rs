@@ -296,27 +296,60 @@ pub fn can_replace_equal_item(new_item: &ItemStack, current_item: &ItemStack) ->
             .is_none()
 }
 
-/// Vanilla `Mob.equipItemIfPossible`: equips `stack` if it beats what is worn, returning
-/// what got equipped.
-#[must_use]
-pub fn equip_item_if_possible<M: Mob + ?Sized>(mob: &M, stack: ItemStack) -> ItemStack {
+/// Where vanilla `Mob.equipItemIfPossible` would put a stack: the slot, what is worn there and
+/// how many items `slot.limit` takes.
+pub(crate) struct EquipDecision {
+    slot: EquipmentSlot,
+    current: ItemStack,
+    count: u8,
+}
+
+impl EquipDecision {
+    /// How many items the slot takes: the whole stack in a hand, one anywhere else.
+    pub(crate) const fn count(&self) -> u8 {
+        self.count
+    }
+}
+
+/// Vanilla `Mob.equipItemIfPossible` up to `canReplace && canHoldItem`: no draws, no changes.
+pub(crate) fn equip_decision<M: Mob + ?Sized>(mob: &M, stack: &ItemStack) -> Option<EquipDecision> {
     let mob_entity = mob.get_mob_entity();
-    let mut slot = get_equipment_slot_for_item(mob, &stack);
-    if !mob.is_equippable_in_slot(&stack, &slot) {
-        return ItemStack::EMPTY.clone();
+    let mut slot = get_equipment_slot_for_item(mob, stack);
+    if !mob.is_equippable_in_slot(stack, &slot) {
+        return None;
     }
 
     let mut current = mob_entity.get_item_slot(&slot);
-    let mut can_replace = mob.can_replace_current_item(&stack, &current, &slot);
+    let mut can_replace = mob.can_replace_current_item(stack, &current, &slot);
     if slot.is_armor_slot() && !can_replace {
         slot = EquipmentSlot::MAIN_HAND;
         current = mob_entity.get_item_slot(&slot);
         can_replace = current.is_empty();
     }
-    if !can_replace || !mob.can_hold_item(&stack) {
-        return ItemStack::EMPTY.clone();
+    if !can_replace || !mob.can_hold_item(stack) {
+        return None;
     }
+    let count = if slot.slot_type() == EquipmentType::Hand {
+        stack.item_count
+    } else {
+        stack.item_count.min(1)
+    };
+    Some(EquipDecision {
+        slot,
+        current,
+        count,
+    })
+}
 
+/// The rest of vanilla `Mob.equipItemIfPossible`: the drop-chance draw for what is worn, then
+/// `slot.limit(stack)` equipped for good. Returns what got equipped.
+pub(crate) fn equip_commit<M: Mob + ?Sized>(
+    mob: &M,
+    decision: EquipDecision,
+    mut stack: ItemStack,
+) -> ItemStack {
+    let mob_entity = mob.get_mob_entity();
+    let EquipDecision { slot, current, .. } = decision;
     let drop_chance = mob_entity.drop_chance(&slot);
     if !current.is_empty()
         && (mob_entity.living_entity.entity.random().next_f32() - 0.1).max(0.0) < drop_chance
@@ -324,7 +357,6 @@ pub fn equip_item_if_possible<M: Mob + ?Sized>(mob: &M, stack: ItemStack) -> Ite
         mob_entity.living_entity.entity.spawn_at_location(current);
     }
 
-    let mut stack = stack;
     let to_equip = limit_for_slot(&slot, &mut stack);
     // Vanilla `setItemSlotAndDropWhenKilled`, through `setItemSlot` and so `onEquipItem`.
     mob.set_item_slot_and_notify(&slot, to_equip.clone());
@@ -333,6 +365,16 @@ pub fn equip_item_if_possible<M: Mob + ?Sized>(mob: &M, stack: ItemStack) -> Ite
         .persistence_required
         .store(true, std::sync::atomic::Ordering::Relaxed);
     to_equip
+}
+
+/// Vanilla `Mob.equipItemIfPossible`: equips `stack` if it beats what is worn, returning
+/// what got equipped.
+#[must_use]
+pub fn equip_item_if_possible<M: Mob + ?Sized>(mob: &M, stack: ItemStack) -> ItemStack {
+    equip_decision(mob, &stack).map_or_else(
+        || ItemStack::EMPTY.clone(),
+        |decision| equip_commit(mob, decision, stack),
+    )
 }
 
 /// The server side of vanilla `LivingEntity.onEquipItem`: the equip sound and the
@@ -381,26 +423,24 @@ fn limit_for_slot(slot: &EquipmentSlot, stack: &mut ItemStack) -> ItemStack {
     }
 }
 
-/// Vanilla `Mob.pickUpItem`.
+/// Vanilla `Mob.pickUpItem`. Pumpkin's pickup event goes between deciding the slot and
+/// equipping, so a cancelled pickup changes nothing and draws nothing.
 pub fn pick_up_item<M: Mob + ?Sized>(mob: &M, item: &crate::entity::item::ItemEntity) {
     let stack = item
         .get_item_stack()
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .clone();
-    let equipped = equip_item_if_possible(mob, stack);
-    if equipped.is_empty() {
+    let Some(decision) = equip_decision(mob, &stack) else {
+        return;
+    };
+    let living = &mob.get_mob_entity().living_entity;
+    if !living.fire_pickup_event(item.get_entity(), u32::from(decision.count())) {
         return;
     }
-    let count = equipped.item_count;
-    // `take` tells the clients before the item goes.
-    if !mob
-        .get_mob_entity()
-        .living_entity
-        .pickup(item.get_entity(), u32::from(count))
-    {
-        return;
-    }
+    let count = equip_commit(mob, decision, stack).item_count;
+    living.on_item_pickup(item);
+    living.take(item.get_entity(), u32::from(count));
     let emptied = {
         let mut item_stack = item
             .get_item_stack()

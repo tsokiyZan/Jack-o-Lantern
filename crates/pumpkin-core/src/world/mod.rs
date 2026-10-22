@@ -98,9 +98,7 @@ use pumpkin_inventory::{Clearable, Inventory};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::bedrock::client::set_actor_data::{CSetActorData, PropertySyncData};
 use pumpkin_protocol::bedrock::client::start_game::{CStartGame, ServerTelemetryData};
-use pumpkin_protocol::java::client::play::{
-    CBlockEvent, CParticle, CRemoveMobEffect, CUpdateMobEffect,
-};
+use pumpkin_protocol::java::client::play::{CBlockEvent, CRemoveMobEffect, CUpdateMobEffect};
 use pumpkin_protocol::java::client::play::{
     CBlockUpdate, CDisguisedChatMessage, CExplosion, CRespawn, CSetBlockDestroyStage, CWorldEvent,
     PlayerSpawnData,
@@ -1409,6 +1407,7 @@ impl World {
         Self::broadcast_java_grouped(packet, recipients_by_version);
     }
 
+    /// Vanilla `ServerLevel.sendParticles(particle, x, y, z, count, xDist, yDist, zDist, speed)`.
     pub fn spawn_particle(
         &self,
         position: Vector3<f64>,
@@ -1418,43 +1417,6 @@ impl World {
         particle: Particle,
     ) {
         self.spawn_particle_with_data(position, offset, max_speed, particle_count, particle, &[]);
-    }
-
-    /// Vanilla `ServerLevel.sendParticles` with a speed per axis and a randomization type
-    /// (26.3): `count` particles of `particle` (options `data`) spread by `offset`, to the
-    /// players within 32 blocks.
-    #[expect(clippy::too_many_arguments)]
-    pub fn send_particles_with_axis_speed(
-        &self,
-        particle: Particle,
-        data: &[u8],
-        position: Vector3<f64>,
-        count: i32,
-        offset: Vector3<f32>,
-        speed: Vector3<f32>,
-        randomization: ParticleRandomization,
-    ) {
-        let packet = AxisSpeedParticles {
-            particle: pumpkin_protocol::java::client::play::CParticle::new(
-                false,
-                false,
-                position,
-                offset,
-                speed.x,
-                count,
-                pumpkin_protocol::VarInt(particle as i32),
-                data,
-            ),
-            speed,
-            randomization,
-        };
-        // `player.blockPosition().closerToCenterThan(pos, 32)`.
-        for player in self.players.load().iter() {
-            let block_center = player.get_entity().block_pos.load().to_centered_f64();
-            if block_center.squared_distance_to_vec(&position) < 32.0 * 32.0 {
-                player.try_send_client_packet(&packet);
-            }
-        }
     }
 
     /// Like [`Self::spawn_particle`], for particles whose type carries options.
@@ -1468,15 +1430,132 @@ impl World {
         particle: Particle,
         data: &[u8],
     ) {
+        let speed = f64::from(max_speed);
+        self.send_particles(
+            particle,
+            data,
+            false,
+            false,
+            position,
+            particle_count,
+            Vector3::new(
+                f64::from(offset.x),
+                f64::from(offset.y),
+                f64::from(offset.z),
+            ),
+            Vector3::new(speed, speed, speed),
+            ParticleRandomization::Default,
+        );
+    }
+
+    /// Particles with no vanilla `sendParticles` behind them, sent to every Java player in the
+    /// world with no range check: stand-ins for what a vanilla client draws itself
+    /// (`addParticle` on the client, a level or entity event), and the plugin API's
+    /// `world.spawn_particle`.
+    pub fn spawn_client_particle(
+        &self,
+        position: Vector3<f64>,
+        offset: Vector3<f32>,
+        max_speed: f32,
+        particle_count: i32,
+        particle: Particle,
+    ) {
         for player in self.players.load().iter() {
-            player.spawn_particle_with_data(
-                position,
-                offset,
-                max_speed,
-                particle_count,
-                particle,
-                data,
-            );
+            player.spawn_particle(position, offset, max_speed, particle_count, particle);
+        }
+    }
+
+    /// Vanilla `ServerLevel.sendParticles` (the 14-argument overload every other one ends in):
+    /// one `ClientboundLevelParticlesPacket` with vanilla's float casts, sent to each player of
+    /// this world in `players` order whose block centre is closer than 32 blocks to `pos`
+    /// (512 with `override_limiter`). Returns how many players it reached.
+    #[expect(clippy::too_many_arguments)]
+    pub fn send_particles(
+        &self,
+        particle: Particle,
+        data: &[u8],
+        override_limiter: bool,
+        always_show: bool,
+        pos: Vector3<f64>,
+        count: i32,
+        dist: Vector3<f64>,
+        speed: Vector3<f64>,
+        randomization: ParticleRandomization,
+    ) -> i32 {
+        let packet = LevelParticles::new(
+            particle,
+            data,
+            override_limiter,
+            always_show,
+            pos,
+            count,
+            dist,
+            speed,
+            randomization,
+        );
+        let mut result = 0;
+        for player in self.players.load().iter() {
+            if Self::send_particles_packet(player, override_limiter, pos, &packet) {
+                result += 1;
+            }
+        }
+        result
+    }
+
+    /// Vanilla `ServerLevel.sendParticles(ServerPlayer, ...)`: the single-speed packet to one
+    /// player, if it is in this world and in range. Whether it was sent.
+    #[expect(clippy::too_many_arguments)]
+    pub fn send_particles_to_player(
+        &self,
+        player: &Player,
+        particle: Particle,
+        data: &[u8],
+        override_limiter: bool,
+        always_show: bool,
+        pos: Vector3<f64>,
+        count: i32,
+        dist: Vector3<f64>,
+        speed: f64,
+    ) -> bool {
+        // `player.level() != this`.
+        if !std::ptr::eq(Arc::as_ptr(&player.world()), self) {
+            return false;
+        }
+        let packet = LevelParticles::new(
+            particle,
+            data,
+            override_limiter,
+            always_show,
+            pos,
+            count,
+            dist,
+            Vector3::new(speed, speed, speed),
+            ParticleRandomization::Default,
+        );
+        Self::send_particles_packet(player, override_limiter, pos, &packet)
+    }
+
+    /// Vanilla's private `ServerLevel.sendParticles(player, overrideLimiter, x, y, z, packet)`:
+    /// `player.blockPosition().closerToCenterThan(pos, overrideLimiter ? 512 : 32)`.
+    fn send_particles_packet(
+        player: &Player,
+        override_limiter: bool,
+        pos: Vector3<f64>,
+        packet: &LevelParticles<'_>,
+    ) -> bool {
+        let distance: f64 = if override_limiter { 512.0 } else { 32.0 };
+        if player
+            .get_entity()
+            .block_pos
+            .load()
+            .dist_to_center_sqr(pos.x, pos.y, pos.z)
+            < distance * distance
+        {
+            // Java only: Bedrock players never got these particles.
+            player.try_send_client_packet(packet);
+            true
+        } else {
+            false
         }
     }
 
@@ -1639,7 +1718,8 @@ impl World {
         self.broadcast_sound(&packet, position, sound_range(volume, None), None);
     }
 
-    /// Spawns a cluster of particles in the world for all players in range.
+    /// Spawns a cluster of particles in the world for all players in range
+    /// ([`Self::send_particles`]).
     pub fn spawn_particles(
         &self,
         particle: pumpkin_data::particle::Particle,
@@ -1648,17 +1728,7 @@ impl World {
         offset: Vector3<f32>,
         max_speed: f32,
     ) {
-        let packet = CParticle::new(
-            false,
-            false,
-            pos,
-            offset,
-            max_speed,
-            count as i32,
-            (particle.to_id() as i32).into(),
-            &[],
-        );
-        self.broadcast_packet_all(&packet);
+        self.spawn_particle(pos, offset, max_speed, count as i32, particle);
     }
 
     /// Plays a Bedrock level sound for players close enough to hear it.
@@ -5835,6 +5905,12 @@ impl World {
             .await;
 
         for entity in entities_to_remove {
+            // `PersistentEntitySectionManager.unloadEntity`, after the chunk's entities are
+            // stored: `setRemoved(UNLOADED_TO_CHUNK)`. Whatever still holds the entity (a
+            // leashee holding it as its holder, say) now sees it gone.
+            entity
+                .get_entity()
+                .set_removed_reason(RemovalReason::UnloadedToChunk);
             entity
                 .get_entity()
                 .update_dynamic_game_event_listener(|listener| listener.remove(self));
@@ -8599,6 +8675,41 @@ mod tests {
         World, bedrock_block_breaking_rate, bedrock_chest_block_actor, merge_entity_records,
     };
 
+    /// `ClientboundLevelParticlesPacket` in 26.3: the three speeds, then the count and the
+    /// randomization type as var ints.
+    #[test]
+    fn level_particles_encode_per_axis_speed_and_randomization() {
+        use pumpkin_protocol::ClientPacket;
+        use pumpkin_util::{math::vector3::Vector3, version::JavaMinecraftVersion};
+
+        let packet = super::LevelParticles::new(
+            pumpkin_data::particle::Particle::Snowflake,
+            &[],
+            true,
+            false,
+            Vector3::new(1.0, 2.0, 3.0),
+            1,
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(0.25, f64::from(0.05f32), -0.5),
+            super::ParticleRandomization::Alternative,
+        );
+        let mut bytes = Vec::new();
+        packet
+            .write_packet_data(&mut bytes, &JavaMinecraftVersion::V_26_3)
+            .unwrap();
+        let mut tail = Vec::new();
+        tail.extend_from_slice(&0.25f32.to_be_bytes());
+        tail.extend_from_slice(&0.05f32.to_be_bytes());
+        tail.extend_from_slice(&(-0.5f32).to_be_bytes());
+        tail.extend_from_slice(&[1, 1]);
+        assert!(bytes.ends_with(&tail), "{bytes:?}");
+        // Particle id, no options, important (overrideLimiter, set here), then force
+        // (alwaysShow).
+        let id = pumpkin_data::particle::Particle::Snowflake as u8;
+        assert_eq!(&bytes[..3], &[id, 1, 0]);
+        assert_eq!(bytes.len(), 3 + 3 * 8 + 6 * 4 + 2);
+    }
+
     fn record(uuid: Option<Uuid>, id: &str) -> NbtCompound {
         let mut nbt = NbtCompound::new();
         nbt.put_string("id", id.to_string());
@@ -8855,31 +8966,65 @@ const fn legacy_world_border(
     }
 }
 
-/// `ClientboundLevelParticlesPacket` with the 26.3 per-axis speed and randomization type,
-/// which `CParticle` (whose shape the plugin API mirrors) doesn't carry. Older clients get the
-/// plain `CParticle` with the x speed.
-struct AxisSpeedParticles<'a> {
+/// Vanilla `ClientboundLevelParticlesPacket`, with the 26.3 per-axis speed and randomization
+/// type, which `CParticle` (whose shape the plugin API mirrors field by field) doesn't carry.
+/// Clients before 26.3 get the plain `CParticle` with the x speed.
+struct LevelParticles<'a> {
     particle: pumpkin_protocol::java::client::play::CParticle<'a>,
     speed: Vector3<f32>,
     randomization: ParticleRandomization,
 }
 
+impl<'a> LevelParticles<'a> {
+    /// `new ClientboundLevelParticlesPacket(...)` as `ServerLevel.sendParticles` builds it:
+    /// `(float)xDist, ..., (float)xSpeed, ...`.
+    #[expect(clippy::too_many_arguments)]
+    const fn new(
+        particle: Particle,
+        data: &'a [u8],
+        override_limiter: bool,
+        always_show: bool,
+        pos: Vector3<f64>,
+        count: i32,
+        dist: Vector3<f64>,
+        speed: Vector3<f64>,
+        randomization: ParticleRandomization,
+    ) -> Self {
+        let speed = Vector3::new(speed.x as f32, speed.y as f32, speed.z as f32);
+        Self {
+            particle: pumpkin_protocol::java::client::play::CParticle::new(
+                always_show,
+                override_limiter,
+                pos,
+                Vector3::new(dist.x as f32, dist.y as f32, dist.z as f32),
+                speed.x,
+                count,
+                pumpkin_protocol::VarInt(particle as i32),
+                data,
+            ),
+            speed,
+            randomization,
+        }
+    }
+}
+
 /// Vanilla `ClientboundLevelParticlesPacket.RandomizationType`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[repr(i32)]
 pub enum ParticleRandomization {
+    #[default]
     Default = 0,
     Alternative = 1,
     AlternativeWithSpeed = 2,
 }
 
-impl pumpkin_protocol::packet::MultiVersionJavaPacket for AxisSpeedParticles<'_> {
+impl pumpkin_protocol::packet::MultiVersionJavaPacket for LevelParticles<'_> {
     fn to_id(version: pumpkin_util::version::JavaMinecraftVersion) -> i32 {
         <pumpkin_protocol::java::client::play::CParticle<'_> as pumpkin_protocol::packet::MultiVersionJavaPacket>::to_id(version)
     }
 }
 
-impl pumpkin_protocol::ClientPacket for AxisSpeedParticles<'_> {
+impl pumpkin_protocol::ClientPacket for LevelParticles<'_> {
     fn write_packet_data(
         &self,
         mut write: impl std::io::Write,

@@ -68,7 +68,7 @@ impl JavaClient {
             drop(player_screen_handler);
         } else if is_negative && is_legal {
             // Item drop
-            player.drop_from_hand(item_stack, false);
+            player.drop_from_hand(item_stack, true, false);
         }
         Ok(())
     }

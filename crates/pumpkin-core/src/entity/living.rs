@@ -34,6 +34,7 @@ use crate::entity::combat::{CombatRules, CombatTracker, FallLocation, knockback_
 use crate::entity::damage_source::DamageSource;
 use crate::entity::effect::MobEffectInstance;
 use crate::entity::mob::equipment::DEFAULT_EQUIPMENT_DROP_CHANCE;
+use crate::entity::player::advancement::trigger::AdvancementTrigger;
 use crate::entity::player::cooldown_group;
 use crate::entity::player::statistics::{CustomStatistic, StatisticCategory};
 use crate::server::Server;
@@ -713,13 +714,14 @@ impl LivingEntity {
         true
     }
 
-    /// Picks up an Item entity or XP Orb
-    pub fn pickup(&self, item: &Entity, stack_amount: u32) -> bool {
+    /// Pumpkin's `EntityPickupItemEvent` for picking `amount` of `item` (an item entity, arrow
+    /// or experience orb) up; false when a plugin cancelled it. Fired before anything changes.
+    pub fn fire_pickup_event(&self, item: &Entity, amount: u32) -> bool {
         let mut pickup_event =
             crate::plugin::api::events::entity::entity_pickup_item::EntityPickupItemEvent::new(
                 self.entity.entity_id,
                 item.entity_type.id.to_string(),
-                stack_amount as u8,
+                amount as u8,
             );
         if let Some(server) = self.entity.world.load().server.upgrade() {
             server
@@ -729,24 +731,55 @@ impl LivingEntity {
                 return false;
             }
         }
+        true
+    }
 
-        // Vanilla `take`: to the players tracking the picked-up entity, while it's still there.
+    /// Vanilla `LivingEntity.take`: to the players tracking the picked-up entity, while it's
+    /// still there.
+    pub fn take(&self, item: &Entity, amount: u32) {
         if item.removed.load(Relaxed) {
-            return true;
+            return;
         }
         self.entity.world.load().send_to_tracking_players_editioned(
             item,
             &CTakeItemEntity::new(
                 item.entity_id.into(),
                 self.entity.entity_id.into(),
-                VarInt(stack_amount as i32),
+                VarInt(amount as i32),
             ),
             &CTakeItemActor {
                 item_runtime_id: VarULong(item.entity_id as u64),
                 actor_runtime_id: VarULong(self.entity.entity_id as u64),
             },
         );
-        true
+    }
+
+    /// Vanilla `LivingEntity.onItemPickup`, with `ServerPlayer`'s override: the
+    /// thrown-item-picked-up advancement triggers.
+    pub fn on_item_pickup(&self, item: &super::item::ItemEntity) {
+        let Some(owner) = item.get_owner() else {
+            return;
+        };
+        let stack = item
+            .get_item_stack()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        let world = self.entity.world.load();
+        if let Some(thrower) = owner.get_player()
+            && let Some(picker) = world.get_entity_by_id(self.entity.entity_id)
+        {
+            thrower.trigger_advancement(AdvancementTrigger::ThrownItemPickedUpByEntity {
+                item: stack.clone(),
+                entity: picker,
+            });
+        }
+        if let Some(player) = world.get_player_by_id(self.entity.entity_id) {
+            player.trigger_advancement(AdvancementTrigger::ThrownItemPickedUpByPlayer {
+                item: stack,
+                thrower: owner,
+            });
+        }
     }
 
     /// Vanilla `ItemStack.causeUseVibration`: the use game event, for items whose
@@ -3360,11 +3393,33 @@ impl LivingEntity {
             .copied()
             .collect();
         for effect_type in effect_types {
-            self.tick_effect(effect_type);
+            if !self.tick_effect(effect_type) {
+                break;
+            }
         }
     }
 
-    fn tick_effect(&self, effect_type: &'static StatusEffect) {
+    /// The effect types active now, to spot an `applyEffectTick` adding or removing one.
+    fn active_effect_types(&self) -> Vec<*const StatusEffect> {
+        let mut types: Vec<*const StatusEffect> = self
+            .active_effects
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .keys()
+            .map(|effect_type| std::ptr::from_ref(*effect_type))
+            .collect();
+        types.sort_unstable();
+        types
+    }
+
+    /// One step of vanilla `tickEffects`' loop over the `activeEffects` `HashMap`. Whether the
+    /// loop goes on: when `applyEffectTick` adds or removes an effect (a bad omen giving the raid
+    /// omen), vanilla's iterator throws a `ConcurrentModificationException` on its next
+    /// `remove` or `next`, which `tickEffects` swallows, so the effect that did it isn't removed
+    /// this tick and the rest of the effects aren't ticked. The set is compared before and
+    /// after, so removing and re-adding the same effect inside one `applyEffectTick` (which
+    /// vanilla's `modCount` would catch) goes unnoticed; no effect does that.
+    fn tick_effect(&self, effect_type: &'static StatusEffect) -> bool {
         let Some((has_remaining, tick_count, amplifier)) = self
             .active_effects
             .lock()
@@ -3383,15 +3438,21 @@ impl LivingEntity {
                 )
             })
         else {
-            return;
+            return true;
         };
         let mut keep = has_remaining;
+        let mut modified = false;
         if keep
             && let Some(mob_effect) = crate::entity::effect::get_mob_effect(effect_type)
             && mob_effect.should_apply_effect_tick(tick_count, amplifier)
-            && !mob_effect.apply_effect_tick(self, amplifier)
         {
-            keep = false;
+            let before = self.active_effect_types();
+            keep = mob_effect.apply_effect_tick(self, amplifier);
+            modified = self.active_effect_types() != before;
+            if !keep && modified {
+                // `iterator.remove()` throws: the effect stays, unticked.
+                return false;
+            }
         }
         let snapshot = if keep {
             let mut effects = self
@@ -3399,7 +3460,7 @@ impl LivingEntity {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             let Some(instance) = effects.get_mut(&effect_type) else {
-                return;
+                return !modified;
             };
             instance.tick_down_duration();
             let downgraded = instance.downgrade_to_hidden_effect();
@@ -3421,6 +3482,11 @@ impl LivingEntity {
                 }
             }
             _ => {
+                // An effect that changed the set and then ran out: `iterator.remove()` throws
+                // too, so it stays for another tick.
+                if modified {
+                    return false;
+                }
                 if self
                     .active_effects
                     .lock()
@@ -3432,6 +3498,8 @@ impl LivingEntity {
                 }
             }
         }
+        // The next `iterator.next()` throws after a modification.
+        !modified
     }
 
     /// Vanilla `LivingEntity.hurtArmor`, empty for most entities: players wear all four armour
@@ -4514,6 +4582,14 @@ impl LivingEntity {
         self.health.load() <= 0.0 || self.dead.load(Relaxed)
     }
 
+    /// Vanilla `LivingEntity.isAffectedByPotions`: not dead or dying; never an armor stand
+    /// (`ArmorStand`'s override). `caller` is this entity.
+    #[must_use]
+    pub fn is_affected_by_potions(&self, caller: &dyn EntityBase) -> bool {
+        caller.get_entity().entity_type != &pumpkin_data::entity::EntityType::ARMOR_STAND
+            && !self.is_dead_or_dying()
+    }
+
     /// Vanilla `LivingEntity.isSleeping` (a sleeping position); Pumpkin keeps it on the
     /// player and the mobs that sleep.
     fn is_sleeping(caller: &dyn EntityBase) -> bool {
@@ -4928,7 +5004,9 @@ impl LivingEntity {
 
         if let Some(player) = caller.get_player() {
             player.increment_stat(StatisticCategory::Used, protection_item.item.id as i32, 1);
-            // TODO: the `used_totem` advancement trigger isn't ported.
+            player.trigger_advancement(AdvancementTrigger::UsedTotem {
+                item: protection_item.item,
+            });
             // `causeUseVibration(this, ITEM_INTERACT_FINISH)`.
             if protection_item
                 .get_data_component::<pumpkin_data::data_component_impl::UseEffectsImpl>()
@@ -5625,7 +5703,7 @@ impl LivingEntity {
                     // `ServerPlayer.handleExtraItemsCreatedOnUse`.
                     let mut remainder_stack = remainder_stack;
                     if !player.inventory.insert_stack_anywhere(&mut remainder_stack) {
-                        player.drop_from_hand(remainder_stack, false);
+                        player.drop_from_hand(remainder_stack, false, false);
                     }
                 }
             }

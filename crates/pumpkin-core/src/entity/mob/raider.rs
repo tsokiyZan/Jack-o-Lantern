@@ -415,15 +415,18 @@ pub fn pick_up_item<M: Mob + ?Sized>(mob: &M, item: &ItemEntity) {
         return;
     }
     let mob_entity = mob.get_mob_entity();
+    let living = &mob_entity.living_entity;
+    if !living.fire_pickup_event(item.get_entity(), u32::from(stack.item_count)) {
+        return;
+    }
     let current = mob_entity.get_item_slot(&EquipmentSlot::HEAD);
     let drop_chance = mob_entity.drop_chance(&EquipmentSlot::HEAD);
     if !current.is_empty() && (entity.random().next_f32() - 0.1).max(0.0) < drop_chance {
         entity.spawn_at_location(current);
     }
+    living.on_item_pickup(item);
     mob.set_item_slot_and_notify(&EquipmentSlot::HEAD, stack.clone());
-    mob_entity
-        .living_entity
-        .pickup(item.get_entity(), u32::from(stack.item_count));
+    living.take(item.get_entity(), u32::from(stack.item_count));
     item.get_entity().remove();
     // Vanilla `Raid.setLeader`, whose banner is the one just worn.
     if let Some(raid_id) = raider.get_raider_data().raid_id.load()

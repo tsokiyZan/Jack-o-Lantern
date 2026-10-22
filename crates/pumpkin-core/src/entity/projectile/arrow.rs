@@ -723,7 +723,7 @@ impl EntityBase for ArrowEntity {
         if in_water {
             for i in 0..4 {
                 let factor = 0.25 * f64::from(i);
-                world.spawn_particle(
+                world.spawn_client_particle(
                     Vector3::new(
                         new_pos.x - velocity.x * factor,
                         new_pos.y - velocity.y * factor,
@@ -738,7 +738,7 @@ impl EntityBase for ArrowEntity {
         }
 
         if is_on_fire {
-            world.spawn_particle(
+            world.spawn_client_particle(
                 entity.pos.load(),
                 Vector3::new(0.0f32, 0.0f32, 0.0f32),
                 0.0,
@@ -750,7 +750,7 @@ impl EntityBase for ArrowEntity {
         if self.is_critical.load(Ordering::Relaxed) {
             for i in 0..4 {
                 let factor = f64::from(i) / 4.0;
-                world.spawn_particle(
+                world.spawn_client_particle(
                     Vector3::new(
                         start_pos.x + velocity.x * factor,
                         start_pos.y + velocity.y * factor,
@@ -1149,13 +1149,20 @@ impl EntityBase for ArrowEntity {
             .read()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut stack = Self::pickup_item_stack(&item_stack);
+        drop(item_stack);
+        // Pumpkin's pickup event, before the inventory changes, when the arrow could go in.
+        if !player.is_creative() && !player.inventory.has_room_for(&stack)
+            || !player.living_entity.fire_pickup_event(&self.entity, 1)
+        {
+            return;
+        }
         if player.is_creative() || player.inventory.insert_stack_anywhere(&mut stack) {
             player.increment_stat(
                 pumpkin_data::statistic::StatisticCategory::PickedUp,
                 stack.item.id as i32,
                 1,
             );
-            player.living_entity.pickup(&self.entity, 1);
+            player.take(&self.entity, 1);
 
             // Remove arrow entity after pickup
             self.get_entity().remove();
