@@ -1319,6 +1319,15 @@ impl Player {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .increment_custom(statistics::CustomStatistic::LeaveGame, 1);
         let world = self.world();
+        // Vanilla `PlayerList.remove`: `removePlayerImmediately(player, UNLOADED_WITH_PLAYER)`.
+        // Set here, not in `World::remove_player`, which a change of world and a respawn also
+        // use for a player that stays. Entities leashed to the player see it gone and drop
+        // their lead on their next `tickLeash`. Pumpkin keeps the vehicle in its chunk (see
+        // `remove_passenger_on_disconnect`), so vanilla's mark on the root vehicle's stack
+        // has no counterpart here.
+        self.living_entity
+            .entity
+            .set_removed_reason(crate::entity::RemovalReason::UnloadedWithPlayer);
         world.remove_player(self, true).await;
 
         let cylindrical = self.watched_section.load();

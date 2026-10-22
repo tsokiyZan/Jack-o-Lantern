@@ -5704,6 +5704,12 @@ impl World {
             .await;
 
         for entity in entities_to_remove {
+            // `PersistentEntitySectionManager.unloadEntity`, after the chunk's entities are
+            // stored: `setRemoved(UNLOADED_TO_CHUNK)`. Whatever still holds the entity (a
+            // leashee holding it as its holder, say) now sees it gone.
+            entity
+                .get_entity()
+                .set_removed_reason(RemovalReason::UnloadedToChunk);
             entity
                 .get_entity()
                 .update_dynamic_game_event_listener(|listener| listener.remove(self));
