@@ -18,6 +18,14 @@ pub struct ExperienceBottleEntity {
 }
 
 impl ExperienceBottleEntity {
+    /// A bottle with no thrower where `entity` stands, as `/summon`, a saved one or a
+    /// dispenser makes it.
+    pub const fn new(entity: Entity) -> Self {
+        Self {
+            thrown: ThrownItemEntity::unowned(entity, GRAVITY),
+        }
+    }
+
     pub fn new_shot(entity: Entity, shooter: &Entity) -> Self {
         Self {
             thrown: ThrownItemEntity::new(entity, shooter, GRAVITY),

@@ -344,6 +344,8 @@ impl DispenserBlock {
             Self::dispense_snowball(ctx, item);
         } else if item.item.id == Item::EGG.id {
             Self::dispense_egg(ctx, item);
+        } else if item.item.id == Item::EXPERIENCE_BOTTLE.id {
+            Self::dispense_experience_bottle(ctx, item);
         } else if item.item.id == Item::SPLASH_POTION.id {
             Self::dispense_splash_potion(ctx, item);
         } else if item.item.id == Item::LINGERING_POTION.id {
@@ -666,6 +668,30 @@ impl DispenserBlock {
         Self::finish_projectile_launch(
             ctx,
             Arc::new(egg),
+            WorldEvent::SoundDispenserProjectileLaunch,
+        );
+    }
+
+    /// Vanilla `ProjectileDispenseBehavior` with `ExperienceBottleItem`'s config: half the
+    /// default uncertainty and a quarter more power, as for thrown potions.
+    fn dispense_experience_bottle(ctx: &DispenseContext<'_>, item: &mut ItemStack) {
+        let _ = item.split(1);
+        let entity = Entity::new(
+            ctx.world.clone(),
+            Self::projectile_spawn_position(ctx),
+            &EntityType::EXPERIENCE_BOTTLE,
+        );
+        let bottle =
+            crate::entity::projectile::experience_bottle::ExperienceBottleEntity::new(entity);
+        Self::launch_thrown(
+            ctx,
+            &bottle.thrown,
+            Self::POTION_PROJECTILE_POWER,
+            Self::POTION_PROJECTILE_UNCERTAINTY,
+        );
+        Self::finish_projectile_launch(
+            ctx,
+            Arc::new(bottle),
             WorldEvent::SoundDispenserProjectileLaunch,
         );
     }

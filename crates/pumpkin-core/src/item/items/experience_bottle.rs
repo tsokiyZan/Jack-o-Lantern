@@ -10,7 +10,7 @@ use pumpkin_data::entity::EntityType;
 use pumpkin_data::item::Item;
 use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_util::Hand;
-use rand::{RngExt, rng};
+use pumpkin_util::random::RandomImpl;
 
 pub struct ExperienceBottleItem;
 
@@ -31,7 +31,14 @@ impl ItemBehaviour for ExperienceBottleItem {
             SoundCategory::Neutral,
             &position,
             0.5,
-            0.4 / (rng().random::<f32>() * 0.4 + 0.8),
+            // `level.getRandom()`.
+            0.4 / (world
+                .random
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .next_f32()
+                * 0.4
+                + 0.8),
         );
 
         let entity = Entity::new(world.clone(), position, &EntityType::EXPERIENCE_BOTTLE);

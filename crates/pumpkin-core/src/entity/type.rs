@@ -254,6 +254,9 @@ pub fn from_type(
         id if id == EntityType::ENDER_PEARL.id => Arc::new(EnderPearlEntity::new(entity)),
         id if id == EntityType::SNOWBALL.id => Arc::new(SnowballEntity::new(entity)),
         id if id == EntityType::EGG.id => Arc::new(EggEntity::new(entity)),
+        id if id == EntityType::EXPERIENCE_BOTTLE.id => Arc::new(
+            crate::entity::projectile::experience_bottle::ExperienceBottleEntity::new(entity),
+        ),
         id if id == EntityType::SILVERFISH.id => SilverfishEntity::new(entity),
         id if id == EntityType::SLIME.id => CubeMobEntity::new(entity, CubeKind::Slime),
         id if id == EntityType::SULFUR_CUBE.id => CubeMobEntity::new(entity, CubeKind::SulfurCube),
