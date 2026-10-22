@@ -115,7 +115,9 @@ impl RavagerEntity {
     fn do_hurt_target(mob: &dyn Mob, target: &dyn EntityBase) {
         let mob_entity = mob.get_mob_entity();
         let attacker: &dyn EntityBase = mob;
-        mob_entity.living_entity.swing_hand();
+        mob_entity
+            .living_entity
+            .swing_for_attack(attacker, pumpkin_util::Hand::Right);
         if let Some(ravager) = attacker.cast_any().downcast_ref::<Self>() {
             ravager.attack_tick.store(ATTACK_DURATION, Relaxed);
             let entity = ravager.get_entity();

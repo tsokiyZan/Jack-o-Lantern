@@ -127,7 +127,8 @@ impl Goal for BreakDoorGoal {
                 self.door_interact_goal.door_pos,
                 0,
             );
-            mob.get_mob_entity().living_entity.swing_hand();
+            let living = &mob.get_mob_entity().living_entity;
+            living.swing_for_attack(mob, living.used_item_hand());
         }
 
         self.break_time += 1;

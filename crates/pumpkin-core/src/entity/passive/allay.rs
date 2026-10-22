@@ -663,7 +663,11 @@ impl Mob for AllayEntity {
             self.mob_entity
                 .set_item_slot(&EquipmentSlot::MAIN_HAND, ItemStack::EMPTY.clone());
             self.play_sound_except(player, Sound::EntityAllayItemTaken, 2.0);
-            self.mob_entity.living_entity.swing_hand();
+            self.mob_entity.living_entity.swing(
+                Hand::Right,
+                item_in_hand.get_interact_animation(),
+                false,
+            );
             let entity = self.get_entity();
             for stack in self.inventory.remove_all_items() {
                 throw_item(

@@ -1724,6 +1724,12 @@ impl LivingEntity {
         self.swing(Hand::Right, SwingAnimationImpl::DEFAULT, false);
     }
 
+    /// Vanilla `Mob.swingForAttack`: the swing animated as the attack of the item in `hand`.
+    pub fn swing_for_attack(&self, caller: &dyn EntityBase, hand: Hand) {
+        let animation = self.get_stack_in_hand(caller, hand).get_attack_animation();
+        self.swing(hand, animation, false);
+    }
+
     /// Vanilla `MobEffectUtil.hasDigSpeed`.
     #[must_use]
     pub fn has_dig_speed(&self) -> bool {

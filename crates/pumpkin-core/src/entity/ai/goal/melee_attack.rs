@@ -276,7 +276,9 @@ impl Goal for MeleeAttackGoal {
                 golem.trigger_attack_animation();
             }
 
-            mob.get_mob_entity().living_entity.swing_hand();
+            mob.get_mob_entity()
+                .living_entity
+                .swing_for_attack(mob, pumpkin_util::Hand::Right);
             // The mob itself, not its bare `Entity`, so the victim knows who hurt it.
             let attacker: &dyn crate::entity::EntityBase = mob;
             let damaged = mob.goal_do_hurt_target(attacker, target.as_ref());

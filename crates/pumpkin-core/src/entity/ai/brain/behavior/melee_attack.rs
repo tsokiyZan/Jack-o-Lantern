@@ -50,7 +50,9 @@ pub fn melee_attack(
                 Arc::new(EntityTracker::new(Arc::clone(&target), true)) as Arc<dyn PositionTracker>,
             );
             let mob = tick.mob;
-            mob.get_mob_entity().living_entity.swing_hand();
+            mob.get_mob_entity()
+                .living_entity
+                .swing_for_attack(mob, pumpkin_util::Hand::Right);
             mob.do_hurt_target(tick, &target);
             tick.brain.set_with_expiry(
                 types::ATTACK_COOLING_DOWN,
