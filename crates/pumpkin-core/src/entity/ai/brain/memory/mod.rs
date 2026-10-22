@@ -1,5 +1,7 @@
 use std::fmt;
 use std::marker::PhantomData;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_nbt::tag::NbtTag;
@@ -165,9 +167,23 @@ fn truncate_description(text: String) -> String {
 #[derive(Default)]
 pub struct MemoryStore {
     slots: Vec<Option<MemorySlot>>,
+    /// `IS_PANICKING`'s presence, readable without the brain lock (`MobEntity::is_panicking`).
+    panicking: Option<Arc<AtomicBool>>,
 }
 
 impl MemoryStore {
+    /// Mirrors `IS_PANICKING`'s presence into `mirror` from now on, starting with its value now.
+    pub fn mirror_panicking(&mut self, mirror: Arc<AtomicBool>) {
+        self.panicking = Some(mirror);
+        self.sync_panicking();
+    }
+
+    fn sync_panicking(&self) {
+        if let Some(mirror) = &self.panicking {
+            mirror.store(self.has_value(types::IS_PANICKING.id()), Ordering::Relaxed);
+        }
+    }
+
     #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.slots.is_empty()
@@ -237,6 +253,13 @@ impl MemoryStore {
         value: T,
         ttl: i64,
     ) {
+        self.write_slot(key, value, ttl);
+        if key.id == types::IS_PANICKING.id() {
+            self.sync_panicking();
+        }
+    }
+
+    fn write_slot<T: MemoryValue>(&mut self, key: MemoryModuleType<T>, value: T, ttl: i64) {
         let Some(Some(slot)) = self.slots.get_mut(key.id.index()) else {
             return;
         };
@@ -260,12 +283,16 @@ impl MemoryStore {
         if let Some(Some(slot)) = self.slots.get_mut(id.index()) {
             slot.clear();
         }
+        if id == types::IS_PANICKING.id() {
+            self.sync_panicking();
+        }
     }
 
     pub fn clear_all(&mut self) {
         for slot in self.slots.iter_mut().flatten() {
             slot.clear();
         }
+        self.sync_panicking();
     }
 
     #[must_use]
@@ -281,6 +308,7 @@ impl MemoryStore {
         for slot in self.slots.iter_mut().flatten() {
             slot.tick();
         }
+        self.sync_panicking();
     }
 
     #[must_use]
@@ -325,6 +353,7 @@ impl MemoryStore {
                 slot.ttl = ttl.unwrap_or(NEVER_EXPIRE);
             }
         }
+        self.sync_panicking();
     }
 
     #[must_use]
@@ -420,6 +449,40 @@ mod tests {
         assert!(store.has_value(types::ADMIRING_ITEM.id()));
         store.tick();
         assert!(!store.has_value(types::ADMIRING_ITEM.id()));
+    }
+
+    /// The lock-free `is_panicking` mirror follows every write: set, erase, expiry, clear and a
+    /// loaded save, and starts from the store's value when attached.
+    #[test]
+    fn panicking_mirror_follows_every_write() {
+        let mirror = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(true));
+        let read = || mirror.load(std::sync::atomic::Ordering::Relaxed);
+        let mut store = MemoryStore::default();
+        store.register(types::IS_PANICKING.id());
+        store.register(types::ADMIRING_ITEM.id());
+        store.mirror_panicking(std::sync::Arc::clone(&mirror));
+        assert!(!read());
+        store.set_with_expiry(types::IS_PANICKING, true, 1);
+        assert!(read());
+        store.set(types::ADMIRING_ITEM, true);
+        store.erase(types::ADMIRING_ITEM.id());
+        assert!(read());
+        store.tick();
+        assert!(read());
+        store.tick();
+        assert!(!read());
+        store.set(types::IS_PANICKING, true);
+        store.erase(types::IS_PANICKING.id());
+        assert!(!read());
+        store.set_optional(types::IS_PANICKING, Some(true));
+        assert!(read());
+        store.clear_all();
+        assert!(!read());
+        let mut saved = MemoryStore::default();
+        saved.register(types::IS_PANICKING.id());
+        saved.set(types::IS_PANICKING, true);
+        store.load_packed(&saved.pack());
+        assert!(read());
     }
 
     #[test]

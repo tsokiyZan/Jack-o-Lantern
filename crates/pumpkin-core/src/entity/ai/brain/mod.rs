@@ -133,6 +133,11 @@ impl Brain {
         self.memories.erase(id);
     }
 
+    /// Mirrors the `IS_PANICKING` memory's presence into `mirror` on every write.
+    pub fn mirror_panicking(&mut self, mirror: std::sync::Arc<std::sync::atomic::AtomicBool>) {
+        self.memories.mirror_panicking(mirror);
+    }
+
     pub fn clear_memories(&mut self) {
         self.memories.clear_all();
     }

@@ -11,11 +11,11 @@ use pumpkin_data::tracked_data::TrackedData;
 use pumpkin_util::random::RandomImpl;
 use uuid::Uuid;
 
-use crate::entity::EntityBase;
 use crate::entity::mob::mount_inventory::{MountInventory, open_mount_inventory};
 use crate::entity::mob::{Mob, is_player_holding};
 use crate::entity::passive::animal::Animal;
 use crate::entity::player::Player;
+use crate::entity::{Entity, EntityBase};
 use pumpkin_nbt::compound::NbtCompound;
 
 /// `AbstractHorse` data flag: tamed.
@@ -26,6 +26,15 @@ pub const FLAG_EATING: u8 = 16;
 pub const FLAG_STANDING: u8 = 32;
 /// `AbstractHorse` data flag: mouth open.
 pub const FLAG_OPEN_MOUTH: u8 = 64;
+
+/// Vanilla `AbstractHorse.onElasticLeashPull`: `Leashable`'s, then the horse stops eating. Free
+/// so the camel, which keeps its own flags, shares it.
+pub fn on_elastic_leash_pull(entity: &Entity, is_eating: bool, stop_eating: impl FnOnce()) {
+    entity.check_fall_distance_accumulation();
+    if is_eating {
+        stop_eating();
+    }
+}
 
 /// Vanilla `AbstractHorse`'s taming by riding and rearing, shared by horses, donkeys, mules,
 /// llamas and the undead horses.
@@ -198,12 +207,11 @@ pub trait AbstractHorse: Mob {
         }
     }
 
-    /// Vanilla `AbstractHorse.onElasticLeashPull`: `Leashable`'s, then the horse stops eating.
+    /// Vanilla `AbstractHorse.onElasticLeashPull`.
     fn horse_on_elastic_leash_pull(&self) {
-        self.get_entity().check_fall_distance_accumulation();
-        if self.horse_flag(FLAG_EATING) {
+        on_elastic_leash_pull(self.get_entity(), self.horse_flag(FLAG_EATING), || {
             self.set_horse_flag(FLAG_EATING, false);
-        }
+        });
     }
 
     /// Vanilla `modifyTemper`.

@@ -238,6 +238,13 @@ impl Mob for CopperGolemEntity {
     /// not be gated either.
     fn update_control_flags(&self) {}
 
+    /// Vanilla `Mob.leashTooFarBehaviour`'s MOVE disable hits the empty goal selector: only the
+    /// leash drops, so the goals standing in for the brain aren't gated (see
+    /// `update_control_flags`).
+    fn leash_too_far_behaviour(&self, caller: &dyn EntityBase) {
+        crate::entity::leashable::drop_leash(caller, true, true);
+    }
+
     /// Vanilla `CopperGolem.playStepSound`.
     fn play_step_sound(
         &self,

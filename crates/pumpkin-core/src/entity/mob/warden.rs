@@ -177,6 +177,13 @@ impl Mob for WardenEntity {
     /// not be gated either.
     fn update_control_flags(&self) {}
 
+    /// Vanilla `Mob.leashTooFarBehaviour`'s MOVE disable hits the empty goal selector: only the
+    /// leash drops, so the goals standing in for the brain aren't gated (see
+    /// `update_control_flags`).
+    fn leash_too_far_behaviour(&self, caller: &dyn crate::entity::EntityBase) {
+        crate::entity::leashable::drop_leash(caller, true, true);
+    }
+
     /// Vanilla `Warden.getWalkTargetValue`.
     fn get_walk_target_value(&self, _pos: &pumpkin_util::math::position::BlockPos) -> f32 {
         0.0

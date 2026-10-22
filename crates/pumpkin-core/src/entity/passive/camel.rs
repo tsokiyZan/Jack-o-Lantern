@@ -229,10 +229,13 @@ impl Mob for CamelEntity {
     /// Vanilla `Camel.onElasticLeashPull`: `AbstractHorse`'s. Its stand-up of a sitting camel
     /// has nothing to do, as Pumpkin's camel never sits.
     fn on_elastic_leash_pull(&self, _caller: &dyn EntityBase) {
-        self.get_entity().check_fall_distance_accumulation();
-        if self.has_flag(FLAG_EATING) {
-            self.set_flag(FLAG_EATING, false);
-        }
+        crate::entity::passive::abstract_horse::on_elastic_leash_pull(
+            self.get_entity(),
+            self.has_flag(FLAG_EATING),
+            || {
+                self.set_flag(FLAG_EATING, false);
+            },
+        );
     }
 
     /// Vanilla `AbstractHorse.supportQuadLeash`.
@@ -244,6 +247,13 @@ impl Mob for CamelEntity {
     /// `Mob.updateControlFlags` gates nothing; the goals standing in for that brain here must
     /// not be gated either.
     fn update_control_flags(&self) {}
+
+    /// Vanilla `Mob.leashTooFarBehaviour`'s MOVE disable hits the empty goal selector: only the
+    /// leash drops, so the goals standing in for the brain aren't gated (see
+    /// `update_control_flags`).
+    fn leash_too_far_behaviour(&self, caller: &dyn EntityBase) {
+        crate::entity::leashable::drop_leash(caller, true, true);
+    }
 
     /// Vanilla `CamelHusk.interact`, before `super.interact`.
     fn before_interact(&self) {
@@ -546,6 +556,36 @@ mod tests {
                     mount_type.resource_name
                 );
             }
+        }
+    }
+
+    /// `Mob.leashTooFarBehaviour` disables MOVE on the goal selector, which is empty on vanilla's
+    /// brain mobs: the goals standing in for their brain keep it. A goal mob (cow) loses it.
+    #[tokio::test]
+    async fn leash_snap_leaves_brain_stand_in_goals_enabled() {
+        let (_folder, world) = crate::world::test_support::test_world();
+        for (entity_type, gated) in [
+            (&EntityType::CAMEL, false),
+            (&EntityType::COPPER_GOLEM, false),
+            (&EntityType::WARDEN, false),
+            (&EntityType::VILLAGER, false),
+            (&EntityType::COW, true),
+        ] {
+            let entity = crate::entity::r#type::from_type(
+                entity_type,
+                Vector3::new(0.0, 100.0, 0.0),
+                &world,
+                uuid::Uuid::new_v4(),
+            );
+            entity.leash_too_far_behaviour(entity.as_ref());
+            let mob = entity.get_mob().unwrap();
+            let goals = mob.get_mob_entity().goals_selector.lock().unwrap();
+            assert_eq!(
+                goals.is_control_disabled(Controls::MOVE),
+                gated,
+                "{}",
+                entity_type.resource_name
+            );
         }
     }
 }

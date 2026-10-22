@@ -163,7 +163,11 @@ fn convert_single_type(from: &dyn Mob, to: &dyn Mob, params: ConversionParams) {
     }
     if let Some(vehicle) = old_entity.get_vehicle() {
         vehicle.get_entity().remove_passenger(old_entity.entity_id);
-        new.set_pending_vehicle(vehicle);
+        // Vanilla mounts `to` here and the `setLeashedTo` below dismounts it again; Pumpkin
+        // mounts at spawn, after the leash, so a leashed mob skips the mount instead.
+        if crate::entity::leashable::leash_holder(old_entity).is_none() {
+            new.set_pending_vehicle(vehicle);
+        }
     }
 
     if params.keep_equipment {

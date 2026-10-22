@@ -122,6 +122,9 @@ pub struct MobEntity {
     /// Vanilla `Mob.bodyRotationControl`.
     pub body_rotation_control: std::sync::Mutex<Box<dyn BodyRotationControlTrait>>,
     pub brain: std::sync::Mutex<Brain>,
+    /// The brain's `IS_PANICKING` memory is present, kept by its every write so other mobs read
+    /// it without the brain lock (`is_panicking`).
+    pub brain_panicking: Arc<AtomicBool>,
     pub brain_inbox: std::sync::Mutex<Vec<BrainMessage>>,
     pub position_target: AtomicCell<BlockPos>,
     pub position_target_range: AtomicI32,
@@ -369,6 +372,7 @@ impl MobEntity {
             jump_control: std::sync::Mutex::new(Box::new(JumpControl::default())),
             body_rotation_control: std::sync::Mutex::new(Box::new(BodyRotationControl::new())),
             brain: std::sync::Mutex::new(Brain::default()),
+            brain_panicking: Arc::new(AtomicBool::new(false)),
             brain_inbox: std::sync::Mutex::new(Vec::new()),
             position_target: AtomicCell::new(BlockPos::ZERO),
             position_target_range: AtomicI32::new(-1),
@@ -843,11 +847,16 @@ impl MobEntity {
 
     /// Builds the mob's brain from its provider, as vanilla does in the constructor.
     pub fn init_brain(&self, mob: &dyn Mob) {
+        self.set_brain(mob.make_brain(&PackedMemories::empty()));
+    }
+
+    /// Replaces the brain, keeping `brain_panicking` mirrored from it.
+    pub fn set_brain(&self, mut brain: Brain) {
+        brain.mirror_panicking(Arc::clone(&self.brain_panicking));
         *self
             .brain
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) =
-            mob.make_brain(&PackedMemories::empty());
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = brain;
     }
 
     /// Reaches the brain from outside a brain tick; a tick never waits on another mob's brain.
@@ -3833,15 +3842,13 @@ impl<T: Mob + Send + 'static> EntityBase for T {
     /// Vanilla `PathfinderMob.isPanicking`: a live brain's `IS_PANICKING` memory, else a
     /// running `PanicGoal`.
     ///
-    /// The brain is only held by this mob's own brain tick, whose callers read the memory from
-    /// the tick instead (`AnimalMakeLove`); a contended lock reads as "no memory". Inside the
-    /// mob's own AI tick its selector is detached and the goal check answers `false`.
+    /// The memory is read from `brain_panicking`, which every write to it updates, so a mob
+    /// whose brain another thread is ticking reads it without the lock (a held memory implies a
+    /// live brain). Inside the mob's own AI tick its selector is detached and the goal check
+    /// answers `false`.
     fn is_panicking(&self) -> bool {
         let mob_entity = self.get_mob_entity();
-        if let Ok(brain) = mob_entity.brain.try_lock()
-            && !brain.is_brain_dead()
-            && brain.has_memory_value(crate::entity::ai::brain::memory::types::IS_PANICKING.id())
-        {
+        if mob_entity.brain_panicking.load(Relaxed) {
             return true;
         }
         mob_entity
@@ -3936,12 +3943,8 @@ impl<T: Mob + Send + 'static> EntityBase for T {
     fn read_custom_nbt(&self, nbt: &NbtCompound) {
         self.get_mob_entity().read_mob_nbt(self, nbt);
         if let Some(brain) = nbt.get_compound("Brain") {
-            *self
-                .get_mob_entity()
-                .brain
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner) =
-                self.make_brain(&PackedMemories::from_nbt(brain));
+            self.get_mob_entity()
+                .set_brain(self.make_brain(&PackedMemories::from_nbt(brain)));
         }
         if let Some(ageable) = self.as_ageable() {
             ageable.read_ageable_nbt(nbt);
