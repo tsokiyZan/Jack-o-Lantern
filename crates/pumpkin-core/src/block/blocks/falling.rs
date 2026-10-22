@@ -77,8 +77,6 @@ impl BlockMetadata for FallingBlock {
             BlockId::GRAVEL,
             BlockId::SAND,
             BlockId::RED_SAND,
-            BlockId::SUSPICIOUS_SAND,
-            BlockId::SUSPICIOUS_GRAVEL,
             BlockId::WHITE_CONCRETE_POWDER,
             BlockId::ORANGE_CONCRETE_POWDER,
             BlockId::MAGENTA_CONCRETE_POWDER,
@@ -139,6 +137,6 @@ impl BlockBehaviour for FallingBlock {
             return;
         }
         let state = args.world.get_block_state(args.position);
-        FallingEntity::replace_spawn(args.world, *args.position, state.id);
+        let _ = FallingEntity::replace_spawn(args.world, *args.position, state.id);
     }
 }

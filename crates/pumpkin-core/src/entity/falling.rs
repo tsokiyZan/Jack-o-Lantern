@@ -76,8 +76,41 @@ impl FallingEntity {
         self.fall_damage_max.store(damage_max, Ordering::Relaxed);
     }
 
+    /// Vanilla `callOnBrokenAfterFall`: the falling block's `onBrokenAfterFall`.
+    fn call_on_broken_after_fall(&self, caller: &dyn EntityBase, world: &World, pos: BlockPos) {
+        let block = Block::from_state_id(self.block_state_id.load());
+        if block.has_tag(&tag::Block::MINECRAFT_ANVIL) {
+            if !self.entity.is_silent() {
+                world.sync_world_event(WorldEvent::SoundAnvilBroken, pos, 0);
+            }
+        } else if block == &Block::SUSPICIOUS_SAND || block == &Block::SUSPICIOUS_GRAVEL {
+            // `BrushableBlock.onBrokenAfterFall`: the break effect where the box's centre is,
+            // and block_destroy.
+            let center = self.entity.bounding_box.load().get_center();
+            world.sync_world_event(
+                WorldEvent::ParticlesAndSoundDestroyBlock,
+                BlockPos::floored_v(center),
+                i32::from(self.block_state_id.load().as_u16()),
+            );
+            world.game_event_from(
+                Some(caller),
+                pumpkin_data::game_event::GameEvent::BlockDestroy,
+                center,
+            );
+        }
+    }
+
+    /// Vanilla `FallingBlockEntity.disableDrop`: it breaks without dropping where it lands.
+    pub fn disable_drop(&self) {
+        self.cancel_drop.store(true, Ordering::Relaxed);
+    }
+
     /// Replaced the current Block and Spawns a new Falling one (synchronous)
-    pub fn replace_spawn(world: &Arc<World>, position: BlockPos, block_state: BlockStateId) {
+    pub fn replace_spawn(
+        world: &Arc<World>,
+        position: BlockPos,
+        block_state: BlockStateId,
+    ) -> Arc<Self> {
         // Replace the original block, TODO: use fluid state
         world.set_block_state(
             &position,
@@ -95,7 +128,8 @@ impl FallingEntity {
         if Block::from_state_id(block_state).has_tag(&tag::Block::MINECRAFT_ANVIL) {
             entity.set_hurts_entities(2.0, 40);
         }
-        world.spawn_entity_non_save(entity);
+        world.spawn_entity_non_save(entity.clone());
+        entity
     }
 }
 
@@ -126,12 +160,8 @@ impl EntityBase for FallingEntity {
             let (current_block, current_state) = world.get_block_and_state(&landing_pos);
             // Vanilla waits until a piston has finished moving a block through the landing cell.
             if current_block != &Block::MOVING_PISTON && self.cancel_drop.load(Ordering::Relaxed) {
-                // `callOnBrokenAfterFall`.
-                let block = Block::from_state_id(self.block_state_id.load());
                 self.entity.remove();
-                if block.has_tag(&tag::Block::MINECRAFT_ANVIL) && !self.entity.is_silent() {
-                    world.sync_world_event(WorldEvent::SoundAnvilBroken, landing_pos, 0);
-                }
+                self.call_on_broken_after_fall(caller, &world, landing_pos);
             } else if current_block != &Block::MOVING_PISTON {
                 let mut state_id = self.block_state_id.load();
                 let block = Block::from_state_id(state_id);

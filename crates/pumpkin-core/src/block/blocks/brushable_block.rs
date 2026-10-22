@@ -3,10 +3,13 @@ use std::sync::Arc;
 use pumpkin_data::block_properties::SuspiciousSandLikeProperties;
 use pumpkin_data::{BlockId, BlockStateId};
 
+use crate::block::blocks::falling::FallingBlock;
 use crate::block::entities::brushable_block::BrushableBlockBlockEntity;
 use crate::block::{
-    BlockBehaviour, BlockMetadata, BrokenArgs, OnPlaceArgs, OnScheduledTickArgs, PlacedArgs,
+    BlockBehaviour, BlockMetadata, BrokenArgs, GetStateForNeighborUpdateArgs, OnPlaceArgs,
+    OnScheduledTickArgs, PlacedArgs,
 };
+use crate::entity::falling::FallingEntity;
 use pumpkin_world::tick::TickPriority;
 
 pub struct BrushableBlock;
@@ -31,13 +34,30 @@ impl BlockBehaviour for BrushableBlock {
             .schedule_block_tick(args.block, *args.position, 2, TickPriority::Normal);
     }
 
-    /// Vanilla `BrushableBlock.tick`: the block entity's `checkReset`.
-    /// TODO: falling when the block below is free.
+    /// Vanilla `BrushableBlock.updateShape`: a neighbour change schedules the tick.
+    fn get_state_for_neighbor_update(
+        &self,
+        args: GetStateForNeighborUpdateArgs<'_>,
+    ) -> BlockStateId {
+        args.world
+            .schedule_block_tick(args.block, *args.position, 2, TickPriority::Normal);
+        args.state_id
+    }
+
+    /// Vanilla `BrushableBlock.tick`: the block entity's `checkReset`, then a fall, which
+    /// never drops the block, when the block below is free.
     fn on_scheduled_tick(&self, args: OnScheduledTickArgs<'_>) {
         if let Some(be) = args.world.get_block_entity(args.position)
             && let Some(brushable) = be.as_any().downcast_ref::<BrushableBlockBlockEntity>()
         {
             brushable.check_reset(args.world);
+        }
+        let (below_block, below_state) = args.world.get_block_and_state(&args.position.down());
+        if FallingBlock::can_fall_through(below_state, below_block)
+            && args.position.0.y >= args.world.min_y
+        {
+            let state = args.world.get_block_state(args.position);
+            FallingEntity::replace_spawn(args.world, *args.position, state.id).disable_drop();
         }
     }
 
