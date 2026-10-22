@@ -239,7 +239,6 @@ impl BedrockPlayer<'_> {
 use pumpkin_data::attributes::Attributes;
 use pumpkin_data::block_properties::HorizontalFacing;
 use pumpkin_data::damage::DamageType;
-use pumpkin_data::data_component_impl::{AttributeModifiersImpl, Operation};
 use pumpkin_data::data_component_impl::{EquipmentSlot, EquippableImpl, ToolImpl, WeaponImpl};
 use pumpkin_data::effect::StatusEffect;
 use pumpkin_data::entity::{EntityPose, EntityStatus, EntityType};
@@ -1359,29 +1358,7 @@ impl Player {
         let base_damage = self
             .living_entity
             .get_attribute_value(&Attributes::ATTACK_DAMAGE);
-        let base_attack_speed = 4.0;
-
         let mut damage_multiplier = 1.0;
-        let mut add_speed = 0.0;
-
-        {
-            let stack = &item_stack;
-            if stack.is_empty() {
-                // Vanilla fist: base_attack_speed = -2.4
-                add_speed = -2.4;
-            } else if let Some(modifiers) = stack.get_data_component::<AttributeModifiersImpl>() {
-                // Only attack speed is read from the item here.
-                // Attack damage is already  part of `base_damage` via the held item's live
-                // ATTACK_DAMAGE modifier, re-adding it here would double it.
-                for item_mod in modifiers.attribute_modifiers.iter() {
-                    if item_mod.operation == Operation::AddValue
-                        && item_mod.id == "minecraft:base_attack_speed"
-                    {
-                        add_speed = item_mod.amount;
-                    }
-                }
-            }
-        }
 
         // Vanilla `createAttackSource`: the mace's while it can smash.
         let is_mace_smash = item_stack.item.id == pumpkin_data::item::Item::MACE.id
@@ -1413,13 +1390,11 @@ impl Player {
             0.0,
         ) as u32;
 
-        let attack_speed = base_attack_speed + add_speed;
-
         let is_bedrock = matches!(self.client.as_ref(), ClientPlatform::Bedrock(_));
         let attack_cooldown_progress = if is_bedrock {
             1.0
         } else {
-            self.get_attack_cooldown_progress(f64::from(server.basic_config.tps), 0.5, attack_speed)
+            f64::from(self.get_attack_strength_scale(0.5))
         };
         self.last_attacked_ticks.store(0, Ordering::Relaxed);
 
@@ -3404,12 +3379,19 @@ impl Player {
         self.client_loaded.store(loaded, Ordering::Relaxed);
     }
 
-    pub fn get_attack_cooldown_progress(&self, tps: f64, base_time: f64, attack_speed: f64) -> f64 {
-        let x = f64::from(self.last_attacked_ticks.load(Ordering::Acquire)) + base_time;
+    /// Vanilla `Player.getCurrentItemAttackStrengthDelay`: ticks to a full-strength attack.
+    pub fn get_current_item_attack_strength_delay(&self) -> f32 {
+        (1.0 / self
+            .living_entity
+            .get_attribute_value(&Attributes::ATTACK_SPEED)
+            * 20.0) as f32
+    }
 
-        let progress_per_tick = tps / attack_speed;
-        let progress = x / progress_per_tick;
-        progress.clamp(0.0, 1.0)
+    /// Vanilla `Player.getAttackStrengthScale`.
+    pub fn get_attack_strength_scale(&self, a: f32) -> f32 {
+        ((self.last_attacked_ticks.load(Ordering::Acquire) as f32 + a)
+            / self.get_current_item_attack_strength_delay())
+        .clamp(0.0, 1.0)
     }
 
     pub async fn fire_packet_sent<P: Send + Sync + std::any::Any>(

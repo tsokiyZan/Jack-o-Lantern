@@ -81,9 +81,8 @@ impl ItemBehaviour for SpearItem {
             return;
         };
 
-        let tps = f64::from(server.basic_config.tps);
-        let attack_delay = tps / Self::attack_speed(player, stack);
-        let elapsed = f64::from(player.last_attacked_ticks.load(Ordering::Acquire));
+        let attack_delay = player.get_current_item_attack_strength_delay();
+        let elapsed = player.last_attacked_ticks.load(Ordering::Acquire) as f32;
         if elapsed + 5.0 < attack_delay {
             return;
         }
@@ -184,10 +183,7 @@ impl SpearItem {
             base_damage,
         ) - base_damage;
         if !Self::is_using_hand(player, hand) {
-            let tps = f64::from(server.basic_config.tps);
-            let charge =
-                player.get_attack_cooldown_progress(tps, 0.5, Self::attack_speed(player, stack))
-                    as f32;
+            let charge = player.get_attack_strength_scale(0.5);
             magic_boost *= charge;
             base_damage *= 0.2 + charge * charge * 0.8;
         }
@@ -630,16 +626,6 @@ impl SpearItem {
             damage -= 4.0 * (f64::from(weakness.amplifier) + 1.0);
         }
         damage.max(0.0)
-    }
-
-    fn attack_speed(player: &Player, stack: &ItemStack) -> f64 {
-        Self::attribute_with_item_modifier(
-            player,
-            stack,
-            &Attributes::ATTACK_SPEED,
-            "minecraft:base_attack_speed",
-        )
-        .max(f64::EPSILON)
     }
 
     fn attribute_with_item_modifier(
