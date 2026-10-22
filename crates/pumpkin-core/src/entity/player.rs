@@ -2706,10 +2706,7 @@ impl Player {
     pub fn stop_sleep_in_bed(&self, forceful_wake_up: bool, update_level_list: bool) {
         let world = self.world();
         if let Some(bed_pos) = self.living_entity.get_sleeping_pos() {
-            world.send_to_tracking_players_and_self(
-                &self.living_entity.entity,
-                &CEntityAnimation::new(self.entity_id().into(), Animation::LeaveBed),
-            );
+            // The plugin event first: before any packet or state change.
             if let Some(server) = world.server.upgrade()
                 && let Some(player_arc) = world.get_player_by_uuid(self.gameprofile.id)
             {
@@ -2719,6 +2716,10 @@ impl Player {
                     );
                 server.plugin_manager.fire_blocking(&server, &mut event);
             }
+            world.send_to_tracking_players_and_self(
+                &self.living_entity.entity,
+                &CEntityAnimation::new(self.entity_id().into(), Animation::LeaveBed),
+            );
         }
         self.living_entity.living_stop_sleeping(self);
         if update_level_list {
@@ -5652,8 +5653,6 @@ impl Player {
 
         let gamemode = event.new_gamemode;
         self.gamemode.store(gamemode);
-        // `ServerPlayerGameMode.changeGameModeForPlayer`: spectators don't count as sleepers.
-        self.world().update_sleeping_player_list();
         // TODO: Fix this when mojang fixes it
         // This is intentional to keep the pure vanilla mojang experience
         // self.previous_gamemode.store(self.previous_gamemode.load());
@@ -5717,6 +5716,9 @@ impl Player {
                     actions: &[PlayerAction::UpdateGameMode((gamemode as i32).into())],
                 }],
             ));
+        // `ServerPlayerGameMode.changeGameModeForPlayer`: after the tab-list update, before
+        // `ServerPlayer.setGameMode`'s CHANGE_GAME_MODE event (spectators don't count).
+        self.world().update_sleeping_player_list();
 
         self.client.try_enqueue_packet_editioned(
             &CGameEvent::new(GameEvent::ChangeGameMode, gamemode as i32 as f32),
@@ -5724,6 +5726,8 @@ impl Player {
                 player_game_type: gamemode.into(),
             },
         );
+        // `ServerPlayer.setGameMode` ends with `onUpdateAbilities()` again.
+        self.send_abilities_update();
 
         true
     }

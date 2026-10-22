@@ -359,6 +359,8 @@ pub struct VillagerEntity {
     pub job_site: std::sync::Mutex<Option<BlockPos>>,
     pub job_site_pending: AtomicBool,
     pub home_pos: std::sync::Mutex<Option<BlockPos>>,
+    /// The brain's `LAST_WOKEN` (game time), `i64::MIN` while unset.
+    last_woken: AtomicI64,
     pub self_weak: std::sync::Mutex<Option<Weak<Self>>>,
 }
 
@@ -435,6 +437,7 @@ impl VillagerEntity {
             job_site: std::sync::Mutex::new(None),
             job_site_pending: AtomicBool::new(false),
             home_pos: std::sync::Mutex::new(None),
+            last_woken: AtomicI64::new(i64::MIN),
             self_weak: std::sync::Mutex::new(None),
         };
         let mob_arc = Arc::new(villager);
@@ -1804,7 +1807,12 @@ impl VillagerEntity {
             let is_night = (12000..=23000).contains(&time);
 
             if is_night {
-                if !is_sleeping {
+                // `SleepInBed`: not within 100 ticks of waking.
+                let since_woken = game_time.wrapping_sub(self.last_woken.load(Ordering::Relaxed));
+                let just_woke = self.last_woken.load(Ordering::Relaxed) != i64::MIN
+                    && since_woken > 0
+                    && since_woken < 100;
+                if !is_sleeping && !just_woke {
                     // Check distance to bed. If close enough, go to sleep
                     let dist = home_pos
                         .to_f64()
@@ -2390,6 +2398,12 @@ impl Mob for VillagerEntity {
                 .or_default();
             *value = (*value + 25).min(GossipType::MinorNegative.max_value());
         }
+    }
+
+    /// Vanilla `Villager.stopSleeping`: `LAST_WOKEN` is the game time.
+    fn after_stop_sleeping(&self) {
+        let now = self.get_entity().world.load().get_world_age();
+        self.last_woken.store(now, Ordering::Relaxed);
     }
 
     fn mob_tick(&self, _caller: &dyn EntityBase) {

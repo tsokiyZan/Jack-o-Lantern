@@ -455,7 +455,13 @@ impl JavaClient {
         let entity = player.get_entity();
         let current = entity.pos.load();
         if position.squared_distance_to_vec(&current) > 1.0 {
-            let (yaw, pitch) = rotation.unwrap_or_else(|| (entity.yaw.load(), entity.pitch.load()));
+            // `Mth.wrapDegrees(packet.getYRot(player.getYRot()))`, likewise the pitch.
+            let (yaw, pitch) = rotation.unwrap_or_else(|| {
+                (
+                    wrap_degrees(entity.yaw.load()),
+                    wrap_degrees(entity.pitch.load()),
+                )
+            });
             player.request_teleport(current, yaw, pitch);
         }
         true

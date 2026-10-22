@@ -1962,6 +1962,10 @@ pub trait Mob: EntityBase + Send + Sync {
         true
     }
 
+    /// A mob's own part of vanilla `stopSleeping`, after `LivingEntity`'s
+    /// (`Villager.stopSleeping`'s `LAST_WOKEN`).
+    fn after_stop_sleeping(&self) {}
+
     /// Vanilla `LivingEntity.isSleeping`: a sleeping position, unless the mob overrides it
     /// (`Fox.isSleeping`, which sleeps without a bed).
     fn is_sleeping(&self) -> bool {

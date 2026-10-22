@@ -4664,9 +4664,11 @@ impl LivingEntity {
         else {
             return false;
         };
-        // `if (isPassenger()) stopRiding()`.
+        // `if (isPassenger()) stopRiding()`, which nothing can cancel.
         if let Some(vehicle) = self.entity.get_vehicle() {
-            vehicle.get_entity().remove_passenger(self.entity.entity_id);
+            vehicle
+                .get_entity()
+                .remove_passenger_on_removal(self.entity.entity_id);
         }
         self.set_pos_to_bed_at(sleep_height, bed);
         // `setBlockAndUpdate(bed, OCCUPIED=true)`; the foot follows through `updateShape`.
@@ -4720,6 +4722,9 @@ impl LivingEntity {
             return;
         }
         self.living_stop_sleeping(caller);
+        if let Some(mob) = caller.get_mob() {
+            mob.after_stop_sleeping();
+        }
     }
 
     /// Vanilla `LivingEntity.stopSleeping`: frees the bed and stands up beside it.
