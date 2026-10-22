@@ -3,12 +3,14 @@ pub mod statistics;
 
 use crate::enchantment::EnchantmentHelper;
 use crate::enchantment::HurtAndBreak;
+use crate::entity::TeleportTarget;
 use crate::entity::damage_source::DamageSource;
 use crate::entity::movement_emission::MovementEmission;
 use crate::item::interaction_result::{InteractionResult, SwingSource};
 use crate::item::item_stack_hurt_enemy;
 use crate::item::items::mace::MaceItem;
 use core::f32;
+use pumpkin_protocol::PositionFlag;
 use std::collections::{HashMap, VecDeque};
 use std::f64::consts::TAU;
 use std::num::NonZero;
@@ -4820,7 +4822,7 @@ impl Player {
     }
 
     /// Teleports the player to a different world or dimension with an optional position, yaw, and pitch.
-    #[expect(clippy::too_many_lines)]
+    /// A `None` yaw or pitch keeps the player's own.
     pub async fn teleport_world(
         self: &Arc<Self>,
         new_world: Arc<World>,
@@ -4828,9 +4830,28 @@ impl Player {
         yaw: Option<f32>,
         pitch: Option<f32>,
     ) {
+        self.change_world(TeleportTarget {
+            world: new_world,
+            position,
+            yaw,
+            pitch,
+            keep_velocity: false,
+            as_passenger: false,
+        })
+        .await;
+    }
+
+    /// The dimension change of vanilla `ServerPlayer.teleport(TeleportTransition)`.
+    #[expect(clippy::too_many_lines)]
+    async fn change_world(self: &Arc<Self>, target: TeleportTarget) {
+        let new_world = target.world.clone();
+        let position = target.position;
         let current_world = self.living_entity.entity.world.load_full();
-        let yaw = yaw.unwrap_or(new_world.level_info.load().spawn_yaw);
-        let pitch = pitch.unwrap_or(new_world.level_info.load().spawn_pitch);
+        // A rotation the transition leaves relative stays the player's own.
+        let own_yaw = self.living_entity.entity.yaw.load();
+        let own_pitch = self.living_entity.entity.pitch.load();
+        let yaw = target.yaw.unwrap_or(own_yaw);
+        let pitch = target.pitch.unwrap_or(own_pitch);
 
         let Some(server) = new_world.server.upgrade() else {
             return;
@@ -4952,7 +4973,16 @@ impl Player {
                 new_world.send_world_info(&player);
                 new_world.send_center_chunk(&player).await;
 
-                player.request_teleport(position, yaw, pitch);
+                // `connection.teleport(PositionMoveRotation.of(transition), relatives)`: a
+                // rotation still the transition's relative one goes as relative.
+                player.connection_teleport(&TeleportTarget {
+                    world: new_world.clone(),
+                    position,
+                    yaw: (target.yaw.is_some() || yaw != own_yaw).then_some(yaw),
+                    pitch: (target.pitch.is_some() || pitch != own_pitch).then_some(pitch),
+                    keep_velocity: target.keep_velocity,
+                    as_passenger: target.as_passenger,
+                });
 
                 let mut changed_world_event = crate::plugin::api::events::player::player_changed_world::PlayerChangedWorldEvent {
                     player: player.clone(),
@@ -4963,6 +4993,153 @@ impl Player {
                 server.plugin_manager.fire(&server, &mut changed_world_event).await;
             }
         }}
+    }
+
+    /// Vanilla `ServerPlayer.teleport(TeleportTransition)`. Returns the player.
+    pub fn teleport_transition(
+        self: &Arc<Self>,
+        target: &TeleportTarget,
+    ) -> Option<Arc<dyn EntityBase>> {
+        if self.living_entity.entity.is_removed() {
+            return None;
+        }
+        if !target.as_passenger {
+            self.remove_vehicle();
+        }
+        if Arc::ptr_eq(&target.world, &self.world()) {
+            self.teleport_in_world(target);
+        } else {
+            let player = self.clone();
+            let target = target.clone();
+            self.spawn_task(async move {
+                player.change_world(target).await;
+            });
+        }
+        Some(self.clone())
+    }
+
+    /// `connection.teleport` within the player's world, and the position sync the other
+    /// players need (Pumpkin's tracker sends a player no regular position updates).
+    pub fn teleport_in_world(&self, target: &TeleportTarget) {
+        if !self.connection_teleport(target) {
+            return;
+        }
+        let entity = &self.living_entity.entity;
+        entity.world.load().broadcast_to_chunk_except(
+            entity.chunk_pos.load(),
+            &[entity.entity_uuid],
+            &CEntityPositionSync::new(
+                entity.entity_id.into(),
+                entity.pos.load(),
+                Vector3::new(0.0, 0.0, 0.0),
+                entity.yaw.load(),
+                entity.pitch.load(),
+                entity.on_ground.load(Ordering::SeqCst),
+            ),
+        );
+    }
+
+    /// Vanilla `ServerGamePacketListenerImpl.teleport(PositionMoveRotation, Set<Relative>)`:
+    /// a `None` yaw or pitch is a relative 0 and `keep_velocity` the relative delta (sent as
+    /// zero). Returns false if a plugin cancelled the teleport.
+    pub fn connection_teleport(&self, target: &TeleportTarget) -> bool {
+        let Some(server) = self.world().server.upgrade() else {
+            return false;
+        };
+        if let Some(player_arc) = self.world().get_player_by_uuid(self.gameprofile.id) {
+            let mut event = PlayerTeleportEvent {
+                player: player_arc,
+                from: self.living_entity.entity.pos.load(),
+                to: target.position,
+                cancelled: false,
+            };
+            server.plugin_manager.fire_blocking(&server, &mut event);
+            if event.cancelled {
+                return false;
+            }
+        }
+
+        let teleport_id = self.teleport_id_count.fetch_add(1, Ordering::Relaxed) + 1;
+        self.chunk_send_epoch.fetch_add(1, Ordering::Relaxed);
+        let entity = &self.living_entity.entity;
+        entity.teleport_set_position(target);
+        let position = entity.pos.load();
+        match self.client.as_ref() {
+            ClientPlatform::Java(client) => {
+                *self
+                    .awaiting_teleport
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner) =
+                    Some((teleport_id.into(), position));
+                let mut relatives = Vec::new();
+                if target.keep_velocity {
+                    relatives.extend([
+                        PositionFlag::DeltaX,
+                        PositionFlag::DeltaY,
+                        PositionFlag::DeltaZ,
+                    ]);
+                }
+                if target.yaw.is_none() {
+                    relatives.push(PositionFlag::YRot);
+                }
+                if target.pitch.is_none() {
+                    relatives.push(PositionFlag::XRot);
+                }
+                let packet = CPlayerPosition::new(
+                    teleport_id.into(),
+                    target.position,
+                    Vector3::new(0.0, 0.0, 0.0),
+                    target.yaw.unwrap_or(0.0),
+                    target.pitch.unwrap_or(0.0),
+                    relatives,
+                );
+                if let Ok(data) = client.serialize_packet(&packet) {
+                    client.try_enqueue_packet(data);
+                }
+            }
+            ClientPlatform::Bedrock(client) => {
+                let yaw = entity.yaw.load();
+                let packet = CBedrockMovePlayer::new(
+                    VarULong(self.entity_id() as u64),
+                    Vector3::new(
+                        position.x as f32,
+                        position.y as f32 + entity.entity_type.eye_height,
+                        position.z as f32,
+                    ),
+                    entity.pitch.load(),
+                    yaw,
+                    yaw,
+                    CBedrockMovePlayer::MODE_TELEPORT,
+                    false,
+                    VarULong(0),
+                    0,
+                    0,
+                    VarULong(self.tick_counter.load(Ordering::Relaxed).max(0) as u64),
+                );
+                if let Ok(data) = client.serialize_packet(&packet) {
+                    client.try_enqueue_packet(data);
+                }
+            }
+        }
+        true
+    }
+
+    /// Vanilla `ServerPlayer.removeVehicle`: off the vehicle where it is, without the
+    /// dismount placement of `stopRiding`. The vehicle's `remove_passenger_internal` sends the
+    /// player the vehicle's effect removals and passenger list.
+    pub fn remove_vehicle(&self) {
+        let vehicle = self
+            .living_entity
+            .entity
+            .vehicle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        if let Some(vehicle) = vehicle {
+            vehicle
+                .get_entity()
+                .remove_passenger_before_teleport(self.entity_id());
+        }
     }
 
     /// `yaw` and `pitch` are in degrees.
@@ -7684,28 +7861,15 @@ impl EntityBase for Player {
         pitch: Option<f32>,
         world: Arc<World>,
     ) {
-        if Arc::ptr_eq(&world, &self.world()) {
-            // Same world
-            let yaw = yaw.unwrap_or_else(|| self.living_entity.entity.yaw.load());
-            let pitch = pitch.unwrap_or_else(|| self.living_entity.entity.pitch.load());
-            self.request_teleport(position, yaw, pitch);
-            let entity = self.get_entity();
-            let chunk_pos = entity.chunk_pos.load();
-            entity.world.load().broadcast_to_chunk_except(
-                chunk_pos,
-                &[self.living_entity.entity.entity_uuid],
-                &CEntityPositionSync::new(
-                    self.living_entity.entity.entity_id.into(),
-                    position,
-                    Vector3::new(0.0, 0.0, 0.0),
-                    yaw,
-                    pitch,
-                    entity.on_ground.load(Ordering::SeqCst),
-                ),
-            );
-        } else if let Some(player_arc) = self.world().get_player_by_uuid(self.gameprofile.id) {
-            self.spawn_task(async move {
-                player_arc.teleport_world(world, position, yaw, pitch).await;
+        // Commands and plugins: vanilla `teleport(TeleportTransition)`, which dismounts.
+        if let Some(player) = self.world().get_player_by_id(self.entity_id()) {
+            player.teleport_transition(&TeleportTarget {
+                world,
+                position,
+                yaw,
+                pitch,
+                keep_velocity: false,
+                as_passenger: false,
             });
         }
     }

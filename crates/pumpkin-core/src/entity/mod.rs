@@ -45,8 +45,8 @@ use pumpkin_protocol::{
     codec::var_int::VarInt,
     codec::var_ulong::VarULong,
     java::client::play::{
-        CEntityVelocity, CPlayerPosition, CSetEntityMetadata, CSetPassengers, CSpawnEntity,
-        CTeleportEntity, Metadata, MetadataSerializer,
+        CEntityVelocity, CPlayerPosition, CRemoveMobEffect, CSetEntityMetadata, CSetPassengers,
+        CSpawnEntity, CTeleportEntity, Metadata, MetadataSerializer,
     },
 };
 use pumpkin_util::Hand;
@@ -5513,8 +5513,14 @@ impl Entity {
                 None
             };
 
-            // Vanilla: ridingCooldown = 60 (prevents immediate re-mount)
-            passenger_entity.riding_cooldown.store(60, Relaxed);
+            // Vanilla `removePassenger`: boardingCooldown = 60 (prevents immediate re-mount);
+            // `Player.removeVehicle` sets a player's back to 0.
+            let cooldown = if passenger.get_player().is_some() {
+                0
+            } else {
+                60
+            };
+            passenger_entity.riding_cooldown.store(cooldown, Relaxed);
             // `oldVehicle.removePassenger(this)`, before the dismount game event.
             self.after_remove_passenger_hook();
             // `removeVehicle`: a passenger that is only unloaded or changing dimension leaves
@@ -5535,6 +5541,25 @@ impl Entity {
             let world = self.world.load();
             let passengers_packet = CSetPassengers::new(VarInt(self.entity_id), &passenger_ids);
             if let Some(player) = passenger.get_player() {
+                // `ServerPlayer.removeVehicle`: the effects of a living vehicle go from the
+                // player's view, then the passenger list.
+                if let Some(vehicle) = world.get_entity_by_id(self.entity_id)
+                    && let Some(living) = vehicle.get_living_entity()
+                {
+                    let effects: Vec<_> = living
+                        .active_effects
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner)
+                        .keys()
+                        .copied()
+                        .collect();
+                    for effect in effects {
+                        player.try_send_client_packet(&CRemoveMobEffect::new(
+                            self.entity_id.into(),
+                            VarInt(i32::from(effect.id)),
+                        ));
+                    }
+                }
                 player.try_send_client_packet(&passengers_packet);
                 world.broadcast_to_chunk_except(
                     chunk_pos,
@@ -6571,8 +6596,17 @@ pub fn blocks_building(entity: &dyn EntityBase) -> bool {
 pub fn teleport_to(entity: &dyn EntityBase, position: Vector3<f64>) {
     let base = entity.get_entity();
     let world = base.world.load_full();
-    if entity.get_player().is_some() {
-        entity.teleport(position, None, None, world);
+    if let Some(player) = entity.get_player() {
+        // `ServerPlayer.teleportTo(x, y, z)`: the client is moved, keeping its speed and look;
+        // nothing dismounts.
+        player.teleport_in_world(&TeleportTarget {
+            world,
+            position,
+            yaw: None,
+            pitch: None,
+            keep_velocity: true,
+            as_passenger: true,
+        });
     } else {
         base.teleport(position, None, None, &world);
     }
@@ -6580,6 +6614,7 @@ pub fn teleport_to(entity: &dyn EntityBase, position: Vector3<f64>) {
 
 /// Vanilla `TeleportTransition`, as Pumpkin's teleports use it: an absolute position, and a
 /// rotation that stays the entity's own where it is `None`.
+#[derive(Clone)]
 pub struct TeleportTarget {
     pub world: Arc<World>,
     pub position: Vector3<f64>,
@@ -6603,16 +6638,6 @@ pub fn teleport_to_portal_destination(
     {
         return;
     }
-    if entity.get_player().is_some() {
-        // TODO: a player goes through `teleport_transition` too once it handles players.
-        entity.teleport(
-            transition.position,
-            transition.yaw,
-            transition.pitch,
-            new_world,
-        );
-        return;
-    }
     // Portals keep the entity's speed (`Relative.DELTA`).
     teleport_transition(
         entity,
@@ -6627,13 +6652,17 @@ pub fn teleport_to_portal_destination(
     );
 }
 
-/// Vanilla `Entity.teleport(TeleportTransition)` for an entity other than a player. Returns
-/// the entity at its destination: a new one after a change of dimension.
+/// Vanilla `Entity.teleport(TeleportTransition)`, and `ServerPlayer.teleport` for a player.
+/// Returns the entity at its destination: a new one after a non-player's change of dimension.
 pub fn teleport_transition(
     entity: &Arc<dyn EntityBase>,
     target: &TeleportTarget,
 ) -> Option<Arc<dyn EntityBase>> {
     let base = entity.get_entity();
+    if entity.get_player().is_some() {
+        let player = base.world.load().get_player_by_id(base.entity_id)?;
+        return player.teleport_transition(target);
+    }
     if base.is_removed() {
         return None;
     }
@@ -6683,11 +6712,6 @@ fn teleport_same_dimension(entity: &Arc<dyn EntityBase>, world: &World, target: 
         .clone();
     for passenger in passengers {
         let transition = passenger_transition(base, passenger.get_entity(), target);
-        if passenger.get_player().is_some() {
-            // TODO: a player passenger rides along by `positionRider`; vanilla also moves it
-            // here as a passenger.
-            continue;
-        }
         teleport_transition(&passenger, &transition);
     }
     base.teleport_set_position(target);
@@ -6719,12 +6743,7 @@ fn teleport_cross_dimension(
         if passenger.get_player().is_some() {
             // TODO: vanilla remounts a player passenger on the new vehicle too; the player's
             // own dimension change can't hand the new player back here.
-            passenger.teleport(
-                transition.position,
-                transition.yaw,
-                transition.pitch,
-                transition.world,
-            );
+            teleport_transition(passenger, &transition);
         } else if let Some(new_passenger) = teleport_transition(passenger, &transition) {
             new_passengers.push(new_passenger);
         }
