@@ -286,11 +286,12 @@ impl Mob for CopperGolemEntity {
                     entity,
                     carried,
                     player.get_entity().pos.load(),
-                    Vector3::new(0.3, 0.3, 0.3),
+                    // `BehaviorUtils.throwItem`'s `new Vec3(0.3F, 0.3F, 0.3F)`.
+                    Vector3::new(f64::from(0.3f32), f64::from(0.3f32), f64::from(0.3f32)),
                     0.3,
                 );
-                self.mob_entity
-                    .set_item_slot(&EquipmentSlot::MAIN_HAND, ItemStack::EMPTY.clone());
+                // `setItemInHand`, through `onEquipItem`.
+                self.set_item_slot_and_notify(&EquipmentSlot::MAIN_HAND, ItemStack::EMPTY.clone());
                 return InteractionResult::SUCCESS;
             }
         }
@@ -312,9 +313,8 @@ impl Mob for CopperGolemEntity {
                 SoundCategory::Players,
                 &entity.pos.load(),
             );
-            let antenna = self
-                .mob_entity
-                .set_item_slot(&EquipmentSlot::SADDLE, ItemStack::EMPTY.clone());
+            let antenna = self.mob_entity.get_item_slot(&EquipmentSlot::SADDLE);
+            self.set_item_slot_and_notify(&EquipmentSlot::SADDLE, ItemStack::EMPTY.clone());
             if !antenna.is_empty() {
                 world.spawn_item_at(entity.pos.load() + Vector3::new(0.0, 1.5, 0.0), antenna);
             }
