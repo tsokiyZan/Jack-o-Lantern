@@ -36,7 +36,7 @@ impl ItemBehaviour for BowItem {
     }
 
     fn on_stopped_using(&self, _stack: &ItemStack, player: &Player) {
-        Self::release_bow(player, crate::item::used_item_hand(player));
+        Self::release_bow(player, player.living_entity.used_item_hand());
     }
 
     fn get_use_duration(&self) -> i32 {

@@ -5506,8 +5506,8 @@ impl LivingEntity {
         }
     }
 
-    /// Vanilla `getUsedItemHand`.
-    fn used_item_hand(&self) -> Hand {
+    /// Vanilla `getUsedItemHand`: the hand of the item in use, the main hand when none is.
+    pub fn used_item_hand(&self) -> Hand {
         self.active_hand
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)

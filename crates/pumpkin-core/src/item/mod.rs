@@ -126,16 +126,6 @@ pub fn default_use(player: &Player, hand: Hand) -> InteractionResult {
     InteractionResult::PASS
 }
 
-/// Vanilla `getUsedItemHand`: the hand of the item in use, the main hand when none is.
-pub fn used_item_hand(player: &Player) -> Hand {
-    player
-        .living_entity
-        .active_hand
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .unwrap_or(Hand::Right)
-}
-
 /// Vanilla `LivingEntity.startUsingItem`: only a non-empty stack, and only when nothing is in
 /// use yet.
 pub fn start_using_item(player: &Player, hand: Hand, stack: ItemStack, duration: i32) {

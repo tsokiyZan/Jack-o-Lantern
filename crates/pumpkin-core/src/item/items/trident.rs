@@ -74,11 +74,7 @@ impl ItemBehaviour for TridentItem {
         if time_held < Self::THROW_THRESHOLD_TIME {
             return;
         }
-        let hand = living
-            .active_hand
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .unwrap_or(Hand::Right);
+        let hand = living.used_item_hand();
         // Vanilla's stack is the one in the hand, which the wear below changes.
         let slot = player.inventory().slot_for_hand(hand);
         let mut stack = player.inventory().get_slot(slot);

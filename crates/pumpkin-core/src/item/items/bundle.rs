@@ -52,7 +52,7 @@ impl BundleItem {
 
     /// Vanilla `BundleItem.dropContent` for the bundle in use.
     fn drop_content(player: &Player) {
-        let hand = crate::item::used_item_hand(player);
+        let hand = player.living_entity.used_item_hand();
         let mut bundle = player.inventory.get_stack_in_hand(hand);
         // `removeOneItemFromBundle`.
         // TODO: vanilla removes the selected item, not always the first.
