@@ -172,6 +172,10 @@ impl Animal for StriderEntity {
 const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::STRIDER_BABY_DIMENSIONS;
 
 impl Mob for StriderEntity {
+    fn should_passengers_inherit_malus(&self) -> bool {
+        true
+    }
+
     /// Vanilla `Strider.checkSpawnObstruction`: water doesn't obstruct it.
     fn check_spawn_obstruction(&self, world: &crate::world::World) -> bool {
         let entity = self.get_entity();

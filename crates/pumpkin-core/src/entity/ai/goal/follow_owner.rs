@@ -165,9 +165,11 @@ impl Goal for FollowOwnerGoal {
 
     fn start(&mut self, mob: &dyn Mob) {
         self.time_to_recalc_path = 0;
-        let mut navigator = mob.get_mob_entity().own_navigation();
-        self.old_water_cost = navigator.get_pathfinding_malus(PathType::Water);
-        navigator.set_pathfinding_malus(PathType::Water, 0.0);
+        let mob_entity = mob.get_mob_entity();
+        // Vanilla `getPathfindingMalus`, which a controlled vehicle may answer; the
+        // `setPathfindingMalus` stays on the own map.
+        self.old_water_cost = mob_entity.get_pathfinding_malus(PathType::Water);
+        mob_entity.set_pathfinding_malus(PathType::Water, 0.0);
     }
 
     fn stop(&mut self, mob: &dyn Mob) {

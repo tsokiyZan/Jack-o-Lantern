@@ -187,6 +187,8 @@ pub trait PathNavigationTrait: Send + Sync {
     fn get_path_mut(&mut self) -> Option<&mut Path>;
     fn set_pathfinding_malus(&mut self, path_type: PathType, malus: f32);
     fn get_pathfinding_malus(&self, path_type: PathType) -> f32;
+    /// The mob's own `pathfindingMalus` map.
+    fn path_type_overrides(&self) -> &FxHashMap<PathType, f32>;
     fn set_mob_dimensions(&mut self, width: f32, height: f32);
     fn can_reach_within(
         &mut self,
@@ -531,7 +533,13 @@ impl PathNavigation {
         mob_data.is_in_water = entity.entity.is_in_water();
         mob_data.entity_id = Some(entity.entity.entity_id);
 
-        for (&path_type, &malus) in &self.path_type_overrides {
+        // Vanilla's node evaluators call `mob.getPathfindingMalus`, which reads the controlled
+        // vehicle's map when it passes its malus on.
+        let inherited = mob
+            .as_ref()
+            .and_then(|mob| mob.get_mob())
+            .and_then(|mob| mob.get_mob_entity().inherited_malus_overrides());
+        for (&path_type, &malus) in inherited.as_ref().unwrap_or(&self.path_type_overrides) {
             mob_data.set_pathfinding_malus(path_type, malus);
         }
         if let Some(mob) = mob.as_ref().and_then(|mob| mob.get_mob()) {
@@ -1387,6 +1395,10 @@ impl PathNavigationTrait for GroundPathNavigation {
         self.inner.get_pathfinding_malus(path_type)
     }
 
+    fn path_type_overrides(&self) -> &FxHashMap<PathType, f32> {
+        &self.inner.path_type_overrides
+    }
+
     fn set_mob_dimensions(&mut self, width: f32, height: f32) {
         self.inner.set_mob_dimensions(width, height);
     }
@@ -1619,6 +1631,10 @@ impl PathNavigationTrait for FlyingPathNavigation {
 
     fn get_pathfinding_malus(&self, path_type: PathType) -> f32 {
         self.inner.get_pathfinding_malus(path_type)
+    }
+
+    fn path_type_overrides(&self) -> &FxHashMap<PathType, f32> {
+        &self.inner.path_type_overrides
     }
 
     fn set_mob_dimensions(&mut self, width: f32, height: f32) {
@@ -1983,6 +1999,10 @@ impl PathNavigationTrait for WaterBoundPathNavigation {
         self.inner.get_pathfinding_malus(path_type)
     }
 
+    fn path_type_overrides(&self) -> &FxHashMap<PathType, f32> {
+        &self.inner.path_type_overrides
+    }
+
     fn set_mob_dimensions(&mut self, width: f32, height: f32) {
         self.inner.set_mob_dimensions(width, height);
     }
@@ -2300,6 +2320,10 @@ impl PathNavigationTrait for WallClimberNavigation {
 
     fn get_pathfinding_malus(&self, path_type: PathType) -> f32 {
         self.inner.get_pathfinding_malus(path_type)
+    }
+
+    fn path_type_overrides(&self) -> &FxHashMap<PathType, f32> {
+        self.inner.path_type_overrides()
     }
 
     fn set_mob_dimensions(&mut self, width: f32, height: f32) {
@@ -2692,6 +2716,10 @@ impl PathNavigationTrait for AmphibiousPathNavigation {
 
     fn get_pathfinding_malus(&self, path_type: PathType) -> f32 {
         self.inner.get_pathfinding_malus(path_type)
+    }
+
+    fn path_type_overrides(&self) -> &FxHashMap<PathType, f32> {
+        &self.inner.path_type_overrides
     }
 
     fn set_mob_dimensions(&mut self, width: f32, height: f32) {

@@ -388,11 +388,7 @@ pub fn default_acceptable_landing_spot(tick: &BrainTick<'_>, target_pos: &BlockP
         Arc::clone(tick.world),
     );
     let path_type = WalkNodeEvaluator::get_path_type_static(&mut context, target_pos.0);
-    tick.mob
-        .get_mob_entity()
-        .own_navigation()
-        .get_pathfinding_malus(path_type)
-        == 0.0
+    tick.mob.get_mob_entity().get_pathfinding_malus(path_type) == 0.0
 }
 
 /// Vanilla `LongJumpUtil.calculateJumpVectorForAngle`.

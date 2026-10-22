@@ -45,6 +45,7 @@ use pumpkin_util::math::vector3::Vector3;
 use pumpkin_util::random::RandomImpl;
 use pumpkin_util::version::JavaMinecraftVersion;
 use pumpkin_util::{Difficulty, Hand};
+use rustc_hash::FxHashMap;
 use std::sync::Arc;
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicI64, AtomicU8, Ordering};
@@ -228,6 +229,43 @@ impl MobEntity {
         }
         let mut control = self.own_move_control();
         f(control.as_mut())
+    }
+
+    /// The vehicle whose malus map `get_pathfinding_malus` reads, if it lends one.
+    fn malus_inheritance_vehicle(&self) -> Option<Arc<dyn EntityBase>> {
+        let vehicle = self.controlled_vehicle_mob()?;
+        vehicle
+            .get_mob()
+            .is_some_and(Mob::should_passengers_inherit_malus)
+            .then_some(vehicle)
+    }
+
+    /// Vanilla `Mob.getPathfindingMalus`: a vehicle that passes its malus on
+    /// (`shouldPassengersInheritMalus`) lends its own map, not recursively.
+    #[must_use]
+    pub fn get_pathfinding_malus(&self, path_type: PathType) -> f32 {
+        if let Some(vehicle) = self.malus_inheritance_vehicle()
+            && let Some(vehicle_mob) = vehicle.get_mob()
+        {
+            return vehicle_mob
+                .get_mob_entity()
+                .own_navigation()
+                .get_pathfinding_malus(path_type);
+        }
+        self.own_navigation().get_pathfinding_malus(path_type)
+    }
+
+    /// The vehicle's malus map when `get_pathfinding_malus` would read it, for `mob_data`.
+    pub fn inherited_malus_overrides(&self) -> Option<FxHashMap<PathType, f32>> {
+        let vehicle = self.malus_inheritance_vehicle()?;
+        let vehicle_mob = vehicle.get_mob()?;
+        Some(
+            vehicle_mob
+                .get_mob_entity()
+                .own_navigation()
+                .path_type_overrides()
+                .clone(),
+        )
     }
 
     /// Vanilla `Mob.stopInPlace`. Pumpkin's leash has no angular momentum to reset.
@@ -1463,6 +1501,11 @@ pub trait Mob: EntityBase + Send + Sync {
             return false;
         }
         self.get_mob_entity().living_entity.can_attack(target)
+    }
+
+    /// Vanilla `Mob.shouldPassengersInheritMalus`.
+    fn should_passengers_inherit_malus(&self) -> bool {
+        false
     }
 
     /// Takes the navigation lock, so callers must not already hold it.

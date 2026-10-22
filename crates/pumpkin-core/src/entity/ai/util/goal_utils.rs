@@ -140,10 +140,7 @@ pub fn is_water(world: &World, pos: &BlockPos) -> bool {
 #[must_use]
 pub fn has_malus(mob: &dyn Mob, context: &mut PathfindingContext, pos: &BlockPos) -> bool {
     let path_type = context.get_land_node_type(Vector3::new(pos.0.x, pos.0.y, pos.0.z));
-    let malus = mob
-        .get_mob_entity()
-        .own_navigation()
-        .get_pathfinding_malus(path_type);
+    let malus = mob.get_mob_entity().get_pathfinding_malus(path_type);
     malus != 0.0
 }
 

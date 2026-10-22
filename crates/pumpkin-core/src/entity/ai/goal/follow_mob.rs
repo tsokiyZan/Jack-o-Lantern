@@ -1,6 +1,7 @@
 use super::{Controls, Goal, to_goal_ticks};
 use crate::entity::EntityBase;
 use crate::entity::ai::pathfinder::NavigatorGoal;
+use crate::entity::ai::pathfinder::node::PathType;
 use crate::entity::mob::Mob;
 use std::sync::Arc;
 
@@ -11,6 +12,7 @@ pub struct FollowMobGoal {
     time_to_recalc_path: i32,
     stop_distance_sq: f64,
     area_size: f64,
+    old_water_cost: f32,
 }
 
 impl FollowMobGoal {
@@ -23,6 +25,7 @@ impl FollowMobGoal {
             time_to_recalc_path: 0,
             stop_distance_sq: f64::from(stop_distance * stop_distance),
             area_size: f64::from(area_size),
+            old_water_cost: 0.0,
         }
     }
 }
@@ -70,14 +73,18 @@ impl Goal for FollowMobGoal {
         !is_idle && dist_sq > self.stop_distance_sq
     }
 
-    fn start(&mut self, _mob: &dyn Mob) {
+    fn start(&mut self, mob: &dyn Mob) {
         self.time_to_recalc_path = 0;
+        let mob_entity = mob.get_mob_entity();
+        self.old_water_cost = mob_entity.get_pathfinding_malus(PathType::Water);
+        mob_entity.set_pathfinding_malus(PathType::Water, 0.0);
     }
 
     fn stop(&mut self, mob: &dyn Mob) {
         self.following_mob = None;
         let mut navigator = mob.get_mob_entity().own_navigation();
         navigator.stop();
+        navigator.set_pathfinding_malus(PathType::Water, self.old_water_cost);
     }
 
     fn tick(&mut self, mob: &dyn Mob) {
