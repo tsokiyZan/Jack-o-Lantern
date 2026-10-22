@@ -116,9 +116,7 @@ impl SchoolingFish {
         let from = mob_entity.living_entity.entity.pos.load();
         let to = leader.get_entity().pos.load();
         mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
+            .own_navigation()
             .set_progress(NavigatorGoal::new(from, to, 1.0));
     }
 

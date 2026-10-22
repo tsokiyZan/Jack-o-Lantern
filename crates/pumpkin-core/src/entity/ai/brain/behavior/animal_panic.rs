@@ -153,12 +153,7 @@ impl Behavior for AnimalPanic {
     fn start(&mut self, tick: &mut BrainTick<'_>) {
         tick.brain.set(types::IS_PANICKING, true);
         tick.brain.erase(types::WALK_TARGET.id());
-        tick.mob
-            .get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .stop();
+        tick.mob.get_mob_entity().own_navigation().stop();
     }
 
     fn stop(&mut self, tick: &mut BrainTick<'_>) {
@@ -166,13 +161,7 @@ impl Behavior for AnimalPanic {
     }
 
     fn tick(&mut self, tick: &mut BrainTick<'_>) {
-        let done = tick
-            .mob
-            .get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .is_done();
+        let done = tick.mob.get_mob_entity().own_navigation().is_done();
         if done && let Some(pos) = self.get_panic_pos(tick.mob) {
             tick.brain.set(
                 types::WALK_TARGET,

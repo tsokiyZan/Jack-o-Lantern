@@ -349,11 +349,7 @@ fn select_variant_to_spawn(world: &World, pos: &BlockPos) -> Option<CatVariant> 
 /// while fleeing or pouncing.
 pub fn feline_custom_server_ai_step(mob: &dyn Mob) {
     let speed = {
-        let control = mob
-            .get_mob_entity()
-            .move_control
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let control = mob.get_mob_entity().own_move_control();
         let control: &dyn Any = &**control;
         control
             .downcast_ref::<MoveControl>()
@@ -778,11 +774,7 @@ impl CatRelaxOnOwnerGoal {
     }
 
     fn move_to_goal_pos(cat: &CatEntity, goal_pos: BlockPos) {
-        let mut navigator = cat
-            .mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut navigator = cat.mob_entity.own_navigation();
         navigator.set_progress(NavigatorGoal::new(
             cat.get_entity().pos.load(),
             goal_pos.0.to_f64(),
@@ -941,11 +933,7 @@ impl Goal for CatRelaxOnOwnerGoal {
         }
         self.on_bed_ticks = 0;
         cat.set_relax_state_one(false);
-        cat.mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .stop();
+        cat.mob_entity.own_navigation().stop();
     }
 
     fn tick(&mut self, mob: &dyn Mob) {

@@ -114,12 +114,9 @@ impl AxolotlEntity {
             playing_dead: AtomicBool::new(false),
             from_bucket: AtomicBool::new(false),
         };
-        *axolotl
-            .mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner) =
-            Navigator::new(AmphibiousPathNavigation::new(false).steered_by_move_control());
+        axolotl.mob_entity.set_own_navigation(Navigator::new(
+            AmphibiousPathNavigation::new(false).steered_by_move_control(),
+        ));
         // Vanilla `Animal`'s and `Axolotl`'s constructors; after the navigator, which
         // holds the maluses.
         set_animal_pathfinding_malus(&axolotl.mob_entity);
@@ -128,17 +125,15 @@ impl AxolotlEntity {
             .set_pathfinding_malus(PathType::Water, 0.0);
         // Vanilla `AxolotlMoveControl` and `AxolotlLookControl`; both pause while the
         // axolotl plays dead (`controls_paused`).
-        *axolotl
+        axolotl
             .mob_entity
-            .move_control
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner) = Box::new(SmoothSwimmingMoveControl::new(
-            85,
-            10,
-            IN_WATER_SPEED_MODIFIER,
-            OUTSIDE_WATER_SPEED_MODIFIER,
-            false,
-        ));
+            .set_own_move_control(Box::new(SmoothSwimmingMoveControl::new(
+                85,
+                10,
+                IN_WATER_SPEED_MODIFIER,
+                OUTSIDE_WATER_SPEED_MODIFIER,
+                false,
+            )));
         *axolotl
             .mob_entity
             .look_control

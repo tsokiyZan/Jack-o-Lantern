@@ -14,19 +14,11 @@ impl RestrictSunGoal {
     }
 
     fn has_ground_path_navigation(mob: &dyn Mob) -> bool {
-        mob.get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .can_navigate_ground()
+        mob.get_mob_entity().own_navigation().can_navigate_ground()
     }
 
     fn set_avoid_sun(mob: &dyn Mob, avoid_sun: bool) {
-        let mut navigator = mob
-            .get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut navigator = mob.get_mob_entity().own_navigation();
         if navigator.can_navigate_ground() {
             navigator.set_avoid_sun(avoid_sun);
         }

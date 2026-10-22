@@ -1,4 +1,3 @@
-use std::sync::PoisonError;
 use std::sync::atomic::Ordering;
 
 use pumpkin_data::HorizontalFacingExt;
@@ -95,11 +94,7 @@ impl Goal for DolphinJumpGoal {
             velocity.y + 0.7,
             velocity.z + f64::from(step_z) * 0.6,
         ));
-        mob.get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .stop();
+        mob.get_mob_entity().own_navigation().stop();
     }
 
     fn stop(&mut self, mob: &dyn Mob) {

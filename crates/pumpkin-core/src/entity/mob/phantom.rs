@@ -57,10 +57,7 @@ impl PhantomEntity {
         let mob_entity = MobEntity::new(entity);
         // Vanilla `Phantom`'s constructor and `createBodyControl`; its look control is
         // `skips_look_control_tick`.
-        *mob_entity
-            .move_control
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner) = Box::new(PhantomMoveControl::default());
+        mob_entity.set_own_move_control(Box::new(PhantomMoveControl::default()));
         *mob_entity
             .body_rotation_control
             .lock()

@@ -226,11 +226,7 @@ impl FoxEntity {
         let mob_entity = MobEntity::new(entity);
         set_animal_pathfinding_malus(&mob_entity);
         // Vanilla `Fox`'s constructor.
-        *mob_entity
-            .move_control
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) =
-            Box::new(FoxMoveControl::default());
+        mob_entity.set_own_move_control(Box::new(FoxMoveControl::default()));
         mob_entity.set_pathfinding_malus(PathType::DangerOther, 0.0);
         mob_entity.set_pathfinding_malus(PathType::DamageOther, 0.0);
         mob_entity.set_can_pick_up_loot(true);
@@ -1318,11 +1314,7 @@ impl StalkPreyGoal {
     }
 
     fn stop_navigation(fox: &FoxEntity) {
-        fox.mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .stop();
+        fox.mob_entity.own_navigation().stop();
     }
 }
 
@@ -1397,11 +1389,7 @@ impl Goal for StalkPreyGoal {
             Self::stop_navigation(fox);
         } else {
             let living = &fox.mob_entity.living_entity;
-            let mut navigator = fox
-                .mob_entity
-                .navigator
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let mut navigator = fox.mob_entity.own_navigation();
             // Vanilla `moveTo(target, 1.5)` paths with a reach of 1.
             let path = navigator.create_path(living, target_pos, 1);
             if path.is_some() {
@@ -1451,9 +1439,7 @@ impl Goal for FoxPounceGoal {
         if !has_clear_path {
             let living = &fox.mob_entity.living_entity;
             fox.mob_entity
-                .navigator
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .own_navigation()
                 .create_path(living, target.get_entity().pos.load(), 0);
             fox.set_crouching(false);
             fox.set_interested(false);
@@ -1508,11 +1494,7 @@ impl Goal for FoxPounceGoal {
                 velocity.z + uz * 0.8,
             ));
         }
-        fox.mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .stop();
+        fox.mob_entity.own_navigation().stop();
     }
 
     fn stop(&mut self, mob: &dyn Mob) {
@@ -1781,16 +1763,10 @@ impl Goal for SleepGoal {
             .jumping
             .store(false, Ordering::Relaxed);
         fox.set_sleeping(true);
-        fox.mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .stop();
+        fox.mob_entity.own_navigation().stop();
         let pos = fox.get_entity().pos.load();
         fox.mob_entity
-            .move_control
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .own_move_control()
             .set_wanted_position(pos.x, pos.y, pos.z, 0.0);
     }
 
@@ -2048,11 +2024,7 @@ impl FoxSearchForItemsGoal {
 
     fn move_to(fox: &FoxEntity, item: &Arc<dyn EntityBase>) {
         let living = &fox.mob_entity.living_entity;
-        let mut navigator = fox
-            .mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut navigator = fox.mob_entity.own_navigation();
         // Vanilla `moveTo(item, 1.2F)` paths with a reach of 1.
         let path = navigator.create_path(living, item.get_entity().pos.load(), 1);
         if path.is_some() {
@@ -2210,11 +2182,7 @@ impl Goal for PerchAndSearchGoal {
         self.reset_look(fox);
         self.looks_remaining = 2 + fox.get_entity().random().next_bounded_i32(3);
         fox.set_sitting(true);
-        fox.mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .stop();
+        fox.mob_entity.own_navigation().stop();
     }
 
     fn stop(&mut self, mob: &dyn Mob) {

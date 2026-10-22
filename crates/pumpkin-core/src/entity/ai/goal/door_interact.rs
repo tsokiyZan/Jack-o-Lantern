@@ -64,11 +64,7 @@ impl DoorInteractGoal {
             return false;
         }
 
-        let navigator = mob
-            .get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let navigator = mob.get_mob_entity().own_navigation();
 
         let Some(path) = navigator.get_path() else {
             return false;

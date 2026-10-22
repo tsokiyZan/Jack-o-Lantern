@@ -101,11 +101,7 @@ impl Goal for SpearUseGoal {
 
     fn stop(&mut self, mob: &dyn Mob) {
         let mob_entity = mob.get_mob_entity();
-        mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .stop();
+        mob_entity.own_navigation().stop();
         mob_entity.set_attacking(false);
         self.state = None;
         mob_entity.living_entity.clear_active_hand();
@@ -137,12 +133,7 @@ impl Goal for SpearUseGoal {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .look_at_entity_with_range(&target, 30.0, 30.0);
 
-        let navigator = || {
-            mob_entity
-                .navigator
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-        };
+        let navigator = || mob_entity.own_navigation();
         if state.not_engaged_yet() {
             if target_dist_sqr > f64::from(self.approach_distance_sq) {
                 navigator().move_to_entity(

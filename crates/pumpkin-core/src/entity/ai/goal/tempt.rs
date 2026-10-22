@@ -190,17 +190,9 @@ impl TemptGoal {
         if let Some(navigation) = &self.navigation {
             (navigation.stop)(mob);
         } else if self.non_pathfinder {
-            mob_entity
-                .move_control
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .set_wait();
+            mob_entity.own_move_control().set_wait();
         } else {
-            mob_entity
-                .navigator
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .stop();
+            mob_entity.own_navigation().stop();
         }
     }
 
@@ -216,15 +208,11 @@ impl TemptGoal {
             let eye = Vector3::new(player_pos.x, player.get_entity().get_eye_y(), player_pos.z);
             let target = (eye - mob_pos) * mob.get_entity().random().next_f64() + mob_pos;
             mob_entity
-                .move_control
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .own_move_control()
                 .set_wanted_position(target.x, target.y, target.z, self.speed);
         } else {
             mob_entity
-                .navigator
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .own_navigation()
                 .set_progress(NavigatorGoal::new(mob_pos, player_pos, self.speed));
         }
     }

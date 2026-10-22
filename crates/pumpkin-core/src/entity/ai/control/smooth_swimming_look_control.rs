@@ -58,10 +58,7 @@ impl SmoothSwimmingLookControl {
                 ));
             }
         } else {
-            let is_idle = mob_entity
-                .navigator
-                .try_lock()
-                .is_ok_and(|navigator| navigator.is_idle());
+            let is_idle = mob_entity.own_navigation().is_idle();
             if is_idle {
                 entity.set_pitch(self.change_angle(entity.pitch.load(), 0.0, 5.0));
             }

@@ -1,7 +1,7 @@
 use crate::item::interaction_result::InteractionResult;
 use pumpkin_util::Hand;
 use std::sync::{
-    Arc, PoisonError,
+    Arc,
     atomic::{AtomicI32, Ordering},
 };
 
@@ -51,21 +51,17 @@ pub struct FrogEntity {
 impl FrogEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
-        *mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner) =
-            Navigator::new(AmphibiousPathNavigation::frog().steered_by_move_control());
+        mob_entity.set_own_navigation(Navigator::new(
+            AmphibiousPathNavigation::frog().steered_by_move_control(),
+        ));
         // Vanilla `Animal`'s and `Frog`'s constructors; after the navigator, which holds
         // the maluses.
         set_animal_pathfinding_malus(&mob_entity);
         mob_entity.set_pathfinding_malus(PathType::Water, 4.0);
         mob_entity.set_pathfinding_malus(PathType::Trapdoor, -1.0);
-        *mob_entity
-            .move_control
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner) =
-            Box::new(SmoothSwimmingMoveControl::new(85, 10, 0.02, 0.1, true));
+        mob_entity.set_own_move_control(Box::new(SmoothSwimmingMoveControl::new(
+            85, 10, 0.02, 0.1, true,
+        )));
         let frog = Self {
             mob_entity,
             ageable_data: AgeableData::default(),

@@ -55,9 +55,7 @@ impl Goal for RunAroundLikeCrazyGoal {
     fn start(&mut self, mob: &dyn Mob) {
         let mob_pos = mob.get_entity().pos.load();
         mob.get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .own_navigation()
             .set_progress(NavigatorGoal::new(
                 mob_pos,
                 Vector3::new(self.pos_x, self.pos_y, self.pos_z),

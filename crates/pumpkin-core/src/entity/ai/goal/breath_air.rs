@@ -1,5 +1,3 @@
-use std::sync::PoisonError;
-
 use pumpkin_data::Block;
 use pumpkin_data::fluid::Fluid;
 use pumpkin_util::math::position::BlockPos;
@@ -58,9 +56,7 @@ impl BreathAirGoal {
             f64::from(destination.0.z),
         );
         mob.get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
+            .own_navigation()
             .set_progress(NavigatorGoal::new(entity.pos.load(), to, 1.0));
     }
 }
@@ -77,11 +73,7 @@ impl Goal for BreathAirGoal {
     }
 
     fn start(&mut self, mob: &dyn Mob) {
-        mob.get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .stop();
+        mob.get_mob_entity().own_navigation().stop();
         Self::find_air_position(mob);
     }
 

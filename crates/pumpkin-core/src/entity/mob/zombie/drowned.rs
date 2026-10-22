@@ -55,15 +55,10 @@ impl DrownedEntity {
         let mob_entity = &entity.mob_entity;
         // Vanilla `Drowned.createNavigation`, then the constructor; after the navigator,
         // which holds the maluses.
-        *mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner) =
-            Navigator::new(AmphibiousPathNavigation::new(false).steered_by_move_control());
-        *mob_entity
-            .move_control
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner) = Box::new(DrownedMoveControl::default());
+        mob_entity.set_own_navigation(Navigator::new(
+            AmphibiousPathNavigation::new(false).steered_by_move_control(),
+        ));
+        mob_entity.set_own_move_control(Box::new(DrownedMoveControl::default()));
         mob_entity.set_pathfinding_malus(PathType::Water, 0.0);
         let drowned = Arc::new(Self {
             entity,
@@ -173,9 +168,7 @@ impl DrownedEntity {
         let pos = entity.pos.load();
         self.entity
             .mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
+            .own_navigation()
             .get_path()
             .is_some_and(|path| {
                 let target = path.get_target().0;
@@ -510,11 +503,7 @@ impl MoveControlTrait for DrownedMoveControl {
                     .store(entity.velocity.load() + Vector3::new(0.0, 0.002, 0.0));
             }
 
-            let navigation_done = mob_entity
-                .navigator
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner)
-                .is_done();
+            let navigation_done = mob_entity.own_navigation().is_done();
             if self.base.operation != Operation::MoveTo || navigation_done {
                 mob_entity.set_speed(0.0);
                 return;
@@ -627,9 +616,7 @@ impl Goal for DrownedGoToWaterGoal {
 
     fn start(&mut self, mob: &dyn Mob) {
         mob.get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
+            .own_navigation()
             .set_progress(NavigatorGoal::new(
                 mob.get_entity().pos.load(),
                 self.wanted,
@@ -825,9 +812,7 @@ impl Goal for DrownedSwimUpGoal {
                 return;
             };
             mob.get_mob_entity()
-                .navigator
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner)
+                .own_navigation()
                 .set_progress(NavigatorGoal::new(pos, next_pos, self.speed_modifier));
         }
     }

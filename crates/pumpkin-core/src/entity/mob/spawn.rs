@@ -87,9 +87,7 @@ impl MobEntity {
         };
         // Vanilla `Mob.onAttributeUpdated`.
         if follow_range_changed {
-            self.navigator
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
+            self.own_navigation()
                 .update_pathfinder_max_visited_nodes(&self.living_entity);
         }
         // `random.nextFloat() < 0.05F` (Mob.java:1089).

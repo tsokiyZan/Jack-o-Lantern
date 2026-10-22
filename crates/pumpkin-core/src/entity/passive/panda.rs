@@ -183,17 +183,10 @@ pub struct PandaEntity {
 }
 
 impl PandaEntity {
-    #[expect(
-        clippy::too_many_lines,
-        reason = "vanilla registerGoals plus the constructor"
-    )]
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
         set_animal_pathfinding_malus(&mob_entity);
-        *mob_entity
-            .move_control
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner) = Box::new(PandaMoveControl::default());
+        mob_entity.set_own_move_control(Box::new(PandaMoveControl::default()));
         // Vanilla's constructor; `/summon` reads `CanPickUpLoot` from the tag afterwards.
         if !mob_entity.living_entity.entity.is_baby() {
             mob_entity.set_can_pick_up_loot(true);
@@ -771,11 +764,7 @@ impl PandaEntity {
         living
             .movement_input
             .store(Vector3::new(input.x, input.y, 0.0));
-        self.mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .stop();
+        self.mob_entity.own_navigation().stop();
         self.sit(true);
     }
 
@@ -843,11 +832,7 @@ fn panda_panic_can_continue(mob: &dyn Mob) -> bool {
     if !as_panda(mob).is_some_and(PandaEntity::is_sitting) {
         return true;
     }
-    mob.get_mob_entity()
-        .navigator
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .stop();
+    mob.get_mob_entity().own_navigation().stop();
     false
 }
 
@@ -1330,10 +1315,7 @@ impl Goal for PandaSitGoal {
             if let Some(item) = edible_items_in(mob, 8.0).first() {
                 let mob_entity = &panda.mob_entity;
                 let living = &mob_entity.living_entity;
-                let mut navigator = mob_entity
-                    .navigator
-                    .lock()
-                    .unwrap_or_else(PoisonError::into_inner);
+                let mut navigator = mob_entity.own_navigation();
                 // Vanilla `moveTo(Entity, speed)` paths with a reach of 1.
                 let path = navigator.create_path(living, item.get_entity().pos.load(), 1);
                 if path.is_some() {

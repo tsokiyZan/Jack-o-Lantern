@@ -29,11 +29,7 @@ impl MoveControlTrait for FishMoveControl {
                 .store(Vector3::new(velocity.x, velocity.y + 0.005, velocity.z));
         }
 
-        let navigation_done = mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .is_done();
+        let navigation_done = mob_entity.own_navigation().is_done();
         if self.operation == Operation::MoveTo && !navigation_done {
             let target_speed = (self.speed_modifier
                 * living.get_attribute_value(&Attributes::MOVEMENT_SPEED))

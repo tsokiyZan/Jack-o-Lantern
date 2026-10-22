@@ -219,16 +219,12 @@ impl LongJumpToRandomPos {
                 Arc::new(BlockPosTracker::new(target_pos)) as Arc<dyn PositionTracker>,
             );
             let mob_entity = tick.mob.get_mob_entity();
-            let path = mob_entity
-                .navigator
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .create_path_within(
-                    &mob_entity.living_entity,
-                    target_pos.to_centered_f64(),
-                    0,
-                    MIN_PATHFIND_DISTANCE_TO_VALID_JUMP,
-                );
+            let path = mob_entity.own_navigation().create_path_within(
+                &mob_entity.living_entity,
+                target_pos.to_centered_f64(),
+                0,
+                MIN_PATHFIND_DISTANCE_TO_VALID_JUMP,
+            );
             if path.is_none_or(|path| !path.can_reach()) {
                 self.chosen_jump = Some(jump_vector);
                 self.prepare_jump_start = tick.time;
@@ -394,9 +390,7 @@ pub fn default_acceptable_landing_spot(tick: &BrainTick<'_>, target_pos: &BlockP
     let path_type = WalkNodeEvaluator::get_path_type_static(&mut context, target_pos.0);
     tick.mob
         .get_mob_entity()
-        .navigator
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .own_navigation()
         .get_pathfinding_malus(path_type)
         == 0.0
 }

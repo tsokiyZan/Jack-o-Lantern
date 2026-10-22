@@ -58,11 +58,7 @@ impl StriderEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
         // Vanilla `createNavigation`, before the constructor's path costs.
-        *mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) =
-            Navigator::new(GroundPathNavigation::strider());
+        mob_entity.set_own_navigation(Navigator::new(GroundPathNavigation::strider()));
         set_animal_pathfinding_malus(&mob_entity);
         // Vanilla `Strider`'s constructor.
         mob_entity.set_pathfinding_malus(PathType::Water, -1.0);

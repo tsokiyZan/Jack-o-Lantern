@@ -65,11 +65,7 @@ pub struct CreakingEntity {
 impl CreakingEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
-        mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .set_can_float(true);
+        mob_entity.own_navigation().set_can_float(true);
         *mob_entity
             .body_rotation_control
             .lock()

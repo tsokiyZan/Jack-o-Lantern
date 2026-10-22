@@ -243,18 +243,11 @@ impl AllayEntity {
         let mut navigator = Navigator::new(FlyingPathNavigation::new());
         navigator.set_can_open_doors(false);
         navigator.set_can_float(true);
-        *mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner) = navigator;
+        mob_entity.set_own_navigation(navigator);
         mob_entity.set_required_path_length(REQUIRED_PATH_LENGTH);
         // Vanilla `Allay`'s constructor. Its `setCanPickUpLoot(canPickUpLoot())` stores
         // false, the flag's default, as a new allay holds nothing.
-        *mob_entity
-            .move_control
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner) =
-            Box::new(FlyingMoveControl::new(MAX_TURN, true));
+        mob_entity.set_own_move_control(Box::new(FlyingMoveControl::new(MAX_TURN, true)));
         let allay = Arc::new_cyclic(|allay: &Weak<Self>| {
             let vibration_position_source = PositionSource::Entity {
                 entity: allay.clone(),

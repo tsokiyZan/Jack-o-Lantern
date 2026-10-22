@@ -789,9 +789,7 @@ impl Goal for LlamaFollowCaravanGoal {
             delta * ((distance - 2.0).max(0.0) / length)
         };
         mob.get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
+            .own_navigation()
             .set_progress(NavigatorGoal::new(pos, pos + delta, self.speed_modifier));
     }
 

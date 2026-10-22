@@ -47,10 +47,7 @@ impl VexEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
         // Vanilla `Vex`'s constructor.
-        *mob_entity
-            .move_control
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner) = Box::new(VexMoveControl::default());
+        mob_entity.set_own_move_control(Box::new(VexMoveControl::default()));
         let mob_arc = Arc::new(Self {
             mob_entity,
             flags: AtomicU8::new(0),
@@ -167,19 +164,16 @@ fn as_vex(mob: &dyn Mob) -> Option<&VexEntity> {
 }
 
 fn move_control_has_wanted(mob: &dyn Mob) -> bool {
-    mob.get_mob_entity()
-        .move_control
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .has_wanted()
+    mob.get_mob_entity().own_move_control().has_wanted()
 }
 
 fn set_wanted_position(mob: &dyn Mob, pos: Vector3<f64>, speed_modifier: f64) {
-    mob.get_mob_entity()
-        .move_control
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .set_wanted_position(pos.x, pos.y, pos.z, speed_modifier);
+    mob.get_mob_entity().own_move_control().set_wanted_position(
+        pos.x,
+        pos.y,
+        pos.z,
+        speed_modifier,
+    );
 }
 
 impl Mob for VexEntity {

@@ -25,14 +25,8 @@ pub fn init(mob_entity: &MobEntity) {
     let mut navigator =
         Navigator::new(WaterBoundPathNavigation::new(false).steered_by_move_control());
     navigator.set_pathfinding_malus(PathType::Water, 0.0);
-    *mob_entity
-        .navigator
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner) = navigator;
-    *mob_entity
-        .move_control
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner) = Box::new(FishMoveControl::default());
+    mob_entity.set_own_navigation(navigator);
+    mob_entity.set_own_move_control(Box::new(FishMoveControl::default()));
 
     let mut goals = mob_entity
         .goals_selector

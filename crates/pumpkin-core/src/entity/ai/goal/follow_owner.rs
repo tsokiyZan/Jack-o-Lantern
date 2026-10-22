@@ -119,11 +119,7 @@ impl FollowOwnerGoal {
                 &world,
             );
 
-            let mut navigator = mob
-                .get_mob_entity()
-                .navigator
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let mut navigator = mob.get_mob_entity().own_navigation();
             navigator.stop();
             return;
         }
@@ -169,22 +165,14 @@ impl Goal for FollowOwnerGoal {
 
     fn start(&mut self, mob: &dyn Mob) {
         self.time_to_recalc_path = 0;
-        let mut navigator = mob
-            .get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut navigator = mob.get_mob_entity().own_navigation();
         self.old_water_cost = navigator.get_pathfinding_malus(PathType::Water);
         navigator.set_pathfinding_malus(PathType::Water, 0.0);
     }
 
     fn stop(&mut self, mob: &dyn Mob) {
         self.owner = None;
-        let mut navigator = mob
-            .get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut navigator = mob.get_mob_entity().own_navigation();
         navigator.stop();
         navigator.set_pathfinding_malus(PathType::Water, self.old_water_cost);
     }
@@ -220,11 +208,7 @@ impl Goal for FollowOwnerGoal {
             } else {
                 let mob_pos = mob.get_mob_entity().living_entity.entity.pos.load();
                 let owner_pos = owner.living_entity.entity.pos.load();
-                let mut navigator = mob
-                    .get_mob_entity()
-                    .navigator
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                let mut navigator = mob.get_mob_entity().own_navigation();
                 navigator.set_progress(NavigatorGoal::new(mob_pos, owner_pos, self.speed_modifier));
             }
         }

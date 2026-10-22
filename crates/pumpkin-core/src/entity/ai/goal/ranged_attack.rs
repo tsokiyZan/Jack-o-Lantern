@@ -127,10 +127,7 @@ impl Goal for RangedAttackGoal {
         }
 
         {
-            let mut navigator = mob_entity
-                .navigator
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let mut navigator = mob_entity.own_navigation();
             if target_dist_sqr <= f64::from(self.attack_radius_sqr) && self.see_time >= 5 {
                 navigator.stop();
             } else if let Some(path) = navigator.create_path(living, target_pos, 1) {

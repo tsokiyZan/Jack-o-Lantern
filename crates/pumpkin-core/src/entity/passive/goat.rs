@@ -69,11 +69,7 @@ impl GoatEntity {
         let mob_entity = MobEntity::new(entity);
         set_animal_pathfinding_malus(&mob_entity);
         // Vanilla `Goat`'s constructor.
-        mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .set_can_float(true);
+        mob_entity.own_navigation().set_can_float(true);
         mob_entity.set_pathfinding_malus(PathType::PowderSnow, -1.0);
         mob_entity.set_pathfinding_malus(PathType::DangerPowderSnow, -1.0);
         let goat = Arc::new(Self {

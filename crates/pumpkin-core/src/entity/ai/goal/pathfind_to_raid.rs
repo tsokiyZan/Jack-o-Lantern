@@ -149,9 +149,7 @@ impl Goal for PathfindToRaidGoal {
                 f64::from(std::f32::consts::FRAC_PI_2),
             ) {
                 mob.get_mob_entity()
-                    .navigator
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .own_navigation()
                     .set_progress(NavigatorGoal::new(
                         mob.get_entity().pos.load(),
                         dest,

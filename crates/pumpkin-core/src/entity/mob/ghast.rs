@@ -44,11 +44,7 @@ impl GhastEntity {
 
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
-        *mob_entity
-            .move_control
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) =
-            Box::new(GhastMoveControl::new(false, |_| false));
+        mob_entity.set_own_move_control(Box::new(GhastMoveControl::new(false, |_| false)));
         let ghast = Self {
             mob_entity,
             is_charging: AtomicBool::new(false),
@@ -575,11 +571,7 @@ impl RandomFloatAroundGoal {
 
 impl Goal for RandomFloatAroundGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
-        let move_control = mob
-            .get_mob_entity()
-            .move_control
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let move_control = mob.get_mob_entity().own_move_control();
         if !move_control.has_wanted() {
             return true;
         }
@@ -600,9 +592,7 @@ impl Goal for RandomFloatAroundGoal {
     fn start(&mut self, mob: &dyn Mob) {
         let result = Self::get_suitable_fly_to_position(mob, self.distance_to_blocks);
         mob.get_mob_entity()
-            .move_control
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .own_move_control()
             .set_wanted_position(result.x, result.y, result.z, 1.0);
     }
 

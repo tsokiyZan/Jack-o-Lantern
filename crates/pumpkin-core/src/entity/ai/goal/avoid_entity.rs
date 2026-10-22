@@ -125,12 +125,11 @@ impl Goal for AvoidEntityGoal {
             return false;
         }
 
-        self.path = mob
-            .get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .create_path(&mob.get_mob_entity().living_entity, pos, 0);
+        self.path = mob.get_mob_entity().own_navigation().create_path(
+            &mob.get_mob_entity().living_entity,
+            pos,
+            0,
+        );
         self.path.is_some()
     }
 
@@ -140,15 +139,11 @@ impl Goal for AvoidEntityGoal {
 
     fn start(&mut self, mob: &dyn Mob) {
         let mob_entity = mob.get_mob_entity();
-        mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .move_to_path(
-                self.path.clone(),
-                self.walk_speed_modifier,
-                &mob_entity.living_entity,
-            );
+        mob_entity.own_navigation().move_to_path(
+            self.path.clone(),
+            self.walk_speed_modifier,
+            &mob_entity.living_entity,
+        );
     }
 
     fn tick(&mut self, mob: &dyn Mob) {
@@ -164,11 +159,7 @@ impl Goal for AvoidEntityGoal {
         } else {
             self.walk_speed_modifier
         };
-        mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .set_speed(speed);
+        mob_entity.own_navigation().set_speed(speed);
     }
 
     fn stop(&mut self, _mob: &dyn Mob) {

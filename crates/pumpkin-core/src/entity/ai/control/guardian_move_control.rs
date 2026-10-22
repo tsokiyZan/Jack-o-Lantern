@@ -26,11 +26,7 @@ impl MoveControlTrait for GuardianMoveControl {
         let mob_entity = mob.get_mob_entity();
         let living = &mob_entity.living_entity;
         let entity = &living.entity;
-        let navigation_done = mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .is_done();
+        let navigation_done = mob_entity.own_navigation().is_done();
         if self.operation != Operation::MoveTo || navigation_done {
             mob_entity.set_speed(0.0);
             guardian.set_moving(entity, false);

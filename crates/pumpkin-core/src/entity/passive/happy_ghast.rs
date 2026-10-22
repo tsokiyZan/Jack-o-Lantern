@@ -74,11 +74,7 @@ impl HappyGhastEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
         set_animal_pathfinding_malus(&mob_entity);
-        *mob_entity
-            .move_control
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) =
-            Box::new(GhastMoveControl::new(true, is_on_still_timeout));
+        mob_entity.set_own_move_control(Box::new(GhastMoveControl::new(true, is_on_still_timeout)));
         let happy_ghast = Self {
             mob_entity,
             ageable_data: AgeableData::default(),
@@ -96,20 +92,13 @@ impl HappyGhastEntity {
     /// Vanilla `adultGhastSetup`.
     fn adult_ghast_setup(&self) {
         let mob_entity = &self.mob_entity;
-        *mob_entity
-            .move_control
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) =
-            Box::new(GhastMoveControl::new(true, is_on_still_timeout));
+        mob_entity.set_own_move_control(Box::new(GhastMoveControl::new(true, is_on_still_timeout)));
         // `HappyGhastLookControl`, through `custom_look_control_tick`.
         *mob_entity
             .look_control
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner) = LookControl::default();
-        *mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) = Navigator::default();
+        mob_entity.set_own_navigation(Navigator::default());
         // Pumpkin keeps the path costs in the navigation, vanilla on the mob.
         set_animal_pathfinding_malus(mob_entity);
         mob_entity.clear_ai_goals(self);
@@ -123,11 +112,7 @@ impl HappyGhastEntity {
     /// Vanilla `babyGhastSetup`.
     fn baby_ghast_setup(&self) {
         let mob_entity = &self.mob_entity;
-        *mob_entity
-            .move_control
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) =
-            Box::new(FlyingMoveControl::new(BABY_MAX_TURN, true));
+        mob_entity.set_own_move_control(Box::new(FlyingMoveControl::new(BABY_MAX_TURN, true)));
         *mob_entity
             .look_control
             .lock()
@@ -137,10 +122,7 @@ impl HappyGhastEntity {
             Navigator::new(FlyingPathNavigation::new().moves_directly_through_fluids());
         navigator.set_can_open_doors(false);
         navigator.set_can_float(true);
-        *mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) = navigator;
+        mob_entity.set_own_navigation(navigator);
         mob_entity.set_required_path_length(BABY_REQUIRED_PATH_LENGTH);
         set_animal_pathfinding_malus(mob_entity);
         self.set_server_still_timeout(0);

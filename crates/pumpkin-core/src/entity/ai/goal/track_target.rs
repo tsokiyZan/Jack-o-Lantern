@@ -67,11 +67,11 @@ impl TrackTargetGoal {
             to_goal_ticks(10 + mob.get_entity().random().next_bounded_i32(5));
         let mob_entity = mob.get_mob_entity();
         let target_entity = target.get_entity();
-        let path = mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .create_path(&mob_entity.living_entity, target_entity.pos.load(), 0);
+        let path = mob_entity.own_navigation().create_path(
+            &mob_entity.living_entity,
+            target_entity.pos.load(),
+            0,
+        );
         let Some(last) = path.as_ref().and_then(Path::get_end_node) else {
             return false;
         };

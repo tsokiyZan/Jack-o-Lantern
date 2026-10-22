@@ -58,10 +58,7 @@ impl MoveToTargetSink {
 
     fn create_path(tick: &BrainTick<'_>, destination: Vector3<f64>) -> Option<Path> {
         let mob_entity = tick.mob.get_mob_entity();
-        let mut navigator = mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut navigator = mob_entity.own_navigation();
         navigator.create_path(&mob_entity.living_entity, destination, 0)
     }
 
@@ -125,15 +122,11 @@ impl MoveToTargetSink {
         tick.brain.set(types::PATH, path.copy());
 
         let mob_entity = tick.mob.get_mob_entity();
-        mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .move_to_path(
-                Some(path),
-                f64::from(self.speed_modifier),
-                &mob_entity.living_entity,
-            );
+        mob_entity.own_navigation().move_to_path(
+            Some(path),
+            f64::from(self.speed_modifier),
+            &mob_entity.living_entity,
+        );
     }
 }
 
@@ -188,13 +181,7 @@ impl Behavior for MoveToTargetSink {
         if walk_target.target().tracks_spectator() {
             return false;
         }
-        let navigation_done = tick
-            .mob
-            .get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .is_done();
+        let navigation_done = tick.mob.get_mob_entity().own_navigation().is_done();
         !navigation_done && !reached_target(&tick.mob.get_entity().block_pos.load(), walk_target)
     }
 
@@ -202,9 +189,7 @@ impl Behavior for MoveToTargetSink {
         let navigator_path = tick
             .mob
             .get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .own_navigation()
             .get_path()
             .map(Path::copy);
         let changed = match (self.path.as_ref(), navigator_path.as_ref()) {
@@ -248,10 +233,7 @@ impl Behavior for MoveToTargetSink {
             });
         let stuck = {
             let mob_entity = tick.mob.get_mob_entity();
-            let mut navigator = mob_entity
-                .navigator
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let mut navigator = mob_entity.own_navigation();
             let stuck = navigator.is_stuck();
             navigator.stop();
             stuck

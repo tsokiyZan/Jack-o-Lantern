@@ -145,12 +145,9 @@ impl RabbitEntity {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner) =
             Box::new(RabbitJumpControl::default());
-        *mob_arc
+        mob_arc
             .mob_entity
-            .move_control
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) =
-            Box::new(RabbitMoveControl::new(Arc::downgrade(&mob_arc)));
+            .set_own_move_control(Box::new(RabbitMoveControl::new(Arc::downgrade(&mob_arc))));
         mob_arc.set_speed_modifier(0.0);
         let mob_weak: Weak<dyn Mob> = {
             let mob_arc: Arc<dyn Mob> = mob_arc.clone();
@@ -259,11 +256,7 @@ impl RabbitEntity {
 
 impl RabbitEntity {
     fn with_move_control<R>(&self, f: impl FnOnce(&mut RabbitMoveControl) -> R) -> Option<R> {
-        let mut guard = self
-            .mob_entity
-            .move_control
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut guard = self.mob_entity.own_move_control();
         let control: &mut dyn Any = &mut **guard;
         control.downcast_mut::<RabbitMoveControl>().map(f)
     }
@@ -294,9 +287,7 @@ impl RabbitEntity {
     fn next_path_pos(&self) -> Option<Vector3<f64>> {
         let width = self.get_entity().entity_dimension.load().width;
         self.mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .own_navigation()
             .get_path()
             .filter(|path| !path.is_done())
             .and_then(|path| path.get_next_entity_pos(width))
@@ -642,11 +633,7 @@ impl RabbitMoveControl {
 
     /// Vanilla `Rabbit.setSpeedModifier`, which sets the speed on this move control.
     fn set_speed_modifier(&mut self, mob: &dyn Mob, speed: f64) {
-        mob.get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .set_speed(speed);
+        mob.get_mob_entity().own_navigation().set_speed(speed);
         let MoveControl {
             wanted_x,
             wanted_y,

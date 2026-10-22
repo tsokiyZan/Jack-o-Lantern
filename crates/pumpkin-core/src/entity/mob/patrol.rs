@@ -209,11 +209,7 @@ impl Goal for LongDistancePatrolGoal {
             } else {
                 self.speed_modifier
             };
-            let mut nav = mob
-                .get_mob_entity()
-                .navigator
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let mut nav = mob.get_mob_entity().own_navigation();
             nav.set_progress(NavigatorGoal::new(pos, patrol_target.to_f64(), speed));
         }
     }

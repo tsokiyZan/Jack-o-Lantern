@@ -119,18 +119,11 @@ impl BeeEntity {
         let mut navigator = Navigator::new(FlyingPathNavigation::new().stable_over_any_block());
         navigator.set_can_open_doors(false);
         navigator.set_can_float(false);
-        *mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) = navigator;
+        mob_entity.set_own_navigation(navigator);
         mob_entity.set_required_path_length(REQUIRED_PATH_LENGTH);
         set_animal_pathfinding_malus(&mob_entity);
         // Vanilla `Bee`'s constructor.
-        *mob_entity
-            .move_control
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) =
-            Box::new(FlyingMoveControl::new(20, true));
+        mob_entity.set_own_move_control(Box::new(FlyingMoveControl::new(20, true)));
         mob_entity.set_pathfinding_malus(PathType::DamageFire, -1.0);
         mob_entity.set_pathfinding_malus(PathType::Water, -1.0);
         mob_entity.set_pathfinding_malus(PathType::WaterBorder, 16.0);
@@ -407,11 +400,7 @@ impl BeeEntity {
 
     fn navigation_move_to(&self, destination: Vector3<f64>, reach_range: i32, speed: f64) {
         let living = &self.mob_entity.living_entity;
-        let mut navigator = self
-            .mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut navigator = self.mob_entity.own_navigation();
         let path = navigator.create_path(living, destination, reach_range);
         navigator.move_to_path(path, speed, living);
     }
@@ -450,9 +439,7 @@ impl BeeEntity {
             f64::from(std::f32::consts::PI / 10.0),
         ) {
             self.mob_entity
-                .navigator
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .own_navigation()
                 .set_max_visited_nodes_multiplier(0.5);
             self.navigation_move_to(next_pos_towards, 1, 1.0);
         }
@@ -990,16 +977,12 @@ impl BeePollinateGoal {
 
     fn set_wanted_pos(&self, bee: &BeeEntity) {
         if let Some(hover_pos) = self.hover_pos {
-            bee.mob_entity
-                .move_control
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .set_wanted_position(
-                    hover_pos.x,
-                    hover_pos.y,
-                    hover_pos.z,
-                    f64::from(Self::SPEED_MODIFIER),
-                );
+            bee.mob_entity.own_move_control().set_wanted_position(
+                hover_pos.x,
+                hover_pos.y,
+                hover_pos.z,
+                f64::from(Self::SPEED_MODIFIER),
+            );
         }
     }
 
@@ -1035,9 +1018,7 @@ impl BeePollinateGoal {
             }
             let path = bee
                 .mob_entity
-                .navigator
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .own_navigation()
                 .create_path(living, pos.to_f64(), 1);
             if path.as_ref().is_some_and(Path::can_reach) {
                 return true;
@@ -1078,11 +1059,7 @@ impl Goal for BeePollinateGoal {
             bee.set_has_nectar(true);
         }
         bee.pollinating.store(false, Ordering::Relaxed);
-        bee.mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .stop();
+        bee.mob_entity.own_navigation().stop();
         bee.remaining_cooldown_before_locating_new_flower
             .store(COOLDOWN_BEFORE_LOCATING_NEW_FLOWER, Ordering::Relaxed);
     }
@@ -1140,11 +1117,7 @@ impl Goal for BeePollinateGoal {
                     flower_pos.y,
                     flower_pos.z + f64::from(Self::get_offset(bee)),
                 ));
-                bee.mob_entity
-                    .navigator
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .stop();
+                bee.mob_entity.own_navigation().stop();
             } else {
                 should_set_wanted_pos = false;
             }
@@ -1269,9 +1242,7 @@ impl BeeGoToHiveGoal {
             return true;
         }
         bee.mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .own_navigation()
             .get_path()
             .is_some_and(|path| {
                 path.get_target() == target_pos && path.can_reach() && path.is_done()
@@ -1282,15 +1253,11 @@ impl BeeGoToHiveGoal {
     fn pathfind_directly_towards(bee: &BeeEntity, target_pos: BlockPos) -> bool {
         let close_enough = if bee.closer_than(target_pos, 3) { 1 } else { 2 };
         bee.mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .own_navigation()
             .set_max_visited_nodes_multiplier(10.0);
         bee.navigation_move_to(target_pos.to_f64(), close_enough, 1.0);
         bee.mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .own_navigation()
             .get_path()
             .is_some_and(Path::can_reach)
     }
@@ -1331,11 +1298,7 @@ impl Goal for BeeGoToHiveGoal {
     fn stop(&mut self, mob: &dyn Mob) {
         self.travelling_ticks = 0;
         self.ticks_stuck = 0;
-        let mut navigator = mob
-            .get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut navigator = mob.get_mob_entity().own_navigation();
         navigator.stop();
         navigator.reset_max_visited_nodes_multiplier();
     }
@@ -1368,11 +1331,7 @@ impl Goal for BeeGoToHiveGoal {
             Self::drop_and_blacklist_hive(bee);
             return;
         }
-        let navigator = bee
-            .mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let navigator = bee.mob_entity.own_navigation();
         let path = navigator.get_path();
         if let Some(last_path) = &self.last_path
             && path.is_some_and(|path| path.same_as_path(last_path))
@@ -1432,11 +1391,7 @@ impl Goal for BeeGoToKnownFlowerGoal {
 
     fn stop(&mut self, mob: &dyn Mob) {
         self.travelling_ticks = 0;
-        let mut navigator = mob
-            .get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut navigator = mob.get_mob_entity().own_navigation();
         navigator.stop();
         navigator.reset_max_visited_nodes_multiplier();
     }
@@ -1623,10 +1578,6 @@ impl Goal for BeeWanderGoal {
 
 impl BeeEntity {
     fn is_navigator_in_progress(&self) -> bool {
-        self.mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .is_in_progress()
+        self.mob_entity.own_navigation().is_in_progress()
     }
 }

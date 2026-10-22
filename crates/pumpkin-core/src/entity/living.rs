@@ -6030,11 +6030,7 @@ impl LivingEntity {
             world.send_entity_status(&self.entity, EntityStatus::Teleport, None);
         }
         if let Some(mob) = caller.get_mob() {
-            mob.get_mob_entity()
-                .navigator
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .stop();
+            mob.get_mob_entity().own_navigation().stop();
         }
         true
     }

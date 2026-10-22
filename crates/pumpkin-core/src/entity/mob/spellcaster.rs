@@ -137,11 +137,7 @@ impl Goal for SpellcasterCastingSpellGoal {
     }
 
     fn start(&mut self, mob: &dyn Mob) {
-        mob.get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .stop();
+        mob.get_mob_entity().own_navigation().stop();
     }
 
     fn stop(&mut self, mob: &dyn Mob) {

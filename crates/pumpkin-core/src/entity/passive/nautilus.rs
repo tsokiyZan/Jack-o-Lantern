@@ -109,25 +109,20 @@ pub struct NautilusEntity {
 impl NautilusEntity {
     pub fn new(entity: Entity, kind: NautilusKind) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
-        *mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner) =
-            Navigator::new(WaterBoundPathNavigation::new(false).steered_by_move_control());
+        mob_entity.set_own_navigation(Navigator::new(
+            WaterBoundPathNavigation::new(false).steered_by_move_control(),
+        ));
         // Vanilla `Animal`'s and `AbstractNautilus`'s constructors; after the navigator,
         // which holds the maluses.
         set_animal_pathfinding_malus(&mob_entity);
         mob_entity.set_pathfinding_malus(PathType::Water, 0.0);
-        *mob_entity
-            .move_control
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner) = Box::new(SmoothSwimmingMoveControl::new(
+        mob_entity.set_own_move_control(Box::new(SmoothSwimmingMoveControl::new(
             MAX_TURN_X,
             MAX_TURN_Y,
             IN_WATER_SPEED_MODIFIER,
             0.0,
             true,
-        ));
+        )));
         *mob_entity
             .look_control
             .lock()
@@ -283,11 +278,7 @@ impl NautilusEntity {
         {
             TamableAnimal::tame(self, player.gameprofile.id);
             Mob::tame(self, player);
-            self.mob_entity
-                .navigator
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner)
-                .stop();
+            self.mob_entity.own_navigation().stop();
             world.send_entity_status(
                 entity,
                 EntityStatus::TamingSucceeded,

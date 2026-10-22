@@ -575,11 +575,7 @@ impl Mob for WolfEntity {
                         .living_entity
                         .jumping
                         .store(false, std::sync::atomic::Ordering::Relaxed);
-                    self.mob_entity
-                        .navigator
-                        .lock()
-                        .unwrap_or_else(std::sync::PoisonError::into_inner)
-                        .stop();
+                    self.mob_entity.own_navigation().stop();
                     self.mob_entity.set_target(None);
                     // `SUCCESS.withoutItem()`.
                     return InteractionResult::SUCCESS;

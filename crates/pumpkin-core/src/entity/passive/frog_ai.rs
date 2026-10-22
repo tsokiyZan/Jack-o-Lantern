@@ -469,9 +469,7 @@ impl ShootTongue {
     fn can_pathfind_to_target(tick: &BrainTick<'_>, target: &dyn EntityBase) -> bool {
         let mob_entity = tick.mob.get_mob_entity();
         mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .own_navigation()
             .create_path(&mob_entity.living_entity, target.get_entity().pos.load(), 0)
             .is_some_and(|path| path.get_dist_to_target() < EATING_DISTANCE)
     }

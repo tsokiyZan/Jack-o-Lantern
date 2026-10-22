@@ -93,14 +93,8 @@ impl GuardianData {
         let mut navigator =
             Navigator::new(WaterBoundPathNavigation::new(false).steered_by_move_control());
         navigator.set_pathfinding_malus(PathType::Water, 0.0);
-        *mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner) = navigator;
-        *mob_entity
-            .move_control
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner) = Box::new(GuardianMoveControl::default());
+        mob_entity.set_own_navigation(navigator);
+        mob_entity.set_own_move_control(Box::new(GuardianMoveControl::default()));
         // The constructor's `clientSideTailAnimation = this.random.nextFloat()`: the value is
         // the client's, but the server draws it too.
         mob_entity.living_entity.entity.random().next_f32();
@@ -413,11 +407,7 @@ impl Goal for GuardianAttackGoal {
     fn start(&mut self, mob: &dyn Mob) {
         self.attack_time = -10;
         let mob_entity = mob.get_mob_entity();
-        mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .stop();
+        mob_entity.own_navigation().stop();
         if let Some(target) = mob.get_target() {
             mob_entity
                 .look_control
@@ -450,11 +440,7 @@ impl Goal for GuardianAttackGoal {
         let Some(target) = mob.get_target() else {
             return;
         };
-        mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .stop();
+        mob_entity.own_navigation().stop();
         mob_entity
             .look_control
             .lock()

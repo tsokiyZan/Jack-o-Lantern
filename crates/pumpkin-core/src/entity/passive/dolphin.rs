@@ -85,20 +85,14 @@ impl DolphinEntity {
             Navigator::new(WaterBoundPathNavigation::new(true).steered_by_move_control());
         // Vanilla `AgeableWaterCreature`'s constructor.
         navigator.set_pathfinding_malus(PathType::Water, 0.0);
-        *mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner) = navigator;
-        *mob_entity
-            .move_control
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner) = Box::new(SmoothSwimmingMoveControl::new(
+        mob_entity.set_own_navigation(navigator);
+        mob_entity.set_own_move_control(Box::new(SmoothSwimmingMoveControl::new(
             85,
             10,
             IN_WATER_SPEED_MODIFIER,
             0.1,
             true,
-        ));
+        )));
         *mob_entity
             .look_control
             .lock()
@@ -511,11 +505,7 @@ impl Goal for DolphinSwimWithPlayerGoal {
 
     fn stop(&mut self, mob: &dyn Mob) {
         self.player = None;
-        mob.get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .stop();
+        mob.get_mob_entity().own_navigation().stop();
     }
 
     fn tick(&mut self, mob: &dyn Mob) {
@@ -533,10 +523,7 @@ impl Goal for DolphinSwimWithPlayerGoal {
 
         let pos = mob.get_entity().pos.load();
         let player_pos = player.get_entity().pos.load();
-        let mut navigator = mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner);
+        let mut navigator = mob_entity.own_navigation();
         if pos.squared_distance_to_vec(&player_pos) < 6.25 {
             navigator.stop();
         } else {
@@ -669,9 +656,7 @@ impl MoveToItemGoal {
         };
         let pos = mob.get_entity().pos.load();
         mob.get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
+            .own_navigation()
             .set_progress(NavigatorGoal::new(
                 pos,
                 item.get_entity().pos.load(),
@@ -778,12 +763,7 @@ impl DolphinSwimToTreasureGoal {
 
     /// Vanilla `Dolphin.closeToNextPos`.
     fn close_to_next_pos(mob: &dyn Mob) -> bool {
-        let target = mob
-            .get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .get_target_pos();
+        let target = mob.get_mob_entity().own_navigation().get_target_pos();
         target.is_some_and(|target| {
             target
                 .to_centered_f64()
@@ -807,11 +787,7 @@ impl Goal for DolphinSwimToTreasureGoal {
 
     fn start(&mut self, mob: &dyn Mob) {
         self.stuck = false;
-        mob.get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .stop();
+        mob.get_mob_entity().own_navigation().stop();
         let entity = mob.get_entity();
         let structures = structures_in_tag(&tag::WorldgenStructure::MINECRAFT_DOLPHIN_LOCATED);
         let found = entity.world.load().find_nearest_map_structure(
@@ -842,12 +818,7 @@ impl Goal for DolphinSwimToTreasureGoal {
         let Some(treasure) = self.treasure_pos else {
             return;
         };
-        let navigation_done = mob
-            .get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .is_done();
+        let navigation_done = mob.get_mob_entity().own_navigation().is_done();
         if !Self::close_to_next_pos(mob) && !navigation_done {
             return;
         }
@@ -901,9 +872,7 @@ impl Goal for DolphinSwimToTreasureGoal {
             .look_at_with_range(next.x, next.y, next.z, 21.0, 1.0);
         let pos = mob.get_entity().pos.load();
         mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
+            .own_navigation()
             .set_progress(NavigatorGoal::new(pos, next, 1.3));
         // `level.getRandom().nextInt(this.adjustedTickDelay(80))`.
         if mob

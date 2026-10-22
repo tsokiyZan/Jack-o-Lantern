@@ -80,20 +80,13 @@ impl WitherEntity {
         };
         // Vanilla `WitherBoss`: FlyingMoveControl(10, false) and flying navigation that
         // doesn't open doors but floats.
-        *wither
+        wither
             .mob_entity
-            .move_control
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) =
-            Box::new(FlyingMoveControl::new(10, false));
+            .set_own_move_control(Box::new(FlyingMoveControl::new(10, false)));
         let mut navigator = Navigator::flying();
         navigator.set_can_open_doors(false);
         navigator.set_can_float(true);
-        *wither
-            .mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) = navigator;
+        wither.mob_entity.set_own_navigation(navigator);
         let mob_arc = Arc::new(wither);
         let mob_weak: Weak<dyn Mob> = {
             let mob_arc: Arc<dyn Mob> = mob_arc.clone();

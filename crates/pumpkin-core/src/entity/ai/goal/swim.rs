@@ -12,10 +12,7 @@ impl SwimGoal {
     /// Vanilla `FloatGoal`, whose constructor lets the mob's navigation path through water.
     #[must_use]
     pub fn new(mob: &MobEntity) -> Box<Self> {
-        mob.navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .set_can_float(true);
+        mob.own_navigation().set_can_float(true);
         Box::new(Self {
             goal_control: Controls::JUMP,
         })

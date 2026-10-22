@@ -67,22 +67,16 @@ impl TurtleEntity {
         let mob_entity = MobEntity::new(entity);
         let travelling = Arc::new(AtomicBool::new(false));
         // Vanilla `createNavigation`, before the path costs.
-        *mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner) = Navigator::new(
+        mob_entity.set_own_navigation(Navigator::new(
             AmphibiousPathNavigation::turtle(travelling.clone()).steered_by_move_control(),
-        );
+        ));
         set_animal_pathfinding_malus(&mob_entity);
         // Vanilla `Turtle`'s constructor.
         mob_entity.set_pathfinding_malus(PathType::Water, 0.0);
         mob_entity.set_pathfinding_malus(PathType::DoorIronClosed, -1.0);
         mob_entity.set_pathfinding_malus(PathType::DoorWoodClosed, -1.0);
         mob_entity.set_pathfinding_malus(PathType::DoorOpen, -1.0);
-        *mob_entity
-            .move_control
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner) = Box::new(TurtleMoveControl::default());
+        mob_entity.set_own_move_control(Box::new(TurtleMoveControl::default()));
         let turtle = Self {
             mob_entity,
             ageable_data: AgeableData::default(),
@@ -395,19 +389,13 @@ fn as_turtle(mob: &dyn Mob) -> Option<&TurtleEntity> {
 }
 
 fn navigation_done(mob: &dyn Mob) -> bool {
-    mob.get_mob_entity()
-        .navigator
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .is_done()
+    mob.get_mob_entity().own_navigation().is_done()
 }
 
 fn move_to(mob: &dyn Mob, target: Vector3<f64>, speed: f64) {
     let pos = mob.get_entity().pos.load();
     mob.get_mob_entity()
-        .navigator
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
+        .own_navigation()
         .set_progress(NavigatorGoal::new(pos, target, speed));
 }
 

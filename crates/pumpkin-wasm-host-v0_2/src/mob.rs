@@ -427,12 +427,9 @@ impl HostMob for PluginHostState {
         Ok(entity.get_mob().is_some_and(|mob| {
             let mob_pos = entity.get_entity().pos.load();
             let dest = Vector3::new(pos.0, pos.1, pos.2);
-            mob.get_mob_entity()
-                .navigator
-                .lock_ignore_poison()
-                .set_progress(pumpkin_core::entity::ai::pathfinder::NavigatorGoal::new(
-                    mob_pos, dest, speed,
-                ));
+            mob.get_mob_entity().own_navigation().set_progress(
+                pumpkin_core::entity::ai::pathfinder::NavigatorGoal::new(mob_pos, dest, speed),
+            );
             true
         }))
     }
@@ -448,12 +445,11 @@ impl HostMob for PluginHostState {
         Ok(entity.get_mob().is_some_and(|mob| {
             let mob_pos = entity.get_entity().pos.load();
             let target_pos = target_entity.get_entity().pos.load();
-            mob.get_mob_entity()
-                .navigator
-                .lock_ignore_poison()
-                .set_progress(pumpkin_core::entity::ai::pathfinder::NavigatorGoal::new(
+            mob.get_mob_entity().own_navigation().set_progress(
+                pumpkin_core::entity::ai::pathfinder::NavigatorGoal::new(
                     mob_pos, target_pos, speed,
-                ));
+                ),
+            );
             mob.get_mob_entity()
                 .look_control
                 .lock_ignore_poison()
@@ -465,7 +461,7 @@ impl HostMob for PluginHostState {
     fn stop_navigation(&mut self, this: Resource<WitMob>) -> wasmtime::Result<()> {
         let entity = self.get(&this)?;
         if let Some(mob) = entity.get_mob() {
-            mob.get_mob_entity().navigator.lock_ignore_poison().stop();
+            mob.get_mob_entity().own_navigation().stop();
         }
         Ok(())
     }
@@ -473,32 +469,22 @@ impl HostMob for PluginHostState {
     fn is_navigating(&mut self, this: Resource<WitMob>) -> wasmtime::Result<bool> {
         let entity = self.get(&this)?;
         Ok(entity.get_mob().is_some_and(|mob| {
-            let is_idle = mob
-                .get_mob_entity()
-                .navigator
-                .lock_ignore_poison()
-                .is_idle();
+            let is_idle = mob.get_mob_entity().own_navigation().is_idle();
             !is_idle
         }))
     }
 
     fn has_reached_destination(&mut self, this: Resource<WitMob>) -> wasmtime::Result<bool> {
         let entity = self.get(&this)?;
-        Ok(entity.get_mob().is_none_or(|mob| {
-            mob.get_mob_entity()
-                .navigator
-                .lock_ignore_poison()
-                .is_idle()
-        }))
+        Ok(entity
+            .get_mob()
+            .is_none_or(|mob| mob.get_mob_entity().own_navigation().is_idle()))
     }
 
     fn set_navigation_speed(&mut self, this: Resource<WitMob>, speed: f64) -> wasmtime::Result<()> {
         let entity = self.get(&this)?;
         if let Some(mob) = entity.get_mob() {
-            mob.get_mob_entity()
-                .navigator
-                .lock_ignore_poison()
-                .set_speed(speed);
+            mob.get_mob_entity().own_navigation().set_speed(speed);
         }
         Ok(())
     }
@@ -514,8 +500,7 @@ impl HostMob for PluginHostState {
             let living = &mob.get_mob_entity().living_entity;
             let dest = Vector3::new(pos.0, pos.1, pos.2);
             mob.get_mob_entity()
-                .navigator
-                .lock_ignore_poison()
+                .own_navigation()
                 .can_reach_within(living, dest, max_distance)
         }))
     }
@@ -530,8 +515,7 @@ impl HostMob for PluginHostState {
         if let Some(mob) = entity.get_mob() {
             let internal_type = from_wit_path_node_type(node_type);
             mob.get_mob_entity()
-                .navigator
-                .lock_ignore_poison()
+                .own_navigation()
                 .set_pathfinding_malus(internal_type, malus);
         }
         Ok(())
@@ -546,8 +530,7 @@ impl HostMob for PluginHostState {
         Ok(entity.get_mob().map_or(0.0, |mob| {
             let internal_type = from_wit_path_node_type(node_type);
             mob.get_mob_entity()
-                .navigator
-                .lock_ignore_poison()
+                .own_navigation()
                 .get_pathfinding_malus(internal_type)
         }))
     }

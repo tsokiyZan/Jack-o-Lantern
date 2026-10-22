@@ -50,11 +50,9 @@ impl TadpoleEntity {
         // alongside their brain.
         fish::init(&mob_entity);
         // Vanilla `Tadpole`'s constructor.
-        *mob_entity
-            .move_control
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner) =
-            Box::new(SmoothSwimmingMoveControl::new(85, 10, 0.02, 0.1, true));
+        mob_entity.set_own_move_control(Box::new(SmoothSwimmingMoveControl::new(
+            85, 10, 0.02, 0.1, true,
+        )));
         *mob_entity
             .look_control
             .lock()

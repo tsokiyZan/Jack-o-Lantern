@@ -154,11 +154,11 @@ impl Goal for MeleeAttackGoal {
             return false;
         }
 
-        self.path = mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .create_path(&mob_entity.living_entity, target.get_entity().pos.load(), 0);
+        self.path = mob_entity.own_navigation().create_path(
+            &mob_entity.living_entity,
+            target.get_entity().pos.load(),
+            0,
+        );
         let can_use = self.path.is_some() || mob_entity.is_in_attack_range(target.as_ref());
         can_use && self.gate.is_none_or(|gate| gate(mob))
     }
@@ -169,11 +169,11 @@ impl Goal for MeleeAttackGoal {
 
     fn start(&mut self, mob: &dyn Mob) {
         let mob_entity = mob.get_mob_entity();
-        mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .move_to_path(self.path.take(), self.speed, &mob_entity.living_entity);
+        mob_entity.own_navigation().move_to_path(
+            self.path.take(),
+            self.speed,
+            &mob_entity.living_entity,
+        );
         mob_entity.set_attacking(true);
         self.update_countdown_ticks = 0;
         self.cooldown = 0;
@@ -194,11 +194,7 @@ impl Goal for MeleeAttackGoal {
         mob.get_mob_entity().set_attacking(false);
 
         // Vanilla: this.mob.getNavigation().stop()
-        mob.get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .stop();
+        mob.get_mob_entity().own_navigation().stop();
     }
 
     fn tick(&mut self, mob: &dyn Mob) {
@@ -243,10 +239,7 @@ impl Goal for MeleeAttackGoal {
             }
 
             let moved = {
-                let mut navigator = mob_entity
-                    .navigator
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                let mut navigator = mob_entity.own_navigation();
                 // Vanilla `moveTo(Entity, 0, speed)` keeps the old path when none is found.
                 navigator
                     .create_path(living, current_target_pos, 0)

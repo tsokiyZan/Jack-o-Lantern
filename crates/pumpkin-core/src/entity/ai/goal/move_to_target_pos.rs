@@ -121,11 +121,7 @@ impl<M: MoveToTargetPos> MoveToTargetPosGoal<M> {
 
     pub fn move_mob_to_block(&self, mob: &dyn Mob) {
         let target = self.get_target_pos();
-        let mut navigator = mob
-            .get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut navigator = mob.get_mob_entity().own_navigation();
 
         navigator.set_progress(NavigatorGoal::new(
             mob.get_entity().pos.load(),
@@ -231,11 +227,7 @@ impl<M: MoveToTargetPos> Goal for MoveToTargetPosGoal<M> {
             self.reached = false;
             self.trying_time += 1;
             if move_to_target_pos.should_recalculate_path(self.trying_time) {
-                let mut navigator = mob
-                    .get_mob_entity()
-                    .navigator
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                let mut navigator = mob.get_mob_entity().own_navigation();
 
                 navigator.set_progress(NavigatorGoal::new(
                     mob.get_entity().pos.load(),

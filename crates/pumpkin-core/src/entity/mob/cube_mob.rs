@@ -91,13 +91,10 @@ impl CubeMobEntity {
             speed_modifier: AtomicCell::new(0.0),
             wants_to_move: AtomicBool::new(false),
         });
-        *cube
-            .mob_entity
-            .move_control
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) = Box::new(CubeMobMoveControl {
-            cube: cube.weak.clone(),
-        });
+        cube.mob_entity
+            .set_own_move_control(Box::new(CubeMobMoveControl {
+                cube: cube.weak.clone(),
+            }));
         cube.register_goals();
         cube
     }
@@ -105,11 +102,7 @@ impl CubeMobEntity {
     /// Vanilla `registerGoals`, which `SulfurCube` runs again when its body empties.
     fn register_goals(&self) {
         // `CubeMobFloatGoal`'s constructor.
-        self.mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .set_can_float(true);
+        self.mob_entity.own_navigation().set_can_float(true);
         let weak = &self.weak;
         let mut goals = self
             .mob_entity

@@ -2,8 +2,8 @@ use crate::block::blocks::infested::InfestedBlock;
 use crate::entity::ai::goal::climb_on_top_of_powder_snow::ClimbOnTopOfPowderSnowGoal;
 use crate::entity::ai::goal::wander_around::WanderAroundGoal;
 use crate::entity::ai::goal::{Controls, Goal, to_goal_ticks};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, Ordering};
-use std::sync::{Arc, PoisonError};
 
 use pumpkin_data::damage::DamageType;
 use pumpkin_data::entity::{EntityStatus, EntityType};
@@ -201,13 +201,7 @@ impl SilverfishMergeWithStoneGoal {
 impl Goal for SilverfishMergeWithStoneGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
         let mob_entity = mob.get_mob_entity();
-        if mob.get_target().is_some()
-            || !mob_entity
-                .navigator
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner)
-                .is_done()
-        {
+        if mob.get_target().is_some() || !mob_entity.own_navigation().is_done() {
             return false;
         }
         if mob

@@ -121,9 +121,7 @@ pub fn is_restricted(restrict: bool, mob: &dyn Mob, pos: &BlockPos) -> bool {
 #[must_use]
 pub fn is_not_stable(mob: &dyn Mob, world: &World, pos: &BlockPos) -> bool {
     !mob.get_mob_entity()
-        .navigator
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .own_navigation()
         .is_stable_destination(world, pos)
 }
 
@@ -144,9 +142,7 @@ pub fn has_malus(mob: &dyn Mob, context: &mut PathfindingContext, pos: &BlockPos
     let path_type = context.get_land_node_type(Vector3::new(pos.0.x, pos.0.y, pos.0.z));
     let malus = mob
         .get_mob_entity()
-        .navigator
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .own_navigation()
         .get_pathfinding_malus(path_type);
     malus != 0.0
 }

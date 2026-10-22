@@ -58,11 +58,7 @@ impl Goal for OcelotAttackGoal {
 
     fn stop(&mut self, mob: &dyn Mob) {
         self.target = None;
-        let mut navigator = mob
-            .get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut navigator = mob.get_mob_entity().own_navigation();
         navigator.stop();
     }
 
@@ -96,10 +92,7 @@ impl Goal for OcelotAttackGoal {
             0.8
         };
 
-        let mut navigator = mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut navigator = mob_entity.own_navigation();
         navigator.set_progress(NavigatorGoal::new(mob_pos, target_pos, speed_modifier));
 
         self.attack_time = (self.attack_time - 1).max(0);

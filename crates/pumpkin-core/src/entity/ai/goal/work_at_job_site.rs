@@ -66,9 +66,7 @@ impl Goal for WorkAtJobSiteGoal {
         if let Some(target) = self.target {
             let entity = &mob.get_mob_entity().living_entity.entity;
             mob.get_mob_entity()
-                .navigator
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .own_navigation()
                 .set_progress(NavigatorGoal::new(
                     entity.pos.load(),
                     target.to_centered_f64(),
@@ -88,11 +86,7 @@ impl Goal for WorkAtJobSiteGoal {
             mob.release_pending_job_site(target);
         }
         self.target = None;
-        mob.get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .stop();
+        mob.get_mob_entity().own_navigation().stop();
     }
 
     fn controls(&self) -> Controls {

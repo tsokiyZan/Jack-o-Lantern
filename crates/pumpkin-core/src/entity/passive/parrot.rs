@@ -218,18 +218,11 @@ impl ParrotEntity {
         let mob_entity = MobEntity::new(entity);
         // Vanilla `Parrot`: FlyingMoveControl(10, false) and flying navigation that doesn't
         // open doors but floats.
-        *mob_entity
-            .move_control
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) =
-            Box::new(FlyingMoveControl::new(10, false));
+        mob_entity.set_own_move_control(Box::new(FlyingMoveControl::new(10, false)));
         let mut navigator = Navigator::flying();
         navigator.set_can_open_doors(false);
         navigator.set_can_float(true);
-        *mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) = navigator;
+        mob_entity.set_own_navigation(navigator);
         // The path costs go on the flying navigation, made first as in `Mob`'s constructor.
         set_animal_pathfinding_malus(&mob_entity);
         // Vanilla `Parrot`'s constructor.

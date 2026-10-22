@@ -239,10 +239,7 @@ impl Goal for BreedGoal {
 
         let living = &mob_entity.living_entity;
         {
-            let mut navigator = mob_entity
-                .navigator
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let mut navigator = mob_entity.own_navigation();
             // Vanilla `moveTo(partner, speed)` paths with a reach of 1.
             if let Some(path) = navigator.create_path(living, mate.get_entity().pos.load(), 1) {
                 navigator.move_to_path(Some(path), self.speed, living);

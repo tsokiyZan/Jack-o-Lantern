@@ -148,12 +148,7 @@ fn has_malus(mob: &dyn Mob, pos: &BlockPos) -> bool {
     let entity = &mob_entity.living_entity.entity;
     let mut context = PathfindingContext::new(entity.block_pos.load().0, entity.world.load_full());
     let path_type = context.get_land_node_type(pos.0);
-    mob_entity
-        .navigator
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .get_pathfinding_malus(path_type)
-        != 0.0
+    mob_entity.own_navigation().get_pathfinding_malus(path_type) != 0.0
 }
 
 const fn is_outside_build_height(world: &World, y: i32) -> bool {

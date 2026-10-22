@@ -52,11 +52,7 @@ impl Goal for ChasePlayerGoal {
     }
 
     fn start(&mut self, mob: &dyn Mob) {
-        let mut navigator = mob
-            .get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut navigator = mob.get_mob_entity().own_navigation();
         navigator.stop();
     }
 

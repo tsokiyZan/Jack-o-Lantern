@@ -109,13 +109,13 @@ pub struct MobEntity {
     pub living_entity: LivingEntity,
     pub goals_selector: std::sync::Mutex<GoalSelector>,
     pub target_selector: std::sync::Mutex<GoalSelector>,
-    pub navigator: std::sync::Mutex<Navigator>,
+    navigator: std::sync::Mutex<Navigator>,
     pub target: std::sync::Mutex<Option<Arc<dyn EntityBase>>>,
     pub look_control: std::sync::Mutex<LookControl>,
     /// How much a vanilla `getAttackBoundingBox` override shrinks the attack box sideways.
     pub attack_box_deflate: f64,
     pub sensing: std::sync::Mutex<Sensing>,
-    pub move_control: std::sync::Mutex<Box<dyn MoveControlTrait>>,
+    move_control: std::sync::Mutex<Box<dyn MoveControlTrait>>,
     pub jump_control: std::sync::Mutex<Box<dyn JumpControlTrait>>,
     /// Vanilla `Mob.bodyRotationControl`.
     pub body_rotation_control: std::sync::Mutex<Box<dyn BodyRotationControlTrait>>,
@@ -173,12 +173,66 @@ impl MobEntity {
             .store(Vector3::new(input.x, input.y, f64::from(speed)));
     }
 
-    /// Vanilla `Mob.stopInPlace`. Pumpkin's leash has no angular momentum to reset.
-    pub fn stop_in_place(&self) {
+    /// Vanilla's `Mob.navigation` field, for the code that reads the field.
+    pub fn own_navigation(&self) -> std::sync::MutexGuard<'_, Navigator> {
         self.navigator
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .stop();
+    }
+
+    /// Vanilla's `Mob.moveControl` field.
+    pub fn own_move_control(&self) -> std::sync::MutexGuard<'_, Box<dyn MoveControlTrait>> {
+        self.move_control
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
+    /// `this.navigation = ...` (`HappyGhast`'s baby/adult swap) and `create_navigation`.
+    pub fn set_own_navigation(&self, navigation: Navigator) {
+        *self.own_navigation() = navigation;
+    }
+
+    /// `this.moveControl = new ...` in a constructor.
+    pub fn set_own_move_control(&self, control: Box<dyn MoveControlTrait>) {
+        *self.own_move_control() = control;
+    }
+
+    /// The vehicle this mob steers, when that vehicle is a `Mob`
+    /// (`getControlledVehicle() instanceof Mob`).
+    fn controlled_vehicle_mob(&self) -> Option<Arc<dyn EntityBase>> {
+        self.living_entity
+            .entity
+            .get_controlled_vehicle()
+            .filter(|vehicle| vehicle.get_mob().is_some())
+    }
+
+    /// Vanilla `Mob.getNavigation()`: the controlled `Mob` vehicle's navigation (recursively), else
+    /// this mob's own. `f` also gets the mob that owns the navigation; pass its `living_entity` to
+    /// every `Navigator` call.
+    pub fn with_navigation<R>(&self, f: impl FnOnce(&mut Navigator, &Self) -> R) -> R {
+        if let Some(vehicle) = self.controlled_vehicle_mob()
+            && let Some(vehicle_mob) = vehicle.get_mob()
+        {
+            return vehicle_mob.get_mob_entity().with_navigation(f);
+        }
+        let mut navigation = self.own_navigation();
+        f(&mut navigation, self)
+    }
+
+    /// Vanilla `Mob.getMoveControl()`, redirected the same way.
+    pub fn with_move_control<R>(&self, f: impl FnOnce(&mut dyn MoveControlTrait) -> R) -> R {
+        if let Some(vehicle) = self.controlled_vehicle_mob()
+            && let Some(vehicle_mob) = vehicle.get_mob()
+        {
+            return vehicle_mob.get_mob_entity().with_move_control(f);
+        }
+        let mut control = self.own_move_control();
+        f(control.as_mut())
+    }
+
+    /// Vanilla `Mob.stopInPlace`. Pumpkin's leash has no angular momentum to reset.
+    pub fn stop_in_place(&self) {
+        self.own_navigation().stop();
         let living = &self.living_entity;
         living.movement_input.store(Vector3::new(0.0, 0.0, 0.0));
         self.set_speed(0.0);
@@ -188,18 +242,14 @@ impl MobEntity {
     /// Vanilla `Mob.setPathfindingMalus`: what this mob pays to path through
     /// `path_type`, or `-1` to never enter it.
     pub fn set_pathfinding_malus(&self, path_type: PathType, malus: f32) {
-        self.navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+        self.own_navigation()
             .set_pathfinding_malus(path_type, malus);
     }
 
     /// Vanilla `getNavigation().setRequiredPathLength`: how far this mob's paths
     /// may reach whatever its follow range.
     pub fn set_required_path_length(&self, length: f32) {
-        self.navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+        self.own_navigation()
             .set_required_path_length(length, &self.living_entity);
     }
 
@@ -371,9 +421,7 @@ impl MobEntity {
             .living_entity
             .get_attribute_value(&Attributes::FOLLOW_RANGE);
         if self.applied_follow_range.swap(follow_range).to_bits() != follow_range.to_bits() {
-            self.navigator
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
+            self.own_navigation()
                 .update_pathfinder_max_visited_nodes(&self.living_entity);
         }
 
@@ -416,20 +464,19 @@ impl MobEntity {
 
         // 4. Repeat for Navigator
         let mut navigator = {
-            let mut guard = self
-                .navigator
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let mut guard = self.own_navigation();
             std::mem::take(&mut *guard)
         };
 
         if !mob.skips_navigation_tick() {
             navigator.tick(&self.living_entity);
             if let Some((target, speed_modifier)) = navigator.take_wanted_position() {
-                self.move_control
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .set_wanted_position(target.x, target.y, target.z, speed_modifier);
+                self.own_move_control().set_wanted_position(
+                    target.x,
+                    target.y,
+                    target.z,
+                    speed_modifier,
+                );
             }
             if navigator.take_jump() {
                 self.jump();
@@ -437,10 +484,7 @@ impl MobEntity {
         }
 
         {
-            *self
-                .navigator
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner) = navigator;
+            *self.own_navigation() = navigator;
         };
 
         mob.custom_server_ai_step(caller);
@@ -448,10 +492,7 @@ impl MobEntity {
         // Controllers are synchronous, so we can just use normal blocks
         // Vanilla ticks move, then look, then jump.
         if !mob.controls_paused() {
-            self.move_control
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .tick(mob);
+            self.own_move_control().tick(mob);
             if !mob.skips_look_control_tick() {
                 let mut look_control = self
                     .look_control
@@ -503,11 +544,7 @@ impl MobEntity {
 
     /// Vanilla `Mob.jumpInLiquid`: a mob whose navigation can't float leaps out.
     pub fn jump_in_liquid(&self) {
-        let can_float = self
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .can_float();
+        let can_float = self.own_navigation().can_float();
         if can_float {
             self.living_entity.jump_in_liquid_base();
         } else {
@@ -1430,11 +1467,7 @@ pub trait Mob: EntityBase + Send + Sync {
 
     /// Takes the navigation lock, so callers must not already hold it.
     fn is_navigator_idle(&self) -> bool {
-        self.get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .is_idle()
+        self.get_mob_entity().own_navigation().is_idle()
     }
 
     fn has_line_of_sight(&self, target: &crate::entity::Entity) -> bool {
@@ -3694,11 +3727,7 @@ pub trait PathAwareEntity: Mob + Send + Sync {
     }
 
     fn is_navigation(&self) -> bool {
-        let navigator = self
-            .get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let navigator = self.get_mob_entity().own_navigation();
         !navigator.is_idle()
     }
 

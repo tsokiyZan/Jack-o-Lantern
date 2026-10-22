@@ -107,11 +107,7 @@ impl SnifferEntity {
     pub fn new(entity: Entity) -> Arc<Self> {
         let mob_entity = MobEntity::new(entity);
         set_animal_pathfinding_malus(&mob_entity);
-        mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .set_can_float(true);
+        mob_entity.own_navigation().set_can_float(true);
         mob_entity.set_pathfinding_malus(PathType::Water, -1.0);
         mob_entity.set_pathfinding_malus(PathType::DangerPowderSnow, -1.0);
         mob_entity.set_pathfinding_malus(PathType::DamageCautious, -1.0);
@@ -285,9 +281,7 @@ impl SnifferEntity {
             return false;
         }
         self.mob_entity
-            .navigator
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
+            .own_navigation()
             .create_path(&self.mob_entity.living_entity, position.to_f64(), 1)
             .is_some_and(|path| path.can_reach())
     }
@@ -347,11 +341,7 @@ impl SnifferEntity {
 
     /// The speed vanilla `Sniffer.jumpFromGround` reads off the move control.
     fn move_speed_modifier(&self) -> f64 {
-        let guard = self
-            .mob_entity
-            .move_control
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner);
+        let guard = self.mob_entity.own_move_control();
         let control: &dyn std::any::Any = &**guard;
         control
             .downcast_ref::<MoveControl>()

@@ -221,11 +221,7 @@ impl ZombieEntityBase {
     /// is also told it may path through doors.
     pub fn set_can_break_doors(&self, can_break_doors: bool, mob: &dyn Mob) {
         let can_break_doors = {
-            let mut navigator = self
-                .mob_entity
-                .navigator
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let mut navigator = self.mob_entity.own_navigation();
             let can_break_doors = can_break_doors && navigator.can_navigate_ground();
             if navigator.can_navigate_ground() {
                 navigator.set_can_open_doors(can_break_doors);
@@ -672,9 +668,7 @@ impl ZombieEntityBase {
             });
             // Vanilla `Mob.onAttributeUpdated`.
             self.mob_entity
-                .navigator
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .own_navigation()
                 .update_pathfinder_max_visited_nodes(living);
         }
 

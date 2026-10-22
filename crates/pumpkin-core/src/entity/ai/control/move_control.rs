@@ -201,9 +201,7 @@ impl MoveControl {
             pos.z + f64::from(dz),
         );
         mob.get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .own_navigation()
             .get_path_type_at(entity, target)
             .is_none_or(|path_type| path_type == PathType::Walkable)
     }

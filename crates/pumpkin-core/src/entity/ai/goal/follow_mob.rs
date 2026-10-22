@@ -76,11 +76,7 @@ impl Goal for FollowMobGoal {
 
     fn stop(&mut self, mob: &dyn Mob) {
         self.following_mob = None;
-        let mut navigator = mob
-            .get_mob_entity()
-            .navigator
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut navigator = mob.get_mob_entity().own_navigation();
         navigator.stop();
     }
 
@@ -104,10 +100,7 @@ impl Goal for FollowMobGoal {
             self.time_to_recalc_path = to_goal_ticks(10);
             let dist_sq = mob_pos.squared_distance_to_vec(&follow_pos);
 
-            let mut navigator = mob_entity
-                .navigator
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let mut navigator = mob_entity.own_navigation();
 
             if dist_sq > self.stop_distance_sq {
                 navigator.set_progress(NavigatorGoal::new(

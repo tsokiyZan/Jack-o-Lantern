@@ -156,10 +156,7 @@ impl Goal for BowAttackGoal {
         }
 
         {
-            let mut navigator = mob_entity
-                .navigator
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let mut navigator = mob_entity.own_navigation();
             if target_dist_sqr <= f64::from(self.attack_radius_sqr) && self.see_time >= 20 {
                 navigator.stop();
                 self.strafing_time += 1;
@@ -188,14 +185,10 @@ impl Goal for BowAttackGoal {
             } else if target_dist_sqr < f64::from(self.attack_radius_sqr * 0.25) {
                 self.strafing_backwards = true;
             }
-            mob_entity
-                .move_control
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .strafe(
-                    if self.strafing_backwards { -0.5 } else { 0.5 },
-                    if self.strafing_clockwise { 0.5 } else { -0.5 },
-                );
+            mob_entity.own_move_control().strafe(
+                if self.strafing_backwards { -0.5 } else { 0.5 },
+                if self.strafing_clockwise { 0.5 } else { -0.5 },
+            );
             // `getControlledVehicle`: the vehicle this mob steers.
             if let Some(vehicle) = living.entity.get_controlled_vehicle()
                 && let Some(vehicle) = vehicle.get_mob()

@@ -48,11 +48,7 @@ pub fn back_up_if_too_close(too_close_distance: i32, strafe_speed: f32) -> OneSh
                 Arc::new(EntityTracker::new(target, true)) as Arc<dyn PositionTracker>,
             );
             let mob_entity = tick.mob.get_mob_entity();
-            mob_entity
-                .move_control
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .strafe(-strafe_speed, 0.0);
+            mob_entity.own_move_control().strafe(-strafe_speed, 0.0);
             let entity = tick.mob.get_entity();
             entity.set_rotation(
                 rotate_if_necessary(entity.yaw.load(), entity.head_yaw.load(), 0.0),
