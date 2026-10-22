@@ -563,6 +563,11 @@ impl ItemEntity {
 }
 
 impl EntityBase for ItemEntity {
+    /// Vanilla `ItemEntity.isAttackable`.
+    fn is_attackable(&self) -> bool {
+        false
+    }
+
     fn tick(&self, caller: &dyn EntityBase, server: &Server) {
         let entity = &self.entity;
         if self

@@ -866,6 +866,24 @@ pub trait EntityBase: Send + Sync + std::any::Any {
         false
     }
 
+    /// Vanilla `Entity.isAttackable`: whether a player's attack reaches this entity at all.
+    fn is_attackable(&self) -> bool {
+        true
+    }
+
+    /// Vanilla `Entity.skipAttackInteraction`: whether this entity handles `source`'s attack
+    /// itself, so that `Player.attack` does nothing more.
+    fn skip_attack_interaction(&self, _source: &dyn EntityBase) -> bool {
+        false
+    }
+
+    /// Vanilla `Projectile.deflect(AIM_DEFLECT, deflector, deflector, byAttack = true, power)`
+    /// for a redirectable projectile attacked by `deflector`: whether it was deflected.
+    /// Only the `redirectable_projectile` types implement it.
+    fn deflect_by_attack(&self, _deflector: &dyn EntityBase, _power: f64) -> bool {
+        false
+    }
+
     /// Vanilla `Entity.igniteForSeconds`.
     fn set_on_fire_for(&self, seconds: f32) {
         self.set_on_fire_for_ticks((seconds * 20.0).floor() as u32);

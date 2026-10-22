@@ -373,6 +373,12 @@ impl ArmorStandEntity {
 }
 
 impl EntityBase for ArmorStandEntity {
+    /// Vanilla `ArmorStand.skipAttackInteraction`: a player who may not interact here.
+    fn skip_attack_interaction(&self, source: &dyn EntityBase) -> bool {
+        let entity = &self.living_entity.entity;
+        source.get_player().is_some() && !entity.world.load().may_interact(&entity.block_pos.load())
+    }
+
     /// Vanilla `ArmorStand.interact`: an empty hand takes the item at the clicked height,
     /// anything else goes into its own slot, swapping with what is there.
     fn interact_at(

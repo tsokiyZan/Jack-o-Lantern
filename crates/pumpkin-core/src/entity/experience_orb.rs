@@ -234,6 +234,11 @@ impl ExperienceOrbEntity {
 }
 
 impl EntityBase for ExperienceOrbEntity {
+    /// Vanilla `ExperienceOrb.isAttackable`.
+    fn is_attackable(&self) -> bool {
+        false
+    }
+
     /// Vanilla `ExperienceOrb.tick`.
     fn tick(&self, caller: &dyn EntityBase, server: &Server) {
         let entity = &self.entity;

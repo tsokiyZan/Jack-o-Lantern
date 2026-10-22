@@ -77,46 +77,7 @@ impl JavaClient {
                 'after: {
                     match event.action {
                         ActionType::Attack => {
-                            let config = &server.advanced_config.pvp;
-                            if !config.enabled {
-                                return;
-                            }
-                            // Vanilla `handleAttack` ignores the packet while the main hand jabs instead.
-                            if player
-                                .inventory()
-                                .held_item()
-                                .get_data_component::<pumpkin_data::data_component_impl::PiercingWeaponImpl>()
-                                .is_some()
-                            {
-                                return;
-                            }
-
-                            if entity_id.0 == player.entity_id() {
-                                self.try_kick(&TextComponent::translate_cross(translation::java::MULTIPLAYER_DISCONNECT_INVALID_ENTITY_ATTACKED, translation::java::MULTIPLAYER_DISCONNECT_INVALID_ENTITY_ATTACKED, []));
-                                return;
-                            }
-
-                            if let Some(player_victim) = &player_target {
-                                if player_victim.living_entity.health.load() <= 0.0 {
-                                    return;
-                                }
-                                if config.protect_creative
-                                    && player_victim.gamemode.load() == GameMode::Creative
-                                {
-                                    world
-                                        .play_sound(
-                                            Sound::EntityPlayerAttackNodamage,
-                                            SoundCategory::Players,
-                                            &player_victim.position(),
-                                        )
-                                        ;
-                                    return;
-                                }
-                            }
-                            if player.cannot_attack_with_item(&player.inventory().held_item(), 5) {
-                                return;
-                            }
-                            player.attack(&event.target);
+                            self.attack_target(player, &event.target, server);
                         }
                         ActionType::Interact | ActionType::InteractAt => {
                             if event.action == ActionType::InteractAt

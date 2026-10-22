@@ -1462,6 +1462,9 @@ impl Player {
 
     #[expect(clippy::too_many_lines)]
     pub fn attack(&self, victim: &Arc<dyn EntityBase>) {
+        if self.cannot_attack(victim.as_ref()) {
+            return;
+        }
         let world = self.world();
         let Some(server) = world.server.upgrade() else {
             return;
@@ -1516,6 +1519,9 @@ impl Player {
         base_damage *= 0.2 + attack_strength_scale * attack_strength_scale * 0.8;
         // Vanilla `onAttack` (`resetOnlyAttackStrengthTicker`).
         self.reset_attack_strength_ticker();
+        if self.deflect_projectile(victim.as_ref()) {
+            return;
+        }
 
         // Vanilla `baseDamage > 0.0F || magicBoost > 0.0F`; `postPiercingAttack` runs either way.
         if base_damage > 0.0 || magic_boost > 0.0 {
@@ -1645,8 +1651,27 @@ impl Player {
         }
 
         self.living_entity.post_piercing_attack(self);
+    }
 
-        if config.swing {}
+    /// Vanilla `Player.cannotAttack`.
+    pub(crate) fn cannot_attack(&self, target: &dyn EntityBase) -> bool {
+        !target.is_attackable() || target.skip_attack_interaction(self)
+    }
+
+    /// Vanilla `Player.deflectProjectile`: a `redirectable_projectile` the player hits is
+    /// aimed along the player's look instead, with the no-damage sound.
+    pub(crate) fn deflect_projectile(&self, target: &dyn EntityBase) -> bool {
+        if target
+            .get_entity()
+            .entity_type
+            .has_tag(&pumpkin_data::tag::EntityType::MINECRAFT_REDIRECTABLE_PROJECTILE)
+            && target.get_projectile().is_some()
+            && target.deflect_by_attack(self, 1.0)
+        {
+            self.play_server_side_sound(Sound::EntityPlayerAttackNodamage);
+            return true;
+        }
+        false
     }
 
     /// Vanilla `Player.playServerSideSound`.
@@ -3769,6 +3794,40 @@ impl Player {
             .get_attribute_value(&pumpkin_data::attributes::Attributes::ENTITY_INTERACTION_RANGE)
             + buffer;
         bounding_box.squared_magnitude(self.eye_position()) < max_range * max_range
+    }
+
+    /// Vanilla `Player.isWithinAttackRange`: the eye's distance to `bounding_box` within the
+    /// weapon's `attack_range` (`AttackRange.defaultFor`, the entity interaction range, without
+    /// one), widened by its hitbox margin and `buffer`.
+    pub fn is_within_attack_range(
+        &self,
+        weapon: &ItemStack,
+        bounding_box: &pumpkin_util::math::boundingbox::BoundingBox,
+        buffer: f64,
+    ) -> bool {
+        let (min_reach, max_reach, hitbox_margin) = if let Some(range) =
+            weapon.get_data_component::<pumpkin_data::data_component_impl::AttackRangeImpl>()
+        {
+            if self.is_creative() {
+                (
+                    range.min_creative_reach,
+                    range.max_creative_reach,
+                    range.hitbox_margin,
+                )
+            } else {
+                (range.min_reach, range.max_reach, range.hitbox_margin)
+            }
+        } else {
+            let interaction_range = self
+                .living_entity
+                .get_attribute_value(&Attributes::ENTITY_INTERACTION_RANGE)
+                as f32;
+            (0.0, interaction_range, 0.0)
+        };
+        let distance = bounding_box.squared_magnitude(self.eye_position()).sqrt();
+        let min_reach = f64::from(min_reach) - f64::from(hitbox_margin) - buffer;
+        let max_reach = f64::from(max_reach) + f64::from(hitbox_margin) + buffer;
+        distance >= min_reach && distance <= max_reach
     }
 
     /// Vanilla `Player.interactOn`: right-clicking `target` with the stack in `hand`. The

@@ -171,6 +171,25 @@ impl FireballEntity {
 }
 
 impl EntityBase for FireballEntity {
+    /// Vanilla `Projectile.deflect(AIM_DEFLECT, ...)`: along the attacker's look, owned by it,
+    /// then `AbstractHurtingProjectile.onDeflection(true)`.
+    fn deflect_by_attack(&self, deflector: &dyn EntityBase, power: f64) -> bool {
+        let entity = self.get_entity();
+        let deflector_entity = deflector.get_entity();
+        entity
+            .velocity
+            .store(deflector_entity.get_look_angle() * power);
+        // `needsSync`.
+        entity.velocity_dirty.store(true, Ordering::SeqCst);
+        self.fireball
+            .hurting
+            .thrown
+            .projectile
+            .set_owner(Some(deflector_entity));
+        self.fireball.hurting.on_deflection(true);
+        true
+    }
+
     /// Vanilla `Projectile.isPickable`: only redirectable projectiles.
     fn can_hit(&self) -> bool {
         self.get_entity()

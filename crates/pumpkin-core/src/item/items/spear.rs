@@ -127,6 +127,9 @@ impl SpearItem {
         base_damage: f32,
         effects: StabEffects,
     ) -> bool {
+        if player.cannot_attack(target.as_ref()) {
+            return false;
+        }
         let target_entity = target.get_entity();
         let world = player.world();
         let damage_source = DamageSource {
@@ -147,6 +150,9 @@ impl SpearItem {
             let charge = player.get_attack_strength_scale(0.5);
             magic_boost *= charge;
             base_damage *= 0.2 + charge * charge * 0.8;
+        }
+        if effects.knockback && player.deflect_projectile(target.as_ref()) {
+            return true;
         }
 
         let total_damage = if effects.damage {

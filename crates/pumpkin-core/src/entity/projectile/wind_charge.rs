@@ -131,6 +131,28 @@ impl WindChargeEntity {
 }
 
 impl EntityBase for WindChargeEntity {
+    /// Vanilla `WindCharge.deflect`: not within its first ticks (`noDeflectTicks`); then
+    /// `Projectile.deflect(AIM_DEFLECT, ...)`, along the attacker's look and owned by it.
+    // TODO: `AbstractHurtingProjectile.onDeflection`'s acceleration reset; Pumpkin's wind
+    // charges don't accelerate.
+    fn deflect_by_attack(&self, deflector: &dyn EntityBase, power: f64) -> bool {
+        if let Some(cooldown) = self.deflect_cooldown()
+            && cooldown.load(Ordering::Relaxed) > 0
+        {
+            return false;
+        }
+        let entity = self.get_entity();
+        let deflector_entity = deflector.get_entity();
+        entity
+            .velocity
+            .store(deflector_entity.get_look_angle() * power);
+        entity.velocity_dirty.store(true, Ordering::SeqCst);
+        self.thrown_item_entity
+            .projectile
+            .set_owner(Some(deflector_entity));
+        true
+    }
+
     /// Vanilla `AbstractWindCharge.canCollideWith`: wind charges pass through each other.
     fn can_collide_with(&self, caller: &dyn EntityBase, other: &dyn EntityBase) -> bool {
         let other_type = other.get_entity().entity_type;

@@ -123,6 +123,11 @@ fn lerp(t: f64, start: f64, end: f64) -> f64 {
 }
 
 impl EntityBase for EyeOfEnder {
+    /// Vanilla `EyeOfEnder.isAttackable`.
+    fn is_attackable(&self) -> bool {
+        false
+    }
+
     fn tick(&self, caller: &dyn EntityBase, server: &Server) {
         let entity = &self.entity;
         entity.tick(caller, server);

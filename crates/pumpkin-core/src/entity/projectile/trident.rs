@@ -144,6 +144,15 @@ impl TridentEntity {
 }
 
 impl EntityBase for TridentEntity {
+    /// Vanilla `AbstractArrow.isAttackable`: only a `redirectable_projectile`, which no arrow
+    /// type is.
+    fn is_attackable(&self) -> bool {
+        pumpkin_data::tag::Taggable::has_tag(
+            self.get_entity().entity_type,
+            &pumpkin_data::tag::EntityType::MINECRAFT_REDIRECTABLE_PROJECTILE,
+        )
+    }
+
     /// Vanilla `ThrownTrident.getWeaponItem`: its own item.
     fn get_weapon_item(&self) -> Option<ItemStack> {
         Some(

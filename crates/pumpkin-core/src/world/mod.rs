@@ -4791,6 +4791,15 @@ impl World {
     }
 
     /// Gets an entity by an entity id
+    /// Vanilla `ServerLevel.mayInteract` for a player: inside the world border. Pumpkin has no
+    /// spawn protection.
+    pub fn may_interact(&self, pos: &BlockPos) -> bool {
+        self.worldborder
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .contains_block(pos.0.x, pos.0.z)
+    }
+
     pub fn get_entity_by_id(&self, id: i32) -> Option<Arc<dyn EntityBase>> {
         for entity in self.entities.load().iter() {
             if entity.get_entity().entity_id == id {

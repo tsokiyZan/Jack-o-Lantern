@@ -276,29 +276,34 @@ impl EntityBase for InteractionEntity {
         true
     }
 
+    /// Vanilla `Interaction.hurtServer`: never hurt.
     fn damage_with_context(
         &self,
         _caller: &dyn EntityBase,
         _amount: f32,
         _damage_type: DamageType,
         _position: Option<Vector3<f64>>,
-        source: Option<&dyn EntityBase>,
-        cause: Option<&dyn EntityBase>,
+        _source: Option<&dyn EntityBase>,
+        _cause: Option<&dyn EntityBase>,
     ) -> bool {
-        let player = source
-            .or(cause)
-            .and_then(|e| e.cast_any().downcast_ref::<Player>());
-        if let Some(player) = player {
-            let timestamp = self.entity.world.load().get_world_age();
-            *self
-                .attack
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(PlayerAction {
-                player: player.gameprofile.id,
-                timestamp,
-            });
-        }
         false
+    }
+
+    /// Vanilla `Interaction.skipAttackInteraction`: a player's attack is recorded, and goes on
+    /// only with `response`.
+    fn skip_attack_interaction(&self, source: &dyn EntityBase) -> bool {
+        let Some(player) = source.get_player() else {
+            return false;
+        };
+        let timestamp = self.entity.world.load().get_world_age();
+        *self
+            .attack
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(PlayerAction {
+            player: player.gameprofile.id,
+            timestamp,
+        });
+        !self.get_response()
     }
 
     fn interact(

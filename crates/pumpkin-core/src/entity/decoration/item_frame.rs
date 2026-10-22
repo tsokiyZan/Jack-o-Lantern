@@ -273,6 +273,11 @@ impl ItemFrameEntity {
 }
 
 impl EntityBase for ItemFrameEntity {
+    /// Vanilla `BlockAttachedEntity.skipAttackInteraction`.
+    fn skip_attack_interaction(&self, source: &dyn EntityBase) -> bool {
+        super::block_attached_skip_attack_interaction(self, source)
+    }
+
     /// Vanilla `BlockAttachedEntity.isPickable`.
     fn can_hit(&self) -> bool {
         true

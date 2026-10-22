@@ -446,6 +446,15 @@ impl ArrowEntity {
 }
 
 impl EntityBase for ArrowEntity {
+    /// Vanilla `AbstractArrow.isAttackable`: only a `redirectable_projectile`, which no arrow
+    /// type is.
+    fn is_attackable(&self) -> bool {
+        pumpkin_data::tag::Taggable::has_tag(
+            self.get_entity().entity_type,
+            &pumpkin_data::tag::EntityType::MINECRAFT_REDIRECTABLE_PROJECTILE,
+        )
+    }
+
     /// Vanilla `AbstractArrow.getWeaponItem`: the weapon it was fired from.
     fn get_weapon_item(&self) -> Option<ItemStack> {
         Self::get_weapon_item(self)

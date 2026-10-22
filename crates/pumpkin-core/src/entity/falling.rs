@@ -134,6 +134,11 @@ impl FallingEntity {
 }
 
 impl EntityBase for FallingEntity {
+    /// Vanilla `FallingBlockEntity.isAttackable`.
+    fn is_attackable(&self) -> bool {
+        false
+    }
+
     /// Vanilla `isPickable`: not removed.
     fn can_hit(&self) -> bool {
         !self.get_entity().is_removed()

@@ -216,6 +216,11 @@ impl PaintingEntity {
 }
 
 impl EntityBase for PaintingEntity {
+    /// Vanilla `BlockAttachedEntity.skipAttackInteraction`.
+    fn skip_attack_interaction(&self, source: &dyn EntityBase) -> bool {
+        super::block_attached_skip_attack_interaction(self, source)
+    }
+
     fn write_custom_nbt(&self, nbt: &mut NbtCompound) {
         let index = self.entity.data.load(Ordering::Relaxed) as u8;
         let direction = BlockDirection::from_index(index).unwrap_or(BlockDirection::South);

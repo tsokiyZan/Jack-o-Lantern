@@ -83,6 +83,11 @@ impl LeashKnotEntity {
 use crate::server::Server;
 
 impl EntityBase for LeashKnotEntity {
+    /// Vanilla `BlockAttachedEntity.skipAttackInteraction`.
+    fn skip_attack_interaction(&self, source: &dyn EntityBase) -> bool {
+        super::block_attached_skip_attack_interaction(self, source)
+    }
+
     /// Vanilla `BlockAttachedEntity.isPickable`.
     fn can_hit(&self) -> bool {
         true

@@ -86,6 +86,11 @@ impl FireworkRocketEntity {
 }
 
 impl EntityBase for FireworkRocketEntity {
+    /// Vanilla `FireworkRocketEntity.isAttackable`.
+    fn is_attackable(&self) -> bool {
+        false
+    }
+
     fn get_projectile(&self) -> Option<&crate::entity::projectile::Projectile> {
         Some(&self.entity.projectile)
     }
