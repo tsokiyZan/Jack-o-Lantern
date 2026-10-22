@@ -1610,6 +1610,22 @@ impl LivingEntity {
             .apply_knockback(knockback_after_resistance(power, resistance), xd, zd);
     }
 
+    /// Vanilla `LivingEntity.getKnockback`: the `attack_knockback` attribute through the
+    /// weapon's enchantments, halved.
+    pub fn get_knockback(
+        &self,
+        caller: &dyn EntityBase,
+        world: &crate::world::World,
+        target: &dyn EntityBase,
+        damage_source: &DamageSource<'_>,
+    ) -> f32 {
+        let knockback = self.get_attribute_value(&Attributes::ATTACK_KNOCKBACK) as f32;
+        let weapon = caller
+            .get_weapon_item()
+            .unwrap_or_else(|| ItemStack::EMPTY.clone());
+        EnchantmentHelper::modify_knockback(world, &weapon, target, damage_source, knockback) / 2.0
+    }
+
     /// The `xd`/`zd` of vanilla `dealDefaultKnockback`: a projectile pushes along its own
     /// motion (fireworks and thrown potions from where they are), anything else from the
     /// damage source's position.

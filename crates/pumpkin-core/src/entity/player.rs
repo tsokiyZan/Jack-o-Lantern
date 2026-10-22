@@ -1393,6 +1393,62 @@ impl Player {
         }
     }
 
+    /// Vanilla `Player.causeExtraKnockback`: the target is pushed along this player's facing
+    /// and the player slows down; a hurt player target is sent its knocked-back motion while
+    /// the server keeps its old one.
+    pub fn cause_extra_knockback(
+        &self,
+        target: &dyn EntityBase,
+        knockback: f32,
+        old_movement: Vector3<f64>,
+        damage: f32,
+    ) {
+        let entity = &self.living_entity.entity;
+        if knockback > 0.0 {
+            // `Mth.sin(yRot * (float) (Math.PI / 180.0))`: the lookup table, in float.
+            let yaw = entity.yaw.load() * (std::f64::consts::PI / 180.0) as f32;
+            let sin = pumpkin_util::math::sin(yaw);
+            let cos = pumpkin_util::math::cos(yaw);
+            if let Some(target_living) = target.get_living_entity() {
+                if target
+                    .get_mob()
+                    .is_none_or(super::mob::Mob::takes_knockback)
+                {
+                    target_living.knockback(
+                        target,
+                        f64::from(knockback),
+                        f64::from(sin),
+                        f64::from(-cos),
+                        Some(self),
+                        damage,
+                        true,
+                    );
+                }
+            } else {
+                target.push_impulse(Vector3::new(
+                    f64::from(-sin * knockback),
+                    0.1,
+                    f64::from(cos * knockback),
+                ));
+            }
+            entity
+                .velocity
+                .store(entity.velocity.load().multiply(0.6, 1.0, 0.6));
+            self.set_sprinting(false);
+        }
+
+        // Bedrock players keep `sync_velocity` for the tracker to send.
+        if let Some(player) = target.get_player()
+            && matches!(player.client.as_ref(), ClientPlatform::Java(_))
+        {
+            let target_entity = target.get_entity();
+            if target_entity.sync_velocity.swap(false, Ordering::SeqCst) {
+                player.send_own_motion();
+                target_entity.velocity.store(old_movement);
+            }
+        }
+    }
+
     #[expect(clippy::too_many_lines)]
     pub fn attack(&self, victim: &Arc<dyn EntityBase>) {
         let world = self.world();
@@ -1423,7 +1479,7 @@ impl Player {
             direct: Some(self),
             causing: Some(self),
         };
-        // Vanilla `getEnchantedDamage` and `getKnockback`, against this target.
+        // Vanilla `getEnchantedDamage`, against this target.
         let extra_ench_damage = f64::from(
             EnchantmentHelper::modify_damage(
                 &world,
@@ -1433,13 +1489,6 @@ impl Player {
                 base_damage as f32,
             ) - base_damage as f32,
         );
-        let knockback_level = EnchantmentHelper::modify_knockback(
-            &world,
-            &item_stack,
-            victim.as_ref(),
-            &damage_source,
-            0.0,
-        ) as u32;
 
         let is_bedrock = matches!(self.client.as_ref(), ClientPlatform::Bedrock(_));
         let attack_cooldown_progress = if is_bedrock {
@@ -1486,6 +1535,7 @@ impl Player {
         let old_living_entity_health = victim
             .get_living_entity()
             .map_or(0.0, |living| living.health.load());
+        let old_movement = victim_entity.velocity.load();
         if !victim.damage_with_context(
             victim.as_ref(),
             total_damage as f32,
@@ -1506,27 +1556,26 @@ impl Player {
             self.trigger_advancement(crate::entity::player::advancement::trigger::AdvancementTrigger::DealtOverkillDamage);
         }
 
+        // `pvp.knockback` only turns off the extra knockback; the victim's own still syncs.
+        let knockback = if config.knockback {
+            self.living_entity
+                .get_knockback(self, &world, victim.as_ref(), &damage_source)
+                + if matches!(attack_type, AttackType::Knockback) {
+                    0.5
+                } else {
+                    0.0
+                }
+        } else {
+            0.0
+        };
+        self.cause_extra_knockback(
+            victim.as_ref(),
+            knockback,
+            old_movement,
+            total_damage as f32,
+        );
+
         if victim.get_living_entity().is_some() {
-            // Vanilla `Player.attack` adds `LivingEntity.getKnockback()` - the Knockback
-            // enchantment bonus, halved - plus 0.5 for a sprint attack, on top of the base
-            // knockback the victim's damage handling applies. A plain hit adds nothing.
-            // `handle_knockback` halves `strength`, so these are twice the vanilla amount.
-            let mut knockback_strength = f64::from(knockback_level);
-            if matches!(attack_type, AttackType::Knockback) {
-                knockback_strength += 1.0;
-            }
-            // Vanilla only pushes the victim when the extra knockback is non-zero;
-            // `Entity::knockback` halves the current velocity, so calling it with 0.0
-            // would still slow the victim down.
-            if config.knockback && knockback_strength > 0.0 {
-                combat::handle_knockback(
-                    attacker_entity,
-                    victim.as_ref(),
-                    knockback_strength,
-                    total_damage as f32,
-                    true,
-                );
-            }
             // Vanilla `doSweepAttack`, after the extra knockback. It reuses the attack's
             // damage source.
             if matches!(attack_type, AttackType::Sweeping) {

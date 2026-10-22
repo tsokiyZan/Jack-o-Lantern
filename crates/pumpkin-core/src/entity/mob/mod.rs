@@ -1075,7 +1075,7 @@ impl MobEntity {
         );
 
         if damaged {
-            let knockback = self.get_knockback(&world, &weapon, target, &damage_source);
+            let knockback = living.get_knockback(caller, &world, target, &damage_source);
             self.cause_extra_knockback(caller, target, knockback, damage);
             // TODO: `weaponItem.hurtEnemy`, whose only effect for a mob is the mace's smash
             // (`MaceItem.hurtEnemy`), which Pumpkin only ports for players.
@@ -1099,21 +1099,6 @@ impl MobEntity {
         // TODO: `postPiercingAttack` runs `EnchantmentHelper.doPostPiercingAttackEffects`,
         // which Pumpkin has no port of; no vanilla enchantment applies it to a melee hit.
         damaged
-    }
-
-    /// Vanilla `LivingEntity.getKnockback`: the `attack_knockback` attribute through the
-    /// weapon's enchantments, halved.
-    fn get_knockback(
-        &self,
-        world: &World,
-        weapon: &ItemStack,
-        target: &dyn EntityBase,
-        damage_source: &DamageSource<'_>,
-    ) -> f32 {
-        let knockback = self
-            .living_entity
-            .get_attribute_value(&Attributes::ATTACK_KNOCKBACK) as f32;
-        EnchantmentHelper::modify_knockback(world, weapon, target, damage_source, knockback) / 2.0
     }
 
     /// Vanilla `LivingEntity.causeExtraKnockback`: a living target is pushed along this mob's
