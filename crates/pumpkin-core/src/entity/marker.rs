@@ -49,7 +49,7 @@ impl EntityBase for MarkerEntity {
         false
     }
 
-    fn is_immune_to_explosion(&self) -> bool {
+    fn is_immune_to_explosion(&self, _explosion: &crate::world::explosion::Explosion) -> bool {
         true
     }
 

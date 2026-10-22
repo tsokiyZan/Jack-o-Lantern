@@ -2,6 +2,7 @@ use crate::entity::player::Player;
 use crate::entity::{Entity, EntityBase, leash, leashable, living::LivingEntity};
 use crate::item::interaction_result::InteractionResult;
 use crate::world::World;
+use pumpkin_data::damage::DamageType;
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::Sound;
@@ -112,6 +113,39 @@ impl EntityBase for LeashKnotEntity {
     /// Vanilla `BlockAttachedEntity.skipAttackInteraction`.
     fn skip_attack_interaction(&self, source: &dyn EntityBase) -> bool {
         super::block_attached_skip_attack_interaction(self, source)
+    }
+
+    /// Vanilla `BlockAttachedEntity.hurtServer`.
+    fn damage_with_context(
+        &self,
+        _caller: &dyn EntityBase,
+        _amount: f32,
+        damage_type: DamageType,
+        _position: Option<Vector3<f64>>,
+        _source: Option<&dyn EntityBase>,
+        cause: Option<&dyn EntityBase>,
+    ) -> bool {
+        super::block_attached_hurt_server(self, &damage_type, cause, |_| self.drop_item())
+    }
+
+    /// Vanilla `BlockAttachedEntity.kill(level)`: `kill(level, this)`.
+    fn kill(&self, _caller: &dyn EntityBase) {
+        super::block_attached_kill(self, None);
+    }
+
+    /// Vanilla `BlockAttachedEntity.ignoreExplosion`.
+    fn is_immune_to_explosion(&self, explosion: &crate::world::explosion::Explosion) -> bool {
+        super::block_attached_ignore_explosion(self, explosion)
+    }
+
+    /// Vanilla `BlockAttachedEntity.move`.
+    fn move_entity(&self, _caller: &dyn EntityBase, motion: Vector3<f64>) {
+        super::block_attached_moved(self, motion, |_| self.drop_item());
+    }
+
+    /// Vanilla `BlockAttachedEntity.push(x, y, z)`.
+    fn push_impulse(&self, impulse: Vector3<f64>) {
+        super::block_attached_moved(self, impulse, |_| self.drop_item());
     }
 
     /// Vanilla `BlockAttachedEntity.isPickable`.

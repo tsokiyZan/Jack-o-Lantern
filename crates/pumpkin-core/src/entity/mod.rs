@@ -376,8 +376,8 @@ pub trait EntityBase: Send + Sync + std::any::Any {
         true
     }
 
-    /// Whether the entity is immune from explosion knockback and damage
-    fn is_immune_to_explosion(&self) -> bool {
+    /// Vanilla `Entity.ignoreExplosion`: whether `explosion` neither hurts nor pushes this entity.
+    fn is_immune_to_explosion(&self, _explosion: &crate::world::explosion::Explosion) -> bool {
         false
     }
 

@@ -416,6 +416,32 @@ impl Explosion {
         self.indirect_source.clone()
     }
 
+    /// Vanilla `Explosion.getDirectSourceEntity`.
+    #[must_use]
+    pub fn direct_source_entity(&self) -> Option<&Arc<dyn EntityBase>> {
+        self.source.as_ref()
+    }
+
+    /// Vanilla `ServerExplosion.shouldAffectBlocklikeEntities`: not from a wind charge, and with
+    /// `mob_griefing` or a block interaction that affects block-like entities (`DESTROY*`).
+    #[must_use]
+    pub fn should_affect_blocklike_entities(&self, world: &World) -> bool {
+        let mob_griefing = world.level_info.load().game_rules.mob_griefing;
+        let is_not_wind_charge = self.source.as_ref().is_none_or(|source| {
+            let entity_type = source.get_entity().entity_type;
+            entity_type != &EntityType::BREEZE_WIND_CHARGE
+                && entity_type != &EntityType::WIND_CHARGE
+        });
+        if mob_griefing {
+            is_not_wind_charge
+        } else {
+            matches!(
+                self.block_interaction,
+                BlockInteraction::Destroy | BlockInteraction::DestroyWithDecay
+            ) && is_not_wind_charge
+        }
+    }
+
     /// Vanilla `ServerExplosion.getDamageSource`.
     #[must_use]
     pub const fn damage_source(&self) -> &ExplosionDamageSource {
@@ -575,7 +601,7 @@ impl Explosion {
             if Some(entity.entity_id) == source_id || entity_base.is_spectator() {
                 continue;
             }
-            if entity_base.is_immune_to_explosion() {
+            if entity_base.is_immune_to_explosion(self) {
                 continue;
             }
             let dist = entity
