@@ -155,6 +155,13 @@ impl CamelEntity {
         }
         let could_age_up = self.can_age_up();
         if could_age_up {
+            // `level.addParticle(HAPPY_VILLAGER, getRandomX(1.0), getRandomY() + 0.5, getRandomZ(1.0),
+            // ...)` does nothing on the server but its arguments still draw from the mob's random.
+            let _ = (
+                self.get_entity().get_random_x(1.0),
+                self.get_entity().get_random_y(),
+                self.get_entity().get_random_z(1.0),
+            );
             self.age_up(10, false);
         }
         if !could_heal && !could_set_in_love && !could_age_up {

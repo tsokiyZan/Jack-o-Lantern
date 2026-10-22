@@ -24,6 +24,8 @@ pub const FLAG_TAME: u8 = 2;
 pub const FLAG_EATING: u8 = 16;
 /// `AbstractHorse` data flag: standing (rearing).
 pub const FLAG_STANDING: u8 = 32;
+/// `AbstractHorse` data flag: mouth open.
+pub const FLAG_OPEN_MOUTH: u8 = 64;
 
 /// Vanilla `AbstractHorse`'s taming by riding and rearing, shared by horses, donkeys, mules,
 /// llamas and the undead horses.
@@ -34,6 +36,8 @@ pub trait AbstractHorse: Mob {
     fn set_horse_owner(&self, owner: Uuid);
     fn horse_temper(&self) -> &AtomicI32;
     fn stand_counter(&self) -> &AtomicI32;
+    /// Vanilla `mouthCounter`.
+    fn mouth_counter(&self) -> &AtomicI32;
     /// Vanilla `standAnim` and `standAnimO`, in that order.
     fn stand_anim(&self) -> &crossbeam::atomic::AtomicCell<[f32; 2]>;
     /// Vanilla `AbstractHorse.inventory`.
@@ -244,6 +248,17 @@ pub trait AbstractHorse: Mob {
 
     /// The standing countdown and the rearing animation from vanilla `AbstractHorse.tick`.
     fn tick_standing(&self) {
+        // `tick`: the mouth closes 30 ticks after `openMouth`.
+        let mouth = self.mouth_counter().load(Relaxed);
+        if mouth > 0 {
+            if mouth + 1 > 30 {
+                self.mouth_counter().store(0, Relaxed);
+                self.set_horse_flag(FLAG_OPEN_MOUTH, false);
+            } else {
+                self.mouth_counter().store(mouth + 1, Relaxed);
+            }
+        }
+
         let counter = self.stand_counter().load(Relaxed);
         if counter > 0 {
             self.stand_counter().store(counter - 1, Relaxed);
@@ -454,6 +469,13 @@ fn eat_heal_grow_temper<H: AbstractHorse + Animal + ?Sized>(
         && let Some(ageable) = horse.as_ageable()
         && !ageable.is_age_locked()
     {
+        // `level.addParticle(HAPPY_VILLAGER, getRandomX(1.0), getRandomY() + 0.5, getRandomZ(1.0),
+        // ...)` does nothing on the server but its arguments still draw from the mob's random.
+        let _ = (
+            horse.get_entity().get_random_x(1.0),
+            horse.get_entity().get_random_y(),
+            horse.get_entity().get_random_z(1.0),
+        );
         ageable.age_up(age_up, false);
         item_used = true;
     }
@@ -507,7 +529,9 @@ fn horse_handle_eating<H: AbstractHorse + Animal + ?Sized>(
     };
     let item_used = eat_heal_grow_temper(horse, item_used, heal, age_up, temper);
     if item_used {
-        // `eating`: `openMouth` (TODO: the mouth counter isn't ported) and the sound.
+        // `eating`: `openMouth`, then the sound.
+        horse.mouth_counter().store(1, Relaxed);
+        horse.set_horse_flag(FLAG_OPEN_MOUTH, true);
         play_horse_eating_sound(horse);
         let entity = horse.get_entity();
         entity.world.load().game_event_from(

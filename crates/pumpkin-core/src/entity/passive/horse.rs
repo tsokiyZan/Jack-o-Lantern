@@ -120,6 +120,7 @@ pub struct HorseEntity {
     pub owner: AtomicCell<Option<Uuid>>,
     /// Vanilla `AbstractHorse.standCounter`.
     pub stand_counter: AtomicI32,
+    pub mouth_counter: AtomicI32,
     /// Vanilla `AbstractHorse.standAnim` and `standAnimO`.
     pub stand_anim: crossbeam::atomic::AtomicCell<[f32; 2]>,
     pub inventory: MountInventory,
@@ -143,6 +144,7 @@ impl HorseEntity {
             gallop_sound_counter: AtomicI32::new(0),
             owner: AtomicCell::new(None),
             stand_counter: AtomicI32::new(0),
+            mouth_counter: AtomicI32::new(0),
             stand_anim: crossbeam::atomic::AtomicCell::new([0.0; 2]),
             inventory: MountInventory::default(),
         };
@@ -437,6 +439,10 @@ impl AbstractHorse for HorseEntity {
 
     fn stand_counter(&self) -> &AtomicI32 {
         &self.stand_counter
+    }
+
+    fn mouth_counter(&self) -> &AtomicI32 {
+        &self.mouth_counter
     }
 
     fn stand_anim(&self) -> &crossbeam::atomic::AtomicCell<[f32; 2]> {
