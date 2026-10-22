@@ -199,17 +199,25 @@ pub fn can_have_a_leash_attached_to(leashable: &dyn EntityBase, holder: &Entity)
     can_be_leashed(leashable)
 }
 
-/// `ClientboundSetEntityLinkPacket(entity, holder)` (and Bedrock's actor link) to the players
-/// tracking `entity`; `None` is the unlink.
-fn send_leash_link(entity: &Entity, holder_id: Option<i32>) {
+/// `ClientboundSetEntityLinkPacket(entity, holder)` and Bedrock's actor link; `None` is the
+/// unlink.
+#[must_use]
+pub fn leash_link_packets(
+    entity_id: i32,
+    holder_id: Option<i32>,
+) -> (
+    pumpkin_protocol::java::client::play::CSetEntityLink,
+    pumpkin_protocol::bedrock::client::CSetActorLink,
+) {
+    // `destEntity != null ? destEntity.getId() : 0`.
     let je_packet = pumpkin_protocol::java::client::play::CSetEntityLink::new(
-        entity.entity_id,
-        holder_id.unwrap_or(-1),
+        entity_id,
+        holder_id.unwrap_or(0),
         true,
     );
     let be_packet = pumpkin_protocol::bedrock::client::CSetActorLink {
         link: pumpkin_protocol::bedrock::client::common::ActorLink {
-            ridden_unique_id: VarLong(i64::from(entity.entity_id)),
+            ridden_unique_id: VarLong(i64::from(entity_id)),
             rider_unique_id: VarLong(i64::from(holder_id.unwrap_or(-1))),
             // 1 is the leash link, 0 the unlink.
             link_type: u8::from(holder_id.is_some()),
@@ -218,6 +226,12 @@ fn send_leash_link(entity: &Entity, holder_id: Option<i32>) {
             vehicle_angular_velocity: 0.0,
         },
     };
+    (je_packet, be_packet)
+}
+
+/// The leash link (`None`: the unlink) to the players tracking `entity`.
+fn send_leash_link(entity: &Entity, holder_id: Option<i32>) {
+    let (je_packet, be_packet) = leash_link_packets(entity.entity_id, holder_id);
     entity
         .world
         .load()
@@ -454,7 +468,7 @@ mod tests {
             v(0.0, 0.0, 1.0),
         )
         .expect("past slack");
-        assert_eq!(r.force.x.to_bits(), 0.600_000_023_841_857_9_f64.to_bits());
+        assert_eq!(r.force.x.to_bits(), 0.600_000_023_841_857_9f64.to_bits());
         assert_eq!(r.force.x.to_bits(), (2.0 * K).to_bits());
         // torque uses the unscaled displacement: 1.0 * 2.0
         assert_eq!(r.torque, 2.0);
@@ -481,9 +495,9 @@ mod tests {
         let lever = v(0.5, 0.0, 1.5);
         let r = compute_dampened_spring_interaction(pivot, obj, 6.0, v(0.0, 0.0, 0.0), lever)
             .expect("past slack");
-        assert_eq!(r.force.x.to_bits(), 0.163_216_776_510_724_17_f64.to_bits());
-        assert_eq!(r.force.y.to_bits(), 0.326_433_553_021_448_33_f64.to_bits());
-        assert_eq!(r.force.z.to_bits(), 0.342_755_230_672_520_7_f64.to_bits());
-        assert_eq!(r.torque.to_bits(), 0.244_825_155_037_608_6_f64.to_bits());
+        assert_eq!(r.force.x.to_bits(), 0.163_216_776_510_724_17f64.to_bits());
+        assert_eq!(r.force.y.to_bits(), 0.326_433_553_021_448_33f64.to_bits());
+        assert_eq!(r.force.z.to_bits(), 0.342_755_230_672_520_7f64.to_bits());
+        assert_eq!(r.torque.to_bits(), 0.244_825_155_037_608_6f64.to_bits());
     }
 }

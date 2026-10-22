@@ -814,7 +814,7 @@ impl EntityBase for MinecartEntity {
 
     fn damage_with_context(
         &self,
-        _caller: &dyn EntityBase,
+        caller: &dyn EntityBase,
         amount: f32,
         damage_type: DamageType,
         _position: Option<Vector3<f64>>,
@@ -893,7 +893,7 @@ impl EntityBase for MinecartEntity {
 
         let damaged = self
             .vehicle
-            .damage_with_context(amount, source, self.drop_item());
+            .damage_with_context(caller, amount, source, self.drop_item());
 
         if will_break && !creative && self.vehicle.entity.is_removed() {
             let world = self.vehicle.entity.world.load();

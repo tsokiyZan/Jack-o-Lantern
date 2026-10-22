@@ -5160,9 +5160,17 @@ impl Entity {
             Some(NbtTag::Compound(holder)) => holder.get_uuid("UUID").map(DelayedLeash::Holder),
             _ => None,
         };
-        // `if (getLeashData() != null && newLeashData == null) removeLeash()`.
         if leash.is_none() {
+            // `if (getLeashData() != null && newLeashData == null) removeLeash()`.
             leashable::drop_leash(caller, true, false);
+        } else {
+            // `setLeashData(newLeashData)` replaces the data outright: the current holder goes
+            // without an event, packet or notify, and the new data starts without momentum.
+            self.leashed_to
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .take();
+            self.leash_angular_momentum.store(0.0);
         }
         *self
             .delayed_leash
@@ -6732,13 +6740,14 @@ fn teleport_cross_dimension(
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .take();
 
-    // `removeAfterChangingDimensions`.
-    if entity.is_leashable() {
-        leashable::drop_leash(entity.as_ref(), true, false);
-    }
+    // `removeAfterChangingDimensions`: `setRemoved` first, then `removeLeash`. The entity is
+    // untracked by then, so the unlink reaches nobody, as in vanilla.
     old_world.remove_entity(entity.as_ref());
     base.removal_reason
         .store(Some(RemovalReason::ChangedDimension));
+    if entity.is_leashable() {
+        leashable::drop_leash(entity.as_ref(), true, false);
+    }
 
     new_base.velocity.store(base.velocity.load());
     new_base.yaw.store(base.yaw.load());

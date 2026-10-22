@@ -232,7 +232,7 @@ impl EntityBase for BoatEntity {
 
     fn damage_with_context(
         &self,
-        _caller: &dyn EntityBase,
+        caller: &dyn EntityBase,
         amount: f32,
         _damage_type: DamageType,
         _position: Option<Vector3<f64>>,
@@ -245,7 +245,8 @@ impl EntityBase for BoatEntity {
         ) else {
             return false;
         };
-        self.vehicle.damage_with_context(amount, source, drop_item)
+        self.vehicle
+            .damage_with_context(caller, amount, source, drop_item)
     }
 
     /// Vanilla `AbstractBoat.interact`: `Entity.interact`'s leashing first, then boarding.

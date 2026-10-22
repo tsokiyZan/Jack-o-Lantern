@@ -612,6 +612,28 @@ impl TrackedEntity {
                 client.try_enqueue_packet(data);
             }
         }
+
+        // Vanilla `ServerEntity.sendPairingData`: a leashed `Leashable` sends its link last.
+        if self.entity.is_leashable()
+            && let Some(holder) = crate::entity::leashable::leash_holder(self.entity.get_entity())
+        {
+            let (je_packet, be_packet) = crate::entity::leashable::leash_link_packets(
+                self.entity_id,
+                Some(holder.get_entity().entity_id),
+            );
+            match player.client.as_ref() {
+                ClientPlatform::Java(client) => {
+                    if let Ok(data) = client.serialize_packet(&je_packet) {
+                        client.try_enqueue_packet(data);
+                    }
+                }
+                ClientPlatform::Bedrock(client) => {
+                    if let Ok(data) = client.serialize_packet(&be_packet) {
+                        client.try_enqueue_packet(data);
+                    }
+                }
+            }
+        }
     }
 
     pub fn remove_pairing(&self, player: &Player) {

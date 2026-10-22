@@ -172,25 +172,18 @@ impl VehicleEntity {
     }
 
     /// `remove(KILLED)`: `AbstractBoat.remove` drops its leash first. Only boats among the
-    /// vehicles are `Leashable`, so a leashed vehicle is a boat.
-    fn remove_destroyed(&self) {
-        // `dropLeash()` on the boat, looked up as the `EntityBase` its hooks run on.
-        if self.entity.is_leashed()
-            && let Some(boat) = self
-                .entity
-                .world
-                .load()
-                .get_entity_by_id(self.entity.entity_id)
-        {
-            crate::entity::leashable::drop_leash(boat.as_ref(), true, true);
+    /// vehicles are `Leashable`, so a leashed vehicle is a boat. `caller` is this vehicle.
+    fn remove_destroyed(&self, caller: &dyn EntityBase) {
+        if self.entity.is_leashed() {
+            crate::entity::leashable::drop_leash(caller, true, true);
         }
         self.entity.remove();
     }
 
     /// Vanilla `VehicleEntity.destroy(level, dropItem)`: the vehicle dies and, with
     /// `entityDrops`, drops its item carrying its custom name.
-    pub fn destroy(&self, drop_item: &'static Item) {
-        self.remove_destroyed();
+    pub fn destroy(&self, caller: &dyn EntityBase, drop_item: &'static Item) {
+        self.remove_destroyed(caller);
         let world = self.entity.world.load();
         if world.level_info.load().game_rules.entity_drops {
             let mut stack = ItemStack::new(1, drop_item);
@@ -204,9 +197,11 @@ impl VehicleEntity {
         }
     }
 
-    /// Vanilla `VehicleEntity.hurtServer`; `drop_item` is the vehicle's `getDropItem`.
+    /// Vanilla `VehicleEntity.hurtServer`; `caller` is this vehicle, `drop_item` its
+    /// `getDropItem`.
     pub fn damage_with_context(
         &self,
+        caller: &dyn EntityBase,
         amount: f32,
         source: Option<&dyn EntityBase>,
         drop_item: &'static Item,
@@ -253,9 +248,9 @@ impl VehicleEntity {
             }
 
             if is_creative {
-                self.remove_destroyed();
+                self.remove_destroyed(caller);
             } else {
-                self.destroy(drop_item);
+                self.destroy(caller, drop_item);
             }
         }
 
