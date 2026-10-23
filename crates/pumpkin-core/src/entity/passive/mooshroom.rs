@@ -21,8 +21,10 @@ use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::codec::var_int::VarInt;
 use pumpkin_util::math::boundingbox::EntityDimensions;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 use uuid::Uuid;
 
+use crate::entity::r#type::from_type;
 use crate::entity::{
     Entity, EntityBase,
     ageable::{AgeableData, AgeableMob},
@@ -36,6 +38,7 @@ use crate::entity::{
     passive::animal::{Animal, set_animal_pathfinding_malus},
     player::Player,
 };
+use crate::world::World;
 
 const TEMPT_ITEMS: &[&Item] = &[&Item::WHEAT];
 
@@ -213,6 +216,49 @@ impl Animal for MooshroomEntity {
     fn is_food(&self, item_stack: &ItemStack) -> bool {
         item_stack.item.has_tag(&tag::Item::MINECRAFT_COW_FOOD)
             || TEMPT_ITEMS.iter().any(|i| i.id == item_stack.item.id)
+    }
+
+    /// Vanilla `MushroomCow.getBreedOffspring`.
+    fn get_breed_offspring(
+        &self,
+        world: &Arc<World>,
+        partner: &dyn EntityBase,
+    ) -> Option<Arc<dyn EntityBase>> {
+        let entity = self.get_entity();
+        let baby = from_type(
+            &EntityType::MOOSHROOM,
+            entity.pos.load(),
+            world,
+            Uuid::new_v4(),
+        );
+        let mate = partner.cast_any().downcast_ref::<Self>()?;
+        if let Some(new_mooshroom) = baby.cast_any().downcast_ref::<Self>() {
+            new_mooshroom.set_variant(offspring_variant(
+                self.get_variant(),
+                mate.get_variant(),
+                &mut *entity.random(),
+            ));
+        }
+        Some(baby)
+    }
+}
+
+/// Vanilla `MushroomCow.getOffspringVariant`: same-coloured parents roll a 1 in 1024 mutation
+/// first (the `&&` short-circuits), otherwise the baby takes either parent's colour.
+fn offspring_variant(
+    this: MooshroomVariant,
+    mate: MooshroomVariant,
+    random: &mut impl RandomImpl,
+) -> MooshroomVariant {
+    if this == mate && random.next_bounded_i32(1024) == 0 {
+        match this {
+            MooshroomVariant::Brown => MooshroomVariant::Red,
+            MooshroomVariant::Red => MooshroomVariant::Brown,
+        }
+    } else if random.next_bool() {
+        this
+    } else {
+        mate
     }
 }
 
@@ -491,4 +537,58 @@ fn flower_stew_effect(item: &Item) -> Option<(&'static str, i32)> {
         _ => return None,
     };
     Some(effect)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pumpkin_util::random::legacy_rand::LegacyRand;
+
+    #[test]
+    fn same_variant_draws_mutation_roll_first() {
+        let seed = (0..)
+            .find(|&s| LegacyRand::from_seed(s).next_bounded_i32(1024) != 0)
+            .unwrap();
+        let mut random = LegacyRand::from_seed(seed);
+        let mut twin = LegacyRand::from_seed(seed);
+        let baby = offspring_variant(
+            MooshroomVariant::Brown,
+            MooshroomVariant::Brown,
+            &mut random,
+        );
+        assert_ne!(twin.next_bounded_i32(1024), 0);
+        let _ = twin.next_bool();
+        assert_eq!(baby, MooshroomVariant::Brown);
+        assert_eq!(random.next_i32(), twin.next_i32());
+    }
+
+    #[test]
+    fn mixed_variants_skip_mutation_roll() {
+        for seed in 0..32 {
+            let mut random = LegacyRand::from_seed(seed);
+            let mut twin = LegacyRand::from_seed(seed);
+            let baby =
+                offspring_variant(MooshroomVariant::Red, MooshroomVariant::Brown, &mut random);
+            let expected = if twin.next_bool() {
+                MooshroomVariant::Red
+            } else {
+                MooshroomVariant::Brown
+            };
+            assert_eq!(baby, expected);
+            assert_eq!(random.next_i32(), twin.next_i32());
+        }
+    }
+
+    #[test]
+    fn mutation_flips_variant() {
+        let seed = (0..)
+            .find(|&s| LegacyRand::from_seed(s).next_bounded_i32(1024) == 0)
+            .unwrap();
+        let baby = offspring_variant(
+            MooshroomVariant::Red,
+            MooshroomVariant::Red,
+            &mut LegacyRand::from_seed(seed),
+        );
+        assert_eq!(baby, MooshroomVariant::Brown);
+    }
 }
