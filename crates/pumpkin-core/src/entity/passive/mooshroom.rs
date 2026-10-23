@@ -233,11 +233,12 @@ impl Animal for MooshroomEntity {
         );
         let mate = partner.cast_any().downcast_ref::<Self>()?;
         if let Some(new_mooshroom) = baby.cast_any().downcast_ref::<Self>() {
-            new_mooshroom.set_variant(offspring_variant(
+            let variant = offspring_variant(
                 self.get_variant(),
                 mate.get_variant(),
                 &mut *entity.random(),
-            ));
+            );
+            new_mooshroom.set_variant(variant);
         }
         Some(baby)
     }
