@@ -3478,6 +3478,14 @@ pub fn deserialize_bedrock_serverbound_packet(
                 layout_craft: p.layout_craft.0.try_into().unwrap(),
             }))
         }
+        id if id == <pumpkin_protocol::bedrock::server::SShowCredits as pumpkin_protocol::Packet>::PACKET_ID as i32 => {
+            use pumpkin_protocol::BServerPacket;
+            let p = <pumpkin_protocol::bedrock::server::SShowCredits as pumpkin_protocol::BServerPacket>::read(&mut Cursor::new(payload)).ok()?;
+            Some(BServerboundPacket::SShowCredits(crate::pumpkin::plugin::bedrock_packets::SShowCredits {
+                player_runtime_id: p.player_runtime_id.0.try_into().unwrap(),
+                credits_state: p.credits_state.0.try_into().unwrap(),
+            }))
+        }
         _ => None,
     }
 }

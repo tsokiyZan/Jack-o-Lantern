@@ -57,4 +57,5 @@ pub use resource_pack_client_response::*;
 pub use respawn::*;
 pub use set_local_player_as_initialized::*;
 pub use set_player_inventory_options::*;
+pub use show_credits::*;
 pub use text::*;

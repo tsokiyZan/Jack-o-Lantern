@@ -846,6 +846,14 @@ interface bedrock-packets {
     /// Layout style of the crafting section.
     layout-craft: s32,
   }
+  /// The client's side of the end-game credits: state 1 when the player has finished (or
+  /// skipped) them.
+  record s-show-credits {
+    /// Runtime entity identifier of the player viewing the credits.
+    player-runtime-id: s64,
+    /// 0: credits started, 1: credits finished.
+    credits-state: s32,
+  }
   /// Transmits in-game chat messages, system alerts, popups, and raw JSON text between client and server.
   record s-text {
     /// Whether translation is requested for localization strings in the message.
@@ -2427,6 +2435,9 @@ interface bedrock-packets {
     s-set-local-player-as-initialized(s-set-local-player-as-initialized),
     /// Sent by the client to sync inventory UI layout options and selected crafting tabs.
     s-set-player-inventory-options(s-set-player-inventory-options),
+    /// The client's side of the end-game credits: state 1 when the player has finished (or
+    /// skipped) them.
+    s-show-credits(s-show-credits),
     /// Transmits in-game chat messages, system alerts, popups, and raw JSON text between client and server.
     s-text(s-text),
     unknown,

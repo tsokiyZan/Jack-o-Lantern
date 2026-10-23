@@ -2269,6 +2269,7 @@ interface java-packets {
     /// WARNING: Could not fully translate type `& 'a [pumpkin_data :: tag :: RegistryKey]` to WIT
     tags: list<inexpressible-host-type>,
   }
+  /// Vanilla `ClientboundTrackedWaypointPacket.Operation`, written as its ordinal.
   enum waypoint-operation {
     track,
     untrack,
@@ -2279,22 +2280,26 @@ interface java-packets {
     x: s32,
     z: s32,
   }
+  /// Vanilla `TrackedWaypoint` and its `Type` (`EMPTY` 0, `VEC3I` 1, `CHUNK` 2, `AZIMUTH` 3).
   variant waypoint-target {
-    position(tuple<s32, s32, s32>),
+    empty,
+    vec3i(tuple<s32, s32, s32>),
     chunk(waypoint-target-chunk),
     azimuth(f32),
-    empty,
   }
+  /// Vanilla `Waypoint.Icon` on the wire: the style's identifier, then an optional RGB colour
+  /// as three bytes (`ByteBufCodecs.RGB_COLOR`).
   record waypoint-icon {
-    style: option<string>,
-    color: s32,
+    style: string,
+    color: option<s32>,
   }
+  /// Vanilla `TrackedWaypoint`; the server only ever sends the UUID side of the identifier.
   record tracked-waypoint {
     identifier: uuid,
-    icon: option<waypoint-icon>,
+    icon: waypoint-icon,
     target: waypoint-target,
   }
-  /// Syncs tracked waypoints (`ClientboundTrackedWaypointPacket`) to client.
+  /// Syncs tracked waypoints (`ClientboundTrackedWaypointPacket`) to the client.
   record c-waypoint {
     operation: waypoint-operation,
     waypoint: tracked-waypoint,
@@ -2885,7 +2890,7 @@ interface java-packets {
     /// This packet is the primary way to manage scoreboard data. In the latest protocol,
     /// it also supports optional custom formatting for how the numeric score is displayed.
     c-update-score(c-update-score),
-    /// Syncs tracked waypoints (`ClientboundTrackedWaypointPacket`) to client.
+    /// Syncs tracked waypoints (`ClientboundTrackedWaypointPacket`) to the client.
     c-waypoint(c-waypoint),
     /// Sent by the server to trigger a specific sound or particle effect at a world location.
     /// 
