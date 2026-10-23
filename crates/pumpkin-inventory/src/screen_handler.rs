@@ -133,6 +133,13 @@ pub trait InventoryPlayer: Send + Sync {
         self.drop_item(item, false);
     }
 
+    /// Vanilla `dropOrPlaceInInventory`'s `isRemoved() && getRemovalReason() !=
+    /// CHANGED_DIMENSION`: a player removed from its level (killed at its 20th death tick, say)
+    /// gets nothing back into its inventory; a returned stack drops at it instead.
+    fn is_removed_not_changing_dimension(&self) -> bool {
+        false
+    }
+
     /// Gets the player's inventory.
     fn get_inventory(&self) -> Arc<PlayerInventory>;
 
@@ -236,7 +243,14 @@ pub trait InventoryPlayer: Send + Sync {
 /// Tries to insert the stack into the player's inventory first,
 /// and drops it in the world if there's no room.
 pub fn offer_or_drop_stack(player: &dyn InventoryPlayer, stack: ItemStack) {
-    // TODO: Super weird disconnect logic in vanilla, investigate this later
+    // Vanilla `AbstractContainerMenu.dropOrPlaceInInventory`. TODO: its `hasDisconnected()`
+    // half (a disconnecting player's returned stacks drop too).
+    if player.is_removed_not_changing_dimension() {
+        if !stack.is_empty() {
+            player.drop_item_server_only(stack);
+        }
+        return;
+    }
     player.get_inventory().offer_or_drop_stack(stack, player);
 }
 

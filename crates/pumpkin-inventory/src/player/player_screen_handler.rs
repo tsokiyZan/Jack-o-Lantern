@@ -243,3 +243,125 @@ impl ScreenHandler for PlayerScreenHandler {
         ItemStack::EMPTY.clone()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::entity_equipment::EntityEquipment;
+    use pumpkin_data::item::Item;
+    use pumpkin_protocol::java::client::play::{
+        CSetContainerContent, CSetContainerProperty, CSetContainerSlot, CSetCursorItem,
+        CSetPlayerInventory, CSetSelectedSlot,
+    };
+    use std::sync::Mutex;
+
+    struct TestPlayer {
+        inventory: Arc<PlayerInventory>,
+        removed: bool,
+        dropped: Mutex<Vec<ItemStack>>,
+    }
+
+    impl InventoryPlayer for TestPlayer {
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
+        fn drop_item(&self, item: ItemStack, _thrown_from_hand: bool) {
+            self.dropped.lock().unwrap().push(item);
+        }
+        fn is_removed_not_changing_dimension(&self) -> bool {
+            self.removed
+        }
+        fn get_inventory(&self) -> Arc<PlayerInventory> {
+            self.inventory.clone()
+        }
+        fn has_infinite_materials(&self) -> bool {
+            false
+        }
+        fn is_creative(&self) -> bool {
+            false
+        }
+        fn experience_level(&self) -> i32 {
+            0
+        }
+        fn add_experience_levels(&self, _levels: i32) {}
+        fn enchantment_seed(&self) -> i32 {
+            0
+        }
+        fn set_enchantment_seed(&self, _seed: i32) {}
+        fn enqueue_inventory_packet(
+            &self,
+            _packet: &CSetContainerContent,
+            _window_type: Option<WindowType>,
+        ) {
+        }
+        fn enqueue_slot_packet(
+            &self,
+            _packet: &CSetContainerSlot,
+            _window_type: Option<WindowType>,
+            _total_slots: usize,
+        ) {
+        }
+        fn enqueue_cursor_packet(&self, _packet: &CSetCursorItem) {}
+        fn enqueue_property_packet(&self, _packet: &CSetContainerProperty) {}
+        fn enqueue_slot_set_packet(&self, _packet: &CSetPlayerInventory) {}
+        fn enqueue_set_held_item_packet(&self, _packet: &CSetSelectedSlot) {}
+        fn enqueue_equipment_change(&self, _slot: &EquipmentSlot, _stack: &ItemStack) {}
+        fn award_experience(&self, _amount: i32) {}
+        fn increment_stat(
+            &self,
+            _category: pumpkin_data::statistic::StatisticCategory,
+            _stat_id: i32,
+            _amount: i32,
+        ) {
+        }
+        fn play_block_sound(&self, _sound: pumpkin_data::sound::Sound, _pitch: f32) {}
+    }
+
+    /// Vanilla `InventoryMenu.removed` through `dropOrPlaceInInventory`: the carried stack and
+    /// the 2x2 grid go back into the inventory, except for a player removed from its level
+    /// (killed at its 20th death tick), whose stacks drop at it.
+    #[test]
+    fn closing_drops_carried_and_grid_only_for_a_removed_player() {
+        for removed in [false, true] {
+            let inventory = Arc::new(PlayerInventory::new(
+                Arc::new(std::sync::Mutex::new(EntityEquipment::new())),
+                Arc::new(rustc_hash::FxHashMap::default()),
+            ));
+            let player = TestPlayer {
+                inventory: inventory.clone(),
+                removed,
+                dropped: Mutex::new(Vec::new()),
+            };
+            let mut handler = PlayerScreenHandler::new(&inventory, None, 0, None);
+            handler
+                .crafting_inventory
+                .set_stack(1, ItemStack::new(3, &Item::OAK_PLANKS));
+            *handler.get_behaviour().cursor_stack.lock().unwrap() = ItemStack::new(5, &Item::STICK);
+            handler.on_closed(&player);
+
+            let dropped = player.dropped.lock().unwrap();
+            let in_inventory = (0..inventory.size())
+                .filter(|&i| !inventory.get_stack(i).is_empty())
+                .count();
+            if removed {
+                assert_eq!(dropped.len(), 2, "carried stack and grid dropped");
+                assert_eq!(in_inventory, 0);
+            } else {
+                assert!(dropped.is_empty());
+                assert_eq!(
+                    in_inventory, 2,
+                    "carried stack and grid back in the inventory"
+                );
+            }
+            assert!(
+                handler
+                    .get_behaviour()
+                    .cursor_stack
+                    .lock()
+                    .unwrap()
+                    .is_empty()
+            );
+            assert!(handler.crafting_inventory.get_stack(1).is_empty());
+        }
+    }
+}

@@ -5509,6 +5509,24 @@ impl Player {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clear();
         self.remove_from_level(&world, crate::entity::RemovalReason::Killed);
+        // `Player.remove`'s menu half: `inventoryMenu.removed` drops the carried stack and the
+        // 2x2 crafting grid at the corpse (the player is removed, not changing dimension), then
+        // an open container closes (`doCloseContainer`: `removed`, the shared slots back).
+        self.player_screen_handler
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .on_closed(self.as_ref());
+        let container_open = !Arc::ptr_eq(
+            &(self.player_screen_handler.clone() as Arc<std::sync::Mutex<dyn ScreenHandler>>),
+            &self
+                .current_screen_handler
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .clone(),
+        );
+        if container_open {
+            self.on_handled_screen_closed();
+        }
     }
 
     /// Vanilla `ServerLevel.removePlayerImmediately(player, reason)` (`CHANGED_DIMENSION` for
@@ -9258,6 +9276,14 @@ impl InventoryPlayer for Player {
 
     fn drop_item_server_only(&self, item: ItemStack) {
         self.drop_from_hand(item, false, true);
+    }
+
+    fn is_removed_not_changing_dimension(&self) -> bool {
+        self.living_entity
+            .entity
+            .removal_reason
+            .load()
+            .is_some_and(|reason| reason != crate::entity::RemovalReason::ChangedDimension)
     }
 
     fn has_infinite_materials(&self) -> bool {
