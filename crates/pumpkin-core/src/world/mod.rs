@@ -2090,6 +2090,12 @@ impl World {
     /// so they tick as in `tick`, and the players then move (`ServerPlayer.doTick`, from the
     /// connection, which the freeze doesn't stop either).
     pub fn tick_frozen(self: &Arc<Self>, server: &Arc<Server>) {
+        let time_of_day = self
+            .level_time
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .time_of_day;
+        self.tick_sleep(time_of_day);
         let handle = server.runtime.clone();
         let players = self.players.load();
         let players_cache = Self::player_collision_cache(&players);
@@ -2578,19 +2584,17 @@ impl World {
             level_time.time_of_day
         };
 
-        let (should_reset_weather, weather_cycle_enabled) = {
-            let mut weather = self
-                .weather
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            weather.tick_weather(self);
-            (
-                weather.raining || weather.thundering,
-                weather.weather_cycle_enabled,
-            )
-        };
+        self.weather
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .tick_weather(self);
 
-        // Vanilla `ServerLevel.tick`: enough players asleep, and enough of them long enough.
+        self.tick_sleep(time_of_day);
+    }
+
+    /// Vanilla `ServerLevel.tick`'s night skip: enough players asleep, and enough of them long
+    /// enough. It sits outside the `runsNormally` blocks, so a frozen level runs it too.
+    fn tick_sleep(&self, time_of_day: i64) {
         let percentage = self
             .level_info
             .load()
@@ -2610,11 +2614,11 @@ impl World {
             }
             self.wake_up_all_players();
 
-            if weather_cycle_enabled && should_reset_weather {
-                let mut weather = self
-                    .weather
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let mut weather = self
+                .weather
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            if weather.weather_cycle_enabled && (weather.raining || weather.thundering) {
                 weather.reset_weather_cycle(self);
             }
         }
@@ -4879,6 +4883,15 @@ impl World {
         let from_credits = player.won_game.load(Ordering::SeqCst);
 
         let server = self.server.upgrade();
+        // In no level: back from the credits, or dead for 20 ticks (`tickDeath`'s
+        // `remove(KILLED)`). The level takes it back below, as `addRespawnedPlayer`.
+        let in_no_level = from_credits
+            || server.as_ref().is_some_and(|s| {
+                s.levelless_players
+                    .load()
+                    .iter()
+                    .any(|p| p.gameprofile.id == player.gameprofile.id)
+            });
         let keep_inventory = server.as_ref().map_or_else(
             || self.level_info.load().game_rules.keep_inventory,
             |s| {
@@ -4975,15 +4988,15 @@ impl World {
 
                         // Detach from the old world before publishing into the new one, so no
                         // observer sees the player in a world whose chunk manager doesn't match.
-                        // A player back from the End credits left its level already.
-                        // It joins the new level's players once placed, below.
-                        if !from_credits {
+                        // A player in no level (the End credits, dead for 20 ticks) left its
+                        // level already. It joins the new level's players once placed, below.
+                        if !in_no_level {
                             self.remove_player(player, false).await;
                             player.unload_watched_chunks(self).await;
                         }
                         player.change_world_chunks(&self.level, &destination);
                         player.living_entity.entity.set_world(destination.clone());
-                        if !from_credits {
+                        if !in_no_level {
                             destination.players.rcu(|current_list| {
                                 let mut new_list = (**current_list).clone();
                                 new_list.push(player.clone());
@@ -5019,10 +5032,11 @@ impl World {
         // `PlayerList.respawn`'s `removePlayerImmediately` for a player that stays in this
         // level: `onTrackingEnd` (out of `players`, the waypoint manager and the sleeping
         // list); `addRespawnedPlayer` puts it back below. The tracker entry is swapped by
-        // `respawn_entity`. A player back from the credits left its level already, and one
-        // changing level left it at the `PlayerChangeWorldEvent` above.
+        // `respawn_entity`. A player in no level (back from the credits, or dead for 20 ticks)
+        // left its level already, and one changing level left it at the
+        // `PlayerChangeWorldEvent` above.
         let same_level = target_world.uuid == self.uuid;
-        if same_level && !from_credits {
+        if same_level && !in_no_level {
             let mut removed = false;
             self.players.rcu(|current| {
                 let mut list = (**current).clone();
@@ -5031,9 +5045,7 @@ impl World {
                 removed = list.len() != before;
                 list
             });
-            // A player dead for 20 ticks already went through them (`tickDeath`'s
-            // `remove(KILLED)`); vanilla's `removePlayerImmediately` then does nothing.
-            if removed && player.living_entity.death_time.load(Ordering::Relaxed) < 20 {
+            if removed {
                 self.on_player_tracking_end(player);
             }
         }
@@ -5145,8 +5157,8 @@ impl World {
 
         // The level takes the player back (`level.addRespawnedPlayer`) once it stands at its
         // respawn position (`snapTo`); only then is it out of the credits, so no level ticks it
-        // where it left (the End exit portal) meanwhile.
-        if from_credits {
+        // where it left (the End exit portal, its corpse) meanwhile.
+        if in_no_level {
             if !target_world
                 .players
                 .load()
@@ -5163,6 +5175,8 @@ impl World {
                 server.take_levelless_player(player.gameprofile.id);
             }
             player.living_entity.entity.removal_reason.store(None);
+        }
+        if from_credits {
             player.won_game.store(false, Ordering::SeqCst);
             player.ending_credits.store(false, Ordering::SeqCst);
         }
@@ -5173,7 +5187,7 @@ impl World {
         // `addRespawnedPlayer`'s `onTrackingStart`: `players.add`, the waypoint manager, then
         // the sleeping list.
         if same_level {
-            if !from_credits
+            if !in_no_level
                 && !target_world
                     .players
                     .load()
@@ -5185,6 +5199,12 @@ impl World {
                     new_list.push(player.clone());
                     new_list
                 });
+            }
+            // `ChunkMap.addEntity`'s `updatePlayerStatus(player, true)`: a player that left the
+            // level gets its chunk view back before it is tracked and before the waypoint
+            // manager connects it (a block connection needs the source's chunk in view).
+            if in_no_level {
+                crate::world::chunker::update_chunk_tracking(player);
             }
             // Clients never remove a dead entity themselves, so viewers would keep the corpse.
             target_world
@@ -5199,9 +5219,9 @@ impl World {
                 .entity_tracker
                 .repair_respawned_player(player, &target_world);
         }
-        // A player changing level without the credits had its sleeping list updated when it
-        // joined the new level's players, above.
-        if same_level || from_credits {
+        // A player changing level from a level had its sleeping list updated when it joined
+        // the new level's players, above.
+        if same_level || in_no_level {
             target_world.update_sleeping_player_list();
         }
         // Vanilla respawns a fresh `ServerPlayer` with an empty `lastEquipmentItems`: after

@@ -5430,7 +5430,10 @@ impl Player {
     /// (`PERFORM_RESPAWN`).
     pub fn show_end_credits(self: &Arc<Self>) {
         self.un_ride();
-        self.remove_from_level(&self.world());
+        self.remove_from_level(
+            &self.world(),
+            crate::entity::RemovalReason::ChangedDimension,
+        );
         if !self.won_game.load(Ordering::SeqCst) {
             self.won_game.store(true, Ordering::SeqCst);
             self.try_enqueue_packet_editioned(
@@ -5483,11 +5486,41 @@ impl Player {
         });
     }
 
-    /// Vanilla `ServerLevel.removePlayerImmediately(player, CHANGED_DIMENSION)`: the player is
-    /// marked removed and leaves the level's players, entity tracking (`ChunkMap.removeEntity`)
-    /// and chunk map (its tickets dropped, its chunks forgotten), and the server holds it in
-    /// no level ([`Server::levelless_players`]).
-    fn remove_from_level(self: &Arc<Self>, world: &Arc<World>) {
+    /// Vanilla `LivingEntity.tickDeath` at `deathTime` 20 for a player: the POOF event (60) to
+    /// its trackers and itself, then `remove(KILLED)`, whose `triggerOnDeathMobEffects` runs
+    /// and clears its effects and whose `onTrackingEnd` takes it out of the level (see
+    /// [`Self::remove_from_level`]). Until it respawns it is a `PlayerList` player in no
+    /// level: chat and server-wide lookups still reach it, level queries (the sleep vote, the
+    /// waypoints, mob targeting, broadcasts to the level) don't. A disconnect takes it off the
+    /// level-less list (`World::remove_player`), and the respawn puts it back in a level.
+    pub fn remove_killed(self: &Arc<Self>) {
+        let world = self.world();
+        let entity = &self.living_entity.entity;
+        if entity.is_removed() {
+            return;
+        }
+        world.send_entity_status(entity, EntityStatus::Poof, None);
+        self.living_entity.trigger_on_death_mob_effects();
+        // `Entity.setRemoved` for a destroying reason: `stopRiding`, and the passengers off.
+        self.un_ride();
+        self.living_entity
+            .active_effects
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clear();
+        self.remove_from_level(&world, crate::entity::RemovalReason::Killed);
+    }
+
+    /// Vanilla `ServerLevel.removePlayerImmediately(player, reason)` (`CHANGED_DIMENSION` for
+    /// the End credits, `KILLED` at a player's 20th death tick): the player is marked removed
+    /// and leaves the level's players, entity tracking (`ChunkMap.removeEntity`) and chunk map
+    /// (its tickets dropped, its chunks forgotten), and the server holds it in no level
+    /// ([`Server::levelless_players`]).
+    fn remove_from_level(
+        self: &Arc<Self>,
+        world: &Arc<World>,
+        reason: crate::entity::RemovalReason,
+    ) {
         // The two lists are separate `ArcSwap`s, so the move can't be one atomic step. The
         // player joins the level-less list first: a lookup in between sees it twice at worst,
         // never not at all. A disconnect racing this takes it off both lists
@@ -5512,9 +5545,7 @@ impl Player {
             return;
         }
         let entity = &self.living_entity.entity;
-        entity
-            .removal_reason
-            .store(Some(crate::entity::RemovalReason::ChangedDimension));
+        entity.removal_reason.store(Some(reason));
         world
             .entity_tracker
             .remove_entity(self.as_ref() as &dyn EntityBase, world);

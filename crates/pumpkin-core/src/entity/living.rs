@@ -5654,16 +5654,18 @@ impl EntityBase for LivingEntity {
                     .load()
                     .despawn_dead_java_player_for_bedrock(&self.entity);
             }
-            // Players remain part of the world until their client requests a
-            // respawn. Removing one here breaks reconnecting while dead.
-            // Vanilla `tickDeath` removes the player here (`remove(KILLED)`), and its
-            // `onTrackingEnd` takes it out of the waypoint manager (`removePlayer`, its own
-            // waypoint untracked) and the sleeping list; those hooks run now, and the respawn
-            // only runs them for a player that respawned sooner.
+            // Vanilla `tickDeath` removes the player here (`remove(KILLED)`): it leaves the
+            // level (its players, tracking, chunks, the waypoint manager and the sleeping
+            // list) and waits in no level until its client asks to respawn.
             if time == 20
                 && let Some(player) = caller.get_player()
+                && let Some(player) = self
+                    .entity
+                    .world
+                    .load()
+                    .get_player_by_uuid(player.gameprofile.id)
             {
-                self.entity.world.load().on_player_tracking_end(player);
+                player.remove_killed();
             }
         }
     }

@@ -49,8 +49,10 @@ pub fn update_position(player: &Arc<Player>) {
     }
 }
 
+/// Vanilla `ChunkMap.updateChunkTracking` (with the move's re-pairing): the player's chunk view
+/// follows its position.
 #[allow(clippy::too_many_lines)]
-fn update_chunk_tracking(player: &Arc<Player>) {
+pub(crate) fn update_chunk_tracking(player: &Arc<Player>) {
     let entity = &player.get_entity();
     let new_chunk_center = entity.chunk_pos.load();
     let old_cylindrical = player.watched_section.load();
