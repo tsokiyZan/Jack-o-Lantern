@@ -727,19 +727,27 @@ pub fn check_spawn_rules(
             && can_monster_spawn;
     }
     if id == EntityType::GUARDIAN.id || id == EntityType::ELDER_GUARDIAN.id {
+        // Vanilla `Guardian.checkGuardianSpawnRules`: the random draw comes first, on every call.
+        if random.next_bounded_i32(20) != 0 && !world.can_see_sky_from_below_water(pos) {
+            return false;
+        }
         if world.level_info.load().difficulty == pumpkin_util::Difficulty::Peaceful {
             return false;
         }
-        if !world
-            .get_fluid(&pos.down())
-            .has_tag(&pumpkin_data::tag::Fluid::MINECRAFT_WATER)
-            || !world
+        if !reason.is_spawner()
+            && !world
                 .get_fluid(pos)
                 .has_tag(&pumpkin_data::tag::Fluid::MINECRAFT_WATER)
         {
             return false;
         }
-        return random.next_bounded_i32(20) == 0 || !world.can_see_sky(pos);
+        if !world
+            .get_fluid(&pos.down())
+            .has_tag(&pumpkin_data::tag::Fluid::MINECRAFT_WATER)
+        {
+            return false;
+        }
+        return true;
     }
 
     // Generic mob spawn rules (Iron Golem, Snow Golem, Villager, Phantom, Shulker, Wandering Trader, Ender Dragon, etc.)

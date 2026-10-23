@@ -6923,6 +6923,27 @@ impl World {
         self.is_within_build_height(position) && sky_light >= MAX_LIGHT_LEVEL
     }
 
+    /// Vanilla `LevelReader.canSeeSkyFromBelowWater`.
+    #[must_use]
+    pub fn can_see_sky_from_below_water(&self, pos: &BlockPos) -> bool {
+        if pos.0.y >= self.sea_level {
+            return self.can_see_sky(pos);
+        }
+        let scan_point = BlockPos(Vector3::new(pos.0.x, self.sea_level, pos.0.z));
+        if !self.can_see_sky(&scan_point) {
+            return false;
+        }
+        let mut current = scan_point.down();
+        while current.0.y > pos.0.y {
+            let state = self.get_block_state(&current);
+            if state.opacity > 0 && !state.is_liquid() {
+                return false;
+            }
+            current = current.down();
+        }
+        true
+    }
+
     const fn is_within_build_height(&self, position: &BlockPos) -> bool {
         position.0.y >= self.dimension.min_y
             && position.0.y < self.dimension.min_y + self.dimension.height
