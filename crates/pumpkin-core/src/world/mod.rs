@@ -5031,7 +5031,9 @@ impl World {
                 removed = list.len() != before;
                 list
             });
-            if removed {
+            // A player dead for 20 ticks already went through them (`tickDeath`'s
+            // `remove(KILLED)`); vanilla's `removePlayerImmediately` then does nothing.
+            if removed && player.living_entity.death_time.load(Ordering::Relaxed) < 20 {
                 self.on_player_tracking_end(player);
             }
         }

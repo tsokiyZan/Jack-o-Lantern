@@ -3851,6 +3851,10 @@ impl LivingEntity {
     /// death path's (`reset_state`), after the respawn's awaits.
     pub fn reset_fresh_entity_state(&self) {
         self.entity.reset_state();
+        // A new entity's `firstTick`: until its first tick, the respawned player's waypoint
+        // makes no connection (`makeWaypointConnectionWith`), so `addRespawnedPlayer`'s
+        // `onTrackingStart` doesn't show it to anyone; its first move after that tick does.
+        self.entity.first_tick.store(true, Relaxed);
         self.entity.portal_cooldown.store(0, Relaxed);
         self.entity.fall_distance.store(0.0);
         self.entity.fire_ticks.store(0, Relaxed);
@@ -5652,6 +5656,15 @@ impl EntityBase for LivingEntity {
             }
             // Players remain part of the world until their client requests a
             // respawn. Removing one here breaks reconnecting while dead.
+            // Vanilla `tickDeath` removes the player here (`remove(KILLED)`), and its
+            // `onTrackingEnd` takes it out of the waypoint manager (`removePlayer`, its own
+            // waypoint untracked) and the sleeping list; those hooks run now, and the respawn
+            // only runs them for a player that respawned sooner.
+            if time == 20
+                && let Some(player) = caller.get_player()
+            {
+                self.entity.world.load().on_player_tracking_end(player);
+            }
         }
     }
 
