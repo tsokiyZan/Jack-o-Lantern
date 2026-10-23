@@ -434,8 +434,25 @@ impl Server {
 
         server.worlds.store(Arc::new(worlds_vec));
 
-        for world in server.worlds.load().iter() {
-            world.prepare_forced_chunks().await;
+        // Vanilla `MinecraftServer.prepareLevels`: every level's saved tickets are reactivated,
+        // then the server waits a tick (10 ms) at a time until no tracked chunk is pending.
+        // No per-chunk listener: readiness is polled, so no load can finish unseen.
+        let worlds = server.worlds.load();
+        let forced: Vec<_> = worlds.iter().map(World::activate_forced_tickets).collect();
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            let pending: usize = worlds
+                .iter()
+                .zip(&forced)
+                .map(|(world, forced)| world.forced_chunks_pending(forced))
+                .sum();
+            if pending == 0 {
+                break;
+            }
+        }
+        // The chunks just loaded start ticking with the next update.
+        for world in worlds.iter() {
+            world.update_active_chunks();
         }
 
         info!("All worlds loaded successfully.");

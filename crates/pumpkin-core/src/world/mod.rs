@@ -581,22 +581,27 @@ impl World {
         portal::block_on_tick(self.level.get_or_fetch_chunk(pos, |_| ()));
     }
 
-    /// Vanilla `MinecraftServer.prepareLevels` for the saved FORCED tickets: reactivates them
-    /// and waits until their chunks are loaded.
-    pub async fn prepare_forced_chunks(self: &Arc<Self>) {
+    /// Vanilla `MinecraftServer.prepareLevels`' `chunkLoadCounter.track` for this level:
+    /// `activateAllDeactivatedTickets` reactivates the saved FORCED tickets, which starts their
+    /// chunks loading. Returns the chunks to wait for ([`World::forced_chunks_pending`]).
+    pub fn activate_forced_tickets(self: &Arc<Self>) -> Vec<Vector2<i32>> {
         self.update_active_chunks();
-        let forced: Vec<Vector2<i32>> = self
-            .forced_chunks
+        self.forced_chunks
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .iter()
             .copied()
-            .collect();
-        for pos in forced {
-            self.level.get_or_fetch_chunk(pos, |_| ()).await;
-        }
-        // The chunks just loaded start ticking with the next update.
-        self.update_active_chunks();
+            .collect()
+    }
+
+    /// `ChunkLoadCounter.pendingChunks` for this level: the forced chunks not loaded yet.
+    /// Readiness is read from the loaded map, as vanilla reads the holders' futures, so a chunk
+    /// that finishes at any moment is seen on the next poll.
+    pub fn forced_chunks_pending(&self, forced: &[Vector2<i32>]) -> usize {
+        forced
+            .iter()
+            .filter(|pos| !self.level.is_chunk_loaded(pos))
+            .count()
     }
 
     pub fn update_active_chunks(self: &Arc<Self>) {
