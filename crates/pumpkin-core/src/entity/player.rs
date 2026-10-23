@@ -5518,6 +5518,8 @@ impl Player {
         world
             .entity_tracker
             .remove_entity(self.as_ref() as &dyn EntityBase, world);
+        // `onTrackingEnd`'s player part: the waypoint manager and the sleeping list.
+        world.on_player_tracking_end(self);
 
         // `updatePlayerStatus(player, false)`: tickets dropped, every tracked chunk forgotten.
         self.clean_up_chunk_tickets(&world.level);

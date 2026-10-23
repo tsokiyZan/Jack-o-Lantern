@@ -5016,6 +5016,26 @@ impl World {
             |new_world| (new_world.clone(), position, yaw, pitch),
         );
 
+        // `PlayerList.respawn`'s `removePlayerImmediately` for a player that stays in this
+        // level: `onTrackingEnd` (out of `players`, the waypoint manager and the sleeping
+        // list); `addRespawnedPlayer` puts it back below. The tracker entry is swapped by
+        // `respawn_entity`. A player back from the credits left its level already, and one
+        // changing level left it at the `PlayerChangeWorldEvent` above.
+        let same_level = target_world.uuid == self.uuid;
+        if same_level && !from_credits {
+            let mut removed = false;
+            self.players.rcu(|current| {
+                let mut list = (**current).clone();
+                let before = list.len();
+                list.retain(|p| p.gameprofile.id != player.gameprofile.id);
+                removed = list.len() != before;
+                list
+            });
+            if removed {
+                self.on_player_tracking_end(player);
+            }
+        }
+
         // Vanilla respawns a fresh `ServerPlayer`: standing, no fall, fire, speed or portal
         // cooldown (sent in `CRespawn`) whatever `restoreFrom` keeps.
         player.living_entity.reset_fresh_entity_state();
@@ -5148,16 +5168,39 @@ impl World {
         // TODO: difficulty
 
         // Registered after positioning; a same-dimension respawn keeps its client entities.
-        if target_world.uuid == self.uuid {
+        // `addRespawnedPlayer`'s `onTrackingStart`: `players.add`, the waypoint manager, then
+        // the sleeping list.
+        if same_level {
+            if !from_credits
+                && !target_world
+                    .players
+                    .load()
+                    .iter()
+                    .any(|p| p.gameprofile.id == player.gameprofile.id)
+            {
+                target_world.players.rcu(|current_list| {
+                    let mut new_list = (**current_list).clone();
+                    new_list.push(player.clone());
+                    new_list
+                });
+            }
             // Clients never remove a dead entity themselves, so viewers would keep the corpse.
             target_world
                 .entity_tracker
                 .respawn_entity(&(player.clone() as Arc<dyn EntityBase>), &target_world);
+            target_world
+                .waypoint_manager
+                .on_player_tracking_start(player);
         } else {
             target_world.add_arriving_player(player);
             target_world
                 .entity_tracker
                 .repair_respawned_player(player, &target_world);
+        }
+        // A player changing level without the credits had its sleeping list updated when it
+        // joined the new level's players, above.
+        if same_level || from_credits {
+            target_world.update_sleeping_player_list();
         }
         // Vanilla respawns a fresh `ServerPlayer` with an empty `lastEquipmentItems`: after
         // `CRespawn` and the re-add, the next tick sends its equipment and modifiers again.
@@ -5770,6 +5813,13 @@ impl World {
         )
     }
 
+    /// The player part of vanilla `ServerLevel.EntityCallbacks.onTrackingEnd`, after
+    /// `players.remove`: the waypoint manager's `removePlayer`, then the sleeping list.
+    pub fn on_player_tracking_end(&self, player: &Player) {
+        self.waypoint_manager.remove_player(player);
+        self.update_sleeping_player_list();
+    }
+
     /// Publishes a player from another world -> tab list first, Java drops spawns without it.
     pub fn add_arriving_player(&self, player: &Arc<Player>) {
         let id = player.gameprofile.id;
@@ -5885,10 +5935,7 @@ impl World {
         if let Some(ref player) = removed_player {
             self.entity_tracker
                 .remove_entity(player.as_ref() as &dyn EntityBase, self);
-            // `onTrackingEnd`: `players.remove`, the waypoint manager's `removePlayer`, then
-            // the sleeping list.
-            self.waypoint_manager.remove_player(player);
-            self.update_sleeping_player_list();
+            self.on_player_tracking_end(player);
             let uuid = player.gameprofile.id;
             let entity_id = player.entity_id();
 
