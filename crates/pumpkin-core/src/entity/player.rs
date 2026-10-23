@@ -1321,10 +1321,14 @@ impl Player {
             self.on_handled_screen_closed();
         }
 
-        // Vanilla `ServerPlayer.disconnect` first: the player's own passengers get off, so
-        // the file doesn't carry them. (Its `stopSleepInBed` comes with master's sleeping
-        // model at the merge.)
+        // Vanilla `ServerPlayer.disconnect` first: the player's own passengers get off, and a
+        // sleeper wakes (`stopSleepInBed(true, false)`), so the file carries neither the
+        // passengers nor `SleepingX/Y/Z` and the bed `Pos`. `World::remove_player`'s own wake
+        // is then a no-op for a disconnect.
         self.living_entity.entity.eject_passengers();
+        if self.is_sleeping() {
+            self.stop_sleep_in_bed(true, false);
+        }
         // Vanilla `PlayerList.remove`: the stat, the player file (still riding, so `Pos` is
         // the seat and `RootVehicle` the stack), then the mount.
         self.stats
@@ -1342,9 +1346,9 @@ impl Player {
         // Vanilla `PlayerList.remove`: `removePlayerImmediately(player, UNLOADED_WITH_PLAYER)`.
         // Set here, not in `World::remove_player`, which a change of world and a respawn also
         // use for a player that stays. Entities leashed to the player see it gone and drop
-        // their lead on their next `tickLeash`. Pumpkin keeps the vehicle in its chunk (see
-        // `remove_passenger_on_disconnect`), so vanilla's mark on the root vehicle's stack
-        // has no counterpart here.
+        // their lead on their next `tickLeash`. Set after `remove_mount_on_disconnect`, which
+        // already marked the root vehicle's stack `UNLOADED_WITH_PLAYER` (vanilla
+        // `removePlayerImmediately` after `unRide`).
         self.living_entity
             .entity
             .set_removed_reason(crate::entity::RemovalReason::UnloadedWithPlayer);
