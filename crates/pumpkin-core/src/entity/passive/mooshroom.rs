@@ -221,6 +221,31 @@ const BABY_DIMENSIONS: EntityDimensions =
     pumpkin_data::entity_dimensions::MUSHROOM_COW_BABY_DIMENSIONS;
 
 impl Mob for MooshroomEntity {
+    /// Vanilla `MushroomCow.thunderHit`: a new bolt swaps the variant (a bolt strikes on several
+    /// ticks), with no damage or fire from `super`.
+    fn mob_on_lightning_strike(
+        &self,
+        caller: &dyn EntityBase,
+        lightning: &crate::entity::lightning::LightningBoltEntity,
+    ) {
+        let bolt_uuid = lightning.get_entity().entity_uuid;
+        if self.last_lightning_bolt_uuid.load() != Some(bolt_uuid) {
+            self.set_variant(match self.get_variant() {
+                MooshroomVariant::Red => MooshroomVariant::Brown,
+                MooshroomVariant::Brown => MooshroomVariant::Red,
+            });
+            self.last_lightning_bolt_uuid.store(Some(bolt_uuid));
+            caller.play_sound_at_self(Sound::EntityMooshroomConvert, 2.0, 1.0);
+        }
+    }
+
+    /// Vanilla `MushroomCow.applyImplicitComponent` for `MOOSHROOM_VARIANT`.
+    fn mob_set_variant_name(&self, name: &str) {
+        self.set_variant(MooshroomVariant::from_name(
+            name.strip_prefix("minecraft:").unwrap_or(name),
+        ));
+    }
+
     /// Vanilla `MushroomCow.getWalkTargetValue`.
     fn get_walk_target_value(&self, pos: &pumpkin_util::math::position::BlockPos) -> f32 {
         let world = self.get_entity().world.load();
