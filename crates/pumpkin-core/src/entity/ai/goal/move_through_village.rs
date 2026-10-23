@@ -4,6 +4,7 @@ use pumpkin_util::math::vector3::Vector3;
 use super::{Controls, Goal};
 use crate::block::blocks::doors::DoorBlock;
 use crate::entity::ai::pathfinder::path::Path;
+use crate::entity::ai::util::goal_utils::has_ground_path_navigation;
 use crate::entity::ai::util::{default_random_pos, land_random_pos};
 use crate::entity::mob::Mob;
 
@@ -85,7 +86,7 @@ fn block_corner(pos: BlockPos) -> Vector3<f64> {
 impl Goal for MoveThroughVillageGoal {
     fn can_start(&mut self, mob: &dyn Mob) -> bool {
         let mob_entity = mob.get_mob_entity();
-        if !mob_entity.with_navigation(|navigation, _| navigation.can_navigate_ground()) {
+        if !has_ground_path_navigation(mob) {
             return false;
         }
 

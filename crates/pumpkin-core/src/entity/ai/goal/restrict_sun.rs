@@ -1,5 +1,6 @@
 use super::{Controls, Goal};
 use crate::entity::EquipmentSlot;
+use crate::entity::ai::util::goal_utils::has_ground_path_navigation;
 use crate::entity::mob::Mob;
 
 /// Vanilla `RestrictSunGoal`: while the sun is up and the mob has nothing on its head, its
@@ -11,11 +12,6 @@ impl RestrictSunGoal {
     #[must_use]
     pub const fn new() -> Self {
         Self
-    }
-
-    fn has_ground_path_navigation(mob: &dyn Mob) -> bool {
-        mob.get_mob_entity()
-            .with_navigation(|navigation, _| navigation.can_navigate_ground())
     }
 
     fn set_avoid_sun(mob: &dyn Mob, avoid_sun: bool) {
@@ -38,7 +34,7 @@ impl Goal for RestrictSunGoal {
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
                 .get(&EquipmentSlot::HEAD)
                 .is_empty()
-            && Self::has_ground_path_navigation(mob)
+            && has_ground_path_navigation(mob)
     }
 
     fn should_continue(&mut self, mob: &dyn Mob) -> bool {

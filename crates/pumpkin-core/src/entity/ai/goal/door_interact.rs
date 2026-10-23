@@ -4,6 +4,7 @@ use std::sync::atomic::Ordering;
 
 use super::{Controls, Goal};
 use crate::block::blocks::doors::DoorBlock;
+use crate::entity::ai::util::goal_utils::has_ground_path_navigation;
 use crate::entity::mob::Mob;
 
 pub struct DoorInteractGoal {
@@ -56,6 +57,10 @@ impl DoorInteractGoal {
     }
 
     pub fn can_use(&mut self, mob: &dyn Mob) -> bool {
+        if !has_ground_path_navigation(mob) {
+            return false;
+        }
+
         if !mob
             .get_entity()
             .horizontal_collision
@@ -148,5 +153,54 @@ impl Goal for DoorInteractGoal {
 
     fn controls(&self) -> Controls {
         Controls::empty()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::DoorInteractGoal;
+    use crate::entity::ai::pathfinder::Navigator;
+    use crate::entity::ai::pathfinder::node::Node;
+    use crate::entity::ai::pathfinder::path::Path;
+    use pumpkin_data::Block;
+    use pumpkin_data::entity::EntityType;
+    use pumpkin_util::math::position::BlockPos;
+    use pumpkin_util::math::vector2::Vector2;
+    use pumpkin_util::math::vector3::Vector3;
+    use pumpkin_world::chunk::ChunkData;
+    use std::sync::atomic::Ordering;
+
+    /// Vanilla `DoorInteractGoal.canUse` starts with `GoalUtils.hasGroundPathNavigation`: a
+    /// zombie bumping into a door on its path is refused once its navigation isn't a ground one
+    /// (a flying vehicle's, say).
+    #[tokio::test]
+    async fn can_use_needs_ground_navigation() {
+        let (_folder, world) = crate::world::test_support::test_world();
+        let chunk = ChunkData::empty_sync(0, 0);
+        chunk.set_block_absolute_y(0, 101, 0, Block::OAK_DOOR.default_state.id);
+        world.level.loaded_chunks.insert(Vector2::new(0, 0), chunk);
+        for (navigation, expected) in [(Navigator::ground(), true), (Navigator::flying(), false)] {
+            let zombie = crate::entity::r#type::from_type(
+                &EntityType::ZOMBIE,
+                Vector3::new(0.5, 100.0, 0.5),
+                &world,
+                uuid::Uuid::new_v4(),
+            );
+            let mob = zombie.get_mob().unwrap();
+            let mob_entity = mob.get_mob_entity();
+            mob_entity.set_own_navigation(navigation);
+            let nodes = vec![
+                Node::new(BlockPos::new(0, 100, 0)),
+                Node::new(BlockPos::new(0, 100, 5)),
+            ];
+            let path = Path::new(nodes, BlockPos::new(0, 100, 5), true);
+            mob_entity
+                .own_navigation()
+                .move_to_path(Some(path), 1.0, &mob_entity.living_entity);
+            mob.get_entity()
+                .horizontal_collision
+                .store(true, Ordering::Relaxed);
+            assert_eq!(DoorInteractGoal::new().can_use(mob), expected);
+        }
     }
 }

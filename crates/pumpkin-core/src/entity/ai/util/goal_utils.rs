@@ -86,6 +86,14 @@ pub fn get_entities_of_class(
         .collect()
 }
 
+/// Vanilla `GoalUtils.hasGroundPathNavigation`: `getNavigation()`, so a steered vehicle's.
+/// Takes that navigation's lock: never call it inside a `with_navigation` closure.
+#[must_use]
+pub fn has_ground_path_navigation(mob: &dyn Mob) -> bool {
+    mob.get_mob_entity()
+        .with_navigation(|navigation, _| navigation.can_navigate_ground())
+}
+
 #[must_use]
 pub fn mob_restricted(mob: &dyn Mob, horizontal_dist: f64) -> bool {
     let mob_entity = mob.get_mob_entity();
