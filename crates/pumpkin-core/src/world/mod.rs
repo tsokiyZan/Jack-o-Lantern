@@ -6113,24 +6113,6 @@ impl World {
                 .get_entity()
                 .add_passenger_without_event(vehicle.clone(), rider);
         }
-        // A converted mob's rider is already in the world, so it is only mounted, by
-        // `rootPassenger.startRiding(to)`: `canRide` (not sneaking, no boarding cooldown) and
-        // `canAddPassenger` (no passenger yet), with the game event.
-        if let Some(rider) = mob.get_mob_entity().take_pending_existing_rider() {
-            let rider_entity = rider.get_entity();
-            if !rider_entity.is_removed()
-                && !rider_entity.is_sneaking()
-                && rider_entity.riding_cooldown.load(Ordering::Relaxed) <= 0
-                && vehicle
-                    .get_entity()
-                    .passengers
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .is_empty()
-            {
-                vehicle.get_entity().add_passenger(vehicle.clone(), rider);
-            }
-        }
         // `to.startRiding(vehicle, false, false)` in a conversion, or `finalizeSpawn`'s.
         if let Some(mount) = mob.get_mob_entity().take_pending_vehicle()
             && !mount.get_entity().is_removed()

@@ -144,8 +144,6 @@ pub struct MobEntity {
     /// which compares against the base value the navigation was built with instead.
     applied_follow_range: AtomicCell<f64>,
     pending_riders: std::sync::Mutex<Vec<Arc<dyn EntityBase>>>,
-    /// A converted mob's rider, already in the world (`ConversionType.SINGLE`'s root passenger).
-    pending_existing_rider: std::sync::Mutex<Option<Arc<dyn EntityBase>>>,
     pending_vehicle: std::sync::Mutex<Option<Arc<dyn EntityBase>>>,
     mob_flags: AtomicU8,
 }
@@ -388,7 +386,6 @@ impl MobEntity {
             death_loot_table_seed: AtomicI64::new(0),
             applied_follow_range: AtomicCell::new(f64::NAN),
             pending_riders: std::sync::Mutex::new(Vec::new()),
-            pending_existing_rider: std::sync::Mutex::new(None),
             pending_vehicle: std::sync::Mutex::new(None),
             mob_flags: AtomicU8::new(0),
         }

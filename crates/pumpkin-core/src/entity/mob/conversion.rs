@@ -154,7 +154,7 @@ pub fn convert_to(
         Uuid::new_v4(),
     );
     let to = converted.get_mob()?;
-    convert_single_type(from, to, params);
+    convert_single_type(from, &converted, to, params);
     after_conversion(to);
     world.spawn_entity(converted.clone());
     old_entity.remove();
@@ -162,7 +162,12 @@ pub fn convert_to(
 }
 
 /// Vanilla `ConversionType.SINGLE.convert`.
-fn convert_single_type(from: &dyn Mob, to: &dyn Mob, params: &ConversionParams) {
+fn convert_single_type(
+    from: &dyn Mob,
+    converted: &Arc<dyn EntityBase>,
+    to: &dyn Mob,
+    params: &ConversionParams,
+) {
     let (old, new) = (from.get_mob_entity(), to.get_mob_entity());
     let (old_living, new_living) = (&old.living_entity, &new.living_entity);
     let (old_entity, new_entity) = (&old_living.entity, &new_living.entity);
@@ -187,8 +192,22 @@ fn convert_single_type(from: &dyn Mob, to: &dyn Mob, params: &ConversionParams) 
             new_entity.remove_passenger(passenger.get_entity().entity_id);
             passenger.get_entity().remove();
         }
-        // `rootPassenger.startRiding(to)`, once `to` is in the world.
-        new.add_pending_existing_rider(rider);
+        // `rootPassenger.startRiding(to)`, before `to` is in the world: `canRide` (not
+        // sneaking, no boarding cooldown) and `canAddPassenger` (no passenger yet), with the
+        // game event. A riding player gets `startRiding`'s packets now, and `to`'s spawn
+        // pairing then carries its passenger list, as `addFreshEntity` after the mount does.
+        let rider_entity = rider.get_entity();
+        if !rider_entity.is_removed()
+            && !rider_entity.is_sneaking()
+            && rider_entity.riding_cooldown.load(Relaxed) <= 0
+            && new_entity
+                .passengers
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .is_empty()
+        {
+            new_entity.add_passenger(converted.clone(), rider);
+        }
     }
     if let Some(vehicle) = old_entity.get_vehicle() {
         vehicle.get_entity().remove_passenger(old_entity.entity_id);
