@@ -81,6 +81,8 @@ pub struct TrackedEntity {
     bedrock_pos: AtomicCell<Vector3<f64>>,
     /// Packed pitch, yaw, head yaw.
     bedrock_rot: AtomicCell<[u8; 3]>,
+    /// Vanilla `ServerEntity.lastPassengers`: the passenger ids last sent to the watchers.
+    last_passengers: std::sync::Mutex<Vec<i32>>,
 }
 
 impl TrackedEntity {
@@ -127,12 +129,39 @@ impl TrackedEntity {
             was_riding: AtomicBool::new(false),
             bedrock_pos: AtomicCell::new(bedrock_pos),
             bedrock_rot: AtomicCell::new(rot),
+            last_passengers: std::sync::Mutex::new(Vec::new()),
         }
     }
 
     #[must_use]
     pub fn has_bedrock_watchers(&self) -> bool {
         self.bedrock_watchers.load(Relaxed) > 0
+    }
+
+    /// The start of vanilla `ServerEntity.sendChanges`, for every entity: a changed passenger
+    /// list goes to everyone watching it.
+    pub fn send_passengers(&self, world: &World) {
+        let passengers: Vec<i32> = self
+            .entity
+            .get_entity()
+            .passengers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .iter()
+            .map(|passenger| passenger.get_entity().entity_id)
+            .collect();
+        let mut last = self
+            .last_passengers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if *last != passengers {
+            let ids: Vec<VarInt> = passengers.iter().copied().map(VarInt).collect();
+            self.send_to_tracking_players(
+                &CSetPassengers::new(VarInt(self.entity_id), &ids),
+                world,
+            );
+            *last = passengers;
+        }
     }
 
     /// Vanilla `ServerEntity.sendChanges`. Non-player entities only.
@@ -489,7 +518,6 @@ impl TrackedEntity {
     #[allow(clippy::too_many_lines)]
     pub fn add_pairing(&self, player: &Arc<Player>) {
         player.client.try_enqueue_spawn_packet(&self.entity);
-        player.try_restore_vehicle(&self.entity);
 
         if let Some(target_player) = self.entity.get_player() {
             let skin_parts = target_player.config.load().skin_parts;
@@ -997,6 +1025,9 @@ impl EntityTracker {
         }
     }
 
+    /// Vanilla `ChunkMap.tick`'s entity part: per entity, a section change re-pairs it with
+    /// every player, then its `sendChanges`; players that changed section are re-paired with
+    /// every entity only after all of them sent.
     pub fn update_all(&self, world: &World) {
         let players = world.players.load();
         let mut moved_players = Vec::new();
@@ -1019,24 +1050,22 @@ impl EntityTracker {
                 }
                 tracked.last_section_pos.store(new_pos);
             }
+
+            // Vanilla `ServerEntity.sendChanges` starts with `updateDataBeforeSync`.
+            if let Some(living) = tracked.entity.get_living_entity() {
+                living.update_dirty_effects();
+            }
+            tracked.send_passengers(world);
+            if tracked.entity.get_player().is_none() {
+                tracked.send_changes(world);
+            } else if tracked.entity.get_entity().synched_data.is_dirty() {
+                tracked.entity.get_entity().send_dirty_entity_data();
+            }
         }
 
         if !moved_players.is_empty() {
             for entry in &self.entity_map {
                 entry.value().update_players(&moved_players, world);
-            }
-        }
-
-        for entry in &self.entity_map {
-            let tracked = entry.value();
-            // Vanilla `ServerEntity.sendChanges` starts with `updateDataBeforeSync`.
-            if let Some(living) = tracked.entity.get_living_entity() {
-                living.update_dirty_effects();
-            }
-            if tracked.entity.get_player().is_none() {
-                tracked.send_changes(world);
-            } else if tracked.entity.get_entity().synched_data.is_dirty() {
-                tracked.entity.get_entity().send_dirty_entity_data();
             }
         }
     }

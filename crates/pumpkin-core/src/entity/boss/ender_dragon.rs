@@ -941,6 +941,11 @@ impl EnderDragonEntity {
 }
 
 impl Mob for EnderDragonEntity {
+    /// Vanilla `EnderDragon.canUsePortal`.
+    fn can_use_portal(&self) -> bool {
+        false
+    }
+
     /// Vanilla `EnderDragon.isPickable`: only its parts are.
     fn is_pickable(&self) -> bool {
         false

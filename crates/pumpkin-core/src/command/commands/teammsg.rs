@@ -46,10 +46,10 @@ impl CommandExecutor for TeamMsgCommandExecutor {
 
         let team_display_name = team.formatted_display_name();
 
-        let online_players = world.players.load();
+        // Vanilla `PlayerList.getPlayers()`: every online player, in any level or none.
         let mut recipients = 0;
 
-        for player in online_players.iter() {
+        context.source.server().for_each_player(|player| {
             if team.players.contains(&player.gameprofile.name) {
                 let msg = if player.gameprofile.name == sender_name {
                     TextComponent::translate_cross(
@@ -76,7 +76,7 @@ impl CommandExecutor for TeamMsgCommandExecutor {
                 player.send_system_message(&msg);
                 recipients += 1;
             }
-        }
+        });
 
         Ok(recipients)
     }

@@ -290,7 +290,8 @@ impl CommandExecutor for SpreadPlayersExecutor {
         for (index, target) in targets.iter().enumerate() {
             let pile = piles[index % pile_count];
             let y = surface_ys[index % pile_count];
-            target.teleport(
+            crate::entity::command_teleport(
+                target.as_ref(),
                 Vector3::new(pile.x.floor() + 0.5, f64::from(y), pile.z.floor() + 0.5),
                 None,
                 None,

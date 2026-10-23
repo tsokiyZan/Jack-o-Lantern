@@ -3,12 +3,14 @@ pub mod statistics;
 
 use crate::enchantment::EnchantmentHelper;
 use crate::enchantment::HurtAndBreak;
+use crate::entity::TeleportTarget;
 use crate::entity::damage_source::DamageSource;
 use crate::entity::movement_emission::MovementEmission;
 use crate::item::interaction_result::{InteractionResult, SwingSource};
 use crate::item::item_stack_hurt_enemy;
 use crate::item::items::mace::MaceItem;
 use core::f32;
+use pumpkin_protocol::PositionFlag;
 use std::collections::{HashMap, VecDeque};
 use std::f64::consts::TAU;
 use std::num::NonZero;
@@ -54,7 +56,7 @@ use pumpkin_util::translation::Locale;
 use pumpkin_util::version::JavaMinecraftVersion;
 use pumpkin_world::chunk::ChunkData;
 use tokio::task::JoinHandle;
-use tracing::{debug, warn};
+use tracing::{debug, error, warn};
 use uuid::Uuid;
 
 #[derive(Clone, Debug)]
@@ -278,10 +280,10 @@ use pumpkin_protocol::java::client::play::{
     COpenBook, COpenScreen, COpenSignEditor, CParticle, CPlayServerLinks, CPlayerAbilities,
     CPlayerInfoUpdate, CPlayerPosition, CPlayerSpawnPosition, CRespawn, CSetCamera,
     CSetContainerContent, CSetContainerProperty, CSetContainerSlot, CSetCursorItem, CSetExperience,
-    CSetHealth, CSetPlayerInventory, CSetSelectedSlot, CSoundEffect, CStopSound, CSubtitle,
-    CSystemChatMessage, CTabList, CTitleAnimation, CTitleText, CUnloadChunk, CUpdateMobEffect,
-    CUpdateTime, GameEvent, MapIcon, MapPatch, PlayerAction, PlayerInfoFlags, PlayerSpawnData,
-    PreviousMessage, Statistic,
+    CSetHealth, CSetPassengers, CSetPlayerInventory, CSetSelectedSlot, CSoundEffect, CStopSound,
+    CSubtitle, CSystemChatMessage, CTabList, CTitleAnimation, CTitleText, CUnloadChunk,
+    CUpdateMobEffect, CUpdateTime, GameEvent, MapIcon, MapPatch, PlayerAction, PlayerInfoFlags,
+    PlayerSpawnData, PreviousMessage, Statistic,
 };
 use pumpkin_protocol::java::server::play::{
     SClickSlot, SContainerButtonClick, SRenameItem, SlotActionType,
@@ -329,23 +331,16 @@ use pumpkin_data::potion::Effect;
 const MAX_CACHED_SIGNATURES: u8 = 128; // Vanilla: 128
 const MAX_PREVIOUS_MESSAGES: u8 = 20; // Vanilla: 20
 
-fn write_root_vehicle(nbt: &mut NbtCompound, uuid: Uuid) {
-    let value = uuid.as_u128();
+/// Vanilla `saveParentVehicle`'s tag: `RootVehicle { Attach: <vehicle UUID>, Entity: <root> }`.
+fn write_root_vehicle(nbt: &mut NbtCompound, attach: Uuid, entity: NbtCompound) {
     let mut root_vehicle = NbtCompound::new();
-    root_vehicle.put(
-        "Attach",
-        NbtTag::IntArray(vec![
-            (value >> 96) as i32,
-            (value >> 64) as i32,
-            (value >> 32) as i32,
-            value as i32,
-        ]),
-    );
+    root_vehicle.put_uuid("Attach", attach);
+    root_vehicle.put_compound("Entity", entity);
     nbt.put("RootVehicle", NbtTag::Compound(root_vehicle));
 }
 
-fn read_root_vehicle(nbt: &NbtCompound) -> Option<Uuid> {
-    let root_vehicle = nbt.get_compound("RootVehicle")?;
+/// `RootVehicle.Attach` (`UUIDUtil.CODEC`: an int array, or a list of four ints).
+fn read_root_vehicle_attach(root_vehicle: &NbtCompound) -> Option<Uuid> {
     let uuid = if let Some([most, more, less, least]) = root_vehicle.get_int_array("Attach") {
         [*most, *more, *less, *least]
     } else {
@@ -423,6 +418,23 @@ pub enum SpamType {
     Command,
 }
 
+/// A player passenger's remount after its vehicle changed dimension.
+///
+/// Vanilla `teleportCrossDimension`'s `newPassenger.startRiding(newEntity, true, false)`. The
+/// player's dimension change is async in Pumpkin, so the new vehicle and the arrived player
+/// meet here, whichever comes first.
+#[derive(Default)]
+pub enum PassengerRemount {
+    #[default]
+    Idle,
+    /// The player is changing dimension as a passenger; its new vehicle isn't made yet.
+    Travelling,
+    /// The new vehicle exists; mount it once the player arrives.
+    VehicleReady(Arc<dyn EntityBase>),
+    /// The player arrived first; the vehicle mounts it when it is added.
+    Arrived,
+}
+
 /// What vanilla `ServerGamePacketListenerImpl` remembers to check the vehicle a player steers.
 #[derive(Default)]
 pub struct SteeredVehicle {
@@ -495,6 +507,8 @@ pub struct Player {
     /// The pending teleport information, including the teleport ID and target location.
     pub awaiting_teleport: Mutex<Option<(VarInt, Vector3<f64>)>>,
     pub steered_vehicle: Mutex<SteeredVehicle>,
+    /// The vehicle a passenger boards again after a change of dimension.
+    pub passenger_remount: std::sync::Mutex<PassengerRemount>,
     /// The coordinates of the chunk section the player is currently watching.
     pub watched_section: AtomicCell<Cylindrical>,
     /// The last time the player performed an action (for idle timeout).
@@ -545,7 +559,13 @@ pub struct Player {
     pub held_chunk_tickets: Mutex<Option<HeldChunkTickets>>,
     pub chunk_send_epoch: AtomicU32,
     pub has_played_before: AtomicBool,
-    root_vehicle_uuid: AtomicCell<Option<Uuid>>,
+    /// The player file's `RootVehicle` between loading and `load_and_spawn_parent_vehicle`,
+    /// so a save in between still carries it.
+    saved_root_vehicle: std::sync::Mutex<Option<NbtCompound>>,
+    /// Set by an arrival or respawn: the entities in the centre chunk (sent out of band
+    /// before the teleport) are paired with the player on its next tick
+    /// (`World::pair_center_chunk`).
+    pub pending_center_pairing: AtomicBool,
     pub chat_session: Arc<Mutex<ChatSession>>,
     pub signature_cache: Mutex<MessageCache>,
     pub player_screen_handler: Arc<std::sync::Mutex<PlayerScreenHandler>>,
@@ -572,6 +592,11 @@ pub struct Player {
     pub fishing_bobber: AtomicI32,
     pub bedrock_skin: arc_swap::ArcSwap<pumpkin_protocol::bedrock::client::Skin>,
     pub seen_credits: AtomicBool,
+    /// Vanilla `ServerPlayer.wonGame` (not saved): the End credits are rolling, and the
+    /// player is out of its level until the client asks to respawn.
+    pub won_game: AtomicBool,
+    /// The client asked to leave the credits and its respawn is under way.
+    pub ending_credits: AtomicBool,
     pub warden_spawn_tracker: std::sync::Mutex<WardenSpawnTracker>,
     pub score: AtomicI32,
     pub spawn_extra_particles_on_fall: AtomicBool,
@@ -777,6 +802,7 @@ impl Player {
             client,
             awaiting_teleport: Mutex::new(None),
             steered_vehicle: Mutex::new(SteeredVehicle::default()),
+            passenger_remount: std::sync::Mutex::new(PassengerRemount::Idle),
             // TODO: Load this from previous instance
             hunger_manager: HungerManager::default(),
             current_block_destroy_stage: AtomicI32::new(-1),
@@ -853,7 +879,8 @@ impl Player {
             last_food_saturation: AtomicBool::new(true),
             subscribed_debug_sample: AtomicBool::new(false),
             has_played_before: AtomicBool::new(false),
-            root_vehicle_uuid: AtomicCell::new(None),
+            saved_root_vehicle: std::sync::Mutex::new(None),
+            pending_center_pairing: AtomicBool::new(false),
             chat_session: Arc::new(Mutex::new(ChatSession::default())), // Placeholder value until the player actually sets their session id
             signature_cache: Mutex::new(MessageCache::default()),
             player_screen_handler: player_screen_handler.clone(),
@@ -878,6 +905,8 @@ impl Player {
             fishing_bobber: AtomicI32::new(-1),
             bedrock_skin: ArcSwap::new(Arc::new(bedrock_skin)),
             seen_credits: AtomicBool::new(false),
+            won_game: AtomicBool::new(false),
+            ending_credits: AtomicBool::new(false),
             warden_spawn_tracker: std::sync::Mutex::new(WardenSpawnTracker::default()),
             score: AtomicI32::new(0),
             spawn_extra_particles_on_fall: AtomicBool::new(false),
@@ -1292,32 +1321,34 @@ impl Player {
             self.on_handled_screen_closed();
         }
 
-        let vehicle = self
-            .living_entity
-            .entity
-            .vehicle
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone();
-        if let Some(vehicle) = vehicle {
-            self.root_vehicle_uuid
-                .store(Some(vehicle.get_entity().entity_uuid));
-            vehicle
-                .get_entity()
-                .remove_passenger_on_disconnect(self.entity_id());
+        // Vanilla `ServerPlayer.disconnect` first: the player's own passengers get off, and a
+        // sleeper wakes (`stopSleepInBed(true, false)`), so the file carries neither the
+        // passengers nor `SleepingX/Y/Z` and the bed `Pos`. `World::remove_player`'s own wake
+        // is then a no-op for a disconnect.
+        self.living_entity.entity.eject_passengers();
+        if self.is_sleeping() {
+            self.stop_sleep_in_bed(true, false);
         }
-
+        // Vanilla `PlayerList.remove`: the stat, the player file (still riding, so `Pos` is
+        // the seat and `RootVehicle` the stack), then the mount.
         self.stats
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .increment_custom(statistics::CustomStatistic::LeaveGame, 1);
+        if let Some(server) = self.world().server.upgrade()
+            && let Err(e) = server.player_data_storage.handle_player_leave(self)
+        {
+            error!("Failed to save player data on disconnect: {e}");
+        }
+        self.remove_mount_on_disconnect();
+
         let world = self.world();
         // Vanilla `PlayerList.remove`: `removePlayerImmediately(player, UNLOADED_WITH_PLAYER)`.
         // Set here, not in `World::remove_player`, which a change of world and a respawn also
         // use for a player that stays. Entities leashed to the player see it gone and drop
-        // their lead on their next `tickLeash`. Pumpkin keeps the vehicle in its chunk (see
-        // `remove_passenger_on_disconnect`), so vanilla's mark on the root vehicle's stack
-        // has no counterpart here.
+        // their lead on their next `tickLeash`. Set after `remove_mount_on_disconnect`, which
+        // already marked the root vehicle's stack `UNLOADED_WITH_PLAYER` (vanilla
+        // `removePlayerImmediately` after `unRide`).
         self.living_entity
             .entity
             .set_removed_reason(crate::entity::RemovalReason::UnloadedWithPlayer);
@@ -1365,20 +1396,138 @@ impl Player {
         //self.world().level.list_cached();
     }
 
-    pub(crate) fn try_restore_vehicle(self: &Arc<Self>, vehicle: &Arc<dyn EntityBase>) {
-        // Claim the UUID atomically, otherwise blank it
-        // between a non-matching swap and restore.
-        if self
-            .root_vehicle_uuid
-            .compare_exchange(Some(vehicle.get_entity().entity_uuid), None)
-            .is_err()
+    /// Vanilla `PlayerList.remove`'s mount handling, after the player file is saved: a root
+    /// vehicle carrying only this player stops being ridden and leaves with it
+    /// (`UNLOADED_WITH_PLAYER`, every passenger before the root), and the player gets off
+    /// whatever it still rides (`unRide`).
+    fn remove_mount_on_disconnect(&self) {
+        let entity = &self.living_entity.entity;
+        if let Some(root) = entity.root_vehicle()
+            && root.get_entity().has_exactly_one_player_passenger()
         {
-            return;
+            debug!("Removing player mount");
+            self.stop_riding_on_disconnect();
+            let world = root.get_entity().world.load_full();
+            // `getPassengersAndSelf`: each passenger's stack, then the root.
+            let mut stack = Vec::new();
+            Self::collect_passengers_and_self(&root, &mut stack);
+            for removed in stack {
+                world.remove_entity_with_reason(
+                    removed.as_ref(),
+                    crate::entity::RemovalReason::UnloadedWithPlayer,
+                );
+            }
         }
 
-        vehicle
+        // `unRide`: the passengers off, the last first, then off the vehicle. The player's
+        // own dismount is forced (plugins are told but can't cancel it), so a leaving player
+        // never stays mounted.
+        entity.eject_passengers();
+        self.stop_riding_on_disconnect();
+    }
+
+    /// `stopRiding` for a disconnecting player: forced, as `setRemoved` does.
+    fn stop_riding_on_disconnect(&self) {
+        if let Some(vehicle) = self.living_entity.entity.get_vehicle() {
+            vehicle
+                .get_entity()
+                .remove_passenger_on_removal(self.entity_id());
+        }
+    }
+
+    /// Vanilla `Entity.getPassengersAndSelf`.
+    fn collect_passengers_and_self(
+        entity: &Arc<dyn EntityBase>,
+        out: &mut Vec<Arc<dyn EntityBase>>,
+    ) {
+        let passengers = entity
             .get_entity()
-            .add_passenger(vehicle.clone(), self.clone());
+            .passengers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        for passenger in &passengers {
+            Self::collect_passengers_and_self(passenger, out);
+        }
+        out.push(entity.clone());
+    }
+
+    /// Vanilla `ServerPlayer.saveParentVehicle`: riding a stack whose root carries exactly one
+    /// player, the player file keeps the vehicle it sits on (`Attach`) and the whole root
+    /// stack (`Entity`, players left out of its `Passengers`). Not riding, a tag loaded from
+    /// the file and not spawned yet is written back.
+    pub fn save_parent_vehicle(&self, nbt: &mut NbtCompound) {
+        let entity = &self.living_entity.entity;
+        if let Some(vehicle) = entity.get_vehicle() {
+            if let Some(root) = entity.root_vehicle()
+                && root.get_entity().has_exactly_one_player_passenger()
+            {
+                // `rootVehicle.save(vehicleWrapper.child("Entity"))`: the child exists even
+                // when the root refuses to save.
+                let mut root_nbt = NbtCompound::new();
+                if root.get_entity().should_save_as_passenger() {
+                    root.write_nbt(&mut root_nbt);
+                }
+                write_root_vehicle(nbt, vehicle.get_entity().entity_uuid, root_nbt);
+            }
+            return;
+        }
+        if let Some(saved) = self
+            .saved_root_vehicle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+        {
+            nbt.put_compound("RootVehicle", saved);
+        }
+    }
+
+    /// Vanilla `ServerPlayer.loadAndSpawnParentVehicle`, right after the player is placed in
+    /// its level: the saved root stack comes back under its saved UUIDs and the player rides
+    /// the entity it was attached to (`startRiding(vehicle, true, false)`, no game event). If
+    /// that entity is not in the stack, the whole stack is discarded. A tag without `Entity`
+    /// (older Pumpkin saves) loads nothing.
+    pub fn load_and_spawn_parent_vehicle(self: &Arc<Self>) {
+        let Some(root_tag) = self
+            .saved_root_vehicle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .take()
+        else {
+            return;
+        };
+        let world = self.world();
+        let Some(vehicle) = root_tag
+            .get_compound("Entity")
+            .and_then(|entity| world.load_entity_recursive(entity))
+        else {
+            return;
+        };
+        let attach_to = read_root_vehicle_attach(&root_tag);
+        let target = if Some(vehicle.get_entity().entity_uuid) == attach_to {
+            Some(vehicle.clone())
+        } else {
+            vehicle
+                .get_entity()
+                .indirect_passengers()
+                .into_iter()
+                .find(|entity| Some(entity.get_entity().entity_uuid) == attach_to)
+        };
+        if let Some(target) = target {
+            target
+                .get_entity()
+                .add_passenger_without_event(target.clone(), self.clone());
+        }
+
+        if !self.living_entity.entity.has_vehicle() {
+            warn!("Couldn't reattach entity to player");
+            world.remove_entity(vehicle.as_ref());
+            // As in vanilla, the passengers are read after `discard` made them get off, so
+            // the list is empty and they stay in the level.
+            for entity in vehicle.get_entity().indirect_passengers() {
+                world.remove_entity(entity.as_ref());
+            }
+        }
     }
 
     pub fn clean_up_chunk_tickets(&self, level: &Arc<pumpkin_world::level::Level>) {
@@ -2265,7 +2414,13 @@ impl Player {
     /// # Note
     /// This function does NOT send any packets. The caller is responsible for
     /// sending `NoRespawnBlockAvailable` if this returns `None`.
-    pub async fn calculate_respawn_point(&self) -> Option<CalculatedRespawnPoint> {
+    ///
+    /// `consume_spawn_block`: a respawn anchor used loses a charge (vanilla
+    /// `findRespawnAndUseSpawnBlock`'s flag; an End exit portal passes false).
+    pub async fn calculate_respawn_point(
+        &self,
+        consume_spawn_block: bool,
+    ) -> Option<CalculatedRespawnPoint> {
         type BedProperties = pumpkin_data::block_properties::WhiteBedLikeProperties;
         type AnchorProperties = pumpkin_data::block_properties::RespawnAnchorLikeProperties;
 
@@ -2361,15 +2516,15 @@ impl Player {
 
             // Try positions around the anchor
             if let Some(spawn_pos) = Self::find_anchor_spawn_position(&world, pos) {
-                // Decrement charges after successful respawn position found
-                let new_charges = charges - 1;
-                let mut new_props = anchor_props;
-                new_props.charges = new_charges;
-                world.set_block_state(
-                    pos,
-                    new_props.to_state_id(block),
-                    pumpkin_world::world::BlockFlags::NOTIFY_ALL,
-                );
+                if consume_spawn_block {
+                    let mut new_props = anchor_props;
+                    new_props.charges = charges - 1;
+                    world.set_block_state(
+                        pos,
+                        new_props.to_state_id(block),
+                        pumpkin_world::world::BlockFlags::NOTIFY_ALL,
+                    );
+                }
 
                 return Some(CalculatedRespawnPoint {
                     position: spawn_pos,
@@ -2382,6 +2537,69 @@ impl Player {
         }
 
         None
+    }
+
+    /// Vanilla `ServerPlayer.findRespawnPositionAndUseSpawnBlock`: the respawn block's
+    /// stand-up position, else the world spawn (`TeleportTransition.createDefault`, or
+    /// `missingRespawnBlock` when the player had a respawn point that no longer works).
+    pub async fn find_respawn_position_and_use_spawn_block(
+        &self,
+        consume_spawn_block: bool,
+    ) -> RespawnPosition {
+        if let Some(respawn) = self.calculate_respawn_point(consume_spawn_block).await {
+            return RespawnPosition {
+                position: respawn.position,
+                yaw: respawn.yaw,
+                pitch: respawn.pitch,
+                dimension: respawn.dimension,
+                missing_respawn_block: false,
+            };
+        }
+        let missing_respawn_block = self
+            .respawn_point
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .is_some();
+        let world = self.world();
+        let default_world = world
+            .server
+            .upgrade()
+            .map_or(world, |s| s.get_world_from_dimension(&Dimension::OVERWORLD));
+        let (spawn_x, spawn_y, spawn_z, spawn_yaw, spawn_pitch) = {
+            let info = default_world.level_info.load();
+            (
+                info.spawn_x,
+                info.spawn_y,
+                info.spawn_z,
+                info.spawn_yaw,
+                info.spawn_pitch,
+            )
+        };
+        // FIXME: This spawn position calculation is incorrect. Should use vanilla's
+        // proper spawn position calculation (see #1381). The y-level calculation
+        // needs to account for spawn radius and find a safe spawn position.
+        let chunk_pos = Vector2::new(spawn_x >> 4, spawn_z >> 4);
+        default_world
+            .level
+            .get_or_fetch_chunk(chunk_pos, |_| ())
+            .await;
+        let top = default_world.get_top_block(Vector2::new(spawn_x, spawn_z));
+        let pos_y = if top > default_world.dimension.min_y {
+            top + 1
+        } else {
+            spawn_y
+        };
+        RespawnPosition {
+            position: Vector3::new(
+                f64::from(spawn_x) + 0.5,
+                f64::from(pos_y),
+                f64::from(spawn_z) + 0.5,
+            ),
+            yaw: spawn_yaw,
+            pitch: spawn_pitch,
+            dimension: default_world.dimension.clone(),
+            missing_respawn_block,
+        }
     }
 
     /// Find a valid spawn position around a bed.
@@ -2572,6 +2790,15 @@ impl Player {
         }
 
         if sprinting { 0.025_999_999 } else { 0.02 }
+    }
+
+    /// `getAbilities().flying`, waiting for the lock: a missed `try_lock` (`is_flying`) would
+    /// let a bubble column push a flying player. Block collisions run with `abilities` unlocked.
+    fn abilities_flying(&self) -> bool {
+        self.abilities
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .flying
     }
 
     pub fn is_flying(&self) -> bool {
@@ -3155,10 +3382,11 @@ impl Player {
             }
         }
 
-        let Some(player_arc) = self.world().get_player_by_uuid(self.gameprofile.id) else {
+        let Some(server_arc) = self.world().server.upgrade() else {
             return;
         };
-        let Some(server_arc) = self.world().server.upgrade() else {
+        // The server's lookup: a player in no level (End credits) is served too.
+        let Some(player_arc) = server_arc.get_player_by_uuid(self.gameprofile.id) else {
             return;
         };
 
@@ -4843,7 +5071,7 @@ impl Player {
     }
 
     /// Teleports the player to a different world or dimension with an optional position, yaw, and pitch.
-    #[expect(clippy::too_many_lines)]
+    /// A `None` yaw or pitch keeps the player's own.
     pub async fn teleport_world(
         self: &Arc<Self>,
         new_world: Arc<World>,
@@ -4851,11 +5079,31 @@ impl Player {
         yaw: Option<f32>,
         pitch: Option<f32>,
     ) {
+        self.change_world(TeleportTarget {
+            world: new_world,
+            position,
+            yaw,
+            pitch,
+            keep_velocity: false,
+            as_passenger: false,
+        })
+        .await;
+    }
+
+    /// The dimension change of vanilla `ServerPlayer.teleport(TeleportTransition)`.
+    #[expect(clippy::too_many_lines)]
+    async fn change_world(self: &Arc<Self>, target: TeleportTarget) {
+        let new_world = target.world.clone();
+        let position = target.position;
         let current_world = self.living_entity.entity.world.load_full();
-        let yaw = yaw.unwrap_or(new_world.level_info.load().spawn_yaw);
-        let pitch = pitch.unwrap_or(new_world.level_info.load().spawn_pitch);
+        // A rotation the transition leaves relative stays the player's own.
+        let own_yaw = self.living_entity.entity.yaw.load();
+        let own_pitch = self.living_entity.entity.pitch.load();
+        let yaw = target.yaw.unwrap_or(own_yaw);
+        let pitch = target.pitch.unwrap_or(own_pitch);
 
         let Some(server) = new_world.server.upgrade() else {
+            self.set_passenger_remount(PassengerRemount::Idle);
             return;
         };
 
@@ -4880,6 +5128,7 @@ impl Player {
 
                 self.set_client_loaded(false);
                 let Some(player) = current_world.remove_player(self, false).await else {
+                    self.set_passenger_remount(PassengerRemount::Idle);
                     return;
                 };
                new_world.players.rcu(|current_list| {
@@ -4971,11 +5220,25 @@ impl Player {
                 self.on_screen_handler_opened(&self.player_screen_handler);
 
                 self.send_health();
+                // `sendActivePlayerEffects`, then `lastSentExp/Health/Food = -1`.
+                self.send_active_effects();
+                self.reset_sent_info();
 
                 new_world.send_world_info(&player);
                 new_world.send_center_chunk(&player).await;
 
-                player.request_teleport(position, yaw, pitch);
+                // `connection.teleport(PositionMoveRotation.of(transition), relatives)`: a
+                // rotation still the transition's relative one goes as relative.
+                player.connection_teleport(&TeleportTarget {
+                    world: new_world.clone(),
+                    position,
+                    yaw: (target.yaw.is_some() || yaw != own_yaw).then_some(yaw),
+                    pitch: (target.pitch.is_some() || pitch != own_pitch).then_some(pitch),
+                    keep_velocity: target.keep_velocity,
+                    as_passenger: target.as_passenger,
+                });
+                player.arrived_as_passenger();
+                player.pending_center_pairing.store(true, Ordering::Relaxed);
 
                 let mut changed_world_event = crate::plugin::api::events::player::player_changed_world::PlayerChangedWorldEvent {
                     player: player.clone(),
@@ -4985,38 +5248,90 @@ impl Player {
                 };
                 server.plugin_manager.fire(&server, &mut changed_world_event).await;
             }
+
+            'cancelled: {
+                self.set_passenger_remount(PassengerRemount::Idle);
+            }
         }}
     }
 
-    /// `yaw` and `pitch` are in degrees.
-    /// Rarly used, for example when waking up the player from a bed or their first time spawn. Otherwise, the `teleport` method should be used.
-    /// The player should respond with the `SConfirmTeleport` packet.
-    pub fn request_teleport(&self, position: Vector3<f64>, yaw: f32, pitch: f32) {
-        // This is the ultra special magic code used to create the teleport id
-        // This returns the old value
-        // This operation wraps around on overflow.
-        let Some(server) = self.world().server.upgrade() else {
+    /// Vanilla `ServerPlayer.teleport(TeleportTransition)`. Returns the player.
+    pub fn teleport_transition(
+        self: &Arc<Self>,
+        target: &TeleportTarget,
+    ) -> Option<Arc<dyn EntityBase>> {
+        if self.living_entity.entity.is_removed() {
+            return None;
+        }
+        if !target.as_passenger {
+            self.remove_vehicle();
+            // A remount still pending from an earlier vehicle's dimension change would have
+            // happened already in vanilla, and this `removeVehicle` undone it.
+            self.set_passenger_remount(PassengerRemount::Idle);
+        }
+        if Arc::ptr_eq(&target.world, &self.world()) {
+            self.teleport_in_world(target);
+        } else {
+            let player = self.clone();
+            let target = target.clone();
+            self.spawn_task(async move {
+                player.change_world(target).await;
+            });
+        }
+        Some(self.clone())
+    }
+
+    /// `connection.teleport` within the player's world, and the position sync the other
+    /// players need (Pumpkin's tracker sends a player no regular position updates).
+    pub fn teleport_in_world(&self, target: &TeleportTarget) {
+        if !self.connection_teleport(target) {
             return;
+        }
+        let entity = &self.living_entity.entity;
+        entity.world.load().broadcast_to_chunk_except(
+            entity.chunk_pos.load(),
+            &[entity.entity_uuid],
+            &CEntityPositionSync::new(
+                entity.entity_id.into(),
+                entity.pos.load(),
+                Vector3::new(0.0, 0.0, 0.0),
+                entity.yaw.load(),
+                entity.pitch.load(),
+                entity.on_ground.load(Ordering::SeqCst),
+            ),
+        );
+    }
+
+    /// Vanilla `ServerGamePacketListenerImpl.teleport(PositionMoveRotation, Set<Relative>)`:
+    /// a `None` yaw or pitch is a relative 0 and `keep_velocity` the relative delta (sent as
+    /// zero). Returns false if a plugin cancelled the teleport.
+    pub fn connection_teleport(&self, target: &TeleportTarget) -> bool {
+        let Some(server) = self.world().server.upgrade() else {
+            return false;
         };
         if let Some(player_arc) = self.world().get_player_by_uuid(self.gameprofile.id) {
             let mut event = PlayerTeleportEvent {
                 player: player_arc,
                 from: self.living_entity.entity.pos.load(),
-                to: position,
+                to: target.position,
                 cancelled: false,
             };
             server.plugin_manager.fire_blocking(&server, &mut event);
             if event.cancelled {
-                return;
+                return false;
             }
         }
+        self.send_connection_teleport(target);
+        true
+    }
 
-        let i = self.teleport_id_count.fetch_add(1, Ordering::Relaxed);
+    /// `connection.teleport` itself, with no plugin event (vanilla `startRiding`'s teleport).
+    fn send_connection_teleport(&self, target: &TeleportTarget) {
+        let teleport_id = self.teleport_id_count.fetch_add(1, Ordering::Relaxed) + 1;
         self.chunk_send_epoch.fetch_add(1, Ordering::Relaxed);
-        let teleport_id = i + 1;
-        self.living_entity.entity.set_pos(position);
         let entity = &self.living_entity.entity;
-        entity.set_rotation(yaw, pitch);
+        entity.teleport_set_position(target);
+        let position = entity.pos.load();
         match self.client.as_ref() {
             ClientPlatform::Java(client) => {
                 *self
@@ -5024,20 +5339,34 @@ impl Player {
                     .lock()
                     .unwrap_or_else(std::sync::PoisonError::into_inner) =
                     Some((teleport_id.into(), position));
+                let mut relatives = Vec::new();
+                if target.keep_velocity {
+                    relatives.extend([
+                        PositionFlag::DeltaX,
+                        PositionFlag::DeltaY,
+                        PositionFlag::DeltaZ,
+                    ]);
+                }
+                if target.yaw.is_none() {
+                    relatives.push(PositionFlag::YRot);
+                }
+                if target.pitch.is_none() {
+                    relatives.push(PositionFlag::XRot);
+                }
                 let packet = CPlayerPosition::new(
                     teleport_id.into(),
-                    position,
+                    target.position,
                     Vector3::new(0.0, 0.0, 0.0),
-                    yaw,
-                    pitch,
-                    // TODO
-                    Vec::new(),
+                    target.yaw.unwrap_or(0.0),
+                    target.pitch.unwrap_or(0.0),
+                    relatives,
                 );
                 if let Ok(data) = client.serialize_packet(&packet) {
                     client.try_enqueue_packet(data);
                 }
             }
             ClientPlatform::Bedrock(client) => {
+                let yaw = entity.yaw.load();
                 let packet = CBedrockMovePlayer::new(
                     VarULong(self.entity_id() as u64),
                     Vector3::new(
@@ -5045,7 +5374,7 @@ impl Player {
                         position.y as f32 + entity.entity_type.eye_height,
                         position.z as f32,
                     ),
-                    pitch,
+                    entity.pitch.load(),
                     yaw,
                     yaw,
                     CBedrockMovePlayer::MODE_TELEPORT,
@@ -5060,6 +5389,275 @@ impl Player {
                 }
             }
         }
+    }
+
+    /// Vanilla `ServerPlayer.removeVehicle`: off the vehicle where it is, without the
+    /// dismount placement of `stopRiding`. The vehicle's `remove_passenger_internal` sends the
+    /// player the vehicle's effect removals and passenger list.
+    pub fn remove_vehicle(&self) {
+        let vehicle = self
+            .living_entity
+            .entity
+            .vehicle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        if let Some(vehicle) = vehicle {
+            vehicle
+                .get_entity()
+                .remove_passenger_before_teleport(self.entity_id());
+        }
+    }
+
+    /// Vanilla `Entity.unRide`: eject the passengers (last first), then leave the vehicle
+    /// (`stopRiding`).
+    pub fn un_ride(&self) {
+        let entity = &self.living_entity.entity;
+        entity.eject_passengers();
+        let vehicle = entity
+            .vehicle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        if let Some(vehicle) = vehicle {
+            vehicle.get_entity().remove_passenger(self.entity_id());
+        }
+    }
+
+    /// Vanilla `ServerPlayer.showEndCredits`: the player leaves its level
+    /// (`removePlayerImmediately(CHANGED_DIMENSION)`) and, the first time, the client rolls the
+    /// credits. It stays online in no level until the client asks to respawn
+    /// (`PERFORM_RESPAWN`).
+    pub fn show_end_credits(self: &Arc<Self>) {
+        self.un_ride();
+        self.remove_from_level(&self.world());
+        if !self.won_game.load(Ordering::SeqCst) {
+            self.won_game.store(true, Ordering::SeqCst);
+            self.try_enqueue_packet_editioned(
+                &CGameEvent::new(GameEvent::WinGame, 0.0),
+                &pumpkin_protocol::bedrock::client::CShowCredits {
+                    player_runtime_id: VarULong(self.entity_id() as u64),
+                    credits_state: VarInt(0),
+                },
+            );
+            self.seen_credits.store(true, Ordering::Relaxed);
+        }
+    }
+
+    /// The `wonGame` branch of vanilla `handleClientCommand(PERFORM_RESPAWN)`: the client is
+    /// done with the credits, and the player respawns keeping everything
+    /// (`PlayerList.respawn(player, true, CHANGED_DIMENSION)`). `won_game` stays set until the
+    /// new level has the player; a second request meanwhile does nothing.
+    pub fn end_credits(self: &Arc<Self>) {
+        if !self.won_game.load(Ordering::SeqCst) || self.ending_credits.swap(true, Ordering::SeqCst)
+        {
+            return;
+        }
+        let player = self.clone();
+        self.spawn_task(async move {
+            player.world().respawn_player(&player, true).await;
+            // `CriteriaTriggers.CHANGED_DIMENSION.trigger(player, END, OVERWORLD)`.
+            player.trigger_advancement(
+                crate::entity::player::advancement::trigger::AdvancementTrigger::EnterDimension {
+                    dimension: "overworld".to_string(),
+                },
+            );
+            {
+                let screen_handler = player
+                    .current_screen_handler
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                let mut screen_handler = screen_handler
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                screen_handler.sync_state();
+            };
+            {
+                let mut abilities = player
+                    .abilities
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                abilities.set_for_gamemode(player.gamemode.load());
+            };
+            player.send_abilities_update();
+        });
+    }
+
+    /// Vanilla `ServerLevel.removePlayerImmediately(player, CHANGED_DIMENSION)`: the player is
+    /// marked removed and leaves the level's players, entity tracking (`ChunkMap.removeEntity`)
+    /// and chunk map (its tickets dropped, its chunks forgotten), and the server holds it in
+    /// no level ([`Server::levelless_players`]).
+    fn remove_from_level(self: &Arc<Self>, world: &Arc<World>) {
+        // The two lists are separate `ArcSwap`s, so the move can't be one atomic step. The
+        // player joins the level-less list first: a lookup in between sees it twice at worst,
+        // never not at all. A disconnect racing this takes it off both lists
+        // (`World::remove_player`); only a player still in the level moves out of it, and
+        // one a disconnect already took out stays gone.
+        let server = world.server.upgrade();
+        if let Some(server) = &server {
+            server.add_levelless_player(self);
+        }
+        let mut removed = false;
+        world.players.rcu(|current| {
+            let mut list = (**current).clone();
+            let before = list.len();
+            list.retain(|p| p.gameprofile.id != self.gameprofile.id);
+            removed = list.len() != before;
+            list
+        });
+        if !removed {
+            if let Some(server) = &server {
+                server.take_levelless_player(self.gameprofile.id);
+            }
+            return;
+        }
+        let entity = &self.living_entity.entity;
+        entity
+            .removal_reason
+            .store(Some(crate::entity::RemovalReason::ChangedDimension));
+        world
+            .entity_tracker
+            .remove_entity(self.as_ref() as &dyn EntityBase, world);
+        // `onTrackingEnd`'s player part: the waypoint manager and the sleeping list.
+        world.on_player_tracking_end(self);
+
+        // `updatePlayerStatus(player, false)`: tickets dropped, every tracked chunk forgotten.
+        self.clean_up_chunk_tickets(&world.level);
+        if let Ok(mut sender) = self.chunk_sender.lock() {
+            sender.reset();
+        }
+        let watched = self.watched_section.load().all_chunks_within();
+        self.watched_section.store(Cylindrical::new(
+            Vector2::new(0, 0),
+            NonZero::new(1).unwrap_or(NonZero::<u8>::MIN),
+        ));
+        let chunks_to_clean = world.level.mark_chunks_as_not_watched(watched);
+        for chunk in &chunks_to_clean {
+            self.try_send_client_packet(&CUnloadChunk::new(chunk.x, chunk.y));
+        }
+        if !chunks_to_clean.is_empty() {
+            let world = world.clone();
+            self.spawn_task(async move {
+                world.remove_entities_in_chunks(&chunks_to_clean).await;
+                world.level.clean_entity_chunks(&chunks_to_clean);
+            });
+        }
+    }
+
+    pub(crate) fn set_passenger_remount(&self, state: PassengerRemount) {
+        *self
+            .passenger_remount
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = state;
+    }
+
+    /// The new vehicle of a player that changed dimension as its passenger was added:
+    /// mount the player now if it already arrived, else when it does.
+    pub(crate) fn vehicle_ready(
+        &self,
+        passenger: &Arc<dyn EntityBase>,
+        vehicle: &Arc<dyn EntityBase>,
+    ) {
+        let arrived = {
+            let mut state = self
+                .passenger_remount
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            match *state {
+                PassengerRemount::Arrived => {
+                    *state = PassengerRemount::Idle;
+                    true
+                }
+                PassengerRemount::Travelling => {
+                    *state = PassengerRemount::VehicleReady(vehicle.clone());
+                    false
+                }
+                _ => false,
+            }
+        };
+        if arrived {
+            self.finish_remount(passenger.clone(), vehicle);
+        }
+    }
+
+    /// The end of the player's dimension change: board the new vehicle if it is ready, else
+    /// leave word that the player is here.
+    fn arrived_as_passenger(self: &Arc<Self>) {
+        let vehicle = {
+            let mut state = self
+                .passenger_remount
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            match std::mem::take(&mut *state) {
+                PassengerRemount::VehicleReady(vehicle) => Some(vehicle),
+                PassengerRemount::Travelling => {
+                    *state = PassengerRemount::Arrived;
+                    None
+                }
+                _ => None,
+            }
+        };
+        if let Some(vehicle) = vehicle {
+            self.finish_remount(self.clone(), &vehicle);
+        }
+    }
+
+    /// Vanilla `startRiding(vehicle, true, false)` for the remount.
+    fn finish_remount(&self, passenger: Arc<dyn EntityBase>, vehicle: &Arc<dyn EntityBase>) {
+        let vehicle_entity = vehicle.get_entity();
+        if self.living_entity.entity.is_removed()
+            || vehicle_entity.is_removed()
+            || !Arc::ptr_eq(&vehicle_entity.world.load(), &self.world())
+        {
+            return;
+        }
+        vehicle_entity.add_passenger_without_event(vehicle.clone(), passenger);
+    }
+
+    /// The rest of vanilla `ServerPlayer.startRiding` once mounted: `positionRider`, the client
+    /// moved to its seat keeping its look, the vehicle's effects, then its passenger list.
+    pub(crate) fn start_riding_packets(
+        &self,
+        vehicle: &Arc<dyn EntityBase>,
+        passengers_packet: &CSetPassengers,
+    ) {
+        let entity = &self.living_entity.entity;
+        vehicle.position_rider(vehicle.as_ref(), self);
+        self.send_connection_teleport(&TeleportTarget {
+            world: self.world(),
+            position: entity.pos.load(),
+            yaw: None,
+            pitch: None,
+            keep_velocity: false,
+            as_passenger: true,
+        });
+        // `sendActiveEffects(livingEntity, connection)`.
+        if let Some(living) = vehicle.get_living_entity() {
+            let effects: Vec<_> = living
+                .active_effects
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .values()
+                .map(|instance| instance.effect.clone())
+                .collect();
+            for effect in &effects {
+                self.send_effect_for(vehicle.get_entity().entity_id, effect, false);
+            }
+        }
+        self.try_send_client_packet(passengers_packet);
+    }
+
+    /// Vanilla `ServerGamePacketListenerImpl.teleport(x, y, z, yRot, xRot)`: an absolute
+    /// position and rotation, the speed stopped. `yaw` and `pitch` are in degrees.
+    pub fn request_teleport(&self, position: Vector3<f64>, yaw: f32, pitch: f32) {
+        self.connection_teleport(&TeleportTarget {
+            world: self.world(),
+            position,
+            yaw: Some(yaw),
+            pitch: Some(pitch),
+            keep_velocity: false,
+            as_passenger: false,
+        });
     }
 
     pub fn block_interaction_range(&self) -> f64 {
@@ -6026,17 +6624,15 @@ impl Player {
         self.try_enqueue_packet_editioned(&je_packet, &be_packet);
     }
 
+    /// Vanilla `ServerPlayer.doTick`'s `totalExperience != lastSentExp` resend, which runs
+    /// whether or not the client has loaded.
     pub fn tick_experience(&self) {
-        if !self.has_client_loaded() {
-            return;
-        }
-
-        let level = self.experience_level.load(Ordering::Relaxed);
-        if self.last_sent_xp.load(Ordering::Relaxed) != level {
+        let points = self.experience_points.load(Ordering::Relaxed);
+        if self.last_sent_xp.load(Ordering::Relaxed) != points {
             let progress = self.experience_progress.load();
-            let points = self.experience_points.load(Ordering::Relaxed);
+            let level = self.experience_level.load(Ordering::Relaxed);
 
-            self.last_sent_xp.store(level, Ordering::Relaxed);
+            self.last_sent_xp.store(points, Ordering::Relaxed);
 
             let attribute = |name: &str, current_value, max_value| BedrockAttribute {
                 min_value: 0.0,
@@ -6162,6 +6758,23 @@ impl Player {
                 }
             }
         }
+    }
+
+    /// Vanilla `ServerPlayer.resetSentInfo` (the `lastSent*` fields to -1): health, food and
+    /// experience go to the client on the next tick.
+    pub fn reset_sent_info(&self) {
+        self.last_sent_xp.store(-1, Ordering::Relaxed);
+        self.last_sent_health.store(-1, Ordering::Relaxed);
+        self.last_sent_food.store(u8::MAX, Ordering::Relaxed);
+    }
+
+    /// `ClientboundSetExperiencePacket` with the player's current experience.
+    pub fn send_experience(&self) {
+        self.try_send_client_packet(&CSetExperience::new(
+            self.experience_progress.load(),
+            self.experience_level.load(Ordering::Relaxed).into(),
+            self.experience_points.load(Ordering::Relaxed).into(),
+        ));
     }
 
     /// Sets the player's experience level and notifies the client.
@@ -7622,6 +8235,16 @@ impl NBTStorage for EnderChestInventory {
 impl NBTStorageInit for EnderChestInventory {}
 
 impl EntityBase for Player {
+    fn can_use_portal(&self, ignore_passenger: bool) -> bool {
+        self.living_entity
+            .living_can_use_portal(self, ignore_passenger)
+    }
+
+    /// Vanilla `Player.getDimensionChangingDelay`.
+    fn dimension_changing_delay(&self) -> u32 {
+        10
+    }
+
     /// Vanilla `ServerPlayer.getKnownMovement`: the client's last move, or the vehicle's when
     /// someone else steers it.
     fn get_known_movement(&self) -> Vector3<f64> {
@@ -7676,6 +8299,20 @@ impl EntityBase for Player {
         self.damage_with_context(caller, amount, damage_type, position, source, cause)
     }
 
+    /// Vanilla `Player.onAboveBubbleColumn`: a flying player isn't moved.
+    fn on_above_bubble_column(&self, caller: &dyn EntityBase, drag_down: bool, pos: BlockPos) {
+        if !self.abilities_flying() {
+            Entity::handle_on_above_bubble_column(caller, drag_down, pos);
+        }
+    }
+
+    /// Vanilla `Player.onInsideBubbleColumn`.
+    fn on_inside_bubble_column(&self, caller: &dyn EntityBase, drag_down: bool) {
+        if !self.abilities_flying() {
+            Entity::handle_on_inside_bubble_column(caller, drag_down);
+        }
+    }
+
     fn teleport(
         &self,
         position: Vector3<f64>,
@@ -7683,28 +8320,16 @@ impl EntityBase for Player {
         pitch: Option<f32>,
         world: Arc<World>,
     ) {
-        if Arc::ptr_eq(&world, &self.world()) {
-            // Same world
-            let yaw = yaw.unwrap_or_else(|| self.living_entity.entity.yaw.load());
-            let pitch = pitch.unwrap_or_else(|| self.living_entity.entity.pitch.load());
-            self.request_teleport(position, yaw, pitch);
-            let entity = self.get_entity();
-            let chunk_pos = entity.chunk_pos.load();
-            entity.world.load().broadcast_to_chunk_except(
-                chunk_pos,
-                &[self.living_entity.entity.entity_uuid],
-                &CEntityPositionSync::new(
-                    self.living_entity.entity.entity_id.into(),
-                    position,
-                    Vector3::new(0.0, 0.0, 0.0),
-                    yaw,
-                    pitch,
-                    entity.on_ground.load(Ordering::SeqCst),
-                ),
-            );
-        } else if let Some(player_arc) = self.world().get_player_by_uuid(self.gameprofile.id) {
-            self.spawn_task(async move {
-                player_arc.teleport_world(world, position, yaw, pitch).await;
+        // Vanilla `teleport(TeleportTransition)`, which dismounts. Commands wake a sleeping
+        // player first (`entity::command_teleport`, vanilla `ServerPlayer.teleportTo`).
+        if let Some(player) = self.world().get_player_by_id(self.entity_id()) {
+            player.teleport_transition(&TeleportTarget {
+                world,
+                position,
+                yaw,
+                pitch,
+                keep_velocity: false,
+                as_passenger: false,
             });
         }
     }
@@ -7983,18 +8608,7 @@ impl EntityBase for Player {
             nbt.put_compound("respawn", respawn_compound);
         }
 
-        let vehicle_uuid = self
-            .living_entity
-            .entity
-            .vehicle
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .as_ref()
-            .map(|vehicle| vehicle.get_entity().entity_uuid)
-            .or_else(|| self.root_vehicle_uuid.load());
-        if let Some(vehicle_uuid) = vehicle_uuid {
-            write_root_vehicle(nbt, vehicle_uuid);
-        }
+        self.save_parent_vehicle(nbt);
         self.stats
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -8173,7 +8787,11 @@ impl EntityBase for Player {
                 force,
             });
         }
-        self.root_vehicle_uuid.store(read_root_vehicle(nbt));
+        *self
+            .saved_root_vehicle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) =
+            nbt.get_compound("RootVehicle").cloned();
         self.stats
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -8301,6 +8919,16 @@ impl Abilities {
             }
         }
     }
+}
+
+/// Where [`Player::find_respawn_position_and_use_spawn_block`] puts the player.
+pub struct RespawnPosition {
+    pub position: Vector3<f64>,
+    pub yaw: f32,
+    pub pitch: f32,
+    pub dimension: Dimension,
+    /// The player had a respawn point, and its block no longer works.
+    pub missing_respawn_block: bool,
 }
 
 /// Represents the player's stored respawn point (bed/anchor/forced).
@@ -9017,7 +9645,7 @@ impl InventoryPlayer for Player {
 
 #[cfg(test)]
 mod tests {
-    use super::{bedrock_inventory_slot, read_root_vehicle, write_root_vehicle};
+    use super::{bedrock_inventory_slot, read_root_vehicle_attach, write_root_vehicle};
     use pumpkin_nbt::{compound::NbtCompound, tag::NbtTag};
     use uuid::Uuid;
 
@@ -9032,22 +9660,26 @@ mod tests {
     }
 
     #[test]
-    fn root_vehicle_uuid_round_trips_with_vanilla_shape() {
+    fn root_vehicle_round_trips_with_vanilla_shape() {
         let expected = Uuid::from_u128(0xFEDC_BA98_7654_3210_89AB_CDEF_0123_4567);
+        let mut entity = NbtCompound::new();
+        entity.put_string("id", "minecraft:oak_boat".to_string());
         let mut nbt = NbtCompound::new();
 
-        write_root_vehicle(&mut nbt, expected);
+        write_root_vehicle(&mut nbt, expected, entity);
 
-        assert_eq!(read_root_vehicle(&nbt), Some(expected));
-        assert!(
-            nbt.get_compound("RootVehicle")
-                .and_then(|root| root.get_int_array("Attach"))
-                .is_some()
+        let root = nbt.get_compound("RootVehicle").expect("RootVehicle");
+        assert_eq!(read_root_vehicle_attach(root), Some(expected));
+        assert!(root.get_int_array("Attach").is_some());
+        assert_eq!(
+            root.get_compound("Entity")
+                .and_then(|entity| entity.get_string("id")),
+            Some("minecraft:oak_boat")
         );
     }
 
     #[test]
-    fn root_vehicle_uuid_accepts_integer_lists() {
+    fn root_vehicle_attach_accepts_integer_lists() {
         let expected = Uuid::from_u128(0xFEDC_BA98_7654_3210_89AB_CDEF_0123_4567);
         let value = expected.as_u128();
         let mut root_vehicle = NbtCompound::new();
@@ -9060,10 +9692,8 @@ mod tests {
                 NbtTag::Int(value as i32),
             ]),
         );
-        let mut nbt = NbtCompound::new();
-        nbt.put("RootVehicle", NbtTag::Compound(root_vehicle));
 
-        assert_eq!(read_root_vehicle(&nbt), Some(expected));
+        assert_eq!(read_root_vehicle_attach(&root_vehicle), Some(expected));
     }
 
     #[test]

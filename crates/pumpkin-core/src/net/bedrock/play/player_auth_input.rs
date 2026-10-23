@@ -14,6 +14,10 @@ impl BedrockClient {
         if !player.has_client_loaded() {
             return;
         }
+        // As Java's `handleMovePlayer`: nothing moves while the End credits roll.
+        if player.won_game.load(Ordering::SeqCst) {
+            return;
+        }
         if player.living_entity.dead.load(Ordering::Relaxed)
             || player.living_entity.health.load() <= 0.0
         {

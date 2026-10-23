@@ -83,7 +83,6 @@ pub async fn start_query_handler(server: Arc<Server>, query_addr: SocketAddr) {
 // Errors of packets that don't meet the format aren't returned since we won't handle them anyway
 // The only errors that are thrown are because of a null terminator in a CString
 // since those errors need to be corrected by server owner
-#[expect(clippy::too_many_lines)]
 #[inline]
 async fn handle_packet(
     buf: Vec<u8>,
@@ -121,26 +120,16 @@ async fn handle_packet(
                         .is_some_and(|token_bound_ip: &SocketAddr| token_bound_ip == &addr)
                 {
                     if packet.is_full_request {
-                        // Get 4 players
-                        let mut players: Vec<CString> = Vec::new();
-                        for world in server.worlds.load().iter() {
-                            let mut world_players = world
-                                .players
-                                .load()
-                                // Although there is no documented limit, we will limit to 4 players
-                                .iter()
-                                .take(4 - players.len())
-                                .filter_map(|player| {
-                                    CString::new(player.gameprofile.name.as_str()).ok()
-                                })
-                                .collect::<Vec<_>>();
-
-                            players.append(&mut world_players); // Append players from this world
-
-                            if players.len() >= 4 {
-                                break; // Stop if we've collected 4 players
-                            }
-                        }
+                        // Get 4 players. Although there is no documented limit, we will limit
+                        // to 4 players.
+                        let players: Vec<CString> = server
+                            .get_all_players()
+                            .iter()
+                            .take(4)
+                            .filter_map(|player| {
+                                CString::new(player.gameprofile.name.as_str()).ok()
+                            })
+                            .collect();
 
                         let plugins = server
                             .plugin_manager

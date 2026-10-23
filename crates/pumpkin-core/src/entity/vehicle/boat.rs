@@ -1,7 +1,7 @@
 use crate::item::interaction_result::InteractionResult;
 use pumpkin_util::Hand;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 
 use crossbeam::atomic::AtomicCell;
 
@@ -11,11 +11,16 @@ use crate::entity::{Entity, EntityBase, living::LivingEntity};
 use crate::server::Server;
 
 use pumpkin_data::damage::DamageType;
+use pumpkin_data::entity::EntityStatus;
+use pumpkin_data::game_event::GameEvent;
 use pumpkin_data::item_stack::ItemStack;
+use pumpkin_data::tracked_data::abstract_boat::DATA_ID_BUBBLE_TIME;
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::java::client::play::Metadata;
 
+use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 
 use crate::entity::vehicle::vehicle::VehicleEntity;
 
@@ -24,6 +29,10 @@ pub struct BoatEntity {
     ticks_underwater: AtomicCell<f32>,
     left_paddle_moving: AtomicBool,
     right_paddle_moving: AtomicBool,
+    is_above_bubble_column: AtomicBool,
+    bubble_column_direction_is_down: AtomicBool,
+    /// The synched `DATA_ID_BUBBLE_TIME`, as this boat last set it.
+    bubble_time: AtomicI32,
 }
 
 impl BoatEntity {
@@ -33,6 +42,9 @@ impl BoatEntity {
             ticks_underwater: AtomicCell::new(0.0),
             left_paddle_moving: AtomicBool::new(false),
             right_paddle_moving: AtomicBool::new(false),
+            is_above_bubble_column: AtomicBool::new(false),
+            bubble_column_direction_is_down: AtomicBool::new(false),
+            bubble_time: AtomicI32::new(0),
         }
     }
 
@@ -52,9 +64,67 @@ impl BoatEntity {
     fn send_wobble_metadata(&self) {
         self.vehicle.send_wobble_metadata();
     }
+
+    /// Vanilla `AbstractBoat.setBubbleTime`: `entityData.set`, sent only on a change.
+    fn set_bubble_time(&self, bubble_time: i32) {
+        self.bubble_time.store(bubble_time, Ordering::Relaxed);
+        self.vehicle
+            .entity
+            .set_synced_data(DATA_ID_BUBBLE_TIME, bubble_time);
+    }
+
+    /// The server half of vanilla `AbstractBoat.tickBubbleColumn`: three seconds above a
+    /// column launch the boat up, or sink it and throw its passengers off.
+    fn tick_bubble_column(&self, caller: &dyn EntityBase) {
+        if !self.is_above_bubble_column.load(Ordering::Relaxed) {
+            self.set_bubble_time(0);
+        }
+        let mut bubble_time = self.bubble_time.load(Ordering::Relaxed);
+        if bubble_time > 0 {
+            bubble_time -= 1;
+            self.set_bubble_time(bubble_time);
+            let diff = 60 - bubble_time - 1;
+            if diff > 0 && bubble_time == 0 {
+                self.set_bubble_time(0);
+                let entity = &self.vehicle.entity;
+                let down = self.bubble_column_direction_is_down.load(Ordering::Relaxed);
+                let world = entity.world.load();
+                if down {
+                    entity.eject_passengers();
+                    world.send_entity_status(entity, EntityStatus::BoatSink, None);
+                } else {
+                    world.send_entity_status(entity, EntityStatus::BoatLaunch, None);
+                }
+                self.handle_bubble_column_effect(caller, down);
+            }
+            self.is_above_bubble_column.store(false, Ordering::Relaxed);
+        }
+    }
+
+    /// Vanilla `AbstractBoat.handleBubbleColumnEffect`.
+    fn handle_bubble_column_effect(&self, caller: &dyn EntityBase, drag_down: bool) {
+        if caller.can_simulate_movement() {
+            let entity = &self.vehicle.entity;
+            let movement = entity.velocity.load();
+            if drag_down {
+                entity
+                    .velocity
+                    .store(movement.add(&Vector3::new(0.0, -0.7, 0.0)));
+            } else {
+                entity
+                    .velocity
+                    .store(Vector3::new(movement.x, 0.6, movement.z));
+            }
+        }
+    }
 }
 
 impl EntityBase for BoatEntity {
+    /// Vanilla `VehicleEntity.getDimensionChangingDelay`.
+    fn dimension_changing_delay(&self) -> u32 {
+        10
+    }
+
     /// Vanilla `AbstractBoat.getPassengerAttachmentPoint`: two riders sit fore and aft (an
     /// animal a little further forward), at the boat's or raft's ride height.
     fn passenger_attachment_point(
@@ -200,10 +270,47 @@ impl EntityBase for BoatEntity {
         None
     }
 
-    fn tick(&self, caller: &dyn EntityBase, _server: &Server) {
+    /// Vanilla `AbstractBoat.onAboveBubbleColumn`: the timer starts; no push.
+    fn on_above_bubble_column(&self, caller: &dyn EntityBase, drag_down: bool, _pos: BlockPos) {
+        let entity = &self.vehicle.entity;
+        self.is_above_bubble_column.store(true, Ordering::Relaxed);
+        self.bubble_column_direction_is_down
+            .store(drag_down, Ordering::Relaxed);
+        if self.bubble_time.load(Ordering::Relaxed) == 0 {
+            self.set_bubble_time(60);
+        }
+        let splash = {
+            let mut random = entity.random();
+            if !entity.is_under_water() && random.next_bounded_i32(100) == 0 {
+                // `playLocalSound`'s pitch and the splash particle's x and z: both do nothing
+                // on the server, but their arguments still draw.
+                random.next_f32();
+                random.next_f32();
+                random.next_f32();
+                true
+            } else {
+                false
+            }
+        };
+        if splash {
+            let controller = caller.controlling_passenger();
+            entity.world.load().game_event_from(
+                controller.as_deref(),
+                GameEvent::Splash,
+                entity.pos.load(),
+            );
+        }
+    }
+
+    fn tick(&self, caller: &dyn EntityBase, server: &Server) {
         self.vehicle.tick();
-        // The end of `Entity.baseTick`: `Leashable.tickLeash`. Boats don't run `Entity::tick`.
-        crate::entity::leashable::tick_leash(caller);
+        // `super.tick()`: `Entity.baseTick`, which ends with `Leashable.tickLeash`.
+        self.vehicle.entity.tick(caller, server);
+        // (`floatBoat` and `move` are not ported yet.) Vanilla applies the block effects
+        // twice, then runs the bubble column timer.
+        self.vehicle.entity.apply_effects_from_blocks(caller);
+        self.vehicle.entity.apply_effects_from_blocks(caller);
+        self.tick_bubble_column(caller);
 
         let underwater = self.ticks_underwater.load();
         if self.vehicle.entity.touching_water.load(Ordering::Relaxed) {

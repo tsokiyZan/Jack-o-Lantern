@@ -14,6 +14,7 @@ impl JavaClient {
         let entity = &player.living_entity.entity;
         if player.has_client_loaded()
             && !player.is_sleeping()
+            && !player.won_game.load(Ordering::Relaxed)
             && player
                 .awaiting_teleport
                 .lock()

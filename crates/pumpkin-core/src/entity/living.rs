@@ -3813,7 +3813,9 @@ impl LivingEntity {
     }
 
     pub fn reset_state(&self) {
-        self.entity.reset_state();
+        self.reset_fresh_entity_state();
+        self.death_time.store(0, Relaxed);
+        self.dead.store(false, Relaxed);
 
         // Restore to maximum health for this entity type
         let max_health = self.get_max_health();
@@ -3830,32 +3832,54 @@ impl LivingEntity {
         self.hurt_cooldown.store(20, Relaxed);
         self.last_damage_taken.store(0f32);
 
-        self.entity.portal_cooldown.store(0, Relaxed);
         *self
             .entity
             .portal_manager
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
 
-        // Clear fall/fire state
-        self.entity.fall_distance.store(0.0);
-        self.death_time.store(0, Relaxed);
-        self.entity.extinguish();
-        self.entity.fire_ticks.store(0, Relaxed);
-
-        // Clear velocity and movement input to remove persisted momentum
-        self.entity.velocity.store(Vector3::default());
-        self.entity.velocity_dirty.store(true, SeqCst);
-        self.movement_input.store(Vector3::default());
-        self.jumping.store(false, Relaxed);
-
         // If this LivingEntity corresponds to a Player, reset their hunger manager
         let world = self.entity.world.load();
         if let Some(player) = world.get_player_by_id(self.entity.entity_id) {
             player.hunger_manager.restart();
         }
+    }
 
-        self.dead.store(false, Relaxed);
+    /// What a respawned player (vanilla's fresh `ServerPlayer`) starts with whatever
+    /// `restoreFrom` copies: standing, not fall-flying, burning or freezing, full air, no
+    /// fall, speed, input, item in use, hurt time or portal cooldown. The dead state is the
+    /// death path's (`reset_state`), after the respawn's awaits.
+    pub fn reset_fresh_entity_state(&self) {
+        self.entity.reset_state();
+        // A new entity's `firstTick`: until its first tick, the respawned player's waypoint
+        // makes no connection (`makeWaypointConnectionWith`), so `addRespawnedPlayer`'s
+        // `onTrackingStart` doesn't show it to anyone; its first move after that tick does.
+        self.entity.first_tick.store(true, Relaxed);
+        self.entity.portal_cooldown.store(0, Relaxed);
+        self.entity.fall_distance.store(0.0);
+        self.entity.fire_ticks.store(0, Relaxed);
+        self.entity.set_frozen_ticks(0);
+        self.breath
+            .air_supply
+            .store(crate::entity::breath::MAX_AIR, Relaxed);
+        self.breath.send_air_supply(&self.entity);
+        self.entity.velocity.store(Vector3::default());
+        self.entity.velocity_dirty.store(true, SeqCst);
+        self.movement_input.store(Vector3::default());
+        self.jumping.store(false, Relaxed);
+        self.hurt_time.store(0, Relaxed);
+        self.entity.invulnerable_time.store(0, Relaxed);
+        // `stopUsingItem` state, without its game event: a fresh player was never using one.
+        self.item_in_use
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .take();
+        *self
+            .active_hand
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
+        self.item_use_time.store(0, Relaxed);
+        self.set_living_flag(Self::USING_ITEM_FLAG, false);
     }
 
     pub fn is_player(&self) -> bool {
@@ -4654,6 +4678,14 @@ impl LivingEntity {
         self.health.load() <= 0.0 || self.dead.load(Relaxed)
     }
 
+    /// Vanilla `LivingEntity.canUsePortal`: `Entity`'s, with this class's `isAlive`, and
+    /// not while sleeping.
+    pub fn living_can_use_portal(&self, caller: &dyn EntityBase, ignore_passenger: bool) -> bool {
+        (ignore_passenger || !self.entity.has_vehicle())
+            && self.is_alive()
+            && !Self::is_sleeping(caller)
+    }
+
     /// Vanilla `LivingEntity.isAffectedByPotions`: not dead or dying; never an armor stand
     /// (`ArmorStand`'s override). `caller` is this entity.
     #[must_use]
@@ -5441,6 +5473,10 @@ impl EntityBase for LivingEntity {
         Some(self.held_item(self))
     }
 
+    fn can_use_portal(&self, ignore_passenger: bool) -> bool {
+        self.living_can_use_portal(self, ignore_passenger)
+    }
+
     fn damage_with_context(
         &self,
         caller: &dyn EntityBase,
@@ -5620,6 +5656,15 @@ impl EntityBase for LivingEntity {
             }
             // Players remain part of the world until their client requests a
             // respawn. Removing one here breaks reconnecting while dead.
+            // Vanilla `tickDeath` removes the player here (`remove(KILLED)`), and its
+            // `onTrackingEnd` takes it out of the waypoint manager (`removePlayer`, its own
+            // waypoint untracked) and the sleeping list; those hooks run now, and the respawn
+            // only runs them for a player that respawned sooner.
+            if time == 20
+                && let Some(player) = caller.get_player()
+            {
+                self.entity.world.load().on_player_tracking_end(player);
+            }
         }
     }
 
@@ -6212,17 +6257,12 @@ impl LivingEntity {
                     }
                 }
                 ConsumeEffect::TeleportRandomly { diameter, .. } => {
-                    // Java Edition dismounts the consumer before random teleport attempts.
-                    let vehicle = caller
-                        .get_entity()
-                        .vehicle
-                        .lock()
-                        .unwrap_or_else(std::sync::PoisonError::into_inner)
-                        .clone();
-                    if let Some(vehicle) = vehicle {
+                    // `TeleportRandomlyConsumeEffect`: a passenger stops riding first (vanilla
+                    // `stopRiding`, the full dismount); a plugin that cancels it keeps it seated.
+                    if let Some(vehicle) = caller.get_entity().get_vehicle() {
                         vehicle
                             .get_entity()
-                            .remove_passenger_sync(caller.get_entity().entity_id);
+                            .remove_passenger(caller.get_entity().entity_id);
                         if caller.get_entity().has_vehicle() {
                             continue;
                         }

@@ -17,6 +17,10 @@ impl JavaClient {
             ));
             return;
         }
+        // Vanilla `handleMovePlayer`: nothing moves while the End credits roll (`wonGame`).
+        if player.won_game.load(Ordering::Relaxed) {
+            return;
+        }
         let entity = &player.get_entity();
         let awaiting_teleport = player
             .awaiting_teleport

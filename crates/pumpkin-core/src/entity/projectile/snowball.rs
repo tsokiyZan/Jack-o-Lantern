@@ -33,6 +33,11 @@ impl SnowballEntity {
 }
 
 impl EntityBase for SnowballEntity {
+    /// Vanilla `ThrowableProjectile.canUsePortal`.
+    fn can_use_portal(&self, _ignore_passenger: bool) -> bool {
+        true
+    }
+
     fn get_projectile(&self) -> Option<&crate::entity::projectile::Projectile> {
         Some(&self.thrown.projectile)
     }

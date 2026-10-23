@@ -373,6 +373,11 @@ fn on_hit_as_potion(potion: &SplashPotionEntity, stack: &ItemStack, hit_pos: Vec
 }
 
 impl EntityBase for SplashPotionEntity {
+    /// Vanilla `ThrowableProjectile.canUsePortal`.
+    fn can_use_portal(&self, _ignore_passenger: bool) -> bool {
+        true
+    }
+
     fn get_projectile(&self) -> Option<&crate::entity::projectile::Projectile> {
         Some(&self.thrown.projectile)
     }

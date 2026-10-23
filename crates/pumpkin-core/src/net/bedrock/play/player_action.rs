@@ -218,6 +218,11 @@ impl BedrockClient {
             PlayerAction::DropItem => {
                 player.drop_held_item(false);
             }
+            // A respawn request while the credits roll ends them too, so a client that skips
+            // the serverbound `ShowCredits` can't be stranded out of every level.
+            PlayerAction::Respawn if player.won_game.load(Ordering::SeqCst) => {
+                player.end_credits();
+            }
             PlayerAction::Respawn
                 if player.living_entity.dead.load(Ordering::Relaxed)
                     || player.living_entity.health.load() <= 0.0 =>

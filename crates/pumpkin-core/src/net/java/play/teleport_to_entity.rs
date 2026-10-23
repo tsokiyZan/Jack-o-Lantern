@@ -26,7 +26,15 @@ impl JavaClient {
             player.camera_target_id.store(Some(target_id));
             player.try_send_client_packet(&CSetCamera::new(target_id.into()));
 
-            player.request_teleport(target_pos, target_yaw, target_pitch);
+            // Vanilla `teleportTo(level, ...)`, which leaves the vehicle (`removeVehicle`).
+            player.teleport_transition(&crate::entity::TeleportTarget {
+                world: target_player.world(),
+                position: target_pos,
+                yaw: Some(target_yaw),
+                pitch: Some(target_pitch),
+                keep_velocity: false,
+                as_passenger: false,
+            });
         }
     }
 }

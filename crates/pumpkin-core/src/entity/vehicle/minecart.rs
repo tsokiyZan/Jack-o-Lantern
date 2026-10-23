@@ -156,6 +156,23 @@ impl MinecartEntity {
 }
 
 impl EntityBase for MinecartEntity {
+    /// `OldMinecartBehavior.getMotionDirection`: the facing turned clockwise (of its opposite
+    /// when flipped).
+    fn dismount_forward(&self) -> Option<pumpkin_data::BlockDirection> {
+        let facing = crate::entity::direction_from_yaw(self.vehicle.entity.yaw.load());
+        let facing = if self.flipped.load(Ordering::Relaxed) {
+            facing.opposite()
+        } else {
+            facing
+        };
+        Some(facing.rotate_clockwise())
+    }
+
+    /// Vanilla `VehicleEntity.getDimensionChangingDelay`.
+    fn dimension_changing_delay(&self) -> u32 {
+        10
+    }
+
     /// Vanilla `AbstractMinecart.getKnownMovement` with `OldMinecartBehavior`'s: the delta
     /// movement (a minecart has no controlling passenger), its horizontal axes clamped to 0.4,
     /// and zero if any axis is NaN.
@@ -289,6 +306,8 @@ impl EntityBase for MinecartEntity {
     #[allow(clippy::too_many_lines)]
     fn tick(&self, caller: &dyn EntityBase, _server: &Server) {
         self.vehicle.tick();
+        // `AbstractMinecart.tick`: `handlePortal` after the hurt and damage decrement.
+        self.vehicle.entity.handle_portal(caller);
         if let MinecartKind::Furnace(minecart) = &self.kind {
             minecart.tick(&self.vehicle.entity);
         }
@@ -382,21 +401,9 @@ impl EntityBase for MinecartEntity {
                             minecart.prime(&self.vehicle.entity, 80);
                         }
                         MinecartKind::Rideable(_) => {
-                            if let Ok(passengers) = self.vehicle.entity.passengers.try_lock() {
-                                let p_ids: Vec<i32> = passengers
-                                    .iter()
-                                    .map(|p| p.get_entity().entity_id)
-                                    .collect();
-                                if !p_ids.is_empty() {
-                                    let world = self.vehicle.entity.world.load();
-                                    let vid = self.vehicle.entity.entity_id;
-                                    if let Some(v) = world.get_entity_by_id(vid) {
-                                        for pid in p_ids {
-                                            v.get_entity().remove_passenger_sync(pid);
-                                        }
-                                    }
-                                }
-                            }
+                            // `Minecart.activateMinecart`: `ejectPassengers`, each one's full
+                            // `stopRiding`.
+                            self.vehicle.entity.eject_passengers();
                             if self.vehicle.get_hurt_time() == 0 {
                                 self.vehicle.set_hurt_dir(-self.vehicle.get_hurt_dir());
                                 self.vehicle.set_hurt_time(10);

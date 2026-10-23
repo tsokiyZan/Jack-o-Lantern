@@ -80,13 +80,11 @@ impl ServerPlayerData {
             self.last_save.store(now);
             // Snapshot all online players periodically across all worlds
             let mut snapshots = Vec::new();
-            for world in server.worlds.load().iter() {
-                for player in world.players.load().iter() {
-                    let mut nbt = NbtCompound::new();
-                    player.write_nbt(&mut nbt);
-                    snapshots.push((player.gameprofile.id, nbt));
-                }
-            }
+            server.for_each_player(|player| {
+                let mut nbt = NbtCompound::new();
+                player.write_nbt(&mut nbt);
+                snapshots.push((player.gameprofile.id, nbt));
+            });
 
             if snapshots.is_empty() {
                 return;
@@ -112,11 +110,9 @@ impl ServerPlayerData {
         let mut total_players = 0;
 
         // Save players from all worlds
-        for world in server.worlds.load().iter() {
-            for player in world.players.load().iter() {
-                self.extract_data_and_save_player(player)?;
-                total_players += 1;
-            }
+        for player in server.get_all_players() {
+            self.extract_data_and_save_player(&player)?;
+            total_players += 1;
         }
 
         debug!("Saved data for {total_players} online players");

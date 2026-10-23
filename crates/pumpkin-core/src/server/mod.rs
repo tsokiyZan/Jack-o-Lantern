@@ -99,6 +99,10 @@ pub struct Server {
     pub item_registry: Arc<ItemRegistry>,
     /// Manages multiple worlds within the server.
     pub worlds: ArcSwap<Vec<Arc<World>>>,
+    /// Players in no level: vanilla's `PlayerList` keeps a player removed from its level while
+    /// the End credits roll (`showEndCredits`) until its client asks to respawn. The server
+    /// counts them as online and serves their connection; no level sees them.
+    pub levelless_players: ArcSwap<Vec<Arc<Player>>>,
     /// All the dimensions that exist on the server.
     pub dimensions: Vec<Dimension>,
     /// Assigns unique IDs to containers.
@@ -293,6 +297,7 @@ impl Server {
             enchantment_manager: Arc::new(enchantment::EnchantmentManager::new()),
             map_id: level_info.load().map_id.into(),
             worlds: ArcSwap::from_pointee(vec![]),
+            levelless_players: ArcSwap::from_pointee(vec![]),
             dimensions,
             command_dispatcher,
             block_registry: block_registry.clone(),
@@ -844,9 +849,16 @@ impl Server {
     ///
     /// * `packet`: A reference to the packet to be broadcast. The packet must implement the `ClientPacket` trait.
     pub fn broadcast_packet_all<P: ClientPacket>(&self, packet: &P) {
-        for world in self.worlds.load().iter() {
-            world.broadcast_packet_all(packet);
-        }
+        World::broadcast_packet_to(&self.get_all_players(), packet);
+    }
+
+    /// Vanilla `PlayerList.broadcastAll`, editioned: every player online, in a level or not.
+    pub fn broadcast_editioned_all<J: ClientPacket, B: pumpkin_protocol::BClientPacket>(
+        &self,
+        je_packet: &J,
+        be_packet: &B,
+    ) {
+        World::broadcast_editioned_to(&self.get_all_players(), je_packet, be_packet);
     }
 
     /// Broadcasts custom server links to all players on the server.
@@ -857,19 +869,18 @@ impl Server {
 
     pub fn broadcast_tab_list_header_footer(&self, header: &TextComponent, footer: &TextComponent) {
         let packet = CTabList::new(header, footer);
-        for world in self.worlds.load().iter() {
-            for player in world.players.load().iter() {
-                *player
-                    .tab_list_header
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner) = header.clone();
-                *player
-                    .tab_list_footer
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner) = footer.clone();
-            }
-            world.broadcast_packet_all(&packet);
+        let players = self.get_all_players();
+        for player in &players {
+            *player
+                .tab_list_header
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) = header.clone();
+            *player
+                .tab_list_footer
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) = footer.clone();
         }
+        World::broadcast_packet_to(&players, &packet);
     }
 
     pub fn broadcast_message(
@@ -889,9 +900,13 @@ impl Server {
                     Some(NOT_SECURE_CHAT_TAG),
                 );
             }
-            for world in self.worlds.load().iter() {
-                world.broadcast_message(&event.message, &event.sender, chat_type, target_name);
-            }
+            World::send_message_to(
+                &self.get_all_players(),
+                &event.message,
+                &event.sender,
+                chat_type,
+                target_name,
+            );
         }
     }
 
@@ -940,16 +955,15 @@ impl Server {
         sender_name: &TextComponent,
         target_name: Option<&TextComponent>,
     ) {
-        for world in self.worlds.load().iter() {
-            world.broadcast_chat_message(
-                message,
-                &is_filtered,
-                sender_player,
-                chat_type,
-                sender_name,
-                target_name,
-            );
-        }
+        World::send_chat_message_to(
+            &self.get_all_players(),
+            message,
+            is_filtered,
+            sender_player,
+            chat_type,
+            sender_name,
+            target_name,
+        );
     }
 
     /// Gets the current difficulty of the server.
@@ -992,13 +1006,13 @@ impl Server {
 
         for world in self.worlds.load().iter() {
             world.set_difficulty(new_difficulty);
-            world.broadcast_editioned(
-                &CChangeDifficulty::new(new_difficulty as u8, locked),
-                &pumpkin_protocol::bedrock::client::CSetDifficulty {
-                    difficulty: (new_difficulty as u32).into(),
-                },
-            );
         }
+        self.broadcast_editioned_all(
+            &CChangeDifficulty::new(new_difficulty as u8, locked),
+            &pumpkin_protocol::bedrock::client::CSetDifficulty {
+                difficulty: (new_difficulty as u32).into(),
+            },
+        );
     }
 
     /// Sets the difficulty lock status of the server and broadcasts the update to all players.
@@ -1009,14 +1023,12 @@ impl Server {
         let difficulty = new_info.difficulty;
         self.level_info.store(Arc::new(new_info));
 
-        for world in self.worlds.load().iter() {
-            world.broadcast_editioned(
-                &CChangeDifficulty::new(difficulty as u8, locked),
-                &pumpkin_protocol::bedrock::client::CSetDifficulty {
-                    difficulty: (difficulty as u32).into(),
-                },
-            );
-        }
+        self.broadcast_editioned_all(
+            &CChangeDifficulty::new(difficulty as u8, locked),
+            &pumpkin_protocol::bedrock::client::CSetDifficulty {
+                difficulty: (difficulty as u32).into(),
+            },
+        );
     }
 
     /// Searches for a player by their username across all worlds.
@@ -1037,19 +1049,21 @@ impl Server {
                 return Some(player);
             }
         }
-        None
+        self.levelless_players
+            .load()
+            .iter()
+            .find(|player| player.gameprofile.name.eq_ignore_ascii_case(name))
+            .cloned()
     }
 
     pub fn get_players_by_ip(&self, ip: IpAddr) -> Vec<Arc<Player>> {
         let mut players = Vec::<Arc<Player>>::new();
 
-        for world in self.worlds.load().iter() {
-            for player in world.players.load().iter() {
-                if player.client.address().ip() == ip {
-                    players.push(player.clone());
-                }
+        self.for_each_player(|player| {
+            if player.client.address().ip() == ip {
+                players.push(player.clone());
             }
-        }
+        });
 
         players
     }
@@ -1061,6 +1075,7 @@ impl Server {
         for world in self.worlds.load().iter() {
             players.extend(world.players.load().iter().cloned());
         }
+        players.extend(self.levelless_players.load().iter().cloned());
 
         players
     }
@@ -1076,6 +1091,9 @@ impl Server {
             for player in players.iter() {
                 f(player);
             }
+        }
+        for player in self.levelless_players.load().iter() {
+            f(player);
         }
     }
 
@@ -1103,7 +1121,48 @@ impl Server {
                 return Some(player);
             }
         }
-        None
+        self.levelless_players
+            .load()
+            .iter()
+            .find(|player| player.gameprofile.id == id)
+            .cloned()
+    }
+
+    /// Holds `player` outside any level (see [`Server::levelless_players`]).
+    pub fn add_levelless_player(&self, player: &Arc<Player>) {
+        self.levelless_players.rcu(|current| {
+            let mut list = (**current).clone();
+            if !list
+                .iter()
+                .any(|p| p.gameprofile.id == player.gameprofile.id)
+            {
+                list.push(player.clone());
+            }
+            list
+        });
+    }
+
+    /// Takes the player with `id` off the level-less list, if it is there.
+    pub fn take_levelless_player(&self, id: uuid::Uuid) -> Option<Arc<Player>> {
+        let mut taken = None;
+        self.levelless_players.rcu(|current| {
+            let mut list = (**current).clone();
+            taken = list
+                .iter()
+                .position(|p| p.gameprofile.id == id)
+                .map(|i| list.remove(i));
+            list
+        });
+        taken
+    }
+
+    /// Vanilla `ServerGamePacketListenerImpl.tick` for a player in no level: its packets are
+    /// still handled (the credits end with a respawn request).
+    fn tick_levelless_players(&self) {
+        let _guard = self.runtime.enter();
+        for player in self.levelless_players.load().iter() {
+            player.process_inbound_packets();
+        }
     }
 
     /// Counts the total number of players across all worlds.
@@ -1114,7 +1173,7 @@ impl Server {
     ///
     /// The total number of players connected to the server.
     pub fn get_player_count(&self) -> usize {
-        let mut count = 0;
+        let mut count = self.levelless_players.load().len();
         for world in self.worlds.load().iter() {
             count += world.players.load().len();
         }
@@ -1123,7 +1182,10 @@ impl Server {
 
     /// Similar to [`Server::get_player_count`] >= n, but may be more efficient since it stops its iteration through all worlds as soon as n players were found.
     pub fn has_n_players(&self, n: usize) -> bool {
-        let mut count = 0;
+        let mut count = self.levelless_players.load().len();
+        if count >= n {
+            return true;
+        }
         for world in self.worlds.load().iter() {
             count += world.players.load().len();
             if count >= n {
@@ -1244,6 +1306,7 @@ impl Server {
             self.sync_game_time();
             self.tick_players_and_network();
         }
+        self.tick_levelless_players();
         // Vanilla `tickConnection`: console commands run between ticks, after the worlds.
         self.handle_console_inputs();
         self.flush_pending_block_updates();
@@ -1370,17 +1433,15 @@ impl Server {
             &sample_slice,
             pumpkin_protocol::codec::var_int::VarInt(0),
         );
-        for world in self.worlds.load().iter() {
-            let players = world.players.load();
-            let recipients = players
-                .iter()
-                .filter(|player| {
-                    player.subscribed_debug_sample.load(Ordering::Relaxed)
-                        && player.permission_lvl.load() >= pumpkin_util::PermissionLvl::Two
-                })
-                .filter_map(|player| player.client.java());
-            World::broadcast_java_clients(&packet, recipients);
-        }
+        let players = self.get_all_players();
+        let recipients = players
+            .iter()
+            .filter(|player| {
+                player.subscribed_debug_sample.load(Ordering::Relaxed)
+                    && player.permission_lvl.load() >= pumpkin_util::PermissionLvl::Two
+            })
+            .filter_map(|player| player.client.java());
+        World::broadcast_java_clients(&packet, recipients);
     }
 
     /// Gets the rolling average tick time over the last 100 ticks, in nanoseconds.

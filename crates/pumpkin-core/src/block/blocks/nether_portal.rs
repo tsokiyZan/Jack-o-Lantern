@@ -7,7 +7,7 @@ use pumpkin_data::{
     entity::EntityType,
 };
 use pumpkin_macros::pumpkin_block;
-use pumpkin_util::{Difficulty, GameMode, math::vector3::Vector3};
+use pumpkin_util::{Difficulty, math::vector3::Vector3};
 use rand::RngExt;
 use uuid::Uuid;
 
@@ -17,29 +17,35 @@ use crate::{
         RandomTickArgs,
     },
     entity::{EntityBase, r#type::from_type},
-    world::{World, portal::nether::NetherPortal},
+    world::{
+        World,
+        portal::{PortalType, nether::NetherPortal},
+    },
 };
 
 #[pumpkin_block("minecraft:nether_portal")]
 pub struct NetherPortalBlock;
 
 impl NetherPortalBlock {
-    /// Gets the portal delay time based on entity type and gamemode
+    /// Vanilla `NetherPortalBlock.getPortalTransitionTime`: a player waits the gamerule delay
+    /// (the creative one while invulnerable), anything else goes through at once.
     #[must_use]
-    pub fn get_portal_time(world: &Arc<World>, entity: &dyn EntityBase) -> u32 {
-        let entity_type = entity.get_entity().entity_type;
+    pub fn get_portal_transition_time(world: &World, entity: &dyn EntityBase) -> u32 {
+        let Some(player) = entity.get_player() else {
+            return 0;
+        };
+        let invulnerable = player
+            .abilities
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .invulnerable;
         let level_info = world.level_info.load();
-        match entity_type.id {
-            id if id == EntityType::PLAYER.id => (world
-                .get_player_by_id(entity.get_entity().entity_id))
-            .map_or(80, |player| match player.gamemode.load() {
-                GameMode::Creative => {
-                    level_info.game_rules.players_nether_portal_creative_delay as u32
-                }
-                _ => level_info.game_rules.players_nether_portal_default_delay as u32,
-            }),
-            _ => 0,
-        }
+        let delay = if invulnerable {
+            level_info.game_rules.players_nether_portal_creative_delay
+        } else {
+            level_info.game_rules.players_nether_portal_default_delay
+        };
+        delay.max(0) as u32
     }
 }
 
@@ -113,19 +119,22 @@ impl BlockBehaviour for NetherPortalBlock {
                 args.world,
                 Uuid::new_v4(),
             );
+            // `setPortalCooldown`, on the piglin and on its vehicle.
             mob.get_entity()
                 .portal_cooldown
-                .store(300, Ordering::Relaxed);
+                .store(mob.dimension_changing_delay(), Ordering::Relaxed);
+            if let Some(vehicle) = mob.get_entity().get_vehicle() {
+                vehicle
+                    .get_entity()
+                    .portal_cooldown
+                    .store(vehicle.dimension_changing_delay(), Ordering::Relaxed);
+            }
             args.world.spawn_entity_non_save(mob);
         }
     }
 
     fn on_entity_collision(&self, args: OnEntityCollisionArgs<'_>) {
-        if args
-            .entity
-            .get_mob()
-            .is_some_and(|mob| !mob.can_use_portal())
-        {
+        if !args.entity.can_use_portal(false) {
             return;
         }
         let target_world =
@@ -144,9 +153,12 @@ impl BlockBehaviour for NetherPortalBlock {
             args.position,
             target_world.dimension.minecraft_name
         );
-        args.entity
-            .get_entity()
-            .try_use_portal(target_world, *args.position);
+        args.entity.get_entity().try_use_portal(
+            args.entity,
+            PortalType::Nether,
+            &target_world,
+            *args.position,
+        );
     }
 
     fn on_state_replaced(&self, args: OnStateReplacedArgs<'_>) {

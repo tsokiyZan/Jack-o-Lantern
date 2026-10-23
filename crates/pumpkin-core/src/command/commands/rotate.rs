@@ -16,7 +16,7 @@ use crate::command::argument_types::entity_anchor::{
 use crate::command::context::command_context::CommandContext;
 use crate::command::node::dispatcher::CommandDispatcher;
 use crate::command::node::{CommandExecutor, CommandExecutorResult};
-use crate::entity::EntityBase;
+use crate::entity::{EntityBase, TeleportTarget};
 
 const DESCRIPTION: &str = "Changes the rotation of an entity.";
 const PERMISSION: &str = "minecraft:command.rotate";
@@ -41,6 +41,18 @@ fn rotate_entity(target: &Arc<dyn EntityBase>, yaw: f32, pitch: f32) {
     let pos = entity.pos.load();
     let world = entity.world.load_full();
     let clamped_pitch = pitch.clamp(-90.0, 90.0);
+    if let Some(player) = target.get_player() {
+        // Vanilla `forceSetRotation` leaves a riding player on its vehicle.
+        player.teleport_in_world(&TeleportTarget {
+            world,
+            position: pos,
+            yaw: Some(yaw),
+            pitch: Some(clamped_pitch),
+            keep_velocity: false,
+            as_passenger: true,
+        });
+        return;
+    }
     target.teleport(pos, Some(yaw), Some(clamped_pitch), world);
 }
 

@@ -354,6 +354,17 @@ impl World {
         | PlayerInfoFlags::UPDATE_LIST_PRIORITY.bits()
         | PlayerInfoFlags::UPDATE_HAT.bits();
 
+    /// Vanilla `ServerLevel.isAllowedToEnterPortal`.
+    #[must_use]
+    pub fn is_allowed_to_enter_portal(&self, to: &Self) -> bool {
+        to.dimension != Dimension::THE_NETHER
+            || self
+                .level_info
+                .load()
+                .game_rules
+                .allow_entering_nether_using_portals
+    }
+
     pub async fn get_block_state_id_async(&self, position: &BlockPos) -> BlockStateId {
         if !self.is_in_build_limit(*position) {
             return Block::AIR.default_state.id;
@@ -771,6 +782,28 @@ impl World {
         self.level.shutdown().await;
     }
 
+    /// Vanilla `EntityType.loadEntityRecursive(tag, level, LOAD, e -> addWithUUID(e) ? e : null)`:
+    /// the entity from its `id`, added to the level under its saved UUID, then each saved
+    /// passenger with its own passengers riding it. `None` when the tag names no known type or
+    /// the UUID is already in the level.
+    pub fn load_entity_recursive(
+        self: &Arc<Self>,
+        nbt: &NbtCompound,
+    ) -> Option<Arc<dyn EntityBase>> {
+        let entity_type = nbt
+            .get_string("id")
+            .and_then(|id| EntityType::from_name(id.strip_prefix("minecraft:").unwrap_or(id)))?;
+        let uuid = nbt.get_uuid("UUID").unwrap_or_else(Uuid::new_v4);
+        let entity = from_type(entity_type, Vector3::new(0.0, 0.0, 0.0), self, uuid);
+        entity.read_nbt_non_mut(nbt);
+        entity.init_data_tracker();
+        if !self.add_entity_silent(entity.clone()) {
+            return None;
+        }
+        Self::load_passengers(self, &entity, nbt);
+        Some(entity)
+    }
+
     /// Vanilla `TicketStorage` saved data (`chunk_tickets.dat`), written with the level's
     /// other saved data on every save, the one on shutdown included.
     fn save_chunk_tickets(&self) {
@@ -797,23 +830,13 @@ impl World {
             let pumpkin_nbt::tag::NbtTag::Compound(passenger_nbt) = passenger_nbt else {
                 continue;
             };
-            let Some(entity_type) = passenger_nbt
-                .get_string("id")
-                .and_then(|id| EntityType::from_name(id.strip_prefix("minecraft:").unwrap_or(id)))
-            else {
+            let Some(passenger) = world.load_entity_recursive(passenger_nbt) else {
                 continue;
             };
-            let uuid = passenger_nbt.get_uuid("UUID").unwrap_or_else(Uuid::new_v4);
-            let passenger = from_type(entity_type, Vector3::new(0.0, 0.0, 0.0), world, uuid);
-            passenger.read_nbt_non_mut(passenger_nbt);
-            passenger.init_data_tracker();
-            if !world.add_entity_silent(passenger.clone()) {
-                continue;
-            }
+            // `loadPassengersRecursive`: the passenger rides once its own stack is loaded.
             vehicle
                 .get_entity()
-                .add_passenger_without_event(vehicle.clone(), passenger.clone());
-            Self::load_passengers(world, &passenger, passenger_nbt);
+                .add_passenger_without_event(vehicle.clone(), passenger);
         }
     }
 
@@ -1266,7 +1289,11 @@ impl World {
     ///
     /// **Note:** This function acquires a lock on the `current_players` map, ensuring thread safety.
     pub fn broadcast_packet_all<P: ClientPacket>(&self, packet: &P) {
-        let players = self.players.load();
+        Self::broadcast_packet_to(&self.players.load(), packet);
+    }
+
+    /// Sends `packet` to the Java clients among `players`.
+    pub fn broadcast_packet_to<P: ClientPacket>(players: &[Arc<Player>], packet: &P) {
         let recipients_by_version = Self::collect_java_recipients_by_version(players.iter());
         Self::broadcast_java_grouped(packet, recipients_by_version);
     }
@@ -1306,11 +1333,28 @@ impl World {
         chat_type: u8,
         target_name: Option<&TextComponent>,
     ) {
+        Self::send_message_to(
+            &self.players.load(),
+            message,
+            sender_name,
+            chat_type,
+            target_name,
+        );
+    }
+
+    /// A disguised chat message (a command's, unsigned) to `players`.
+    pub fn send_message_to(
+        players: &[Arc<Player>],
+        message: &TextComponent,
+        sender_name: &TextComponent,
+        chat_type: u8,
+        target_name: Option<&TextComponent>,
+    ) {
         let be_packet = SText::new(message.clone().get_text(), sender_name.clone().get_text());
         let je_packet =
             CDisguisedChatMessage::new(message, (chat_type + 1).into(), sender_name, target_name);
 
-        self.broadcast_editioned(&je_packet, &be_packet);
+        Self::broadcast_editioned_to(players, &je_packet, &be_packet);
     }
 
     // This should replace broadcast_packet_all at some point
@@ -1319,7 +1363,15 @@ impl World {
         je_packet: &J,
         be_packet: &B,
     ) {
-        let players = self.players.load();
+        Self::broadcast_editioned_to(&self.players.load(), je_packet, be_packet);
+    }
+
+    /// `broadcast_editioned` to `players`.
+    pub fn broadcast_editioned_to<J: ClientPacket, B: BClientPacket>(
+        players: &[Arc<Player>],
+        je_packet: &J,
+        be_packet: &B,
+    ) {
         let je_recipients_by_version = Self::collect_java_recipients_by_version(players.iter());
 
         Self::broadcast_java_grouped(je_packet, je_recipients_by_version);
@@ -1341,11 +1393,36 @@ impl World {
         sender_name: &TextComponent,
         target_name: Option<&TextComponent>,
     ) {
+        // Vanilla `PlayerList.broadcastChatMessage`: every player online, in any level or none.
+        let players = self.server.upgrade().map_or_else(
+            || self.players.load().as_ref().clone(),
+            |server| server.get_all_players(),
+        );
+        Self::send_chat_message_to(
+            &players,
+            message,
+            is_filtered,
+            sender_player,
+            chat_type,
+            sender_name,
+            target_name,
+        );
+    }
+
+    /// The body of vanilla `PlayerList.broadcastChatMessage`, to `players`.
+    pub fn send_chat_message_to(
+        players: &[Arc<Player>],
+        message: &crate::net::chat::PlayerChatMessage,
+        is_filtered: impl Fn(&Player) -> bool,
+        sender_player: Option<&Arc<Player>>,
+        chat_type: VarInt,
+        sender_name: &TextComponent,
+        target_name: Option<&TextComponent>,
+    ) {
         let tracked = crate::net::chat::OutgoingChatMessage::create(message.clone());
         let mut was_fully_filtered = false;
 
-        let players = self.players.load();
-        for player in players.iter() {
+        for player in players {
             let filtered = is_filtered(player);
             tracked.send_to_player(player, filtered, chat_type, sender_name, target_name);
             was_fully_filtered |= filtered && message.is_fully_filtered();
@@ -2008,23 +2085,6 @@ impl World {
             .collect()
     }
 
-    /// Vanilla `Entity.countPlayerPassengers`: the players among all of the entity's
-    /// passengers, however deep.
-    fn count_player_passengers(entity: &dyn EntityBase) -> usize {
-        entity
-            .get_entity()
-            .passengers
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone()
-            .iter()
-            .map(|passenger| {
-                usize::from(passenger.get_player().is_some())
-                    + Self::count_player_passengers(passenger.as_ref())
-            })
-            .sum()
-    }
-
     /// The entity half of vanilla `ServerLevel.tick` while the tick is frozen:
     /// `TickRateManager.isEntityFrozen` never freezes a player or an entity that carries one,
     /// so they tick as in `tick`, and the players then move (`ServerPlayer.doTick`, from the
@@ -2038,6 +2098,9 @@ impl World {
             let _guard = player_handle.enter();
             player.get_entity().common_tick();
             player.tick(server);
+            if player.pending_center_pairing.swap(false, Ordering::Relaxed) {
+                player.world().pair_center_chunk(player);
+            }
         });
         for player in players.iter() {
             if player.get_entity().has_passengers() {
@@ -2050,7 +2113,7 @@ impl World {
         let guard = handle.enter();
         for entity in self.entities.load().iter() {
             if entity.get_entity().has_vehicle()
-                || Self::count_player_passengers(entity.as_ref()) == 0
+                || entity.get_entity().count_player_passengers() == 0
             {
                 continue;
             }
@@ -2129,6 +2192,9 @@ impl World {
             let _guard = player_handle.enter();
             player.get_entity().common_tick();
             player.tick(server);
+            if player.pending_center_pairing.swap(false, Ordering::Relaxed) {
+                player.world().pair_center_chunk(player);
+            }
         });
         // A player's passengers tick with it, as with any other vehicle.
         for player in players.iter() {
@@ -4022,6 +4088,9 @@ impl World {
         }
         // `onTrackingStart`: Bedrock gets no waypoint packets, but Java players see it.
         self.waypoint_manager.on_player_tracking_start(&player);
+
+        // `PrepareSpawnTask.spawn`, after `placeNewPlayer`.
+        player.load_and_spawn_parent_vehicle();
     }
 
     /// Finishes the Java login.
@@ -4579,6 +4648,9 @@ impl World {
                 false,
             );
         }
+
+        // `PrepareSpawnTask.spawn`, after `placeNewPlayer`.
+        player.load_and_spawn_parent_vehicle();
     }
 
     /// Bedrock trackers' `MobEquipment` for a joining player's held item. Java trackers get
@@ -4619,9 +4691,6 @@ impl World {
         player.get_entity().refresh_synced_data();
 
         chunker::update_position(player);
-        // Update commands
-
-        player.set_health(20.0);
     }
 
     /// Vanilla `ServerLevel.explode(source, x, y, z, r, interaction)`: default damage source,
@@ -4806,84 +4875,45 @@ impl World {
         ));
 
         let data_kept = u8::from(alive);
+        // Back from the End credits: the player is in no level (`showEndCredits`).
+        let from_credits = player.won_game.load(Ordering::SeqCst);
 
         let server = self.server.upgrade();
-        let default_world = server.as_ref().map_or_else(
-            || self.clone(),
-            |s| s.get_world_from_dimension(&Dimension::OVERWORLD),
+        let keep_inventory = server.as_ref().map_or_else(
+            || self.level_info.load().game_rules.keep_inventory,
+            |s| {
+                s.get_world_from_dimension(&Dimension::OVERWORLD)
+                    .level_info
+                    .load()
+                    .game_rules
+                    .keep_inventory
+            },
         );
 
-        // Copy spawn info from default world level_info to avoid holding lock across await
-        let (spawn_x, spawn_y, spawn_z, spawn_yaw, spawn_pitch, keep_inventory) = {
-            let info = default_world.level_info.load();
-            (
-                info.spawn_x,
-                info.spawn_y,
-                info.spawn_z,
-                info.spawn_yaw,
-                info.spawn_pitch,
-                info.game_rules.keep_inventory,
-            )
-        };
-
-        // Get respawn position and dimension
-        let (position, yaw, pitch, respawn_dimension) = if let Some(respawn) =
-            player.calculate_respawn_point().await
-        {
-            (
-                respawn.position,
-                respawn.yaw,
-                respawn.pitch,
-                respawn.dimension,
-            )
-        } else {
-            // No valid respawn point - send notification if player had one set
-            if player
+        // Vanilla `PlayerList.respawn`: `findRespawnPositionAndUseSpawnBlock(!keepAllPlayerData)`.
+        let respawn = player
+            .find_respawn_position_and_use_spawn_block(!alive)
+            .await;
+        if respawn.missing_respawn_block {
+            player
+                .send_client_packet(&CGameEvent::new(GameEvent::NoRespawnBlockAvailable, 0.0))
+                .await;
+            let mut guard = player
                 .respawn_point
                 .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .is_some()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            if let Some(point) = guard.as_ref()
+                && !point.force
             {
-                player
-                    .send_client_packet(&CGameEvent::new(GameEvent::NoRespawnBlockAvailable, 0.0))
-                    .await;
-                let mut guard = player
-                    .respawn_point
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner);
-                if let Some(point) = guard.as_ref()
-                    && !point.force
-                {
-                    *guard = None;
-                }
+                *guard = None;
             }
-
-            // FIXME: This spawn position calculation is incorrect. Should use vanilla's
-            // proper spawn position calculation (see #1381). The y-level calculation
-            // needs to account for spawn radius and find a safe spawn position.
-            let chunk_pos = Vector2::new(spawn_x >> 4, spawn_z >> 4);
-            default_world
-                .level
-                .get_or_fetch_chunk(chunk_pos, |_| ())
-                .await;
-            let top = default_world.get_top_block(Vector2::new(spawn_x, spawn_z));
-            let pos_y = if top > default_world.dimension.min_y {
-                top + 1
-            } else {
-                spawn_y
-            };
-
-            (
-                Vector3::new(
-                    f64::from(spawn_x) + 0.5,
-                    f64::from(pos_y),
-                    f64::from(spawn_z) + 0.5,
-                ),
-                spawn_yaw,
-                spawn_pitch,
-                default_world.dimension.clone(),
-            )
-        };
+        }
+        let (position, yaw, pitch, respawn_dimension) = (
+            respawn.position,
+            respawn.yaw,
+            respawn.pitch,
+            respawn.dimension,
+        );
 
         let mut spawn_loc_event = crate::plugin::api::events::player::player_spawn_location::PlayerSpawnLocationEvent::new(
             player.clone(),
@@ -4945,16 +4975,22 @@ impl World {
 
                         // Detach from the old world before publishing into the new one, so no
                         // observer sees the player in a world whose chunk manager doesn't match.
-                        self.remove_player(player, false).await;
-                        player.unload_watched_chunks(self).await;
+                        // A player back from the End credits left its level already.
+                        // It joins the new level's players once placed, below.
+                        if !from_credits {
+                            self.remove_player(player, false).await;
+                            player.unload_watched_chunks(self).await;
+                        }
                         player.change_world_chunks(&self.level, &destination);
                         player.living_entity.entity.set_world(destination.clone());
-                        destination.players.rcu(|current_list| {
-                            let mut new_list = (**current_list).clone();
-                            new_list.push(player.clone());
-                            new_list
-                        });
-                        destination.update_sleeping_player_list();
+                        if !from_credits {
+                            destination.players.rcu(|current_list| {
+                                let mut new_list = (**current_list).clone();
+                                new_list.push(player.clone());
+                                new_list
+                            });
+                            destination.update_sleeping_player_list();
+                        }
                     }
 
                     (Some(destination), position, yaw, pitch)
@@ -4979,6 +5015,32 @@ impl World {
             || (self.clone(), position, yaw, pitch),
             |new_world| (new_world.clone(), position, yaw, pitch),
         );
+
+        // `PlayerList.respawn`'s `removePlayerImmediately` for a player that stays in this
+        // level: `onTrackingEnd` (out of `players`, the waypoint manager and the sleeping
+        // list); `addRespawnedPlayer` puts it back below. The tracker entry is swapped by
+        // `respawn_entity`. A player back from the credits left its level already, and one
+        // changing level left it at the `PlayerChangeWorldEvent` above.
+        let same_level = target_world.uuid == self.uuid;
+        if same_level && !from_credits {
+            let mut removed = false;
+            self.players.rcu(|current| {
+                let mut list = (**current).clone();
+                let before = list.len();
+                list.retain(|p| p.gameprofile.id != player.gameprofile.id);
+                removed = list.len() != before;
+                list
+            });
+            // A player dead for 20 ticks already went through them (`tickDeath`'s
+            // `remove(KILLED)`); vanilla's `removePlayerImmediately` then does nothing.
+            if removed && player.living_entity.death_time.load(Ordering::Relaxed) < 20 {
+                self.on_player_tracking_end(player);
+            }
+        }
+
+        // Vanilla respawns a fresh `ServerPlayer`: standing, no fall, fire, speed or portal
+        // cooldown (sent in `CRespawn`) whatever `restoreFrom` keeps.
+        player.living_entity.reset_fresh_entity_state();
 
         // Notify plugins that the player has respawned (non-cancellable).
         if let Some(server) = self.server.upgrade() {
@@ -5048,16 +5110,32 @@ impl World {
             )
             .await;
 
-        player.living_entity.reset_state();
+        // Vanilla `restoreFrom(old, keepAllPlayerData)`: after the credits (`alive`) the player
+        // keeps its health, food, effects, inventory and experience.
+        if !alive {
+            player.living_entity.reset_state();
+        }
 
         player.send_permission_lvl_update();
 
-        player.hunger_manager.restart();
+        // `restoreFrom`'s `lastSentExp/Health/Food = -1`: the client's new player gets them on
+        // the next tick.
+        player.reset_sent_info();
+        let mut experience_sent = false;
+        if !alive {
+            player.hunger_manager.restart();
 
-        if !keep_inventory {
-            player.set_experience(0, 0.0, 0);
-            player.inventory.clear();
+            if !keep_inventory {
+                player.set_experience(0, 0.0, 0);
+                player.inventory.clear();
+                experience_sent = true;
+            }
         }
+        // `PlayerList.respawn`: the experience and the active effects, always.
+        if !experience_sent {
+            player.send_experience();
+        }
+        player.send_active_effects();
 
         // Set entity position BEFORE loading chunks, so chunks load at the right location
         // This mirrors the initial spawn flow where update_position is called before teleport
@@ -5065,19 +5143,66 @@ impl World {
         player.get_entity().set_rotation(yaw, pitch);
         player.get_entity().last_pos.store(position);
 
-        // TODO: difficulty, exp bar, status effect
+        // The level takes the player back (`level.addRespawnedPlayer`) once it stands at its
+        // respawn position (`snapTo`); only then is it out of the credits, so no level ticks it
+        // where it left (the End exit portal) meanwhile.
+        if from_credits {
+            if !target_world
+                .players
+                .load()
+                .iter()
+                .any(|p| p.gameprofile.id == player.gameprofile.id)
+            {
+                target_world.players.rcu(|current_list| {
+                    let mut new_list = (**current_list).clone();
+                    new_list.push(player.clone());
+                    new_list
+                });
+            }
+            if let Some(server) = &server {
+                server.take_levelless_player(player.gameprofile.id);
+            }
+            player.living_entity.entity.removal_reason.store(None);
+            player.won_game.store(false, Ordering::SeqCst);
+            player.ending_credits.store(false, Ordering::SeqCst);
+        }
+
+        // TODO: difficulty
 
         // Registered after positioning; a same-dimension respawn keeps its client entities.
-        if target_world.uuid == self.uuid {
+        // `addRespawnedPlayer`'s `onTrackingStart`: `players.add`, the waypoint manager, then
+        // the sleeping list.
+        if same_level {
+            if !from_credits
+                && !target_world
+                    .players
+                    .load()
+                    .iter()
+                    .any(|p| p.gameprofile.id == player.gameprofile.id)
+            {
+                target_world.players.rcu(|current_list| {
+                    let mut new_list = (**current_list).clone();
+                    new_list.push(player.clone());
+                    new_list
+                });
+            }
             // Clients never remove a dead entity themselves, so viewers would keep the corpse.
             target_world
                 .entity_tracker
                 .respawn_entity(&(player.clone() as Arc<dyn EntityBase>), &target_world);
+            target_world
+                .waypoint_manager
+                .on_player_tracking_start(player);
         } else {
             target_world.add_arriving_player(player);
             target_world
                 .entity_tracker
                 .repair_respawned_player(player, &target_world);
+        }
+        // A player changing level without the credits had its sleeping list updated when it
+        // joined the new level's players, above.
+        if same_level || from_credits {
+            target_world.update_sleeping_player_list();
         }
         // Vanilla respawns a fresh `ServerPlayer` with an empty `lastEquipmentItems`: after
         // `CRespawn` and the re-add, the next tick sends its equipment and modifiers again.
@@ -5094,6 +5219,7 @@ impl World {
 
         // Send teleport packet after at least the center chunk was delivered
         player.request_teleport(position, yaw, pitch);
+        player.pending_center_pairing.store(true, Ordering::Relaxed);
 
         target_world.refresh_java_player_for_bedrock(player).await;
     }
@@ -5201,17 +5327,14 @@ impl World {
                         base_entity.velocity.store(Vector3::default());
 
                         // UUID-dedupes if another watcher already loaded this entity.
-                        // Tracker owns pairing (spawn packets + vehicle restore).
+                        // Tracker owns pairing (spawn packets).
                         if world.add_entity_silent(entity.clone()) {
                             Self::load_passengers(&world, &entity, entity_nbt);
-                        }
-                        if let Some(player) = &player {
-                            player.try_restore_vehicle(&entity);
                         }
                     }
                 } else if let Some(player) = &player {
                     // Already live for other watchers: pair this player now so
-                    // spawn packets and vehicle restore do not wait on a tracker tick.
+                    // spawn packets do not wait on a tracker tick.
                     world
                         .entity_tracker
                         .update_player_chunks(player, &world, &[position]);
@@ -5692,6 +5815,13 @@ impl World {
         )
     }
 
+    /// The player part of vanilla `ServerLevel.EntityCallbacks.onTrackingEnd`, after
+    /// `players.remove`: the waypoint manager's `removePlayer`, then the sleeping list.
+    pub fn on_player_tracking_end(&self, player: &Player) {
+        self.waypoint_manager.remove_player(player);
+        self.update_sleeping_player_list();
+    }
+
     /// Publishes a player from another world -> tab list first, Java drops spawns without it.
     pub fn add_arriving_player(&self, player: &Arc<Player>) {
         let id = player.gameprofile.id;
@@ -5716,7 +5846,7 @@ impl World {
     }
 
     /// Sends the centre chunk ahead of the teleport and records it as held.
-    pub async fn send_center_chunk(&self, player: &Player) {
+    pub async fn send_center_chunk(&self, player: &Arc<Player>) {
         let ClientPlatform::Java(java_client) = player.client.as_ref() else {
             return;
         };
@@ -5731,6 +5861,19 @@ impl World {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .mark_sent_out_of_band(center_chunk);
+    }
+
+    /// Pairs a player that just arrived or respawned with the entities in its centre chunk, on
+    /// its first tick there. Vanilla pairs such a player in `ChunkMap.move` on its tick
+    /// (`TrackedEntity.updatePlayer`, gated by `isChunkTracked`), after `connection.teleport`
+    /// and after that tick's `ChunkMap.tick` (`sendChanges`). Pumpkin pairs per sent chunk,
+    /// and the centre chunk went out of band before the teleport, so its entities are paired
+    /// here. A player back from another dimension so sees what already stands there, such as
+    /// the vehicle it rides again.
+    pub fn pair_center_chunk(&self, player: &Arc<Player>) {
+        let center_chunk = player.get_entity().chunk_pos.load();
+        self.entity_tracker
+            .update_player_chunks(player, self, &[center_chunk]);
     }
 
     /// Must only be called after the player's own `CLogin` packet has been sent.
@@ -5780,13 +5923,21 @@ impl World {
             }
             new_list
         });
+        // A player of this level watching the End credits is in no level's list: the server
+        // holds it (`PlayerList`), and it leaves from there. One found here may be halfway
+        // through `Player::remove_from_level` (already on the level-less list), so it is
+        // taken off that list too.
+        if let Some(server) = self.server.upgrade() {
+            if removed_player.is_some() {
+                server.take_levelless_player(player.gameprofile.id);
+            } else if player.world().uuid == self.uuid {
+                removed_player = server.take_levelless_player(player.gameprofile.id);
+            }
+        }
         if let Some(ref player) = removed_player {
             self.entity_tracker
                 .remove_entity(player.as_ref() as &dyn EntityBase, self);
-            // `onTrackingEnd`: `players.remove`, the waypoint manager's `removePlayer`, then
-            // the sleeping list.
-            self.waypoint_manager.remove_player(player);
-            self.update_sleeping_player_list();
+            self.on_player_tracking_end(player);
             let uuid = player.gameprofile.id;
             let entity_id = player.entity_id();
 
@@ -5964,24 +6115,6 @@ impl World {
                 .get_entity()
                 .add_passenger_without_event(vehicle.clone(), rider);
         }
-        // A converted mob's rider is already in the world, so it is only mounted, by
-        // `rootPassenger.startRiding(to)`: `canRide` (not sneaking, no boarding cooldown) and
-        // `canAddPassenger` (no passenger yet), with the game event.
-        if let Some(rider) = mob.get_mob_entity().take_pending_existing_rider() {
-            let rider_entity = rider.get_entity();
-            if !rider_entity.is_removed()
-                && !rider_entity.is_sneaking()
-                && rider_entity.riding_cooldown.load(Ordering::Relaxed) <= 0
-                && vehicle
-                    .get_entity()
-                    .passengers
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .is_empty()
-            {
-                vehicle.get_entity().add_passenger(vehicle.clone(), rider);
-            }
-        }
         // `to.startRiding(vehicle, false, false)` in a conversion, or `finalizeSpawn`'s.
         if let Some(mount) = mob.get_mob_entity().take_pending_vehicle()
             && !mount.get_entity().is_removed()
@@ -6077,18 +6210,21 @@ impl World {
     }
 
     pub fn remove_entity(&self, entity: &dyn EntityBase) {
+        self.remove_entity_with_reason(entity, RemovalReason::Discarded);
+    }
+
+    /// Vanilla `Entity.setRemoved(reason)`: the entity leaves its vehicle only when the
+    /// reason destroys it, its passengers always get off, and it leaves the level.
+    pub fn remove_entity_with_reason(&self, entity: &dyn EntityBase, reason: RemovalReason) {
         let base_entity = entity.get_entity();
-        if base_entity
-            .removal_reason
-            .swap(Some(RemovalReason::Discarded))
-            .is_some()
-        {
+        if base_entity.removal_reason.swap(Some(reason)).is_some() {
             return;
         }
         base_entity.removed.store(true, Ordering::Release);
 
-        // Vanilla `setRemoved`: a destroyed entity leaves its vehicle and its passengers get off.
-        if let Some(vehicle) = base_entity.get_vehicle() {
+        if reason.should_destroy()
+            && let Some(vehicle) = base_entity.get_vehicle()
+        {
             vehicle
                 .get_entity()
                 .remove_passenger_on_removal(base_entity.entity_id);

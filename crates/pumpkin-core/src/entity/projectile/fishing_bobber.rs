@@ -218,6 +218,16 @@ impl FishingBobberEntity {
 }
 
 impl EntityBase for FishingBobberEntity {
+    /// Vanilla `FishingHook.canUsePortal`.
+    fn can_use_portal(&self, _ignore_passenger: bool) -> bool {
+        false
+    }
+
+    /// Vanilla `Projectile.getDimensionChangingDelay`.
+    fn dimension_changing_delay(&self) -> u32 {
+        2
+    }
+
     fn get_owner_id(&self) -> Option<i32> {
         self.projectile.get_owner_id(&self.entity)
     }

@@ -180,13 +180,13 @@ impl LevelTime {
             game_time: self.world_age,
             clock_updates: Vec::new(),
         };
-        for world in server.worlds.load().iter() {
-            let time_of_day = world.get_time_of_day();
-            for player in world.players.load().iter() {
-                let bedrock = CSetTime::new(player.client_time_of_day(time_of_day) as _);
-                player.client.try_enqueue_packet_editioned(&java, &bedrock);
-            }
-        }
+        // Every player online (`PlayerList`), with the time of its level; one watching the End
+        // credits still has the End's.
+        server.for_each_player(|player| {
+            let time_of_day = player.world().get_time_of_day();
+            let bedrock = CSetTime::new(player.client_time_of_day(time_of_day) as _);
+            player.client.try_enqueue_packet_editioned(&java, &bedrock);
+        });
     }
 
     pub fn add_time(&mut self, time: i64) {

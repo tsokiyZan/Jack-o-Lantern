@@ -8,7 +8,12 @@ impl JavaClient {
         player.update_last_action_time();
         match client_status.action_id.0 {
             SClientCommand::PERFORM_RESPAWN => {
-                // Perform respawn
+                // Vanilla: after the End credits (`wonGame`) the player comes back keeping
+                // everything; otherwise only a dead player respawns.
+                if player.won_game.load(Ordering::SeqCst) {
+                    player.end_credits();
+                    return;
+                }
                 if player.living_entity.health.load() > 0.0 {
                     return;
                 }

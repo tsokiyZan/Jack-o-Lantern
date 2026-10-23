@@ -7,7 +7,7 @@ use crate::{
     world::{
         World,
         game_event::DynamicGameEventListener,
-        portal::{NetherPortal, PortalProcessor, PortalType, SourcePortalInfo},
+        portal::{NetherPortal, PortalProcessor, PortalType, SourcePortalInfo, TeleportTransition},
     },
 };
 use arc_swap::ArcSwap;
@@ -15,7 +15,7 @@ use bytes::BufMut;
 use crossbeam::atomic::AtomicCell;
 use inside_block_effect::InsideBlockEffectApplier;
 use living::LivingEntity;
-use player::Player;
+use player::{PassengerRemount, Player};
 use pumpkin_data::BlockState;
 use pumpkin_data::biome::Biome;
 use pumpkin_data::block_state::PistonBehavior;
@@ -46,8 +46,8 @@ use pumpkin_protocol::{
     codec::var_int::VarInt,
     codec::var_ulong::VarULong,
     java::client::play::{
-        CEntityVelocity, CPlayerPosition, CSetEntityMetadata, CSetPassengers, CSpawnEntity,
-        CTeleportEntity, Metadata, MetadataSerializer,
+        CEntityVelocity, CPlayerPosition, CRemoveMobEffect, CSetEntityMetadata, CSetPassengers,
+        CSpawnEntity, CTeleportEntity, Metadata, MetadataSerializer,
     },
 };
 use pumpkin_util::Hand;
@@ -659,6 +659,16 @@ pub trait EntityBase: Send + Sync + std::any::Any {
             .is_some_and(|passenger| passenger.is_client_authoritative())
     }
 
+    /// Vanilla `Entity.onAboveBubbleColumn`.
+    fn on_above_bubble_column(&self, caller: &dyn EntityBase, drag_down: bool, pos: BlockPos) {
+        Entity::handle_on_above_bubble_column(caller, drag_down, pos);
+    }
+
+    /// Vanilla `Entity.onInsideBubbleColumn`.
+    fn on_inside_bubble_column(&self, caller: &dyn EntityBase, drag_down: bool) {
+        Entity::handle_on_inside_bubble_column(caller, drag_down);
+    }
+
     /// Vanilla `Entity.canSimulateMovement` on the server: a vehicle a player steers is only
     /// moved by that player's client.
     fn can_simulate_movement(&self) -> bool {
@@ -1040,6 +1050,12 @@ pub trait EntityBase: Send + Sync + std::any::Any {
         self.get_entity().has_passengers()
     }
 
+    /// The forward direction this vehicle places dismounting passengers by, where it isn't its
+    /// facing (`AbstractMinecart.getDismountLocationForPassenger` uses `getMotionDirection`).
+    fn dismount_forward(&self) -> Option<BlockDirection> {
+        None
+    }
+
     fn has_passenger(&self, other: &dyn EntityBase) -> bool {
         self.get_entity()
             .has_passenger(other.get_entity().entity_id)
@@ -1059,6 +1075,29 @@ pub trait EntityBase: Send + Sync + std::any::Any {
     /// and what follows it, for the entities whose `move` override takes the piston too.
     fn move_by_piston(&self, caller: &dyn EntityBase, delta: Vector3<f64>) {
         self.get_entity().move_by_piston(caller, delta);
+    }
+
+    /// Vanilla `Entity.canUsePortal`.
+    fn can_use_portal(&self, ignore_passenger: bool) -> bool {
+        let entity = self.get_entity();
+        (ignore_passenger || !entity.has_vehicle()) && entity.is_alive()
+    }
+
+    /// Vanilla `Entity.getDimensionChangingDelay`, with `Projectile`'s override (2).
+    fn dimension_changing_delay(&self) -> u32 {
+        if self.get_projectile().is_some() {
+            return 2;
+        }
+        match self.get_entity().get_first_passenger() {
+            Some(first) if first.get_player().is_some() => first.dimension_changing_delay(),
+            _ => 300,
+        }
+    }
+
+    /// Vanilla `Entity.canTeleport`: leaving the End, a player riding along must have seen
+    /// the credits.
+    fn can_teleport(&self, from: &World, to: &World) -> bool {
+        self.get_entity().can_teleport_base(from, to)
     }
 
     /// Vanilla `Entity.getPistonPushReaction`: how a moving piston block treats this entity.
@@ -1637,9 +1676,6 @@ pub struct Entity {
     pub portal_cooldown: AtomicU32,
 
     pub portal_manager: std::sync::Mutex<Option<PortalProcessor>>,
-    /// A portal destination found off the tick, applied on the entity's next tick so the
-    /// copy into the new dimension never races the world tick.
-    pending_portal_transition: std::sync::Mutex<Option<TeleportTarget>>,
     /// Custom name for the entity
     pub custom_name: ArcSwap<Option<TextComponent>>,
     /// Indicates whether the entity's custom name is visible
@@ -1823,7 +1859,6 @@ impl Entity {
             last_biome_update_pos: AtomicCell::new(BlockPos::new(floor_x, floor_y, floor_z)),
             portal_cooldown: AtomicU32::new(0),
             portal_manager: std::sync::Mutex::new(None),
-            pending_portal_transition: std::sync::Mutex::new(None),
             custom_name: ArcSwap::new(Arc::new(None)),
             custom_name_visible: AtomicBool::new(false),
             silent: AtomicBool::new(false),
@@ -2278,19 +2313,6 @@ impl Entity {
             wrap_degrees(to_degrees(pumpkin_util::math::atan2(delta.z, delta.x)) as f32 - 90.0);
         self.yaw.store(yaw);
         self.head_yaw.store(yaw);
-    }
-
-    /// Vanilla `getDimensionChangingDelay`: 10 for a player, and for a vehicle whose first
-    /// passenger is a player; 300 for anything else.
-    fn dimension_changing_delay(&self) -> u32 {
-        let player_first = self
-            .get_first_passenger()
-            .is_some_and(|passenger| passenger.get_player().is_some());
-        if self.entity_type == &EntityType::PLAYER || player_first {
-            10
-        } else {
-            300
-        }
     }
 
     /// Vanilla `Entity.isSupportedBy`: whether `pos` is this entity's main supporting block.
@@ -3667,93 +3689,81 @@ impl Entity {
         self.velocity.store(velo);
     }
 
-    /// Vanilla `Entity.handlePortal`. The destination is searched for off the tick, like
-    /// before; the entity then changes place with [`teleport_transition`].
-    fn tick_portal(&self, caller: &dyn EntityBase) {
-        if self.portal_cooldown.load(Ordering::Relaxed) > 0 {
-            self.portal_cooldown.fetch_sub(1, Ordering::Relaxed);
-        }
-        let pending = self
-            .pending_portal_transition
+    /// Vanilla `Entity.ejectPassengers`: each passenger stops riding, the last first.
+    pub fn eject_passengers(&self) {
+        let passengers = self
+            .passengers
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .take();
-        if let Some(target) = pending
-            && let Some(entity_arc) = self.world.load().get_entity_by_id(self.entity_id)
-        {
-            teleport_transition(&entity_arc, &target);
-            return;
-        }
-        let Ok(mut manager_guard) = self.portal_manager.try_lock() else {
-            return;
-        };
-        let mut should_remove = false;
-        if let Some(portal_processor) = manager_guard.as_mut() {
-            // `canUsePortal(false)`: not a passenger, and alive.
-            let can_use_portal = !self.has_vehicle() && inside_block_effect::is_alive(caller);
-            if portal_processor.process_portal_teleportation(
-                &self.world.load(),
-                caller,
-                can_use_portal,
-            ) {
-                self.portal_cooldown
-                    .store(self.dimension_changing_delay(), Ordering::Relaxed);
-
-                let world_clone = self.world.load_full();
-                let portal_type = portal_processor.portal_type;
-                let dest_world_opt = portal_processor.destination_world.clone();
-                let src_portal = portal_processor.source_portal.clone();
-                let entity_id = self.entity_id;
-
-                let rt_handle = world_clone.server.upgrade().map(|s| s.runtime.clone());
-                rayon::spawn(move || {
-                    let _guard = rt_handle.as_ref().map(tokio::runtime::Handle::enter);
-                    let Some(entity_arc) = world_clone.get_entity_by_id(entity_id) else {
-                        return;
-                    };
-                    let transition = portal_type.get_portal_destination(
-                        &world_clone,
-                        dest_world_opt,
-                        entity_arc.as_ref(),
-                        src_portal.as_ref(),
-                    );
-
-                    if let Some(transition) = transition {
-                        if entity_arc.get_player().is_some() {
-                            entity_arc.teleport(
-                                transition.position,
-                                transition.yaw,
-                                transition.pitch,
-                                transition.new_world,
-                            );
-                        } else {
-                            // Portals keep the entity's speed (`Relative.DELTA`).
-                            *entity_arc
-                                .get_entity()
-                                .pending_portal_transition
-                                .lock()
-                                .unwrap_or_else(std::sync::PoisonError::into_inner) =
-                                Some(TeleportTarget {
-                                    world: transition.new_world,
-                                    position: transition.position,
-                                    yaw: transition.yaw,
-                                    pitch: transition.pitch,
-                                    keep_velocity: true,
-                                    as_passenger: false,
-                                });
-                        }
-                    }
-                });
-            } else if portal_processor.portal_time == 0 {
-                should_remove = true;
-            }
-        }
-        if should_remove {
-            *manager_guard = None;
+            .clone();
+        for passenger in passengers.iter().rev() {
+            self.remove_passenger(passenger.get_entity().entity_id);
         }
     }
 
-    pub fn try_use_portal(&self, portal_world: Arc<World>, pos: BlockPos) {
+    /// The base of vanilla `Entity.canTeleport` (`EntityBase::can_teleport`'s default), for
+    /// overrides that call `super`.
+    pub fn can_teleport_base(&self, from: &World, to: &World) -> bool {
+        if from.dimension == Dimension::THE_END && to.dimension == Dimension::OVERWORLD {
+            return !self
+                .passengers
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .iter()
+                .any(|passenger| {
+                    passenger
+                        .get_player()
+                        .is_some_and(|player| !player.seen_credits.load(Ordering::Relaxed))
+                });
+        }
+        true
+    }
+
+    /// Vanilla `Entity.handlePortal`: the destination is searched for, and the entity changes
+    /// place, inside its own tick.
+    pub(crate) fn handle_portal(&self, caller: &dyn EntityBase) {
+        // `processPortalCooldown`.
+        if self.portal_cooldown.load(Ordering::Relaxed) > 0 {
+            self.portal_cooldown.fetch_sub(1, Ordering::Relaxed);
+        }
+        let world = self.world.load_full();
+        // Never held across the destination search: its chunk wait (`block_on_tick`) runs other
+        // pool jobs on this thread, and any of them locking this mutex (a teleport of this
+        // entity, a tick of it as a new passenger) would deadlock on this very thread.
+        let mut guard = self
+            .portal_manager
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let Some(processor) = guard.as_mut() else {
+            return;
+        };
+        if processor.process_portal_teleportation(&world, caller, caller.can_use_portal(false)) {
+            // `setPortalCooldown`.
+            self.portal_cooldown
+                .store(caller.dimension_changing_delay(), Ordering::Relaxed);
+            // Vanilla reads `portalProcess` once and acts on it: the search runs on this tick's
+            // copy, so nothing touched while it waits changes where the entity goes.
+            let processor = processor.clone();
+            drop(guard);
+            let transition = processor.get_portal_destination(&world, caller);
+            if let Some(transition) = transition
+                && let Some(this) = world.get_entity_by_id(self.entity_id)
+            {
+                teleport_to_portal_destination(&this, &world, transition);
+            }
+        } else if processor.has_expired() {
+            *guard = None;
+        }
+    }
+
+    /// Vanilla `Entity.setAsInsidePortal`, for the portal block of `portal`'s type.
+    pub fn try_use_portal(
+        &self,
+        caller: &dyn EntityBase,
+        portal: PortalType,
+        portal_world: &World,
+        pos: BlockPos,
+    ) {
         let mut portal_event =
             crate::plugin::api::events::entity::entity_portal::EntityPortalEvent::new(
                 self.entity_id,
@@ -3771,7 +3781,7 @@ impl Entity {
         // Vanilla `setAsInsidePortal`: a portal touched during the cooldown restarts it.
         if self.portal_cooldown.load(Ordering::Relaxed) > 0 {
             self.portal_cooldown
-                .store(self.dimension_changing_delay(), Ordering::Relaxed);
+                .store(caller.dimension_changing_delay(), Ordering::Relaxed);
             return;
         }
 
@@ -3790,16 +3800,12 @@ impl Entity {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let world = self.world.load();
-        if manager.is_none() {
-            let portal_type = if portal_world.dimension == Dimension::THE_END
-                || self.world.load().dimension == Dimension::THE_END
-            {
-                PortalType::End
-            } else {
-                PortalType::Nether
-            };
-
-            let mut new_manager = PortalProcessor::new(portal_type, pos, portal_world);
+        // `isSamePortal`: a processor of the other portal is replaced.
+        if manager
+            .as_ref()
+            .is_none_or(|manager| !manager.is_same_portal(portal))
+        {
+            let mut new_manager = PortalProcessor::new(portal, pos);
 
             let (block, state) = world.get_block_and_state(&pos);
             let source_axis = (block == &pumpkin_data::Block::NETHER_PORTAL).then(|| {
@@ -5428,11 +5434,10 @@ impl Entity {
         drop(passengers);
 
         let world = self.world.load();
-        let chunk_pos = self.chunk_pos.load();
-        world.broadcast_to_chunk(
-            chunk_pos,
-            &CSetPassengers::new(VarInt(self.entity_id), &passenger_ids),
-        );
+        let passengers_packet = CSetPassengers::new(VarInt(self.entity_id), &passenger_ids);
+        let rider = event_source.get_player();
+        // Everyone watching the vehicle, the rider too, learns of the mount from the
+        // vehicle's tracker (`ServerEntity.sendChanges`, `TrackedEntity::send_passengers`).
         // The end of `addPassenger`, before `startRiding`'s `entity_mount` game event.
         vehicle_hooks.after_add_passenger();
         if send_event {
@@ -5447,40 +5452,11 @@ impl Entity {
         if event_source.get_mob().is_some() && event_source.get_entity().is_leashed() {
             leashable::drop_leash(event_source.as_ref(), true, true);
         }
-    }
-
-    pub(crate) fn remove_passenger_on_disconnect(&self, passenger_id: i32) {
-        let mut removed = false;
-        let mut passengers = self
-            .passengers
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        if let Some(index) = passengers
-            .iter()
-            .position(|passenger| passenger.get_entity().entity_id == passenger_id)
-        {
-            let passenger = passengers.remove(index);
-            *passenger
-                .get_entity()
-                .vehicle
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
-            removed = true;
+        if let Some(player) = rider {
+            // `ServerPlayer.startRiding`: the rider is placed and told; the tracker's
+            // passenger list follows for everyone watching the vehicle, the rider again too.
+            player.start_riding_packets(&vehicle_hooks, &passengers_packet);
         }
-
-        let passenger_ids: Vec<VarInt> = passengers
-            .iter()
-            .map(|passenger| VarInt(passenger.get_entity().entity_id))
-            .collect();
-        drop(passengers);
-        if removed {
-            self.after_remove_passenger_hook();
-        }
-
-        self.world.load().broadcast_to_chunk(
-            self.chunk_pos.load(),
-            &CSetPassengers::new(VarInt(self.entity_id), &passenger_ids),
-        );
     }
 
     /// The vehicle's `removePassenger` override (`EntityBase::after_remove_passenger`), run
@@ -5489,10 +5465,6 @@ impl Entity {
         if let Some(vehicle) = self.world.load().get_entity_by_id(self.entity_id) {
             vehicle.after_remove_passenger();
         }
-    }
-
-    pub fn remove_passenger_sync(&self, passenger_id: i32) {
-        self.remove_passenger_on_disconnect(passenger_id);
     }
 
     pub fn remove_passenger(&self, passenger_id: i32) {
@@ -5558,8 +5530,6 @@ impl Entity {
             (removed_passenger, passenger_ids)
         };
 
-        let chunk_pos = self.chunk_pos.load();
-
         if let Some(passenger) = removed_passenger {
             let vehicle_box = self.bounding_box.load();
             let passenger_entity = passenger.get_entity();
@@ -5567,8 +5537,12 @@ impl Entity {
             // Pre-allocate teleport ID and block movement packets BEFORE sending
             // CSetPassengers. This prevents a race condition where the client receives
             // the dismount packet, sends stale position packets from the old riding
-            // position, and the server processes them before the teleport arrives.
-            let teleport_id = if reposition && let Some(player) = passenger.get_player() {
+            // position, and the server processes them before the teleport arrives. A removed
+            // passenger isn't placed (below), so it gets no teleport id either.
+            let teleport_id = if reposition
+                && !passenger_entity.is_removed()
+                && let Some(player) = passenger.get_player()
+            {
                 let id = player
                     .teleport_id_count
                     .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
@@ -5586,8 +5560,14 @@ impl Entity {
                 None
             };
 
-            // Vanilla: ridingCooldown = 60 (prevents immediate re-mount)
-            passenger_entity.riding_cooldown.store(60, Relaxed);
+            // Vanilla `removePassenger`: boardingCooldown = 60 (prevents immediate re-mount);
+            // `Player.removeVehicle` sets a player's back to 0.
+            let cooldown = if passenger.get_player().is_some() {
+                0
+            } else {
+                60
+            };
+            passenger_entity.riding_cooldown.store(cooldown, Relaxed);
             // `oldVehicle.removePassenger(this)`, before the dismount game event.
             self.after_remove_passenger_hook();
             // `removeVehicle`: a passenger that is only unloaded or changing dimension leaves
@@ -5604,37 +5584,45 @@ impl Entity {
                 );
             }
 
-            // Send CSetPassengers directly to the dismounting player before broadcasting it.
+            // `ServerPlayer.removeVehicle` tells the dismounting player directly; everyone
+            // watching the vehicle, the player too, gets the list from the vehicle's tracker.
             let world = self.world.load();
             let passengers_packet = CSetPassengers::new(VarInt(self.entity_id), &passenger_ids);
             if let Some(player) = passenger.get_player() {
+                // `ServerPlayer.removeVehicle`: the effects of a living vehicle go from the
+                // player's view, then the passenger list.
+                if let Some(vehicle) = world.get_entity_by_id(self.entity_id)
+                    && let Some(living) = vehicle.get_living_entity()
+                {
+                    let effects: Vec<_> = living
+                        .active_effects
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner)
+                        .keys()
+                        .copied()
+                        .collect();
+                    for effect in effects {
+                        player.try_send_client_packet(&CRemoveMobEffect::new(
+                            self.entity_id.into(),
+                            VarInt(i32::from(effect.id)),
+                        ));
+                    }
+                }
                 player.try_send_client_packet(&passengers_packet);
-                world.broadcast_to_chunk_except(
-                    chunk_pos,
-                    &[player.get_entity().entity_uuid],
-                    &passengers_packet,
-                );
-            } else {
-                world.broadcast_to_chunk(chunk_pos, &passengers_packet);
             }
 
-            if !reposition {
+            // `LivingEntity.dismountVehicle`: a removed entity stays where it is.
+            if !reposition || passenger_entity.is_removed() {
                 return;
             }
 
-            // Calculate dismount directions and offsets (vanilla DismountHelper)
-            let vehicle_yaw = self.yaw.load();
-            // Wrap yaw to 0..360 range
-            let wrapped_yaw = (vehicle_yaw % 360.0 + 360.0) % 360.0;
-            let forward_dir = if !(45.0..315.0).contains(&wrapped_yaw) {
-                BlockDirection::South
-            } else if (45.0..135.0).contains(&wrapped_yaw) {
-                BlockDirection::West
-            } else if (135.0..225.0).contains(&wrapped_yaw) {
-                BlockDirection::North
-            } else {
-                BlockDirection::East
-            };
+            // Calculate dismount directions and offsets (vanilla DismountHelper): forward is
+            // the vehicle's facing (`getDirection`), or its `getMotionDirection` where its
+            // `getDismountLocationForPassenger` uses that (minecarts).
+            let forward_dir = world
+                .get_entity_by_id(self.entity_id)
+                .and_then(|vehicle| vehicle.dismount_forward())
+                .unwrap_or_else(|| direction_from_yaw(self.yaw.load()));
 
             let get_step = |dir: BlockDirection| -> (i32, i32) {
                 match dir {
@@ -5833,13 +5821,6 @@ impl Entity {
             } else {
                 passenger_entity.set_pos(dismount_pos);
             }
-        } else {
-            // No passenger was removed, still need to broadcast the passenger list
-            let world = self.world.load();
-            world.broadcast_to_chunk(
-                chunk_pos,
-                &CSetPassengers::new(VarInt(self.entity_id), &passenger_ids),
-            );
         }
     }
 
@@ -6085,14 +6066,39 @@ impl Entity {
             && self.entity_type != &EntityType::PLAYER
     }
 
-    /// Vanilla `Entity.shouldBeSaved`, without the vehicle under exactly one player: Pumpkin
-    /// saves only that vehicle's UUID with the player and keeps the vehicle in its chunk.
+    /// Vanilla `Entity.shouldBeSaved`: not removed for good, not a passenger (saved in its
+    /// vehicle's `Passengers`), and not a vehicle carrying exactly one player (saved with that
+    /// player, `ServerPlayer.saveParentVehicle`).
     #[must_use]
     pub fn should_be_saved(&self) -> bool {
         self.removal_reason
             .load()
             .is_none_or(|reason| reason.should_save())
             && !self.has_vehicle()
+            && (!self.has_passengers() || !self.has_exactly_one_player_passenger())
+    }
+
+    /// Vanilla `Entity.getIndirectPassengers`: every passenger, then its own, depth first.
+    #[must_use]
+    pub fn indirect_passengers(&self) -> Vec<Arc<dyn EntityBase>> {
+        let mut passengers = Vec::new();
+        self.collect_indirect_passengers(&mut passengers);
+        passengers
+    }
+
+    /// Vanilla `Entity.countPlayerPassengers`: the indirect passengers that are players.
+    #[must_use]
+    pub fn count_player_passengers(&self) -> usize {
+        self.indirect_passengers()
+            .iter()
+            .filter(|passenger| passenger.get_player().is_some())
+            .count()
+    }
+
+    /// Vanilla `Entity.hasExactlyOnePlayerPassenger`.
+    #[must_use]
+    pub fn has_exactly_one_player_passenger(&self) -> bool {
+        self.count_player_passengers() == 1
     }
 
     /// Vanilla `Entity.load`'s `Glowing` and `data`.
@@ -6265,7 +6271,7 @@ impl EntityBase for Entity {
             self.riding_cooldown
                 .store(riding_cooldown - 1, Ordering::Relaxed);
         }
-        self.tick_portal(caller);
+        self.handle_portal(caller);
         // Recomputed during movement/block-collision handling in the same tick.
         let was_in_powder_snow = self.is_in_powder_snow.load(Ordering::Relaxed);
         self.was_in_powder_snow
@@ -6641,15 +6647,59 @@ pub fn blocks_building(entity: &dyn EntityBase) -> bool {
 pub fn teleport_to(entity: &dyn EntityBase, position: Vector3<f64>) {
     let base = entity.get_entity();
     let world = base.world.load_full();
-    if entity.get_player().is_some() {
-        entity.teleport(position, None, None, world);
+    if let Some(player) = entity.get_player() {
+        // `ServerPlayer.teleportTo(x, y, z)`: the client is moved, keeping its speed and look;
+        // nothing dismounts.
+        player.teleport_in_world(&TeleportTarget {
+            world,
+            position,
+            yaw: None,
+            pitch: None,
+            keep_velocity: true,
+            as_passenger: true,
+        });
     } else {
         base.teleport(position, None, None, &world);
     }
 }
 
+/// Vanilla `Direction.fromYRot` (`Entity.getDirection`): the horizontal direction a yaw faces.
+#[must_use]
+pub fn direction_from_yaw(yaw: f32) -> BlockDirection {
+    let wrapped_yaw = (yaw % 360.0 + 360.0) % 360.0;
+    if !(45.0..315.0).contains(&wrapped_yaw) {
+        BlockDirection::South
+    } else if (45.0..135.0).contains(&wrapped_yaw) {
+        BlockDirection::West
+    } else if (135.0..225.0).contains(&wrapped_yaw) {
+        BlockDirection::North
+    } else {
+        BlockDirection::East
+    }
+}
+
+/// Vanilla `Entity.teleportTo(level, ...)`, as `/tp` and `/spreadplayers` use it.
+///
+/// A sleeping player wakes first (`ServerPlayer.teleportTo`: `stopSleepInBed(true, true)`),
+/// then the teleport. Other teleports (pearls, gateways, plugins) don't wake.
+pub fn command_teleport(
+    entity: &dyn EntityBase,
+    position: Vector3<f64>,
+    yaw: Option<f32>,
+    pitch: Option<f32>,
+    world: Arc<World>,
+) {
+    if let Some(player) = entity.get_player()
+        && player.is_sleeping()
+    {
+        player.stop_sleep_in_bed(true, true);
+    }
+    entity.teleport(position, yaw, pitch, world);
+}
+
 /// Vanilla `TeleportTransition`, as Pumpkin's teleports use it: an absolute position, and a
 /// rotation that stays the entity's own where it is `None`.
+#[derive(Clone)]
 pub struct TeleportTarget {
     pub world: Arc<World>,
     pub position: Vector3<f64>,
@@ -6661,13 +6711,51 @@ pub struct TeleportTarget {
     pub as_passenger: bool,
 }
 
-/// Vanilla `Entity.teleport(TeleportTransition)` for an entity other than a player. Returns
-/// the entity at its destination: a new one after a change of dimension.
+/// Vanilla `Entity.teleportToPortalDestination`.
+pub fn teleport_to_portal_destination(
+    entity: &Arc<dyn EntityBase>,
+    world: &World,
+    transition: TeleportTransition,
+) {
+    let new_world = transition.new_world;
+    if !(world.is_allowed_to_enter_portal(&new_world)
+        && (new_world.dimension == world.dimension || entity.can_teleport(world, &new_world)))
+    {
+        return;
+    }
+    // `ServerPlayer.teleport` first tells the player its respawn block is gone.
+    if transition.missing_respawn_block
+        && let Some(player) = entity.get_player()
+    {
+        player.try_send_client_packet(&pumpkin_protocol::java::client::play::CGameEvent::new(
+            pumpkin_protocol::java::client::play::GameEvent::NoRespawnBlockAvailable,
+            0.0,
+        ));
+    }
+    teleport_transition(
+        entity,
+        &TeleportTarget {
+            world: new_world,
+            position: transition.position,
+            yaw: transition.yaw,
+            pitch: transition.pitch,
+            keep_velocity: transition.keep_velocity,
+            as_passenger: false,
+        },
+    );
+}
+
+/// Vanilla `Entity.teleport(TeleportTransition)`, and `ServerPlayer.teleport` for a player.
+/// Returns the entity at its destination: a new one after a non-player's change of dimension.
 pub fn teleport_transition(
     entity: &Arc<dyn EntityBase>,
     target: &TeleportTarget,
 ) -> Option<Arc<dyn EntityBase>> {
     let base = entity.get_entity();
+    if entity.get_player().is_some() {
+        let player = base.world.load().get_player_by_id(base.entity_id)?;
+        return player.teleport_transition(target);
+    }
     if base.is_removed() {
         return None;
     }
@@ -6717,11 +6805,6 @@ fn teleport_same_dimension(entity: &Arc<dyn EntityBase>, world: &World, target: 
         .clone();
     for passenger in passengers {
         let transition = passenger_transition(base, passenger.get_entity(), target);
-        if passenger.get_player().is_some() {
-            // TODO: a player passenger rides along by `positionRider`; vanilla also moves it
-            // here as a passenger.
-            continue;
-        }
         teleport_transition(&passenger, &transition);
     }
     base.teleport_set_position(target);
@@ -6743,24 +6826,20 @@ fn teleport_cross_dimension(
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .clone();
-    // `ejectPassengers`, last first.
-    for passenger in old_passengers.iter().rev() {
-        base.remove_passenger(passenger.get_entity().entity_id);
-    }
+    base.eject_passengers();
     let mut new_passengers = Vec::with_capacity(old_passengers.len());
     for passenger in &old_passengers {
         let transition = passenger_transition(base, passenger.get_entity(), target);
-        if passenger.get_player().is_some() {
-            // TODO: vanilla remounts a player passenger on the new vehicle too; the player's
-            // own dimension change can't hand the new player back here.
-            passenger.teleport(
-                transition.position,
-                transition.yaw,
-                transition.pitch,
-                transition.world,
-            );
-        } else if let Some(new_passenger) = teleport_transition(passenger, &transition) {
+        // A player's dimension change finishes later (`teleport_world`): it and the new
+        // vehicle meet through its `passenger_remount`.
+        let player = passenger.get_player();
+        if let Some(player) = player {
+            player.set_passenger_remount(PassengerRemount::Travelling);
+        }
+        if let Some(new_passenger) = teleport_transition(passenger, &transition) {
             new_passengers.push(new_passenger);
+        } else if let Some(player) = player {
+            player.set_passenger_remount(PassengerRemount::Idle);
         }
     }
 
@@ -6803,8 +6882,13 @@ fn teleport_cross_dimension(
     new_base.teleport_set_position(target);
     new_entity.init_data_tracker();
     target.world.add_entity_silent(new_entity.clone());
+    // `newPassenger.startRiding(newEntity, true, false)`.
     for new_passenger in new_passengers {
-        new_base.add_passenger_without_event(new_entity.clone(), new_passenger);
+        if let Some(player) = new_passenger.get_player() {
+            player.vehicle_ready(&new_passenger, &new_entity);
+        } else {
+            new_base.add_passenger_without_event(new_entity.clone(), new_passenger);
+        }
     }
     new_entity
 }

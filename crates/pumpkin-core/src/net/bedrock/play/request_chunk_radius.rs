@@ -40,6 +40,10 @@ impl BedrockClient {
             "Player {} updated their render distance: {} -> {}.",
             player.gameprofile.name, old_view_distance, view_distance
         );
-        chunker::update_position(player);
+        // Vanilla applies a new view distance in `ChunkMap.move`, which a player in no level
+        // (End credits) never reaches.
+        if !player.won_game.load(std::sync::atomic::Ordering::SeqCst) {
+            chunker::update_position(player);
+        }
     }
 }

@@ -43,6 +43,7 @@ pub enum PortalType {
 }
 
 impl PortalType {
+    /// Vanilla `Portal.getPortalTransitionTime`, with `NetherPortalBlock`'s override.
     pub fn get_portal_transition_time(
         &self,
         current_world: &World,
@@ -51,31 +52,41 @@ impl PortalType {
         match self {
             Self::End => 0,
             Self::Nether => {
-                let entity_type = entity.get_entity().entity_type;
-                let level_info = current_world.level_info.load();
-                match entity_type.id {
-                    id if id == pumpkin_data::entity::EntityType::PLAYER.id => (current_world
-                        .get_player_by_id(entity.get_entity().entity_id))
-                    .map_or(80, |player| match player.gamemode.load() {
-                        pumpkin_util::GameMode::Creative => {
-                            level_info.game_rules.players_nether_portal_creative_delay as u32
-                        }
-                        _ => level_info.game_rules.players_nether_portal_default_delay as u32,
-                    }),
-                    _ => 0,
-                }
+                crate::block::blocks::nether_portal::NetherPortalBlock::get_portal_transition_time(
+                    current_world,
+                    entity,
+                )
             }
         }
     }
 
+    /// Vanilla `Portal.getPortalDestination` of the nether and end portal blocks: the target
+    /// level follows from the level the entity is in now (`NETHER ? OVERWORLD : NETHER`,
+    /// `END ? OVERWORLD : END`), and there is none if the server lacks it.
     #[expect(clippy::too_many_lines)]
     pub fn get_portal_destination(
         &self,
         current_level: &World,
-        dest_world: Arc<World>,
         caller: &dyn crate::entity::EntityBase,
         source_portal: Option<&SourcePortalInfo>,
     ) -> Option<TeleportTransition> {
+        let (own_dimension, other) = match self {
+            Self::Nether => (Dimension::THE_NETHER, Dimension::THE_NETHER),
+            Self::End => (Dimension::THE_END, Dimension::THE_END),
+        };
+        let new_dimension = if current_level.dimension == own_dimension {
+            Dimension::OVERWORLD
+        } else {
+            other
+        };
+        let dest_world = current_level
+            .server
+            .upgrade()?
+            .worlds
+            .load()
+            .iter()
+            .find(|world| world.dimension == new_dimension)
+            .cloned()?;
         match self {
             Self::End => {
                 let is_end_portal = dest_world.dimension == Dimension::THE_END
@@ -92,18 +103,9 @@ impl PortalType {
                         let platform_pos = BlockPos::new(100, 49, 0);
 
                         // Ensure chunks covering the platform are loaded/generated
-                        if let Ok(handle) = tokio::runtime::Handle::try_current() {
-                            tokio::task::block_in_place(|| {
-                                handle.block_on(async {
-                                    let center_chunk =
-                                        Vector2::new(platform_pos.0.x >> 4, platform_pos.0.z >> 4);
-                                    dest_world
-                                        .level
-                                        .get_or_fetch_chunk(center_chunk, |_| ())
-                                        .await;
-                                });
-                            });
-                        }
+                        let center_chunk =
+                            Vector2::new(platform_pos.0.x >> 4, platform_pos.0.z >> 4);
+                        block_on_tick(dest_world.level.get_or_fetch_chunk(center_chunk, |_| ()));
 
                         // Generate/regenerate the obsidian platform (5x5 obsidian at Y=48, and 5x5x3 air above it)
                         for dx in -2..=2 {
@@ -133,46 +135,58 @@ impl PortalType {
                             position: Vector3::new(100.5f64, y, 0.5f64),
                             yaw: Some(90.0f32),
                             pitch: None,
+                            keep_velocity: true,
+                            missing_respawn_block: false,
                         })
                     } else {
-                        // Leaving the End through the exit portal: return to overworld spawn
-                        if let Some(player) =
-                            current_level.get_player_by_id(caller.get_entity().entity_id)
-                        {
-                            match player.client.as_ref() {
-                                crate::net::ClientPlatform::Java(client) => {
-                                    if let Ok(data) = client.serialize_packet(&pumpkin_protocol::java::client::play::CGameEvent::new(
-                                        pumpkin_protocol::java::client::play::GameEvent::WinGame,
-                                        1.0,
-                                    )) {
-                                        client.try_enqueue_packet(data);
-                                    }
-                                }
-                                crate::net::ClientPlatform::Bedrock(client) => {
-                                    if let Ok(data) = client.serialize_packet(
-                                        &pumpkin_protocol::bedrock::client::CShowCredits {
-                                            player_runtime_id: (caller.get_entity().entity_id
-                                                as u64)
-                                                .into(),
-                                            credits_state: 0.into(),
-                                        },
-                                    ) {
-                                        client.try_enqueue_packet(data);
-                                    }
-                                }
-                            }
+                        // Leaving the End: to the level's respawn data (Pumpkin keeps the world
+                        // spawn in the Overworld), a player to its own respawn position. The
+                        // credits are the portal block's (`EndPortalBlock.entityInside`).
+                        if let Some(player) = caller.get_player() {
+                            let respawn = block_on_tick(
+                                player.find_respawn_position_and_use_spawn_block(false),
+                            );
+                            let server = current_level.server.upgrade()?;
+                            let new_world = server
+                                .worlds
+                                .load()
+                                .iter()
+                                .find(|world| world.dimension == respawn.dimension)
+                                .cloned()?;
+                            // `TeleportTransition.DO_NOTHING`, no relatives.
+                            return Some(TeleportTransition {
+                                new_world,
+                                position: respawn.position,
+                                yaw: Some(respawn.yaw),
+                                pitch: Some(respawn.pitch),
+                                keep_velocity: false,
+                                missing_respawn_block: respawn.missing_respawn_block,
+                            });
                         }
-
-                        let info = dest_world.level_info.load();
+                        let (spawn_x, spawn_z, spawn_yaw, spawn_pitch) = {
+                            let info = dest_world.level_info.load();
+                            (info.spawn_x, info.spawn_z, info.spawn_yaw, info.spawn_pitch)
+                        };
+                        // `Entity.adjustSpawnLocation`: on top of the spawn column
+                        // (`MOTION_BLOCKING_NO_LEAVES`), then `atBottomCenterOf`.
+                        let top = block_on_tick(dest_world.get_heightmap_height_async(
+                            pumpkin_world::chunk::ChunkHeightmapType::MotionBlockingNoLeaves,
+                            spawn_x,
+                            spawn_z,
+                        ));
+                        let entity = caller.get_entity();
+                        // `Relative.ROTATION`: the respawn angles are added to the entity's.
                         Some(TeleportTransition {
                             new_world: dest_world,
                             position: Vector3::new(
-                                f64::from(info.spawn_x) + 0.5,
-                                f64::from(info.spawn_y),
-                                f64::from(info.spawn_z) + 0.5,
+                                f64::from(spawn_x) + 0.5,
+                                f64::from(top + 1),
+                                f64::from(spawn_z) + 0.5,
                             ),
-                            yaw: None,
-                            pitch: None,
+                            yaw: Some(entity.yaw.load() + spawn_yaw),
+                            pitch: Some(entity.pitch.load() + spawn_pitch),
+                            keep_velocity: true,
+                            missing_respawn_block: false,
                         })
                     }
                 } else {
@@ -207,26 +221,17 @@ impl PortalType {
                 )
                 .or_else(|| {
                     // Ensure the chunks around approximate_exit_pos are generated/loaded in dest_world
-                    if let Ok(handle) = tokio::runtime::Handle::try_current() {
-                        tokio::task::block_in_place(|| {
-                            handle.block_on(async {
-                                let center_chunk = Vector2::new(
-                                    approximate_exit_pos.0.x >> 4,
-                                    approximate_exit_pos.0.z >> 4,
-                                );
-                                for dx in -1..=1 {
-                                    for dz in -1..=1 {
-                                        let chunk_pos =
-                                            Vector2::new(center_chunk.x + dx, center_chunk.y + dz);
-                                        dest_world
-                                            .level
-                                            .get_or_fetch_chunk(chunk_pos, |_| ())
-                                            .await;
-                                    }
-                                }
-                            });
-                        });
-                    }
+                    let center_chunk =
+                        Vector2::new(approximate_exit_pos.0.x >> 4, approximate_exit_pos.0.z >> 4);
+                    block_on_tick(async {
+                        for dx in -1..=1 {
+                            for dz in -1..=1 {
+                                let chunk_pos =
+                                    Vector2::new(center_chunk.x + dx, center_chunk.y + dz);
+                                dest_world.level.get_or_fetch_chunk(chunk_pos, |_| ()).await;
+                            }
+                        }
+                    });
 
                     if let Some((build_pos, axis, is_fallback)) = NetherPortal::find_safe_location(
                         &dest_world,
@@ -275,6 +280,8 @@ impl PortalType {
                     position: final_pos,
                     yaw,
                     pitch: None,
+                    keep_velocity: true,
+                    missing_respawn_block: false,
                 })
             }
         }
@@ -286,35 +293,53 @@ pub struct TeleportTransition {
     pub position: Vector3<f64>,
     pub yaw: Option<f32>,
     pub pitch: Option<f32>,
+    /// `Relative.DELTA`: the entity keeps its speed.
+    pub keep_velocity: bool,
+    /// Vanilla `TeleportTransition.missingRespawnBlock`: the player is told its respawn
+    /// block no longer works.
+    pub missing_respawn_block: bool,
 }
 
+#[derive(Clone)]
 pub struct PortalProcessor {
     pub portal_type: PortalType,
     pub entry_position: BlockPos,
     pub portal_time: u32,
     pub inside_portal_this_tick: bool,
-    pub destination_world: Arc<World>,
     pub source_portal: Option<SourcePortalInfo>,
 }
 
 impl PortalProcessor {
-    pub const fn new(
-        portal_type: PortalType,
-        entry_position: BlockPos,
-        destination_world: Arc<World>,
-    ) -> Self {
+    #[must_use]
+    pub const fn new(portal_type: PortalType, entry_position: BlockPos) -> Self {
         Self {
             portal_type,
             entry_position,
             portal_time: 0,
             inside_portal_this_tick: true,
-            destination_world,
             source_portal: None,
         }
     }
 
     pub const fn set_source_portal(&mut self, info: SourcePortalInfo) {
         self.source_portal = Some(info);
+    }
+
+    /// Vanilla `PortalProcessor.isSamePortal`.
+    #[must_use]
+    pub fn is_same_portal(&self, portal: PortalType) -> bool {
+        self.portal_type == portal
+    }
+
+    /// Vanilla `PortalProcessor.getPortalDestination`: the portal's destination for `entity`,
+    /// searched for (and loaded) on the entity's tick.
+    pub fn get_portal_destination(
+        &self,
+        world: &World,
+        entity: &dyn crate::entity::EntityBase,
+    ) -> Option<TeleportTransition> {
+        self.portal_type
+            .get_portal_destination(world, entity, self.source_portal.as_ref())
     }
 
     pub fn process_portal_teleportation(
@@ -349,5 +374,79 @@ impl PortalProcessor {
     #[must_use]
     pub const fn has_expired(&self) -> bool {
         self.portal_time == 0
+    }
+}
+
+/// Waits for `future` (a chunk load) on the tick, as vanilla's `ServerChunkCache.getChunk` does
+/// with `managedBlock`: the server thread keeps running queued work until the chunk is there.
+///
+/// Entities tick on the global rayon pool, and loading a chunk from disk decodes it on that same
+/// pool (`rayon::spawn` in the region file manager). A worker that only slept here would hold a
+/// thread the load needs, so enough entities portalling in one tick would leave no worker for the
+/// decode. A waiting worker instead runs other pool jobs, the decode among them.
+pub(crate) fn block_on_tick<F: Future>(future: F) -> F::Output {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::task::{Context, Poll, Wake, Waker};
+
+    struct ThreadWaker {
+        woken: AtomicBool,
+        thread: std::thread::Thread,
+    }
+    impl Wake for ThreadWaker {
+        fn wake(self: Arc<Self>) {
+            self.wake_by_ref();
+        }
+        fn wake_by_ref(self: &Arc<Self>) {
+            self.woken.store(true, Ordering::Release);
+            self.thread.unpark();
+        }
+    }
+
+    if rayon::current_thread_index().is_none()
+        && let Ok(handle) = tokio::runtime::Handle::try_current()
+    {
+        // Not on a pool thread: nothing of the pool is held while it blocks.
+        return tokio::task::block_in_place(|| handle.block_on(future));
+    }
+
+    let state = Arc::new(ThreadWaker {
+        woken: AtomicBool::new(false),
+        thread: std::thread::current(),
+    });
+    let waker = Waker::from(state.clone());
+    let mut cx = Context::from_waker(&waker);
+    let mut future = std::pin::pin!(future);
+    loop {
+        state.woken.store(false, Ordering::Release);
+        if let Poll::Ready(output) = future.as_mut().poll(&mut cx) {
+            return output;
+        }
+        while !state.woken.load(Ordering::Acquire) {
+            if rayon::yield_now() != Some(rayon::Yield::Executed) {
+                // Idle pool: sleep until woken, but look for new pool work now and then.
+                std::thread::park_timeout(std::time::Duration::from_millis(1));
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    /// A chunk load decodes on the same rayon pool the entity ticks on: a worker waiting for it
+    /// must run that pool work itself, or a pool whose workers all wait never finishes the load.
+    #[test]
+    fn block_on_tick_runs_pool_work_while_waiting() {
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(1)
+            .build()
+            .expect("pool");
+        let output = pool.install(|| {
+            let (tx, rx) = tokio::sync::oneshot::channel();
+            rayon::spawn(move || {
+                let _ = tx.send(7);
+            });
+            super::block_on_tick(async { rx.await.expect("sent") })
+        });
+        assert_eq!(output, 7);
     }
 }
