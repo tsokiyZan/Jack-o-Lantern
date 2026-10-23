@@ -12,7 +12,9 @@ use pumpkin_world::world::BlockFlags;
 use crate::block::{BlockBehaviour, FallOnArgs, OnEntityCollisionArgs, PathComputationType};
 use crate::entity::EntityBase;
 use crate::entity::inside_block_effect::InsideBlockEffectType;
+use crate::world::ParticleRandomization;
 use pumpkin_data::Block;
+use pumpkin_data::particle::Particle;
 use pumpkin_util::random::RandomImpl;
 
 #[pumpkin_block("minecraft:powder_snow")]
@@ -107,16 +109,32 @@ impl BlockBehaviour for PowderSnowBlock {
             let known_movement = args.entity.get_known_movement();
             let is_moving = known_movement.x != 0.0 || known_movement.z != 0.0;
             if is_moving {
-                let mut random = args
-                    .world
-                    .random
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner);
-                if random.next_bool() {
-                    // The snowflake's speeds: `Mth.randomBetween(random, -1, 1) / 12`, twice.
-                    // The particle itself needs per-axis speeds the packet can't carry yet.
-                    random.next_f32();
-                    random.next_f32();
+                // `Mth.randomBetween(random, -1.0F, 1.0F) * 0.083333336F`, x before z.
+                let speeds = {
+                    let mut random = args
+                        .world
+                        .random
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner);
+                    random.next_bool().then(|| {
+                        let xs = (random.next_f32() * 2.0 - 1.0) * 0.083_333_336f32;
+                        let zs = (random.next_f32() * 2.0 - 1.0) * 0.083_333_336f32;
+                        (xs, zs)
+                    })
+                };
+                if let Some((xs, zs)) = speeds {
+                    let entity_pos = entity.pos.load();
+                    args.world.send_particles(
+                        Particle::Snowflake,
+                        &[],
+                        false,
+                        false,
+                        Vector3::new(entity_pos.x, f64::from(args.position.0.y + 1), entity_pos.z),
+                        1,
+                        Vector3::default(),
+                        Vector3::new(f64::from(xs), f64::from(0.05f32), f64::from(zs)),
+                        ParticleRandomization::Alternative,
+                    );
                 }
             }
         }

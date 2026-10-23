@@ -119,11 +119,14 @@ pub fn save_fish_to_bucket_tag(mob: &dyn Mob, bucket: &mut ItemStack) {
 }
 
 /// Vanilla `AbstractFish.mobInteract`: `bucketMobPickup`, else `Mob.mobInteract`'s pass.
+/// `save_to_bucket_tag` is the fish's `saveToBucketTag` (`save_fish_to_bucket_tag` unless the
+/// fish adds components).
 pub fn fish_mob_interact(
     mob: &dyn Mob,
     player: &Arc<Player>,
     item_stack: &mut ItemStack,
     bucket_item: &'static Item,
+    save_to_bucket_tag: impl FnOnce(&mut ItemStack),
 ) -> InteractionResult {
     if bucket_mob_pickup(
         mob,
@@ -131,7 +134,7 @@ pub fn fish_mob_interact(
         item_stack,
         bucket_item,
         Sound::ItemBucketFillFish,
-        |bucket| save_fish_to_bucket_tag(mob, bucket),
+        save_to_bucket_tag,
     ) {
         InteractionResult::SUCCESS
     } else {

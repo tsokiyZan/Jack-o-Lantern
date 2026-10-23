@@ -3,13 +3,13 @@
 
 use std::sync::{Arc, Mutex, PoisonError, Weak};
 
+use crate::world::ParticleRandomization;
 use pumpkin_data::game_event::GameEvent;
 use pumpkin_data::particle::Particle;
 use pumpkin_data::tag::{self, Tag, Taggable};
 use pumpkin_data::{Block, BlockDirection};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_nbt::tag::NbtTag;
-use pumpkin_protocol::java::client::play::CParticle;
 use pumpkin_protocol::{VarInt, ser::NetworkWriteExt};
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector2::Vector2;
@@ -565,9 +565,6 @@ impl GameEventListener for VibrationListener {
     }
 }
 
-/// Vanilla `ServerLevel.sendParticles` range for a particle that doesn't override the limiter.
-const PARTICLE_RANGE: f64 = 32.0;
-
 /// `ServerLevel.sendParticles(new VibrationParticleOption(destination, arrivalInTicks), x, y,
 /// z, 1, 0, 0, 0, 0)`; whether any player got it.
 fn send_vibration_particle(
@@ -583,30 +580,17 @@ fn send_vibration_particle(
     if data.write_var_int(&VarInt(arrival_in_ticks)).is_err() {
         return false;
     }
-    let packet = CParticle::new(
+    world.send_particles(
+        Particle::Vibration,
+        &data,
         false,
         false,
         position,
-        Vector3::new(0.0, 0.0, 0.0),
-        0.0,
         1,
-        VarInt(Particle::Vibration as i32),
-        &data,
-    );
-    let mut sent = false;
-    for player in world.players.load().iter() {
-        if player
-            .get_entity()
-            .block_pos
-            .load()
-            .dist_to_center_sqr(position.x, position.y, position.z)
-            < PARTICLE_RANGE * PARTICLE_RANGE
-        {
-            player.try_send_client_packet(&packet);
-            sent = true;
-        }
-    }
-    sent
+        Vector3::new(0.0, 0.0, 0.0),
+        Vector3::new(0.0, 0.0, 0.0),
+        ParticleRandomization::Default,
+    ) > 0
 }
 
 /// Vanilla `VibrationSystem.Ticker.tick`.

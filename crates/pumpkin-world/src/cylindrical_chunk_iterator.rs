@@ -52,6 +52,19 @@ impl Cylindrical {
         hyp_sqr < vd * vd
     }
 
+    /// Vanilla `ChunkTrackingView.isInViewDistance`: `isWithinDistance(.., false)`, whose
+    /// buffer is one chunk instead of the two of the neighbour-including check.
+    #[must_use]
+    #[inline]
+    pub const fn is_in_view_distance(&self, x: i32, z: i32) -> bool {
+        let vd = self.view_distance.get() as i64;
+        let dx = (x - self.center.x).abs() as i64 - 1;
+        let dz = (z - self.center.y).abs() as i64 - 1;
+        let rel_x = if dx > 0 { dx } else { 0 };
+        let rel_z = if dz > 0 { dz } else { 0 };
+        rel_x * rel_x + rel_z * rel_z < vd * vd
+    }
+
     /// Returns a precomputed list of relative chunk offset pairs `(dx, dy)` for a given view distance.
     #[must_use]
     #[inline]

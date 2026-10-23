@@ -145,6 +145,11 @@ impl InteractionEntity {
 }
 
 impl EntityBase for InteractionEntity {
+    /// Vanilla `Interaction.getPistonPushReaction`.
+    fn piston_push_reaction(&self) -> pumpkin_data::block_state::PistonBehavior {
+        pumpkin_data::block_state::PistonBehavior::Ignore
+    }
+
     /// Vanilla `Interaction.canBeHitByProjectile`.
     fn can_be_hit_by_projectile(&self) -> bool {
         false

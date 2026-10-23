@@ -35,6 +35,14 @@ pub enum SpawnGroupData {
         is_baby: bool,
         can_spawn_jockey: bool,
     },
+    /// Vanilla `AbstractSchoolingFish.SchoolSpawnGroupData`, or `TropicalFish.TropicalFishGroupData`
+    /// when it carries the group's packed variant. The leader's own `finalize_spawn` returns it
+    /// with no leader; the free `finalize_spawn`, which holds the shared entity, makes it the
+    /// leader.
+    School {
+        leader: Option<Arc<dyn EntityBase>>,
+        tropical_variant: Option<i32>,
+    },
 }
 
 impl SpawnGroupData {
@@ -117,6 +125,22 @@ impl MobEntity {
         )
     }
 
+    /// Queues an entity already in the world to mount this mob when it enters the world, as
+    /// `ConversionType.SINGLE`'s `rootPassenger.startRiding(to)` does.
+    pub fn add_pending_existing_rider(&self, rider: Arc<dyn EntityBase>) {
+        *self
+            .pending_existing_rider
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(rider);
+    }
+
+    pub(crate) fn take_pending_existing_rider(&self) -> Option<Arc<dyn EntityBase>> {
+        self.pending_existing_rider
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .take()
+    }
+
     /// Queues an entity already in the world for this mob to mount when it enters the world,
     /// as a vanilla `startRiding` during `finalizeSpawn` does.
     pub fn set_pending_vehicle(&self, vehicle: Arc<dyn EntityBase>) {
@@ -180,7 +204,15 @@ pub fn finalize_spawn(
     group_data: Option<SpawnGroupData>,
 ) -> Option<SpawnGroupData> {
     match entity.get_mob() {
-        Some(mob) => mob.finalize_spawn(world, reason, group_data),
+        Some(mob) => {
+            let mut group_data = mob.finalize_spawn(world, reason, group_data);
+            if let Some(SpawnGroupData::School { leader, .. }) = &mut group_data
+                && leader.is_none()
+            {
+                *leader = Some(entity.clone());
+            }
+            group_data
+        }
         None => group_data,
     }
 }

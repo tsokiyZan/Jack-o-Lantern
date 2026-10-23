@@ -8,9 +8,12 @@ impl JavaClient {
             .store(true, Ordering::Relaxed);
         // Vanilla `handleMovePlayer` for a packet without a position: no move, but the client's
         // flags (`setOnGroundWithMovement`) and the fall's end on the ground. Like a move, not
-        // before the client has loaded or while a teleport waits for its confirmation.
+        // before the client has loaded or while a teleport waits for its confirmation, and
+        // nothing for a sleeper (`handlePlayerPositionChange`'s sleeping branch; no move, so no
+        // teleport back).
         let entity = &player.living_entity.entity;
         if player.has_client_loaded()
+            && !player.is_sleeping()
             && !player.won_game.load(Ordering::Relaxed)
             && player
                 .awaiting_teleport

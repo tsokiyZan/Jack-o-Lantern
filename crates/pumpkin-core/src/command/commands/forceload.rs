@@ -16,101 +16,124 @@ const PERMISSION: &str = "minecraft:command.forceload";
 
 static ERROR_FAILED_ADD: CommandErrorType<0> = CommandErrorType::new(
     translation::java::COMMANDS_FORCELOAD_ADDED_FAILURE,
-    "No world in source",
+    translation::java::COMMANDS_FORCELOAD_ADDED_FAILURE,
 );
 static ERROR_FAILED_REMOVE: CommandErrorType<0> = CommandErrorType::new(
     translation::java::COMMANDS_FORCELOAD_REMOVED_FAILURE,
-    "No world in source",
+    translation::java::COMMANDS_FORCELOAD_REMOVED_FAILURE,
 );
 static ERROR_FAILED_QUERY: CommandErrorType<0> = CommandErrorType::new(
     translation::java::COMMANDS_FORCELOAD_QUERY_FAILURE,
-    "No world in source",
+    translation::java::COMMANDS_FORCELOAD_QUERY_FAILURE,
 );
 static ERROR_TOO_MANY: CommandErrorType<2> = CommandErrorType::new(
     translation::java::COMMANDS_FORCELOAD_TOOBIG,
-    "Too many chunks",
+    translation::java::COMMANDS_FORCELOAD_TOOBIG,
 );
+
+static ERROR_OUT_OF_WORLD: CommandErrorType<0> = CommandErrorType::new(
+    translation::java::ARGUMENT_POS_OUTOFWORLD,
+    translation::java::ARGUMENT_POS_OUTOFWORLD,
+);
+static ERROR_NOT_TICKING: CommandErrorType<2> = CommandErrorType::new(
+    translation::java::COMMANDS_FORCELOAD_QUERY_FAILURE,
+    translation::java::COMMANDS_FORCELOAD_QUERY_FAILURE,
+);
+
+/// Vanilla `ChunkPos.toString`, which `Component.translationArg(ChunkPos)` prints.
+fn chunk_pos_text(x: i32, z: i32) -> TextComponent {
+    TextComponent::text(format!("[{x}, {z}]"))
+}
+
+/// Vanilla `ForceLoadCommand.changeForceLoad`: `setChunkForced` on every chunk of the area,
+/// reported through a `CommandResponseTracker` counting only the chunks that changed (none
+/// fails with `added.failure` / `removed.failure`; one names that chunk).
+fn change_force_load(context: &CommandContext, add: bool) -> CommandExecutorResult {
+    let from = ColumnPosArgumentType::get_column_pos(context, "from")?;
+    let to = if context.get_argument::<Coordinates>("to").is_ok() {
+        ColumnPosArgumentType::get_column_pos(context, "to")?
+    } else {
+        from
+    };
+    let min_x = from.0.x.min(to.0.x);
+    let min_z = from.0.y.min(to.0.y);
+    let max_x = from.0.x.max(to.0.x);
+    let max_z = from.0.y.max(to.0.y);
+    if min_x < -30_000_000 || min_z < -30_000_000 || max_x >= 30_000_000 || max_z >= 30_000_000 {
+        return Err(ERROR_OUT_OF_WORLD.create_without_context());
+    }
+    let min_chunk_x = min_x >> 4;
+    let min_chunk_z = min_z >> 4;
+    let max_chunk_x = max_x >> 4;
+    let max_chunk_z = max_z >> 4;
+    let chunk_count =
+        (i64::from(max_chunk_x - min_chunk_x) + 1) * (i64::from(max_chunk_z - min_chunk_z) + 1);
+    if chunk_count > 256 {
+        return Err(ERROR_TOO_MANY.create_without_context(
+            TextComponent::text("256"),
+            TextComponent::text(chunk_count.to_string()),
+        ));
+    }
+
+    let failed = if add {
+        &ERROR_FAILED_ADD
+    } else {
+        &ERROR_FAILED_REMOVE
+    };
+    let world = context
+        .source
+        .world
+        .as_ref()
+        .ok_or_else(|| failed.create_without_context())?;
+
+    let mut changed = 0;
+    let mut only_changed = None;
+    for x in min_chunk_x..=max_chunk_x {
+        for z in min_chunk_z..=max_chunk_z {
+            if world.set_chunk_forced(x, z, add) {
+                changed += 1;
+                only_changed = (changed == 1).then_some((x, z));
+            }
+        }
+    }
+    if changed == 0 {
+        return Err(failed.create_without_context());
+    }
+
+    let dimension = TextComponent::text(world.dimension.minecraft_name.to_string());
+    let text = if let Some((x, z)) = only_changed {
+        let key = if add {
+            translation::java::COMMANDS_FORCELOAD_ADDED_SINGLE
+        } else {
+            translation::java::COMMANDS_FORCELOAD_REMOVED_SINGLE
+        };
+        TextComponent::translate_cross(key, key, [chunk_pos_text(x, z), dimension])
+    } else {
+        let key = if add {
+            translation::java::COMMANDS_FORCELOAD_ADDED_MULTIPLE
+        } else {
+            translation::java::COMMANDS_FORCELOAD_REMOVED_MULTIPLE
+        };
+        TextComponent::translate_cross(
+            key,
+            key,
+            [
+                TextComponent::text(changed.to_string()),
+                dimension,
+                chunk_pos_text(min_chunk_x, min_chunk_z),
+                chunk_pos_text(max_chunk_x, max_chunk_z),
+            ],
+        )
+    };
+    context.source.send_feedback(text, true);
+    Ok(changed)
+}
 
 struct ForceloadAddExecutor;
 
 impl CommandExecutor for ForceloadAddExecutor {
     fn execute(&self, context: &CommandContext) -> CommandExecutorResult {
-        let from_pos = ColumnPosArgumentType::get_column_pos(context, "from")?;
-
-        let to_pos = if context.get_argument::<Coordinates>("to").is_ok() {
-            ColumnPosArgumentType::get_column_pos(context, "to")?
-        } else {
-            from_pos
-        };
-
-        let world = context
-            .source
-            .world
-            .as_ref()
-            .ok_or_else(|| ERROR_FAILED_ADD.create_without_context())?;
-
-        let chunk_x_start = from_pos.0.x >> 4;
-        let chunk_z_start = from_pos.0.y >> 4;
-
-        let chunk_x_end = to_pos.0.x >> 4;
-        let chunk_z_end = to_pos.0.y >> 4;
-
-        let min_x = chunk_x_start.min(chunk_x_end);
-        let max_x = chunk_x_start.max(chunk_x_end);
-        let min_z = chunk_z_start.min(chunk_z_end);
-        let max_z = chunk_z_start.max(chunk_z_end);
-
-        let count_x = max_x - min_x + 1;
-        let count_z = max_z - min_z + 1;
-        let total_chunks = count_x * count_z;
-
-        if total_chunks > 256 {
-            return Err(ERROR_TOO_MANY.create_without_context(
-                TextComponent::text("256"),
-                TextComponent::text(total_chunks.to_string()),
-            ));
-        }
-
-        {
-            let mut forced = world
-                .forced_chunks
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            for x in min_x..=max_x {
-                for z in min_z..=max_z {
-                    forced.insert(Vector2::new(x, z));
-                }
-            }
-        }
-
-        world.update_active_chunks();
-
-        let dimension_name = world.dimension.minecraft_name.to_string();
-
-        let text = if total_chunks == 1 {
-            TextComponent::translate_cross(
-                translation::java::COMMANDS_FORCELOAD_ADDED_SINGLE,
-                translation::java::COMMANDS_FORCELOAD_ADDED_SINGLE,
-                [
-                    TextComponent::text(format!("[{min_x}, {min_z}]")),
-                    TextComponent::text(dimension_name),
-                ],
-            )
-        } else {
-            TextComponent::translate_cross(
-                translation::java::COMMANDS_FORCELOAD_ADDED_MULTIPLE,
-                translation::java::COMMANDS_FORCELOAD_ADDED_MULTIPLE,
-                [
-                    TextComponent::text(total_chunks.to_string()),
-                    TextComponent::text(dimension_name),
-                    TextComponent::text(format!("[{min_x}, {min_z}]")),
-                    TextComponent::text(format!("[{max_x}, {max_z}]")),
-                ],
-            )
-        };
-        context.source.send_feedback(text, true);
-
-        Ok(total_chunks)
+        change_force_load(context, true)
     }
 }
 
@@ -118,88 +141,15 @@ struct ForceloadRemoveExecutor;
 
 impl CommandExecutor for ForceloadRemoveExecutor {
     fn execute(&self, context: &CommandContext) -> CommandExecutorResult {
-        let from_pos = ColumnPosArgumentType::get_column_pos(context, "from")?;
-
-        let to_pos = if context.get_argument::<Coordinates>("to").is_ok() {
-            ColumnPosArgumentType::get_column_pos(context, "to")?
-        } else {
-            from_pos
-        };
-
-        let world = context
-            .source
-            .world
-            .as_ref()
-            .ok_or_else(|| ERROR_FAILED_REMOVE.create_without_context())?;
-
-        let chunk_x_start = from_pos.0.x >> 4;
-        let chunk_z_start = from_pos.0.y >> 4;
-
-        let chunk_x_end = to_pos.0.x >> 4;
-        let chunk_z_end = to_pos.0.y >> 4;
-
-        let min_x = chunk_x_start.min(chunk_x_end);
-        let max_x = chunk_x_start.max(chunk_x_end);
-        let min_z = chunk_z_start.min(chunk_z_end);
-        let max_z = chunk_z_start.max(chunk_z_end);
-
-        let count_x = max_x - min_x + 1;
-        let count_z = max_z - min_z + 1;
-        let total_chunks = count_x * count_z;
-
-        if total_chunks > 256 {
-            return Err(ERROR_TOO_MANY.create_without_context(
-                TextComponent::text("256"),
-                TextComponent::text(total_chunks.to_string()),
-            ));
-        }
-
-        {
-            let mut forced = world
-                .forced_chunks
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            for x in min_x..=max_x {
-                for z in min_z..=max_z {
-                    forced.remove(&Vector2::new(x, z));
-                }
-            }
-        }
-
-        world.update_active_chunks();
-
-        let dimension_name = world.dimension.minecraft_name.to_string();
-
-        let text = if total_chunks == 1 {
-            TextComponent::translate_cross(
-                translation::java::COMMANDS_FORCELOAD_REMOVED_SINGLE,
-                translation::java::COMMANDS_FORCELOAD_REMOVED_SINGLE,
-                [
-                    TextComponent::text(format!("[{min_x}, {min_z}]")),
-                    TextComponent::text(dimension_name),
-                ],
-            )
-        } else {
-            TextComponent::translate_cross(
-                translation::java::COMMANDS_FORCELOAD_REMOVED_MULTIPLE,
-                translation::java::COMMANDS_FORCELOAD_REMOVED_MULTIPLE,
-                [
-                    TextComponent::text(total_chunks.to_string()),
-                    TextComponent::text(dimension_name),
-                    TextComponent::text(format!("[{min_x}, {min_z}]")),
-                    TextComponent::text(format!("[{max_x}, {max_z}]")),
-                ],
-            )
-        };
-        context.source.send_feedback(text, true);
-
-        Ok(total_chunks)
+        change_force_load(context, false)
     }
 }
 
 struct ForceloadRemoveAllExecutor;
 
 impl CommandExecutor for ForceloadRemoveAllExecutor {
+    /// Vanilla `ForceLoadCommand.removeAll`: `setChunkForced(false)` on each forced chunk;
+    /// always succeeds and returns 0.
     fn execute(&self, context: &CommandContext) -> CommandExecutorResult {
         let world = context
             .source
@@ -207,128 +157,115 @@ impl CommandExecutor for ForceloadRemoveAllExecutor {
             .as_ref()
             .ok_or_else(|| ERROR_FAILED_REMOVE.create_without_context())?;
 
-        let removed_count = {
-            let mut forced = world
-                .forced_chunks
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            let count = forced.len();
-            forced.clear();
-            count
-        };
-
-        world.update_active_chunks();
-
-        let dimension_name = world.dimension.minecraft_name.to_string();
+        let forced: Vec<Vector2<i32>> = world
+            .forced_chunks
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .iter()
+            .copied()
+            .collect();
+        for pos in forced {
+            world.set_chunk_forced(pos.x, pos.y, false);
+        }
 
         let text = TextComponent::translate_cross(
             translation::java::COMMANDS_FORCELOAD_REMOVED_ALL,
             translation::java::COMMANDS_FORCELOAD_REMOVED_ALL,
-            [TextComponent::text(dimension_name)],
+            [TextComponent::text(
+                world.dimension.minecraft_name.to_string(),
+            )],
         );
         context.source.send_feedback(text, true);
 
-        Ok(removed_count as i32)
+        Ok(0)
     }
 }
 
 struct ForceloadQueryExecutor;
 
 impl CommandExecutor for ForceloadQueryExecutor {
+    /// Vanilla `ForceLoadCommand.queryForceLoad`.
     fn execute(&self, context: &CommandContext) -> CommandExecutorResult {
         let world = context
             .source
             .world
             .as_ref()
             .ok_or_else(|| ERROR_FAILED_QUERY.create_without_context())?;
-
-        let chunk_pos = if context.get_argument::<Coordinates>("pos").is_ok() {
-            let pos = ColumnPosArgumentType::get_column_pos(context, "pos")?;
-            Vector2::new(pos.0.x >> 4, pos.0.y >> 4)
-        } else {
-            let block_x = context.source.position.x.floor() as i32;
-            let block_z = context.source.position.z.floor() as i32;
-            Vector2::new(block_x >> 4, block_z >> 4)
-        };
-
-        let is_forced = {
-            let forced = world
-                .forced_chunks
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            forced.contains(&chunk_pos)
-        };
-
-        let dimension_name = world.dimension.minecraft_name.to_string();
-
-        if is_forced {
-            let text = TextComponent::translate_cross(
-                translation::java::COMMANDS_FORCELOAD_QUERY_SUCCESS,
-                translation::java::COMMANDS_FORCELOAD_QUERY_SUCCESS,
-                [
-                    TextComponent::text(format!("[{}, {}]", chunk_pos.x, chunk_pos.y)),
-                    TextComponent::text(dimension_name),
-                ],
-            );
-            context.source.send_feedback(text, false);
-        } else {
-            let text = TextComponent::translate_cross(
-                translation::java::COMMANDS_FORCELOAD_QUERY_FAILURE,
-                translation::java::COMMANDS_FORCELOAD_QUERY_FAILURE,
-                [
-                    TextComponent::text(format!("[{}, {}]", chunk_pos.x, chunk_pos.y)),
-                    TextComponent::text(dimension_name),
-                ],
-            );
-            context.source.send_error(text);
+        let pos = ColumnPosArgumentType::get_column_pos(context, "pos")?;
+        let chunk_pos = Vector2::new(pos.0.x >> 4, pos.0.y >> 4);
+        let dimension = TextComponent::text(world.dimension.minecraft_name.to_string());
+        let is_forced = world
+            .forced_chunks
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .contains(&chunk_pos);
+        if !is_forced {
+            return Err(ERROR_NOT_TICKING
+                .create_without_context(chunk_pos_text(chunk_pos.x, chunk_pos.y), dimension));
         }
+        let text = TextComponent::translate_cross(
+            translation::java::COMMANDS_FORCELOAD_QUERY_SUCCESS,
+            translation::java::COMMANDS_FORCELOAD_QUERY_SUCCESS,
+            [chunk_pos_text(chunk_pos.x, chunk_pos.y), dimension],
+        );
+        context.source.send_feedback(text, false);
+        Ok(1)
+    }
+}
 
-        let all_forced = {
-            let forced = world
-                .forced_chunks
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            forced
-                .iter()
-                .map(|pos| format!("[{}, {}]", pos.x, pos.y))
-                .collect::<Vec<_>>()
-        };
+struct ForceloadListExecutor;
 
-        if all_forced.is_empty() {
-            let text = TextComponent::translate_cross(
+impl CommandExecutor for ForceloadListExecutor {
+    /// Vanilla `ForceLoadCommand.listForceLoad`: the forced chunks sorted by packed position.
+    fn execute(&self, context: &CommandContext) -> CommandExecutorResult {
+        let world = context
+            .source
+            .world
+            .as_ref()
+            .ok_or_else(|| ERROR_FAILED_QUERY.create_without_context())?;
+        let dimension = TextComponent::text(world.dimension.minecraft_name.to_string());
+        let mut forced: Vec<Vector2<i32>> = world
+            .forced_chunks
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .iter()
+            .copied()
+            .collect();
+        // `ChunkPos.pack`: x in the low 32 bits, z in the high, compared as a signed long.
+        forced.sort_by_key(|pos| (i64::from(pos.y) << 32) | i64::from(pos.x as u32));
+        let chunk_count = forced.len();
+        if chunk_count == 0 {
+            context.source.send_error(TextComponent::translate_cross(
                 translation::java::COMMANDS_FORCELOAD_ADDED_NONE,
                 translation::java::COMMANDS_FORCELOAD_ADDED_NONE,
-                [TextComponent::text(
-                    world.dimension.minecraft_name.to_string(),
-                )],
-            );
-            context.source.send_error(text);
-        } else {
-            let list_str = all_forced.join(", ");
-            let text = if all_forced.len() == 1 {
-                TextComponent::translate_cross(
-                    translation::java::COMMANDS_FORCELOAD_LIST_SINGLE,
-                    translation::java::COMMANDS_FORCELOAD_LIST_SINGLE,
-                    [
-                        TextComponent::text(world.dimension.minecraft_name.to_string()),
-                        TextComponent::text(list_str),
-                    ],
-                )
-            } else {
-                TextComponent::translate_cross(
-                    translation::java::COMMANDS_FORCELOAD_LIST_MULTIPLE,
-                    translation::java::COMMANDS_FORCELOAD_LIST_MULTIPLE,
-                    [
-                        TextComponent::text(all_forced.len().to_string()),
-                        TextComponent::text(world.dimension.minecraft_name.to_string()),
-                        TextComponent::text(list_str),
-                    ],
-                )
-            };
-            context.source.send_feedback(text, false);
+                [dimension],
+            ));
+            return Ok(0);
         }
-
-        Ok(i32::from(is_forced))
+        let list = forced
+            .iter()
+            .map(|pos| format!("[{}, {}]", pos.x, pos.y))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let text = if chunk_count == 1 {
+            TextComponent::translate_cross(
+                translation::java::COMMANDS_FORCELOAD_LIST_SINGLE,
+                translation::java::COMMANDS_FORCELOAD_LIST_SINGLE,
+                [dimension, TextComponent::text(list)],
+            )
+        } else {
+            TextComponent::translate_cross(
+                translation::java::COMMANDS_FORCELOAD_LIST_MULTIPLE,
+                translation::java::COMMANDS_FORCELOAD_LIST_MULTIPLE,
+                [
+                    TextComponent::text(chunk_count.to_string()),
+                    dimension,
+                    TextComponent::text(list),
+                ],
+            )
+        };
+        context.source.send_feedback(text, false);
+        Ok(chunk_count as i32)
     }
 }
 
@@ -361,7 +298,7 @@ pub fn register(dispatcher: &mut CommandDispatcher, registry: &PermissionRegistr
         )
         .then(
             literal("query")
-                .executes(ForceloadQueryExecutor)
+                .executes(ForceloadListExecutor)
                 .then(argument("pos", ColumnPosArgumentType).executes(ForceloadQueryExecutor)),
         );
 

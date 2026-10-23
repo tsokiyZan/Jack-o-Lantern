@@ -124,8 +124,8 @@ pub trait InventoryPlayer: Send + Sync {
     ///
     /// # Arguments
     /// - `item` - The item to drop
-    /// - `retain_ownership` - If true, the player keeps ownership (for pickup delay)
-    fn drop_item(&self, item: ItemStack, retain_ownership: bool);
+    /// - `thrown_from_hand` - Vanilla `thrownFromHand`: the player is the thrower and gets the drop stats
+    fn drop_item(&self, item: ItemStack, thrown_from_hand: bool);
 
     /// Drops an item the client didn't predict dropping (vanilla `Prediction.SERVER_ONLY`),
     /// as giving back what a closed container held when the inventory is full.

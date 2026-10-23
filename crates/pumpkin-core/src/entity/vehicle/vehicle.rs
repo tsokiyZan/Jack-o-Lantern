@@ -173,7 +173,7 @@ impl VehicleEntity {
 
     /// `remove(KILLED)`: `AbstractBoat.remove` drops its leash first. Only boats among the
     /// vehicles are `Leashable`, so a leashed vehicle is a boat. `caller` is this vehicle.
-    fn remove_destroyed(&self, caller: &dyn EntityBase) {
+    pub fn remove_destroyed(&self, caller: &dyn EntityBase) {
         if self.entity.is_leashed() {
             crate::entity::leashable::drop_leash(caller, true, true);
         }

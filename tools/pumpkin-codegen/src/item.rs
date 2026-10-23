@@ -100,6 +100,8 @@ pub struct ItemComponents {
     pub compostable: Option<CompostableComponent>,
     #[serde(rename = "minecraft:cooking_fuel")]
     pub cooking_fuel: Option<CookingFuelComponent>,
+    #[serde(rename = "minecraft:villager_food")]
+    pub villager_food: Option<VillagerFoodComponent>,
     #[serde(rename = "minecraft:damage_type")]
     pub damage_type: Option<String>,
     #[serde(rename = "minecraft:debug_stick_state")]
@@ -197,6 +199,11 @@ pub struct EnchantableComponent {
 #[derive(Deserialize, Clone)]
 pub struct CompostableComponent {
     pub layers: serde_json::Value,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct VillagerFoodComponent {
+    pub nutrition: i32,
 }
 
 #[derive(Deserialize, Clone)]
@@ -820,6 +827,12 @@ impl ToTokens for ItemComponents {
             let layers = int_provider_tokens(&compostable.layers);
             tokens.extend(quote! {
                 (Compostable, &CompostableImpl { layers: #layers }),
+            });
+        }
+        if let Some(food) = &self.villager_food {
+            let nutrition = food.nutrition;
+            tokens.extend(quote! {
+                (VillagerFood, &VillagerFoodImpl { nutrition: #nutrition }),
             });
         }
         if let Some(fuel) = &self.cooking_fuel {

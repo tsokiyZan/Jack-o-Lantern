@@ -6,7 +6,6 @@ use pumpkin_data::data_component_impl::DyeImpl;
 use pumpkin_data::dye_color::DyeColor;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
-use pumpkin_data::particle::Particle;
 use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_inventory::crafting::crafting_inventory::CraftingInventory;
 use pumpkin_inventory::crafting::crafting_screen_handler::match_crafting_recipe;
@@ -25,7 +24,6 @@ use crate::entity::{
 };
 use crate::world::World;
 use pumpkin_protocol::bedrock::server::actor_event::ActorEventID;
-use pumpkin_util::math::vector3::Vector3;
 use pumpkin_util::random::RandomImpl;
 use uuid::Uuid;
 
@@ -155,7 +153,6 @@ pub trait Animal: Mob {
                 mob_entity.set_love_ticks(600, Some(player.gameprofile.id));
                 let entity = &mob_entity.living_entity.entity;
                 let world = entity.world.load();
-                let pos = entity.pos.load();
 
                 world.send_entity_status(
                     entity,
@@ -163,13 +160,6 @@ pub trait Animal: Mob {
                     Some(ActorEventID::InLoveHearts),
                 );
 
-                world.spawn_particle(
-                    pos + Vector3::new(0.0, f64::from(entity.height()), 0.0),
-                    Vector3::new(0.5, 0.5, 0.5),
-                    1.0,
-                    7,
-                    Particle::Heart,
-                );
                 self.play_eating_sound(ambient_sound);
                 return InteractionResult::SUCCESS_SERVER;
             }

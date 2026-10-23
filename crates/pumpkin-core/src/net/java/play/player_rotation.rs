@@ -22,15 +22,20 @@ impl JavaClient {
             return;
         }
         let entity = &player.get_entity();
-        // Vanilla `handleMovePlayer` for a packet without a position: no move, but the client's
-        // flags (`setOnGroundWithMovement`) and the fall's end on the ground. While a teleport
-        // waits for its confirmation, only the rotation is taken (`absSnapRotationTo`).
-        if player
+        let awaiting_teleport = player
             .awaiting_teleport
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .is_none()
-        {
+            .is_some();
+        // `handlePlayerPositionChange` while sleeping: a move of more than a block (none here)
+        // is teleported back, and nothing else is taken, not even the rotation.
+        if !awaiting_teleport && player.is_sleeping() {
+            return;
+        }
+        // Vanilla `handleMovePlayer` for a packet without a position: no move, but the client's
+        // flags (`setOnGroundWithMovement`) and the fall's end on the ground. While a teleport
+        // waits for its confirmation, only the rotation is taken (`absSnapRotationTo`).
+        if !awaiting_teleport {
             entity.on_ground.store(rotation.ground, Ordering::Relaxed);
             entity
                 .horizontal_collision

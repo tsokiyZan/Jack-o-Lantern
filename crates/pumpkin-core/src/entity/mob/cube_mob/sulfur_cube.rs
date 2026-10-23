@@ -593,15 +593,21 @@ impl CubeMobEntity {
         if !self.sulfur_can_hold_item(&stack) || sulfur.pickup_timer.load(Relaxed) > 0 {
             return;
         }
-        // `take` tells the clients before the item goes.
-        if !self.mob_entity.living_entity.pickup(item.get_entity(), 1) {
+        let living = &self.mob_entity.living_entity;
+        if !living.fire_pickup_event(item.get_entity(), 1) {
             return;
         }
+        living.on_item_pickup(item);
         let swallowed = item
             .get_item_stack()
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .split(1);
+        self.set_item_slot_and_notify(&EquipmentSlot::BODY, swallowed);
+        self.play_sound(Sound::EntitySulfurCubeAbsorb, 1.0, 1.0);
+        self.mob_entity.set_guaranteed_drop(&EquipmentSlot::BODY);
+        // Vanilla `take` comes last, while the emptied item is still there.
+        living.take(item.get_entity(), 1);
         let emptied = item
             .get_item_stack()
             .lock()
@@ -612,9 +618,6 @@ impl CubeMobEntity {
         } else {
             item.init_data_tracker();
         }
-        self.set_item_slot_and_notify(&EquipmentSlot::BODY, swallowed);
-        self.play_sound(Sound::EntitySulfurCubeAbsorb, 1.0, 1.0);
-        self.mob_entity.set_guaranteed_drop(&EquipmentSlot::BODY);
     }
 
     /// Vanilla `SulfurCube.getBaseExperienceReward`.

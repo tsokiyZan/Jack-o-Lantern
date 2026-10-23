@@ -44,3 +44,28 @@ pub fn tick_conversion(
     }
     piglin.finish_conversion();
 }
+
+/// Vanilla `AbstractPiglin.finishConversion`: a zombified piglin keeping the equipment and the
+/// loot pickup, with 10 seconds of nausea.
+pub fn finish_conversion(piglin: &dyn Mob) {
+    crate::entity::mob::conversion::convert_single(
+        piglin,
+        &pumpkin_data::entity::EntityType::ZOMBIFIED_PIGLIN,
+        true,
+        true,
+        |zombified| {
+            zombified
+                .get_mob_entity()
+                .living_entity
+                .add_effect(pumpkin_data::potion::Effect {
+                    effect_type: &pumpkin_data::effect::StatusEffect::NAUSEA,
+                    duration: 200,
+                    amplifier: 0,
+                    ambient: false,
+                    show_particles: true,
+                    show_icon: true,
+                    blend: false,
+                });
+        },
+    );
+}

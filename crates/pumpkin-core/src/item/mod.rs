@@ -68,7 +68,7 @@ pub fn create_filled_result(
     if stack.is_empty() {
         *stack = new_stack;
     } else if !player.inventory.insert_stack_anywhere(&mut new_stack) {
-        player.drop_from_hand(new_stack, false);
+        player.drop_from_hand(new_stack, false, false);
     }
 }
 
@@ -193,7 +193,7 @@ fn swap_with_equipment_slot(
     inventory.set_stack_in_hand(hand, rest);
     let mut to_inventory = in_slot;
     if !to_inventory.is_empty() && !inventory.insert_stack_anywhere(&mut to_inventory) {
-        player.drop_from_hand(to_inventory, false);
+        player.drop_from_hand(to_inventory, false, false);
     }
     InteractionResult::SUCCESS
 }

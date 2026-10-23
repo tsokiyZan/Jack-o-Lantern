@@ -18,6 +18,7 @@ use living::LivingEntity;
 use player::{PassengerRemount, Player};
 use pumpkin_data::BlockState;
 use pumpkin_data::biome::Biome;
+use pumpkin_data::block_state::PistonBehavior;
 use pumpkin_data::data_component_impl::EquipmentSlot;
 use pumpkin_data::dimension::Dimension;
 use pumpkin_data::entity::EntityStatus;
@@ -84,6 +85,7 @@ pub mod bucketable;
 pub mod custom_sound;
 pub mod damage_source;
 pub mod decoration;
+pub mod dismount_helper;
 pub mod effect;
 pub mod entity_reference;
 pub mod experience_orb;
@@ -104,11 +106,13 @@ pub mod passive;
 pub mod player;
 pub mod projectile;
 pub mod projectile_deflection;
+pub mod simple_container;
 pub mod spawn_util;
 pub mod synched_entity_data;
 pub mod tnt;
 pub mod r#type;
 pub mod vehicle;
+pub mod waypoint;
 
 pub use lightning::LightningBoltEntity;
 
@@ -1096,6 +1100,13 @@ pub trait EntityBase: Send + Sync + std::any::Any {
         self.get_entity().can_teleport_base(from, to)
     }
 
+    /// Vanilla `Entity.getPistonPushReaction`: how a moving piston block treats this entity.
+    /// The mapping onto [`PistonBehavior`] is `Normal` = `PUSH_PULL`, `PushOnly` = `PUSH`,
+    /// `Destroy` = `POPPED`, `Block` = `IMMOVEABLE`, `Ignore` = `IGNORE_ENTITY`.
+    fn piston_push_reaction(&self) -> PistonBehavior {
+        PistonBehavior::Normal
+    }
+
     /// Vanilla `Entity.getKnownMovement`: a player steering this entity knows its movement best.
     fn get_known_movement(&self) -> Vector3<f64> {
         let entity = self.get_entity();
@@ -1642,6 +1653,9 @@ pub struct Entity {
     pub tick_count: AtomicI32,
     /// Vanilla `Entity.firstTick`: cleared at the end of the first base tick.
     pub first_tick: AtomicBool,
+    /// Whether this world's waypoint manager tracks the entity as a waypoint, so `set_pos` only
+    /// enters the manager for transmitters (vanilla passes it nothing else).
+    pub waypoint_tracked: AtomicBool,
     /// Vanilla `pistonDeltas` and `pistonDeltasGameTime`.
     piston_deltas: std::sync::Mutex<([f64; 3], i64)>,
     /// Vanilla `movementThisTick`: the moves made since the last block-effect sweep.
@@ -1832,6 +1846,7 @@ impl Entity {
             age: AtomicI32::new(0),
             tick_count: AtomicI32::new(0),
             first_tick: AtomicBool::new(true),
+            waypoint_tracked: AtomicBool::new(false),
             movement_this_tick: std::sync::Mutex::new(Vec::new()),
             piston_deltas: std::sync::Mutex::new(([0.0; 3], 0)),
             final_movements_this_tick: std::sync::Mutex::new(Vec::new()),
@@ -2255,6 +2270,14 @@ impl Entity {
                     ));
                 }
             }
+
+            // The end of vanilla `setPosRaw`: on any position change, once past the first tick
+            // and not removed, `updateWaypoint` for a transmitter and `updatePlayer` for a
+            // receiving player.
+            if !self.first_tick.load(Ordering::Relaxed) && !self.is_removed() {
+                let world = self.world.load();
+                world.waypoint_manager.on_entity_moved(&world, self);
+            }
         }
     }
 
@@ -2290,6 +2313,13 @@ impl Entity {
             wrap_degrees(to_degrees(pumpkin_util::math::atan2(delta.z, delta.x)) as f32 - 90.0);
         self.yaw.store(yaw);
         self.head_yaw.store(yaw);
+    }
+
+    /// Vanilla `Entity.isSupportedBy`: whether `pos` is this entity's main supporting block.
+    /// Reads `mainSupportingBlockPos` as is, without [`Self::get_supporting_block_pos`]'s
+    /// on-ground check.
+    pub fn is_supported_by(&self, pos: BlockPos) -> bool {
+        self.supporting_block_pos.load() == Some(pos)
     }
 
     /// Returns the block position of the block the (non-player) entity is standing on, if any.
@@ -2863,6 +2893,14 @@ impl Entity {
                         effect_applier,
                         is_precise,
                     );
+                    // Vanilla `onInsideBlock`, which only `ServerPlayer` overrides.
+                    if let Some(player) = caller.get_player() {
+                        player.trigger_advancement(
+                            crate::entity::player::advancement::trigger::AdvancementTrigger::EnterBlock {
+                                block,
+                            },
+                        );
+                    }
                 }
                 if inside_fluid {
                     effect_applier.advance_step(iteration);
@@ -5082,6 +5120,14 @@ impl Entity {
         self.removal_reason.load().is_some()
     }
 
+    /// Vanilla `Entity.setRemoved`'s bookkeeping for an entity leaving without being destroyed
+    /// (`UNLOADED_TO_CHUNK`, `UNLOADED_WITH_PLAYER`): the first reason sticks. The world's own
+    /// lists are the caller's business.
+    pub fn set_removed_reason(&self, reason: RemovalReason) {
+        let _ = self.removal_reason.compare_exchange(None, Some(reason));
+        self.removed.store(true, Ordering::Release);
+    }
+
     pub fn is_alive(&self) -> bool {
         !self.is_removed()
     }
@@ -6130,10 +6176,7 @@ impl Entity {
             return;
         };
         let world = self.world.load_full();
-        let mut scoreboard = world
-            .scoreboard
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut scoreboard = world.lock_scoreboard();
         if !scoreboard.add_player_to_team(&world, team_name, self.entity_uuid.to_string()) {
             tracing::warn!(
                 "Unable to add entity to team \"{team_name}\" (that team probably doesn't exist)"
@@ -6649,7 +6692,7 @@ pub fn command_teleport(
     if let Some(player) = entity.get_player()
         && player.is_sleeping()
     {
-        player.wake_up();
+        player.stop_sleep_in_bed(true, true);
     }
     entity.teleport(position, yaw, pitch, world);
 }

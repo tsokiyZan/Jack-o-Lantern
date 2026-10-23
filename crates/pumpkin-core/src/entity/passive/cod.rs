@@ -36,6 +36,20 @@ impl CodEntity {
 }
 
 impl Mob for CodEntity {
+    /// Vanilla `AbstractSchoolingFish.finalizeSpawn`.
+    fn finalize_spawn(
+        &self,
+        _world: &Arc<crate::world::World>,
+        _reason: crate::entity::mob::spawn::EntitySpawnReason,
+        group_data: Option<crate::entity::mob::spawn::SpawnGroupData>,
+    ) -> Option<crate::entity::mob::spawn::SpawnGroupData> {
+        self.mob_entity.finalize_spawn_base();
+        Some(schooling_fish::finalize_school_spawn(
+            &self.school,
+            group_data,
+        ))
+    }
+
     /// Vanilla `WaterAnimal.checkSpawnObstruction`: water doesn't obstruct it.
     fn check_spawn_obstruction(&self, world: &crate::world::World) -> bool {
         let entity = self.get_entity();
@@ -78,6 +92,7 @@ impl Mob for CodEntity {
             player,
             item_stack,
             &pumpkin_data::item::Item::COD_BUCKET,
+            |bucket| crate::entity::bucketable::save_fish_to_bucket_tag(self, bucket),
         )
     }
 

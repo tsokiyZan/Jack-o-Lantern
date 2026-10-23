@@ -796,7 +796,7 @@ impl pumpkin::plugin::world::HostWorld for PluginHostState {
                 wasmtime::Error::msg(format!("Unknown particle ID: {}", particle as u16))
             })?;
 
-        world_ref.spawn_particle(
+        world_ref.spawn_client_particle(
             pumpkin_util::math::vector3::Vector3::new(pos.0, pos.1, pos.2),
             pumpkin_util::math::vector3::Vector3::new(
                 offset.0 as f32,
@@ -1428,7 +1428,7 @@ impl pumpkin::plugin::world::HostChunk for PluginHostState {
             chunk_data.mark_dirty(true);
             let absolute_pos =
                 BlockPos::new(chunk_data.x * 16 + pos.x, pos.y, chunk_data.z * 16 + pos.z);
-            world.register_block_change(absolute_pos, state);
+            world.register_block_change(absolute_pos);
         }
 
         Ok(())

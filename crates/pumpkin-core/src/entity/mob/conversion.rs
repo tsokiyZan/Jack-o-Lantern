@@ -111,11 +111,26 @@ impl ConversionTracker {
     }
 }
 
-/// Vanilla `ConversionParams`, without the scoreboard team, which Pumpkin does not carry over.
-#[derive(Clone, Copy)]
+/// Vanilla `ConversionParams`, without the type: `convert_to` is always `SINGLE`, and the cube
+/// split runs `SPLIT_ON_DEATH` itself. `team` is the team's name.
+#[derive(Clone)]
 pub struct ConversionParams {
     pub keep_equipment: bool,
     pub preserve_can_pick_up_loot: bool,
+    pub team: Option<String>,
+}
+
+impl ConversionParams {
+    /// Vanilla `ConversionParams.single`: the team is `mob.getTeam()`, read before anything
+    /// changes.
+    #[must_use]
+    pub fn single(mob: &dyn Mob, keep_equipment: bool, preserve_can_pick_up_loot: bool) -> Self {
+        Self {
+            keep_equipment,
+            preserve_can_pick_up_loot,
+            team: mob.get_team_name(),
+        }
+    }
 }
 
 /// Vanilla `Mob.convertTo` for a `ConversionType.SINGLE` conversion: builds the new mob,
@@ -124,7 +139,7 @@ pub struct ConversionParams {
 pub fn convert_to(
     from: &dyn Mob,
     entity_type: &'static EntityType,
-    params: ConversionParams,
+    params: &ConversionParams,
     after_conversion: impl FnOnce(&dyn Mob),
 ) -> Option<Arc<dyn EntityBase>> {
     let old_entity = from.get_entity();
@@ -147,7 +162,7 @@ pub fn convert_to(
 }
 
 /// Vanilla `ConversionType.SINGLE.convert`.
-fn convert_single_type(from: &dyn Mob, to: &dyn Mob, params: ConversionParams) {
+fn convert_single_type(from: &dyn Mob, to: &dyn Mob, params: &ConversionParams) {
     let (old, new) = (from.get_mob_entity(), to.get_mob_entity());
     let (old_living, new_living) = (&old.living_entity, &new.living_entity);
     let (old_entity, new_entity) = (&old_living.entity, &new_living.entity);
@@ -158,8 +173,22 @@ fn convert_single_type(from: &dyn Mob, to: &dyn Mob, params: ConversionParams) {
     new_entity.set_rotation(old_entity.yaw.load(), old_entity.pitch.load());
     new_entity.velocity.store(old_entity.velocity.load());
     if let Some(rider) = root_passenger {
+        // `rootPassenger.stopRiding()`, then `boardingCooldown = 0`, which undoes the 60 ticks
+        // the dismount set.
         old_entity.remove_passenger(rider.get_entity().entity_id);
-        new.add_pending_rider(rider);
+        rider.get_entity().riding_cooldown.store(0, Relaxed);
+        // `to` is brand new, so it normally carries nobody.
+        let to_passengers = new_entity
+            .passengers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        for passenger in to_passengers {
+            new_entity.remove_passenger(passenger.get_entity().entity_id);
+            passenger.get_entity().remove();
+        }
+        // `rootPassenger.startRiding(to)`, once `to` is in the world.
+        new.add_pending_existing_rider(rider);
     }
     if let Some(vehicle) = old_entity.get_vehicle() {
         vehicle.get_entity().remove_passenger(old_entity.entity_id);
@@ -221,6 +250,10 @@ fn convert_single_type(from: &dyn Mob, to: &dyn Mob, params: ConversionParams) {
     new_entity
         .on_ground
         .store(old_entity.on_ground.load(Relaxed), Relaxed);
+    // Only the position: vanilla sets no pose here.
+    if let Some(pos) = old_living.get_sleeping_pos() {
+        new_living.set_sleeping_pos(pos);
+    }
     if let Some(holder) = crate::entity::leashable::leash_holder(old_entity) {
         crate::entity::leashable::set_leashed_to(to, holder, true);
     }
@@ -239,10 +272,7 @@ pub fn convert_single(
     convert_to(
         from,
         to_type,
-        ConversionParams {
-            keep_equipment,
-            preserve_can_pick_up_loot,
-        },
+        &ConversionParams::single(from, keep_equipment, preserve_can_pick_up_loot),
         after_conversion,
     )
 }

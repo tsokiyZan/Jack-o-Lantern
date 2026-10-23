@@ -42,7 +42,11 @@ impl JavaClient {
                     }}
                 }
             }
-            Action::LeaveBed => player.wake_up(),
+            Action::LeaveBed => {
+                if player.is_sleeping() {
+                    player.stop_sleep_in_bed(false, true);
+                }
+            }
 
             Action::StartHorseJump => {
                 if let Some(vehicle) = player.get_entity().get_controlled_vehicle()

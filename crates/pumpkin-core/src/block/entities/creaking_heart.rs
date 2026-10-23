@@ -2,6 +2,7 @@ use std::collections::VecDeque;
 use std::sync::atomic::{AtomicI32, AtomicI64, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 
+use crate::world::ParticleRandomization;
 use crossbeam::atomic::AtomicCell;
 use pumpkin_data::block_properties::{
     CreakingHeartLikeProperties, CreakingHeartState, GlowLichenLikeProperties,
@@ -14,7 +15,6 @@ use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_data::{Block, BlockDirection, BlockStateId};
 use pumpkin_nbt::compound::NbtCompound;
-use pumpkin_protocol::java::client::play::CParticle;
 use pumpkin_protocol::{VarInt, ser::NetworkWriteExt};
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
@@ -48,8 +48,6 @@ const HURT_CALL_PARTICLE_TICKS: i32 = 50;
 const MAX_DEPTH: i32 = 2;
 const MAX_COUNT: i32 = 64;
 const TICKS_GRACE_PERIOD: i64 = 30;
-/// Vanilla `ServerLevel.sendParticles`' range for a particle that overrides the limiter.
-const OVERRIDE_LIMITER_PARTICLE_RANGE: f64 = 512.0;
 
 /// Vanilla `creakingInfo`: the spawned creaking, or its UUID until it is found again.
 #[derive(Clone)]
@@ -626,25 +624,15 @@ fn send_trail_particle(
     if written.is_err() {
         return;
     }
-    let packet = CParticle::new(
+    world.send_particles(
+        Particle::Trail,
+        &data,
         true,
         true,
         position,
-        Vector3::new(0.0, 0.0, 0.0),
-        0.0,
         1,
-        VarInt(Particle::Trail as i32),
-        &data,
+        Vector3::new(0.0, 0.0, 0.0),
+        Vector3::new(0.0, 0.0, 0.0),
+        ParticleRandomization::Default,
     );
-    for player in world.players.load().iter() {
-        if player
-            .get_entity()
-            .block_pos
-            .load()
-            .dist_to_center_sqr(position.x, position.y, position.z)
-            < OVERRIDE_LIMITER_PARTICLE_RANGE * OVERRIDE_LIMITER_PARTICLE_RANGE
-        {
-            player.try_send_client_packet(&packet);
-        }
-    }
 }

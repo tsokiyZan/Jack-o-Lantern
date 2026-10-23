@@ -1,11 +1,10 @@
 use pumpkin_macros::pumpkin_block;
-use pumpkin_util::math::vector3::Vector3;
 use std::collections::{HashSet, VecDeque};
 use std::sync::Arc;
 
 use crate::block::{BlockBehaviour, OnNeighborUpdateArgs, PlacedArgs};
-use pumpkin_data::particle::Particle;
 use pumpkin_data::sound::{Sound, SoundCategory};
+use pumpkin_data::world::WorldEvent;
 use pumpkin_data::{Block, BlockStateId};
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_world::world::BlockFlags;
@@ -119,23 +118,16 @@ impl BlockBehaviour for WetSpongeBlock {
                     BlockFlags::NOTIFY_ALL,
                 );
 
-                // Play dry sound and spawn smoke particles
+                // `levelEvent(2009, pos, 0)`: the client draws the steam.
+                args.world.sync_world_event(
+                    WorldEvent::ParticlesWaterEvaporating,
+                    *args.position,
+                    0,
+                );
                 args.world.play_block_sound(
                     Sound::BlockWetSpongeDries,
                     SoundCategory::Blocks,
                     *args.position,
-                );
-
-                args.world.spawn_particle(
-                    Vector3::new(
-                        args.position.0.x as f64 + 0.5,
-                        args.position.0.y as f64 + 1.0,
-                        args.position.0.z as f64 + 0.5,
-                    ),
-                    Vector3::new(0.25, 0.0, 0.25),
-                    0.01,
-                    16,
-                    Particle::Cloud,
                 );
             }
         }

@@ -859,7 +859,12 @@ pub fn spawn_category_for_position(
                             return batch_buffer;
                         }
 
-                        if entity_type.resource_name == "tropical_fish" && group_size >= 8 {
+                        // `mob.isMaxGroupSizeReached(groupSize)`.
+                        if batch_buffer
+                            .last()
+                            .and_then(|e| e.get_mob())
+                            .is_some_and(|mob| mob.is_max_group_size_reached(group_size))
+                        {
                             break;
                         }
                     }

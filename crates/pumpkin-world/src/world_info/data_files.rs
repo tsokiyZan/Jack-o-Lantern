@@ -955,6 +955,155 @@ pub fn write_last_map_id(
         .map_err(|e| WorldInfoError::SerializationError(e.to_string()))
 }
 
+/// Vanilla `TicketType.FORCED` as `TicketStorage`'s codec names it.
+const FORCED_TICKET_TYPE: &str = "minecraft:forced";
+/// Vanilla `ChunkMap.FORCED_TICKET_LEVEL`: `ChunkLevel.byStatus(ENTITY_TICKING)`.
+pub const FORCED_TICKET_LEVEL: i32 = 31;
+
+/// Vanilla `TicketStorage` (`data/minecraft/chunk_tickets.dat`, per dimension): forced chunks.
+///
+/// Pumpkin keeps only `minecraft:forced` tickets; the other
+/// persistent type, `portal`, times out within 300 ticks of a restart in vanilla and isn't
+/// modelled, so it is dropped on load.
+#[must_use]
+pub fn read_forced_chunks(dim_folder: &Path) -> Vec<(i32, i32)> {
+    let path = minecraft_data_dir(dim_folder).join("chunk_tickets.dat");
+    let Ok(file) = File::open(&path) else {
+        return Vec::new();
+    };
+    let root = match read_gzip_compound_tag(file) {
+        Ok(root) => root,
+        Err(err) => {
+            warn!("Failed to read {}: {err}", path.display());
+            return Vec::new();
+        }
+    };
+    let Some(tickets) = root
+        .get_compound("data")
+        .and_then(|data| data.get_list("tickets"))
+    else {
+        return Vec::new();
+    };
+    let mut forced = Vec::new();
+    for ticket in tickets {
+        let NbtTag::Compound(ticket) = ticket else {
+            continue;
+        };
+        // `BuiltInRegistries.TICKET_TYPE.byNameCodec()`: an identifier, namespace optional.
+        let is_forced = ticket
+            .get_string("type")
+            .is_some_and(|ty| ty == FORCED_TICKET_TYPE || ty == "forced");
+        if !is_forced {
+            continue;
+        }
+        if let Some(&[x, z]) = ticket.get_int_array("chunk_pos")
+            && !forced.contains(&(x, z))
+        {
+            forced.push((x, z));
+        }
+    }
+    forced
+}
+
+/// Writes `chunk_tickets.dat` the way vanilla's `TicketStorage.CODEC` does.
+///
+/// Each forced chunk is `{chunk_pos:[I;x,z], level:31, type:"minecraft:forced"}` (`ticks_left` is 0, the
+/// optional field's default, and left out), and no `tickets` list at all when there are none.
+/// Vanilla's order is its hash map's; Pumpkin writes the chunks sorted by packed position.
+pub fn write_forced_chunks(
+    dim_folder: &Path,
+    forced: &[(i32, i32)],
+    data_version: i32,
+) -> Result<(), WorldInfoError> {
+    let dir = ensure_minecraft_data_dir(dim_folder)?;
+    let mut sorted = forced.to_vec();
+    // `ChunkPos.pack`: x in the low 32 bits, z in the high.
+    sorted.sort_by_key(|&(x, z)| (i64::from(z) << 32) | i64::from(x as u32));
+    let mut data = NbtCompound::new();
+    if !sorted.is_empty() {
+        let tickets = sorted
+            .into_iter()
+            .map(|(x, z)| {
+                let mut ticket = NbtCompound::new();
+                ticket.put("chunk_pos", NbtTag::IntArray(vec![x, z]));
+                ticket.put_int("level", FORCED_TICKET_LEVEL);
+                ticket.put_string("type", FORCED_TICKET_TYPE.to_string());
+                NbtTag::Compound(ticket)
+            })
+            .collect();
+        data.put_list("tickets", tickets);
+    }
+    let mut root = NbtCompound::new();
+    root.put_compound("data", data);
+    root.put_int("DataVersion", data_version);
+    let file = File::create(dir.join("chunk_tickets.dat"))?;
+    pumpkin_nbt::nbt_compress::write_gzip_compound_tag(root, BufWriter::new(file))
+        .map_err(|e| WorldInfoError::SerializationError(e.to_string()))
+}
+
+#[cfg(test)]
+mod chunk_tickets_tests {
+    use std::{fs::File, io::BufWriter};
+
+    use pumpkin_nbt::{compound::NbtCompound, tag::NbtTag};
+    use tempfile::TempDir;
+
+    use super::{ensure_minecraft_data_dir, read_forced_chunks, write_forced_chunks};
+
+    #[test]
+    fn forced_chunks_round_trip() {
+        let dir = TempDir::new().unwrap();
+        let forced = vec![(3, -1), (0, 0), (-2, 5)];
+        write_forced_chunks(dir.path(), &forced, 4767).unwrap();
+        let mut read = read_forced_chunks(dir.path());
+        read.sort_unstable();
+        let mut expected = forced;
+        expected.sort_unstable();
+        assert_eq!(read, expected);
+    }
+
+    #[test]
+    fn empty_file_has_no_ticket_list() {
+        let dir = TempDir::new().unwrap();
+        write_forced_chunks(dir.path(), &[], 4767).unwrap();
+        let root = pumpkin_nbt::nbt_compress::read_gzip_compound_tag(
+            File::open(dir.path().join("data/minecraft/chunk_tickets.dat")).unwrap(),
+        )
+        .unwrap();
+        assert!(root.get_compound("data").unwrap().is_empty());
+        assert_eq!(root.get_int("DataVersion"), Some(4767));
+        assert!(read_forced_chunks(dir.path()).is_empty());
+    }
+
+    #[test]
+    fn reads_only_forced_tickets() {
+        let dir = TempDir::new().unwrap();
+        let ticket = |x: i32, z: i32, ty: &str| {
+            let mut t = NbtCompound::new();
+            t.put("chunk_pos", NbtTag::IntArray(vec![x, z]));
+            t.put_int("level", 31);
+            t.put_string("type", ty.to_string());
+            t.put_long("ticks_left", 12);
+            NbtTag::Compound(t)
+        };
+        let mut data = NbtCompound::new();
+        data.put_list(
+            "tickets",
+            vec![
+                ticket(1, 2, "minecraft:forced"),
+                ticket(4, 4, "minecraft:portal"),
+                ticket(-7, 9, "forced"),
+            ],
+        );
+        let mut root = NbtCompound::new();
+        root.put_compound("data", data);
+        let dir_path = ensure_minecraft_data_dir(dir.path()).unwrap();
+        let file = File::create(dir_path.join("chunk_tickets.dat")).unwrap();
+        pumpkin_nbt::nbt_compress::write_gzip_compound_tag(root, BufWriter::new(file)).unwrap();
+        assert_eq!(read_forced_chunks(dir.path()), vec![(1, 2), (-7, 9)]);
+    }
+}
+
 #[cfg(test)]
 mod random_sequences_tests {
     use tempfile::TempDir;

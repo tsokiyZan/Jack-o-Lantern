@@ -168,6 +168,24 @@ impl BoundingBox {
         }
     }
 
+    /// Vanilla `AABB.intersect`: the overlap of both boxes (component-wise max of the mins,
+    /// min of the maxes).
+    #[must_use]
+    pub const fn intersect(&self, other: &Self) -> Self {
+        Self {
+            min: Vector3::new(
+                self.min.x.max(other.min.x),
+                self.min.y.max(other.min.y),
+                self.min.z.max(other.min.z),
+            ),
+            max: Vector3::new(
+                self.max.x.min(other.max.x),
+                self.max.y.min(other.max.y),
+                self.max.z.min(other.max.z),
+            ),
+        }
+    }
+
     /// Creates a bounding box from arrays of min and max coordinates.
     ///
     /// # Arguments
@@ -301,6 +319,22 @@ impl BoundingBox {
             self.max.y - eps,
             self.max.z - eps,
         ))
+    }
+
+    /// Vanilla `AABB.distanceToSqr(AABB)`: the squared gap between the two boxes, 0 when
+    /// they touch or overlap.
+    #[must_use]
+    pub fn distance_to_sqr_box(&self, other: &Self) -> f64 {
+        let dx = (self.min.x - other.max.x)
+            .max(other.min.x - self.max.x)
+            .max(0.0);
+        let dy = (self.min.y - other.max.y)
+            .max(other.min.y - self.max.y)
+            .max(0.0);
+        let dz = (self.min.z - other.max.z)
+            .max(other.min.z - self.max.z)
+            .max(0.0);
+        dx * dx + dy * dy + dz * dz
     }
 
     /// Returns a new bounding box shifted by a delta vector.
@@ -674,5 +708,20 @@ impl EntityDimensions {
                 .attachments
                 .scale(width_factor, height_factor, width_factor),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::BoundingBox;
+
+    #[test]
+    fn distance_to_sqr_box_is_the_squared_gap() {
+        let a = BoundingBox::new_array([0.0, 0.0, 0.0], [1.0, 1.0, 1.0]);
+        let touching = BoundingBox::new_array([1.0, 0.0, 0.0], [2.0, 1.0, 1.0]);
+        assert_eq!(a.distance_to_sqr_box(&touching), 0.0);
+        let apart = BoundingBox::new_array([4.0, 0.5, 0.0], [5.0, 2.0, 1.0]);
+        assert_eq!(a.distance_to_sqr_box(&apart), 9.0);
+        assert_eq!(apart.distance_to_sqr_box(&a), 9.0);
     }
 }

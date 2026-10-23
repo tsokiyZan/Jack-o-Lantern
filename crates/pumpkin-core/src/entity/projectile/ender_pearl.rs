@@ -8,7 +8,7 @@ use crate::{
 };
 use pumpkin_data::damage::DamageType;
 use pumpkin_data::dimension::Dimension;
-use pumpkin_data::entity::{EntityPose, EntityStatus};
+use pumpkin_data::entity::EntityStatus;
 use pumpkin_data::particle::Particle;
 use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_protocol::bedrock::server::actor_event::ActorEventID;
@@ -48,7 +48,8 @@ impl EnderPearlEntity {
         if owner_entity.world.load().dimension == level.dimension {
             owner_entity.is_alive()
                 && owner.get_living_entity().is_none_or(|living| {
-                    living.health.load() > 0.0 && owner_entity.pose.load() != EntityPose::Sleeping
+                    living.health.load() > 0.0
+                        && !crate::entity::living::LivingEntity::is_sleeping(owner)
                 })
         } else {
             owner.can_use_portal(true)
@@ -116,7 +117,7 @@ impl EntityBase for EnderPearlEntity {
             let offset = Vector3::new(0.0, dy, 0.0);
             let speed = Vector3::new(speed_x, 0.0, speed_z);
 
-            world.spawn_particle(
+            world.spawn_client_particle(
                 hit_pos.add(&offset),
                 Vector3::new(speed.x as f32, speed.y as f32, speed.z as f32),
                 1.0,

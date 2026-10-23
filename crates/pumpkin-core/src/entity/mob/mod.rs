@@ -144,6 +144,8 @@ pub struct MobEntity {
     /// which compares against the base value the navigation was built with instead.
     applied_follow_range: AtomicCell<f64>,
     pending_riders: std::sync::Mutex<Vec<Arc<dyn EntityBase>>>,
+    /// A converted mob's rider, already in the world (`ConversionType.SINGLE`'s root passenger).
+    pending_existing_rider: std::sync::Mutex<Option<Arc<dyn EntityBase>>>,
     pending_vehicle: std::sync::Mutex<Option<Arc<dyn EntityBase>>>,
     mob_flags: AtomicU8,
 }
@@ -386,6 +388,7 @@ impl MobEntity {
             death_loot_table_seed: AtomicI64::new(0),
             applied_follow_range: AtomicCell::new(f64::NAN),
             pending_riders: std::sync::Mutex::new(Vec::new()),
+            pending_existing_rider: std::sync::Mutex::new(None),
             pending_vehicle: std::sync::Mutex::new(None),
             mob_flags: AtomicU8::new(0),
         }
@@ -1961,9 +1964,17 @@ pub trait Mob: EntityBase + Send + Sync {
         true
     }
 
-    /// Vanilla `LivingEntity.isSleeping`, for mobs that sleep without a bed.
+    /// A mob's own part of vanilla `stopSleeping`, after `LivingEntity`'s
+    /// (`Villager.stopSleeping`'s `LAST_WOKEN`).
+    fn after_stop_sleeping(&self) {}
+
+    /// Vanilla `LivingEntity.isSleeping`: a sleeping position, unless the mob overrides it
+    /// (`Fox.isSleeping`, which sleeps without a bed).
     fn is_sleeping(&self) -> bool {
-        false
+        self.get_mob_entity()
+            .living_entity
+            .get_sleeping_pos()
+            .is_some()
     }
 
     /// The mob's own part of vanilla `LivingEntity.canBeSeenAsEnemy`.
@@ -2117,6 +2128,19 @@ pub trait Mob: EntityBase + Send + Sync {
 
     /// Vanilla `Bucketable.setFromBucket`, for the mobs that keep the flag.
     fn set_from_bucket(&self, _from_bucket: bool) {}
+
+    /// Vanilla `Entity.applyImplicitComponents` for components a mob keeps beyond its
+    /// variant name (salmon size, tropical fish pattern and colours): applies those `item`
+    /// carries and returns whether this mob took any.
+    fn mob_apply_item_components(&self, _item: &pumpkin_data::item_stack::ItemStack) -> bool {
+        false
+    }
+
+    /// Vanilla `Mob.isMaxGroupSizeReached`: whether a natural spawn group stops at
+    /// `group_size`.
+    fn is_max_group_size_reached(&self, _group_size: i32) -> bool {
+        false
+    }
 
     /// A vanilla `actuallyHurt` override that takes the hit instead of the mob: whether it did.
     fn absorb_hurt(
@@ -3425,7 +3449,7 @@ pub fn is_player_holding(passenger: &dyn EntityBase, item: &Item) -> bool {
 
 /// Vanilla `ConversionType.convertCommon`: what a converted mob takes over from the old one.
 /// Scoreboard teams are not carried over.
-pub fn convert_common(from: &dyn Mob, to: &dyn Mob, params: conversion::ConversionParams) {
+pub fn convert_common(from: &dyn Mob, to: &dyn Mob, params: &conversion::ConversionParams) {
     let (old, new) = (from.get_mob_entity(), to.get_mob_entity());
     let (old_living, new_living) = (&old.living_entity, &new.living_entity);
     let (old_entity, new_entity) = (&old_living.entity, &new_living.entity);
@@ -3496,8 +3520,27 @@ pub fn convert_common(from: &dyn Mob, to: &dyn Mob, params: conversion::Conversi
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .extend(tags);
+    // `COMPONENTS_TO_COPY`: the custom name, and the custom data, which an entity always has.
     if let Some(name) = &**old_entity.custom_name.load() {
         new_entity.set_custom_name(name.clone());
+    }
+    let custom_data = old_entity
+        .entity_custom_data
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone();
+    *new_entity
+        .entity_custom_data
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = custom_data;
+    if let Some(team) = &params.team {
+        let from_team = from.get_team_name();
+        let world = new_entity.world.load_full();
+        let mut scoreboard = world.lock_scoreboard();
+        scoreboard.add_player_to_team(&world, team, new_entity.entity_uuid.to_string());
+        if from_team.as_ref() == Some(team) {
+            scoreboard.remove_player_from_team(&world, team, &old_entity.entity_uuid.to_string());
+        }
     }
     if let (Some(old_zombie), Some(new_zombie)) = (from.as_zombie(), to.as_zombie())
         && old_zombie.can_break_doors()
@@ -3699,7 +3742,9 @@ impl<T: Mob + Send + 'static> EntityBase for T {
                 let entity = &mob_entity.living_entity.entity;
                 let pos = entity.pos.load();
                 let world = entity.world.load();
-                world.spawn_particle(
+                // Vanilla `Animal.aiStep`'s hearts are a client-side `addParticle` the server
+                // never sends (and the client's `inLove` isn't synced).
+                world.spawn_client_particle(
                     pos + Vector3::new(0.0, f64::from(entity.height()) + 0.5, 0.0),
                     Vector3::new(0.5, 0.5, 0.5),
                     1.0,

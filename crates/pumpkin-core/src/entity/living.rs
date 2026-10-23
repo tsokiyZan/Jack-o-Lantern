@@ -34,6 +34,7 @@ use crate::entity::combat::{CombatRules, CombatTracker, FallLocation, knockback_
 use crate::entity::damage_source::DamageSource;
 use crate::entity::effect::MobEffectInstance;
 use crate::entity::mob::equipment::DEFAULT_EQUIPMENT_DROP_CHANCE;
+use crate::entity::player::advancement::trigger::AdvancementTrigger;
 use crate::entity::player::cooldown_group;
 use crate::entity::player::statistics::{CustomStatistic, StatisticCategory};
 use crate::server::Server;
@@ -155,6 +156,8 @@ pub struct LivingEntity {
     pub active_effects: std::sync::Mutex<FxHashMap<&'static StatusEffect, MobEffectInstance>>,
     /// Vanilla `fallFlyTicks`.
     pub fall_fly_ticks: AtomicI32,
+    /// The synced `SLEEPING_POS_ID`: the bed this entity sleeps in.
+    sleeping_pos: AtomicCell<Option<BlockPos>>,
     /// The synced `DATA_ARROW_COUNT_ID` and its countdown, `removeArrowTime`.
     arrow_count: AtomicI32,
     remove_arrow_time: AtomicI32,
@@ -167,6 +170,8 @@ pub struct LivingEntity {
     /// Vanilla `AttributeMap.attributesToUpdate`: attribute ids changed since the last
     /// `refreshDirtyAttributes`.
     attributes_to_update: std::sync::Mutex<Vec<u8>>,
+    /// Vanilla `locatorBarIcon`: how this entity shows on other players' locator bars.
+    pub locator_bar_icon: std::sync::Mutex<crate::entity::waypoint::WaypointIconState>,
     pub entity_equipment: Arc<std::sync::Mutex<EntityEquipment>>,
     pub equipment_drop_chances: Arc<std::sync::Mutex<FxHashMap<EquipmentSlot, f32>>>,
     pub movement_input: AtomicCell<Vector3<f64>>,
@@ -403,11 +408,15 @@ impl LivingEntity {
             active_effects: std::sync::Mutex::new(FxHashMap::default()),
             effects_dirty: AtomicBool::new(false),
             fall_fly_ticks: AtomicI32::new(0),
+            sleeping_pos: AtomicCell::new(None),
             arrow_count: AtomicI32::new(0),
             remove_arrow_time: AtomicI32::new(0),
             stinger_count: AtomicI32::new(0),
             remove_stinger_time: AtomicI32::new(0),
             attributes_to_update: std::sync::Mutex::new(Vec::new()),
+            locator_bar_icon: std::sync::Mutex::new(
+                crate::entity::waypoint::WaypointIconState::default(),
+            ),
             entity_equipment: Arc::new(std::sync::Mutex::new(EntityEquipment::new())),
             equipment_drop_chances: Arc::new(std::sync::Mutex::new(FxHashMap::default())),
             equipment_slots: Arc::new(build_equipment_slots()),
@@ -713,13 +722,14 @@ impl LivingEntity {
         true
     }
 
-    /// Picks up an Item entity or XP Orb
-    pub fn pickup(&self, item: &Entity, stack_amount: u32) -> bool {
+    /// Pumpkin's `EntityPickupItemEvent` for picking `amount` of `item` (an item entity, arrow
+    /// or experience orb) up; false when a plugin cancelled it. Fired before anything changes.
+    pub fn fire_pickup_event(&self, item: &Entity, amount: u32) -> bool {
         let mut pickup_event =
             crate::plugin::api::events::entity::entity_pickup_item::EntityPickupItemEvent::new(
                 self.entity.entity_id,
                 item.entity_type.id.to_string(),
-                stack_amount as u8,
+                amount as u8,
             );
         if let Some(server) = self.entity.world.load().server.upgrade() {
             server
@@ -729,24 +739,55 @@ impl LivingEntity {
                 return false;
             }
         }
+        true
+    }
 
-        // Vanilla `take`: to the players tracking the picked-up entity, while it's still there.
+    /// Vanilla `LivingEntity.take`: to the players tracking the picked-up entity, while it's
+    /// still there.
+    pub fn take(&self, item: &Entity, amount: u32) {
         if item.removed.load(Relaxed) {
-            return true;
+            return;
         }
         self.entity.world.load().send_to_tracking_players_editioned(
             item,
             &CTakeItemEntity::new(
                 item.entity_id.into(),
                 self.entity.entity_id.into(),
-                VarInt(stack_amount as i32),
+                VarInt(amount as i32),
             ),
             &CTakeItemActor {
                 item_runtime_id: VarULong(item.entity_id as u64),
                 actor_runtime_id: VarULong(self.entity.entity_id as u64),
             },
         );
-        true
+    }
+
+    /// Vanilla `LivingEntity.onItemPickup`, with `ServerPlayer`'s override: the
+    /// thrown-item-picked-up advancement triggers.
+    pub fn on_item_pickup(&self, item: &super::item::ItemEntity) {
+        let Some(owner) = item.get_owner() else {
+            return;
+        };
+        let stack = item
+            .get_item_stack()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        let world = self.entity.world.load();
+        if let Some(thrower) = owner.get_player()
+            && let Some(picker) = world.get_entity_by_id(self.entity.entity_id)
+        {
+            thrower.trigger_advancement(AdvancementTrigger::ThrownItemPickedUpByEntity {
+                item: stack.clone(),
+                entity: picker,
+            });
+        }
+        if let Some(player) = world.get_player_by_id(self.entity.entity_id) {
+            player.trigger_advancement(AdvancementTrigger::ThrownItemPickedUpByPlayer {
+                item: stack,
+                thrower: owner,
+            });
+        }
     }
 
     /// Vanilla `ItemStack.causeUseVibration`: the use game event, for items whose
@@ -1592,8 +1633,21 @@ impl LivingEntity {
         }
     }
 
-    /// Vanilla `onAttributeUpdated`.
+    /// Vanilla `onAttributeUpdated`, with `ServerPlayer`'s override first.
     fn on_attribute_updated(&self, attribute_id: u8) {
+        let world = self.entity.world.load();
+        // `ServerPlayer.onAttributeUpdated`: the receive range adds or removes the player from
+        // the waypoint manager, before the living handling.
+        if attribute_id == Attributes::WAYPOINT_RECEIVE_RANGE.id
+            && self.entity.entity_type == &EntityType::PLAYER
+            && let Some(player) = world.get_player_by_id(self.entity.entity_id)
+        {
+            if self.get_attribute_value(&Attributes::WAYPOINT_RECEIVE_RANGE) > 0.0 {
+                world.waypoint_manager.add_player(&player);
+            } else {
+                world.waypoint_manager.remove_player(&player);
+            }
+        }
         if attribute_id == Attributes::MAX_HEALTH.id {
             let max_health = self.get_max_health();
             if self.health.load() > max_health {
@@ -1607,7 +1661,17 @@ impl LivingEntity {
         }
         // `SCALE` refreshes the dimensions, which needs the full entity: the tick picks the
         // change up from `applied_scale`.
-        // TODO: `WAYPOINT_TRANSMIT_RANGE` tracking; the waypoint manager isn't ported.
+        else if attribute_id == Attributes::WAYPOINT_TRANSMIT_RANGE.id {
+            if self.get_attribute_value(&Attributes::WAYPOINT_TRANSMIT_RANGE) > 0.0 {
+                if let Some(entity) = world.get_entity_by_id(self.entity.entity_id) {
+                    world.waypoint_manager.track_waypoint(&entity);
+                }
+            } else {
+                world
+                    .waypoint_manager
+                    .untrack_waypoint(self.entity.entity_id);
+            }
+        }
     }
 
     // Check if the entity is in water
@@ -2866,7 +2930,7 @@ impl LivingEntity {
         self.update_death_stats(&*dyn_self, kill_credit.as_deref());
 
         if Self::is_sleeping(&*dyn_self) {
-            Self::stop_sleeping(&*dyn_self);
+            self.stop_sleeping(&*dyn_self);
         }
         self.clear_active_hand();
 
@@ -3360,11 +3424,33 @@ impl LivingEntity {
             .copied()
             .collect();
         for effect_type in effect_types {
-            self.tick_effect(effect_type);
+            if !self.tick_effect(effect_type) {
+                break;
+            }
         }
     }
 
-    fn tick_effect(&self, effect_type: &'static StatusEffect) {
+    /// The effect types active now, to spot an `applyEffectTick` adding or removing one.
+    fn active_effect_types(&self) -> Vec<*const StatusEffect> {
+        let mut types: Vec<*const StatusEffect> = self
+            .active_effects
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .keys()
+            .map(|effect_type| std::ptr::from_ref(*effect_type))
+            .collect();
+        types.sort_unstable();
+        types
+    }
+
+    /// One step of vanilla `tickEffects`' loop over the `activeEffects` `HashMap`. Whether the
+    /// loop goes on: when `applyEffectTick` adds or removes an effect (a bad omen giving the raid
+    /// omen), vanilla's iterator throws a `ConcurrentModificationException` on its next
+    /// `remove` or `next`, which `tickEffects` swallows, so the effect that did it isn't removed
+    /// this tick and the rest of the effects aren't ticked. The set is compared before and
+    /// after, so removing and re-adding the same effect inside one `applyEffectTick` (which
+    /// vanilla's `modCount` would catch) goes unnoticed; no effect does that.
+    fn tick_effect(&self, effect_type: &'static StatusEffect) -> bool {
         let Some((has_remaining, tick_count, amplifier)) = self
             .active_effects
             .lock()
@@ -3383,15 +3469,21 @@ impl LivingEntity {
                 )
             })
         else {
-            return;
+            return true;
         };
         let mut keep = has_remaining;
+        let mut modified = false;
         if keep
             && let Some(mob_effect) = crate::entity::effect::get_mob_effect(effect_type)
             && mob_effect.should_apply_effect_tick(tick_count, amplifier)
-            && !mob_effect.apply_effect_tick(self, amplifier)
         {
-            keep = false;
+            let before = self.active_effect_types();
+            keep = mob_effect.apply_effect_tick(self, amplifier);
+            modified = self.active_effect_types() != before;
+            if !keep && modified {
+                // `iterator.remove()` throws: the effect stays, unticked.
+                return false;
+            }
         }
         let snapshot = if keep {
             let mut effects = self
@@ -3399,7 +3491,7 @@ impl LivingEntity {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             let Some(instance) = effects.get_mut(&effect_type) else {
-                return;
+                return !modified;
             };
             instance.tick_down_duration();
             let downgraded = instance.downgrade_to_hidden_effect();
@@ -3421,6 +3513,11 @@ impl LivingEntity {
                 }
             }
             _ => {
+                // An effect that changed the set and then ran out: `iterator.remove()` throws
+                // too, so it stays for another tick.
+                if modified {
+                    return false;
+                }
                 if self
                     .active_effects
                     .lock()
@@ -3432,6 +3529,8 @@ impl LivingEntity {
                 }
             }
         }
+        // The next `iterator.next()` throws after a modification.
+        !modified
     }
 
     /// Vanilla `LivingEntity.hurtArmor`, empty for most entities: players wear all four armour
@@ -3876,11 +3975,7 @@ impl LivingEntity {
         nbt.put_short("HurtTime", self.hurt_time.load(Relaxed) as i16);
         nbt.put_short("DeathTime", i16::from(self.death_time.load(Relaxed)));
         nbt.put_bool("FallFlying", self.entity.is_fall_flying());
-        // `sleeping_pos`: only players keep the bed they sleep in.
-        if let Some(sleeping_pos) = self
-            .self_player()
-            .and_then(|player| player.sleeping_bed_pos.load())
-        {
+        if let Some(sleeping_pos) = self.get_sleeping_pos() {
             nbt.put(
                 "sleeping_pos",
                 NbtTag::IntArray(vec![sleeping_pos.0.x, sleeping_pos.0.y, sleeping_pos.0.z]),
@@ -3921,6 +4016,13 @@ impl LivingEntity {
         };
         if !equipment.child_tags.is_empty() {
             nbt.put("equipment", NbtTag::Compound(equipment));
+        }
+        let icon = self
+            .locator_bar_icon
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if icon.has_data() {
+            nbt.put("locator_bar_icon", NbtTag::Compound(icon.to_nbt()));
         }
     }
 
@@ -4092,7 +4194,45 @@ impl LivingEntity {
         self.entity
             .fall_flying
             .store(nbt.get_bool("FallFlying").unwrap_or(false), Relaxed);
+        // `sleeping_pos`: lie down at once, and move to the bed now unless the first tick
+        // will (`baseTick`).
+        if let Some(NbtTag::IntArray(bed)) = nbt.get("sleeping_pos")
+            && let &[x, y, z] = bed.as_slice()
+        {
+            let bed = BlockPos::new(x, y, z);
+            self.set_sleeping_pos(bed);
+            // `entityData.set(DATA_POSE, SLEEPING)`, which refreshes the dimensions.
+            self.entity.set_pose_with_dimensions(
+                EntityPose::Sleeping,
+                self.entity.get_dimensions(EntityPose::Sleeping),
+            );
+            if !self.entity.first_tick.load(Relaxed)
+                && !self.set_pos_to_bed(bed)
+                && let Some(caller) = self
+                    .entity
+                    .world
+                    .load()
+                    .get_entity_by_id(self.entity.entity_id)
+            {
+                self.stop_sleeping(caller.as_ref());
+            }
+        } else {
+            self.clear_sleeping_pos();
+        }
+        self.read_locator_bar_icon(nbt);
         // todo more...
+    }
+
+    /// Vanilla `locatorBarIcon = input.read("locator_bar_icon", Icon.CODEC)
+    /// .orElseGet(Icon::new)`.
+    fn read_locator_bar_icon(&self, nbt: &NbtCompound) {
+        *self
+            .locator_bar_icon
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = nbt
+            .get_compound("locator_bar_icon")
+            .and_then(crate::entity::waypoint::WaypointIconState::from_nbt)
+            .unwrap_or_default();
     }
 
     /// Vanilla `LivingEntity.getDamageAfterArmorAbsorb`.
@@ -4284,7 +4424,7 @@ impl LivingEntity {
         }
 
         if Self::is_sleeping(caller) {
-            Self::stop_sleeping(caller);
+            self.stop_sleeping(caller);
         }
 
         self.no_action_time.store(0, Relaxed);
@@ -4542,20 +4682,184 @@ impl LivingEntity {
             && !Self::is_sleeping(caller)
     }
 
-    /// Vanilla `LivingEntity.isSleeping` (a sleeping position); Pumpkin keeps it on the
-    /// player and the mobs that sleep.
-    fn is_sleeping(caller: &dyn EntityBase) -> bool {
-        caller.get_player().map_or_else(
-            || caller.get_mob().is_some_and(super::mob::Mob::is_sleeping),
-            crate::entity::player::Player::is_sleeping,
-        )
+    /// Vanilla `LivingEntity.isAffectedByPotions`: not dead or dying; never an armor stand
+    /// (`ArmorStand`'s override). `caller` is this entity.
+    #[must_use]
+    pub fn is_affected_by_potions(&self, caller: &dyn EntityBase) -> bool {
+        caller.get_entity().entity_type != &pumpkin_data::entity::EntityType::ARMOR_STAND
+            && !self.is_dead_or_dying()
     }
 
-    /// Vanilla `LivingEntity.stopSleeping`. Only players keep a bed in Pumpkin.
-    fn stop_sleeping(caller: &dyn EntityBase) {
-        if let Some(player) = caller.get_player() {
-            player.wake_up();
+    /// Vanilla `LivingEntity.isSleeping`: a sleeping position, or a mob's own override
+    /// (`Fox.isSleeping`, its sleeping flag). `caller` is the entity.
+    #[must_use]
+    pub fn is_sleeping(caller: &dyn EntityBase) -> bool {
+        if let Some(mob) = caller.get_mob() {
+            return mob.is_sleeping();
         }
+        if let Some(player) = caller.get_player() {
+            return player.is_sleeping();
+        }
+        caller
+            .get_living_entity()
+            .is_some_and(|living| living.get_sleeping_pos().is_some())
+    }
+
+    /// Vanilla `LivingEntity.getSleepingPos`.
+    #[must_use]
+    pub fn get_sleeping_pos(&self) -> Option<BlockPos> {
+        self.sleeping_pos.load()
+    }
+
+    /// Vanilla `LivingEntity.setSleepingPos`.
+    pub fn set_sleeping_pos(&self, pos: BlockPos) {
+        self.sleeping_pos.store(Some(pos));
+        self.entity
+            .set_synced_data(tracked_data::living_entity::SLEEPING_POS_ID, Some(pos));
+    }
+
+    /// Vanilla `LivingEntity.clearSleepingPos`.
+    pub fn clear_sleeping_pos(&self) {
+        self.sleeping_pos.store(None);
+        self.entity.set_synced_data(
+            tracked_data::living_entity::SLEEPING_POS_ID,
+            None::<BlockPos>,
+        );
+    }
+
+    /// Vanilla `LivingEntity.startSleeping`: lies down in the bed at `bed` (its head).
+    /// `caller` is this entity.
+    pub fn start_sleeping(&self, caller: &dyn EntityBase, bed: BlockPos) -> bool {
+        let world = self.entity.world.load_full();
+        let state = world.get_block_state(&bed);
+        let block = Block::from_state_id(state.id);
+        if !crate::block::blocks::bed::is_abstract_bed(block) {
+            return false;
+        }
+        let Some(sleep_height) = crate::block::blocks::bed::get_sleep_height(&world, bed, state)
+        else {
+            return false;
+        };
+        // `if (isPassenger()) stopRiding()`, which nothing can cancel.
+        if let Some(vehicle) = self.entity.get_vehicle() {
+            vehicle
+                .get_entity()
+                .remove_passenger_on_removal(self.entity.entity_id);
+        }
+        self.set_pos_to_bed_at(sleep_height, bed);
+        // `setBlockAndUpdate(bed, OCCUPIED=true)`; the foot follows through `updateShape`.
+        crate::block::blocks::bed::BedBlock::set_occupied(true, &world, block, &bed, state.id);
+        caller.set_pose(EntityPose::Sleeping);
+        self.set_sleeping_pos(bed);
+        self.entity.velocity.store(Vector3::default());
+        self.entity.velocity_dirty.store(true, SeqCst);
+        true
+    }
+
+    /// Vanilla `LivingEntity.setPosToBed(BlockPos)`.
+    fn set_pos_to_bed(&self, bed: BlockPos) -> bool {
+        let world = self.entity.world.load();
+        let state = world.get_block_state(&bed);
+        if !crate::block::blocks::bed::is_abstract_bed(Block::from_state_id(state.id)) {
+            return false;
+        }
+        let Some(sleep_height) = crate::block::blocks::bed::get_sleep_height(&world, bed, state)
+        else {
+            return false;
+        };
+        self.set_pos_to_bed_at(sleep_height, bed);
+        true
+    }
+
+    /// Vanilla `LivingEntity.setPosToBed(double, BlockPos)`.
+    fn set_pos_to_bed_at(&self, sleep_height: f64, bed: BlockPos) {
+        self.entity.set_pos(Vector3::new(
+            f64::from(bed.0.x) + 0.5,
+            f64::from(bed.0.y) + sleep_height + 0.125,
+            f64::from(bed.0.z) + 0.5,
+        ));
+    }
+
+    /// Vanilla `LivingEntity.checkBedExists`.
+    fn check_bed_exists(&self) -> bool {
+        self.get_sleeping_pos().is_some_and(|bed| {
+            let world = self.entity.world.load();
+            let state = world.get_block_state(&bed);
+            crate::block::blocks::bed::is_abstract_bed(Block::from_state_id(state.id))
+                && crate::block::blocks::bed::get_sleep_height(&world, bed, state).is_some()
+        })
+    }
+
+    /// Vanilla `stopSleeping` with its overrides: a player through
+    /// `Player.stopSleepInBed(true, true)`. `caller` is this entity.
+    pub fn stop_sleeping(&self, caller: &dyn EntityBase) {
+        if let Some(player) = caller.get_player() {
+            player.stop_sleep_in_bed(true, true);
+            return;
+        }
+        self.living_stop_sleeping(caller);
+        if let Some(mob) = caller.get_mob() {
+            mob.after_stop_sleeping();
+        }
+    }
+
+    /// Vanilla `LivingEntity.stopSleeping`: frees the bed and stands up beside it.
+    pub(crate) fn living_stop_sleeping(&self, caller: &dyn EntityBase) {
+        let world = self.entity.world.load_full();
+        if let Some(bed) = self.get_sleeping_pos()
+            && world.is_loaded(&bed)
+        {
+            let state = world.get_block_state(&bed);
+            let block = Block::from_state_id(state.id);
+            if crate::block::blocks::bed::is_abstract_bed(block) {
+                let facing =
+                    pumpkin_data::block_properties::WhiteBedLikeProperties::from_state_id(state.id)
+                        .facing;
+                crate::block::blocks::bed::BedBlock::set_occupied(
+                    false, &world, block, &bed, state.id,
+                );
+                crate::block::blocks::bed::on_stop_sleeping(&world, bed, block);
+                let stand_up = crate::block::blocks::bed::find_stand_up_position(
+                    self.entity.entity_type,
+                    &world,
+                    bed,
+                    facing,
+                    self.entity.yaw.load(),
+                )
+                .unwrap_or_else(|| {
+                    Vector3::new(
+                        f64::from(bed.0.x) + 0.5,
+                        f64::from(bed.0.y + 1) + 0.1,
+                        f64::from(bed.0.z) + 0.5,
+                    )
+                });
+                // `Vec3.atBottomCenterOf(bed).subtract(standUp).normalize()`.
+                let look = Vector3::new(
+                    f64::from(bed.0.x) + 0.5 - stand_up.x,
+                    f64::from(bed.0.y) - stand_up.y,
+                    f64::from(bed.0.z) + 0.5 - stand_up.z,
+                );
+                let length = (look.x * look.x + look.y * look.y + look.z * look.z).sqrt();
+                let look = if length < f64::from(1.0E-5f32) {
+                    Vector3::default()
+                } else {
+                    Vector3::new(look.x / length, look.y / length, look.z / length)
+                };
+                // `(float)Mth.wrapDegrees(Mth.atan2(z, x) * 180.0F / (float)Math.PI - 90.0)`.
+                let yaw = pumpkin_util::math::wrap_degrees_f64(
+                    pumpkin_util::math::atan2(look.z, look.x) * 180.0
+                        / f64::from(std::f32::consts::PI)
+                        - 90.0,
+                ) as f32;
+                self.entity.set_pos(stand_up);
+                self.entity.yaw.store(yaw);
+                self.entity.set_pitch(0.0);
+            }
+        }
+        let pos = self.entity.pos.load();
+        caller.set_pose(EntityPose::Standing);
+        self.entity.set_pos(pos);
+        self.clear_sleeping_pos();
     }
 
     /// Vanilla `LivingEntity.actuallyHurt`, with `Player`'s override.
@@ -4956,7 +5260,9 @@ impl LivingEntity {
 
         if let Some(player) = caller.get_player() {
             player.increment_stat(StatisticCategory::Used, protection_item.item.id as i32, 1);
-            // TODO: the `used_totem` advancement trigger isn't ported.
+            player.trigger_advancement(AdvancementTrigger::UsedTotem {
+                item: protection_item.item,
+            });
             // `causeUseVibration(this, ITEM_INTERACT_FINISH)`.
             if protection_item
                 .get_data_component::<pumpkin_data::data_component_impl::UseEffectsImpl>()
@@ -5211,6 +5517,12 @@ impl EntityBase for LivingEntity {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .tick();
+        if self.entity.first_tick.load(Relaxed)
+            && let Some(bed) = self.get_sleeping_pos()
+            && !self.set_pos_to_bed(bed)
+        {
+            self.stop_sleeping(caller);
+        }
         crate::enchantment::EnchantmentHelper::tick_effects(caller, self);
         self.entity.tick(caller, server);
 
@@ -5273,7 +5585,11 @@ impl EntityBase for LivingEntity {
         if self.entity.tick_count.load(Relaxed) % 20 == 0 {
             self.recheck_combat_status();
         }
-        // TODO: `checkBedExists`: only players keep a bed, and the bed's own removal wakes them.
+        if Self::is_sleeping(caller)
+            && (!super::leashable::can_interact_with_level(caller) || !self.check_bed_exists())
+        {
+            self.stop_sleeping(caller);
+        }
 
         if !self.entity.removed.load(Relaxed) {
             if is_player {
@@ -5299,9 +5615,6 @@ impl EntityBase for LivingEntity {
                         .lock()
                         .unwrap_or_else(std::sync::PoisonError::into_inner)
                         .client_tick(mob);
-                    if mob.is_sleeping() {
-                        self.entity.set_pitch(0.0);
-                    }
                 }
             }
         }
@@ -5310,6 +5623,9 @@ impl EntityBase for LivingEntity {
             self.fall_fly_ticks.fetch_add(1, Relaxed);
         } else {
             self.fall_fly_ticks.store(0, Relaxed);
+        }
+        if Self::is_sleeping(caller) {
+            self.entity.set_pitch(0.0);
         }
         self.refresh_dirty_attributes();
 
@@ -5657,7 +5973,7 @@ impl LivingEntity {
                     // `ServerPlayer.handleExtraItemsCreatedOnUse`.
                     let mut remainder_stack = remainder_stack;
                     if !player.inventory.insert_stack_anywhere(&mut remainder_stack) {
-                        player.drop_from_hand(remainder_stack, false);
+                        player.drop_from_hand(remainder_stack, false, false);
                     }
                 }
             }

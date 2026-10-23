@@ -303,7 +303,6 @@ use pumpkin_world::biome;
 use pumpkin_world::cylindrical_chunk_iterator::Cylindrical;
 
 use crate::block;
-use crate::block::blocks::straw_bed::StrawBedBlock;
 use crate::command::context::command_source::CommandSource;
 use crate::command::node::dispatcher::CommandDispatcher;
 use crate::command::{CommandSender, client_suggestions};
@@ -473,12 +472,8 @@ pub struct Player {
     pub camera_target_id: AtomicCell<Option<i32>>,
     /// The player's spawnpoint
     pub respawn_point: std::sync::Mutex<Option<RespawnPoint>>,
-    /// Whether the player is sleeping in a bed.
-    pub sleeping: AtomicBool,
     /// Vanilla `sleepCounter`: counts up to 100 while asleep, and from 100 to 110 after waking.
     pub sleep_counter: AtomicI32,
-    /// Head position of the bed the player is currently sleeping in.
-    pub sleeping_bed_pos: AtomicCell<Option<BlockPos>>,
     /// Manages the player's hunger level.
     pub hunger_manager: HungerManager,
     /// The ID of the currently open container (if any).
@@ -837,9 +832,7 @@ impl Player {
             current_explosion_cause: AtomicCell::new(None),
             // TODO: Send the CPlayerSpawnPosition packet when the client connects with proper values
             respawn_point: std::sync::Mutex::new(None),
-            sleeping: AtomicBool::new(false),
             sleep_counter: AtomicI32::new(0),
-            sleeping_bed_pos: AtomicCell::new(None),
             // We want this to be an impossible watched section so that `chunker::update_position`
             // will mark chunks as watched for a new join rather than a respawn.
             // (We left shift by one so we can search around that chunk)
@@ -1346,6 +1339,15 @@ impl Player {
         self.remove_mount_on_disconnect();
 
         let world = self.world();
+        // Vanilla `PlayerList.remove`: `removePlayerImmediately(player, UNLOADED_WITH_PLAYER)`.
+        // Set here, not in `World::remove_player`, which a change of world and a respawn also
+        // use for a player that stays. Entities leashed to the player see it gone and drop
+        // their lead on their next `tickLeash`. Pumpkin keeps the vehicle in its chunk (see
+        // `remove_passenger_on_disconnect`), so vanilla's mark on the root vehicle's stack
+        // has no counterpart here.
+        self.living_entity
+            .entity
+            .set_removed_reason(crate::entity::RemovalReason::UnloadedWithPlayer);
         world.remove_player(self, true).await;
 
         let cylindrical = self.watched_section.load();
@@ -2751,27 +2753,22 @@ impl Player {
         Some(spawn_pos)
     }
 
-    pub fn sleep(&self, bed_head_pos: BlockPos) {
-        // TODO: Stop riding
-
-        self.set_pose(EntityPose::Sleeping);
-        self.living_entity
-            .entity
-            .set_pos(bed_head_pos.to_f64().add_raw(0.5, 0.6875, 0.5));
-        self.get_entity().set_synced_data(
-            pumpkin_data::tracked_data::player::SLEEPING_POS_ID,
-            Some(bed_head_pos),
-        );
-        self.get_entity().set_velocity(Vector3::default());
-
-        self.sleeping.store(true, Ordering::Relaxed);
-        self.sleep_counter.store(0, Ordering::Relaxed);
-        self.sleeping_bed_pos.store(Some(bed_head_pos));
+    /// Vanilla `Player.startSleepInBed`'s sleeping part, with `ServerPlayer.startSleeping`:
+    /// lies down in the bed at `bed` (its head), resets `TIME_SINCE_REST` and teleports the
+    /// client into the bed. The bed's checks are the caller's.
+    pub fn start_sleep_in_bed(&self, bed: BlockPos) -> bool {
+        if !self.living_entity.start_sleeping(self, bed) {
+            return false;
+        }
         self.set_stat(
             statistics::StatisticCategory::Custom,
             statistics::CustomStatistic::TimeSinceRest as i32,
             0,
         );
+        let entity = &self.living_entity.entity;
+        self.request_teleport(entity.pos.load(), entity.yaw.load(), entity.pitch.load());
+        self.sleep_counter.store(0, Ordering::Relaxed);
+        true
     }
 
     pub fn get_off_ground_speed(&self) -> f64 {
@@ -2813,11 +2810,10 @@ impl Player {
         self.living_entity.get_block_speed_factor()
     }
 
-    /// Vanilla `LivingEntity.isSleeping` for a player.
+    /// Vanilla `LivingEntity.isSleeping` for a player: a sleeping position.
     #[must_use]
     pub fn is_sleeping(&self) -> bool {
-        // TODO: Track sleeping position state explicitly (vanilla checks sleepingPosition.isPresent()).
-        self.sleeping.load(Ordering::Relaxed)
+        self.living_entity.get_sleeping_pos().is_some()
     }
 
     #[must_use]
@@ -2903,69 +2899,59 @@ impl Player {
         self.set_pose(actual_pose);
     }
 
-    /// The sleep-state part of vanilla `stopSleepInBed(false, _)`, which every caller of
-    /// `wake_up` uses.
-    fn stop_sleep_in_bed(&self) {
-        self.sleeping.store(false, Ordering::Relaxed);
-        self.sleep_counter.store(100, Ordering::Relaxed);
-    }
-
     /// Vanilla `Player.isSleepingLongEnough`.
     #[must_use]
     pub fn is_sleeping_long_enough(&self) -> bool {
         self.is_sleeping() && self.sleep_counter.load(Ordering::Relaxed) >= 100
     }
 
-    pub fn wake_up(&self) {
+    /// The end of vanilla `ServerPlayer.startSleepInBed`, whether or not the player lay
+    /// down: the "no rest" overlay where nights can't be slept through, then the world's
+    /// sleeping player list.
+    pub fn after_start_sleep_in_bed(&self) {
         let world = self.world();
-        let Some(bed_pos) = self.sleeping_bed_pos.load() else {
-            self.set_pose(EntityPose::Standing);
-            if self.is_sleeping() {
-                self.stop_sleep_in_bed();
-            }
-            return;
-        };
-
-        if let Some(server) = world.server.upgrade()
-            && let Some(player_arc) = world.get_player_by_uuid(self.gameprofile.id)
-        {
-            let mut event =
-                crate::plugin::api::events::player::player_bed::PlayerBedLeaveEvent::new(
-                    player_arc, bed_pos,
-                );
-            server.plugin_manager.fire_blocking(&server, &mut event);
-        }
-
-        let (bed, bed_state) = world.get_block_and_state_id(&bed_pos);
-        if bed == &Block::STRAW_BED {
-            StrawBedBlock::destroy_after_use(&world, bed_pos);
-        } else if bed.has_tag(&tag::Block::MINECRAFT_BEDS) {
-            crate::block::blocks::bed::BedBlock::set_occupied(
-                false, &world, bed, &bed_pos, bed_state,
+        if !world.can_sleep_through_nights() {
+            self.send_system_message_raw(
+                &TextComponent::translate_cross(
+                    pumpkin_data::translation::java::SLEEP_NOT_POSSIBLE,
+                    pumpkin_data::translation::java::SLEEP_NOT_POSSIBLE,
+                    [],
+                ),
+                true,
             );
         }
+        world.update_sleeping_player_list();
+    }
 
-        self.set_pose(EntityPose::Standing);
-        self.living_entity.entity.set_pos(self.position());
-        self.living_entity.entity.set_synced_data(
-            pumpkin_data::tracked_data::player::SLEEPING_POS_ID,
-            None::<BlockPos>,
-        );
-
-        self.set_stat(
-            statistics::StatisticCategory::Custom,
-            statistics::CustomStatistic::TimeSinceRest as i32,
-            0,
-        );
-
-        let chunk_pos = self.living_entity.entity.chunk_pos.load();
-        world.broadcast_to_chunk(
-            chunk_pos,
-            &CEntityAnimation::new(self.entity_id().into(), Animation::LeaveBed),
-        );
-
-        self.stop_sleep_in_bed();
-        self.sleeping_bed_pos.store(None);
+    /// Vanilla `ServerPlayer.stopSleepInBed` with `Player`'s: the wake-up animation while
+    /// sleeping, `LivingEntity.stopSleeping` (out of the bed to its stand-up position), the
+    /// sleep counter, then the client is teleported there.
+    pub fn stop_sleep_in_bed(&self, forceful_wake_up: bool, update_level_list: bool) {
+        let world = self.world();
+        if let Some(bed_pos) = self.living_entity.get_sleeping_pos() {
+            // The plugin event first: before any packet or state change.
+            if let Some(server) = world.server.upgrade()
+                && let Some(player_arc) = world.get_player_by_uuid(self.gameprofile.id)
+            {
+                let mut event =
+                    crate::plugin::api::events::player::player_bed::PlayerBedLeaveEvent::new(
+                        player_arc, bed_pos,
+                    );
+                server.plugin_manager.fire_blocking(&server, &mut event);
+            }
+            world.send_to_tracking_players_and_self(
+                &self.living_entity.entity,
+                &CEntityAnimation::new(self.entity_id().into(), Animation::LeaveBed),
+            );
+        }
+        self.living_entity.living_stop_sleeping(self);
+        if update_level_list {
+            world.update_sleeping_player_list();
+        }
+        self.sleep_counter
+            .store(if forceful_wake_up { 0 } else { 100 }, Ordering::Relaxed);
+        let entity = &self.living_entity.entity;
+        self.request_teleport(entity.pos.load(), entity.yaw.load(), entity.pitch.load());
     }
 
     pub fn show_title(&self, text: &TextComponent, mode: &TitleMode) {
@@ -3223,6 +3209,35 @@ impl Player {
         {
             self.trigger_advancement(advancement::trigger::AdvancementTrigger::FallFromHeight {
                 start,
+            });
+        }
+    }
+
+    /// The waypoint part of vanilla `ServerPlayer.updatePlayerAttributes`: a crouching player's
+    /// transmit range is cut to nothing. Like `addOrUpdateTransientModifier` /
+    /// `removeModifier`, only a real change marks the attribute updated.
+    fn update_player_attributes(&self) {
+        const CROUCH_MODIFIER_ID: &str = "minecraft:waypoint_transmit_range_crouch";
+        let living = &self.living_entity;
+        let attribute = &Attributes::WAYPOINT_TRANSMIT_RANGE;
+        let crouching = self.get_entity().pose.load() == EntityPose::Crouching;
+        let has_modifier = living
+            .attributes
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get(&attribute.id)
+            .is_some_and(|instance| instance.get_modifier(CROUCH_MODIFIER_ID).is_some());
+        if crouching && !has_modifier {
+            living.update_attribute(attribute, |instance| {
+                instance.add_or_replace_modifier(crate::entity::attributes::Modifier {
+                    id: CROUCH_MODIFIER_ID.to_string(),
+                    amount: -1.0,
+                    operation: crate::entity::attributes::ModifierOperation::MultiplyTotal,
+                });
+            });
+        } else if !crouching && has_modifier {
+            living.update_attribute(attribute, |instance| {
+                instance.remove_modifier(CROUCH_MODIFIER_ID);
             });
         }
     }
@@ -3618,11 +3633,19 @@ impl Player {
             }
         }
         self.tick_counter.fetch_add(1, Ordering::Relaxed);
-        // Vanilla `Player.tick`'s sleep counter.
+        // Vanilla `Player.tick`'s sleep counter, and the wake when the bed under the
+        // player may no longer be slept in (morning).
         if self.is_sleeping() {
             let counter = self.sleep_counter.load(Ordering::Relaxed) + 1;
             self.sleep_counter
                 .store(counter.min(100), Ordering::Relaxed);
+            let world = self.world();
+            let feet = world.get_block(&self.living_entity.entity.block_pos.load());
+            if crate::block::blocks::bed::is_abstract_bed(feet)
+                && !world.dimension.bed_rule.can_sleep(world.is_dark_outside())
+            {
+                self.stop_sleep_in_bed(false, true);
+            }
         } else {
             let counter = self.sleep_counter.load(Ordering::Relaxed);
             if counter > 0 {
@@ -3731,6 +3754,7 @@ impl Player {
         self.update_player_pose();
         self.check_inventory_advancements();
         self.track_start_falling_position();
+        self.update_player_attributes();
         if let Ok(mut adv) = self.advancements.try_lock() {
             adv.flush_dirty(self, true);
         }
@@ -3738,7 +3762,6 @@ impl Player {
         // experience handling
         self.tick_experience();
         self.tick_health();
-        self.tick_raid_omen();
         self.tick_maps(server);
 
         // Anti-spam counter decay
@@ -5916,55 +5939,6 @@ impl Player {
         }
     }
 
-    pub fn tick_raid_omen(&self) {
-        if self.is_spectator() {
-            return;
-        }
-
-        if let Some(bad_omen) = self.get_effect(&StatusEffect::BAD_OMEN)
-            && !self.has_effect(&StatusEffect::RAID_OMEN)
-        {
-            let world = self.world();
-            if !world.dimension.can_start_raid {
-                return;
-            }
-            let player_pos = self.living_entity.entity.block_pos.load();
-            let pos_f64 = self.living_entity.entity.pos.load();
-
-            let village_pos = world
-                .villager_poi
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .get_nearest_job_site(player_pos, 64)
-                .or_else(|| {
-                    world.raids.try_lock().ok().and_then(|raids| {
-                        raids
-                            .get_nearby_raid(&player_pos, 64.0 * 64.0)
-                            .map(|r| r.center)
-                    })
-                });
-
-            if let Some(pos) = village_pos {
-                if let Some(p) = self.world().get_player_by_uuid(self.gameprofile.id) {
-                    let bad_omen_amplifier = bad_omen.amplifier;
-                    p.living_entity.remove_effect(&StatusEffect::BAD_OMEN);
-                    p.set_raid_omen_position(pos);
-                    let effect = Effect {
-                        effect_type: &StatusEffect::RAID_OMEN,
-                        duration: 600,
-                        amplifier: bad_omen_amplifier,
-                        ambient: false,
-                        show_particles: true,
-                        show_icon: true,
-                        blend: true,
-                    };
-                    p.add_effect(effect);
-                }
-                world.play_sound(Sound::BlockBellResonate, SoundCategory::Neutral, &pos_f64);
-            }
-        }
-    }
-
     pub fn set_health(&self, health: f32) {
         self.living_entity.set_health(health);
         self.send_health();
@@ -6364,6 +6338,9 @@ impl Player {
                     actions: &[PlayerAction::UpdateGameMode((gamemode as i32).into())],
                 }],
             ));
+        // `ServerPlayerGameMode.changeGameModeForPlayer`: after the tab-list update, before
+        // `ServerPlayer.setGameMode`'s CHANGE_GAME_MODE event (spectators don't count).
+        self.world().update_sleeping_player_list();
 
         self.client.try_enqueue_packet_editioned(
             &CGameEvent::new(GameEvent::ChangeGameMode, gamemode as i32 as f32),
@@ -6371,6 +6348,8 @@ impl Player {
                 player_game_type: gamemode.into(),
             },
         );
+        // `ServerPlayer.setGameMode` ends with `onUpdateAbilities()` again.
+        self.send_abilities_update();
 
         true
     }
@@ -6446,34 +6425,70 @@ impl Player {
         ));
     }
 
-    /// Vanilla `LivingEntity.drop`'s swing then the drop: the main hand swings for the
-    /// players tracking this one, and for this player too when `server_only` (vanilla's
-    /// `Prediction.SERVER_ONLY`, a drop the client didn't predict).
-    pub fn drop_from_hand(&self, item_stack: ItemStack, server_only: bool) {
+    /// Vanilla `LivingEntity.drop(stack, thrownFromHand, prediction)`: the main hand swings for
+    /// the players tracking this one, and for this player too when `server_only` (vanilla's
+    /// `Prediction.SERVER_ONLY`, a drop the client didn't predict), then the drop.
+    pub fn drop_from_hand(&self, item_stack: ItemStack, thrown_from_hand: bool, server_only: bool) {
         if item_stack.is_empty() {
             return;
         }
         self.living_entity
             .swing(Hand::Right, SwingAnimationImpl::DEFAULT, server_only);
-        self.drop_item(item_stack);
+        self.drop_item(item_stack, thrown_from_hand);
     }
 
-    pub fn drop_item(&self, item_stack: ItemStack) {
-        self.increment_stat(
-            statistics::StatisticCategory::Dropped,
-            item_stack.item.id as i32,
-            item_stack.item_count as i32,
-        );
-        self.increment_custom_stat(
-            statistics::CustomStatistic::Drop,
-            item_stack.item_count as i32,
-        );
+    /// Vanilla `ServerPlayer.take`: the take packet, then the open container's changes at once.
+    pub fn take(&self, item: &Entity, amount: u32) {
+        self.living_entity.take(item, amount);
+        self.current_screen_handler
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .send_content_updates();
+    }
+
+    /// The drop half of vanilla `ServerPlayer.drop`: the item entity, then the `Dropped` and
+    /// `Drop` stats only for an item thrown from the hand.
+    pub fn drop_item(&self, item_stack: ItemStack, thrown_from_hand: bool) {
+        let (item_id, count) = (item_stack.item.id, item_stack.item_count);
+        let Some(item_entity) = self.create_item_stack_to_drop(item_stack, thrown_from_hand) else {
+            return;
+        };
+        self.world().spawn_entity(item_entity);
+        if thrown_from_hand {
+            self.increment_stat(
+                statistics::StatisticCategory::Dropped,
+                item_id as i32,
+                count as i32,
+            );
+            self.increment_custom_stat(statistics::CustomStatistic::Drop, 1);
+        }
+    }
+
+    /// Vanilla `LivingEntity.createItemStackToDrop(stack, false, thrownFromHand)`.
+    #[must_use]
+    pub fn create_item_stack_to_drop(
+        &self,
+        item_stack: ItemStack,
+        thrown_from_hand: bool,
+    ) -> Option<Arc<ItemEntity>> {
+        if item_stack.is_empty() {
+            return None;
+        }
         let item_pos = self.living_entity.entity.pos.load()
             + Vector3::new(0.0, self.living_entity.entity.get_eye_height() - 0.3, 0.0);
         let entity = Entity::new(self.world(), item_pos, &EntityType::ITEM);
 
-        // Vanilla `LivingEntity.createItemStackToDrop(stack, false, ...)`, in its float
-        // arithmetic with `Mth.sin`/`Mth.cos`, drawing from the player's random.
+        // Vanilla `new ItemEntity(level, x, y, z, stack)` draws its own random velocity
+        // (two `nextDouble`s on the item's random) before `setDeltaMovement` replaces it.
+        let item_entity = ItemEntity::new(entity, item_stack);
+        item_entity.set_pickup_delay(40);
+        if thrown_from_hand {
+            item_entity.set_thrower(&self.living_entity.entity);
+        }
+
+        // In its float arithmetic with `Mth.sin`/`Mth.cos`, drawing from the player's random.
         let deg_to_rad = (std::f64::consts::PI / 180.0) as f32;
         let x_rot = self.living_entity.entity.pitch.load() * deg_to_rad;
         let y_rot = self.living_entity.entity.yaw.load() * deg_to_rad;
@@ -6495,14 +6510,8 @@ impl Player {
             f64::from(-sin_x * 0.3 + 0.1 + y_jitter * 0.1),
             f64::from(cos_y * cos_x * 0.3) + f64::from(dir).sin() * f64::from(pow2),
         );
-
-        // TODO: Merge stacks together
-        // Vanilla `new ItemEntity(level, x, y, z, stack)` draws its own random velocity
-        // (two `nextDouble`s on the item's random) before `setDeltaMovement` replaces it.
-        let item_entity = Arc::new(ItemEntity::new(entity, item_stack));
         item_entity.get_entity().velocity.store(velocity);
-        item_entity.set_pickup_delay(40);
-        self.world().spawn_entity(item_entity);
+        Some(Arc::new(item_entity))
     }
 
     pub fn drop_held_item(&self, drop_stack: bool) {
@@ -6536,7 +6545,7 @@ impl Player {
         let updated_stack = item_stack.clone();
         self.inventory().set_held_item(updated_stack.clone());
 
-        self.drop_from_hand(dropped_stack, false);
+        self.drop_from_hand(dropped_stack, true, false);
 
         let inv: Arc<dyn Inventory> = self.inventory.clone();
         let screen_binding = self
@@ -8642,6 +8651,12 @@ impl EntityBase for Player {
             nbt.get_bool("seenCredits").unwrap_or(false),
             Ordering::Relaxed,
         );
+        // `ServerPlayer.readAdditionalSaveData`: a player saved asleep wakes on load,
+        // `stopSleepInBed(true, true)` before the connection exists, so with no packets.
+        if self.is_sleeping() {
+            self.living_entity.living_stop_sleeping(self);
+            self.sleep_counter.store(0, Ordering::Relaxed);
+        }
         self.current_explosion_impact_pos.store(
             nbt.get_list("last_explosion_impact_pos")
                 .and_then(|list| match list {
@@ -9200,12 +9215,12 @@ impl InventoryPlayer for Player {
         self
     }
 
-    fn drop_item(&self, item: ItemStack, _retain_ownership: bool) {
-        self.drop_from_hand(item, false);
+    fn drop_item(&self, item: ItemStack, thrown_from_hand: bool) {
+        self.drop_from_hand(item, thrown_from_hand, false);
     }
 
     fn drop_item_server_only(&self, item: ItemStack) {
-        self.drop_from_hand(item, true);
+        self.drop_from_hand(item, false, true);
     }
 
     fn has_infinite_materials(&self) -> bool {

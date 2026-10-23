@@ -434,6 +434,10 @@ impl Server {
 
         server.worlds.store(Arc::new(worlds_vec));
 
+        for world in server.worlds.load().iter() {
+            world.prepare_forced_chunks().await;
+        }
+
         info!("All worlds loaded successfully.");
 
         let enabled_packs = server.level_info.load().data_packs.enabled.clone();
@@ -1347,7 +1351,7 @@ impl Server {
 
         for world in worlds.iter() {
             world.flush_block_updates();
-            world.flush_synced_block_events();
+            // No block events: vanilla runs them only when the level ticks.
             // A frozen level still runs `chunkSource.tick`, so tracked entities still send.
             world.entity_tracker.update_all(world);
 

@@ -29,6 +29,61 @@ const AREA_EFFECT_CLOUD_INSTANT_SCALE: f64 = 0.5;
 const SPLASH_MIN_DURATION: i32 = 20;
 
 impl PotionContents {
+    /// Vanilla `PotionContents.getColor`: the custom color, else the visible effects' colors
+    /// weighted by amplifier + 1 (`getColorOptional`, opaque), else -13083194.
+    #[must_use]
+    pub fn color(stack: &ItemStack) -> i32 {
+        if let Some(color) = stack
+            .get_data_component::<pumpkin_data::data_component_impl::PotionContentsImpl>()
+            .and_then(|contents| contents.custom_color)
+        {
+            return color;
+        }
+        let (mut red, mut green, mut blue, mut total_weight) = (0i32, 0i32, 0i32, 0i32);
+        for (effect, _, amplifier, _, visible, _) in Self::read_potion_effects(stack) {
+            if visible {
+                let color = effect.color;
+                let amplifier = i32::from(amplifier) + 1;
+                red += amplifier * ((color >> 16) & 0xFF);
+                green += amplifier * ((color >> 8) & 0xFF);
+                blue += amplifier * (color & 0xFF);
+                total_weight += amplifier;
+            }
+        }
+        if total_weight == 0 {
+            -13_083_194
+        } else {
+            // `ARGB.color(r, g, b)`: alpha 255.
+            (0xFF << 24)
+                | ((red / total_weight) << 16)
+                | ((green / total_weight) << 8)
+                | (blue / total_weight)
+        }
+    }
+
+    /// Vanilla `PotionContents.hasEffects`: custom effects, or a potion with effects.
+    #[must_use]
+    pub fn has_effects(stack: &ItemStack) -> bool {
+        !Self::read_potion_effects(stack).is_empty()
+    }
+
+    /// Vanilla `potion().isPresent() && potion().get().value().hasInstantEffects()`: only the
+    /// base potion's effects, not the custom ones.
+    #[must_use]
+    pub fn potion_has_instant_effects(stack: &ItemStack) -> bool {
+        stack
+            .get_data_component::<pumpkin_data::data_component_impl::PotionContentsImpl>()
+            .and_then(|contents| contents.potion_id)
+            .and_then(|id| u8::try_from(id).ok())
+            .and_then(pumpkin_data::potion::Potion::from_id)
+            .is_some_and(|potion| {
+                potion
+                    .effects
+                    .iter()
+                    .any(|effect| crate::entity::effect::is_instantaneous(effect.effect_type))
+            })
+    }
+
     /// Read effects from an `ItemStack`'s `PotionContents` data component.
     #[must_use]
     pub fn read_potion_effects(

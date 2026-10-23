@@ -21,6 +21,11 @@ impl MarkerEntity {
 }
 
 impl EntityBase for MarkerEntity {
+    /// Vanilla `Marker.getPistonPushReaction`.
+    fn piston_push_reaction(&self) -> pumpkin_data::block_state::PistonBehavior {
+        pumpkin_data::block_state::PistonBehavior::Ignore
+    }
+
     fn tick(&self, _caller: &dyn EntityBase, _server: &Server) {}
 
     fn init_data_tracker(&self) {}

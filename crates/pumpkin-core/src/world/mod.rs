@@ -1,3 +1,4 @@
+use crate::block::entities::piston::PistonBlockEntity;
 use crate::block::entities::{BlockEntity, block_entity_from_nbt};
 use dashmap::DashMap;
 use pumpkin_data::chunk::Biome;
@@ -38,6 +39,7 @@ pub mod stopwatches;
 pub(crate) mod test_support;
 pub mod time;
 pub mod villager_poi;
+pub mod waypoint_manager;
 
 use crate::block::RandomTickArgs;
 use crate::world::chunker::is_within_chebyshev_distance;
@@ -97,9 +99,7 @@ use pumpkin_inventory::{Clearable, Inventory};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::bedrock::client::set_actor_data::{CSetActorData, PropertySyncData};
 use pumpkin_protocol::bedrock::client::start_game::{CStartGame, ServerTelemetryData};
-use pumpkin_protocol::java::client::play::{
-    CBlockEvent, CParticle, CRemoveMobEffect, CUpdateMobEffect,
-};
+use pumpkin_protocol::java::client::play::{CBlockEvent, CRemoveMobEffect, CUpdateMobEffect};
 use pumpkin_protocol::java::client::play::{
     CBlockUpdate, CDisguisedChatMessage, CExplosion, CRespawn, CSetBlockDestroyStage, CWorldEvent,
     PlayerSpawnData,
@@ -267,8 +267,15 @@ pub struct World {
     pub entities: ArcSwap<Vec<Arc<dyn EntityBase>>>,
     /// The world's scoreboard, used for tracking scores, objectives, and display information.
     pub scoreboard: std::sync::Mutex<Scoreboard>,
+    /// Taken by `lock_scoreboard` before the scoreboard and held until the change's queued team
+    /// packets and waypoint remakes are sent, so changes apply in the order they were made.
+    /// Lock order: apply -> scoreboard -> manager; the manager may take the scoreboard, never
+    /// the reverse.
+    pub(crate) scoreboard_apply: std::sync::Mutex<()>,
     /// The world's worldborder, defining the playable area and controlling its expansion or contraction.
     pub worldborder: std::sync::Mutex<Worldborder>,
+    /// Vanilla `ServerLevel.sleepStatus`.
+    pub sleep_status: std::sync::Mutex<SleepStatus>,
     /// Vanilla `Level.random`: one `LegacyRandomSource` for the level, seeded uniquely per run
     /// (`RandomSource.create()`), that everything vanilla draws from `level.getRandom()` shares.
     pub random: std::sync::Mutex<pumpkin_util::random::legacy_rand::LegacyRand>,
@@ -283,9 +290,16 @@ pub struct World {
     /// Block Behaviour
     pub block_registry: Arc<BlockRegistry>,
     pub server: Weak<Server>,
-    synced_block_event_queue: std::sync::Mutex<Vec<BlockEvent>>,
+    /// Vanilla `ServerLevel.blockEvents`, an `ObjectLinkedOpenHashSet`: queued in order, an
+    /// event already waiting is not queued twice.
+    synced_block_event_queue: std::sync::Mutex<indexmap::IndexSet<BlockEvent>>,
+    /// Vanilla `ServerLevel.handlingTick`: set from the start of the level tick through the
+    /// block events, cleared before entities and block entities tick.
+    handling_tick: std::sync::atomic::AtomicBool,
     /// A map of unsent block changes, keyed by block position.
-    unsent_block_changes: std::sync::Mutex<HashMap<BlockPos, BlockStateId>>,
+    /// Vanilla `ChunkHolder.changedBlocksPerSection`: positions only; the state sent is the
+    /// one the block holds when the changes are broadcast.
+    unsent_block_changes: std::sync::Mutex<FxHashSet<BlockPos>>,
     /// Persisted vanilla POI storage for portal and villager lookups.
     pub portal_poi: std::sync::Mutex<portal::PortalPoiStorage>,
     /// Villager job sites and their current owners.
@@ -310,6 +324,8 @@ pub struct World {
     pub custom_block_entity_data: DashMap<BlockPos, NbtCompound>,
     /// Entity tracker responsible for tracking entity visibility and sending delta/status packets to watchers.
     pub entity_tracker: entity_tracker::EntityTracker,
+    /// Vanilla `ServerLevel.waypointManager`.
+    pub waypoint_manager: waypoint_manager::WaypointManager,
 }
 
 #[derive(Clone, Copy)]
@@ -435,14 +451,23 @@ impl World {
             NbtCompound::new()
         };
 
+        let forced_chunks = pumpkin_world::world_info::data_files::read_forced_chunks(
+            &level.level_folder.dim_folder,
+        )
+        .into_iter()
+        .map(|(x, z)| Vector2::new(x, z))
+        .collect();
+
         Self {
             uuid: Uuid::new_v4(),
             level,
             level_info,
             players: ArcSwap::new(Arc::new(Vec::new())),
             entities: ArcSwap::new(Arc::new(Vec::new())),
-            scoreboard: std::sync::Mutex::new(Scoreboard::default()),
+            scoreboard: std::sync::Mutex::new(Scoreboard::for_world()),
+            scoreboard_apply: std::sync::Mutex::new(()),
             worldborder: std::sync::Mutex::new(worldborder),
+            sleep_status: std::sync::Mutex::new(SleepStatus::default()),
             random: std::sync::Mutex::new(
                 pumpkin_util::random::legacy_rand::LegacyRand::from_seed(
                     pumpkin_util::random::get_seed(),
@@ -454,8 +479,9 @@ impl World {
             block_registry,
             sea_level: generation_settings.sea_level,
             min_y: i32::from(generation_settings.shape.min_y),
-            synced_block_event_queue: std::sync::Mutex::new(Vec::new()),
-            unsent_block_changes: std::sync::Mutex::new(HashMap::new()),
+            synced_block_event_queue: std::sync::Mutex::new(indexmap::IndexSet::new()),
+            handling_tick: std::sync::atomic::AtomicBool::new(false),
+            unsent_block_changes: std::sync::Mutex::new(FxHashSet::default()),
             portal_poi: std::sync::Mutex::new(portal_poi),
             villager_poi: std::sync::Mutex::new(villager_poi::VillagerPoiStorage::default()),
             raids: std::sync::Mutex::new(raid::Raids::default()),
@@ -463,7 +489,9 @@ impl World {
             spawn_state: ArcSwap::new(Arc::new(SpawnState::empty())),
             active_chunks: RwLock::new(FxHashSet::default()),
             active_chunk_tracker: std::sync::Mutex::new(ActiveChunkTracker::default()),
-            forced_chunks: std::sync::Mutex::new(FxHashSet::default()),
+            // Vanilla `TicketStorage` saved data: the FORCED tickets come back deactivated and
+            // `MinecraftServer.prepareLevels` reactivates them before the first tick.
+            forced_chunks: std::sync::Mutex::new(forced_chunks),
             server,
             block_entities: DashMap::new(),
             game_event_listeners: game_event::GameEventListenerRegistries::default(),
@@ -471,6 +499,7 @@ impl World {
             custom_data: std::sync::Mutex::new(custom_data),
             custom_block_entity_data: DashMap::new(),
             entity_tracker: entity_tracker::EntityTracker::new(),
+            waypoint_manager: waypoint_manager::WaypointManager::default(),
         }
     }
 
@@ -514,6 +543,63 @@ impl World {
                 }
             });
         }
+    }
+
+    /// Vanilla `ServerLevel.setChunkForced`: adds or removes the chunk's FORCED ticket and
+    /// returns whether that changed anything. A newly forced chunk is loaded before this
+    /// returns (vanilla's `getChunk`, which runs the distance manager's updates first), so the
+    /// next command finds it loaded.
+    pub fn set_chunk_forced(self: &Arc<Self>, chunk_x: i32, chunk_z: i32, forced: bool) -> bool {
+        let pos = Vector2::new(chunk_x, chunk_z);
+        let updated = {
+            let mut forced_chunks = self
+                .forced_chunks
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            if forced {
+                forced_chunks.insert(pos)
+            } else {
+                forced_chunks.remove(&pos)
+            }
+        };
+        if updated {
+            self.update_active_chunks();
+        }
+        if forced && updated {
+            self.load_chunk_blocking(pos);
+        }
+        updated
+    }
+
+    /// Loads (or generates) a chunk and waits for it, like vanilla's main-thread `getChunk`.
+    pub fn load_chunk_blocking(self: &Arc<Self>, pos: Vector2<i32>) {
+        if self.level.is_chunk_loaded(&pos) {
+            return;
+        }
+        let Ok(handle) = tokio::runtime::Handle::try_current() else {
+            return;
+        };
+        tokio::task::block_in_place(|| {
+            handle.block_on(self.level.get_or_fetch_chunk(pos, |_| ()));
+        });
+    }
+
+    /// Vanilla `MinecraftServer.prepareLevels` for the saved FORCED tickets: reactivates them
+    /// and waits until their chunks are loaded.
+    pub async fn prepare_forced_chunks(self: &Arc<Self>) {
+        self.update_active_chunks();
+        let forced: Vec<Vector2<i32>> = self
+            .forced_chunks
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .iter()
+            .copied()
+            .collect();
+        for pos in forced {
+            self.level.get_or_fetch_chunk(pos, |_| ()).await;
+        }
+        // The chunks just loaded start ticking with the next update.
+        self.update_active_chunks();
     }
 
     pub fn update_active_chunks(self: &Arc<Self>) {
@@ -691,6 +777,8 @@ impl World {
             error!("Failed to save portal POI: {e}");
         }
 
+        self.save_chunk_tickets();
+
         self.level.shutdown().await;
     }
 
@@ -714,6 +802,25 @@ impl World {
         }
         Self::load_passengers(self, &entity, nbt);
         Some(entity)
+    }
+
+    /// Vanilla `TicketStorage` saved data (`chunk_tickets.dat`), written with the level's
+    /// other saved data on every save, the one on shutdown included.
+    fn save_chunk_tickets(&self) {
+        let forced: Vec<(i32, i32)> = self
+            .forced_chunks
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .iter()
+            .map(|pos| (pos.x, pos.y))
+            .collect();
+        if let Err(err) = pumpkin_world::world_info::data_files::write_forced_chunks(
+            &self.level.level_folder.dim_folder,
+            &forced,
+            pumpkin_world::world_info::WORLD_VERSION,
+        ) {
+            warn!("Failed to save chunk_tickets.dat: {err}");
+        }
     }
 
     /// The passenger part of vanilla `EntityType.loadEntityRecursive`: each saved passenger,
@@ -1038,34 +1145,44 @@ impl World {
         }
     }
 
+    /// Vanilla `ServerLevel.blockEvent`, with the block at `pos` as the event's block.
     pub fn add_synced_block_event(&self, pos: BlockPos, r#type: u8, data: u8) {
-        let mut queue = self
-            .synced_block_event_queue
+        let block = self.get_block(&pos).id;
+        self.synced_block_event_queue
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        queue.push(BlockEvent { pos, r#type, data });
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .insert(BlockEvent {
+                pos,
+                block,
+                r#type,
+                data,
+            });
     }
 
+    /// Vanilla `ServerLevel.runBlockEvents`: runs events until the queue is empty, including
+    /// those queued by the events themselves; an event whose block has changed is dropped.
     pub fn flush_synced_block_events(self: &Arc<Self>) {
-        // THIS IS IMPORTANT
-        // it prevents deadlocks and also removes the need to wait for a lock when adding a new synced block
-        let events = {
-            let mut queue = self
+        loop {
+            // The lock is released before the event runs: it may queue more events.
+            let Some(event) = self
                 .synced_block_event_queue
                 .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            std::mem::take(&mut *queue)
-        };
-
-        for event in events {
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .shift_remove_index(0)
+            else {
+                break;
+            };
             let block = self.get_block(&event.pos);
-            if !self.block_registry.on_synced_block_event(
-                block,
-                self,
-                &event.pos,
-                event.r#type,
-                event.data,
-            ) {
+            // `doBlockEvent`: `state.is(eventData.block())`.
+            if block.id != event.block
+                || !self.block_registry.on_synced_block_event(
+                    block,
+                    self,
+                    &event.pos,
+                    event.r#type,
+                    event.data,
+                )
+            {
                 continue;
             }
             let chunk_pos = event.pos.chunk_position();
@@ -1467,6 +1584,7 @@ impl World {
         Self::broadcast_java_grouped(packet, recipients_by_version);
     }
 
+    /// Vanilla `ServerLevel.sendParticles(particle, x, y, z, count, xDist, yDist, zDist, speed)`.
     pub fn spawn_particle(
         &self,
         position: Vector3<f64>,
@@ -1476,43 +1594,6 @@ impl World {
         particle: Particle,
     ) {
         self.spawn_particle_with_data(position, offset, max_speed, particle_count, particle, &[]);
-    }
-
-    /// Vanilla `ServerLevel.sendParticles` with a speed per axis and a randomization type
-    /// (26.3): `count` particles of `particle` (options `data`) spread by `offset`, to the
-    /// players within 32 blocks.
-    #[expect(clippy::too_many_arguments)]
-    pub fn send_particles_with_axis_speed(
-        &self,
-        particle: Particle,
-        data: &[u8],
-        position: Vector3<f64>,
-        count: i32,
-        offset: Vector3<f32>,
-        speed: Vector3<f32>,
-        randomization: ParticleRandomization,
-    ) {
-        let packet = AxisSpeedParticles {
-            particle: pumpkin_protocol::java::client::play::CParticle::new(
-                false,
-                false,
-                position,
-                offset,
-                speed.x,
-                count,
-                pumpkin_protocol::VarInt(particle as i32),
-                data,
-            ),
-            speed,
-            randomization,
-        };
-        // `player.blockPosition().closerToCenterThan(pos, 32)`.
-        for player in self.players.load().iter() {
-            let block_center = player.get_entity().block_pos.load().to_centered_f64();
-            if block_center.squared_distance_to_vec(&position) < 32.0 * 32.0 {
-                player.try_send_client_packet(&packet);
-            }
-        }
     }
 
     /// Like [`Self::spawn_particle`], for particles whose type carries options.
@@ -1526,15 +1607,132 @@ impl World {
         particle: Particle,
         data: &[u8],
     ) {
+        let speed = f64::from(max_speed);
+        self.send_particles(
+            particle,
+            data,
+            false,
+            false,
+            position,
+            particle_count,
+            Vector3::new(
+                f64::from(offset.x),
+                f64::from(offset.y),
+                f64::from(offset.z),
+            ),
+            Vector3::new(speed, speed, speed),
+            ParticleRandomization::Default,
+        );
+    }
+
+    /// Particles with no vanilla `sendParticles` behind them, sent to every Java player in the
+    /// world with no range check: stand-ins for what a vanilla client draws itself
+    /// (`addParticle` on the client, a level or entity event), and the plugin API's
+    /// `world.spawn_particle`.
+    pub fn spawn_client_particle(
+        &self,
+        position: Vector3<f64>,
+        offset: Vector3<f32>,
+        max_speed: f32,
+        particle_count: i32,
+        particle: Particle,
+    ) {
         for player in self.players.load().iter() {
-            player.spawn_particle_with_data(
-                position,
-                offset,
-                max_speed,
-                particle_count,
-                particle,
-                data,
-            );
+            player.spawn_particle(position, offset, max_speed, particle_count, particle);
+        }
+    }
+
+    /// Vanilla `ServerLevel.sendParticles` (the 14-argument overload every other one ends in):
+    /// one `ClientboundLevelParticlesPacket` with vanilla's float casts, sent to each player of
+    /// this world in `players` order whose block centre is closer than 32 blocks to `pos`
+    /// (512 with `override_limiter`). Returns how many players it reached.
+    #[expect(clippy::too_many_arguments)]
+    pub fn send_particles(
+        &self,
+        particle: Particle,
+        data: &[u8],
+        override_limiter: bool,
+        always_show: bool,
+        pos: Vector3<f64>,
+        count: i32,
+        dist: Vector3<f64>,
+        speed: Vector3<f64>,
+        randomization: ParticleRandomization,
+    ) -> i32 {
+        let packet = LevelParticles::new(
+            particle,
+            data,
+            override_limiter,
+            always_show,
+            pos,
+            count,
+            dist,
+            speed,
+            randomization,
+        );
+        let mut result = 0;
+        for player in self.players.load().iter() {
+            if Self::send_particles_packet(player, override_limiter, pos, &packet) {
+                result += 1;
+            }
+        }
+        result
+    }
+
+    /// Vanilla `ServerLevel.sendParticles(ServerPlayer, ...)`: the single-speed packet to one
+    /// player, if it is in this world and in range. Whether it was sent.
+    #[expect(clippy::too_many_arguments)]
+    pub fn send_particles_to_player(
+        &self,
+        player: &Player,
+        particle: Particle,
+        data: &[u8],
+        override_limiter: bool,
+        always_show: bool,
+        pos: Vector3<f64>,
+        count: i32,
+        dist: Vector3<f64>,
+        speed: f64,
+    ) -> bool {
+        // `player.level() != this`.
+        if !std::ptr::eq(Arc::as_ptr(&player.world()), self) {
+            return false;
+        }
+        let packet = LevelParticles::new(
+            particle,
+            data,
+            override_limiter,
+            always_show,
+            pos,
+            count,
+            dist,
+            Vector3::new(speed, speed, speed),
+            ParticleRandomization::Default,
+        );
+        Self::send_particles_packet(player, override_limiter, pos, &packet)
+    }
+
+    /// Vanilla's private `ServerLevel.sendParticles(player, overrideLimiter, x, y, z, packet)`:
+    /// `player.blockPosition().closerToCenterThan(pos, overrideLimiter ? 512 : 32)`.
+    fn send_particles_packet(
+        player: &Player,
+        override_limiter: bool,
+        pos: Vector3<f64>,
+        packet: &LevelParticles<'_>,
+    ) -> bool {
+        let distance: f64 = if override_limiter { 512.0 } else { 32.0 };
+        if player
+            .get_entity()
+            .block_pos
+            .load()
+            .dist_to_center_sqr(pos.x, pos.y, pos.z)
+            < distance * distance
+        {
+            // Java only: Bedrock players never got these particles.
+            player.try_send_client_packet(packet);
+            true
+        } else {
+            false
         }
     }
 
@@ -1697,7 +1895,8 @@ impl World {
         self.broadcast_sound(&packet, position, sound_range(volume, None), None);
     }
 
-    /// Spawns a cluster of particles in the world for all players in range.
+    /// Spawns a cluster of particles in the world for all players in range
+    /// ([`Self::send_particles`]).
     pub fn spawn_particles(
         &self,
         particle: pumpkin_data::particle::Particle,
@@ -1706,17 +1905,7 @@ impl World {
         offset: Vector3<f32>,
         max_speed: f32,
     ) {
-        let packet = CParticle::new(
-            false,
-            false,
-            pos,
-            offset,
-            max_speed,
-            count as i32,
-            (particle.to_id() as i32).into(),
-            &[],
-        );
-        self.broadcast_packet_all(&packet);
+        self.spawn_particle(pos, offset, max_speed, count as i32, particle);
     }
 
     /// Plays a Bedrock level sound for players close enough to hear it.
@@ -1953,8 +2142,7 @@ impl World {
 
         let start = std::time::Instant::now();
 
-        self.flush_block_updates();
-        self.flush_synced_block_events();
+        self.handling_tick.store(true, Relaxed);
         self.update_active_chunks();
         self.tick_environment();
         let mut raids = {
@@ -1980,9 +2168,17 @@ impl World {
         let t_chunks = std::time::Instant::now();
         self.tick_chunks(server);
         let chunk_elapsed = t_chunks.elapsed();
-        // Vanilla `ServerChunkCache.tick` ends with `chunkMap.tick`, every tracked entity's
-        // `sendChanges`: what changed last tick and between ticks goes out before entities tick.
+        // Vanilla `ServerChunkCache.tickChunks` ends with `broadcastChangedChunks`: the block
+        // changes so far go out before the tracker and the block events.
+        self.flush_block_updates();
+        // `chunkMap.tick`, every tracked entity's `sendChanges`: what changed last tick and
+        // between ticks goes out before entities tick.
         self.entity_tracker.update_all(self);
+        // Vanilla `runBlockEvents`, last in the `handlingTick` window: after the block, fluid
+        // and chunk ticks, so an event queued by a scheduled tick runs (and a piston starts
+        // moving) in the same game tick, and after this tick's broadcasts.
+        self.flush_synced_block_events();
+        self.handling_tick.store(false, Relaxed);
 
         let handle = server.runtime.clone();
 
@@ -2084,17 +2280,33 @@ impl World {
                 }
             }
         }
-        let block_entity_count = block_entities.len();
+        // Vanilla `LevelChunk.isTicking`: a block entity outside the world border doesn't tick.
+        let border = self
+            .worldborder
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let ticking: Vec<Arc<dyn BlockEntity>> = block_entities
+            .iter()
+            .filter(|be| {
+                let pos = be.get_position();
+                border.contains_block(pos.0.x, pos.0.z)
+            })
+            .cloned()
+            .collect();
+        drop(border);
+        let block_entity_count = ticking.len();
 
         let t_be = std::time::Instant::now();
         let be_handle = handle;
-        block_entities.par_chunks(16).for_each(|batch| {
+        ticking.par_chunks(16).for_each(|batch| {
             let _guard = be_handle.enter();
             for be in batch {
                 be.tick(self);
             }
         });
-        // Drained after all ticks, so changes (hopper -> chest) land in the same tick.
+        // Drained after all ticks, so changes (hopper -> chest) land in the same tick. Vanilla's
+        // `setChanged` sends the update whether or not the block entity ticks, so drain the
+        // unfiltered list.
         let guard = be_handle.enter();
         self.flush_comparator_updates(&block_entities);
         drop(guard);
@@ -2134,14 +2346,17 @@ impl World {
         }
     }
 
-    pub fn register_block_change(&self, position: BlockPos, block_state_id: BlockStateId) {
+    /// Vanilla `ChunkHolder.blockChanged`: the block at `position` is sent with the next
+    /// [`flush_block_updates`](Self::flush_block_updates), as it is then.
+    pub fn register_block_change(&self, position: BlockPos) {
         self.unsent_block_changes
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .insert(position, block_state_id);
+            .insert(position);
     }
 
-    /// Queues block state changes for broadcast to nearby players.
+    /// Queues the changed positions for broadcast to nearby players; the states are read
+    /// again when they are sent.
     ///
     /// Call [`flush_block_updates`](Self::flush_block_updates) afterward to send the packets.
     pub fn queue_block_updates(&self, changes: &[(BlockPos, BlockStateId)]) {
@@ -2149,8 +2364,8 @@ impl World {
             .unsent_block_changes
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        for (pos, state_id) in changes {
-            guard.insert(*pos, *state_id);
+        for (pos, _) in changes {
+            guard.insert(*pos);
         }
     }
 
@@ -2167,7 +2382,13 @@ impl World {
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             std::mem::take(&mut *guard)
         };
-        for (position, block_state_id) in changes {
+        // Vanilla `ChunkHolder.broadcastChanges` reads each changed block when it sends, so a
+        // cell written several times (a piston's 18 then its 324, which doesn't notify) goes
+        // out as it is now, not as it was at the last notifying write.
+        for position in changes {
+            let Some(block_state_id) = self.get_block_state_id_if_loaded(&position) else {
+                continue;
+            };
             let chunk_section = chunk_section_from_pos(&position);
             block_state_updates_by_chunk_section
                 .entry(chunk_section)
@@ -2312,7 +2533,7 @@ impl World {
     }
 
     pub fn tick_environment(self: &Arc<Self>) {
-        let (is_night, time_of_day) = {
+        let time_of_day = {
             let mut level_time = self
                 .level_time
                 .lock()
@@ -2354,7 +2575,7 @@ impl World {
                     self.level.level_channel.notify();
                 }
             }
-            (level_time.is_night(), level_time.time_of_day)
+            level_time.time_of_day
         };
 
         let (should_reset_weather, weather_cycle_enabled) = {
@@ -2369,7 +2590,39 @@ impl World {
             )
         };
 
-        if self.should_skip_night() && is_night {
+        // Vanilla `ServerLevel.tick`: enough players asleep, and enough of them long enough.
+        let percentage = self
+            .level_info
+            .load()
+            .game_rules
+            .players_sleeping_percentage as i32;
+        let enough_sleeping = {
+            let status = self
+                .sleep_status
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            status.are_enough_sleeping(percentage)
+                && status.are_enough_deep_sleeping(percentage, &self.players.load())
+        };
+        if enough_sleeping {
+            if self.level_info.load().game_rules.advance_time {
+                self.skip_night(time_of_day);
+            }
+            self.wake_up_all_players();
+
+            if weather_cycle_enabled && should_reset_weather {
+                let mut weather = self
+                    .weather
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                weather.reset_weather_cycle(self);
+            }
+        }
+    }
+
+    /// The clock's move to the next morning when the night is slept through.
+    fn skip_night(&self, time_of_day: i64) {
+        {
             let level_time = {
                 let mut guard = self
                     .level_time
@@ -2380,24 +2633,86 @@ impl World {
                 guard.clone()
             };
             level_time.send_time(self);
+        }
+    }
 
-            // Vanilla `wakeUpAllPlayers` wakes only the sleeping players.
-            for player in self
-                .players
-                .load()
-                .iter()
-                .filter(|player| player.is_sleeping())
-            {
-                player.wake_up();
-            }
+    /// Vanilla `ServerLevel.wakeUpAllPlayers`.
+    fn wake_up_all_players(&self) {
+        self.sleep_status
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .remove_all_sleepers();
+        let sleepers: Vec<_> = self
+            .players
+            .load()
+            .iter()
+            .filter(|player| player.is_sleeping())
+            .cloned()
+            .collect();
+        for player in sleepers {
+            player.stop_sleep_in_bed(false, false);
+        }
+    }
 
-            if weather_cycle_enabled && should_reset_weather {
-                let mut weather = self
-                    .weather
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner);
-                weather.reset_weather_cycle(self);
+    /// Vanilla `ServerLevel.canSleepThroughNights`.
+    pub fn can_sleep_through_nights(&self) -> bool {
+        self.level_info
+            .load()
+            .game_rules
+            .players_sleeping_percentage
+            <= 100
+    }
+
+    /// Vanilla `ServerLevel.updateSleepingPlayerList`.
+    pub fn update_sleeping_player_list(&self) {
+        let players = self.players.load();
+        if players.is_empty() {
+            return;
+        }
+        let changed = self
+            .sleep_status
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .update(&players);
+        if changed {
+            self.announce_sleep_status(&players);
+        }
+    }
+
+    /// Vanilla `ServerLevel.announceSleepStatus` (a dedicated server always announces).
+    fn announce_sleep_status(&self, players: &[Arc<Player>]) {
+        if !self.can_sleep_through_nights() {
+            return;
+        }
+        let percentage = self
+            .level_info
+            .load()
+            .game_rules
+            .players_sleeping_percentage as i32;
+        let message = {
+            let status = self
+                .sleep_status
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            if status.are_enough_sleeping(percentage) {
+                TextComponent::translate_cross(
+                    translation::java::SLEEP_SKIPPING_NIGHT,
+                    translation::java::SLEEP_SKIPPING_NIGHT,
+                    [],
+                )
+            } else {
+                TextComponent::translate_cross(
+                    translation::java::SLEEP_PLAYERS_SLEEPING,
+                    translation::java::SLEEP_PLAYERS_SLEEPING,
+                    [
+                        TextComponent::text(status.amount_sleeping().to_string()),
+                        TextComponent::text(status.sleepers_needed(percentage).to_string()),
+                    ],
+                )
             }
+        };
+        for player in players {
+            player.send_system_message_raw(&message, true);
         }
     }
 
@@ -2789,6 +3104,14 @@ impl World {
                         collisions.push(shape);
                     }
                 }
+            } else if block == &Block::MOVING_PISTON {
+                for shape in self.moving_piston_collision_shape(&pos) {
+                    let shape = shape.at_pos(pos);
+                    if shape.intersects(&bounding_box) {
+                        collided = true;
+                        collisions.push(shape);
+                    }
+                }
             } else {
                 for shape in state.get_block_collision_shapes_at(&pos) {
                     let shape = shape.at_pos(pos);
@@ -2804,7 +3127,68 @@ impl World {
             }
         }
 
+        for pos in self.moving_pistons_beyond(&bounding_box, min, max) {
+            let mut collided = false;
+            for shape in self.moving_piston_collision_shape(&pos) {
+                let shape = shape.at_pos(pos);
+                if shape.intersects(&bounding_box) {
+                    collided = true;
+                    collisions.push(shape);
+                }
+            }
+            if collided {
+                positions.push((collisions.len(), pos));
+            }
+        }
+
         (collisions, positions)
+    }
+
+    /// Vanilla `MovingPistonBlock.getCollisionShape`: the block entity's shape, or none.
+    pub fn moving_piston_collision_shape(&self, pos: &BlockPos) -> Vec<BoundingBox> {
+        self.get_block_entity(pos)
+            .and_then(|block_entity| {
+                block_entity
+                    .as_any()
+                    .downcast_ref::<PistonBlockEntity>()
+                    .map(PistonBlockEntity::get_collision_shape)
+            })
+            .unwrap_or_default()
+    }
+
+    /// The `MOVING_PISTON` cells of vanilla's `BlockCollisions` cursor outside `inner_min..=inner_max`.
+    /// The cursor reaches one block past the box; a moving piston collides on its face and edge
+    /// cells (`cursorFaceType` 1 and 2) but never its corners (3), since its shape can stick up to
+    /// a block out of its cell.
+    fn moving_pistons_beyond(
+        &self,
+        bounding_box: &BoundingBox,
+        inner_min: BlockPos,
+        inner_max: BlockPos,
+    ) -> impl Iterator<Item = BlockPos> + '_ {
+        let cursor_min = BlockPos::new(
+            (bounding_box.min.x - 1.0E-7).floor() as i32 - 1,
+            (bounding_box.min.y - 1.0E-7).floor() as i32 - 1,
+            (bounding_box.min.z - 1.0E-7).floor() as i32 - 1,
+        );
+        let cursor_max = BlockPos::new(
+            (bounding_box.max.x + 1.0E-7).floor() as i32 + 1,
+            (bounding_box.max.y + 1.0E-7).floor() as i32 + 1,
+            (bounding_box.max.z + 1.0E-7).floor() as i32 + 1,
+        );
+        BlockPos::iterate(cursor_min, cursor_max).filter(move |pos| {
+            let (p, lo, hi) = (pos.0, inner_min.0, inner_max.0);
+            let inner = (lo.x..=hi.x).contains(&p.x)
+                && (lo.y..=hi.y).contains(&p.y)
+                && (lo.z..=hi.z).contains(&p.z);
+            if inner {
+                return false;
+            }
+            let face_type = u8::from(p.x == cursor_min.0.x || p.x == cursor_max.0.x)
+                + u8::from(p.y == cursor_min.0.y || p.y == cursor_max.0.y)
+                + u8::from(p.z == cursor_min.0.z || p.z == cursor_max.0.z);
+            face_type != 3 && self.get_block(pos) == &Block::MOVING_PISTON
+        })
     }
 
     /// Vanilla `CollisionGetter.noCollision(AABB)`: no block shape and no collidable entity in
@@ -2852,13 +3236,25 @@ impl World {
 
         for pos in BlockPos::iterate(min, max) {
             let state = self.get_block_state(&pos);
-            let collided = Self::check_collision(&bounding_box, pos, state, false, |_| ());
+            let collided = if Block::from_state_id(state.id) == &Block::MOVING_PISTON {
+                self.moving_piston_collides(&bounding_box, &pos)
+            } else {
+                Self::check_collision(&bounding_box, pos, state, false, |_| ())
+            };
 
             if collided {
                 return false;
             }
         }
-        true
+        !self
+            .moving_pistons_beyond(&bounding_box, min, max)
+            .any(|pos| self.moving_piston_collides(&bounding_box, &pos))
+    }
+
+    fn moving_piston_collides(&self, bounding_box: &BoundingBox, pos: &BlockPos) -> bool {
+        self.moving_piston_collision_shape(pos)
+            .iter()
+            .any(|shape| shape.at_pos(*pos).intersects(bounding_box))
     }
 
     /// Vanilla's `BlockView.getDismountHeight()`.
@@ -2975,6 +3371,11 @@ impl World {
         for entity in entities {
             self.spawn_entity_non_save(entity);
         }
+    }
+
+    /// Vanilla `ServerLevel.isHandlingTick`.
+    pub fn is_handling_tick(&self) -> bool {
+        self.handling_tick.load(Relaxed)
     }
 
     pub fn get_world_age(&self) -> i64 {
@@ -3685,6 +4086,8 @@ impl World {
                 false,
             );
         }
+        // `onTrackingStart`: Bedrock gets no waypoint packets, but Java players see it.
+        self.waypoint_manager.on_player_tracking_start(&player);
 
         // `PrepareSpawnTask.spawn`, after `placeNewPlayer`.
         player.load_and_spawn_parent_vehicle();
@@ -4197,6 +4600,11 @@ impl World {
         player.has_played_before.store(true, Ordering::Relaxed);
         player.on_screen_handler_opened(&player.player_screen_handler);
 
+        // `level.addNewPlayer`'s `onTrackingStart`, which vanilla's `placeNewPlayer` runs after
+        // `sendLevelInfo` and before `sendActivePlayerEffects`. `World::add_player` runs
+        // before the login packet, too early to send waypoints.
+        self.waypoint_manager.on_player_tracking_start(player);
+
         player.send_active_effects();
         player
             .living_entity
@@ -4581,6 +4989,7 @@ impl World {
                                 new_list.push(player.clone());
                                 new_list
                             });
+                            destination.update_sleeping_player_list();
                         }
                     }
 
@@ -4770,34 +5179,6 @@ impl World {
         target_world.refresh_java_player_for_bedrock(player).await;
     }
 
-    /// Returns true if enough players are sleeping and we should skip the night.
-    pub fn should_skip_night(&self) -> bool {
-        let players = self.players.load();
-
-        let player_count = players.len();
-        let sleeping_player_count = players
-            .iter()
-            .filter(|player| player.is_sleeping_long_enough())
-            .count();
-        drop(players);
-
-        if player_count == 0 {
-            return false;
-        }
-
-        let sleep_percentage = self
-            .level_info
-            .load()
-            .game_rules
-            .players_sleeping_percentage
-            .clamp(0, 100);
-        let required_sleeping =
-            ((player_count as f64 * sleep_percentage as f64) / 100.0).ceil() as usize;
-        let required_sleeping = required_sleeping.max(1);
-
-        sleeping_player_count >= required_sleeping
-    }
-
     // NOTE: This function doesn't actually await on anything, it just spawns two tokio tasks
     /// IMPORTANT: Chunks have to be non-empty
     fn spawn_world_entity_chunks(self: &Arc<Self>, player: Arc<Player>, chunks: Vec<Vector2<i32>>) {
@@ -4927,6 +5308,30 @@ impl World {
                     server.spawn_task(task);
                 }
             }
+        }
+    }
+
+    /// Locks the world scoreboard; use it for any team change. The guard sends what the change
+    /// queued (team packets, and `ServerScoreboard`'s `updatePlayerWaypoint` /
+    /// `updateTeamWaypoints` right after each) once the scoreboard is released: the waypoint
+    /// manager reads the scoreboard under its own lock, so it must never be entered with the
+    /// scoreboard held. Lock order: apply -> scoreboard -> manager; the manager may take the
+    /// scoreboard, never the reverse. The apply lock is taken first and held until the queue
+    /// is sent, so changes apply in order. A team change made through a plain
+    /// `scoreboard.lock()` stays queued until the next guard.
+    pub fn lock_scoreboard(&self) -> waypoint_manager::ScoreboardGuard<'_> {
+        let apply = self
+            .scoreboard_apply
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        waypoint_manager::ScoreboardGuard {
+            world: self,
+            apply: Some(apply),
+            guard: Some(
+                self.scoreboard
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner),
+            ),
         }
     }
 
@@ -5332,6 +5737,8 @@ impl World {
         });
         self.entity_tracker
             .add_entity(&(player.clone() as Arc<dyn EntityBase>), self);
+        // `onTrackingStart`.
+        self.update_sleeping_player_list();
         Ok(())
     }
 
@@ -5382,6 +5789,8 @@ impl World {
 
         self.entity_tracker
             .add_entity(&(player.clone() as Arc<dyn EntityBase>), self);
+        // `onTrackingStart` (`addDuringTeleport` / `addRespawnedPlayer`).
+        self.waypoint_manager.on_player_tracking_start(player);
     }
 
     /// Sends the centre chunk ahead of the teleport and records it as held.
@@ -5446,6 +5855,10 @@ impl World {
         fire_event: bool,
     ) -> Option<Arc<Player>> {
         let mut removed_player: Option<Arc<Player>> = None;
+        // `ServerPlayer.disconnect` (and `teleportTo`'s wake for a level change).
+        if player.is_sleeping() {
+            player.stop_sleep_in_bed(true, false);
+        }
 
         self.players.rcu(|current_list| {
             let mut new_list = (**current_list).clone();
@@ -5472,6 +5885,10 @@ impl World {
         if let Some(ref player) = removed_player {
             self.entity_tracker
                 .remove_entity(player.as_ref() as &dyn EntityBase, self);
+            // `onTrackingEnd`: `players.remove`, the waypoint manager's `removePlayer`, then
+            // the sleeping list.
+            self.waypoint_manager.remove_player(player);
+            self.update_sleeping_player_list();
             let uuid = player.gameprofile.id;
             let entity_id = player.entity_id();
 
@@ -5620,6 +6037,8 @@ impl World {
     pub fn spawn_entity_non_save(&self, entity: Arc<dyn EntityBase>) {
         let _base_entity = entity.get_entity();
         self.entity_tracker.add_entity(&entity, self);
+        // `onCreated` / `onTrackingStart`.
+        self.waypoint_manager.on_entity_added(&entity);
         self.spawn_state.load().add_entity(self, entity.as_ref());
         entity
             .get_entity()
@@ -5639,17 +6058,39 @@ impl World {
         let Some(mob) = vehicle.get_mob() else {
             return;
         };
+        // `startRiding(vehicle, false, false)` in `finalizeSpawn`: no game event.
         for rider in mob.get_mob_entity().take_pending_riders() {
             rider.init_data_tracker();
             self.add_entity_silent(rider.clone());
-            vehicle.get_entity().add_passenger(vehicle.clone(), rider);
+            vehicle
+                .get_entity()
+                .add_passenger_without_event(vehicle.clone(), rider);
         }
+        // A converted mob's rider is already in the world, so it is only mounted, by
+        // `rootPassenger.startRiding(to)`: `canRide` (not sneaking, no boarding cooldown) and
+        // `canAddPassenger` (no passenger yet), with the game event.
+        if let Some(rider) = mob.get_mob_entity().take_pending_existing_rider() {
+            let rider_entity = rider.get_entity();
+            if !rider_entity.is_removed()
+                && !rider_entity.is_sneaking()
+                && rider_entity.riding_cooldown.load(Ordering::Relaxed) <= 0
+                && vehicle
+                    .get_entity()
+                    .passengers
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .is_empty()
+            {
+                vehicle.get_entity().add_passenger(vehicle.clone(), rider);
+            }
+        }
+        // `to.startRiding(vehicle, false, false)` in a conversion, or `finalizeSpawn`'s.
         if let Some(mount) = mob.get_mob_entity().take_pending_vehicle()
             && !mount.get_entity().is_removed()
         {
             mount
                 .get_entity()
-                .add_passenger(mount.clone(), vehicle.clone());
+                .add_passenger_without_event(mount.clone(), vehicle.clone());
         }
     }
 
@@ -5724,6 +6165,8 @@ impl World {
         // serialized at once (which would double it on the next reload).
         self.spawn_state.load().add_entity(self, entity.as_ref());
         self.entity_tracker.add_entity(&entity, self);
+        // `onCreated` / `onTrackingStart`.
+        self.waypoint_manager.on_entity_added(&entity);
         base_entity.update_dynamic_game_event_listener(|listener| listener.add(self));
 
         self.entities.rcu(|current_entities| {
@@ -5766,6 +6209,9 @@ impl World {
 
         self.spawn_state.load().remove_entity(self, entity);
         self.entity_tracker.remove_entity(entity, self);
+        // `onDestroyed` and `LivingEntity.onRemoval`.
+        self.waypoint_manager
+            .untrack_waypoint(base_entity.entity_id);
         base_entity.update_dynamic_game_event_listener(|listener| listener.remove(self));
         self.entities.rcu(|current_entities| {
             let mut new_entities = (**current_entities).clone();
@@ -5809,10 +6255,19 @@ impl World {
             .await;
 
         for entity in entities_to_remove {
+            // `PersistentEntitySectionManager.unloadEntity`, after the chunk's entities are
+            // stored: `setRemoved(UNLOADED_TO_CHUNK)`. Whatever still holds the entity (a
+            // leashee holding it as its holder, say) now sees it gone.
+            entity
+                .get_entity()
+                .set_removed_reason(RemovalReason::UnloadedToChunk);
             entity
                 .get_entity()
                 .update_dynamic_game_event_listener(|listener| listener.remove(self));
             self.entity_tracker.remove_entity(entity.as_ref(), self);
+            // `LivingEntity.onRemoval` (`setRemoved(UNLOADED_TO_CHUNK)`).
+            self.waypoint_manager
+                .untrack_waypoint(entity.get_entity().entity_id);
             self.spawn_state.load().remove_entity(self, entity.as_ref());
         }
 
@@ -6001,10 +6456,7 @@ impl World {
         // Level.java setBlock
         if self.get_block_state_id(position) == block_state_id {
             if flags.contains(BlockFlags::NOTIFY_LISTENERS) {
-                self.unsent_block_changes
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .insert(*position, block_state_id);
+                self.register_block_change(*position);
             }
 
             if flags.contains(BlockFlags::NOTIFY_NEIGHBORS) {
@@ -6014,7 +6466,10 @@ impl World {
                 }
             }
 
-            if !flags.intersects(BlockFlags::MOVED | BlockFlags::UPDATE_KNOWN_SHAPE) {
+            // Only `UPDATE_KNOWN_SHAPE` (vanilla 16) skips the shape updates; a piston's
+            // `MOVED` (vanilla 64) still sends them.
+            if !flags.contains(BlockFlags::UPDATE_KNOWN_SHAPE) {
+                // Vanilla `updateFlags & -34`: without `UPDATE_NEIGHBORS` and `UPDATE_SUPPRESS_DROPS`.
                 let mut neighbour_update_flags = flags;
                 neighbour_update_flags.remove(BlockFlags::NOTIFY_NEIGHBORS);
                 neighbour_update_flags.remove(BlockFlags::SKIP_DROPS);
@@ -7165,11 +7620,24 @@ impl World {
             neighbor_state_id,
         );
 
+        // Vanilla `Block.updateOrDestroy`.
         if new_state_id != block_state_id {
             if is_air(new_state_id) {
-                self.break_block(block_pos, None, flags | BlockFlags::NOTIFY_ALL);
+                // `destroyBlock(pos, (flags & 32) == 0, null)`: the write is a plain
+                // `UPDATE_ALL`. The caller's other flags (a piston's `MOVED`, its skipped
+                // block-entity side effects) belong to the neighbour's write, not this one.
+                self.break_block(
+                    block_pos,
+                    None,
+                    BlockFlags::NOTIFY_ALL | (flags & BlockFlags::SKIP_DROPS),
+                );
             } else {
-                self.set_block_state(block_pos, new_state_id, flags);
+                // `setBlock(pos, newState, flags & -33)`.
+                self.set_block_state(
+                    block_pos,
+                    new_state_id,
+                    flags.difference(BlockFlags::SKIP_DROPS),
+                );
             }
         }
     }
@@ -8038,6 +8506,8 @@ impl World {
             warn!("Failed to save world_border.dat: {err}");
         }
 
+        self.save_chunk_tickets();
+
         {
             let custom_data = self
                 .custom_data
@@ -8560,6 +9030,41 @@ mod tests {
         World, bedrock_block_breaking_rate, bedrock_chest_block_actor, merge_entity_records,
     };
 
+    /// `ClientboundLevelParticlesPacket` in 26.3: the three speeds, then the count and the
+    /// randomization type as var ints.
+    #[test]
+    fn level_particles_encode_per_axis_speed_and_randomization() {
+        use pumpkin_protocol::ClientPacket;
+        use pumpkin_util::{math::vector3::Vector3, version::JavaMinecraftVersion};
+
+        let packet = super::LevelParticles::new(
+            pumpkin_data::particle::Particle::Snowflake,
+            &[],
+            true,
+            false,
+            Vector3::new(1.0, 2.0, 3.0),
+            1,
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(0.25, f64::from(0.05f32), -0.5),
+            super::ParticleRandomization::Alternative,
+        );
+        let mut bytes = Vec::new();
+        packet
+            .write_packet_data(&mut bytes, &JavaMinecraftVersion::V_26_3)
+            .unwrap();
+        let mut tail = Vec::new();
+        tail.extend_from_slice(&0.25f32.to_be_bytes());
+        tail.extend_from_slice(&0.05f32.to_be_bytes());
+        tail.extend_from_slice(&(-0.5f32).to_be_bytes());
+        tail.extend_from_slice(&[1, 1]);
+        assert!(bytes.ends_with(&tail), "{bytes:?}");
+        // Particle id, no options, important (overrideLimiter, set here), then force
+        // (alwaysShow).
+        let id = pumpkin_data::particle::Particle::Snowflake as u8;
+        assert_eq!(&bytes[..3], &[id, 1, 0]);
+        assert_eq!(bytes.len(), 3 + 3 * 8 + 6 * 4 + 2);
+    }
+
     fn record(uuid: Option<Uuid>, id: &str) -> NbtCompound {
         let mut nbt = NbtCompound::new();
         nbt.put_string("id", id.to_string());
@@ -8816,31 +9321,65 @@ const fn legacy_world_border(
     }
 }
 
-/// `ClientboundLevelParticlesPacket` with the 26.3 per-axis speed and randomization type,
-/// which `CParticle` (whose shape the plugin API mirrors) doesn't carry. Older clients get the
-/// plain `CParticle` with the x speed.
-struct AxisSpeedParticles<'a> {
+/// Vanilla `ClientboundLevelParticlesPacket`, with the 26.3 per-axis speed and randomization
+/// type, which `CParticle` (whose shape the plugin API mirrors field by field) doesn't carry.
+/// Clients before 26.3 get the plain `CParticle` with the x speed.
+struct LevelParticles<'a> {
     particle: pumpkin_protocol::java::client::play::CParticle<'a>,
     speed: Vector3<f32>,
     randomization: ParticleRandomization,
 }
 
+impl<'a> LevelParticles<'a> {
+    /// `new ClientboundLevelParticlesPacket(...)` as `ServerLevel.sendParticles` builds it:
+    /// `(float)xDist, ..., (float)xSpeed, ...`.
+    #[expect(clippy::too_many_arguments)]
+    const fn new(
+        particle: Particle,
+        data: &'a [u8],
+        override_limiter: bool,
+        always_show: bool,
+        pos: Vector3<f64>,
+        count: i32,
+        dist: Vector3<f64>,
+        speed: Vector3<f64>,
+        randomization: ParticleRandomization,
+    ) -> Self {
+        let speed = Vector3::new(speed.x as f32, speed.y as f32, speed.z as f32);
+        Self {
+            particle: pumpkin_protocol::java::client::play::CParticle::new(
+                always_show,
+                override_limiter,
+                pos,
+                Vector3::new(dist.x as f32, dist.y as f32, dist.z as f32),
+                speed.x,
+                count,
+                pumpkin_protocol::VarInt(particle as i32),
+                data,
+            ),
+            speed,
+            randomization,
+        }
+    }
+}
+
 /// Vanilla `ClientboundLevelParticlesPacket.RandomizationType`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[repr(i32)]
 pub enum ParticleRandomization {
+    #[default]
     Default = 0,
     Alternative = 1,
     AlternativeWithSpeed = 2,
 }
 
-impl pumpkin_protocol::packet::MultiVersionJavaPacket for AxisSpeedParticles<'_> {
+impl pumpkin_protocol::packet::MultiVersionJavaPacket for LevelParticles<'_> {
     fn to_id(version: pumpkin_util::version::JavaMinecraftVersion) -> i32 {
         <pumpkin_protocol::java::client::play::CParticle<'_> as pumpkin_protocol::packet::MultiVersionJavaPacket>::to_id(version)
     }
 }
 
-impl pumpkin_protocol::ClientPacket for AxisSpeedParticles<'_> {
+impl pumpkin_protocol::ClientPacket for LevelParticles<'_> {
     fn write_packet_data(
         &self,
         mut write: impl std::io::Write,
@@ -8867,5 +9406,66 @@ impl pumpkin_protocol::ClientPacket for AxisSpeedParticles<'_> {
         write.write_var_int(&pumpkin_protocol::VarInt(particle.particle_count))?;
         write.write_var_int(&pumpkin_protocol::VarInt(self.randomization as i32))?;
         Ok(())
+    }
+}
+
+/// Vanilla `SleepStatus`: the world's players, and how many of them sleep.
+#[derive(Default)]
+pub struct SleepStatus {
+    active_players: i32,
+    sleeping_players: i32,
+}
+
+impl SleepStatus {
+    /// Vanilla `areEnoughSleeping`.
+    #[must_use]
+    pub fn are_enough_sleeping(&self, percentage: i32) -> bool {
+        self.sleeping_players >= self.sleepers_needed(percentage)
+    }
+
+    /// Vanilla `areEnoughDeepSleeping`.
+    #[must_use]
+    pub fn are_enough_deep_sleeping(&self, percentage: i32, players: &[Arc<Player>]) -> bool {
+        let deep_sleepers = players
+            .iter()
+            .filter(|player| player.is_sleeping_long_enough())
+            .count() as i32;
+        deep_sleepers >= self.sleepers_needed(percentage)
+    }
+
+    /// Vanilla `sleepersNeeded`: `max(1, ceil(active * percentage / 100.0F))`.
+    #[must_use]
+    pub fn sleepers_needed(&self, percentage: i32) -> i32 {
+        let needed = ((self.active_players.wrapping_mul(percentage)) as f32 / 100.0).ceil() as i32;
+        if needed > 1 { needed } else { 1 }
+    }
+
+    /// Vanilla `removeAllSleepers`.
+    pub const fn remove_all_sleepers(&mut self) {
+        self.sleeping_players = 0;
+    }
+
+    /// Vanilla `amountSleeping`.
+    #[must_use]
+    pub const fn amount_sleeping(&self) -> i32 {
+        self.sleeping_players
+    }
+
+    /// Vanilla `update`: recounts, and says whether an announcement is due.
+    pub fn update(&mut self, players: &[Arc<Player>]) -> bool {
+        let old_active = self.active_players;
+        let old_sleeping = self.sleeping_players;
+        self.active_players = 0;
+        self.sleeping_players = 0;
+        for player in players {
+            if !player.is_spectator() {
+                self.active_players += 1;
+                if player.is_sleeping() {
+                    self.sleeping_players += 1;
+                }
+            }
+        }
+        (old_sleeping > 0 || self.sleeping_players > 0)
+            && (old_active != self.active_players || old_sleeping != self.sleeping_players)
     }
 }

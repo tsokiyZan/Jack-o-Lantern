@@ -3499,6 +3499,7 @@ dependencies = [
 name = "pumpkin-wasm-host-v0_2"
 version = "0.2.0+26.3-26.51"
 dependencies = [
+ "arc-swap",
  "bytes",
  "pumpkin-config",
  "pumpkin-core",
@@ -3513,6 +3514,7 @@ dependencies = [
  "rand 0.10.3",
  "serde_json",
  "sysinfo",
+ "tempfile",
  "time",
  "tokio",
  "tracing",

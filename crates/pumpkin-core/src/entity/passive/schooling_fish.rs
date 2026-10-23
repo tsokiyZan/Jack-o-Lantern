@@ -26,6 +26,33 @@ pub fn init(mob_entity: &MobEntity) {
         .add_goal(5, Box::new(FollowFlockLeaderGoal::for_mob(mob_entity)));
 }
 
+/// Vanilla `AbstractSchoolingFish.finalizeSpawn`, after `Mob.finalizeSpawn`.
+///
+/// The first fish of a spawn group leads it (a group with no leader yet, which the free `finalize_spawn`
+/// fills in), every later one starts following that leader.
+pub fn finalize_school_spawn(
+    school: &SchoolingFish,
+    group_data: Option<crate::entity::mob::spawn::SpawnGroupData>,
+) -> crate::entity::mob::spawn::SpawnGroupData {
+    use crate::entity::mob::spawn::SpawnGroupData;
+    match group_data {
+        Some(SpawnGroupData::School {
+            leader: Some(leader),
+            tropical_variant,
+        }) => {
+            school.start_following(&leader);
+            SpawnGroupData::School {
+                leader: Some(leader),
+                tropical_variant,
+            }
+        }
+        _ => SpawnGroupData::School {
+            leader: None,
+            tropical_variant: None,
+        },
+    }
+}
+
 /// The school a fish belongs to. Other fish change `school_size` from their own
 /// ticks, so it is atomic; the leader is only ever written by its owner.
 pub struct SchoolingFish {

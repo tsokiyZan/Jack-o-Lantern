@@ -501,12 +501,11 @@ impl CommandExecutor for LootExecutor {
                 let mut used_items = Vec::new();
                 for stack in &drops {
                     for player in &targets {
+                        // Vanilla `LootCommand.playerGive`: what doesn't fit is lost.
                         let mut remaining = stack.clone();
-                        player.inventory().insert_stack_anywhere(&mut remaining);
-                        if !remaining.is_empty() {
-                            player.drop_item(remaining);
+                        if player.inventory().insert_stack_anywhere(&mut remaining) {
+                            used_items.push(stack.clone());
                         }
-                        used_items.push(stack.clone());
                     }
                 }
                 send_callback(context, &used_items, table_id_for_callback.as_deref());

@@ -106,9 +106,11 @@ impl MooshroomEntity {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .is_some();
         if has_effects {
-            world.send_particles_with_axis_speed(
+            world.send_particles(
                 Particle::Smoke,
                 &[],
+                false,
+                false,
                 particle_pos,
                 2,
                 Vector3::new(0.5, 0.0, 0.5),
@@ -120,9 +122,11 @@ impl MooshroomEntity {
             // `SpellParticleOption.create(EFFECT, -1, 1.0F)`: color, then power.
             let mut options = (-1i32).to_be_bytes().to_vec();
             options.extend_from_slice(&1.0f32.to_be_bytes());
-            world.send_particles_with_axis_speed(
+            world.send_particles(
                 Particle::Effect,
                 &options,
+                false,
+                false,
                 particle_pos,
                 4,
                 Vector3::new(0.5, 0.0, 0.5),
@@ -410,10 +414,7 @@ impl MooshroomEntity {
         crate::entity::mob::conversion::convert_to(
             self,
             &EntityType::COW,
-            crate::entity::mob::conversion::ConversionParams {
-                keep_equipment: false,
-                preserve_can_pick_up_loot: false,
-            },
+            &crate::entity::mob::conversion::ConversionParams::single(self, false, false),
             |_cow| {
                 world.spawn_particle(
                     pos + Vector3::new(0.0, height * 0.5, 0.0),

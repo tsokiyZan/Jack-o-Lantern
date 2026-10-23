@@ -6,11 +6,11 @@ use std::sync::atomic::{AtomicBool, AtomicI32, AtomicI64, Ordering};
 use std::sync::{Arc, Weak};
 use uuid::Uuid;
 
-use crate::block::blocks::bed::BedBlock;
 use crate::entity::ai::pathfinder::node::PathType;
 use pumpkin_data::Enchantment;
 use pumpkin_data::attributes::Attributes;
 use pumpkin_data::block_properties::{BedPart, WhiteBedLikeProperties as BedProperties};
+use pumpkin_data::data_component_impl::VillagerFoodImpl;
 use pumpkin_data::effect::StatusEffect;
 use pumpkin_data::entity::{EntityPose, EntityType};
 use pumpkin_data::item::{Item, JavaToBedrockItemMapping};
@@ -36,6 +36,7 @@ use pumpkin_util::text::TextComponent;
 use pumpkin_util::version::JavaMinecraftVersion;
 
 use crate::entity::player::Player;
+use crate::entity::simple_container;
 use crate::entity::{
     Entity, EntityBase,
     ai::{
@@ -56,7 +57,6 @@ use crate::world::villager_poi::profession_for_block;
 pub mod data;
 pub use data::{
     BREEDING_FOOD_THRESHOLD, GossipType, VillagerData, VillagerProfession, VillagerType,
-    get_food_points,
 };
 
 pub(crate) fn trigger_trade_advancement(player: &Player) {
@@ -359,6 +359,8 @@ pub struct VillagerEntity {
     pub job_site: std::sync::Mutex<Option<BlockPos>>,
     pub job_site_pending: AtomicBool,
     pub home_pos: std::sync::Mutex<Option<BlockPos>>,
+    /// The brain's `LAST_WOKEN` (game time), `i64::MIN` while unset.
+    last_woken: AtomicI64,
     pub self_weak: std::sync::Mutex<Option<Weak<Self>>>,
 }
 
@@ -405,6 +407,8 @@ impl VillagerEntity {
         mob_entity.set_pathfinding_malus(PathType::DamageFire, -1.0);
         // Vanilla `Villager`'s constructor.
         mob_entity.set_required_path_length(48.0);
+        // `/summon` reads `CanPickUpLoot` (default false) over this, as vanilla's load does.
+        mob_entity.set_can_pick_up_loot(true);
         let villager_data = VillagerData::new(VillagerType::Plains, VillagerProfession::None, 1);
         let inventory = std::sync::Mutex::new((0..8).map(|_| ItemStack::EMPTY.clone()).collect());
 
@@ -433,6 +437,7 @@ impl VillagerEntity {
             job_site: std::sync::Mutex::new(None),
             job_site_pending: AtomicBool::new(false),
             home_pos: std::sync::Mutex::new(None),
+            last_woken: AtomicI64::new(i64::MIN),
             self_weak: std::sync::Mutex::new(None),
         };
         let mob_arc = Arc::new(villager);
@@ -532,18 +537,21 @@ impl VillagerEntity {
         mob_arc
     }
 
+    /// Vanilla `Villager.countFoodPointsInInventory`: count times `villager_food` nutrition
+    /// over the inventory.
     pub fn count_food_points_in_inventory(&self) -> i32 {
         let inventory = self
             .inventory
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let mut total = 0;
-        for stack in inventory.iter() {
-            if !stack.is_empty() {
-                total += get_food_points(stack.get_item()) * stack.item_count as i32;
-            }
-        }
-        total
+        inventory
+            .iter()
+            .filter_map(|stack| {
+                stack
+                    .get_data_component::<VillagerFoodImpl>()
+                    .map(|food| i32::from(stack.item_count) * food.nutrition)
+            })
+            .sum()
     }
 
     fn poi_owner(&self) -> Option<Weak<dyn EntityBase>> {
@@ -556,32 +564,40 @@ impl VillagerEntity {
         Some(owner)
     }
 
+    /// Vanilla `Villager.hungry`.
+    fn hungry(&self) -> bool {
+        self.food_level.load(Ordering::Relaxed) < BREEDING_FOOD_THRESHOLD
+    }
+
+    /// Vanilla `Villager.eatUntilFull`: per slot, one item at a time, removing what was eaten
+    /// once full or once the slot is done.
     pub fn eat_until_full(&self) {
-        if self.food_level.load(Ordering::Relaxed) >= BREEDING_FOOD_THRESHOLD {
+        if !self.hungry() {
             return;
         }
         let mut inventory = self
             .inventory
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        for stack in inventory.iter_mut() {
-            if !stack.is_empty() {
-                let points = get_food_points(stack.get_item());
-                if points > 0 {
-                    while stack.item_count > 0
-                        && self.food_level.load(Ordering::Relaxed) < BREEDING_FOOD_THRESHOLD
-                    {
-                        self.food_level.fetch_add(points, Ordering::Relaxed);
-                        stack.item_count -= 1;
-                    }
-                    if stack.item_count == 0 {
-                        *stack = ItemStack::EMPTY.clone();
-                    }
-                    if self.food_level.load(Ordering::Relaxed) >= BREEDING_FOOD_THRESHOLD {
-                        break;
-                    }
+        for slot in 0..inventory.len() {
+            let stack = &inventory[slot];
+            let Some(nutrition) = stack
+                .get_data_component::<VillagerFoodImpl>()
+                .map(|food| food.nutrition)
+            else {
+                continue;
+            };
+            let item_count = stack.item_count;
+            let mut to_remove = 0;
+            for _ in 0..item_count {
+                self.food_level.fetch_add(nutrition, Ordering::Relaxed);
+                to_remove += 1;
+                if !self.hungry() {
+                    simple_container::remove_item(&mut inventory, slot, to_remove);
+                    return;
                 }
             }
+            simple_container::remove_item(&mut inventory, slot, to_remove);
         }
     }
 
@@ -1692,8 +1708,6 @@ impl VillagerEntity {
         self.update_job_site(&world);
 
         // 1. Bed / Sleeping logic (for all villagers: babies, nitwits, adults)
-        let is_sleeping = self.get_entity().pose.load() == EntityPose::Sleeping;
-
         // Check if current bed is still valid
         if let Some(current_home) = self.get_home_pos() {
             let (block, state) = world.get_block_and_state(&current_home);
@@ -1704,19 +1718,12 @@ impl VillagerEntity {
                 false
             };
 
+            // A sleeper whose bed is gone wakes in `LivingEntity::tick` (`checkBedExists`).
             if !valid {
                 *self
                     .home_pos
                     .lock()
                     .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
-                if is_sleeping {
-                    // Wake up if bed was broken
-                    self.set_pose(EntityPose::Standing);
-                    self.get_entity().set_synced_data(
-                        pumpkin_data::tracked_data::villager::SLEEPING_POS_ID,
-                        None::<BlockPos>,
-                    );
-                }
             }
         }
 
@@ -1786,14 +1793,26 @@ impl VillagerEntity {
             }
         }
 
-        // Handle Sleeping/Waking up based on time
-        let is_sleeping = self.get_entity().pose.load() == EntityPose::Sleeping;
-        if let Some(home_pos) = self.get_home_pos() {
+        // Handle Sleeping/Waking up based on time: the stand-in for the brain's `SleepInBed`
+        // and `WakeUp`, which a NoAI villager never runs.
+        let living = &self.mob_entity.living_entity;
+        let is_sleeping = living.get_sleeping_pos().is_some();
+        let home = if self.mob_entity.is_no_ai() {
+            None
+        } else {
+            self.get_home_pos()
+        };
+        if let Some(home_pos) = home {
             let time = world.get_time_of_day();
             let is_night = (12000..=23000).contains(&time);
 
             if is_night {
-                if !is_sleeping {
+                // `SleepInBed`: not within 100 ticks of waking.
+                let since_woken = game_time.wrapping_sub(self.last_woken.load(Ordering::Relaxed));
+                let just_woke = self.last_woken.load(Ordering::Relaxed) != i64::MIN
+                    && since_woken > 0
+                    && since_woken < 100;
+                if !is_sleeping && !just_woke {
                     // Check distance to bed. If close enough, go to sleep
                     let dist = home_pos
                         .to_f64()
@@ -1801,44 +1820,20 @@ impl VillagerEntity {
                     if dist <= 4.0 {
                         // Within 2 blocks (squared distance 4.0)
                         let (block, state) = world.get_block_and_state(&home_pos);
-                        if block.has_tag(&pumpkin_data::tag::Block::MINECRAFT_BEDS) {
-                            let bed_props = BedProperties::from_state_id(state.id);
-                            if !bed_props.occupied {
-                                // Make bed occupied
-                                BedBlock::set_occupied(true, &world, block, &home_pos, state.id);
-
-                                self.set_pose(EntityPose::Sleeping);
-                                self.get_entity().set_synced_data(
-                                    pumpkin_data::tracked_data::villager::SLEEPING_POS_ID,
-                                    Some(home_pos),
-                                );
-                            }
+                        if block.has_tag(&pumpkin_data::tag::Block::MINECRAFT_BEDS)
+                            && !BedProperties::from_state_id(state.id).occupied
+                        {
+                            living.start_sleeping(self, home_pos);
                         }
                     }
                 }
             } else if is_sleeping {
                 // It is day, wake up!
-                let (block, state) = world.get_block_and_state(&home_pos);
-                if block.has_tag(&pumpkin_data::tag::Block::MINECRAFT_BEDS) {
-                    let bed_props = BedProperties::from_state_id(state.id);
-                    if bed_props.occupied {
-                        BedBlock::set_occupied(false, &world, block, &home_pos, state.id);
-                    }
-                }
-
-                self.set_pose(EntityPose::Standing);
-                self.get_entity().set_synced_data(
-                    pumpkin_data::tracked_data::villager::SLEEPING_POS_ID,
-                    None::<BlockPos>,
-                );
+                living.stop_sleeping(self);
             }
-        } else if is_sleeping {
+        } else if is_sleeping && !self.mob_entity.is_no_ai() {
             // Wake up during the day
-            self.set_pose(EntityPose::Standing);
-            self.get_entity().set_synced_data(
-                pumpkin_data::tracked_data::villager::SLEEPING_POS_ID,
-                None::<BlockPos>,
-            );
+            living.stop_sleeping(self);
         }
 
         // 2. Iron Golem spawning logic (only for adults)
@@ -1922,9 +1917,42 @@ impl Mob for VillagerEntity {
         crate::entity::leashable::drop_leash(caller, true, true);
     }
 
+    /// Vanilla `Villager.wantsToPickUp`.
+    fn wants_to_pick_up(
+        &self,
+        _brain: &crate::entity::ai::brain::Brain,
+        stack: &ItemStack,
+    ) -> bool {
+        let requested = self
+            .villager_data
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .profession_enum()
+            .requested_items()
+            .iter()
+            .any(|item| item.id == stack.item.id);
+        (stack
+            .item
+            .has_tag(&pumpkin_data::tag::Item::MINECRAFT_VILLAGER_PICKS_UP)
+            || stack.has_data_component(pumpkin_data::data_component::DataComponent::VillagerFood)
+            || requested)
+            && simple_container::can_add_item(
+                &self
+                    .inventory
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner),
+                stack,
+            )
+    }
+
+    /// Vanilla `Villager.pickUpItem`.
+    fn mob_pick_up_item(&self, item: &crate::entity::item::ItemEntity) {
+        simple_container::inventory_carrier_pick_up_item(self, &self.inventory, item);
+    }
+
     /// Vanilla `Villager.getAmbientSound`.
     fn ambient_sound(&self) -> Option<pumpkin_data::sound::Sound> {
-        if self.get_entity().pose.load() == EntityPose::Sleeping {
+        if self.mob_entity.living_entity.get_sleeping_pos().is_some() {
             None
         } else if self.is_trading.load(Ordering::Relaxed) {
             Some(pumpkin_data::sound::Sound::EntityVillagerTrade)
@@ -1957,7 +1985,8 @@ impl Mob for VillagerEntity {
             nbt.put_compound("VillagerData", villager_data_nbt);
         };
 
-        nbt.put_int("FoodLevel", self.food_level.load(Ordering::Relaxed));
+        // Vanilla `putByte`.
+        nbt.put_byte("FoodLevel", self.food_level.load(Ordering::Relaxed) as i8);
         nbt.put_int("Xp", self.xp.load(Ordering::Relaxed));
         nbt.put_long(
             "LastRestock",
@@ -2089,9 +2118,12 @@ impl Mob for VillagerEntity {
             }
         }
 
-        if let Some(food) = nbt.get_int("FoodLevel") {
-            self.food_level.store(food, Ordering::Relaxed);
-        }
+        // Vanilla `getByteOr("FoodLevel", 0)`: any numeric tag, cut to a byte.
+        let food = nbt
+            .get("FoodLevel")
+            .and_then(NbtTag::as_numeric_int)
+            .map_or(0, |food| i32::from(food as i8));
+        self.food_level.store(food, Ordering::Relaxed);
         if let Some(xp) = nbt.get_int("Xp") {
             self.xp.store(xp, Ordering::Relaxed);
         }
@@ -2199,30 +2231,13 @@ impl Mob for VillagerEntity {
                 .inventory
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
-            // Vanilla `SimpleContainer.fromItemList`: clear the slots, then `addItem` each stack.
-            for slot in inventory.iter_mut() {
-                *slot = ItemStack::EMPTY.clone();
-            }
-            for tag in inventory_list {
-                if let Some(item_compound) = tag.extract_compound()
-                    && let Some(mut stack) = ItemStack::read_item_stack(item_compound)
-                {
-                    for slot in inventory.iter_mut() {
-                        if !slot.is_empty() && slot.are_items_and_components_equal(&stack) {
-                            let moved = stack
-                                .item_count
-                                .min(slot.get_max_stack_size().saturating_sub(slot.item_count));
-                            slot.item_count += moved;
-                            stack.item_count -= moved;
-                        }
-                    }
-                    if stack.item_count > 0
-                        && let Some(slot) = inventory.iter_mut().find(|slot| slot.is_empty())
-                    {
-                        *slot = stack;
-                    }
-                }
-            }
+            simple_container::from_item_list(
+                &mut inventory,
+                inventory_list
+                    .iter()
+                    .filter_map(NbtTag::extract_compound)
+                    .filter_map(ItemStack::read_item_stack),
+            );
         }
 
         // Gossips
@@ -2385,6 +2400,12 @@ impl Mob for VillagerEntity {
         }
     }
 
+    /// Vanilla `Villager.stopSleeping`: `LAST_WOKEN` is the game time.
+    fn after_stop_sleeping(&self) {
+        let now = self.get_entity().world.load().get_world_age();
+        self.last_woken.store(now, Ordering::Relaxed);
+    }
+
     fn mob_tick(&self, _caller: &dyn EntityBase) {
         self.villager_mob_tick();
     }
@@ -2398,7 +2419,7 @@ impl Mob for VillagerEntity {
         if item_stack.item == &Item::VILLAGER_SPAWN_EGG
             || !self.get_entity().is_alive()
             || self.is_trading.load(Ordering::Relaxed)
-            || self.get_entity().pose.load() == EntityPose::Sleeping
+            || self.mob_entity.living_entity.get_sleeping_pos().is_some()
         {
             // TODO: `AgeableMob.mobInteract`'s golden dandelion.
             return InteractionResult::PASS;

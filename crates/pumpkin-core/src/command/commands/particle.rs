@@ -2,8 +2,6 @@ use std::sync::Arc;
 
 use pumpkin_data::particle::Particle;
 use pumpkin_data::translation;
-use pumpkin_protocol::codec::var_int::VarInt;
-use pumpkin_protocol::java::client::play::CParticle;
 use pumpkin_util::PermissionLvl;
 use pumpkin_util::math::vector3::Vector3;
 use pumpkin_util::permission::{Permission, PermissionDefault, PermissionRegistry};
@@ -31,6 +29,8 @@ const ERROR_FAILED: CommandErrorType<0> = CommandErrorType::new(
     translation::java::COMMANDS_PARTICLE_FAILED,
 );
 
+/// Vanilla `ParticleCommand.sendParticles`: `level.sendParticles(player, particle, force, false,
+/// ...)` for each player, counting the ones it reached.
 #[allow(clippy::too_many_arguments)]
 fn send_particles(
     source: &CommandSource,
@@ -43,34 +43,23 @@ fn send_particles(
     viewers: Option<Vec<Arc<Player>>>,
 ) -> Result<i32, CommandSyntaxError> {
     let world = source.world().clone();
+    // The default viewers are every player on the server; the ones in other worlds are skipped
+    // by `sendParticles`' level check, so this world's players are the same set.
     let players: Vec<Arc<Player>> = viewers.unwrap_or_else(|| world.players.load().to_vec());
 
-    let offset = Vector3::new(delta.x as f32, delta.y as f32, delta.z as f32);
-    let packet = CParticle::new(
-        force,
-        false,
-        pos,
-        offset,
-        speed,
-        count,
-        VarInt(i32::from(particle.to_id())),
-        &[],
-    );
-
-    let max_dist_sq = if force { 512.0 * 512.0 } else { 32.0 * 32.0 };
     let mut sent_count = 0;
-
     for player in &players {
-        if !Arc::ptr_eq(&player.world(), &world) {
-            continue;
-        }
-        let player_pos = player.position();
-        let dx = player_pos.x - pos.x;
-        let dy = player_pos.y - pos.y;
-        let dz = player_pos.z - pos.z;
-        let dist_sq = dx * dx + dy * dy + dz * dz;
-        if dist_sq <= max_dist_sq {
-            player.try_send_client_packet(&packet);
+        if world.send_particles_to_player(
+            player,
+            particle,
+            &[],
+            force,
+            false,
+            pos,
+            count,
+            delta,
+            f64::from(speed),
+        ) {
             sent_count += 1;
         }
     }
@@ -79,7 +68,8 @@ fn send_particles(
         return Err(ERROR_FAILED.create_without_context());
     }
 
-    let particle_name = format!("{particle:?}").to_lowercase();
+    // `BuiltInRegistries.PARTICLE_TYPE.getKey(particle.getType()).toString()`.
+    let particle_name = format!("minecraft:{}", particle.to_name());
     source.send_feedback(
         TextComponent::translate_cross(
             translation::java::COMMANDS_PARTICLE_SUCCESS,
