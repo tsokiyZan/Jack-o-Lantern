@@ -115,3 +115,25 @@ pub fn block_attached_ignore_explosion(
     // `super.ignoreExplosion` is false.
     !explosion.should_affect_blocklike_entities(&this.get_entity().world.load())
 }
+
+/// Vanilla `HangingEntity.spawnAtLocation(level, stack, yOffs)`: the item is spawned 0.15 out
+/// from the entity along `direction` (horizontal steps only), `y_offset` above it.
+pub fn hanging_spawn_at_location(
+    this: &dyn EntityBase,
+    direction: pumpkin_data::BlockDirection,
+    stack: pumpkin_data::item_stack::ItemStack,
+    y_offset: f32,
+) {
+    const OUT: f32 = 0.15;
+    let entity = this.get_entity();
+    let pos = entity.pos.load();
+    let step = direction.to_offset();
+    entity.world.load_full().spawn_item_at(
+        pumpkin_util::math::vector3::Vector3::new(
+            pos.x + f64::from(step.x as f32 * OUT),
+            pos.y + f64::from(y_offset),
+            pos.z + f64::from(step.z as f32 * OUT),
+        ),
+        stack,
+    );
+}
