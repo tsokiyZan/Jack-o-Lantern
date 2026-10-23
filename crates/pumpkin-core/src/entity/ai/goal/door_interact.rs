@@ -203,4 +203,57 @@ mod tests {
             assert_eq!(DoorInteractGoal::new().can_use(mob), expected);
         }
     }
+
+    /// The same check through `Mob.getNavigation()`'s redirect: a zombie steering a mob
+    /// vehicle reads the vehicle's navigation (and its path), whatever its own is.
+    #[tokio::test]
+    async fn can_use_reads_the_steered_vehicles_navigation() {
+        let (_folder, world) = crate::world::test_support::test_world();
+        let chunk = ChunkData::empty_sync(0, 0);
+        chunk.set_block_absolute_y(0, 101, 0, Block::OAK_DOOR.default_state.id);
+        world.level.loaded_chunks.insert(Vector2::new(0, 0), chunk);
+        for (navigation, expected) in [(Navigator::ground(), true), (Navigator::flying(), false)] {
+            let position = Vector3::new(0.5, 100.0, 0.5);
+            let vehicle = crate::entity::r#type::from_type(
+                &EntityType::CHICKEN,
+                position,
+                &world,
+                uuid::Uuid::new_v4(),
+            );
+            let zombie = crate::entity::r#type::from_type(
+                &EntityType::ZOMBIE,
+                position,
+                &world,
+                uuid::Uuid::new_v4(),
+            );
+            vehicle
+                .get_entity()
+                .add_passenger_without_event(vehicle.clone(), zombie.clone());
+            let mob = zombie.get_mob().unwrap();
+            assert!(
+                mob.get_mob_entity()
+                    .living_entity
+                    .entity
+                    .get_controlled_vehicle()
+                    .is_some(),
+                "the zombie steers the chicken"
+            );
+            let vehicle_entity = vehicle.get_mob().unwrap().get_mob_entity();
+            vehicle_entity.set_own_navigation(navigation);
+            let nodes = vec![
+                Node::new(BlockPos::new(0, 100, 0)),
+                Node::new(BlockPos::new(0, 100, 5)),
+            ];
+            let path = Path::new(nodes, BlockPos::new(0, 100, 5), true);
+            vehicle_entity.own_navigation().move_to_path(
+                Some(path),
+                1.0,
+                &vehicle_entity.living_entity,
+            );
+            mob.get_entity()
+                .horizontal_collision
+                .store(true, Ordering::Relaxed);
+            assert_eq!(DoorInteractGoal::new().can_use(mob), expected);
+        }
+    }
 }
