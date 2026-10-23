@@ -656,7 +656,15 @@ impl Level {
     }
 
     async fn fetch_chunk(self: &Arc<Self>, pos: Vector2<i32>) -> SyncChunk {
+        // Register first, then look again: the scheduler publishes a chunk into
+        // `loaded_chunks` before it notifies the listeners (`publish_chunk`, then
+        // `process_new_chunk`), so either this re-check sees the chunk or the listener is in
+        // place before the notify. Checking only before registering loses a load that finishes
+        // in between, and the receiver then waits forever.
         let recv = self.chunk_listener.add_single_chunk_listener(pos);
+        if let Some(chunk) = self.loaded_chunks.get(&pos).map(|chunk| chunk.clone()) {
+            return chunk;
+        }
 
         {
             let mut lock = self
@@ -1224,6 +1232,35 @@ mod tests {
         assert_eq!(saved.len(), 1);
         assert_eq!(saved[0].delay, 23900);
         assert_eq!(saved[0].priority, TickPriority::Low);
+    }
+
+    /// A chunk whose load finishes between `get_or_fetch_chunk`'s "loaded?" miss and its
+    /// listener registration notifies nobody; the waiter must still see it instead of parking
+    /// forever (the forced-chunk startup and `/forceload add` hang).
+    #[tokio::test]
+    async fn get_or_fetch_chunk_sees_a_load_that_finishes_before_its_listener() {
+        let temp_dir = TempDir::new().unwrap();
+        let level = test_level(&temp_dir);
+        // Stop the scheduler so only the hook below can finish the load.
+        level.shutdown().await;
+        let pos = Vector2::new(3, -2);
+        let chunk: SyncChunk = Arc::new(ChunkData::empty(pos.x, pos.y));
+        let hook_level = Arc::downgrade(&level);
+        let hook_chunk = chunk.clone();
+        *level.chunk_listener.before_single_register.lock().unwrap() = Some(Box::new(move || {
+            let level = hook_level.upgrade().unwrap();
+            // The scheduler's `publish_chunk`, then `process_new_chunk`.
+            level.loaded_chunks.insert(pos, hook_chunk.clone());
+            level.chunk_listener.process_new_chunk(pos, &hook_chunk);
+        }));
+
+        let got = tokio::time::timeout(
+            Duration::from_secs(5),
+            level.get_or_fetch_chunk(pos, Clone::clone),
+        )
+        .await
+        .expect("get_or_fetch_chunk parked on a chunk that was already loaded");
+        assert!(Arc::ptr_eq(&got, &chunk));
     }
 
     #[tokio::test]

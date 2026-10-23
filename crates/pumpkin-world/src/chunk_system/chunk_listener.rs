@@ -9,6 +9,10 @@ use tokio::sync::oneshot;
 pub struct ChunkListener {
     single: Mutex<Vec<(ChunkPos, oneshot::Sender<SyncChunk>)>>,
     global: Mutex<Vec<Sender<(ChunkPos, Weak<crate::chunk::ChunkData>)>>>,
+    /// Runs once at the start of the next `add_single_chunk_listener`, before the listener is
+    /// in place, so a test can finish a chunk load exactly there.
+    #[cfg(test)]
+    pub(crate) before_single_register: Mutex<Option<Box<dyn FnOnce() + Send>>>,
 }
 
 impl Default for ChunkListener {
@@ -23,15 +27,31 @@ impl ChunkListener {
         Self {
             single: Mutex::new(Vec::new()),
             global: Mutex::new(Vec::new()),
+            #[cfg(test)]
+            before_single_register: Mutex::new(None),
         }
     }
 
     pub fn add_single_chunk_listener(&self, pos: ChunkPos) -> oneshot::Receiver<SyncChunk> {
+        #[cfg(test)]
+        {
+            let hook = self
+                .before_single_register
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .take();
+            if let Some(hook) = hook {
+                hook();
+            }
+        }
         let (tx, rx) = oneshot::channel();
-        self.single
+        let mut single = self
+            .single
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .push((pos, tx));
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        // A waiter that found its chunk loaded after registering drops its receiver.
+        single.retain(|(_, send)| !send.is_closed());
+        single.push((pos, tx));
         rx
     }
 
