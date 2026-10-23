@@ -5657,7 +5657,10 @@ impl EntityBase for LivingEntity {
             // Vanilla `tickDeath` removes the player here (`remove(KILLED)`): it leaves the
             // level (its players, tracking, chunks, the waypoint manager and the sleeping
             // list) and waits in no level until its client asks to respawn.
-            if time == 20
+            // `deathTime >= 20 && !isRemoved()`: a player that rejoined dead past tick 20
+            // (its `DeathTime` saved) leaves on its first tick.
+            if time >= 20
+                && !self.entity.is_removed()
                 && let Some(player) = caller.get_player()
                 && let Some(player) = self
                     .entity
