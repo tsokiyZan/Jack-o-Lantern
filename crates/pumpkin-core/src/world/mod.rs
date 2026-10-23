@@ -571,17 +571,14 @@ impl World {
         updated
     }
 
-    /// Loads (or generates) a chunk and waits for it, like vanilla's main-thread `getChunk`.
+    /// Loads (or generates) a chunk and waits for it, like vanilla's main-thread `getChunk`,
+    /// from any thread: [`portal::block_on_tick`] runs pool work while it waits on a rayon
+    /// worker and needs no Tokio runtime.
     pub fn load_chunk_blocking(self: &Arc<Self>, pos: Vector2<i32>) {
         if self.level.is_chunk_loaded(&pos) {
             return;
         }
-        let Ok(handle) = tokio::runtime::Handle::try_current() else {
-            return;
-        };
-        tokio::task::block_in_place(|| {
-            handle.block_on(self.level.get_or_fetch_chunk(pos, |_| ()));
-        });
+        portal::block_on_tick(self.level.get_or_fetch_chunk(pos, |_| ()));
     }
 
     /// Vanilla `MinecraftServer.prepareLevels` for the saved FORCED tickets: reactivates them
@@ -9080,6 +9077,37 @@ mod tests {
     use super::{
         World, bedrock_block_breaking_rate, bedrock_chest_block_actor, merge_entity_records,
     };
+
+    /// `/forceload add` from a thread with no Tokio runtime (a global rayon worker, say) still
+    /// loads the chunk before returning, as `setChunkForced`'s `getChunk` does.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn load_chunk_blocking_loads_without_a_tokio_handle() {
+        let (_folder, world) = crate::world::test_support::test_world();
+        // No generation (slow in a test build): the chunk "loads" from the thread below,
+        // the way the scheduler publishes and then notifies.
+        world.level.shutdown().await;
+        let pos = pumpkin_util::math::vector2::Vector2::new(5, -7);
+        let level = world.level.clone();
+        let scheduler = std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(200));
+            let chunk = std::sync::Arc::new(pumpkin_world::chunk::ChunkData::empty(pos.x, pos.y));
+            level.loaded_chunks.insert(pos, chunk.clone());
+            level.chunk_listener.process_new_chunk(pos, &chunk);
+        });
+        let loader = world.clone();
+        let loaded = std::thread::spawn(move || {
+            assert!(tokio::runtime::Handle::try_current().is_err());
+            loader.load_chunk_blocking(pos);
+            loader.level.is_chunk_loaded(&pos)
+        })
+        .join()
+        .unwrap();
+        scheduler.join().unwrap();
+        assert!(
+            loaded,
+            "load_chunk_blocking returned before the chunk was loaded"
+        );
+    }
 
     /// `ClientboundLevelParticlesPacket` in 26.3: the three speeds, then the count and the
     /// randomization type as var ints.
