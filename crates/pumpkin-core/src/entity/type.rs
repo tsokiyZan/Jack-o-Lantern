@@ -728,7 +728,7 @@ pub fn check_spawn_rules(
     }
     if id == EntityType::GUARDIAN.id || id == EntityType::ELDER_GUARDIAN.id {
         // Vanilla `Guardian.checkGuardianSpawnRules`: the random draw comes first, on every call.
-        if random.next_bounded_i32(20) != 0 && !world.can_see_sky_from_below_water(pos) {
+        if random.next_bounded_i32(20) != 0 && world.can_see_sky_from_below_water(pos) {
             return false;
         }
         if world.level_info.load().difficulty == pumpkin_util::Difficulty::Peaceful {
