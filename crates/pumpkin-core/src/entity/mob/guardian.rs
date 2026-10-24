@@ -157,7 +157,7 @@ impl GuardianData {
         let guardian = mob_weak.clone();
         target_selector.add_goal(
             1,
-            ActiveTargetGoal::predicated(mob_entity, 10, true, move |target, _world| {
+            ActiveTargetGoal::predicated_living(mob_entity, 10, true, move |target, _world| {
                 let entity_type = target.entity.entity_type;
                 (entity_type == &EntityType::PLAYER
                     || entity_type == &EntityType::SQUID

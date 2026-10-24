@@ -123,7 +123,7 @@ impl ShulkerEntity {
             // `ShulkerDefenseAttackGoal`: a shulker on a team fights off monsters.
             target_selector.add_goal(
                 3,
-                ActiveTargetGoal::predicated(&mob_arc.mob_entity, 10, true, |target, _| {
+                ActiveTargetGoal::predicated_living(&mob_arc.mob_entity, 10, true, |target, _| {
                     target.entity.entity_type.is_enemy
                 })
                 .starting_only_when(|mob| mob.get_team_name().is_some())

@@ -88,9 +88,12 @@ impl VindicatorEntity {
             target_selector.add_goal(
                 4,
                 Box::new(VindicatorJohnnyAttackGoal(
-                    ActiveTargetGoal::predicated(&mob_arc.mob_entity, 0, true, |target, _| {
-                        target.entity.entity_type.attackable != Some(false)
-                    })
+                    ActiveTargetGoal::predicated_living(
+                        &mob_arc.mob_entity,
+                        0,
+                        true,
+                        |target, _| target.entity.entity_type.attackable != Some(false),
+                    )
                     .must_reach(),
                 )),
             );

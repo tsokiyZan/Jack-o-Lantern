@@ -128,7 +128,7 @@ impl WitherEntity {
             target_selector.add_goal(1, Box::new(RevengeGoal::new(true)));
             target_selector.add_goal(
                 2,
-                crate::entity::ai::goal::active_target::ActiveTargetGoal::predicated(
+                crate::entity::ai::goal::active_target::ActiveTargetGoal::predicated_living(
                     &mob_arc.mob_entity,
                     0,
                     false,

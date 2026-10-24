@@ -11,6 +11,24 @@ use crate::entity::ai::pathfinder::pathfinding_context::PathfindingContext;
 use crate::entity::mob::Mob;
 use crate::world::World;
 
+/// Vanilla `getEntitiesOfClass(LivingEntity.class, area, e -> true)`.
+#[must_use]
+pub fn get_living_entities_in_area(world: &World, area: &BoundingBox) -> Vec<Arc<dyn EntityBase>> {
+    let mut found = world
+        .get_entities_at_box(area)
+        .into_iter()
+        .filter(|entity| entity.get_living_entity().is_some())
+        .collect::<Vec<_>>();
+    found.extend(
+        world
+            .get_players_at_box(area)
+            .into_iter()
+            .map(|player| player as Arc<dyn EntityBase>),
+    );
+    found.sort_by_cached_key(|e| crate::entity::section_iteration_key(e.get_entity()));
+    found
+}
+
 /// The vanilla entity class `entity_type`'s class extends, when that parent is itself a
 /// concrete entity type.
 const fn parent_class(entity_type: &EntityType) -> Option<&'static EntityType> {

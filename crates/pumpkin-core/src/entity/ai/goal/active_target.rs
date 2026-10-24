@@ -70,6 +70,8 @@ pub struct ActiveTargetGoal {
     confirm: Option<MobFilter>,
     /// Vanilla `getTargetSearchArea` overrides: the box searched for non-player targets.
     search_area: Option<fn(&dyn Mob, f64) -> BoundingBox>,
+    /// Vanilla `LivingEntity.class` candidates: players and non-mob living entities too.
+    living_candidates: bool,
 }
 
 impl ActiveTargetGoal {
@@ -105,6 +107,7 @@ impl ActiveTargetGoal {
             start_gate: None,
             confirm: None,
             search_area: None,
+            living_candidates: false,
         }
     }
 
@@ -190,6 +193,7 @@ impl ActiveTargetGoal {
             start_gate: None,
             confirm: None,
             search_area: None,
+            living_candidates: false,
         })
     }
 
@@ -221,6 +225,36 @@ impl ActiveTargetGoal {
             start_gate: None,
             confirm: None,
             search_area: None,
+            living_candidates: false,
+        })
+    }
+
+    /// Like `predicated`, but targets vanilla `LivingEntity.class` (includes players).
+    pub fn predicated_living(
+        mob: &MobEntity,
+        reciprocal_chance: i32,
+        check_visibility: bool,
+        predicate: impl Fn(&LivingEntity, &World) -> bool + Send + Sync + 'static,
+    ) -> Box<Self> {
+        let track_target_goal = TrackTargetGoal::new(check_visibility, false);
+        let mut target_predicate = TargetPredicate::create_attackable();
+        target_predicate.base_max_distance = mob
+            .living_entity
+            .get_attribute_value(&Attributes::FOLLOW_RANGE);
+        target_predicate.set_predicate(predicate);
+
+        Box::new(Self {
+            track_target_goal,
+            target: None,
+            reciprocal_chance: to_goal_ticks(reciprocal_chance),
+            target_type: None,
+            target_predicate,
+            condition: TargetCondition::Always,
+            gate: None,
+            start_gate: None,
+            confirm: None,
+            search_area: None,
+            living_candidates: true,
         })
     }
 
@@ -257,6 +291,17 @@ impl ActiveTargetGoal {
                 .iter()
                 .map(|player| Arc::clone(player) as Arc<dyn EntityBase>)
                 .collect()
+        } else if self.living_candidates {
+            let area = self.search_area.map_or_else(
+                || {
+                    entity
+                        .bounding_box
+                        .load()
+                        .expand(follow_range, follow_range, follow_range)
+                },
+                |area| area(mob, follow_range),
+            );
+            goal_utils::get_living_entities_in_area(&world, &area)
         } else {
             let area = self.search_area.map_or_else(
                 || {
