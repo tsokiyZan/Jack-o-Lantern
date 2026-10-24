@@ -1139,7 +1139,7 @@ pub fn is_valid_empty_spawn_block(
 
 /// Vanilla `Mob.checkSpawnRules`, which `PathfinderMob` makes "the walk target value of its
 /// block isn't negative".
-fn mob_check_spawn_rules(mob: &dyn crate::entity::mob::Mob) -> bool {
+pub(crate) fn mob_check_spawn_rules(mob: &dyn crate::entity::mob::Mob) -> bool {
     !crate::entity::mob::is_pathfinder_mob(mob)
         || mob.get_walk_target_value(&mob.get_entity().block_pos.load()) >= 0.0
 }
