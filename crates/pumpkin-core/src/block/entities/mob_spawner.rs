@@ -1,6 +1,6 @@
 use std::sync::{
     Arc, Mutex,
-    atomic::{AtomicI32, Ordering},
+    atomic::{AtomicBool, AtomicI32, Ordering},
 };
 
 use crossbeam::atomic::AtomicCell;
@@ -26,6 +26,7 @@ pub struct MobSpawnerBlockEntity {
     pub required_player_range: i32,
     pub entity_type: AtomicCell<Option<&'static EntityType>>,
     pub spawn_potentials: Mutex<Vec<(Option<&'static EntityType>, i32)>>,
+    pub potentials_aliased_default: AtomicBool,
 }
 
 impl MobSpawnerBlockEntity {
@@ -51,6 +52,7 @@ impl MobSpawnerBlockEntity {
             required_player_range: Self::DEFAULT_REQUIRED_PLAYER_RANGE,
             entity_type: AtomicCell::new(entity_type),
             spawn_potentials: Mutex::new(Vec::new()),
+            potentials_aliased_default: AtomicBool::new(false),
         }
     }
 
@@ -120,18 +122,27 @@ impl MobSpawnerBlockEntity {
         };
 
         // Spawn potential selection (vanilla spawnPotentials.getRandom).
-        let total_weight: i32 = potentials.iter().map(|(_, w)| w).sum::<i32>().max(0);
-        if total_weight > 0 {
-            let mut remaining = random.next_bounded_i32(total_weight);
-            for (entry_type, weight) in &potentials {
-                if remaining < *weight {
-                    if let Some(et) = entry_type {
-                        self.entity_type.store(Some(et));
+        let total_weight = potentials
+            .iter()
+            .try_fold(0i32, |acc, (_, w)| acc.checked_add(*w));
+        if let Some(total_weight) = total_weight {
+            if total_weight > 0 {
+                let mut remaining = random.next_bounded_i32(total_weight);
+                for (entry_type, weight) in &potentials {
+                    if remaining < *weight {
+                        if let Some(et) = entry_type {
+                            self.entity_type.store(Some(et));
+                        }
+                        break;
                     }
-                    break;
+                    remaining -= weight;
                 }
-                remaining -= weight;
             }
+        } else {
+            tracing::warn!(
+                "Mob spawner at {pos} has spawn potential weight overflow, skipping random draw",
+                pos = self.position
+            );
         }
         drop(random);
 
@@ -328,6 +339,58 @@ impl MobSpawnerBlockEntity {
 
     pub fn set_entity_type(&self, entity_type: &'static EntityType) {
         self.entity_type.store(Some(entity_type));
+        if self.potentials_aliased_default.load(Ordering::Relaxed) {
+            let mut potentials = self
+                .spawn_potentials
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            if potentials.len() == 1 {
+                potentials[0].0 = Some(entity_type);
+            }
+        }
+    }
+
+    /// Parse `SpawnPotentials` from an NBT list.
+    /// Returns `(entries, aliased_default)` where `aliased_default` is true when
+    /// the list is absent or any entry fails to parse. An empty list is valid.
+    fn parse_spawn_potentials(
+        list: Option<&[pumpkin_nbt::tag::NbtTag]>,
+        entity_type: Option<&'static EntityType>,
+    ) -> (Vec<(Option<&'static EntityType>, i32)>, bool) {
+        let Some(list) = list else {
+            return (vec![(entity_type, 1)], true);
+        };
+
+        let mut entries: Vec<(Option<&'static EntityType>, i32)> = Vec::with_capacity(list.len());
+        for tag in list {
+            let Some(entry) = tag.extract_compound() else {
+                return (vec![(entity_type, 1)], true);
+            };
+            let Some(weight) = entry.get_int("weight") else {
+                return (vec![(entity_type, 1)], true);
+            };
+            if weight < 0 {
+                return (vec![(entity_type, 1)], true);
+            }
+            let et = entry
+                .get_compound("data")
+                .and_then(|data| {
+                    data.get_compound("entity")
+                        .and_then(|entity| entity.get_string("id"))
+                        .or_else(|| data.get_string("id"))
+                })
+                .or_else(|| {
+                    entry
+                        .get_compound("entity")
+                        .and_then(|entity| entity.get_string("id"))
+                })
+                .and_then(EntityType::from_name);
+            if et.is_none() {
+                return (vec![(entity_type, 1)], true);
+            }
+            entries.push((et, weight));
+        }
+        (entries, false)
     }
 }
 
@@ -395,34 +458,8 @@ impl BlockEntity for MobSpawnerBlockEntity {
             .and_then(EntityType::from_name);
 
         // Parse SpawnPotentials from NBT, or default to one entry.
-        let spawn_potentials = nbt.get_list("SpawnPotentials").map_or_else(
-            || {
-                // No SpawnPotentials: one entry from the entity_type we already resolved.
-                vec![(entity_type, 1)]
-            },
-            |list| {
-                list.iter()
-                    .filter_map(|tag| {
-                        let entry = tag.extract_compound()?;
-                        let weight = entry.get_int("weight").map_or(1, |w| w.max(0));
-                        let et = entry
-                            .get_compound("data")
-                            .and_then(|data| {
-                                data.get_compound("entity")
-                                    .and_then(|entity| entity.get_string("id"))
-                                    .or_else(|| data.get_string("id"))
-                            })
-                            .or_else(|| {
-                                entry
-                                    .get_compound("entity")
-                                    .and_then(|entity| entity.get_string("id"))
-                            })
-                            .and_then(EntityType::from_name);
-                        Some((et, weight))
-                    })
-                    .collect()
-            },
-        );
+        let (spawn_potentials, potentials_aliased_default) =
+            Self::parse_spawn_potentials(nbt.get_list("SpawnPotentials"), entity_type);
 
         Self {
             position,
@@ -435,6 +472,7 @@ impl BlockEntity for MobSpawnerBlockEntity {
             required_player_range,
             entity_type: AtomicCell::new(entity_type),
             spawn_potentials: Mutex::new(spawn_potentials),
+            potentials_aliased_default: AtomicBool::new(potentials_aliased_default),
         }
     }
 
