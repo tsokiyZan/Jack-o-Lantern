@@ -1418,6 +1418,7 @@ impl StructurePieceBase for MineShaftCorridor {
                     entity.put_string("id", "minecraft:cave_spider".to_string());
                     spawn_data.put_compound("entity", entity);
                     nbt.put_compound("SpawnData", spawn_data);
+                    nbt.put_list("SpawnPotentials", Vec::new());
                     chunk.add_block_entity(nbt);
                 }
             }

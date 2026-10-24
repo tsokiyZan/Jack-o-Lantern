@@ -8,7 +8,7 @@ use pumpkin_data::{entity::EntityType, world::WorldEvent};
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_nbt::tag::NbtTag;
 use pumpkin_util::math::{boundingbox::BoundingBox, position::BlockPos, vector3::Vector3};
-use pumpkin_util::random::RandomImpl;
+use pumpkin_util::random::{RandomImpl, legacy_rand::LegacyRand};
 
 use crate::{
     block::entities::BlockEntity, entity::EntityBase, entity::mob::spawn::finalize_spawn,
@@ -101,34 +101,20 @@ impl MobSpawnerBlockEntity {
 }
 
 impl MobSpawnerBlockEntity {
-    /// Vanilla `BaseSpawner.delay`.
+    /// Picks a spawn entity from `spawn_potentials` using weighted random.
     /// Total weight 0 draws nothing (matching vanilla WeightedList.getRandom).
-    fn delay(&self, world: &Arc<World>) {
-        let min_delay = self.min_delay;
-        let max_delay = self.max_delay;
-        let potentials = self
-            .spawn_potentials
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone();
-        let mut random = world
-            .random
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let new_delay = if max_delay <= min_delay {
-            min_delay
-        } else {
-            min_delay + random.next_bounded_i32(max_delay - min_delay)
-        };
-
-        // Spawn potential selection (vanilla spawnPotentials.getRandom).
+    fn pick_spawn_potential(
+        &self,
+        potentials: &[(Option<&'static EntityType>, i32)],
+        random: &mut LegacyRand,
+    ) {
         let total_weight = potentials
             .iter()
             .try_fold(0i32, |acc, (_, w)| acc.checked_add(*w));
         if let Some(total_weight) = total_weight {
             if total_weight > 0 {
                 let mut remaining = random.next_bounded_i32(total_weight);
-                for (entry_type, weight) in &potentials {
+                for (entry_type, weight) in potentials {
                     if remaining < *weight {
                         if let Some(et) = entry_type {
                             self.entity_type.store(Some(et));
@@ -144,6 +130,30 @@ impl MobSpawnerBlockEntity {
                 pos = self.position
             );
         }
+    }
+
+    fn potentials_snapshot(&self) -> Vec<(Option<&'static EntityType>, i32)> {
+        self.spawn_potentials
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+    }
+
+    /// Vanilla `BaseSpawner.delay`.
+    fn delay(&self, world: &Arc<World>) {
+        let min_delay = self.min_delay;
+        let max_delay = self.max_delay;
+        let potentials = self.potentials_snapshot();
+        let mut random = world
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let new_delay = if max_delay <= min_delay {
+            min_delay
+        } else {
+            min_delay + random.next_bounded_i32(max_delay - min_delay)
+        };
+        self.pick_spawn_potential(&potentials, &mut random);
         drop(random);
 
         self.delay.store(new_delay, Ordering::Relaxed);
@@ -153,10 +163,6 @@ impl MobSpawnerBlockEntity {
     /// Vanilla `BaseSpawner.serverTick`.
     #[expect(clippy::too_many_lines)]
     fn server_tick(&self, world: &Arc<World>) {
-        let Some(entity_type) = self.entity_type.load() else {
-            return;
-        };
-
         // Check player proximity and spawner game rule.
         let center = self.position.to_centered_f64();
         if !world.has_nearby_alive_player(center, self.required_player_range as f64) {
@@ -176,6 +182,20 @@ impl MobSpawnerBlockEntity {
             self.delay.store(delay - 1, Ordering::Relaxed);
             return;
         }
+
+        // If no entity type is set, pick from spawn_potentials.
+        if self.entity_type.load().is_none() {
+            let potentials = self.potentials_snapshot();
+            let mut random = world
+                .random
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            self.pick_spawn_potential(&potentials, &mut random);
+        }
+        let Some(entity_type) = self.entity_type.load() else {
+            self.delay(world);
+            return;
+        };
 
         // Spawn loop.
         let spawn_range = self.spawn_range;
@@ -435,25 +455,6 @@ impl BlockEntity for MobSpawnerBlockEntity {
                     .and_then(|entity| entity.get_string("id"))
                     .or_else(|| data.get_string("id"))
             })
-            .or_else(|| {
-                nbt.get_list("SpawnPotentials")
-                    .and_then(|list| list.first())
-                    .and_then(|tag| tag.extract_compound())
-                    .and_then(|entry| {
-                        entry
-                            .get_compound("data")
-                            .and_then(|data| {
-                                data.get_compound("entity")
-                                    .and_then(|entity| entity.get_string("id"))
-                                    .or_else(|| data.get_string("id"))
-                            })
-                            .or_else(|| {
-                                entry
-                                    .get_compound("entity")
-                                    .and_then(|entity| entity.get_string("id"))
-                            })
-                    })
-            })
             .or_else(|| nbt.get_string("EntityId"))
             .and_then(EntityType::from_name);
 
@@ -483,6 +484,7 @@ impl BlockEntity for MobSpawnerBlockEntity {
     fn chunk_data_nbt(&self) -> Option<NbtCompound> {
         let mut nbt = NbtCompound::new();
         self.write_spawner_nbt(&mut nbt);
+        nbt.child_tags.remove("SpawnPotentials");
         Some(nbt)
     }
 

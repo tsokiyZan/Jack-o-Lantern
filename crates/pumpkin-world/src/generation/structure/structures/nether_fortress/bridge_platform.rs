@@ -141,6 +141,7 @@ impl StructurePieceBase for BridgePlatformPiece {
                 entity_nbt_inner.put_string("id", "minecraft:blaze".to_string());
                 spawn_entry.put_compound("entity", entity_nbt_inner);
                 entity_nbt.put_compound("SpawnData", spawn_entry);
+                entity_nbt.put_list("SpawnPotentials", Vec::new());
 
                 chunk.add_block_entity(entity_nbt);
             }
