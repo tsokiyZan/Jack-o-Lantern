@@ -1,11 +1,12 @@
 use std::sync::{
-    Arc,
+    Arc, Mutex,
     atomic::{AtomicI32, Ordering},
 };
 
 use crossbeam::atomic::AtomicCell;
 use pumpkin_data::{entity::EntityType, world::WorldEvent};
 use pumpkin_nbt::compound::NbtCompound;
+use pumpkin_nbt::tag::NbtTag;
 use pumpkin_util::math::{boundingbox::BoundingBox, position::BlockPos, vector3::Vector3};
 use pumpkin_util::random::RandomImpl;
 
@@ -24,6 +25,7 @@ pub struct MobSpawnerBlockEntity {
     pub max_nearby_entities: i32,
     pub required_player_range: i32,
     pub entity_type: AtomicCell<Option<&'static EntityType>>,
+    pub spawn_potentials: Mutex<Vec<(Option<&'static EntityType>, i32)>>,
 }
 
 impl MobSpawnerBlockEntity {
@@ -48,9 +50,11 @@ impl MobSpawnerBlockEntity {
             max_nearby_entities: Self::DEFAULT_MAX_NEARBY_ENTITIES,
             required_player_range: Self::DEFAULT_REQUIRED_PLAYER_RANGE,
             entity_type: AtomicCell::new(entity_type),
+            spawn_potentials: Mutex::new(Vec::new()),
         }
     }
 
+    /// Writes spawner data to NBT (used by `write_nbt` and `chunk_data_nbt`).
     pub fn write_spawner_nbt(&self, nbt: &mut NbtCompound) {
         nbt.put_short("Delay", self.delay.load(Ordering::Relaxed) as i16);
         nbt.put_short("MinSpawnDelay", self.min_delay as i16);
@@ -60,6 +64,7 @@ impl MobSpawnerBlockEntity {
         nbt.put_short("MaxNearbyEntities", self.max_nearby_entities as i16);
         nbt.put_short("RequiredPlayerRange", self.required_player_range as i16);
 
+        // SpawnData
         if let Some(entity_type) = self.entity_type.load() {
             let mut spawn_entry = NbtCompound::new();
 
@@ -70,14 +75,40 @@ impl MobSpawnerBlockEntity {
 
             nbt.put_compound("SpawnData", spawn_entry);
         }
+
+        // SpawnPotentials
+        let potentials = self
+            .spawn_potentials
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut entries: Vec<NbtTag> = Vec::with_capacity(potentials.len());
+        for (entity_type, weight) in potentials.iter() {
+            let mut entry = NbtCompound::new();
+            entry.put_int("weight", *weight);
+            let mut data = NbtCompound::new();
+            let mut entity_nbt = NbtCompound::new();
+            if let Some(et) = entity_type {
+                entity_nbt.put_string("id", format!("minecraft:{}", et.resource_name));
+            }
+            data.put_compound("entity", entity_nbt);
+            entry.put_compound("data", data);
+            entries.push(NbtTag::Compound(entry));
+        }
+        nbt.put_list("SpawnPotentials", entries);
     }
 }
 
 impl MobSpawnerBlockEntity {
     /// Vanilla `BaseSpawner.delay`.
+    /// Total weight 0 draws nothing (matching vanilla WeightedList.getRandom).
     fn delay(&self, world: &Arc<World>) {
         let min_delay = self.min_delay;
         let max_delay = self.max_delay;
+        let potentials = self
+            .spawn_potentials
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
         let mut random = world
             .random
             .lock()
@@ -87,8 +118,23 @@ impl MobSpawnerBlockEntity {
         } else {
             min_delay + random.next_bounded_i32(max_delay - min_delay)
         };
-        // Pumpkin has no spawn potentials list: skip the potential selection step.
+
+        // Spawn potential selection (vanilla spawnPotentials.getRandom).
+        let total_weight: i32 = potentials.iter().map(|(_, w)| w).sum::<i32>().max(0);
+        if total_weight > 0 {
+            let mut remaining = random.next_bounded_i32(total_weight);
+            for (entry_type, weight) in &potentials {
+                if remaining < *weight {
+                    if let Some(et) = entry_type {
+                        self.entity_type.store(Some(et));
+                    }
+                    break;
+                }
+                remaining -= weight;
+            }
+        }
         drop(random);
+
         self.delay.store(new_delay, Ordering::Relaxed);
         world.add_synced_block_event(self.position, 1, 0);
     }
@@ -100,7 +146,7 @@ impl MobSpawnerBlockEntity {
             return;
         };
 
-        // Step 1: Check player proximity and spawner game rule.
+        // Check player proximity and spawner game rule.
         let center = self.position.to_centered_f64();
         if !world.has_nearby_alive_player(center, self.required_player_range as f64) {
             return;
@@ -109,7 +155,7 @@ impl MobSpawnerBlockEntity {
             return;
         }
 
-        // Step 2: Handle delay.
+        // Handle delay.
         let mut delay = self.delay.load(Ordering::Relaxed);
         if delay == -1 {
             self.delay(world);
@@ -120,46 +166,22 @@ impl MobSpawnerBlockEntity {
             return;
         }
 
-        // Step 3: Spawn loop.
+        // Spawn loop.
         let spawn_range = self.spawn_range;
         let max_nearby = self.max_nearby_entities;
         let mut spawned_any = false;
         let mut cancelled_any = false;
 
         for _ in 0..self.spawn_count {
-            // Draw spawn position from level random (one lock per draw).
+            // Draw spawn position from level random (single lock).
             let mut rng = world
                 .random
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             let a = rng.next_f64();
-            drop(rng);
-
-            let mut rng = world
-                .random
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
             let b = rng.next_f64();
-            drop(rng);
-
-            let mut rng = world
-                .random
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
             let y_rand = rng.next_bounded_i32(3);
-            drop(rng);
-
-            let mut rng = world
-                .random
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
             let c = rng.next_f64();
-            drop(rng);
-
-            let mut rng = world
-                .random
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
             let d = rng.next_f64();
             drop(rng);
 
@@ -247,6 +269,7 @@ impl MobSpawnerBlockEntity {
                     continue;
                 }
                 // finalize_spawn for mobs only (keep existing behavior).
+                // TODO: support SpawnData NBT (`entity` tag, custom_spawn_rules, equipment).
                 finalize_spawn(
                     &entity,
                     world,
@@ -297,7 +320,7 @@ impl MobSpawnerBlockEntity {
             spawned_any = true;
         }
 
-        // Step 4: After loop, delay if anything spawned or was cancelled.
+        // After loop, delay if anything spawned or was cancelled.
         if spawned_any || cancelled_any {
             self.delay(world);
         }
@@ -371,6 +394,36 @@ impl BlockEntity for MobSpawnerBlockEntity {
             .or_else(|| nbt.get_string("EntityId"))
             .and_then(EntityType::from_name);
 
+        // Parse SpawnPotentials from NBT, or default to one entry.
+        let spawn_potentials = nbt.get_list("SpawnPotentials").map_or_else(
+            || {
+                // No SpawnPotentials: one entry from the entity_type we already resolved.
+                vec![(entity_type, 1)]
+            },
+            |list| {
+                list.iter()
+                    .filter_map(|tag| {
+                        let entry = tag.extract_compound()?;
+                        let weight = entry.get_int("weight").map_or(1, |w| w.max(0));
+                        let et = entry
+                            .get_compound("data")
+                            .and_then(|data| {
+                                data.get_compound("entity")
+                                    .and_then(|entity| entity.get_string("id"))
+                                    .or_else(|| data.get_string("id"))
+                            })
+                            .or_else(|| {
+                                entry
+                                    .get_compound("entity")
+                                    .and_then(|entity| entity.get_string("id"))
+                            })
+                            .and_then(EntityType::from_name);
+                        Some((et, weight))
+                    })
+                    .collect()
+            },
+        );
+
         Self {
             position,
             delay: AtomicI32::new(delay),
@@ -381,6 +434,7 @@ impl BlockEntity for MobSpawnerBlockEntity {
             max_nearby_entities,
             required_player_range,
             entity_type: AtomicCell::new(entity_type),
+            spawn_potentials: Mutex::new(spawn_potentials),
         }
     }
 
@@ -389,26 +443,9 @@ impl BlockEntity for MobSpawnerBlockEntity {
     }
 
     fn chunk_data_nbt(&self) -> Option<NbtCompound> {
-        let mut final_nbt = NbtCompound::new();
-        final_nbt.put_short("Delay", self.delay.load(Ordering::Relaxed) as i16);
-        final_nbt.put_short("MinSpawnDelay", self.min_delay as i16);
-        final_nbt.put_short("MaxSpawnDelay", self.max_delay as i16);
-        final_nbt.put_short("SpawnCount", self.spawn_count as i16);
-        final_nbt.put_short("SpawnRange", self.spawn_range as i16);
-        final_nbt.put_short("MaxNearbyEntities", self.max_nearby_entities as i16);
-        final_nbt.put_short("RequiredPlayerRange", self.required_player_range as i16);
-
-        if let Some(entity_type) = self.entity_type.load() {
-            let mut spawn_entry = NbtCompound::new();
-
-            let mut entity_nbt = NbtCompound::new();
-            entity_nbt.put_string("id", format!("minecraft:{}", entity_type.resource_name));
-
-            spawn_entry.put_compound("entity", entity_nbt);
-
-            final_nbt.put_compound("SpawnData", spawn_entry);
-        }
-        Some(final_nbt)
+        let mut nbt = NbtCompound::new();
+        self.write_spawner_nbt(&mut nbt);
+        Some(nbt)
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
