@@ -301,6 +301,9 @@ impl EntityBase for TridentEntity {
         {
             super::on_hit(caller, h);
         }
+
+        // `Entity.tick` → `baseTick` → `checkBelowWorld`: discard if below world.
+        entity.check_out_of_world(caller);
     }
 
     fn get_entity(&self) -> &Entity {

@@ -369,7 +369,7 @@ impl EntityBase for ShulkerBulletEntity {
         true
     }
     #[allow(clippy::too_many_lines)]
-    fn tick(&self, _caller: &dyn EntityBase, _server: &Server) {
+    fn tick(&self, caller: &dyn EntityBase, _server: &Server) {
         if self.has_hit.load(Ordering::Relaxed) {
             return;
         }
@@ -616,5 +616,8 @@ impl EntityBase for ShulkerBulletEntity {
                 }
             }
         }
+
+        // `Entity.tick` → `baseTick` → `checkBelowWorld`: discard if below world.
+        entity.check_out_of_world(caller);
     }
 }

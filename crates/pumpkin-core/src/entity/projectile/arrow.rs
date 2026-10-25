@@ -875,6 +875,9 @@ impl EntityBase for ArrowEntity {
                 }
             }
         }
+
+        // `Entity.tick` → `baseTick` → `checkBelowWorld`: discard if below world.
+        entity.check_out_of_world(caller);
     }
 
     #[allow(clippy::too_many_lines)]
