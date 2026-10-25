@@ -47,7 +47,7 @@ pub struct Ticker;
 
 impl Ticker {
     /// Runs the main server tick loop on a dedicated thread.
-    pub fn run(server: &Arc<Server>) {
+    pub fn run(server: &Arc<Server>, watchdog_state: &Arc<crate::server::watchdog::WatchdogState>) {
         let _guard = server.runtime.enter();
         // Single monotonic base, the schedule is plain nanosecond arithmetic.
         let base = Instant::now();
@@ -62,6 +62,9 @@ impl Ticker {
         });
 
         'ticker: loop {
+            // Record the tick start for the watchdog before any work begins.
+            watchdog_state.record_tick_start();
+
             // Doubles as the tick-duration start, so the loop reads the clock twice.
             let tick_start_nanos = elapsed_nanos(base);
             let manager = &server.tick_rate_manager;

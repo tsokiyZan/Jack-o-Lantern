@@ -63,6 +63,7 @@ pub mod seasonal_events;
 pub mod server_test_manager;
 pub mod tick_rate_manager;
 pub mod ticker;
+pub mod watchdog;
 
 pub use recipe::RecipeManager;
 

@@ -331,12 +331,24 @@ impl PumpkinServer {
         };
 
         // Ticker
+        let watchdog_state = Arc::new(crate::server::watchdog::WatchdogState::new());
+
+        // Spawn the watchdog thread before the ticker, so it can observe ticks.
+        if let Err(err) = crate::server::watchdog::spawn(
+            server.advanced_config.max_tick_time,
+            watchdog_state.clone(),
+        ) {
+            error!("Failed to spawn Server Watchdog thread: {err}");
+            std::process::exit(1);
+        }
+
         {
             let ticker_server = server.clone();
+            let ticker_watchdog = watchdog_state.clone();
             if let Err(err) = std::thread::Builder::new()
                 .name("Server-Ticker".into())
                 .spawn(move || {
-                    Ticker::run(&ticker_server);
+                    Ticker::run(&ticker_server, &ticker_watchdog);
                 })
             {
                 error!("Failed to spawn Server-Ticker thread: {err}");
