@@ -1,10 +1,10 @@
 //! Server watchdog: forcibly shuts down the process when a single tick exceeds
 //! `max_tick_time` milliseconds, mirroring vanilla's `ServerWatchdog`.
 //!
-//! The ticker writes the monotonic start time of each tick into a shared
-//! `AtomicU64`.  The watchdog reads that value, checks whether the server has
-//! been inside a tick longer than the allowed limit, and calls `exit(1)` when
-//! it has.
+//! The ticker calls [`WatchdogState::begin_tick`] at the start of each tick,
+//! storing the monotonic start time and an `in_tick` flag.  The watchdog
+//! reads those values, checks whether the server has been inside a tick
+//! longer than the allowed limit, and calls `process::exit(1)` when it has.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -31,25 +31,15 @@ pub struct WatchdogState {
 
 impl Default for WatchdogState {
     fn default() -> Self {
-        Self::new()
+        Self::new(0)
     }
 }
 
 impl WatchdogState {
+    /// Create a new watchdog state with the given maximum tick time in
+    /// milliseconds.  Pass `0` to disable the watchdog entirely.
     #[must_use]
-    pub fn new() -> Self {
-        let max_tick_time_nanos = (50i64 * 1_000_000) as u64;
-        Self {
-            base: Instant::now(),
-            tick_start_nanos: AtomicU64::new(0),
-            in_tick: AtomicBool::new(false),
-            max_tick_time_nanos,
-        }
-    }
-
-    /// Create a state with a custom maximum tick time.
-    #[must_use]
-    pub fn with_max_tick_time(max_tick_time_ms: i64) -> Self {
+    pub fn new(max_tick_time_ms: i64) -> Self {
         let max_tick_time_nanos = if max_tick_time_ms <= 0 {
             0
         } else {
@@ -151,12 +141,16 @@ pub fn stalled(
 /// `tick_start + max_tick_time` each iteration.  When a stall is detected it
 /// logs the vanilla messages, dumps thread names, and calls `process::exit(1)`.
 ///
+/// `milliseconds_per_tick` is a closure that returns the current
+/// milliseconds-per-tick value, so that changes to the tick rate are reflected
+/// in the stall message.
+///
 /// `stop_check` is a closure that returns `true` when the server is shutting down.
 ///
 /// Returns `Err` if the thread could not be spawned (extremely rare).
 pub fn spawn(
     max_tick_time_ms: i64,
-    milliseconds_per_tick: f64,
+    milliseconds_per_tick: Arc<dyn Fn() -> f64 + Send + Sync>,
     state: Arc<WatchdogState>,
     stop_check: Arc<dyn Fn() -> bool + Send + Sync>,
 ) -> std::io::Result<()> {
@@ -166,13 +160,20 @@ pub fn spawn(
 
     std::thread::Builder::new()
         .name("Server Watchdog".into())
-        .spawn(move || run(max_tick_time_ms, milliseconds_per_tick, &state, &stop_check))
+        .spawn(move || {
+            run(
+                max_tick_time_ms,
+                &milliseconds_per_tick,
+                &state,
+                &stop_check,
+            );
+        })
         .map(|_| ())
 }
 
 fn run(
-    max_tick_time_ms: i64,
-    milliseconds_per_tick: f64,
+    _max_tick_time_ms: i64,
+    milliseconds_per_tick: &Arc<dyn Fn() -> f64 + Send + Sync>,
     state: &Arc<WatchdogState>,
     stop_check: &Arc<dyn Fn() -> bool + Send + Sync>,
 ) {
@@ -191,9 +192,9 @@ fn run(
         {
             // Stalled — log vanilla messages and exit.
             error!(
-                "A single server tick took {:.2} seconds (should be max {:.4})",
+                "A single server tick took {:.2} seconds (should be max {})",
                 elapsed_seconds,
-                milliseconds_per_tick / 1000.0
+                milliseconds_per_tick() / 1000.0
             );
             error!("Considering it to be crashed, server will forcibly shutdown.");
             thread_dump();
@@ -208,7 +209,7 @@ fn run(
             let remaining_ms = remaining_ns / 1_000_000;
             remaining_ms.max(1)
         } else {
-            let max_sleep_ms = u64::try_from(max_tick_time_ms).unwrap_or(u64::MAX);
+            let max_sleep_ms = max_tick_time_nanos / 1_000_000;
             max_sleep_ms.min(1000)
         };
 
@@ -295,7 +296,7 @@ mod tests {
     /// Test begin_tick / end_tick flow with a real WatchdogState.
     #[test]
     fn begin_tick_and_end_tick_flow() {
-        let state = WatchdogState::with_max_tick_time(50);
+        let state = WatchdogState::new(50);
 
         // Before begin_tick: not in tick
         assert!(!state.in_tick());
@@ -313,7 +314,7 @@ mod tests {
 
         // Decision after end_tick should not be stalled
         let now = state.now_nanos();
-        let result = stalled(true, start, now, state.max_tick_time_nanos());
+        let result = stalled(state.in_tick(), start, now, state.max_tick_time_nanos());
         // elapsed is tiny, so not stalled
         assert!(result.is_none());
     }
@@ -321,7 +322,7 @@ mod tests {
     /// Test that the decision function works with controllable time values.
     #[test]
     fn controllable_time_stalled_while_in_tick_past_max() {
-        let state = WatchdogState::with_max_tick_time(50); // 50 ms = 50_000_000 ns
+        let state = WatchdogState::new(50); // 50 ms = 50_000_000 ns
 
         state.begin_tick();
         let start = state.tick_start_nanos();
@@ -353,7 +354,7 @@ mod tests {
     /// Test that the RAII guard clears in_tick on drop.
     #[test]
     fn raii_guard_clears_in_tick() {
-        let state = Arc::new(WatchdogState::with_max_tick_time(50));
+        let state = Arc::new(WatchdogState::new(50));
 
         state.begin_tick();
         assert!(state.in_tick());
@@ -369,12 +370,34 @@ mod tests {
     /// Test WatchdogState with custom max tick time.
     #[test]
     fn custom_max_tick_time() {
-        let state = WatchdogState::with_max_tick_time(100); // 100 ms
+        let state = WatchdogState::new(100); // 100 ms
         assert_eq!(state.max_tick_time_nanos(), 100_000_000);
 
-        let state2 = WatchdogState::with_max_tick_time(-1);
+        let state2 = WatchdogState::new(-1);
         // Negative value should result in 0 (disabled)
         assert_eq!(state2.max_tick_time_nanos(), 0);
+    }
+
+    /// Test that max_tick_time is respected in the stalled decision.
+    #[test]
+    fn max_tick_time_respected_in_stalled() {
+        // State with 60000 ms max: a tick that started 100 ms ago is NOT stalled.
+        let state = WatchdogState::new(60_000); // 60000 ms = 60_000_000_000 ns
+        assert_eq!(state.max_tick_time_nanos(), 60_000_000_000);
+        let result = stalled(true, 0, 100_000_000, state.max_tick_time_nanos());
+        assert!(
+            result.is_none(),
+            "100 ms elapsed should not stall with 60000 ms limit"
+        );
+
+        // State with 1000 ms max: a tick that started 2000 ms ago IS stalled.
+        let state2 = WatchdogState::new(1_000); // 1000 ms = 1_000_000_000 ns
+        assert_eq!(state2.max_tick_time_nanos(), 1_000_000_000);
+        let result2 = stalled(true, 0, 2_000_000_000, state2.max_tick_time_nanos());
+        assert!(
+            result2.is_some(),
+            "2000 ms elapsed should stall with 1000 ms limit"
+        );
     }
 
     /// Test stalled function with max_tick_time_nanos = 0 (disabled).
@@ -390,7 +413,6 @@ mod tests {
         // tick_start is near u64::MAX, now wraps to small value
         let tick_start: u64 = u64::MAX - 100;
         let now: u64 = 50;
-        let _elapsed = now.wrapping_sub(tick_start);
         // wrapping_sub gives 150, which is small
         // Use a very small max to trigger the stall
         let result = stalled(true, tick_start, now, 100);
