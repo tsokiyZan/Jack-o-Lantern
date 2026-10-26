@@ -43,7 +43,9 @@ impl WatchdogState {
         let max_tick_time_nanos = if max_tick_time_ms <= 0 {
             0
         } else {
-            u64::try_from(max_tick_time_ms).unwrap_or(u64::MAX) * 1_000_000
+            u64::try_from(max_tick_time_ms)
+                .unwrap_or(u64::MAX)
+                .saturating_mul(1_000_000)
         };
         Self {
             base: Instant::now(),
@@ -161,18 +163,12 @@ pub fn spawn(
     std::thread::Builder::new()
         .name("Server Watchdog".into())
         .spawn(move || {
-            run(
-                max_tick_time_ms,
-                &milliseconds_per_tick,
-                &state,
-                &stop_check,
-            );
+            run(&milliseconds_per_tick, &state, &stop_check);
         })
         .map(|_| ())
 }
 
 fn run(
-    _max_tick_time_ms: i64,
     milliseconds_per_tick: &Arc<dyn Fn() -> f64 + Send + Sync>,
     state: &Arc<WatchdogState>,
     stop_check: &Arc<dyn Fn() -> bool + Send + Sync>,
@@ -192,7 +188,7 @@ fn run(
         {
             // Stalled — log vanilla messages and exit.
             error!(
-                "A single server tick took {:.2} seconds (should be max {})",
+                "A single server tick took {:.2} seconds (should be max {:.2})",
                 elapsed_seconds,
                 milliseconds_per_tick() / 1000.0
             );
@@ -405,6 +401,28 @@ mod tests {
     fn stalled_disabled_max() {
         let result = stalled(true, 0, u64::MAX, 0);
         assert!(result.is_none());
+    }
+
+    /// Test that new(i64::MAX) does not panic and the limit does not stall
+    /// immediately (saturating_mul prevents overflow).
+    #[test]
+    fn new_i64_max_does_not_panic() {
+        let state = WatchdogState::new(i64::MAX);
+        // max_tick_time_nanos should be u64::MAX * 1_000_000 = saturated
+        assert_eq!(state.max_tick_time_nanos(), u64::MAX);
+
+        // After beginning a tick, the elapsed time should not exceed the limit
+        // within 100 ms of real time.
+        state.begin_tick();
+        let start = state.tick_start_nanos();
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        let now = state.now_nanos();
+        let _elapsed = now.wrapping_sub(start);
+        let result = stalled(state.in_tick(), start, now, state.max_tick_time_nanos());
+        assert!(
+            result.is_none(),
+            "100 ms should not stall with i64::MAX limit"
+        );
     }
 
     /// Test wrapping subtraction edge case.
