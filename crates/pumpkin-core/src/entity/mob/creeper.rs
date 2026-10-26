@@ -13,7 +13,7 @@ use pumpkin_protocol::codec::var_int::VarInt;
 use pumpkin_util::random::RandomImpl;
 
 use crate::entity::{
-    as_entity_base, Entity, EntityBase,
+    Entity, EntityBase,
     ai::goal::{
         active_target::ActiveTargetGoal, avoid_entity::AvoidEntityGoal,
         creeper_ignite::CreeperIgniteGoal, look_around::RandomLookAroundGoal,
@@ -375,9 +375,9 @@ impl Mob for CreeperEntity {
             victim_living.drop_from_loot_table(
                 CHARGED_CREEPER_LOOT_TABLE,
                 &LootContextParameters {
-                    this_entity: Some(as_entity_base(&victim.get_entity().entity_type)),
-                    killer_entity: Some(as_entity_base(&living.entity.entity_type)),
-                    direct_killer_entity: Some(as_entity_base(&living.entity.entity_type)),
+                    this_entity: Some(victim),
+                    killer_entity: Some(living),
+                    direct_killer_entity: Some(living),
                     position: Some(victim.get_entity().pos.load()),
                     ..Default::default()
                 },

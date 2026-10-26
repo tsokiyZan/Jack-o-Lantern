@@ -17,7 +17,7 @@ use crate::entity::item::ItemEntity;
 use crate::entity::mob::spawn::SpawnGroupData;
 use crate::entity::player::Player;
 use crate::entity::{
-    as_entity_base, Entity, EntityBase,
+    Entity, EntityBase, as_entity_base,
     mob::{Mob, MobEntity, equipment::RegionalDifficulty, skeleton::SkeletonEntityBase},
 };
 use crate::world::World;

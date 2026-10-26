@@ -36,13 +36,14 @@ use crate::entity::mob::is_monster;
 use crate::entity::mob::spawn::SpawnGroupData;
 use crate::entity::r#type::from_type;
 use crate::entity::{
-    as_entity_base, Entity, EntityBase,
+    Entity, EntityBase,
     ageable::{AgeableData, AgeableMob},
     ai::goal::{
         breed::BreedGoal, escape_danger::EscapeDangerGoal, follow_parent::FollowParentGoal,
         look_around::RandomLookAroundGoal, look_at_entity::LookAtEntityGoal, swim::SwimGoal,
         tempt::TemptGoal, wander_around::WanderAroundGoal,
     },
+    as_entity_base,
     mob::{Mob, MobEntity},
     passive::animal::{Animal, set_animal_pathfinding_malus},
     player::Player,

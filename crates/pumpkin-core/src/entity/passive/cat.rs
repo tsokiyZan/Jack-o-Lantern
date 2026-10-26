@@ -39,7 +39,7 @@ use crate::entity::mob::spawn::SpawnGroupData;
 use crate::entity::passive::animal::{animal_can_mate, get_mixed_color};
 use crate::entity::r#type::from_type;
 use crate::entity::{
-    as_entity_base, Entity, EntityBase,
+    Entity, EntityBase,
     ai::goal::{
         active_target::{ActiveTargetGoal, NonTameRandomTargetGoal},
         avoid_entity::AvoidEntityGoal,
@@ -54,6 +54,7 @@ use crate::entity::{
         tempt::TemptGoal,
         wander_around::WanderAroundGoal,
     },
+    as_entity_base,
     mob::{Mob, MobEntity},
     passive::{
         animal::{Animal, set_animal_pathfinding_malus},

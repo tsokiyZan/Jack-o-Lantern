@@ -23,7 +23,7 @@ use pumpkin_util::math::{boundingbox::BoundingBox, position::BlockPos, vector3::
 use pumpkin_util::random::RandomImpl;
 
 use crate::entity::{
-    as_entity_base, Entity, EntityBase,
+    Entity, EntityBase,
     ai::{
         goal::{
             active_target::ActiveTargetGoal, chase_player::ChasePlayerGoal,
@@ -35,6 +35,7 @@ use crate::entity::{
         },
         pathfinder::node::PathType,
     },
+    as_entity_base,
     mob::{
         Mob, MobEntity,
         neutral::{NeutralData, NeutralMob},

@@ -429,7 +429,7 @@ impl<R: Fn(&str) -> Option<Value>> Parser<'_, R> {
                     "enchanted_count_increase" | "looting_enchant" => {
                         LootFunctionKind::EnchantedCountIncrease {
                             count: provider(function.get("count")?)?,
-                            limit: function.get("limit").and_then(number).unwrap_or(0),
+                            limit: function.get("limit").and_then(number).map(|v| v as i32),
                         }
                     }
                     "limit_count" => {

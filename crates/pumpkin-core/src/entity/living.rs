@@ -23,7 +23,7 @@ use std::sync::atomic::{
 
 use super::breath::BreathManager;
 use super::experience_orb::ExperienceOrbEntity;
-use super::{Entity, EntityBase, NBTStorageInit};
+use super::{as_entity_base, Entity, EntityBase, NBTStorageInit};
 use crate::enchantment::EnchantmentHelper;
 use crate::entity::NBTStorage;
 use crate::entity::ageable::AgeableMob;
@@ -2984,9 +2984,9 @@ impl LivingEntity {
                 .filter(|hand_stack| !hand_stack.is_empty());
             let params = LootContextParameters {
                 killed_by_player: Some(player_killed),
-                this_entity: Some(as_entity_base(&self.entity.entity_type)),
+                this_entity: Some(self),
                 // `ATTACKING_ENTITY`: `source.getEntity()`.
-                killer_entity: cause.map(|c| c.get_entity().entity_type),
+                killer_entity: cause.map(|c| c.get_entity()),
                 attacking_entity_looting_level: cause
                     .and_then(|cause| {
                         cause.get_living_entity().map(|living| {
@@ -2998,7 +2998,7 @@ impl LivingEntity {
                         })
                     })
                     .unwrap_or(0),
-                direct_killer_entity: source.map(|s| s.get_entity().entity_type),
+                direct_killer_entity: source.map(|s| s.get_entity()),
                 position: Some(self.entity.pos.load()),
                 world_time: world.get_time_of_day() as u64,
                 damage_type: Some(damage_type),
@@ -3349,7 +3349,7 @@ impl LivingEntity {
         self.drop_from_loot_table(
             key,
             &LootContextParameters {
-                this_entity: Some(as_entity_base(&self.entity.entity_type)),
+                this_entity: Some(self),
                 position: Some(self.entity.pos.load()),
                 ..Default::default()
             },
@@ -3367,7 +3367,7 @@ impl LivingEntity {
         self.drop_from_loot_table(
             key,
             &LootContextParameters {
-                this_entity: Some(as_entity_base(&self.entity.entity_type)),
+                this_entity: Some(self),
                 position: Some(self.entity.pos.load()),
                 tool: Some(tool.clone()),
                 ..Default::default()
@@ -3391,7 +3391,7 @@ impl LivingEntity {
             return;
         };
         let params = LootContextParameters {
-            this_entity: Some(as_entity_base(&self.entity.entity_type)),
+            this_entity: Some(self),
             position: Some(self.entity.pos.load()),
             tool: Some(tool.clone()),
             ..Default::default()
@@ -3406,7 +3406,7 @@ impl LivingEntity {
         self.drop_from_loot_table(
             key,
             &LootContextParameters {
-                this_entity: Some(as_entity_base(&self.entity.entity_type)),
+                this_entity: Some(self),
                 tool: Some(tool.clone()),
                 ..Default::default()
             },

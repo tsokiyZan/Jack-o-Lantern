@@ -207,6 +207,10 @@ impl Generator {
                     }
                     LootFunctionKind::EnchantedCountIncrease {count, limit} => {
                         let count = number_tokens(count);
+                        let limit = match limit {
+                            Some(v) => quote! { Some(#v as i32) },
+                            None => quote! { None },
+                        };
                         quote! {LootFunctionKind::EnchantedCountIncrease {count: #count, limit: #limit}}
                     }
                     LootFunctionKind::LimitCount {min, max} => {
@@ -262,10 +266,10 @@ impl Generator {
     fn table(&mut self, table: &DynamicLootTable) -> TokenStream {
         let pools: Vec<_> = table.pools.iter().map(|pool| self.pool(pool)).collect();
         let functions = self.functions(&table.functions);
-        let random_sequence = table.random_sequence.as_ref().map_or_else(
-            || quote! {None},
-            |seq| quote! {Some(#seq)},
-        );
+        let random_sequence = table
+            .random_sequence
+            .as_ref()
+            .map_or_else(|| quote! {None}, |seq| quote! {Some(#seq)});
         quote! { LootTable { pools: &[#(#pools),*], functions: #functions, random_sequence: #random_sequence } }
     }
 }

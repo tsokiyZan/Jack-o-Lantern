@@ -159,7 +159,10 @@ fn apply_count_function<R: RandomImpl>(
     rng: &mut R,
 ) -> i32 {
     match &function.kind {
-        LootFunctionKind::SetCount { count: provider, add } => {
+        LootFunctionKind::SetCount {
+            count: provider,
+            add,
+        } => {
             let new_count = evaluate_rolls(provider, rng);
             if *add {
                 base_count + new_count
@@ -173,11 +176,12 @@ fn apply_count_function<R: RandomImpl>(
                 return base_count;
             }
             let bonus = evaluate_rolls(count, rng);
-            let result = base_count + java_round_f32(level as f32 * rng.mth_next_float(0.0, 1.0)) + bonus;
+            let result =
+                base_count + java_round_f32(level as f32 * rng.mth_next_float(0.0, 1.0)) + bonus;
             limit.map_or(result, |lim| result.min(lim))
         }
         LootFunctionKind::LimitCount { min, max } => {
-            let mut result = count;
+            let mut result = base_count;
             if let Some(min_p) = min {
                 let min_val = evaluate_rolls(min_p, rng);
                 result = result.max(min_val);
@@ -188,7 +192,7 @@ fn apply_count_function<R: RandomImpl>(
             }
             result
         }
-        _ => count,
+        _ => base_count,
     }
 }
 
@@ -266,14 +270,36 @@ fn check_condition<R: RandomImpl>(
                 .is_some_and(|chance| rng.next_f32() < *chance)
         }
         LootCondition::AllOf(conditions) => conditions.iter().all(|c| {
-            check_condition(*c, has_silk_touch, has_shears, fortune_level, looting_level, params, rng)
+            check_condition(
+                *c,
+                has_silk_touch,
+                has_shears,
+                fortune_level,
+                looting_level,
+                params,
+                rng,
+            )
         }),
         LootCondition::AnyOf(conditions) => conditions.iter().any(|c| {
-            check_condition(*c, has_silk_touch, has_shears, fortune_level, looting_level, params, rng)
+            check_condition(
+                *c,
+                has_silk_touch,
+                has_shears,
+                fortune_level,
+                looting_level,
+                params,
+                rng,
+            )
         }),
-        LootCondition::Inverted(cond) => {
-            !check_condition(*cond, has_silk_touch, has_shears, fortune_level, looting_level, params, rng)
-        }
+        LootCondition::Inverted(cond) => !check_condition(
+            *cond,
+            has_silk_touch,
+            has_shears,
+            fortune_level,
+            looting_level,
+            params,
+            rng,
+        ),
         LootCondition::EntityOnFire => params.is_on_fire.unwrap_or(false),
         LootCondition::DirectAttackerWeaponEnchantment(tag) => {
             direct_attacker_weapon_has_enchantment(params, tag)
@@ -282,15 +308,11 @@ fn check_condition<R: RandomImpl>(
         LootCondition::EntityProperties { target, predicate } => {
             predicates::matches_entity(target, &*predicate, params)
         }
-        LootCondition::MatchBlock(predicate) => {
-            predicates::matches_block(&*predicate, params)
-        }
+        LootCondition::MatchBlock(predicate) => predicates::matches_block(&*predicate, params),
         LootCondition::LocationCheck { offset, predicate } => {
             predicates::matches_location(*offset, &*predicate, params)
         }
-        LootCondition::MatchTool(predicate) => {
-            predicates::matches_tool(&*predicate, params)
-        }
+        LootCondition::MatchTool(predicate) => predicates::matches_tool(&*predicate, params),
         LootCondition::WeatherCheck {
             raining,
             thundering,
@@ -310,14 +332,11 @@ fn check_condition<R: RandomImpl>(
         LootCondition::DamageSourceTag { tag, expected } => {
             // Simplified: check if the damage type matches the tag
             // Full implementation would need damage type tag resolution
-            params
-                .damage_type
-                .as_ref()
-                .map_or(expected, |dt| {
-                    // Tag match is handled at the datapack level; for now,
-                    // we treat unknown tags as not matching when expected=true
-                    expected
-                })
+            params.damage_type.as_ref().map_or(expected, |dt| {
+                // Tag match is handled at the datapack level; for now,
+                // we treat unknown tags as not matching when expected=true
+                expected
+            })
         }
     }
 }
@@ -417,16 +436,18 @@ fn evaluate_static<R: RandomImpl>(
                         {
                             // Use child's item
                             match &child.kind {
-                                LootEntryKind::Item(name) => return evaluate_entry(
-                                    name,
-                                    child,
-                                    has_silk_touch,
-                                    has_shears,
-                                    fortune_level,
-                                    looting_level,
-                                    params,
-                                    random,
-                                ),
+                                LootEntryKind::Item(name) => {
+                                    return evaluate_entry(
+                                        name,
+                                        child,
+                                        has_silk_touch,
+                                        has_shears,
+                                        fortune_level,
+                                        looting_level,
+                                        params,
+                                        random,
+                                    );
+                                }
                                 _ => continue,
                             }
                         }
@@ -532,7 +553,10 @@ fn evaluate_entry<R: RandomImpl>(
     }
 
     // Check for furnace_smelt function
-    let smelts = entry.functions.iter().any(|f| matches!(f.kind, LootFunctionKind::FurnaceSmelt));
+    let smelts = entry
+        .functions
+        .iter()
+        .any(|f| matches!(f.kind, LootFunctionKind::FurnaceSmelt));
 
     if count <= 0 {
         return Vec::new();
@@ -576,11 +600,13 @@ fn evaluate_entry_recursive<R: RandomImpl>(
     };
 
     if let Some(item_name) = item_name {
-        let item = Item::from_registry_key(item_name.strip_prefix("minecraft:").unwrap_or(item_name));
+        let item =
+            Item::from_registry_key(item_name.strip_prefix("minecraft:").unwrap_or(item_name));
         if let Some(item) = item {
             let mut count: i32 = 1;
             for func in entry.functions {
-                count = apply_count_function(count, func, fortune_level, looting_level, params, random);
+                count =
+                    apply_count_function(count, func, fortune_level, looting_level, params, random);
             }
             if count > 0 {
                 let stack = ItemStack::new(1, item);
@@ -641,11 +667,20 @@ fn evaluate_dynamic<R: RandomImpl>(
             // Handle different entry kinds
             match &entry.kind {
                 DynamicLootEntryKind::Item(item_name) => {
-                    let item = Item::from_registry_key(item_name.strip_prefix("minecraft:").unwrap_or(item_name));
+                    let item = Item::from_registry_key(
+                        item_name.strip_prefix("minecraft:").unwrap_or(item_name),
+                    );
                     if let Some(item) = item {
                         let mut count: i32 = 1;
                         for func in &entry.functions {
-                            count = apply_dynamic_count_function(count, func, fortune_level, looting_level, params, random);
+                            count = apply_dynamic_count_function(
+                                count,
+                                func,
+                                fortune_level,
+                                looting_level,
+                                params,
+                                random,
+                            );
                         }
                         if count > 0 {
                             let stack = ItemStack::new(1, item);
@@ -669,11 +704,20 @@ fn evaluate_dynamic<R: RandomImpl>(
                         ) && child.weight > 0
                         {
                             if let DynamicLootEntryKind::Item(name) = &child.kind {
-                                let item = Item::from_registry_key(name.strip_prefix("minecraft:").unwrap_or(name));
+                                let item = Item::from_registry_key(
+                                    name.strip_prefix("minecraft:").unwrap_or(name),
+                                );
                                 if let Some(item) = item {
                                     let mut count: i32 = 1;
                                     for func in &child.functions {
-                                        count = apply_dynamic_count_function(count, func, fortune_level, looting_level, params, random);
+                                        count = apply_dynamic_count_function(
+                                            count,
+                                            func,
+                                            fortune_level,
+                                            looting_level,
+                                            params,
+                                            random,
+                                        );
                                     }
                                     if count > 0 {
                                         let stack = ItemStack::new(1, item);
@@ -763,7 +807,10 @@ fn apply_dynamic_count_function<R: RandomImpl>(
     rng: &mut R,
 ) -> i32 {
     match &function.kind {
-        LootFunctionKind::SetCount { count: provider, add } => {
+        LootFunctionKind::SetCount {
+            count: provider,
+            add,
+        } => {
             let new_count = evaluate_rolls(provider, rng);
             if *add {
                 base_count + new_count
@@ -777,11 +824,12 @@ fn apply_dynamic_count_function<R: RandomImpl>(
                 return base_count;
             }
             let bonus = evaluate_rolls(count, rng);
-            let result = base_count + java_round_f32(level as f32 * rng.mth_next_float(0.0, 1.0)) + bonus;
+            let result =
+                base_count + java_round_f32(level as f32 * rng.mth_next_float(0.0, 1.0)) + bonus;
             limit.map_or(result, |lim| result.min(lim))
         }
         LootFunctionKind::LimitCount { min, max } => {
-            let mut result = count;
+            let mut result = base_count;
             if let Some(min_p) = min {
                 let min_val = evaluate_rolls(min_p, rng);
                 result = result.max(min_val);
@@ -792,7 +840,7 @@ fn apply_dynamic_count_function<R: RandomImpl>(
             }
             result
         }
-        _ => count,
+        _ => base_count,
     }
 }
 
@@ -812,11 +860,19 @@ fn evaluate_dynamic_entry_recursive<R: RandomImpl>(
     };
 
     if let Some(item_name) = item_name {
-        let item = Item::from_registry_key(item_name.strip_prefix("minecraft:").unwrap_or(item_name));
+        let item =
+            Item::from_registry_key(item_name.strip_prefix("minecraft:").unwrap_or(item_name));
         if let Some(item) = item {
             let mut count: i32 = 1;
             for func in &entry.functions {
-                count = apply_dynamic_count_function(count, func, fortune_level, looting_level, params, random);
+                count = apply_dynamic_count_function(
+                    count,
+                    func,
+                    fortune_level,
+                    looting_level,
+                    params,
+                    random,
+                );
             }
             if count > 0 {
                 let stack = ItemStack::new(1, item);
@@ -855,7 +911,8 @@ fn check_dynamic_condition<R: RandomImpl>(
         } => {
             let level = looting_level;
             let chance = if level > 0 {
-                *enchanted_chance_base + *enchanted_chance_per_level_above_first * (level - 1) as f32
+                *enchanted_chance_base
+                    + *enchanted_chance_per_level_above_first * (level - 1) as f32
             } else {
                 0.0
             };
@@ -868,14 +925,36 @@ fn check_dynamic_condition<R: RandomImpl>(
                 .is_some_and(|chance| rng.next_f32() < *chance)
         }
         DynamicLootCondition::AllOf(conditions) => conditions.iter().all(|c| {
-            check_dynamic_condition(c, has_silk_touch, has_shears, fortune_level, looting_level, params, rng)
+            check_dynamic_condition(
+                c,
+                has_silk_touch,
+                has_shears,
+                fortune_level,
+                looting_level,
+                params,
+                rng,
+            )
         }),
         DynamicLootCondition::AnyOf(conditions) => conditions.iter().any(|c| {
-            check_dynamic_condition(c, has_silk_touch, has_shears, fortune_level, looting_level, params, rng)
+            check_dynamic_condition(
+                c,
+                has_silk_touch,
+                has_shears,
+                fortune_level,
+                looting_level,
+                params,
+                rng,
+            )
         }),
-        DynamicLootCondition::Inverted(cond) => {
-            !check_dynamic_condition(cond, has_silk_touch, has_shears, fortune_level, looting_level, params, rng)
-        }
+        DynamicLootCondition::Inverted(cond) => !check_dynamic_condition(
+            cond,
+            has_silk_touch,
+            has_shears,
+            fortune_level,
+            looting_level,
+            params,
+            rng,
+        ),
         DynamicLootCondition::EntityOnFire => params.is_on_fire.unwrap_or(false),
         DynamicLootCondition::DirectAttackerWeaponEnchantment(tag) => {
             direct_attacker_weapon_has_enchantment(params, tag)
@@ -883,15 +962,11 @@ fn check_dynamic_condition<R: RandomImpl>(
         DynamicLootCondition::EntityProperties { target, predicate } => {
             predicates::matches_entity(*target, predicate, params)
         }
-        DynamicLootCondition::MatchBlock(predicate) => {
-            predicates::matches_block(predicate, params)
-        }
+        DynamicLootCondition::MatchBlock(predicate) => predicates::matches_block(predicate, params),
         DynamicLootCondition::LocationCheck { offset, predicate } => {
             predicates::matches_location(*offset, predicate, params)
         }
-        DynamicLootCondition::MatchTool(predicate) => {
-            predicates::matches_tool(predicate, params)
-        }
+        DynamicLootCondition::MatchTool(predicate) => predicates::matches_tool(predicate, params),
         DynamicLootCondition::WeatherCheck {
             raining,
             thundering,
@@ -909,13 +984,10 @@ fn check_dynamic_condition<R: RandomImpl>(
             true
         }
         DynamicLootCondition::DamageSourceTag { tag, expected } => {
-            params
-                .damage_type
-                .as_ref()
-                .map_or(*expected, |dt| {
-                    // Simplified tag matching
-                    *expected
-                })
+            params.damage_type.as_ref().map_or(*expected, |dt| {
+                // Simplified tag matching
+                *expected
+            })
         }
     }
 }
@@ -1098,7 +1170,8 @@ pub fn container_unpack_params(
                 .living_entity
                 .get_attribute_value(&pumpkin_data::attributes::Attributes::LUCK) as f32
         }),
-        this_entity: player.map(|player| player.living_entity.entity.get_entity() as &dyn EntityBase),
+        this_entity: player
+            .map(|player| player.living_entity.entity.get_entity() as &dyn EntityBase),
         ..Default::default()
     }
 }

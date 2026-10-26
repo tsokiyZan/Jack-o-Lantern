@@ -1,6 +1,6 @@
 use super::BlockEntity;
-use crate::entity::as_entity_base;
 use crate::entity::Entity;
+use crate::entity::as_entity_base;
 use crate::entity::item::ItemEntity;
 use crate::entity::living::LivingEntity;
 use crate::world::World;
