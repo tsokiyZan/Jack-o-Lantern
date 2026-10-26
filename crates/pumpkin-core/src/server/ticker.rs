@@ -63,7 +63,8 @@ impl Ticker {
 
         'ticker: loop {
             // Record the tick start for the watchdog before any work begins.
-            watchdog_state.record_tick_start();
+            watchdog_state.begin_tick();
+            let tick_guard = crate::server::watchdog::TickGuard::new(watchdog_state);
 
             // Doubles as the tick-duration start, so the loop reads the clock twice.
             let tick_start_nanos = elapsed_nanos(base);
@@ -132,6 +133,9 @@ impl Ticker {
             }
 
             server.update_tick_times(tick_duration_nanos);
+
+            // Drop the guard before STOP_INTERRUPT checks so in_tick is cleared.
+            drop(tick_guard);
 
             if STOP_INTERRUPT.is_cancelled() {
                 break 'ticker;

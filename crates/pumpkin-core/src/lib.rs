@@ -333,10 +333,19 @@ impl PumpkinServer {
         // Ticker
         let watchdog_state = Arc::new(crate::server::watchdog::WatchdogState::new());
 
+        // Compute milliseconds-per-tick for the watchdog message.
+        let manager = &server.tick_rate_manager;
+        let milliseconds_per_tick = manager.nanoseconds_per_tick() as f64 / 1_000_000.0;
+
         // Spawn the watchdog thread before the ticker, so it can observe ticks.
+        // Use SHOULD_STOP (a static AtomicBool) as the stop flag so the watchdog
+        // can break out of its loop during shutdown and never call exit(1) mid-save.
+        let stop_flag = Arc::new(|| SHOULD_STOP.load(Ordering::Relaxed));
         if let Err(err) = crate::server::watchdog::spawn(
             server.advanced_config.max_tick_time,
+            milliseconds_per_tick,
             watchdog_state.clone(),
+            stop_flag,
         ) {
             error!("Failed to spawn Server Watchdog thread: {err}");
             std::process::exit(1);
