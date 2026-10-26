@@ -17,7 +17,7 @@ use crate::entity::item::ItemEntity;
 use crate::entity::mob::spawn::SpawnGroupData;
 use crate::entity::player::Player;
 use crate::entity::{
-    Entity, EntityBase,
+    as_entity_base, Entity, EntityBase,
     mob::{Mob, MobEntity, equipment::RegionalDifficulty, skeleton::SkeletonEntityBase},
 };
 use crate::world::World;
@@ -76,7 +76,7 @@ impl BoggedSkeletonEntity {
         };
         let pos = entity.pos.load();
         let params = LootContextParameters {
-            this_entity: Some(entity.entity_type),
+            this_entity: Some(as_entity_base(&entity.entity_type)),
             position: Some(pos),
             tool: Some(tool.clone()),
             ..Default::default()

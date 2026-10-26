@@ -1,4 +1,5 @@
 use super::BlockEntity;
+use crate::entity::as_entity_base;
 use crate::entity::Entity;
 use crate::entity::item::ItemEntity;
 use crate::entity::living::LivingEntity;
@@ -140,7 +141,7 @@ impl BrushableBlockBlockEntity {
         let loot = world.get_loot_table(&key).map_or_else(Vec::new, |table| {
             let params = LootContextParameters {
                 luck: user.get_attribute_value(&Attributes::LUCK) as f32,
-                this_entity: Some(user.entity.entity_type),
+                this_entity: Some(as_entity_base(&user.entity.entity_type)),
                 tool: Some(brush.clone()),
                 ..container_unpack_params(self.position.to_centered_f64(), None)
             };

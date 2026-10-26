@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::entity::as_entity_base;
 use pumpkin_data::data_component_impl::{EquipmentSlot, SwingAnimationImpl};
 use pumpkin_data::entity::EntityType;
 use pumpkin_data::item::Item;
@@ -1098,7 +1099,7 @@ pub fn get_barter_response_items(tick: &BrainTick<'_>) -> Vec<ItemStack> {
         return Vec::new();
     };
     let params = LootContextParameters {
-        this_entity: Some(tick.mob.get_entity().entity_type),
+        this_entity: Some(as_entity_base(&tick.mob.get_entity().entity_type)),
         ..Default::default()
     };
     crate::world::loot::generate_loot_from_handle(&table, tick.world, 0, &params)

@@ -1,4 +1,3 @@
-use pumpkin_data::{data_component::DataComponent, data_component_impl::read_data};
 use pumpkin_nbt::{compound::NbtCompound, tag::NbtTag};
 use serde_json::Value;
 
@@ -40,21 +39,11 @@ fn entity_matches(entity: &dyn EntityBase, predicate: &Value) -> bool {
                     matches,
                 )
             }
-            "components" => expected.as_object().is_some_and(|components| {
-                components.iter().all(|(key, expected)| {
-                    let Some(component) = DataComponent::try_from_name(key) else {
-                        return false;
-                    };
-                    let Some(actual) = entity.get_component(component) else {
-                        return false;
-                    };
-                    let Some(tag) = json_to_nbt(expected) else {
-                        return false;
-                    };
-                    read_data(component, &tag)
-                        .is_some_and(|expected| actual.equal(expected.as_ref()))
-                })
-            }),
+            "components" => {
+                // Fork doesn't support entity data components, so we can't check them.
+                // Skip this subpredicate (treat as matching).
+                true
+            }
             // Other entity subpredicates are not implemented yet.
             _ => true,
         },

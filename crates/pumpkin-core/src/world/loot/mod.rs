@@ -3,7 +3,6 @@ use pumpkin_data::BlockState;
 use pumpkin_data::Enchantment;
 use pumpkin_data::damage::DamageType;
 use pumpkin_data::data_component_impl::EnchantmentsImpl;
-use pumpkin_data::entity::EntityType;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::recipes::{CookingRecipeKind, get_cooking_recipe_with_ingredient};
@@ -20,6 +19,12 @@ use pumpkin_util::random::legacy_rand::LegacyRand;
 use pumpkin_util::random::{RandomImpl, shuffle};
 
 use crate::world::World;
+
+/// Coerce `&EntityType` to `&dyn EntityBase` for `LootContextParameters`.
+/// `EntityType` implements `EntityBase` but Rust can't double-coerce through `Some()`.
+fn as_entity_base(entity_type: &pumpkin_data::entity::EntityType) -> &dyn EntityBase {
+    entity_type
+}
 
 mod predicates;
 mod tests;
@@ -146,7 +151,7 @@ fn evaluate_rolls<R: RandomImpl>(provider: &LootNumberProvider, rng: &mut R) -> 
 
 /// Evaluate a `LootFunction` that modifies count.
 fn apply_count_function<R: RandomImpl>(
-    count: i32,
+    base_count: i32,
     function: &LootFunction,
     fortune_level: i32,
     looting_level: i32,
@@ -157,7 +162,7 @@ fn apply_count_function<R: RandomImpl>(
         LootFunctionKind::SetCount { count: provider, add } => {
             let new_count = evaluate_rolls(provider, rng);
             if *add {
-                count + new_count
+                base_count + new_count
             } else {
                 new_count
             }
@@ -165,10 +170,10 @@ fn apply_count_function<R: RandomImpl>(
         LootFunctionKind::EnchantedCountIncrease { count, limit } => {
             let level = looting_level;
             if level == 0 {
-                return count;
+                return base_count;
             }
-            let level_count = evaluate_rolls(count, rng);
-            let result = count + java_round_f32(level as f32 * rng.mth_next_float(0.0, 1.0));
+            let bonus = evaluate_rolls(count, rng);
+            let result = base_count + java_round_f32(level as f32 * rng.mth_next_float(0.0, 1.0)) + bonus;
             limit.map_or(result, |lim| result.min(lim))
         }
         LootFunctionKind::LimitCount { min, max } => {
@@ -274,18 +279,17 @@ fn check_condition<R: RandomImpl>(
             direct_attacker_weapon_has_enchantment(params, tag)
         }
         // New condition types from upstream: evaluate via predicates module or pass through.
-        LootCondition::EntityProperties { target, predicate: _ } => {
-            // Evaluate via the predicates module
-            predicates::matches_entity(target, predicate, params)
+        LootCondition::EntityProperties { target, predicate } => {
+            predicates::matches_entity(target, &*predicate, params)
         }
-        LootCondition::MatchBlock(predicate: _) => {
-            predicates::matches_block(predicate, params)
+        LootCondition::MatchBlock(predicate) => {
+            predicates::matches_block(&*predicate, params)
         }
-        LootCondition::LocationCheck { offset, predicate: _ } => {
-            predicates::matches_location(*offset, predicate, params)
+        LootCondition::LocationCheck { offset, predicate } => {
+            predicates::matches_location(*offset, &*predicate, params)
         }
-        LootCondition::MatchTool(predicate: _) => {
-            predicates::matches_tool(predicate, params)
+        LootCondition::MatchTool(predicate) => {
+            predicates::matches_tool(&*predicate, params)
         }
         LootCondition::WeatherCheck {
             raining,
@@ -751,7 +755,7 @@ fn pick_dynamic_entry<'a, R: RandomImpl>(
 }
 
 fn apply_dynamic_count_function<R: RandomImpl>(
-    count: i32,
+    base_count: i32,
     function: &DynamicLootFunction,
     fortune_level: i32,
     looting_level: i32,
@@ -762,7 +766,7 @@ fn apply_dynamic_count_function<R: RandomImpl>(
         LootFunctionKind::SetCount { count: provider, add } => {
             let new_count = evaluate_rolls(provider, rng);
             if *add {
-                count + new_count
+                base_count + new_count
             } else {
                 new_count
             }
@@ -770,9 +774,10 @@ fn apply_dynamic_count_function<R: RandomImpl>(
         LootFunctionKind::EnchantedCountIncrease { count, limit } => {
             let level = looting_level;
             if level == 0 {
-                return count;
+                return base_count;
             }
-            let result = count + java_round_f32(level as f32 * rng.mth_next_float(0.0, 1.0));
+            let bonus = evaluate_rolls(count, rng);
+            let result = base_count + java_round_f32(level as f32 * rng.mth_next_float(0.0, 1.0)) + bonus;
             limit.map_or(result, |lim| result.min(lim))
         }
         LootFunctionKind::LimitCount { min, max } => {
@@ -876,7 +881,7 @@ fn check_dynamic_condition<R: RandomImpl>(
             direct_attacker_weapon_has_enchantment(params, tag)
         }
         DynamicLootCondition::EntityProperties { target, predicate } => {
-            predicates::matches_entity(target, predicate, params)
+            predicates::matches_entity(*target, predicate, params)
         }
         DynamicLootCondition::MatchBlock(predicate) => {
             predicates::matches_block(predicate, params)

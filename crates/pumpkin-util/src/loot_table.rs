@@ -82,7 +82,7 @@ pub enum LootFunctionKind {
     },
     EnchantedCountIncrease {
         count: LootNumberProvider,
-        limit: i32,
+        limit: Option<i32>,
     },
     LimitCount {
         min: Option<LootNumberProvider>,

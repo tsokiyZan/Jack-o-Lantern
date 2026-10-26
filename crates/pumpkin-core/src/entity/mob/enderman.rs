@@ -23,7 +23,7 @@ use pumpkin_util::math::{boundingbox::BoundingBox, position::BlockPos, vector3::
 use pumpkin_util::random::RandomImpl;
 
 use crate::entity::{
-    Entity, EntityBase,
+    as_entity_base, Entity, EntityBase,
     ai::{
         goal::{
             active_target::ActiveTargetGoal, chase_player::ChasePlayerGoal,
@@ -495,7 +495,7 @@ impl Mob for EndermanEntity {
             block_state: Some(state),
             position: Some(entity.pos.load()),
             tool: Some(tool),
-            this_entity: Some(entity.entity_type),
+            this_entity: Some(as_entity_base(&entity.entity_type)),
             ..Default::default()
         };
         let pos = entity.block_pos.load();

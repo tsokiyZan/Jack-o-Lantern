@@ -39,7 +39,7 @@ use crate::entity::mob::spawn::SpawnGroupData;
 use crate::entity::passive::animal::{animal_can_mate, get_mixed_color};
 use crate::entity::r#type::from_type;
 use crate::entity::{
-    Entity, EntityBase,
+    as_entity_base, Entity, EntityBase,
     ai::goal::{
         active_target::{ActiveTargetGoal, NonTameRandomTargetGoal},
         avoid_entity::AvoidEntityGoal,
@@ -818,7 +818,7 @@ impl CatRelaxOnOwnerGoal {
         let cat_pos = entity.block_pos.load();
         // `dropFromGiftLootTable`: the gift context has the origin and this entity.
         let params = crate::world::loot::LootContextParameters {
-            this_entity: Some(entity.entity_type),
+            this_entity: Some(as_entity_base(&entity.entity_type)),
             position: Some(entity.pos.load()),
             ..Default::default()
         };

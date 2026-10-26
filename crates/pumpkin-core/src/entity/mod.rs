@@ -6953,3 +6953,9 @@ fn find_free_position(
     }
     closest.map(|(point, _)| point)
 }
+
+/// Coerce `&EntityType` to `&dyn EntityBase` for `LootContextParameters`.
+/// `EntityType` implements `EntityBase` but Rust can't double-coerce through `Some()`.
+pub fn as_entity_base(entity_type: &pumpkin_data::entity::EntityType) -> &dyn EntityBase {
+    entity_type
+}

@@ -36,7 +36,7 @@ use crate::entity::mob::is_monster;
 use crate::entity::mob::spawn::SpawnGroupData;
 use crate::entity::r#type::from_type;
 use crate::entity::{
-    Entity, EntityBase,
+    as_entity_base, Entity, EntityBase,
     ageable::{AgeableData, AgeableMob},
     ai::goal::{
         breed::BreedGoal, escape_danger::EscapeDangerGoal, follow_parent::FollowParentGoal,
@@ -664,7 +664,7 @@ impl PandaEntity {
         {
             // `dropFromGiftLootTable`: the gift context has the origin and this entity.
             let params = LootContextParameters {
-                this_entity: Some(entity.entity_type),
+                this_entity: Some(as_entity_base(&entity.entity_type)),
                 position: Some(entity.pos.load()),
                 ..Default::default()
             };

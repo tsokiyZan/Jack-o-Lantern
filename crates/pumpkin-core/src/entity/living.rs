@@ -2984,7 +2984,7 @@ impl LivingEntity {
                 .filter(|hand_stack| !hand_stack.is_empty());
             let params = LootContextParameters {
                 killed_by_player: Some(player_killed),
-                this_entity: Some(self.entity.entity_type),
+                this_entity: Some(as_entity_base(&self.entity.entity_type)),
                 // `ATTACKING_ENTITY`: `source.getEntity()`.
                 killer_entity: cause.map(|c| c.get_entity().entity_type),
                 attacking_entity_looting_level: cause
@@ -3349,7 +3349,7 @@ impl LivingEntity {
         self.drop_from_loot_table(
             key,
             &LootContextParameters {
-                this_entity: Some(self.entity.entity_type),
+                this_entity: Some(as_entity_base(&self.entity.entity_type)),
                 position: Some(self.entity.pos.load()),
                 ..Default::default()
             },
@@ -3367,7 +3367,7 @@ impl LivingEntity {
         self.drop_from_loot_table(
             key,
             &LootContextParameters {
-                this_entity: Some(self.entity.entity_type),
+                this_entity: Some(as_entity_base(&self.entity.entity_type)),
                 position: Some(self.entity.pos.load()),
                 tool: Some(tool.clone()),
                 ..Default::default()
@@ -3391,7 +3391,7 @@ impl LivingEntity {
             return;
         };
         let params = LootContextParameters {
-            this_entity: Some(self.entity.entity_type),
+            this_entity: Some(as_entity_base(&self.entity.entity_type)),
             position: Some(self.entity.pos.load()),
             tool: Some(tool.clone()),
             ..Default::default()
@@ -3406,7 +3406,7 @@ impl LivingEntity {
         self.drop_from_loot_table(
             key,
             &LootContextParameters {
-                this_entity: Some(self.entity.entity_type),
+                this_entity: Some(as_entity_base(&self.entity.entity_type)),
                 tool: Some(tool.clone()),
                 ..Default::default()
             },
