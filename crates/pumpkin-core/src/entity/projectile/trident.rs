@@ -130,12 +130,9 @@ impl TridentEntity {
             return true;
         }
 
-        // Skip other projectiles and item entities
-        if other_ent.entity_type == &pumpkin_data::entity::EntityType::ARROW
-            || other_ent.entity_type == &pumpkin_data::entity::EntityType::TRIDENT
-            || other_ent.entity_type == &pumpkin_data::entity::EntityType::ITEM
-            || other_ent.entity_type == &pumpkin_data::entity::EntityType::FALLING_BLOCK
-        {
+        // Vanilla `canHitEntity`'s `canBeHitByProjectile`: alive and pickable, which leaves out
+        // spectators, clouds, the dragon's body, dying mobs and most projectiles.
+        if !other.can_be_hit_by_projectile() {
             return true;
         }
 
@@ -191,22 +188,14 @@ impl EntityBase for TridentEntity {
 
         // Trident is flying
         let start_pos = entity.pos.load();
-        let mut velocity = entity.velocity.load();
+        let velocity = entity.velocity.load();
 
-        // Apply gravity
-        velocity.y -= Self::GRAVITY;
+        // Vanilla `AbstractArrow.tick`: move by the current velocity first, then apply drag,
+        // then gravity.
+        let new_pos = start_pos.add(&velocity);
+        entity.set_pos(new_pos);
 
-        // Apply inertia (air resistance or water drag)
-        let inertia = if entity.touching_water.load(Ordering::Relaxed) {
-            Self::WATER_INERTIA
-        } else {
-            Self::AIR_INERTIA
-        };
-        velocity = velocity.multiply(inertia, inertia, inertia);
-
-        entity.velocity.store(velocity);
-
-        // Update rotation based on velocity
+        // Update rotation based on pre-gravity velocity
         let len = velocity.horizontal_length();
         entity.set_rotation(
             velocity.x.atan2(velocity.z) as f32 * 57.295_776,
@@ -215,16 +204,14 @@ impl EntityBase for TridentEntity {
         // Vanilla `AbstractArrow.tick`'s `checkLeftOwner`, with `Projectile.tick`'s shoot event.
         self.projectile.tick(entity);
 
-        // Move trident
-        let new_pos = start_pos.add(&velocity);
-        entity.set_pos(new_pos);
-
-        // Broadcast velocity update
+        // Broadcast velocity update (before drag/gravity — matches vanilla ThrownTrident which
+        // calls super.tick() = AbstractArrow.tick; the velocity packet uses the pre-gravity
+        // movement since that's what the move was based on).
         let packet = CEntityVelocity::new(entity.entity_id.into(), velocity);
         let chunk_pos = entity.chunk_pos.load();
         world.broadcast_to_chunk(chunk_pos, &packet);
 
-        // Check for collisions using raycasting
+        // Check for collisions using raycasting (pre-gravity velocity)
         let search_box = BoundingBox::new(
             Vector3::new(
                 start_pos.x.min(new_pos.x),
@@ -301,6 +288,17 @@ impl EntityBase for TridentEntity {
         {
             super::on_hit(caller, h);
         }
+
+        // Apply drag and gravity after move and hit handling, matching vanilla order.
+        let mut velocity = velocity;
+        let inertia = if entity.touching_water.load(Ordering::Relaxed) {
+            Self::WATER_INERTIA
+        } else {
+            Self::AIR_INERTIA
+        };
+        velocity = velocity.multiply(inertia, inertia, inertia);
+        velocity.y -= Self::GRAVITY;
+        entity.velocity.store(velocity);
 
         // `Entity.tick` → `baseTick` → `checkBelowWorld`: discard if below world.
         entity.check_out_of_world(caller);
