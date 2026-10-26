@@ -1,3 +1,9 @@
+use crate::entity::{
+    mob::{Mob, cube_mob::CubeMobEntity},
+    passive::sheep::SheepEntity,
+    player::Player,
+};
+use pumpkin_data::{data_component::DataComponent, data_component_impl::read_data};
 use pumpkin_nbt::{compound::NbtCompound, tag::NbtTag};
 use serde_json::Value;
 
@@ -16,38 +22,114 @@ pub(super) fn matches_entity(
     entity.is_some_and(|entity| entity_matches(entity, predicate))
 }
 
+/// Vanilla `EntityPredicate.matches`: every present part must match. A key this does not
+/// implement fails the predicate, as an unsatisfiable condition does, and never passes it.
 fn entity_matches(entity: &dyn EntityBase, predicate: &Value) -> bool {
     let Some(properties) = predicate.as_object() else {
         return false;
     };
-    properties.iter().all(
-        |(key, expected)| match key.strip_prefix("minecraft:").unwrap_or(key) {
-            "entity_type" | "type" => {
-                let matches = |name: &str| {
-                    let kind = entity.get_entity().entity_type;
-                    name.strip_prefix('#').map_or_else(
-                        || kind.resource_name == name.strip_prefix("minecraft:").unwrap_or(name),
-                        |tag| kind.is_tagged_with(tag) == Some(true),
-                    )
-                };
-                expected.as_str().map_or_else(
-                    || {
-                        expected.as_array().is_some_and(|names| {
-                            names.iter().any(|name| name.as_str().is_some_and(matches))
-                        })
-                    },
-                    matches,
+    properties.iter().all(|(key, expected)| {
+        let key = key.strip_prefix("minecraft:").unwrap_or(key);
+        match key {
+            "entity_type" | "type" => holder_set_matches(expected, |name| {
+                let kind = entity.get_entity().entity_type;
+                name.strip_prefix('#').map_or_else(
+                    || kind.resource_name == name.strip_prefix("minecraft:").unwrap_or(name),
+                    |tag| kind.is_tagged_with(tag) == Some(true),
                 )
+            }),
+            "flags" => flags_match(entity, expected),
+            "components" => expected.as_object().is_some_and(|components| {
+                components.iter().all(|(key, expected)| {
+                    let Some(component) = DataComponent::try_from_name(key) else {
+                        return false;
+                    };
+                    let Some(actual) = entity.get_component(component) else {
+                        return false;
+                    };
+                    let Some(tag) = json_to_nbt(expected) else {
+                        return false;
+                    };
+                    read_data(component, &tag)
+                        .is_some_and(|expected| actual.equal(expected.as_ref()))
+                })
+            }),
+            // `VehiclePredicate`: the entity rides something that matches.
+            "vehicle" => entity
+                .get_entity()
+                .get_vehicle()
+                .is_some_and(|vehicle| entity_matches(vehicle.as_ref(), expected)),
+            "type_specific/cube_mob" => expected.as_object().is_some_and(|expected| {
+                entity
+                    .cast_any()
+                    .downcast_ref::<CubeMobEntity>()
+                    .is_some_and(|cube| {
+                        expected.iter().all(|(key, bounds)| {
+                            key == "size" && integer_matches(cube.get_size(), bounds)
+                        })
+                    })
+            }),
+            "type_specific/sheep" => expected.as_object().is_some_and(|expected| {
+                entity
+                    .cast_any()
+                    .downcast_ref::<SheepEntity>()
+                    .is_some_and(|sheep| {
+                        expected.iter().all(|(key, expected)| {
+                            key == "sheared" && expected.as_bool() == Some(sheep.is_sheared())
+                        })
+                    })
+            }),
+            "type_specific/raider" => expected.as_object().is_some_and(|expected| {
+                let Some(raider) = entity.get_mob().and_then(Mob::as_raider) else {
+                    return false;
+                };
+                let flag = |name: &str| {
+                    expected
+                        .get(name)
+                        .map_or(Some(false), serde_json::Value::as_bool)
+                };
+                expected
+                    .keys()
+                    .all(|key| matches!(key.as_str(), "has_raid" | "is_captain"))
+                    && flag("has_raid") == Some(raider.has_active_raid())
+                    && flag("is_captain") == Some(raider.is_captain())
+            }),
+            // `fishing_hook` needs the bobber's open-water state, which Pumpkin does not track.
+            _ => false,
+        }
+    })
+}
+
+/// Vanilla `EntityFlagsPredicate`: each present flag must equal the entity's.
+fn flags_match(entity: &dyn EntityBase, expected: &Value) -> bool {
+    let Some(flags) = expected.as_object() else {
+        return false;
+    };
+    let base = entity.get_entity();
+    let living = entity.get_living_entity();
+    flags.iter().all(|(key, expected)| {
+        let Some(expected) = expected.as_bool() else {
+            return false;
+        };
+        match key.as_str() {
+            "is_on_ground" => base.on_ground.load(std::sync::atomic::Ordering::Relaxed) == expected,
+            "is_on_fire" => base.is_on_fire() == expected,
+            "is_sneaking" => base.is_sneaking() == expected,
+            "is_sprinting" => base.is_sprinting() == expected,
+            "is_swimming" => base.is_swimming() == expected,
+            "is_flying" => {
+                (living.is_some()
+                    && (base.is_fall_flying()
+                        || entity.get_player().is_some_and(Player::is_flying)))
+                    == expected
             }
-            "components" => {
-                // Fork doesn't support entity data components, so we can't check them.
-                // Skip this subpredicate (treat as matching).
-                true
-            }
-            // Other entity subpredicates are not implemented yet.
-            _ => true,
-        },
-    )
+            "is_in_water" => base.is_in_water() == expected,
+            // Non-living entities have neither a baby nor a gliding state to compare.
+            "is_fall_flying" => living.is_none() || base.is_fall_flying() == expected,
+            "is_baby" => living.is_none() || base.is_baby() == expected,
+            _ => false,
+        }
+    })
 }
 
 fn json_to_nbt(value: &Value) -> Option<NbtTag> {

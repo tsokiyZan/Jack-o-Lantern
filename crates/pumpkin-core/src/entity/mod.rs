@@ -312,6 +312,14 @@ pub trait EntityBase: Send + Sync + std::any::Any {
         Vector3::from_yaw_pitch(entity.yaw.load(), entity.pitch.load())
     }
 
+    /// Vanilla `DataComponentGetter.get` on an entity, for loot `components` predicates.
+    fn get_component(
+        &self,
+        _component: pumpkin_data::data_component::DataComponent,
+    ) -> Option<Box<dyn pumpkin_data::data_component_impl::DataComponentImpl>> {
+        None
+    }
+
     fn init_data_tracker(&self) {
         let entity = self.get_entity();
 
@@ -6952,10 +6960,4 @@ fn find_free_position(
         }
     }
     closest.map(|(point, _)| point)
-}
-
-/// Coerce `&EntityType` to `&dyn EntityBase` for `LootContextParameters`.
-/// `EntityType` implements `EntityBase` but Rust can't double-coerce through `Some()`.
-pub fn as_entity_base(entity_type: &pumpkin_data::entity::EntityType) -> &dyn EntityBase {
-    entity_type
 }

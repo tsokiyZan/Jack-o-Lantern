@@ -54,7 +54,6 @@ use crate::entity::{
         tempt::TemptGoal,
         wander_around::WanderAroundGoal,
     },
-    as_entity_base,
     mob::{Mob, MobEntity},
     passive::{
         animal::{Animal, set_animal_pathfinding_malus},
@@ -819,7 +818,7 @@ impl CatRelaxOnOwnerGoal {
         let cat_pos = entity.block_pos.load();
         // `dropFromGiftLootTable`: the gift context has the origin and this entity.
         let params = crate::world::loot::LootContextParameters {
-            this_entity: Some(as_entity_base(&entity.entity_type)),
+            this_entity: Some(cat),
             position: Some(entity.pos.load()),
             ..Default::default()
         };

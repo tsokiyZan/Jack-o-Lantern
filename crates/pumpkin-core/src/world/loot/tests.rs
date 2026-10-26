@@ -1,4 +1,44 @@
 use super::*;
+use pumpkin_util::random::xoroshiro128::Xoroshiro;
+
+/// Rolls a table on a seeded random. These sweeps check distributions, so the source only has
+/// to be well mixed across consecutive seeds, which `Xoroshiro` is and `LegacyRand` is not.
+trait TestGenerate {
+    fn generate_loot(&self, seed: i64) -> Vec<ItemStack> {
+        self.generate_loot_with_context(seed, &LootContextParameters::default())
+    }
+    fn generate_loot_with_context(
+        &self,
+        seed: i64,
+        params: &LootContextParameters<'_>,
+    ) -> Vec<ItemStack>;
+}
+
+impl TestGenerate for LootTableHandle {
+    fn generate_loot_with_context(
+        &self,
+        seed: i64,
+        params: &LootContextParameters<'_>,
+    ) -> Vec<ItemStack> {
+        self.evaluate(&mut Xoroshiro::from_seed(seed as u64), params)
+    }
+}
+
+fn generate_dynamic_loot(table: &DynamicLootTable, seed: i64) -> Vec<ItemStack> {
+    generate_dynamic_loot_with_context(table, seed, &LootContextParameters::default())
+}
+
+fn generate_dynamic_loot_with_context(
+    table: &DynamicLootTable,
+    seed: i64,
+    params: &LootContextParameters<'_>,
+) -> Vec<ItemStack> {
+    generation::generate(
+        generation::Table::Dynamic(table),
+        &mut Xoroshiro::from_seed(seed as u64),
+        params,
+    )
+}
 
 #[test]
 fn alternatives_use_the_first_matching_child() {
@@ -29,8 +69,7 @@ fn entity_predicates_do_not_match_a_missing_entity() {
 
 use crate::entity::{
     Entity,
-    ai::test_support::world,
-    mob::magma_cube::MagmaCubeEntity,
+    mob::cube_mob::{CubeKind, CubeMobEntity},
     passive::{
         chicken::ChickenEntity,
         frog::FrogEntity,
@@ -68,8 +107,7 @@ fn assert_drops(
 
 #[tokio::test]
 async fn component_predicates_select_chicken_and_mooshroom_variants() {
-    let folder = tempfile::tempdir().unwrap();
-    let world = world(&folder);
+    let (_folder, world) = crate::world::test_support::test_world();
     let chicken = ChickenEntity::new(Entity::new(
         world.clone(),
         Vector3::default(),
@@ -123,8 +161,7 @@ async fn component_predicates_select_chicken_and_mooshroom_variants() {
 
 #[tokio::test]
 async fn component_predicates_use_the_current_entity_color() {
-    let folder = tempfile::tempdir().unwrap();
-    let world = world(&folder);
+    let (_folder, world) = crate::world::test_support::test_world();
     let sheep = SheepEntity::new(Entity::new(
         world.clone(),
         Vector3::default(),
@@ -175,13 +212,11 @@ async fn component_predicates_use_the_current_entity_color() {
 
 #[tokio::test]
 async fn damage_source_predicates_use_the_attackers_components() {
-    let folder = tempfile::tempdir().unwrap();
-    let world = world(&folder);
-    let cube = MagmaCubeEntity::new(Entity::new(
-        world.clone(),
-        Vector3::default(),
-        &EntityType::MAGMA_CUBE,
-    ));
+    let (_folder, world) = crate::world::test_support::test_world();
+    let cube = CubeMobEntity::new(
+        Entity::new(world.clone(), Vector3::default(), &EntityType::MAGMA_CUBE),
+        CubeKind::MagmaCube,
+    );
     let frog = FrogEntity::new(Entity::new(
         world.clone(),
         Vector3::default(),
@@ -191,7 +226,7 @@ async fn damage_source_predicates_use_the_attackers_components() {
         "../../../../../assets/datapack/data/minecraft/loot_table/entities/magma_cube.json"
     );
     for size in [1, 2] {
-        cube.slime.set_size(size, true);
+        cube.set_size(size, true);
         for (variant, light) in [
             (FrogVariant::Temperate, &Item::OCHRE_FROGLIGHT),
             (FrogVariant::Warm, &Item::PEARLESCENT_FROGLIGHT),
@@ -489,8 +524,7 @@ fn count_limit_precedes_explosion_decay() {
 #[tokio::test]
 async fn enchanted_count_uses_the_attackers_allowed_equipment_and_float_rounding() {
     use pumpkin_data::{Enchantment, data_component_impl::EquipmentSlot};
-    let folder = tempfile::tempdir().unwrap();
-    let world = world(&folder);
+    let (_folder, world) = crate::world::test_support::test_world();
     let attacker = SheepEntity::new(Entity::new(world, Vector3::default(), &EntityType::SHEEP));
     let mut sword = ItemStack::new(1, &Item::DIAMOND_SWORD);
     sword.add_enchantment(&Enchantment::LOOTING, 3);
@@ -588,8 +622,7 @@ fn match_tool_distinguishes_missing_and_present_empty_tools() {
 
 #[tokio::test]
 async fn component_predicates_do_not_discard_the_existing_fire_condition() {
-    let folder = tempfile::tempdir().unwrap();
-    let world = world(&folder);
+    let (_folder, world) = crate::world::test_support::test_world();
     let chicken = ChickenEntity::new(Entity::new(world, Vector3::default(), &EntityType::CHICKEN));
     let table = parse_loot_table(r#"{"pools":[{"entries":[{"type":"minecraft:alternatives","children":[{"type":"minecraft:item","name":"minecraft:diamond","condition":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:flags":{"is_on_fire":true},"minecraft:components":{"minecraft:chicken/variant":"minecraft:warm"}}}},{"type":"minecraft:item","name":"minecraft:stone"}]}]}]}"#).unwrap();
     for (variant, on_fire, expected) in [
@@ -618,8 +651,7 @@ async fn double_plants_keep_their_adjacent_half_location_checks() {
     };
     use pumpkin_util::math::{position::BlockPos, vector2::Vector2};
     use pumpkin_world::{chunk::ChunkData, world::BlockFlags};
-    let folder = tempfile::tempdir().unwrap();
-    let world = world(&folder);
+    let (_folder, world) = crate::world::test_support::test_world();
     world
         .level
         .loaded_chunks

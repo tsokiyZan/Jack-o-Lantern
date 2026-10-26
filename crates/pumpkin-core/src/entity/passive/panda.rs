@@ -43,7 +43,6 @@ use crate::entity::{
         look_around::RandomLookAroundGoal, look_at_entity::LookAtEntityGoal, swim::SwimGoal,
         tempt::TemptGoal, wander_around::WanderAroundGoal,
     },
-    as_entity_base,
     mob::{Mob, MobEntity},
     passive::animal::{Animal, set_animal_pathfinding_malus},
     player::Player,
@@ -665,7 +664,7 @@ impl PandaEntity {
         {
             // `dropFromGiftLootTable`: the gift context has the origin and this entity.
             let params = LootContextParameters {
-                this_entity: Some(as_entity_base(&entity.entity_type)),
+                this_entity: Some(self),
                 position: Some(entity.pos.load()),
                 ..Default::default()
             };

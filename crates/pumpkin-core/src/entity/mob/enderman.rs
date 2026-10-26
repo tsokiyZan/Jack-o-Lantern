@@ -35,7 +35,6 @@ use crate::entity::{
         },
         pathfinder::node::PathType,
     },
-    as_entity_base,
     mob::{
         Mob, MobEntity,
         neutral::{NeutralData, NeutralMob},
@@ -496,7 +495,7 @@ impl Mob for EndermanEntity {
             block_state: Some(state),
             position: Some(entity.pos.load()),
             tool: Some(tool),
-            this_entity: Some(as_entity_base(&entity.entity_type)),
+            this_entity: Some(self),
             ..Default::default()
         };
         let pos = entity.block_pos.load();

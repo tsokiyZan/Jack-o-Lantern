@@ -23,7 +23,7 @@ use std::sync::atomic::{
 
 use super::breath::BreathManager;
 use super::experience_orb::ExperienceOrbEntity;
-use super::{as_entity_base, Entity, EntityBase, NBTStorageInit};
+use super::{Entity, EntityBase, NBTStorageInit};
 use crate::enchantment::EnchantmentHelper;
 use crate::entity::NBTStorage;
 use crate::entity::ageable::AgeableMob;
@@ -2984,9 +2984,10 @@ impl LivingEntity {
                 .filter(|hand_stack| !hand_stack.is_empty());
             let params = LootContextParameters {
                 killed_by_player: Some(player_killed),
-                this_entity: Some(self),
+                world: Some(&world),
+                this_entity: Some(dyn_self),
                 // `ATTACKING_ENTITY`: `source.getEntity()`.
-                killer_entity: cause.map(|c| c.get_entity()),
+                killer_entity: cause,
                 attacking_entity_looting_level: cause
                     .and_then(|cause| {
                         cause.get_living_entity().map(|living| {
@@ -2998,7 +2999,7 @@ impl LivingEntity {
                         })
                     })
                     .unwrap_or(0),
-                direct_killer_entity: source.map(|s| s.get_entity()),
+                direct_killer_entity: source,
                 position: Some(self.entity.pos.load()),
                 world_time: world.get_time_of_day() as u64,
                 damage_type: Some(damage_type),
@@ -3011,14 +3012,6 @@ impl LivingEntity {
                         .get_living_entity()
                         .map(|living| living.held_item(direct))
                 }),
-                damage_source_entity: cause.map(|cause| cause.get_entity().entity_type),
-                damage_source_frog_variant: cause
-                    .and_then(crate::entity::passive::frog::frog_variant_of)
-                    .map(|variant| variant.asset_id()),
-                this_cube_mob_size: dyn_self
-                    .cast_any()
-                    .downcast_ref::<crate::entity::mob::cube_mob::CubeMobEntity>()
-                    .map(crate::entity::mob::cube_mob::CubeMobEntity::get_size),
                 ..Default::default()
             };
             self.drop_loot(dyn_self.get_mob(), &params);
@@ -3336,20 +3329,21 @@ impl LivingEntity {
     }
 
     /// Vanilla `LivingEntity.dropFromGiftLootTable`.
-    pub fn drop_from_gift_loot_table(&self, key: &str) -> bool {
-        self.drop_from_gift_loot_table_with(key, |stack| self.entity.spawn_at_location(stack))
+    pub fn drop_from_gift_loot_table(&self, this: &dyn EntityBase, key: &str) -> bool {
+        self.drop_from_gift_loot_table_with(this, key, |stack| self.entity.spawn_at_location(stack))
     }
 
     /// Vanilla `LivingEntity.dropFromGiftLootTable` with its own consumer.
     pub fn drop_from_gift_loot_table_with(
         &self,
+        this: &dyn EntityBase,
         key: &str,
         consumer: impl FnMut(ItemStack),
     ) -> bool {
         self.drop_from_loot_table(
             key,
             &LootContextParameters {
-                this_entity: Some(self),
+                this_entity: Some(this),
                 position: Some(self.entity.pos.load()),
                 ..Default::default()
             },
@@ -3360,6 +3354,7 @@ impl LivingEntity {
     /// Vanilla `LivingEntity.dropFromShearingLootTable`.
     pub fn drop_from_shearing_loot_table(
         &self,
+        this: &dyn EntityBase,
         key: &str,
         tool: &ItemStack,
         consumer: impl FnMut(ItemStack),
@@ -3367,7 +3362,7 @@ impl LivingEntity {
         self.drop_from_loot_table(
             key,
             &LootContextParameters {
-                this_entity: Some(self),
+                this_entity: Some(this),
                 position: Some(self.entity.pos.load()),
                 tool: Some(tool.clone()),
                 ..Default::default()
@@ -3380,6 +3375,7 @@ impl LivingEntity {
     /// forwards to the table for this mob's variant (`inner`).
     pub fn drop_from_nested_shearing_loot_table(
         &self,
+        this: &dyn EntityBase,
         outer: &str,
         inner: &str,
         tool: &ItemStack,
@@ -3391,7 +3387,7 @@ impl LivingEntity {
             return;
         };
         let params = LootContextParameters {
-            this_entity: Some(self),
+            this_entity: Some(this),
             position: Some(self.entity.pos.load()),
             tool: Some(tool.clone()),
             ..Default::default()
@@ -3402,11 +3398,16 @@ impl LivingEntity {
     }
 
     /// Vanilla `LivingEntity.dropFromEntityInteractLootTable`.
-    pub fn drop_from_entity_interact_loot_table(&self, key: &str, tool: &ItemStack) -> bool {
+    pub fn drop_from_entity_interact_loot_table(
+        &self,
+        this: &dyn EntityBase,
+        key: &str,
+        tool: &ItemStack,
+    ) -> bool {
         self.drop_from_loot_table(
             key,
             &LootContextParameters {
-                this_entity: Some(self),
+                this_entity: Some(this),
                 tool: Some(tool.clone()),
                 ..Default::default()
             },

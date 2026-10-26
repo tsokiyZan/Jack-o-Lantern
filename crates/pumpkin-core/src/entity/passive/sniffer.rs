@@ -300,7 +300,7 @@ impl SnifferEntity {
         let head = self.get_head_block().to_f64();
         self.mob_entity
             .living_entity
-            .drop_from_gift_loot_table_with(SNIFFER_DIGGING, |stack| {
+            .drop_from_gift_loot_table_with(self, SNIFFER_DIGGING, |stack| {
                 world.spawn_item_at(head, stack);
             });
         self.play_sound_at_self(Sound::EntitySnifferDropSeed, 1.0, 1.0);
