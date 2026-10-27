@@ -12,6 +12,7 @@ use pumpkin_data::entity::EntityType;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::Sound;
+use pumpkin_data::tag::Taggable;
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::codec::item_stack_seralizer::ItemStackSerializer;
 use pumpkin_protocol::java::client::play::{CSetEntityMetadata, Metadata};
@@ -230,45 +231,54 @@ impl ItemFrameEntity {
         }
     }
 
-    pub fn drop_item(&self, caused_by: Option<&dyn EntityBase>, with_frame: bool) {
+    /// Vanilla `ItemFrame.dropItem(level, causedBy)`: the break sound, the frame and its item,
+    /// then `BLOCK_CHANGE`.
+    fn drop_item(&self, caused_by: Option<&dyn EntityBase>) {
+        self.play_sound_at_self(self.get_break_sound(), 1.0, 1.0);
+        self.drop_item_with_frame(caused_by, true);
+        self.entity.world.load().game_event_from(
+            caused_by,
+            pumpkin_data::game_event::GameEvent::BlockChange,
+            self.entity.pos.load(),
+        );
+    }
+
+    /// Vanilla `ItemFrame.dropItem(level, causedBy, withFrame)`. `removeFramedMap` is a no-op:
+    /// Pumpkin's maps don't track frame markers.
+    fn drop_item_with_frame(&self, caused_by: Option<&dyn EntityBase>, with_frame: bool) {
         if self.is_fixed() {
             return;
         }
-
         let item_stack = self.get_item();
-        *self
-            .item_stack
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) = ItemStack::EMPTY.clone();
-        let item_serializer = ItemStackSerializer::from(ItemStack::EMPTY.clone());
-        self.entity.set_synced_data(
-            pumpkin_data::tracked_data::item_frame::ITEM,
-            item_serializer,
-        );
-
-        let is_creative_player = caused_by.is_some_and(|s| {
-            s.cast_any()
-                .downcast_ref::<Player>()
+        self.set_item(ItemStack::EMPTY.clone(), true);
+        let world = self.entity.world.load();
+        if !world.level_info.load().game_rules.entity_drops
+            || caused_by
+                .and_then(EntityBase::get_player)
                 .is_some_and(Player::is_creative)
-        });
-
-        if is_creative_player {
+        {
             return;
         }
-
-        let world = self.entity.world.load();
-        let pos = self.entity.block_pos.load();
-
+        let direction = self.get_facing();
         if with_frame {
-            world.drop_stack(&pos, self.get_frame_item_stack_with_data());
+            super::hanging_spawn_at_location(
+                self,
+                direction,
+                self.get_frame_item_stack_with_data(),
+                0.0,
+            );
         }
+        if !item_stack.is_empty() && self.entity.random().next_f32() < self.get_drop_chance() {
+            super::hanging_spawn_at_location(self, direction, item_stack, 0.0);
+        }
+    }
 
-        if !item_stack.is_empty() {
-            let drop_chance = self.item_drop_chance.load();
-            if self.entity.random().next_f32() < drop_chance {
-                world.drop_stack(&pos, item_stack);
-            }
-        }
+    /// Vanilla `ItemFrame.canHurtWhenFixed`.
+    fn can_hurt_when_fixed(damage_type: &DamageType, cause: Option<&dyn EntityBase>) -> bool {
+        damage_type.has_tag(&pumpkin_data::tag::DamageType::MINECRAFT_BYPASSES_INVULNERABILITY)
+            || cause
+                .and_then(EntityBase::get_player)
+                .is_some_and(Player::is_creative)
     }
 }
 
@@ -428,46 +438,87 @@ impl EntityBase for ItemFrameEntity {
         }
     }
 
+    /// Vanilla `ItemFrame.hurtServer`.
     fn damage_with_context(
         &self,
         _caller: &dyn EntityBase,
         _amount: f32,
         damage_type: DamageType,
         _position: Option<Vector3<f64>>,
-        source: Option<&dyn EntityBase>,
-        _cause: Option<&dyn EntityBase>,
+        _source: Option<&dyn EntityBase>,
+        cause: Option<&dyn EntityBase>,
     ) -> bool {
-        let fixed = self.is_fixed();
-        let is_creative_player = source.is_some_and(|s| {
-            s.cast_any()
-                .downcast_ref::<Player>()
-                .is_some_and(Player::is_creative)
-        });
-        let bypasses_invuln =
-            damage_type == DamageType::OUT_OF_WORLD || damage_type == DamageType::GENERIC_KILL;
-
-        if fixed {
-            if !bypasses_invuln && !is_creative_player {
-                return false;
-            }
-            self.drop_item(source, true);
-            self.entity.remove();
+        if self.is_fixed() {
+            return Self::can_hurt_when_fixed(&damage_type, cause)
+                && super::block_attached_hurt_server(self, &damage_type, cause, |cause| {
+                    self.drop_item(cause);
+                });
+        }
+        if self.entity.is_invulnerable_to(&damage_type, cause) {
+            return false;
+        }
+        // `shouldDamageDropItem`.
+        if !damage_type.has_tag(&pumpkin_data::tag::DamageType::MINECRAFT_IS_EXPLOSION)
+            && !self.get_item().is_empty()
+        {
+            self.drop_item_with_frame(cause, false);
+            self.entity.world.load().game_event_from(
+                cause,
+                pumpkin_data::game_event::GameEvent::BlockChange,
+                self.entity.pos.load(),
+            );
+            self.play_sound_at_self(self.get_remove_item_sound(), 1.0, 1.0);
             return true;
         }
+        super::block_attached_hurt_server(self, &damage_type, cause, |cause| {
+            self.drop_item(cause);
+        })
+    }
 
-        let has_item = !self.get_item().is_empty();
-        let is_explosion =
-            damage_type == DamageType::EXPLOSION || damage_type == DamageType::PLAYER_EXPLOSION;
+    /// Vanilla `BlockAttachedEntity.kill(level)`: `kill(level, this)`. `onKilled`'s
+    /// `removeFramedMap` is a no-op (see `drop_item_with_frame`).
+    fn kill(&self, _caller: &dyn EntityBase) {
+        super::block_attached_kill(self, None);
+    }
 
-        if !is_explosion && has_item {
-            self.drop_item(source, false);
-            self.entity.play_sound(self.get_remove_item_sound());
-        } else {
-            self.drop_item(source, true);
-            self.entity.play_sound(self.get_break_sound());
-            self.entity.remove();
+    /// Vanilla `BlockAttachedEntity.ignoreExplosion`.
+    fn is_immune_to_explosion(&self, explosion: &crate::world::explosion::Explosion) -> bool {
+        super::block_attached_ignore_explosion(self, explosion)
+    }
+
+    /// Vanilla `BlockAttachedEntity.thunderHit`.
+    fn on_lightning_strike(
+        &self,
+        _caller: &dyn EntityBase,
+        _lightning: &crate::entity::lightning::LightningBoltEntity,
+    ) {
+        super::block_attached_thunder_hit();
+    }
+
+    /// Vanilla `moveEntityByPiston`: `ItemFrame.move(PISTON, ..)`.
+    fn move_by_piston(&self, _caller: &dyn EntityBase, delta: Vector3<f64>) {
+        if !self.is_fixed() {
+            super::block_attached_moved(self, delta, |cause| self.drop_item(cause));
         }
-        true
+    }
+
+    /// Vanilla `ItemFrame.move`.
+    fn move_entity(&self, _caller: &dyn EntityBase, motion: Vector3<f64>) {
+        if !self.is_fixed() {
+            super::block_attached_moved(self, motion, |cause| self.drop_item(cause));
+        }
+    }
+
+    /// Vanilla `ItemFrame.push(x, y, z)`.
+    fn push_impulse(&self, impulse: Vector3<f64>) {
+        if !self.is_fixed() {
+            super::block_attached_moved(self, impulse, |cause| self.drop_item(cause));
+        }
+    }
+
+    /// Vanilla `BlockAttachedEntity.tick`: no `baseTick`, only `checkBelowWorld`.
+    fn tick(&self, caller: &dyn EntityBase, _server: &crate::server::Server) {
+        self.entity.check_out_of_world(caller);
     }
 
     fn cast_any(&self) -> &dyn std::any::Any {
