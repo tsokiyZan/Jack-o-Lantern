@@ -412,7 +412,15 @@ impl CommandExecutor for LootExecutor {
                         },
                     ),
                     tool: killer_tool,
-                    position: killer.as_ref().map(|p| p.position()),
+                    // `ORIGIN`: `source.getPosition()`, for any source.
+                    position: Some(context.source.position),
+                    // `DIRECT_ATTACKING_ENTITY` is the source: its main hand decides
+                    // `equipment` predicates such as the fire-aspect smelt.
+                    direct_attacker_weapon: context.source.entity.as_ref().and_then(|direct| {
+                        direct
+                            .get_living_entity()
+                            .map(|living| living.held_item(direct.as_ref()))
+                    }),
                     ..Default::default()
                 };
 

@@ -310,7 +310,11 @@ impl<R: Fn(&str) -> Option<Value>> Parser<'_, R> {
             Some("direct_attacker" | "direct_killer") => LootEntityTarget::DirectAttacker,
             _ => return None,
         };
-        let mut predicate = value.get("predicate")?.as_object()?.clone();
+        // LootItemEntityPropertyCondition: an absent predicate is true, entity or not.
+        let Some(predicate) = value.get("predicate") else {
+            return Some(Condition::None);
+        };
+        let mut predicate = predicate.as_object()?.clone();
         let mut conditions = Vec::new();
         if target == LootEntityTarget::This {
             for key in ["minecraft:flags", "flags"] {

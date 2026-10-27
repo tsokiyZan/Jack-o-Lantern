@@ -91,7 +91,7 @@ fn entity_matches(entity: &dyn EntityBase, predicate: &Value) -> bool {
                 expected
                     .keys()
                     .all(|key| matches!(key.as_str(), "has_raid" | "is_captain"))
-                    && flag("has_raid") == Some(raider.has_active_raid())
+                    && flag("has_raid") == Some(raider.has_raid())
                     && flag("is_captain") == Some(raider.is_captain())
             }),
             // `fishing_hook` needs the bobber's open-water state, which Pumpkin does not track.
@@ -356,7 +356,7 @@ pub(super) fn matches_location(
             if !loaded {
                 return false;
             }
-            let biome = world.get_biome(&position);
+            let biome = world.get_zoomed_biome(&position);
             holder_set_matches(expected, |name| {
                 name.strip_prefix('#').map_or_else(
                     || {
