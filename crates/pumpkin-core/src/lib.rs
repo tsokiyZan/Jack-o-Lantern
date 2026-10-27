@@ -245,6 +245,30 @@ pub struct PumpkinServer {
 }
 
 impl PumpkinServer {
+    /// Spawns the watchdog thread before the ticker, so it can observe ticks. It uses
+    /// `SHOULD_STOP` (a static `AtomicBool`) as the stop flag so the watchdog can break out of its
+    /// loop during shutdown and never call exit(1) mid-save.
+    fn spawn_watchdog(server: &Arc<Server>) -> Arc<crate::server::watchdog::WatchdogState> {
+        let watchdog_state = Arc::new(crate::server::watchdog::WatchdogState::new(
+            server.advanced_config.max_tick_time,
+        ));
+        let stop_flag = Arc::new(|| SHOULD_STOP.load(Ordering::Relaxed));
+        let milliseconds_per_tick = Arc::new({
+            let manager = server.tick_rate_manager.clone();
+            move || manager.nanoseconds_per_tick() as f64 / 1_000_000.0
+        });
+        if let Err(err) = crate::server::watchdog::spawn(
+            server.advanced_config.max_tick_time,
+            milliseconds_per_tick,
+            watchdog_state.clone(),
+            stop_flag,
+        ) {
+            error!("Failed to spawn Server Watchdog thread: {err}");
+            std::process::exit(1);
+        }
+        watchdog_state
+    }
+
     pub fn log_info(&self, message: &str) {
         tracing::info!(target: "plugin", "{}", message);
     }
@@ -331,27 +355,7 @@ impl PumpkinServer {
         };
 
         // Ticker
-        let watchdog_state = Arc::new(crate::server::watchdog::WatchdogState::new(
-            server.advanced_config.max_tick_time,
-        ));
-
-        // Spawn the watchdog thread before the ticker, so it can observe ticks.
-        // Use SHOULD_STOP (a static AtomicBool) as the stop flag so the watchdog
-        // can break out of its loop during shutdown and never call exit(1) mid-save.
-        let stop_flag = Arc::new(|| SHOULD_STOP.load(Ordering::Relaxed));
-        let milliseconds_per_tick = Arc::new({
-            let manager = server.tick_rate_manager.clone();
-            move || manager.nanoseconds_per_tick() as f64 / 1_000_000.0
-        });
-        if let Err(err) = crate::server::watchdog::spawn(
-            server.advanced_config.max_tick_time,
-            milliseconds_per_tick,
-            watchdog_state.clone(),
-            stop_flag,
-        ) {
-            error!("Failed to spawn Server Watchdog thread: {err}");
-            std::process::exit(1);
-        }
+        let watchdog_state = Self::spawn_watchdog(&server);
 
         {
             let ticker_server = server.clone();
