@@ -124,6 +124,9 @@ impl BlockBehaviour for BlastFurnaceBlock {
     }
 
     fn placed(&self, args: PlacedArgs<'_>) {
+        if !args.is_new_block() {
+            return;
+        }
         let blasting_furnace_block_entity = BlastingFurnaceBlockEntity::new(*args.position);
         args.world
             .add_block_entity(Arc::new(blasting_furnace_block_entity));

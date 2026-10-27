@@ -45,6 +45,9 @@ impl BlockBehaviour for SmallDripleafBlock {
         )
     }
     fn placed(&self, args: PlacedArgs<'_>) {
+        if !args.is_new_block() {
+            return;
+        }
         {
             let lower_small_dripleaf_props =
                 SmallDripleafLikeProperties::from_state_id(args.state_id);

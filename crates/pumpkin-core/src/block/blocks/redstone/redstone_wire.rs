@@ -39,6 +39,9 @@ impl BlockBehaviour for RedstoneWireBlock {
     }
 
     fn placed(&self, args: PlacedArgs<'_>) {
+        if !args.is_new_block() {
+            return;
+        }
         update_power_strength(args.world, args.position);
 
         for direction in [BlockDirection::Up, BlockDirection::Down] {

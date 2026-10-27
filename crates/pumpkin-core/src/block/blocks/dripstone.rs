@@ -62,6 +62,9 @@ impl BlockBehaviour for DripstoneBlock {
         dripstone_props.to_state_id(&Block::POINTED_DRIPSTONE)
     }
     fn placed(&self, args: PlacedArgs<'_>) {
+        if !args.is_new_block() {
+            return;
+        }
         {
             let (len, vertical_dir) = get_stalagmite_or_stalactice_len_and_dir_from_tip_pos(
                 args.world,

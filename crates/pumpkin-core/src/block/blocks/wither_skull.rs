@@ -89,6 +89,9 @@ impl BlockBehaviour for WitherSkeletonSkullBlock {
     }
 
     fn placed(&self, args: PlacedArgs<'_>) {
+        if !args.is_new_block() {
+            return;
+        }
         args.world
             .add_block_entity(Arc::new(SkullBlockEntity::new(*args.position)));
 

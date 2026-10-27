@@ -25,6 +25,9 @@ impl JukeboxBlock {
 impl BlockBehaviour for JukeboxBlock {
     /// Called when the jukebox is placed - creates the block entity
     fn placed(&self, args: PlacedArgs<'_>) {
+        if !args.is_new_block() {
+            return;
+        }
         let block_entity = JukeboxBlockEntity::new(*args.position);
         args.world.add_block_entity(Arc::new(block_entity));
     }

@@ -4,9 +4,13 @@ use pumpkin_data::{Block, BlockDirection, BlockStateId};
 use pumpkin_macros::pumpkin_block;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_world::tick::TickPriority;
-use pumpkin_world::world::BlockAccessor;
+use pumpkin_world::world::{BlockAccessor, BlockFlags};
 
-use crate::block::{BlockBehaviour, CanPlaceAtArgs, GetStateForNeighborUpdateArgs, OnPlaceArgs};
+use crate::block::{
+    BlockBehaviour, CanPlaceAtArgs, GetStateForNeighborUpdateArgs, OnPlaceArgs,
+    OnScheduledTickArgs, PlacedArgs,
+};
+use crate::entity::falling::FallingEntity;
 
 #[pumpkin_block("minecraft:scaffolding")]
 pub struct ScaffoldingBlock;
@@ -57,6 +61,13 @@ impl BlockBehaviour for ScaffoldingBlock {
         props.to_state_id(args.block)
     }
 
+    /// Vanilla `ScaffoldingBlock.onPlace`: every state change schedules the distance check.
+    fn placed(&self, args: PlacedArgs<'_>) {
+        args.world
+            .schedule_block_tick(args.block, *args.position, 1, TickPriority::Normal);
+    }
+
+    /// Vanilla `ScaffoldingBlock.updateShape`: the state stays; the scheduled tick recomputes it.
     fn get_state_for_neighbor_update(
         &self,
         args: GetStateForNeighborUpdateArgs<'_>,
@@ -70,13 +81,32 @@ impl BlockBehaviour for ScaffoldingBlock {
                 TickPriority::Normal,
             );
         }
-        let distance = Self::get_distance(args.world, args.position);
-        if distance == 7 {
-            return Block::AIR.default_state.id;
-        }
+        args.world
+            .schedule_block_tick(args.block, *args.position, 1, TickPriority::Normal);
+        args.state_id
+    }
+
+    /// Vanilla `ScaffoldingBlock.tick`.
+    fn on_scheduled_tick(&self, args: OnScheduledTickArgs<'_>) {
+        let state_id = args.world.get_block_state_id(args.position);
+        let props = ScaffoldingLikeProperties::from_state_id(state_id);
+        let distance = Self::get_distance(args.world.as_ref(), args.position);
         let mut new_props = props;
         new_props.distance = distance;
-        new_props.bottom = Self::is_bottom(args.world, args.position, distance);
-        new_props.to_state_id(args.block)
+        new_props.bottom = Self::is_bottom(args.world.as_ref(), args.position, distance);
+        let new_state_id = new_props.to_state_id(args.block);
+        if distance == 7 {
+            if props.distance == 7 {
+                // `FallingBlockEntity.fall`.
+                let _ = FallingEntity::replace_spawn(args.world, *args.position, new_state_id);
+            } else {
+                // `destroyBlock(pos, true)`.
+                args.world
+                    .break_block(args.position, None, BlockFlags::NOTIFY_ALL);
+            }
+        } else if new_state_id != state_id {
+            args.world
+                .set_block_state(args.position, new_state_id, BlockFlags::NOTIFY_ALL);
+        }
     }
 }

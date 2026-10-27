@@ -110,6 +110,9 @@ impl BlockBehaviour for CarvedPumpkinBlock {
     }
 
     fn placed(&self, args: PlacedArgs<'_>) {
+        if !args.is_new_block() {
+            return;
+        }
         if let Some(pattern) = find_golem_pattern(args.world, args.position) {
             spawn_golem(args.world, pattern);
         }

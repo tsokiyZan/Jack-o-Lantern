@@ -101,6 +101,9 @@ fn placed_chest_impl<E: BlockEntity + 'static>(
     args: &PlacedArgs<'_>,
     create_entity: impl FnOnce(BlockPos) -> E,
 ) {
+    if !args.is_new_block() {
+        return;
+    }
     let chest = create_entity(*args.position);
     args.world.add_block_entity(Arc::new(chest));
 

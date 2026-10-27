@@ -53,6 +53,9 @@ impl BlockBehaviour for BedBlock {
     }
 
     fn placed(&self, args: PlacedArgs<'_>) {
+        if !args.is_new_block() {
+            return;
+        }
         {
             let bed_entity = BedBlockEntity::new(*args.position);
             args.world.add_block_entity(Arc::new(bed_entity));

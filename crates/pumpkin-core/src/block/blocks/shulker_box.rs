@@ -64,6 +64,9 @@ impl BlockBehaviour for ShulkerBoxBlock {
     }
 
     fn placed(&self, args: PlacedArgs<'_>) {
+        if !args.is_new_block() {
+            return;
+        }
         {
             let barrel_block_entity = ShulkerBoxBlockEntity::new(*args.position);
             args.world.add_block_entity(Arc::new(barrel_block_entity));

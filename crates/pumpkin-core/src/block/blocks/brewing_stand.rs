@@ -80,6 +80,9 @@ impl BlockBehaviour for BrewingStandBlock {
     }
 
     fn placed(&self, args: PlacedArgs<'_>) {
+        if !args.is_new_block() {
+            return;
+        }
         let be = BrewingStandBlockEntity::new(*args.position);
         args.world.add_block_entity(Arc::new(be));
     }

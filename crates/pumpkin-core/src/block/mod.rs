@@ -389,6 +389,15 @@ pub struct PlacedArgs<'a> {
     pub notify: bool,
 }
 
+impl PlacedArgs<'_> {
+    /// Vanilla `!oldState.is(state.getBlock())`: `placed` runs on every state change, and most
+    /// blocks only act when the block itself is new.
+    #[must_use]
+    pub fn is_new_block(&self) -> bool {
+        Block::from_state_id(self.old_state_id) != self.block
+    }
+}
+
 pub struct PlayerPlacedArgs<'a> {
     pub world: &'a Arc<World>,
     pub block: &'a Block,

@@ -6480,7 +6480,12 @@ impl World {
             );
         }
 
-        if !flags.contains(BlockFlags::SKIP_BLOCK_ADDED_CALLBACK) && is_new_block {
+        // LevelChunk.setBlockState: `onPlace` runs on every state change, not only a new
+        // block, as long as the removal callbacks left the new block in place. Each block
+        // guards on `oldState.is(block)` itself where vanilla does.
+        if !flags.contains(BlockFlags::SKIP_BLOCK_ADDED_CALLBACK)
+            && self.get_block(position) == new_block
+        {
             self.block_registry.on_placed(
                 self,
                 new_block,
@@ -6489,15 +6494,18 @@ impl World {
                 replaced_block_state_id,
                 block_moved,
             );
-            let new_fluid = self.get_fluid(position);
-            self.block_registry.on_placed_fluid(
-                self,
-                new_fluid,
-                block_state_id,
-                position,
-                replaced_block_state_id,
-                block_moved,
-            );
+            // LiquidBlock.onPlace: only a liquid block, not a waterlogged one.
+            if new_block == &Block::WATER || new_block == &Block::LAVA {
+                let new_fluid = self.get_fluid(position);
+                self.block_registry.on_placed_fluid(
+                    self,
+                    new_fluid,
+                    block_state_id,
+                    position,
+                    replaced_block_state_id,
+                    block_moved,
+                );
+            }
         }
 
         // Level.java setBlock

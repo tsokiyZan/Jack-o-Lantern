@@ -84,6 +84,9 @@ impl BlockBehaviour for BarrelBlock {
     }
 
     fn placed(&self, args: PlacedArgs<'_>) {
+        if !args.is_new_block() {
+            return;
+        }
         let barrel_block_entity = BarrelBlockEntity::new(*args.position);
         args.world.add_block_entity(Arc::new(barrel_block_entity));
     }

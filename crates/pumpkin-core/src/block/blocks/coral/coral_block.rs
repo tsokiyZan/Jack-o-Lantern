@@ -19,6 +19,9 @@ impl BlockMetadata for CoralBlock {
 }
 impl BlockBehaviour for CoralBlock {
     fn placed(&self, args: PlacedArgs<'_>) {
+        if !args.is_new_block() {
+            return;
+        }
         {
             if !scan_for_water(args.world, args.position) && !is_dead_coral(args.block) {
                 try_schedule_die_tick(args.block, args.world, args.position);

@@ -24,6 +24,9 @@ impl BlockBehaviour for ShelfBlock {
     }
 
     fn placed(&self, args: PlacedArgs<'_>) {
+        if !args.is_new_block() {
+            return;
+        }
         {
             let entity = ShelfBlockEntity::new(*args.position);
             args.world.add_block_entity(Arc::new(entity));

@@ -92,6 +92,9 @@ impl BlockBehaviour for RailBlock {
     }
 
     fn placed(&self, args: PlacedArgs<'_>) {
+        if !args.is_new_block() {
+            return;
+        }
         update_flanking_rails_shape(args.world, args.block, args.state_id, args.position);
     }
 

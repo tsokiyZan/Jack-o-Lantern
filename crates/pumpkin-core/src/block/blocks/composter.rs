@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::{
     block::{
         BlockBehaviour, GetComparatorOutputArgs, NormalUseArgs, OnScheduledTickArgs,
-        PathComputationType, UseWithItemArgs, registry::BlockActionResult,
+        PathComputationType, PlacedArgs, UseWithItemArgs, registry::BlockActionResult,
     },
     entity::{Entity, item::ItemEntity},
     world::World,
@@ -82,6 +82,15 @@ impl BlockBehaviour for ComposterBlock {
         }
     }
 
+    /// Vanilla `ComposterBlock.onPlace`: reaching level 7 by any route schedules the tick that
+    /// makes bone meal ready.
+    fn placed(&self, args: PlacedArgs<'_>) {
+        if ComposterLikeProperties::from_state_id(args.state_id).level == 7 {
+            args.world
+                .schedule_block_tick(args.block, *args.position, 20, TickPriority::Normal);
+        }
+    }
+
     fn on_scheduled_tick(&self, args: OnScheduledTickArgs<'_>) {
         let state_id = args.world.get_block_state_id(args.position);
         let props = ComposterLikeProperties::from_state_id(state_id);
@@ -115,9 +124,6 @@ impl ComposterBlock {
         let mut props = ComposterLikeProperties::from_state_id(state_id);
         props.level = level;
         world.set_block_state(location, props.to_state_id(block), BlockFlags::NOTIFY_ALL);
-        if level == 7 {
-            world.schedule_block_tick(block, *location, 20, TickPriority::Normal);
-        }
     }
 
     pub fn clear_composter(

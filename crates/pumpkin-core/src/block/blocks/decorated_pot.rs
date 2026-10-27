@@ -30,6 +30,9 @@ impl BlockBehaviour for DecoratedPotBlock {
     }
 
     fn placed(&self, args: PlacedArgs<'_>) {
+        if !args.is_new_block() {
+            return;
+        }
         let entity = DecoratedPotBlockEntity::new(*args.position);
         args.world.add_block_entity(Arc::new(entity));
     }

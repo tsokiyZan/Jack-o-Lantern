@@ -33,6 +33,9 @@ impl BlockBehaviour for KelpBlock {
         )
     }
     fn placed(&self, args: PlacedArgs<'_>) {
+        if !args.is_new_block() {
+            return;
+        }
         {
             let support_pos = args.position.down();
             let support_block = args.world.get_block(&support_pos);

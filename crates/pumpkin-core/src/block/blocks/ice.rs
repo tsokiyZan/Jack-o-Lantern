@@ -46,7 +46,11 @@ fn slightly_melt(world: &Arc<World>, pos: &BlockPos, block: &Block, age: u8) -> 
     if age < 3 {
         let mut new_props = NetherWartLikeProperties::default(block);
         new_props.r#age = age + 1;
-        world.set_block_state(pos, new_props.to_state_id(block), BlockFlags::NOTIFY_ALL);
+        world.set_block_state(
+            pos,
+            new_props.to_state_id(block),
+            BlockFlags::NOTIFY_LISTENERS,
+        );
         false
     } else {
         melt(world, pos);

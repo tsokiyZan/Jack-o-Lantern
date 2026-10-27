@@ -124,7 +124,7 @@ impl BlockBehaviour for PistonBlock {
     }
 
     fn placed(&self, args: PlacedArgs<'_>) {
-        if args.old_state_id == args.state_id {
+        if !args.is_new_block() {
             return;
         }
         try_move(args.world, args.block, args.position);

@@ -120,6 +120,9 @@ impl BlockBehaviour for DropperBlock {
     }
 
     fn placed(&self, args: PlacedArgs<'_>) {
+        if !args.is_new_block() {
+            return;
+        }
         let dropper_block_entity = DropperBlockEntity::new(*args.position);
         args.world.add_block_entity(Arc::new(dropper_block_entity));
     }

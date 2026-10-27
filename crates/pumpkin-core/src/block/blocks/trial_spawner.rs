@@ -10,6 +10,9 @@ pub struct TrialSpawnerBlock;
 
 impl BlockBehaviour for TrialSpawnerBlock {
     fn placed(&self, args: PlacedArgs<'_>) {
+        if !args.is_new_block() {
+            return;
+        }
         let entity = TrialSpawnerBlockEntity::new(*args.position);
         args.world.add_block_entity(Arc::new(entity));
     }

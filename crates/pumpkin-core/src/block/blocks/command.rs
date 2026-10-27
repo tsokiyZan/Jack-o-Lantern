@@ -334,6 +334,9 @@ impl BlockBehaviour for CommandBlock {
     }
 
     fn placed(&self, args: PlacedArgs<'_>) {
+        if !args.is_new_block() {
+            return;
+        }
         {
             let send_command_feedback = {
                 let game_rules = &args.world.level_info.load().game_rules;
