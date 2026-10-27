@@ -732,6 +732,27 @@ impl MobEntity {
         self.set_guaranteed_drop(slot);
     }
 
+    /// Vanilla `Mob.dropPreservedEquipment(level)`: drops every guaranteed-drop item.
+    pub fn drop_preserved_equipment(&self) {
+        // Vanilla `EquipmentSlot.VALUES` order.
+        for slot in [
+            EquipmentSlot::MAIN_HAND,
+            EquipmentSlot::OFF_HAND,
+            EquipmentSlot::FEET,
+            EquipmentSlot::LEGS,
+            EquipmentSlot::CHEST,
+            EquipmentSlot::HEAD,
+            EquipmentSlot::BODY,
+            EquipmentSlot::SADDLE,
+        ] {
+            let stack = self.get_item_slot(&slot);
+            if !stack.is_empty() && self.drop_chance(&slot) > 1.0 {
+                self.set_item_slot(&slot, ItemStack::EMPTY.clone());
+                self.living_entity.entity.spawn_at_location(stack);
+            }
+        }
+    }
+
     fn write_drop_chances(&self, nbt: &mut NbtCompound) {
         let chances = self
             .living_entity

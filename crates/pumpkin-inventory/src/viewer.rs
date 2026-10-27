@@ -26,7 +26,12 @@ impl ViewerCountTracker {
     }
 
     pub fn close_container(&self) {
-        self.current.fetch_sub(1, Ordering::Relaxed);
+        // A recheck may already have dropped this viewer from the count.
+        let _ = self
+            .current
+            .try_update(Ordering::Relaxed, Ordering::Relaxed, |count| {
+                Some(count.saturating_sub(1))
+            });
     }
 
     /// Returns the current number of players viewing this container

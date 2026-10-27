@@ -22,6 +22,7 @@ use crate::block::blocks::chiseled_bookshelf::ChiseledBookshelfBlock;
 use crate::block::blocks::command::CommandBlock;
 use crate::block::blocks::composter::ComposterBlock;
 use crate::block::blocks::conduit::ConduitBlock;
+use crate::block::blocks::copper_golem_statue::CopperGolemStatueBlock;
 use crate::block::blocks::coral::coral_block::CoralBlock;
 use crate::block::blocks::coral::coral_fan::CoralFanBlock;
 use crate::block::blocks::coral::coral_plant::CoralPlantBlock;
@@ -362,6 +363,7 @@ pub fn default_registry() -> Arc<BlockRegistry> {
 
     // Weathering copper blocks
     manager.register(WeatheringCopperBlock);
+    manager.register(CopperGolemStatueBlock);
     manager.register(WeatheringCopperChainBlock);
     manager.register(WeatheringCopperDoorBlock);
     manager.register(WeatheringCopperGrateBlock);
