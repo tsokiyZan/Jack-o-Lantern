@@ -95,6 +95,7 @@ impl SnowGolemEntity {
         let drop_pos = entity.pos.load()
             + pumpkin_util::math::vector3::Vector3::new(0.0, entity.get_eye_height(), 0.0);
         self.mob_entity.living_entity.drop_from_shearing_loot_table(
+            self,
             "minecraft:shearing/snow_golem",
             tool,
             |drop| world.spawn_item_at(drop_pos, drop),

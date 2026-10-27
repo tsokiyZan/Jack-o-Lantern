@@ -495,7 +495,7 @@ impl Mob for EndermanEntity {
             block_state: Some(state),
             position: Some(entity.pos.load()),
             tool: Some(tool),
-            this_entity: Some(entity.entity_type),
+            this_entity: Some(self),
             ..Default::default()
         };
         let pos = entity.block_pos.load();

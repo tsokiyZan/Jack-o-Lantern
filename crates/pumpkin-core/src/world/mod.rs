@@ -6664,6 +6664,8 @@ impl World {
                 block_state: Some(broken_block_state),
                 position: Some(position.to_f64()),
                 killed_by_player: Some(cause.is_some()),
+                // `THIS_ENTITY`: the breaker, which `entity_properties` conditions read.
+                this_entity: cause.map(|player| player.as_ref() as &dyn crate::entity::EntityBase),
                 ..Default::default()
             };
             crate::block::drop_loot(self, broken_block, position, true, &params);

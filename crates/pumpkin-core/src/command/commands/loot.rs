@@ -412,7 +412,15 @@ impl CommandExecutor for LootExecutor {
                         },
                     ),
                     tool: killer_tool,
-                    position: killer.as_ref().map(|p| p.position()),
+                    // `ORIGIN`: `source.getPosition()`, for any source.
+                    position: Some(context.source.position),
+                    // `DIRECT_ATTACKING_ENTITY` is the source: its main hand decides
+                    // `equipment` predicates such as the fire-aspect smelt.
+                    direct_attacker_weapon: context.source.entity.as_ref().and_then(|direct| {
+                        direct
+                            .get_living_entity()
+                            .map(|living| living.held_item(direct.as_ref()))
+                    }),
                     ..Default::default()
                 };
 
@@ -430,6 +438,15 @@ impl CommandExecutor for LootExecutor {
                     });
                     match context.server().datapack_manager.get_loot_table(&key) {
                         Some(loot_table) => {
+                            // `THIS_ENTITY` is the target, `ATTACKING_ENTITY` and
+                            // `DIRECT_ATTACKER` the source, and `DAMAGE_SOURCE` is magic.
+                            let params = LootContextParameters {
+                                this_entity: Some(entity.as_ref()),
+                                killer_entity: context.source.entity.as_deref(),
+                                direct_killer_entity: context.source.entity.as_deref(),
+                                damage_type: Some(pumpkin_data::damage::DamageType::MAGIC),
+                                ..params.clone()
+                            };
                             drops.extend(crate::world::loot::generate_loot_from_handle(
                                 &loot_table,
                                 context.world(),

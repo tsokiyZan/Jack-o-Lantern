@@ -674,8 +674,7 @@ impl Raids {
         let pos_f64 = pos.to_f64();
         self.raid_map.values().find(|r| {
             r.is_active()
-                && r.center.to_f64().squared_distance_to_vec(&pos_f64)
-                    <= Raid::VALID_RAID_RADIUS_SQR
+                && r.center.to_f64().squared_distance_to_vec(&pos_f64) < Raid::VALID_RAID_RADIUS_SQR
         })
     }
 
@@ -683,8 +682,7 @@ impl Raids {
         let pos_f64 = pos.to_f64();
         self.raid_map.values_mut().find(|r| {
             r.is_active()
-                && r.center.to_f64().squared_distance_to_vec(&pos_f64)
-                    <= Raid::VALID_RAID_RADIUS_SQR
+                && r.center.to_f64().squared_distance_to_vec(&pos_f64) < Raid::VALID_RAID_RADIUS_SQR
         })
     }
 

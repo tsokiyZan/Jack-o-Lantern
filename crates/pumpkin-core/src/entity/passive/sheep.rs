@@ -136,6 +136,7 @@ impl SheepEntity {
         self.mob_entity
             .living_entity
             .drop_from_nested_shearing_loot_table(
+                self,
                 "minecraft:shearing/sheep",
                 &format!("minecraft:shearing/sheep/{color}"),
                 tool,
@@ -196,6 +197,21 @@ impl Animal for SheepEntity {
 const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::SHEEP_BABY_DIMENSIONS;
 
 impl Mob for SheepEntity {
+    fn mob_get_component(
+        &self,
+        component: pumpkin_data::data_component::DataComponent,
+    ) -> Option<Box<dyn pumpkin_data::data_component_impl::DataComponentImpl>> {
+        use pumpkin_data::{
+            data_component::DataComponent, data_component_impl::SheepColorImpl, dye_color::DyeColor,
+        };
+        match component {
+            DataComponent::SheepColor => Some(Box::new(SheepColorImpl {
+                value: DyeColor::from(self.get_color()).name().into(),
+            })),
+            _ => None,
+        }
+    }
+
     /// Vanilla `Sheep.getDefaultDimensions`.
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
         let entity = self.get_entity();

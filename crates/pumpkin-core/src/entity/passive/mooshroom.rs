@@ -268,6 +268,21 @@ const BABY_DIMENSIONS: EntityDimensions =
     pumpkin_data::entity_dimensions::MUSHROOM_COW_BABY_DIMENSIONS;
 
 impl Mob for MooshroomEntity {
+    fn mob_get_component(
+        &self,
+        component: pumpkin_data::data_component::DataComponent,
+    ) -> Option<Box<dyn pumpkin_data::data_component_impl::DataComponentImpl>> {
+        use pumpkin_data::{
+            data_component::DataComponent, data_component_impl::MooshroomVariantImpl,
+        };
+        match component {
+            DataComponent::MooshroomVariant => Some(Box::new(MooshroomVariantImpl {
+                value: self.get_variant().as_str().into(),
+            })),
+            _ => None,
+        }
+    }
+
     /// Vanilla `MushroomCow.thunderHit`: a new bolt swaps the variant (a bolt strikes on several
     /// ticks), with no damage or fire from `super`.
     fn mob_on_lightning_strike(
@@ -504,6 +519,7 @@ impl MooshroomEntity {
                 self.mob_entity
                     .living_entity
                     .drop_from_nested_shearing_loot_table(
+                        self,
                         "minecraft:shearing/mooshroom",
                         table,
                         tool,
