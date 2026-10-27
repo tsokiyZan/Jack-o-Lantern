@@ -90,14 +90,9 @@ impl Goal for RunAroundLikeCrazyGoal {
             }
             horse.modify_temper(5);
         }
-        for passenger in entity
-            .passengers
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone()
-        {
-            entity.remove_passenger(passenger.get_entity().entity_id);
-        }
+        // `ejectPassengers`. A `for` over `passengers.lock().clone()` would keep the guard
+        // alive through the loop, and `remove_passenger` locks it again: a deadlock.
+        entity.eject_passengers();
         horse.make_mad();
         entity
             .world
