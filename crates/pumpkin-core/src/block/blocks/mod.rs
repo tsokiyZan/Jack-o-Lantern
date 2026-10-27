@@ -82,6 +82,7 @@ pub mod carved_pumpkin;
 pub mod dripstone;
 pub mod farmland;
 pub mod hay;
+pub mod huge_mushroom;
 pub mod leaves;
 pub mod logs;
 pub mod mangrove_roots;

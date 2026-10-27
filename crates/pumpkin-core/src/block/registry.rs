@@ -222,6 +222,7 @@ use crate::block::blocks::enchanting_table::EnchantingTableBlock;
 use crate::block::blocks::end_rod::EndRodBlock;
 use crate::block::blocks::ender_chest::EnderChestBlock;
 use crate::block::blocks::hopper::HopperBlock;
+use crate::block::blocks::huge_mushroom::HugeMushroomBlock;
 use crate::block::blocks::jukebox::JukeboxBlock;
 use crate::block::blocks::ladder::LadderBlock;
 use crate::block::blocks::lanterns::LanternBlock;
@@ -346,6 +347,7 @@ pub fn default_registry() -> Arc<BlockRegistry> {
     manager.register(TrapDoorBlock);
     manager.register(MushroomPlantBlock);
     manager.register(ShelfMushroomBlock);
+    manager.register(HugeMushroomBlock);
     manager.register(FlowerbedBlock);
     manager.register(LeafLitterBlock);
     manager.register(WallBlock);
