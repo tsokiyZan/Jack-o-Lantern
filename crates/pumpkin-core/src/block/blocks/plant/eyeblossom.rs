@@ -26,9 +26,9 @@ use crate::{
 const EYEBLOSSOM_XZ_RANGE: i32 = 3;
 const EYEBLOSSOM_Y_RANGE: i32 = 2;
 /// The `particleColor` of vanilla's `EyeblossomBlock.Type.OPEN`.
-const OPEN_PARTICLE_COLOR: i32 = 16_545_810;
+pub(crate) const OPEN_PARTICLE_COLOR: i32 = 16_545_810;
 /// The `particleColor` of vanilla's `EyeblossomBlock.Type.CLOSED`.
-const CLOSED_PARTICLE_COLOR: i32 = 6_250_335;
+pub(crate) const CLOSED_PARTICLE_COLOR: i32 = 6_250_335;
 
 pub struct EyeblossomBlock;
 
@@ -120,7 +120,7 @@ impl BlockBehaviour for EyeblossomBlock {
 impl PlantBlockBase for EyeblossomBlock {}
 
 /// Vanilla's `EyeblossomBlock.Type.spawnTransformParticle`.
-fn spawn_transform_particle(world: &World, pos: &BlockPos, particle_color: i32) {
+pub(crate) fn spawn_transform_particle(world: &World, pos: &BlockPos, particle_color: i32) {
     let mut rng = rand::rng();
     let start = pos.to_centered_f64();
     let lifetime = 0.5 + rng.random::<f64>();

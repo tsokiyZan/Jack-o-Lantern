@@ -46,3 +46,50 @@ pub const fn get_potted_item(item_id: u16) -> BlockId {
     };
     BlockId::new_or_air(raw_id)
 }
+#[doc = r" The item id of the plant in a potted block (vanilla `FlowerPotBlock.potted` as an"]
+#[doc = r" item), or `None` for the empty pot or any other block."]
+#[must_use]
+pub const fn get_potted_content(potted_block_id: u16) -> Option<u16> {
+    match potted_block_id {
+        464 => Some(77),
+        465 => Some(78),
+        466 => Some(79),
+        467 => Some(80),
+        468 => Some(81),
+        469 => Some(82),
+        470 => Some(83),
+        471 => Some(84),
+        473 => Some(85),
+        472 => Some(86),
+        474 => Some(239),
+        1266 => Some(242),
+        1267 => Some(243),
+        491 => Some(244),
+        475 => Some(298),
+        476 => Some(299),
+        1283 => Some(300),
+        1284 => Some(301),
+        477 => Some(302),
+        478 => Some(303),
+        479 => Some(304),
+        480 => Some(305),
+        481 => Some(306),
+        482 => Some(307),
+        483 => Some(308),
+        484 => Some(309),
+        485 => Some(310),
+        486 => Some(311),
+        487 => Some(312),
+        488 => Some(313),
+        463 => Some(314),
+        490 => Some(317),
+        489 => Some(318),
+        1009 => Some(320),
+        1010 => Some(321),
+        1011 => Some(322),
+        1012 => Some(323),
+        883 => Some(340),
+        492 => Some(413),
+        _ => None,
+    }
+}
