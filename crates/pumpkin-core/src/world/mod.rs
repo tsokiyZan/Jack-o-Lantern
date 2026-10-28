@@ -6498,7 +6498,11 @@ impl World {
             self.remove_block_entity(position);
         }
 
-        if is_new_block && (flags.contains(BlockFlags::NOTIFY_NEIGHBORS) || block_moved) {
+        // LevelChunk.setBlockState: a rail runs `affectNeighborsAfterRemoval` on every state
+        // change too (`newBlock instanceof BaseRailBlock`).
+        if (is_new_block || new_block.has_tag(&pumpkin_data::tag::Block::MINECRAFT_RAILS))
+            && (flags.contains(BlockFlags::NOTIFY_NEIGHBORS) || block_moved)
+        {
             self.block_registry.on_state_replaced(
                 self,
                 old_block,
