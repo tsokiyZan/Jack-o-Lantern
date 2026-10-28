@@ -201,4 +201,3 @@ pub fn block_receives_redstone_power(world: &World, pos: &BlockPos) -> bool {
 pub fn is_diode(block: &Block) -> bool {
     block == &Block::REPEATER || block == &Block::COMPARATOR
 }
-

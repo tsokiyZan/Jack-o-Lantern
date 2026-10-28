@@ -3,7 +3,6 @@ use pumpkin_util::Hand;
 use std::any::Any;
 use std::sync::atomic::Ordering;
 
-use crate::enchantment::EnchantmentHelper;
 use crate::entity::EntityBase;
 use crate::entity::player::Player;
 use crate::entity::projectile::arrow::ArrowEntity;
@@ -81,28 +80,27 @@ impl BowItem {
                 stack.copy_with_count(1)
             },
         );
-        // Vanilla `useAmmo`: Infinity's requirement looks at the ammo.
-        let ammo_to_use =
-            EnchantmentHelper::process_ammo_use(&player.world(), weapon, &projectile, 1);
+        // Vanilla `draw`: an arrow `useAmmo` doesn't take (Infinity, creative) is marked
+        // `INTANGIBLE_PROJECTILE`, so it can't be picked up.
+        let projectiles = ProjectileWeaponItem::draw(
+            &player.world(),
+            weapon,
+            &projectile,
+            gamemode == GameMode::Creative,
+        );
 
         // Calculate power and fire
         let power = Self::get_power_for_time(use_ticks);
 
         let is_crit = (power - 1.0).abs() < f32::EPSILON;
-        Self::shoot(
-            player,
-            weapon,
-            std::slice::from_ref(&projectile),
-            power,
-            1.0,
-            is_crit,
-        );
+        Self::shoot(player, weapon, &projectiles, power, 1.0, is_crit);
 
-        // Consume arrow (if not creative and no Infinity)
-        if let Some(slot) = arrow_slot
-            && gamemode != GameMode::Creative
-            && ammo_to_use > 0
-        {
+        // The ammo `useAmmo` took.
+        if let Some(slot) = arrow_slot && projectiles.first().is_some_and(|drawn| {
+            drawn
+                .get_data_component::<pumpkin_data::data_component_impl::IntangibleProjectileImpl>()
+                .is_none()
+        }) {
             player.consume_arrow(slot);
         }
 
@@ -135,14 +133,12 @@ impl BowItem {
         is_crit: bool,
     ) -> ArrowEntity {
         let world = player.world();
-        let is_creative = player.gamemode.load() == GameMode::Creative;
         ProjectileWeaponItem::create_projectile(
             world,
             player.get_entity(),
             weapon,
             projectile,
             is_crit,
-            is_creative,
         )
     }
 
@@ -160,7 +156,6 @@ impl BowItem {
         }
 
         let world = player.world();
-        let is_creative = player.gamemode.load() == GameMode::Creative;
         let speed = power * ProjectileWeaponItem::ARROW_SPEED_MULTIPLIER;
 
         ProjectileWeaponItem::shoot_projectiles(
@@ -171,7 +166,6 @@ impl BowItem {
             speed,
             uncertainty,
             is_crit,
-            is_creative,
             true,
         );
 

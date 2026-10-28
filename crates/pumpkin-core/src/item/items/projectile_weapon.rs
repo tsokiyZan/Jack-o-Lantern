@@ -32,14 +32,17 @@ impl ProjectileWeaponItem {
         weapon: &ItemStack,
         projectile: &ItemStack,
         is_crit: bool,
-        is_creative: bool,
     ) -> ArrowEntity {
         let arrow_entity = Entity::new(
             world,
             shooter.pos.load(),
             ArrowEntity::entity_type_for_item(projectile.item),
         );
-        let pickup = if is_creative {
+        // `AbstractArrow`'s constructor: an intangible projectile is creative-only pickup.
+        let pickup = if projectile
+            .get_data_component::<pumpkin_data::data_component_impl::IntangibleProjectileImpl>()
+            .is_some()
+        {
             ArrowPickup::CreativeOnly
         } else {
             ArrowPickup::Allowed
@@ -128,7 +131,6 @@ impl ProjectileWeaponItem {
         power: f32,
         uncertainty: f32,
         is_crit: bool,
-        is_creative: bool,
         from_rotation: bool,
     ) {
         let shooter_entity = shooter.get_entity();
@@ -155,14 +157,8 @@ impl ProjectileWeaponItem {
             let angle = angle_offset + direction * (i.div_ceil(2) as f32) * angle_step;
             direction = -direction;
 
-            let arrow = Self::create_projectile(
-                world.clone(),
-                shooter_entity,
-                weapon,
-                projectile,
-                is_crit,
-                is_creative,
-            );
+            let arrow =
+                Self::create_projectile(world.clone(), shooter_entity, weapon, projectile, is_crit);
             if from_rotation {
                 // `BowItem.shootProjectile`.
                 arrow.set_velocity_from_rotation(

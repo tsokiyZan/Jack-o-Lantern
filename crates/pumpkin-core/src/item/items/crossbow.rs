@@ -154,7 +154,6 @@ impl CrossbowItem {
                     &player.position(),
                 );
 
-                let is_creative = player.gamemode.load() == GameMode::Creative;
                 ProjectileWeaponItem::shoot_projectiles(
                     &world,
                     player,
@@ -163,7 +162,6 @@ impl CrossbowItem {
                     Self::ARROW_POWER,
                     1.0,
                     false,
-                    is_creative,
                     false,
                 );
 
