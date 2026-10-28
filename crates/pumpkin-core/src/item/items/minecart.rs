@@ -6,11 +6,13 @@ use crate::entity::player::Player;
 use crate::entity::vehicle::minecart::MinecartEntity;
 use crate::item::{ItemBehaviour, ItemMetadata};
 use crate::server::Server;
+use crate::world::game_event::GameEventContext;
 use pumpkin_data::BlockDirection;
 use pumpkin_data::block_properties::{
     BlockProperties, PoweredRailLikeProperties, RailLikeProperties,
 };
 use pumpkin_data::entity::EntityType;
+use pumpkin_data::game_event::GameEvent;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::tag::Taggable;
@@ -88,6 +90,11 @@ impl ItemBehaviour for MinecartItem {
         );
         let minecart_entity = Arc::new(MinecartEntity::new(entity));
         world.spawn_entity(minecart_entity);
+        world.game_event(
+            GameEvent::EntityPlace,
+            location.to_centered_f64(),
+            GameEventContext::of(Some(player), Some(world.get_block_state(&location.down()))),
+        );
         item.decrement_unless_creative(player.gamemode.load(), 1);
         BlockActionResult::Success
     }

@@ -740,7 +740,10 @@ impl DataComponentImpl for LodestoneTrackerImpl {
             target_compound.put("pos", NbtTag::IntArray(vec![target.x, target.y, target.z]));
             compound.put_compound("target", target_compound);
         }
-        compound.put_bool("tracked", self.tracked);
+        // `optionalFieldOf("tracked", true)` leaves the default out.
+        if !self.tracked {
+            compound.put_bool("tracked", false);
+        }
         NbtTag::Compound(compound)
     }
     default_impl!(LodestoneTracker);

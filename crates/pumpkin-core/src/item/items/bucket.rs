@@ -241,8 +241,8 @@ pub(crate) fn try_pickup_fluid_at(
         return Some(&Item::WATER_BUCKET);
     }
 
+    // Vanilla `LiquidBlock.pickupBlock`: a source just becomes air (`setBlock(AIR, 11)`).
     if state == Block::LAVA.default_state.id || state == Block::WATER.default_state.id {
-        world.break_block(&block_pos, None, BlockFlags::NOTIFY_ALL);
         world.set_block_state(
             &block_pos,
             Block::AIR.default_state.id,
@@ -256,25 +256,6 @@ pub(crate) fn try_pickup_fluid_at(
     }
 
     None
-}
-
-fn try_pickup_bucket_item(
-    world: &Arc<World>,
-    block_pos: BlockPos,
-    direction: BlockDirection,
-) -> Option<&'static Item> {
-    if let Some(item) = try_pickup_fluid_at(world, block_pos) {
-        return Some(item);
-    }
-
-    let target_pos = block_pos.offset(direction.to_offset());
-    let (block, state) = world.get_block_and_state_id(&target_pos);
-
-    let unwaterlogged = block.set_waterlogged(state, false)?;
-
-    world.set_block_state(&target_pos, unwaterlogged, BlockFlags::NOTIFY_ALL);
-    world.schedule_fluid_tick(&Fluid::WATER, target_pos, 5, TickPriority::Normal);
-    Some(&Item::WATER_BUCKET)
 }
 
 pub(crate) const fn should_evaporate_in_nether(item: &Item, world: &World) -> bool {
@@ -416,9 +397,8 @@ impl ItemBehaviour for EmptyBucketItem {
         }
 
         let block_pos = hit.block_pos;
-        let direction = hit.direction;
 
-        let Some(item) = try_pickup_bucket_item(&world, block_pos, direction) else {
+        let Some(item) = try_pickup_fluid_at(&world, block_pos) else {
             return InteractionResult::FAIL;
         };
 
@@ -438,10 +418,12 @@ impl ItemBehaviour for EmptyBucketItem {
         }
 
         player.award_item_used(&Item::BUCKET);
-        world.play_sound(
+        // `player.playSound(pickupSound)`: at the player, for everyone but it.
+        world.play_sound_expect(
+            player,
             get_fill_sound(item),
-            SoundCategory::Blocks,
-            &block_pos.to_f64(),
+            SoundCategory::Players,
+            &player.position(),
         );
         world.game_event_from(
             Some(player),

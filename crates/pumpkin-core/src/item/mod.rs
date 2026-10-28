@@ -269,6 +269,75 @@ pub trait ItemBehaviour: Send + Sync {
     fn as_any(&self) -> &dyn Any;
 }
 
+/// Vanilla `ItemStack.causeUseVibration`: the game event at the causer, for items whose
+/// `use_effects` make vibrations. An emptied stack has no components, so it makes none.
+pub fn cause_use_vibration(
+    stack: &ItemStack,
+    causer: &dyn EntityBase,
+    event: pumpkin_data::game_event::GameEvent,
+) {
+    if !stack.is_empty()
+        && stack
+            .get_data_component::<pumpkin_data::data_component_impl::UseEffectsImpl>()
+            .is_some_and(|use_effects| use_effects.interact_vibrations)
+    {
+        let entity = causer.get_entity();
+        entity
+            .world
+            .load()
+            .game_event_from(Some(causer), event, entity.pos.load());
+    }
+}
+
+/// Vanilla `EntityType.getYOffset`: how far an entity spawned at `spawn_pos` sits above it.
+///
+/// `entity_box` is its box one block above `spawn_pos`. The box drops onto the collisions in
+/// the block, and the block below when `moved_up`.
+#[must_use]
+pub fn spawn_y_offset(
+    world: &crate::world::World,
+    spawn_pos: BlockPos,
+    moved_up: bool,
+    entity_box: &pumpkin_util::math::boundingbox::BoundingBox,
+) -> f64 {
+    use pumpkin_util::math::boundingbox::BoundingBox;
+    let mut area = BoundingBox::from_block(&spawn_pos);
+    if moved_up {
+        area.min.y -= 1.0;
+    }
+
+    // `level.getCollisions(null, area)`: entity collisions first, then block collisions.
+    let mut shapes: Vec<BoundingBox> = world
+        .get_all_at_box(&area.expand_all(1.0E-7))
+        .iter()
+        .filter(|entity| !entity.is_spectator() && entity.is_collidable(None))
+        .map(|entity| entity.get_entity().bounding_box.load())
+        .collect();
+    for pos in BlockPos::iterate(area.min_block_pos(), area.max_block_pos()) {
+        let state = world.get_block_state(&pos);
+        if state.is_air() {
+            continue;
+        }
+        shapes.extend(
+            state
+                .get_block_collision_shapes_at(&pos)
+                .map(|shape| shape.at_pos(pos))
+                .filter(|shape| shape.intersects(&area)),
+        );
+    }
+
+    // `Shapes.collide(Y, entityBox, shapes, movedUp ? -2 : -1)`.
+    let mut distance: f64 = if moved_up { -2.0 } else { -1.0 };
+    for shape in &shapes {
+        if distance.abs() < 1.0E-7 {
+            distance = 0.0;
+            break;
+        }
+        distance = shape.collide_along(entity_box, pumpkin_util::math::vector3::Axis::Y, distance);
+    }
+    1.0 + distance
+}
+
 /// Vanilla `Item.getPlayerPOVHitResult`'s ray: from the eyes along
 /// `calculateViewVector(xRot, yRot)` scaled by `blockInteractionRange()`.
 #[must_use]

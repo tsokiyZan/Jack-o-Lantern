@@ -4,7 +4,6 @@ use std::any::Any;
 use crate::entity::player::Player;
 use crate::item::{ItemBehaviour, ItemMetadata};
 use pumpkin_data::item::Item;
-use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_util::Hand;
 
 pub struct WritableBookItem;
@@ -25,11 +24,6 @@ impl ItemBehaviour for WritableBookItem {
         if item.id == Item::WRITTEN_BOOK.id {
             player.open_book(hand);
         }
-        player.world().play_sound(
-            Sound::ItemBookPageTurn,
-            SoundCategory::Players,
-            &player.position(),
-        );
         player.award_item_used(item);
         InteractionResult::SUCCESS
     }

@@ -9,10 +9,12 @@ use crate::entity::projectile::eye_of_ender::EyeOfEnder;
 use crate::item::{ItemBehaviour, ItemMetadata};
 use crate::server::Server;
 use crate::world::World;
+use crate::world::game_event::GameEventContext;
 use crate::world::portal::end::EndPortal;
 use pumpkin_data::BlockId;
 use pumpkin_data::block_properties::EndPortalFrameLikeProperties;
 use pumpkin_data::entity::EntityType;
+use pumpkin_data::game_event::GameEvent;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::{Sound, SoundCategory};
@@ -64,6 +66,7 @@ impl ItemBehaviour for EnderEyeItem {
         let new_state_id = props.to_state_id(block);
 
         world.set_block_state(&location, new_state_id, BlockFlags::NOTIFY_LISTENERS);
+        world.update_neighbour_for_output_signal(&location, &Block::END_PORTAL_FRAME);
         // Consume one item.
         item.decrement_unless_creative(player.gamemode.load(), 1);
         world.sync_world_event(WorldEvent::EndPortalFrameFill, location, 0);
@@ -100,11 +103,12 @@ impl ItemBehaviour for EnderEyeItem {
             return InteractionResult::CONSUME;
         };
 
+        // `new EyeOfEnder(level, player.getX(), player.getY(0.5), player.getZ())`.
+        let player_pos = player.get_entity().pos.load();
         let spawn_pos = Vector3::new(
-            player.get_entity().pos.load().x,
-            player.get_entity().pos.load().y
-                + f64::from(EntityType::EYE_OF_ENDER.dimension[1]) * 0.5,
-            player.get_entity().pos.load().z,
+            player_pos.x,
+            player_pos.y + f64::from(player.get_entity().height()) * 0.5,
+            player_pos.z,
         );
 
         let entity = Entity::new(world.clone(), spawn_pos, &EntityType::EYE_OF_ENDER);
@@ -117,20 +121,26 @@ impl ItemBehaviour for EnderEyeItem {
         );
         eye.signal_to(target_vec);
 
+        world.game_event(
+            GameEvent::ProjectileShoot,
+            eye.get_entity().pos.load(),
+            GameEventContext::of_entity(player),
+        );
         world.spawn_entity(eye);
+        player.trigger_advancement(
+            crate::entity::player::advancement::trigger::AdvancementTrigger::LaunchedEyeOfEnder,
+        );
 
-        let pitch = 0.33f32 + rand::random::<f32>() * (0.5 - 0.33);
+        // `Mth.lerp(level.getRandom().nextFloat(), 0.33, 0.5)`, at the player.
+        let pitch = 0.33f32 + world.random_f32() * (0.5 - 0.33);
         world.play_sound_fine(
             Sound::EntityEnderEyeLaunch,
             SoundCategory::Neutral,
-            &spawn_pos,
+            &player_pos,
             1.0,
             pitch,
         );
 
-        player.trigger_advancement(
-            crate::entity::player::advancement::trigger::AdvancementTrigger::LaunchedEyeOfEnder,
-        );
         crate::item::consume_in_hand(player, hand);
         player.award_item_used(&Item::ENDER_EYE);
         InteractionResult::SUCCESS_SERVER

@@ -4,6 +4,7 @@ use crate::block::registry::BlockActionResult;
 use crate::entity::player::Player;
 use crate::item::{ItemBehaviour, ItemMetadata};
 use crate::server::Server;
+use pumpkin_data::game_event::GameEvent;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::world::WorldEvent;
@@ -38,9 +39,15 @@ impl ItemBehaviour for BoneMealItem {
             .block_registry
             .bone_meal(block, &world, &location, state_id)
         {
-            world.sync_world_event(WorldEvent::ParticlesAndSoundPlantGrowth, location, 15);
+            // Vanilla shrinks the stack (restored afterwards in creative) before the
+            // vibration, so the last bone meal makes none.
+            let vibrates = item.item_count > 1;
             item.decrement_unless_creative(player.gamemode.load(), 1);
-            BlockActionResult::Success
+            if vibrates {
+                crate::item::cause_use_vibration(item, player, GameEvent::ItemInteractFinish);
+            }
+            world.sync_world_event(WorldEvent::ParticlesAndSoundPlantGrowth, location, 15);
+            BlockActionResult::SuccessServer
         } else {
             BlockActionResult::Pass
         }

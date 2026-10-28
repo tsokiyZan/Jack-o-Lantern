@@ -42,6 +42,58 @@ impl FishingBobberEntity {
         }
     }
 
+    /// Vanilla `FishingHook(Player, Level, luck, lureSpeed)`: cast from beside the player's
+    /// eyes, aimed along its look with a random spread from the hook's own random.
+    pub fn new_cast(entity: Entity, owner: &Player) -> Self {
+        use pumpkin_util::math::{atan2, cos, sin};
+        use pumpkin_util::random::RandomImpl;
+        const PI: f32 = std::f32::consts::PI;
+        let (y_rot, x_rot) = owner.rotation();
+        let y_cos = cos(-y_rot * (PI / 180.0) - PI);
+        let y_sin = sin(-y_rot * (PI / 180.0) - PI);
+        let x_cos = -cos(-x_rot * (PI / 180.0));
+        let x_sin = sin(-x_rot * (PI / 180.0));
+        let owner_pos = owner.living_entity.entity.pos.load();
+        entity.pos.store(Vector3::new(
+            owner_pos.x - f64::from(y_sin) * 0.3,
+            owner.eye_position().y,
+            owner_pos.z - f64::from(y_cos) * 0.3,
+        ));
+
+        let direction = Vector3::new(
+            f64::from(-y_sin),
+            f64::from((-(x_sin / x_cos)).clamp(-5.0, 5.0)),
+            f64::from(-y_cos),
+        );
+        let dist = direction.length();
+        let (sx, sy, sz) = {
+            let mut random = entity.random();
+            (
+                0.6 / dist + random.next_triangular(0.5, 0.010_336_5),
+                0.6 / dist + random.next_triangular(0.5, 0.010_336_5),
+                0.6 / dist + random.next_triangular(0.5, 0.010_336_5),
+            )
+        };
+        let velocity = direction.multiply(sx, sy, sz);
+        entity.velocity.store(velocity);
+        // `(float)(Mth.atan2(..) * 180.0F / (float)Math.PI)`.
+        let to_degrees = |radians: f64| (radians * 180.0 / f64::from(PI)) as f32;
+        entity.set_rotation(
+            to_degrees(atan2(velocity.x, velocity.z)),
+            to_degrees(atan2(velocity.y, velocity.horizontal_length())),
+        );
+
+        Self {
+            entity,
+            projectile: Projectile::owned_by(&owner.living_entity.entity),
+            hooked_entity_id: AtomicI32::new(0),
+            in_ground: AtomicBool::new(false),
+            has_hit: AtomicBool::new(false),
+            wait_countdown: AtomicI32::new(rand::random::<i32>().abs() % 600 + 100),
+            bite_countdown: AtomicI32::new(0),
+        }
+    }
+
     pub fn reel_in(&self, player: &Player) -> i32 {
         use pumpkin_data::item::Item;
         let world = self.entity.world.load();

@@ -216,10 +216,12 @@ pub fn intersects_aabb_with_hit(
     Some((t_hit, direction, hit_pos, is_inside))
 }
 
-/// Vanilla `VoxelShape.clip`: a ray starting inside the shape hits at once (probed a
-/// thousandth of the way along, so a ray leaving a face from outside is not inside), otherwise
-/// `AABB.clip` over the shape's boxes.
-fn clip_block_shapes(
+/// Vanilla `VoxelShape.clip`, over block-local `shapes` at `block_pos`.
+///
+/// A ray starting inside the shape hits at once (probed a thousandth of the way along, so a
+/// ray leaving a face from outside is not inside), otherwise `AABB.clip` over the shape's
+/// boxes.
+pub fn clip_block_shapes(
     shapes: impl Iterator<Item = BoundingBox>,
     _state: &BlockState,
     block_pos: &BlockPos,

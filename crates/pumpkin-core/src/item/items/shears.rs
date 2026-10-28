@@ -7,16 +7,18 @@ use crate::entity::item::ItemEntity;
 use crate::entity::player::Player;
 use crate::item::{ItemBehaviour, ItemMetadata};
 use crate::server::Server;
-use pumpkin_data::BlockId;
+use crate::world::game_event::GameEventContext;
 use pumpkin_data::block_properties::BeeNestLikeProperties;
 use pumpkin_data::block_properties::BlockProperties;
 use pumpkin_data::block_properties::CaveVinesLikeProperties;
 use pumpkin_data::block_properties::KelpLikeProperties;
 use pumpkin_data::entity::EntityType;
+use pumpkin_data::game_event::GameEvent;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_data::{Block, BlockDirection, BlockStateId};
+use pumpkin_data::{BlockId, BlockState};
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
 use pumpkin_world::world::BlockFlags;
@@ -88,12 +90,19 @@ fn handle_growing_plant(
         return false;
     };
 
+    // Vanilla `ShearsItem.useOn`: the player predicts its own sound.
     let world = player.world();
-    world.set_block_state(location, new_state_id, BlockFlags::NOTIFY_ALL);
-    world.play_sound(
+    world.play_block_sound_expect(
+        player,
         Sound::BlockGrowingPlantCrop,
         SoundCategory::Blocks,
-        &location.to_f64(),
+        *location,
+    );
+    world.set_block_state(location, new_state_id, BlockFlags::NOTIFY_ALL);
+    world.game_event(
+        GameEvent::BlockChange,
+        location.to_centered_f64(),
+        GameEventContext::of(Some(player), Some(BlockState::from_id(new_state_id))),
     );
     player.damage_held_item(1);
     true

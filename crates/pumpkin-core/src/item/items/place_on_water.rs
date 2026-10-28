@@ -5,8 +5,11 @@ use std::any::Any;
 use crate::entity::player::Player;
 use crate::item::{ItemBehaviour, ItemMetadata};
 use crate::world::BlockFlags;
+use crate::world::game_event::GameEventContext;
+use pumpkin_data::block_sound_type::SoundType;
+use pumpkin_data::game_event::GameEvent;
 use pumpkin_data::item::Item;
-use pumpkin_data::sound::Sound;
+use pumpkin_data::sound::SoundCategory;
 use pumpkin_data::{Block, BlockDirection};
 
 pub struct PlaceOnWaterBlockItem;
@@ -37,10 +40,10 @@ impl ItemBehaviour for PlaceOnWaterBlockItem {
 
         let above_pos = hit_pos.up();
         let above_state = world.get_block_state(&above_pos);
-        let (placed_block, sound) = if item.id == Item::LILY_PAD.id {
-            (&Block::LILY_PAD, Sound::BlockLilyPadPlace)
+        let placed_block = if item.id == Item::LILY_PAD.id {
+            &Block::LILY_PAD
         } else {
-            (&Block::FROGSPAWN, Sound::BlockFrogspawnPlace)
+            &Block::FROGSPAWN
         };
         // Vanilla places through `BlockItem.place`, which checks `canSurvive`.
         if above_state.is_air()
@@ -61,10 +64,27 @@ impl ItemBehaviour for PlaceOnWaterBlockItem {
                 placed_block.default_state.id,
                 BlockFlags::NOTIFY_ALL,
             );
-            world.play_sound(
-                sound,
-                pumpkin_data::sound::SoundCategory::Blocks,
-                &above_pos.to_f64(),
+            player.trigger_advancement(
+                crate::entity::player::advancement::trigger::AdvancementTrigger::PlacedBlock {
+                    block_id: format!("minecraft:{}", placed_block.name),
+                },
+            );
+            // Vanilla `BlockItem.place`: the place sound, which the placer predicts, then
+            // `BLOCK_PLACE`.
+            let placed_state = world.get_block_state(&above_pos);
+            let sound_type = SoundType::from_state_id(placed_state.id.as_u16());
+            world.play_sound_raw_expect(
+                player,
+                sound_type.place_sound as u16,
+                SoundCategory::Blocks,
+                &above_pos.to_centered_f64(),
+                f32::midpoint(sound_type.volume, 1.0),
+                sound_type.pitch * 0.8,
+            );
+            world.game_event(
+                GameEvent::BlockPlace,
+                above_pos.to_centered_f64(),
+                GameEventContext::of(Some(player), Some(placed_state)),
             );
 
             crate::item::consume_in_hand(player, hand);
