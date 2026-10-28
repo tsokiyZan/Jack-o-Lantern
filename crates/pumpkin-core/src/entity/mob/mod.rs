@@ -2495,6 +2495,11 @@ pub trait Mob: EntityBase + Send + Sync {
         true
     }
 
+    /// Vanilla `isIgnoringBlockTriggers`, which bats turn on.
+    fn mob_is_ignoring_block_triggers(&self) -> bool {
+        false
+    }
+
     /// Whether the mob pushes the entities it touches; vanilla bats override
     /// `pushEntities` to do nothing.
     fn pushes_entities(&self) -> bool {
@@ -3725,6 +3730,10 @@ impl<T: Mob + Send + 'static> EntityBase for T {
 
     fn is_pushable(&self) -> bool {
         self.mob_is_pushable() && self.get_mob_entity().living_entity.is_pushable_for(self)
+    }
+
+    fn is_ignoring_block_triggers(&self) -> bool {
+        self.mob_is_ignoring_block_triggers()
     }
 
     /// Vanilla `LivingEntity.push`: a sleeping entity is not pushed.

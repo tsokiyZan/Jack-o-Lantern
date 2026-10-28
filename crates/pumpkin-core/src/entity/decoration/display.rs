@@ -689,6 +689,11 @@ impl BlockDisplayEntity {
 }
 
 impl EntityBase for BlockDisplayEntity {
+    /// Vanilla `Display.isIgnoringBlockTriggers`.
+    fn is_ignoring_block_triggers(&self) -> bool {
+        true
+    }
+
     /// Vanilla `Display.getPistonPushReaction`.
     fn piston_push_reaction(&self) -> pumpkin_data::block_state::PistonBehavior {
         pumpkin_data::block_state::PistonBehavior::Ignore
@@ -811,6 +816,11 @@ impl ItemDisplayEntity {
 }
 
 impl EntityBase for ItemDisplayEntity {
+    /// Vanilla `Display.isIgnoringBlockTriggers`.
+    fn is_ignoring_block_triggers(&self) -> bool {
+        true
+    }
+
     /// Vanilla `Display.getPistonPushReaction`.
     fn piston_push_reaction(&self) -> pumpkin_data::block_state::PistonBehavior {
         pumpkin_data::block_state::PistonBehavior::Ignore
@@ -1065,6 +1075,11 @@ impl TextDisplayEntity {
 }
 
 impl EntityBase for TextDisplayEntity {
+    /// Vanilla `Display.isIgnoringBlockTriggers`.
+    fn is_ignoring_block_triggers(&self) -> bool {
+        true
+    }
+
     /// Vanilla `Display.getPistonPushReaction`.
     fn piston_push_reaction(&self) -> pumpkin_data::block_state::PistonBehavior {
         pumpkin_data::block_state::PistonBehavior::Ignore

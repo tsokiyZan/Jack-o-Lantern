@@ -377,6 +377,11 @@ impl ArmorStandEntity {
 }
 
 impl EntityBase for ArmorStandEntity {
+    /// Vanilla `ArmorStand.isIgnoringBlockTriggers`.
+    fn is_ignoring_block_triggers(&self) -> bool {
+        self.is_marker()
+    }
+
     /// Vanilla `ArmorStand.getPistonPushReaction`: a marker is ignored, else the default.
     fn piston_push_reaction(&self) -> pumpkin_data::block_state::PistonBehavior {
         if self.is_marker() {

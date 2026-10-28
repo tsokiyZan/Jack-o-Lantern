@@ -1,11 +1,17 @@
 use std::sync::Arc;
 
+use pumpkin_data::game_event::GameEvent;
+use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_data::{Block, BlockDirection, BlockState, BlockStateId};
 use pumpkin_util::math::{boundingbox::BoundingBox, position::BlockPos};
-use pumpkin_world::{tick::TickPriority, world::BlockFlags};
+use pumpkin_world::{
+    tick::TickPriority,
+    world::{BlockAccessor, BlockFlags},
+};
 
 use crate::{
-    block::{OnEntityCollisionArgs, OnStateReplacedArgs},
+    block::{GetStateForNeighborUpdateArgs, OnEntityCollisionArgs, OnStateReplacedArgs},
+    entity::EntityBase,
     world::World,
 };
 
@@ -25,23 +31,73 @@ fn detection_box_at(pos: &BlockPos) -> BoundingBox {
     PRESSURE_PLATE_DETECTION_BOX.at_pos(*pos)
 }
 
+/// Vanilla `BasePressurePlateBlock.getEntityCount`: entities in the box that are not
+/// spectators and don't ignore block triggers, players included. `living_only` is the
+/// `MOBS` sensitivity.
+fn entity_count(world: &World, pos: &BlockPos, living_only: bool) -> usize {
+    let aabb = detection_box_at(pos);
+    let entities = world
+        .get_entities_at_box(&aabb)
+        .into_iter()
+        .filter(|entity| {
+            !entity.is_spectator()
+                && !entity.is_ignoring_block_triggers()
+                && (!living_only || entity.get_living_entity().is_some())
+        })
+        .count();
+    let players = world
+        .get_players_at_box(&aabb)
+        .into_iter()
+        .filter(|player| !player.is_spectator())
+        .count();
+    entities + players
+}
+
 pub(crate) trait PressurePlate {
+    /// Vanilla `BasePressurePlateBlock.entityInside`.
     fn on_entity_collision_pp(&self, args: OnEntityCollisionArgs<'_>) {
         let output = self.get_redstone_output(args.block, args.state.id);
         if output == 0 {
-            self.update_plate_state(args.world, args.position, args.block, args.state, output);
+            self.update_plate_state(
+                Some(args.entity),
+                args.world,
+                args.position,
+                args.block,
+                args.state,
+                output,
+            );
         }
     }
 
+    /// Vanilla `BasePressurePlateBlock.affectNeighborsAfterRemoval`.
     fn on_state_replaced_pp(&self, args: OnStateReplacedArgs<'_>) {
         if !args.moved && self.get_redstone_output(args.block, args.old_state_id) > 0 {
-            args.world.update_neighbors(args.position, None);
-            args.world.update_neighbors(&args.position.down(), None);
+            args.world
+                .update_neighbors_at(args.position, args.block, None);
+            args.world
+                .update_neighbors_at(&args.position.down(), args.block, None);
         }
     }
 
+    /// Vanilla `BasePressurePlateBlock.updateShape`: the plate goes when its support below
+    /// does.
+    fn get_state_for_neighbor_update_pp(
+        &self,
+        args: &GetStateForNeighborUpdateArgs<'_>,
+    ) -> BlockStateId {
+        if args.direction == BlockDirection::Down
+            && !Self::can_pressure_plate_place_at(args.world, args.position)
+        {
+            return Block::AIR.default_state.id;
+        }
+        args.state_id
+    }
+
+    /// Vanilla `BasePressurePlateBlock.checkPressed`. `source` is the entity that stepped on
+    /// the plate, `None` from the scheduled tick.
     fn update_plate_state(
         &self,
+        source: Option<&dyn EntityBase>,
         world: &Arc<World>,
         pos: &BlockPos,
         block: &Block,
@@ -69,17 +125,34 @@ pub(crate) trait PressurePlate {
             };
             let state = self.set_redstone_output(block, state, next_output);
             world.set_block_state(pos, state, BlockFlags::NOTIFY_LISTENERS);
-            world.update_neighbors(pos, None);
-            world.update_neighbors(&pos.down(), None);
+            world.update_neighbors_at(pos, block, None);
+            world.update_neighbors_at(&pos.down(), block, None);
         }
+
+        let was_pressed = output > 0;
+        let (click_on, click_off) = self.click_sounds(block);
+        if !has_output && was_pressed {
+            world.play_block_sound(click_off, SoundCategory::Blocks, *pos);
+            world.game_event_from(source, GameEvent::BlockDeactivate, pos.to_centered_f64());
+        } else if has_output && !was_pressed {
+            world.play_block_sound(click_on, SoundCategory::Blocks, *pos);
+            world.game_event_from(source, GameEvent::BlockActivate, pos.to_centered_f64());
+        }
+
         if has_output {
             world.schedule_block_tick(block, *pos, self.tick_rate(), TickPriority::Normal);
         }
     }
 
-    fn can_pressure_plate_place_at(world: &World, block_pos: &BlockPos) -> bool {
-        let floor = world.get_block_state(&block_pos.down());
-        floor.is_side_solid(BlockDirection::Up)
+    /// Vanilla `BasePressurePlateBlock.canSurvive`: `canSupportRigidBlock` or
+    /// `canSupportCenter` below. The fork has no rigid support shape, so the first is the
+    /// full-face check.
+    fn can_pressure_plate_place_at(world: &dyn BlockAccessor, block_pos: &BlockPos) -> bool {
+        let below = block_pos.down();
+        world
+            .get_block_state(&below)
+            .is_side_solid(BlockDirection::Up)
+            || crate::block::can_support_center(world, &below, BlockDirection::Up)
     }
 
     fn get_redstone_output(&self, block: &Block, state: BlockStateId) -> u8;
@@ -87,6 +160,9 @@ pub(crate) trait PressurePlate {
     fn set_redstone_output(&self, block: &Block, state: &BlockState, output: u8) -> BlockStateId;
 
     fn calculate_redstone_output(&self, world: &World, block: &Block, pos: &BlockPos) -> u8;
+
+    /// Vanilla `BlockSetType.pressurePlateClickOn` / `pressurePlateClickOff`.
+    fn click_sounds(&self, block: &Block) -> (Sound, Sound);
 
     fn tick_rate(&self) -> i32 {
         20

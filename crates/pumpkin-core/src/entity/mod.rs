@@ -573,6 +573,11 @@ pub trait EntityBase: Send + Sync + std::any::Any {
         false
     }
 
+    /// Vanilla `isIgnoringBlockTriggers`: pressure plates and tripwires don't see the entity.
+    fn is_ignoring_block_triggers(&self) -> bool {
+        false
+    }
+
     /// Vanilla `canBeCollidedWith`: whether other movement treats this entity as solid.
     fn is_collidable(&self, _entity: Option<&dyn EntityBase>) -> bool {
         false
