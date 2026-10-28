@@ -261,21 +261,26 @@ pub trait ItemBehaviour: Send + Sync {
         true
     }
 
+    /// The ray of vanilla `Item.getPlayerPOVHitResult`.
     fn get_start_and_end_pos(&self, player: &Player) -> (Vector3<f64>, Vector3<f64>) {
-        let start_pos = player.eye_position();
-        let (yaw, pitch) = player.rotation();
-        let (yaw_rad, pitch_rad) = (f64::from(yaw.to_radians()), f64::from(pitch.to_radians()));
-        let block_interaction_range = 4.5; // This is not the same as the block_interaction_range in the
-        // player entity.
-        let direction = Vector3::new(
-            -yaw_rad.sin() * pitch_rad.cos() * block_interaction_range,
-            -pitch_rad.sin() * block_interaction_range,
-            pitch_rad.cos() * yaw_rad.cos() * block_interaction_range,
-        );
-
-        let end_pos = start_pos.add(&direction);
-        (start_pos, end_pos)
+        player_pov_ray(player)
     }
 
     fn as_any(&self) -> &dyn Any;
+}
+
+/// Vanilla `Item.getPlayerPOVHitResult`'s ray: from the eyes along
+/// `calculateViewVector(xRot, yRot)` scaled by `blockInteractionRange()`.
+#[must_use]
+pub fn player_pov_ray(player: &Player) -> (Vector3<f64>, Vector3<f64>) {
+    let start_pos = player.eye_position();
+    let (yaw, pitch) = player.rotation();
+    let view = crate::entity::Entity::calculate_view_vector(pitch, yaw);
+    let range = player.block_interaction_range();
+    let end_pos = start_pos.add(&Vector3::new(
+        view.x * range,
+        view.y * range,
+        view.z * range,
+    ));
+    (start_pos, end_pos)
 }
