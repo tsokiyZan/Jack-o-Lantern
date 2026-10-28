@@ -1,8 +1,10 @@
 use std::sync::Arc;
 
-use pumpkin_data::block_properties::{NetherWartLikeProperties, blocks_movement};
+use pumpkin_data::block_properties::NetherWartLikeProperties;
 use pumpkin_data::dimension::Dimension;
-use pumpkin_data::{Block, BlockDirection, BlockId, BlockState, BlockStateId, Enchantment};
+use pumpkin_data::tag::{self, Taggable};
+use pumpkin_data::{Block, BlockDirection, BlockId, BlockStateId};
+use pumpkin_util::GameMode;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_world::tick::TickPriority;
 use pumpkin_world::world::BlockFlags;
@@ -68,32 +70,31 @@ impl BlockMetadata for IceBlock {
 
 impl BlockBehaviour for IceBlock {
     fn broken(&self, args: BrokenArgs<'_>) {
-        {
-            let held_item = args.player.inventory().held_item();
-            let has_silk_touch = held_item.get_enchantment_level(&Enchantment::SILK_TOUCH) > 0;
-            if !has_silk_touch {
-                if args.world.dimension.water_evaporates {
-                    args.world.set_block_state(
-                        args.position,
-                        BlockStateId::AIR,
-                        BlockFlags::NOTIFY_ALL,
-                    );
-                    return;
-                }
+        if args.player.gamemode.load() == GameMode::Creative {
+            return;
+        }
+        let held_item = args.player.inventory().held_item();
+        if !held_item.has_enchantment_tag(&tag::Enchantment::MINECRAFT_PREVENTS_ICE_MELTING) {
+            if args.world.dimension.water_evaporates {
+                args.world.set_block_state(
+                    args.position,
+                    BlockStateId::AIR,
+                    BlockFlags::NOTIFY_ALL,
+                );
+                return;
+            }
 
-                let below_pos = args.position.down();
-                let (below_block, below_state_id) = args.world.get_block_and_state_id(&below_pos);
-                let below_state = BlockState::from_id(below_state_id);
-                if blocks_movement(below_state, below_block.id)
-                    || below_state.is_liquid()
-                    || below_state.is_solid()
-                {
-                    args.world.set_block_state(
-                        args.position,
-                        Block::WATER.default_state.id,
-                        BlockFlags::NOTIFY_ALL,
-                    );
-                }
+            let below_pos = args.position.down();
+            let below_block = args.world.get_block(&below_pos);
+            if below_block.has_tag(&tag::Block::MINECRAFT_ICE_MELTS_WHEN_DESTROYED_ABOVE)
+                || below_block == &Block::WATER
+                || below_block == &Block::LAVA
+            {
+                args.world.set_block_state(
+                    args.position,
+                    Block::WATER.default_state.id,
+                    BlockFlags::NOTIFY_ALL,
+                );
             }
         }
     }

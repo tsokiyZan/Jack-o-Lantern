@@ -28,7 +28,9 @@ pub struct FarmlandBlock;
 
 impl BlockBehaviour for FarmlandBlock {
     fn on_scheduled_tick(&self, args: OnScheduledTickArgs<'_>) {
-        turn_to_base_block(None, args.world, args.position);
+        if !can_place_at(args.world.as_ref(), args.position) {
+            turn_to_base_block(None, args.world, args.position);
+        }
     }
 
     /// Vanilla `FarmlandBlock.fallOn`: a heavy enough landing tramples the farmland.
@@ -75,10 +77,14 @@ impl BlockBehaviour for FarmlandBlock {
     }
 
     fn random_tick(&self, args: RandomTickArgs<'_>) {
-        if args.world.is_raining_at(&args.position.up())
-            || is_water_nearby(args.world, args.position)
+        let state_id = args.world.get_block_state_id(args.position);
+        let mut props = FarmlandProperties::from_state_id(state_id);
+        if is_water_nearby(args.world, args.position)
+            || args.world.is_raining_at(&args.position.up())
         {
-            let mut props = FarmlandProperties::default(args.block);
+            if props.moisture >= 7 {
+                return;
+            }
             let mut new_moisture = 7;
             if let Some(server) = args.world.server.upgrade() {
                 let mut event =
@@ -99,38 +105,35 @@ impl BlockBehaviour for FarmlandBlock {
                 props.to_state_id(args.block),
                 BlockFlags::NOTIFY_LISTENERS,
             );
+        } else if props.moisture == 0 {
+            if !args
+                .world
+                .get_block(&args.position.up())
+                .has_tag(&tag::Block::MINECRAFT_MAINTAINS_FARMLAND)
+            {
+                turn_to_base_block(None, args.world, args.position);
+            }
         } else {
-            let state_id = args.world.get_block_state_id(args.position);
-            let mut props = FarmlandProperties::from_state_id(state_id);
-            if props.moisture == 0 {
-                if !args
-                    .world
-                    .get_block(&args.position.up())
-                    .has_tag(&tag::Block::MINECRAFT_MAINTAINS_FARMLAND)
-                {
-                    turn_to_base_block(None, args.world, args.position);
-                }
-            } else {
-                let mut new_moisture = (props.moisture as i32 - 1).clamp(0, 7);
-                if let Some(server) = args.world.server.upgrade() {
-                    let mut event = crate::plugin::api::events::block::moisture_change::MoistureChangeEvent::new(
+            let mut new_moisture = (props.moisture as i32 - 1).clamp(0, 7);
+            if let Some(server) = args.world.server.upgrade() {
+                let mut event =
+                    crate::plugin::api::events::block::moisture_change::MoistureChangeEvent::new(
                         *args.position,
                         args.world.clone(),
                         new_moisture,
                     );
-                    server.plugin_manager.fire_blocking(&server, &mut event);
-                    if event.cancelled {
-                        return;
-                    }
-                    new_moisture = event.new_moisture;
+                server.plugin_manager.fire_blocking(&server, &mut event);
+                if event.cancelled {
+                    return;
                 }
-                props.moisture = new_moisture.clamp(0, 7) as u8;
-                args.world.set_block_state(
-                    args.position,
-                    props.to_state_id(args.block),
-                    BlockFlags::NOTIFY_LISTENERS,
-                );
+                new_moisture = event.new_moisture;
             }
+            props.moisture = new_moisture.clamp(0, 7) as u8;
+            args.world.set_block_state(
+                args.position,
+                props.to_state_id(args.block),
+                BlockFlags::NOTIFY_LISTENERS,
+            );
         }
     }
 
@@ -182,9 +185,10 @@ pub fn turn_to_base_block(
     );
 }
 
+/// Vanilla `FarmlandBlock.canSurvive`.
 fn can_place_at(world: &dyn BlockAccessor, block_pos: &BlockPos) -> bool {
-    let state = world.get_block_state(&block_pos.up());
-    !state.is_solid() // TODO: add fence gate block
+    let (above_block, above_state) = world.get_block_and_state(&block_pos.up());
+    !above_state.is_solid() || above_block.has_tag(&tag::Block::MINECRAFT_MAINTAINS_FARMLAND)
 }
 
 fn is_water_nearby(world: &Arc<World>, block_pos: &BlockPos) -> bool {
