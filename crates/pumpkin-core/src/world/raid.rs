@@ -731,22 +731,4 @@ impl Raids {
             Some(id)
         }
     }
-
-    pub fn tick(&mut self, world: &Arc<World>) {
-        self.tick_counter += 1;
-
-        let mut stopped_ids = Vec::new();
-        for (&id, raid) in &mut self.raid_map {
-            raid.tick(world);
-            if raid.is_stopped() {
-                stopped_ids.push(id);
-            }
-        }
-
-        for id in stopped_ids {
-            if let Some(mut raid) = self.raid_map.remove(&id) {
-                raid.remove_all_players(world);
-            }
-        }
-    }
 }

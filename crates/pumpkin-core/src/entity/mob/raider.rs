@@ -105,8 +105,18 @@ pub trait Raider: PatrollingMonster {
         entity.set_synced_data(tracked_data::pillager::IS_CELEBRATING, celebrating);
     }
 
+    /// Vanilla `Raider.hasActiveRaid`: in a raid that is still active.
     fn has_active_raid(&self) -> bool {
-        self.get_raider_data().raid_id.load().is_some()
+        let Some(raid_id) = self.get_raider_data().raid_id.load() else {
+            return false;
+        };
+        let world = self.get_mob_entity().living_entity.entity.world.load();
+        world
+            .raids
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get(raid_id)
+            .is_some_and(crate::world::raid::Raid::is_active)
     }
 
     /// Vanilla `Raider.hasRaid`: in a raid, or standing where one is active.

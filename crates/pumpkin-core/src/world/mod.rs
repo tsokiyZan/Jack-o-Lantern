@@ -2183,25 +2183,37 @@ impl World {
         self.handling_tick.store(true, Relaxed);
         self.update_active_chunks();
         self.tick_environment();
-        let mut raids = {
+        // Vanilla `Raids.tick`. Each raid leaves the map only while it ticks itself, so what
+        // its tick reaches (a raider's goals, loot `has_raid`) still finds the other raids.
+        let raid_ids: Vec<i32> = {
             let mut guard = self
                 .raids
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
-            std::mem::take(&mut *guard)
+            guard.tick_counter += 1;
+            guard.raid_map.keys().copied().collect()
         };
-        raids.tick(self);
-        {
-            let mut guard = self
+        for id in raid_ids {
+            let raid = self
                 .raids
                 .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            for (id, raid) in guard.raid_map.drain() {
-                raids.raid_map.insert(id, raid);
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .raid_map
+                .remove(&id);
+            let Some(mut raid) = raid else {
+                continue;
+            };
+            if raid.is_stopped() {
+                raid.remove_all_players(self);
+                continue;
             }
-            raids.next_id = raids.next_id.max(guard.next_id);
-            *guard = raids;
-        };
+            raid.tick(self);
+            self.raids
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .raid_map
+                .insert(id, raid);
+        }
 
         let t_chunks = std::time::Instant::now();
         self.tick_chunks(server);
