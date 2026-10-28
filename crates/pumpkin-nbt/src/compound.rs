@@ -215,10 +215,11 @@ impl NbtCompound {
         }
     }
 
-    /// Returns the named byte value, or `None` if the tag is absent or has another type.
+    /// Returns the named byte value, converting any numeric tag like vanilla
+    /// `CompoundTag`, or `None` if the tag is absent or not a number.
     #[must_use]
     pub fn get_byte(&self, name: &str) -> Option<i8> {
-        self.get(name).and_then(super::tag::NbtTag::extract_byte)
+        self.get(name).and_then(super::tag::NbtTag::as_numeric_byte)
     }
 
     /// Returns the named tag.
@@ -235,10 +236,12 @@ impl NbtCompound {
         self.child_tags.contains_key(name)
     }
 
-    /// Returns the named short value, or `None` if the tag is absent or has another type.
+    /// Returns the named short value, converting any numeric tag like vanilla
+    /// `CompoundTag`, or `None` if the tag is absent or not a number.
     #[must_use]
     pub fn get_short(&self, name: &str) -> Option<i16> {
-        self.get(name).and_then(super::tag::NbtTag::extract_short)
+        self.get(name)
+            .and_then(super::tag::NbtTag::as_numeric_short)
     }
 
     /// Returns any named numeric value as a short
@@ -248,22 +251,26 @@ impl NbtCompound {
             .and_then(super::tag::NbtTag::as_numeric_short)
     }
 
-    /// Returns the named integer value, or `None` if the tag is absent or has another type.
+    /// Returns the named integer value, converting any numeric tag like vanilla
+    /// `CompoundTag`, or `None` if the tag is absent or not a number.
     #[must_use]
     pub fn get_int(&self, name: &str) -> Option<i32> {
-        self.get(name).and_then(super::tag::NbtTag::extract_int)
+        self.get(name).and_then(super::tag::NbtTag::as_numeric_int)
     }
 
-    /// Returns the named long value, or `None` if the tag is absent or has another type.
+    /// Returns the named long value, converting any numeric tag like vanilla
+    /// `CompoundTag`, or `None` if the tag is absent or not a number.
     #[must_use]
     pub fn get_long(&self, name: &str) -> Option<i64> {
-        self.get(name).and_then(super::tag::NbtTag::extract_long)
+        self.get(name).and_then(super::tag::NbtTag::as_numeric_long)
     }
 
-    /// Returns the named float value, or `None` if the tag is absent or has another type.
+    /// Returns the named float value, converting any numeric tag like vanilla
+    /// `CompoundTag`, or `None` if the tag is absent or not a number.
     #[must_use]
     pub fn get_float(&self, name: &str) -> Option<f32> {
-        self.get(name).and_then(super::tag::NbtTag::extract_float)
+        self.get(name)
+            .and_then(super::tag::NbtTag::as_numeric_float)
     }
 
     /// Returns any named numeric value as a float
@@ -273,16 +280,21 @@ impl NbtCompound {
             .and_then(super::tag::NbtTag::as_numeric_float)
     }
 
-    /// Returns the named double value, or `None` if the tag is absent or has another type.
+    /// Returns the named double value, converting any numeric tag like vanilla
+    /// `CompoundTag`, or `None` if the tag is absent or not a number.
     #[must_use]
     pub fn get_double(&self, name: &str) -> Option<f64> {
-        self.get(name).and_then(super::tag::NbtTag::extract_double)
+        self.get(name)
+            .and_then(super::tag::NbtTag::as_numeric_double)
     }
 
-    /// Returns the named byte as a boolean, where zero is `false`.
+    /// Returns the named number as a boolean (its byte value is nonzero), like vanilla
+    /// `CompoundTag.getBoolean`.
     #[must_use]
     pub fn get_bool(&self, name: &str) -> Option<bool> {
-        self.get(name).and_then(super::tag::NbtTag::extract_bool)
+        self.get(name)
+            .and_then(super::tag::NbtTag::as_numeric_byte)
+            .map(|byte| byte != 0)
     }
 
     /// Returns the named string, or `None` if the tag is absent or has another type.
