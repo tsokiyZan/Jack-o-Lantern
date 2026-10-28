@@ -203,6 +203,19 @@ impl Mob for SquidEntity {
         Some(self)
     }
 
+    /// Vanilla `AgeableMob.mobInteract` (squids don't override it): the golden dandelion.
+    fn mob_interact(
+        &self,
+        player: &Arc<crate::entity::player::Player>,
+        _hand: pumpkin_util::Hand,
+        item_stack: &mut pumpkin_data::item_stack::ItemStack,
+    ) -> crate::item::interaction_result::InteractionResult {
+        if crate::entity::ageable::golden_dandelion_interact(self, player, item_stack) {
+            return crate::item::interaction_result::InteractionResult::SUCCESS;
+        }
+        crate::item::interaction_result::InteractionResult::PASS
+    }
+
     /// Vanilla `Squid.getDefaultDimensions`.
     fn default_dimensions(&self, pose: EntityPose) -> EntityDimensions {
         let entity = self.get_entity();

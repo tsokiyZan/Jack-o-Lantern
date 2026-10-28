@@ -2421,7 +2421,8 @@ impl Mob for VillagerEntity {
             || self.is_trading.load(Ordering::Relaxed)
             || self.mob_entity.living_entity.get_sleeping_pos().is_some()
         {
-            // TODO: `AgeableMob.mobInteract`'s golden dandelion.
+            // `super.mobInteract`: villagers are `cannot_be_age_locked`, so the golden dandelion
+            // does nothing.
             return InteractionResult::PASS;
         }
         if self.get_entity().age.load(Ordering::Relaxed) < 0 {

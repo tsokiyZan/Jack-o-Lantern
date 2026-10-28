@@ -417,6 +417,10 @@ impl Mob for DolphinEntity {
         item_stack: &mut ItemStack,
     ) -> InteractionResult {
         if item_stack.is_empty() || !item_stack.get_item().has_tag(&tag::Item::MINECRAFT_FISHES) {
+            // `super.mobInteract`: `AgeableMob`'s golden dandelion.
+            if crate::entity::ageable::golden_dandelion_interact(self, player, item_stack) {
+                return InteractionResult::SUCCESS;
+            }
             return InteractionResult::PASS;
         }
         self.get_entity().play_sound(Sound::EntityDolphinEat);
