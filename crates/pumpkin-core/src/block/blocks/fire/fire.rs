@@ -1,7 +1,6 @@
 use pumpkin_data::BlockStateId;
 use pumpkin_data::biome::Biome;
 use pumpkin_data::dimension::Dimension;
-use pumpkin_data::fluid::Fluid;
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_data::{Block, BlockDirection};
 use pumpkin_macros::pumpkin_block;
@@ -105,9 +104,11 @@ impl FireBlock {
         let mut total_burn_chance = 0;
 
         for dir in BlockDirection::all() {
-            let neighbor_block = world.get_block(&pos.offset(dir.to_offset()));
-            if *world.get_fluid(&pos.offset(dir.to_offset())) != Fluid::EMPTY {
-                continue; // Skip if there is a fluid
+            let (neighbor_block, neighbor_state) =
+                world.get_block_and_state_id(&pos.offset(dir.to_offset()));
+            // `getIgniteOdds(BlockState)`: a waterlogged block has none.
+            if neighbor_block.is_waterlogged(neighbor_state) {
+                continue;
             }
             if let Some(flammable) = &neighbor_block.flammable {
                 total_burn_chance = total_burn_chance.max(i32::from(flammable.spread_chance));
@@ -125,8 +126,12 @@ impl FireBlock {
             || world.is_raining_at(&pos.south())
     }
 
-    // Get burn odds for a block, used in try_spreading_fire
-    fn get_burn_odds(block: &Block) -> i32 {
+    /// Vanilla `FireBlock.getBurnOdds(BlockState)`: none for a waterlogged block, which still
+    /// takes `checkBurnOut`'s draw.
+    fn get_burn_odds(block: &Block, state_id: BlockStateId) -> i32 {
+        if block.is_waterlogged(state_id) {
+            return 0;
+        }
         block.flammable.as_ref().map_or(0, |f| f.burn_chance.into())
     }
 
@@ -153,8 +158,8 @@ impl FireBlock {
     }
 
     fn try_spreading_fire(&self, world: &Arc<World>, pos: &BlockPos, chance: i32, age: u8) {
-        let block = world.get_block(pos);
-        let odds = Self::get_burn_odds(block);
+        let (block, state_id) = world.get_block_and_state_id(pos);
+        let odds = Self::get_burn_odds(block, state_id);
         if rand::rng().random_range(0..chance) < odds {
             if let Some(server) = world.server.upgrade() {
                 let mut event = crate::plugin::api::events::block::block_burn::BlockBurnEvent {

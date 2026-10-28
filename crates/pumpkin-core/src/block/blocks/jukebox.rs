@@ -86,9 +86,10 @@ impl BlockBehaviour for JukeboxBlock {
     }
 
     /// Vanilla: `JukeboxBlock.onStateReplaced()` -> `ItemScatterer.onStateReplaced()`
-    fn on_state_replaced(&self, _args: OnStateReplacedArgs<'_>) {
-        // Vanilla calls ItemScatterer.onStateReplaced which updates comparators
-        // TODO: world.updateComparators(pos, block) when implemented
+    /// Vanilla `JukeboxBlock.affectNeighborsAfterRemoval`: `Containers.updateNeighboursAfterDestroy`.
+    fn on_state_replaced(&self, args: OnStateReplacedArgs<'_>) {
+        args.world
+            .update_neighbour_for_output_signal(args.position, args.block);
     }
 
     /// Vanilla: `JukeboxBlock.emitsRedstonePower()` returns true

@@ -1,14 +1,17 @@
 use std::sync::{Arc, atomic::Ordering};
 
 use pumpkin_data::{
-    Block, BlockDirection, BlockState, BlockStateId, Rotation,
+    Block, BlockState, BlockStateId, Rotation,
     block_properties::{Axis, HorizontalAxis, NetherPortalLikeProperties},
     dimension::Dimension,
     entity::EntityType,
 };
 use pumpkin_macros::pumpkin_block;
-use pumpkin_util::{Difficulty, math::vector3::Vector3};
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
+use pumpkin_util::{
+    Difficulty,
+    math::{vector3::Vector3, wrap_degrees},
+};
 use uuid::Uuid;
 
 use crate::{
@@ -16,9 +19,14 @@ use crate::{
         BlockBehaviour, GetStateForNeighborUpdateArgs, OnEntityCollisionArgs, OnStateReplacedArgs,
         RandomTickArgs,
     },
-    entity::{EntityBase, r#type::from_type},
+    entity::{
+        EntityBase,
+        mob::spawn::{EntitySpawnReason, finalize_spawn},
+        r#type::from_type,
+    },
     world::{
         World,
+        natural_spawner::is_valid_spawn_floor,
         portal::{PortalType, nether::NetherPortal},
     },
 };
@@ -74,19 +82,27 @@ impl BlockBehaviour for NetherPortalBlock {
         Block::AIR.default_state.id
     }
 
+    /// Vanilla `NetherPortalBlock.randomTick`: now and then a zombified piglin comes out
+    /// (`EntityType.spawn(level, pos.above(), STRUCTURE)`).
     fn random_tick(&self, args: RandomTickArgs<'_>) {
         let level_info = args.world.level_info.load();
         let difficulty = level_info.difficulty;
+        // `isSpawningMonsters`.
         if !level_info.game_rules.spawn_mobs
+            || !level_info.game_rules.spawn_monsters
             || difficulty == Difficulty::Peaceful
             || !args.world.dimension.nether_portal_spawns_piglin
         {
             return;
         }
 
-        let difficulty_id = difficulty as u32;
-        let roll = rand::rng().random_range(0..2000);
-        if roll >= difficulty_id {
+        let roll = args
+            .world
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .next_bounded_i32(2000);
+        if roll >= difficulty as i32 {
             return;
         }
 
@@ -103,33 +119,41 @@ impl BlockBehaviour for NetherPortalBlock {
             bottom_pos = bottom_pos.down();
         }
 
-        if args
-            .world
-            .get_block_state(&bottom_pos)
-            .is_side_solid(BlockDirection::Up)
-        {
-            let spawn_pos = Vector3::new(
-                bottom_pos.0.x as f64 + 0.5,
-                (bottom_pos.0.y + 1) as f64,
-                bottom_pos.0.z as f64 + 0.5,
-            );
-            let mob = from_type(
-                &EntityType::ZOMBIFIED_PIGLIN,
-                spawn_pos,
-                args.world,
-                Uuid::new_v4(),
-            );
-            // `setPortalCooldown`, on the piglin and on its vehicle.
-            mob.get_entity()
+        if !is_valid_spawn_floor(
+            args.world.get_block_state(&bottom_pos),
+            &EntityType::ZOMBIFIED_PIGLIN,
+        ) {
+            return;
+        }
+        // `EntityType.create`: the block centre, a yaw from the level random, then
+        // `finalizeSpawn`.
+        let spawn_pos = Vector3::new(
+            f64::from(bottom_pos.0.x) + 0.5,
+            f64::from(bottom_pos.0.y + 1),
+            f64::from(bottom_pos.0.z) + 0.5,
+        );
+        let yaw = wrap_degrees(args.world.random_f32() * 360.0);
+        let mob = from_type(
+            &EntityType::ZOMBIFIED_PIGLIN,
+            spawn_pos,
+            args.world,
+            Uuid::new_v4(),
+        );
+        mob.get_entity().set_rotation(yaw, 0.0);
+        finalize_spawn(&mob, args.world, EntitySpawnReason::Structure, None);
+        // `setPortalCooldown`, on the piglin and on its vehicle.
+        mob.get_entity()
+            .portal_cooldown
+            .store(mob.dimension_changing_delay(), Ordering::Relaxed);
+        if let Some(vehicle) = mob.get_entity().get_vehicle() {
+            vehicle
+                .get_entity()
                 .portal_cooldown
-                .store(mob.dimension_changing_delay(), Ordering::Relaxed);
-            if let Some(vehicle) = mob.get_entity().get_vehicle() {
-                vehicle
-                    .get_entity()
-                    .portal_cooldown
-                    .store(vehicle.dimension_changing_delay(), Ordering::Relaxed);
-            }
-            args.world.spawn_entity_non_save(mob);
+                .store(vehicle.dimension_changing_delay(), Ordering::Relaxed);
+        }
+        args.world.spawn_entity(mob.clone());
+        if let Some(mob) = mob.get_mob() {
+            mob.play_ambient_sound();
         }
     }
 
