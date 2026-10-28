@@ -2082,14 +2082,28 @@ impl World {
         self.play_sound_expect(player, sound, category, &new_vec);
     }
 
-    /// Each player's position, touch box and chunk, for the entities that touch players.
+    /// Each player's position, touch box and chunk, for the entities that touch players:
+    /// vanilla `Player.aiStep`'s pickup area for a live player who isn't a spectator.
     fn player_collision_cache(players: &[Arc<Player>]) -> Vec<PlayerCollisionEntry<'_>> {
         players
             .par_iter()
+            .filter(|player| player.living_entity.health.load() > 0.0 && !player.is_spectator())
             .map(|player| {
                 let entity = player.get_entity();
                 let pos = entity.pos.load();
-                let bb = entity.bounding_box.load().expand(1.0, 0.5, 1.0);
+                let own = entity.bounding_box.load();
+                // Riding a vehicle that's still there: both boxes, inflated (1, 0, 1).
+                let bb = match entity
+                    .vehicle
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .as_ref()
+                {
+                    Some(vehicle) if !vehicle.get_entity().is_removed() => own
+                        .minmax(&vehicle.get_entity().bounding_box.load())
+                        .expand(1.0, 0.0, 1.0),
+                    _ => own.expand(1.0, 0.5, 1.0),
+                };
                 let chunk_pos = Vector2::new(
                     get_section_cord(pos.x.floor() as i32),
                     get_section_cord(pos.z.floor() as i32),
@@ -6031,8 +6045,10 @@ impl World {
                 && (player_pos.z - entity_pos.z).abs() < 5.0
                 && player_bb.intersects(&entity_bb)
             {
+                // Every player whose area holds the entity touches it (`Player.aiStep` is per
+                // player). Vanilla touches one random orb a player overlaps per tick; here
+                // the orb's pickup delay leaves one per tick too, the first in order.
                 entity.on_player_collision(player);
-                break;
             }
         }
     }
