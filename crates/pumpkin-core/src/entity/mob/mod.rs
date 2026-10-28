@@ -1177,10 +1177,8 @@ impl MobEntity {
             && world
                 .get_fluid(&pos.down())
                 .has_tag(&tag::Fluid::MINECRAFT_WATER)
-            && (world.get_block(&pos.up()) == &Block::WATER
-                || world
-                    .get_fluid(&pos.up())
-                    .has_tag(&tag::Fluid::MINECRAFT_WATER))
+            // `getBlockState(pos.above()).is(Blocks.WATER)`: kelp or seagrass above won't do.
+            && world.get_block(&pos.up()) == &Block::WATER
     }
 
     pub fn check_surface_ageable_water_creature_spawn_rules(world: &World, pos: &BlockPos) -> bool {
