@@ -132,9 +132,9 @@ impl ChiseledBookshelfBlock {
         player.award_item_used(item.item);
 
         let sound = if item.get_item() == &Item::ENCHANTED_BOOK {
-            Sound::BlockChiseledBookshelfPickupEnchanted
+            Sound::BlockChiseledBookshelfInsertEnchanted
         } else {
-            Sound::BlockChiseledBookshelfPickup
+            Sound::BlockChiseledBookshelfInsert
         };
 
         entity.set_book(
