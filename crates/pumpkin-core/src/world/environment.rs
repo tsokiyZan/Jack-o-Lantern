@@ -73,6 +73,19 @@ impl<'a> EnvironmentAttributes<'a> {
                     0.0
                 }
             }
+            EnvironmentAttribute::GameplayTurtleEggHatchChance => {
+                // The attribute's default, raised by the day timeline's `maximum` modifier.
+                const DEFAULT_CHANCE: f32 = 0.002;
+                if self.world.dimension.has_skylight && !self.world.dimension.has_fixed_time {
+                    DEFAULT_CHANCE.max(sample_step_float_track(
+                        DayTimeline::TURTLE_EGG_HATCH_CHANCE_KEYFRAMES,
+                        DayTimeline::PERIOD_TICKS,
+                        self.world.get_time_of_day(),
+                    ))
+                } else {
+                    DEFAULT_CHANCE
+                }
+            }
             EnvironmentAttribute::VisualSunAngle => {
                 super::calculate_celestial_angle(self.world.get_time_of_day()) * 360.0
             }

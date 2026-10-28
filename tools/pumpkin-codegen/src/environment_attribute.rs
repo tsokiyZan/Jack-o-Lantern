@@ -429,6 +429,7 @@ pub fn build() -> TokenStream {
         creaking_active_keyframes,
         eyeblossom_open_keyframes,
         cat_waking_up_gift_chance_keyframes,
+        turtle_egg_hatch_chance_keyframes,
     ) = if let Ok(content) = std::fs::read_to_string(timeline_path) {
         if let Ok(timeline) = serde_json::from_str::<TimelineJson>(&content) {
             let period = timeline.period_ticks.unwrap_or(24000);
@@ -438,6 +439,7 @@ pub fn build() -> TokenStream {
             let mut creaking_kfs = Vec::new();
             let mut eyeblossom_kfs = Vec::new();
             let mut cat_gift_kfs = Vec::new();
+            let mut turtle_egg_kfs = Vec::new();
 
             if let Some(track) = timeline.tracks.get("minecraft:gameplay/sky_light_level") {
                 for kf in &track.keyframes {
@@ -484,6 +486,16 @@ pub fn build() -> TokenStream {
                     cat_gift_kfs.push(quote! { FloatKeyframe::new(#ticks, #val) });
                 }
             }
+            if let Some(track) = timeline
+                .tracks
+                .get("minecraft:gameplay/turtle_egg_hatch_chance")
+            {
+                for kf in &track.keyframes {
+                    let ticks = kf.ticks;
+                    let val = kf.value.as_f64().unwrap_or(0.0) as f32;
+                    turtle_egg_kfs.push(quote! { FloatKeyframe::new(#ticks, #val) });
+                }
+            }
             (
                 period,
                 sky_kfs,
@@ -492,10 +504,12 @@ pub fn build() -> TokenStream {
                 creaking_kfs,
                 eyeblossom_kfs,
                 cat_gift_kfs,
+                turtle_egg_kfs,
             )
         } else {
             (
                 24000,
+                Vec::new(),
                 Vec::new(),
                 Vec::new(),
                 Vec::new(),
@@ -507,6 +521,7 @@ pub fn build() -> TokenStream {
     } else {
         (
             24000,
+            Vec::new(),
             Vec::new(),
             Vec::new(),
             Vec::new(),
@@ -814,6 +829,9 @@ pub fn build() -> TokenStream {
             ];
             pub const CAT_WAKING_UP_GIFT_CHANCE_KEYFRAMES: &'static [FloatKeyframe] = &[
                 #(#cat_waking_up_gift_chance_keyframes),*
+            ];
+            pub const TURTLE_EGG_HATCH_CHANCE_KEYFRAMES: &'static [FloatKeyframe] = &[
+                #(#turtle_egg_hatch_chance_keyframes),*
             ];
         }
 

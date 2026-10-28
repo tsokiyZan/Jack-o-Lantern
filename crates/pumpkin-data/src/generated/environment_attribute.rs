@@ -681,6 +681,10 @@ impl DayTimeline {
         FloatKeyframe::new(362i32, 0f32),
         FloatKeyframe::new(23667i32, 0.7f32),
     ];
+    pub const TURTLE_EGG_HATCH_CHANCE_KEYFRAMES: &'static [FloatKeyframe] = &[
+        FloatKeyframe::new(21062i32, 1f32),
+        FloatKeyframe::new(21905i32, 0.002f32),
+    ];
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum MoonPhase {
