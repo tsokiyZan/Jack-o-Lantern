@@ -35,8 +35,8 @@ use crate::entity::{Entity, EntityBase};
 use crate::item::ItemMetadata;
 use crate::item::items::boat::BoatItem;
 use crate::item::items::bucket::{
-    FilledBucketItem, empty_sulfur_cube_bucket, play_bucket_evaporation,
-    should_evaporate_in_nether, try_pickup_fluid_at, try_place_filled_bucket,
+    FilledBucketItem, empty_contents, empty_sulfur_cube_bucket, play_bucket_evaporation,
+    should_evaporate_in_nether, try_pickup_fluid_at,
 };
 use crate::item::items::honeycomb::get_waxed;
 use crate::item::items::ignite::ignition::Ignition;
@@ -64,7 +64,7 @@ use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_data::translation;
 use pumpkin_data::world::WorldEvent;
-use pumpkin_data::{Block, BlockStateId, FacingExt};
+use pumpkin_data::{Block, BlockStateId};
 use pumpkin_inventory::Inventory;
 use pumpkin_inventory::generic_container_screen_handler::create_generic_3x3;
 use pumpkin_inventory::player::player_inventory::PlayerInventory;
@@ -874,12 +874,8 @@ impl DispenserBlock {
             play_bucket_evaporation(ctx.world, None, &front.to_centered_f64());
             true
         } else {
-            let placed = try_place_filled_bucket(
-                ctx.world,
-                item.item,
-                *ctx.position,
-                ctx.facing.to_block_direction(),
-            );
+            // `emptyContents(null, level, target, null)`: the front block, no fallback.
+            let placed = empty_contents(ctx.world, item.item, front, false, false).is_some();
             if placed {
                 // Vanilla `BucketItem.playEmptySound`, with no user.
                 ctx.world

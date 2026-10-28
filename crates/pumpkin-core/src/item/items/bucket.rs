@@ -330,51 +330,84 @@ fn try_place_powder_snow(world: &Arc<World>, pos: BlockPos, direction: BlockDire
     true
 }
 
+/// Vanilla `BucketItem.use`'s `placePos`: the clicked block when it takes water
+/// (`LiquidBlockContainer`) and the bucket holds water, else the block in front of the clicked
+/// face.
+pub(crate) fn bucket_place_pos(
+    world: &World,
+    item: &Item,
+    pos: BlockPos,
+    direction: BlockDirection,
+) -> BlockPos {
+    if item.id != Item::LAVA_BUCKET.id && world.get_block(&pos).is_waterloggable() {
+        pos
+    } else {
+        pos.offset(direction.to_offset())
+    }
+}
+
+/// Vanilla `BucketItem.emptyContents` from `use`: pours at `bucket_place_pos`, and when nothing
+/// can go there, at the block in front of the clicked face. `shift_key_down` keeps a sneaking
+/// player's water out of the clicked block. Returns where the fluid went.
 pub(crate) fn try_place_filled_bucket(
     world: &Arc<World>,
     item: &Item,
     pos: BlockPos,
     direction: BlockDirection,
-) -> bool {
-    let (block, state) = world.get_block_and_state(&pos);
+    shift_key_down: bool,
+) -> Option<BlockPos> {
+    let front = pos.offset(direction.to_offset());
     if item.id == Item::POWDER_SNOW_BUCKET.id {
-        return try_place_powder_snow(world, pos, direction);
+        return try_place_powder_snow(world, pos, direction).then_some(front);
     }
+    let place_pos = bucket_place_pos(world, item, pos, direction);
+    empty_contents(world, item, place_pos, shift_key_down, true)
+        .or_else(|| empty_contents(world, item, front, shift_key_down, false))
+}
 
-    if item.id == Item::WATER_BUCKET.id && block.is_waterlogged(state.id) {
-        let state_id = block.set_waterlogged(state.id, true).unwrap_or(state.id);
-        world.set_block_state(&pos, state_id, BlockFlags::NOTIFY_ALL);
-        world.schedule_fluid_tick(&Fluid::WATER, pos, 5, TickPriority::Normal);
-        return true;
+/// Vanilla `BucketItem.emptyContents` at `pos`; `has_hit` is whether a hit result came along
+/// (the first try from `use`, which may fall back).
+pub(crate) fn empty_contents(
+    world: &Arc<World>,
+    item: &Item,
+    pos: BlockPos,
+    shift_key_down: bool,
+    has_hit: bool,
+) -> Option<BlockPos> {
+    let water = item.id != Item::LAVA_BUCKET.id;
+    let (block, state) = world.get_block_and_state(&pos);
+    // `BlockBehaviour.canBeReplaced(state, fluid)`.
+    let may_replace = state.replaceable() || !state.is_solid();
+    // `SimpleWaterloggedBlock.canPlaceLiquid`: any water, even into a waterlogged block (whose
+    // `placeLiquid` then does nothing).
+    let container = block.is_waterloggable();
+    let can_place_liquid = container && water;
+    let place_liquid = may_replace || can_place_liquid;
+    if !(state.is_air() || place_liquid && (!shift_key_down || !has_hit)) {
+        return None;
     }
-
-    let target_pos = pos.offset(direction.to_offset());
-    let (block, state) = world.get_block_and_state(&target_pos);
-
-    if block.is_waterloggable() {
-        if item.id == Item::LAVA_BUCKET.id {
-            return false;
-        }
-        let state_id = block.set_waterlogged(state.id, true).unwrap_or(state.id);
-        world.set_block_state(&target_pos, state_id, BlockFlags::NOTIFY_ALL);
-        world.schedule_fluid_tick(&Fluid::WATER, target_pos, 5, TickPriority::Normal);
-        return true;
+    if container && water {
+        world
+            .block_registry
+            .place_liquid(world, block, state.id, &pos, &Fluid::WATER);
+        return Some(pos);
     }
-
-    if state.id == Block::AIR.default_state.id || state.is_liquid() {
-        world.set_block_state(
-            &target_pos,
-            if item.id == Item::LAVA_BUCKET.id {
-                Block::LAVA.default_state.id
-            } else {
-                Block::WATER.default_state.id
-            },
-            BlockFlags::NOTIFY_ALL,
-        );
-        return true;
+    // `blockState.getFluidState().isSource()`, of the state before it's destroyed.
+    let (_, fluid_state) = world.get_fluid_and_fluid_state(&pos);
+    if may_replace && !state.is_liquid() {
+        world.break_block(&pos, None, BlockFlags::NOTIFY_ALL);
     }
-
-    false
+    let fluid_block = if water {
+        Block::WATER.default_state.id
+    } else {
+        Block::LAVA.default_state.id
+    };
+    if world.set_block_state(&pos, fluid_block, BlockFlags::NOTIFY_ALL) == fluid_block
+        && !fluid_state.is_source
+    {
+        return None;
+    }
+    Some(pos)
 }
 
 impl ItemBehaviour for EmptyBucketItem {
@@ -462,19 +495,26 @@ impl ItemBehaviour for FilledBucketItem {
         // mob still comes out.
         // TODO: the evaporation's large smoke particles.
         let evaporated = should_evaporate_in_nether(item, &world);
-        if evaporated {
+        let poured_at = if evaporated {
             // `BucketItem.use`'s `placePos`: the clicked block when it holds water
             // (`LiquidBlockContainer`), else the block in front of the clicked face; the sound
             // plays at its centre.
-            let place_pos = if world.get_block(&pos).is_waterloggable() {
-                pos
-            } else {
-                pos.offset(direction.to_offset())
-            };
+            let place_pos = bucket_place_pos(&world, item, pos, direction);
             play_bucket_evaporation(&world, Some(player), &place_pos.to_centered_f64());
-        } else if !try_place_filled_bucket(&world, item, pos, direction) {
-            return InteractionResult::FAIL;
-        }
+            None
+        } else {
+            let poured = try_place_filled_bucket(
+                &world,
+                item,
+                pos,
+                direction,
+                player.get_entity().is_sneaking(),
+            );
+            if poured.is_none() {
+                return InteractionResult::FAIL;
+            }
+            poured
+        };
 
         if let Some(server) = world.server.upgrade()
             && let Some(player_arc) = world.get_player_by_uuid(player.gameprofile.id)
@@ -488,27 +528,23 @@ impl ItemBehaviour for FilledBucketItem {
             server.plugin_manager.fire_blocking(&server, &mut event);
         }
 
-        let place_pos = if world
-            .get_block_and_state(&pos)
-            .0
-            .is_waterlogged(world.get_block_state_id(&pos))
-        {
-            pos
-        } else {
-            pos.offset(direction.to_offset())
-        };
+        // `checkExtraContent` spawns a bucket's mob at `placePos`; `playEmptySound` plays where
+        // the fluid went.
+        let place_pos = bucket_place_pos(&world, item, pos, direction);
 
-        if !evaporated {
-            world.play_sound(
+        if let Some(poured_at) = poured_at {
+            // `level.playSound(user, pos, ...)`: the block's centre, for everyone but the user.
+            world.play_sound_expect(
+                player,
                 get_empty_sound(item),
                 SoundCategory::Blocks,
-                &place_pos.to_f64(),
+                &poured_at.to_centered_f64(),
             );
             // The end of vanilla `BucketItem.playEmptySound`.
             world.game_event_from(
                 Some(player),
                 GameEvent::FluidPlace,
-                place_pos.to_centered_f64(),
+                poured_at.to_centered_f64(),
             );
         }
 

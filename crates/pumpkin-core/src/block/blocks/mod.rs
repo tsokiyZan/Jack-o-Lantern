@@ -1,4 +1,5 @@
 // Portals & dimension blocks
+pub mod dried_ghast;
 pub mod end_gateway;
 pub mod end_portal;
 pub mod end_portal_frame;

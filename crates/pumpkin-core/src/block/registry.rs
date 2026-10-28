@@ -178,7 +178,7 @@ use crate::block::fluid::water::FlowingWater;
 use crate::block::{
     BlockBehaviour, BlockHitResult, BlockMetadata, BonemealArgs, BounceOnArgs, FallOnArgs,
     FluidMetadata, GetInsideCollisionShapeArgs, GetScreenHandlerFactoryArgs, OnEntityCollisionArgs,
-    OnEntityStepArgs, OnProjectileHitArgs, PathComputationType,
+    OnEntityStepArgs, OnProjectileHitArgs, PathComputationType, PlaceLiquidArgs,
 };
 use crate::entity::EntityBase;
 use crate::entity::inside_block_effect::InsideBlockEffectApplier;
@@ -219,6 +219,7 @@ use crate::block::blocks::chain::ChainBlock;
 use crate::block::blocks::cobweb::CobwebBlock;
 use crate::block::blocks::crafting_table::CraftingTableBlock;
 use crate::block::blocks::dragon_egg::DragonEggBlock;
+use crate::block::blocks::dried_ghast::DriedGhastBlock;
 use crate::block::blocks::enchanting_table::EnchantingTableBlock;
 use crate::block::blocks::end_rod::EndRodBlock;
 use crate::block::blocks::ender_chest::EnderChestBlock;
@@ -351,6 +352,7 @@ pub fn default_registry() -> Arc<BlockRegistry> {
     manager.register(ShelfMushroomBlock);
     manager.register(HugeMushroomBlock);
     manager.register(PotentSulfurBlock);
+    manager.register(DriedGhastBlock);
     manager.register(FlowerbedBlock);
     manager.register(LeafLitterBlock);
     manager.register(WallBlock);
@@ -1164,6 +1166,29 @@ impl BlockRegistry {
             });
         }
         block.default_state.id
+    }
+
+    /// Vanilla `LiquidBlockContainer.placeLiquid` on `block`; blocks without their own
+    /// behaviour are `SimpleWaterloggedBlock`s.
+    pub fn place_liquid(
+        &self,
+        world: &Arc<World>,
+        block: &Block,
+        state_id: BlockStateId,
+        position: &BlockPos,
+        fluid: &Fluid,
+    ) -> bool {
+        let args = PlaceLiquidArgs {
+            world,
+            block,
+            state_id,
+            position,
+            fluid,
+        };
+        match self.get_pumpkin_block(block.id) {
+            Some(pumpkin_block) => pumpkin_block.place_liquid(args),
+            None => crate::block::place_liquid_waterlogged(&args),
+        }
     }
 
     pub fn player_placed(
