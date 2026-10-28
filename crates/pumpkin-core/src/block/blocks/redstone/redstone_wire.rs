@@ -14,9 +14,9 @@ use pumpkin_world::world::{BlockAccessor, BlockFlags};
 
 use crate::block::registry::BlockActionResult;
 use crate::block::{
-    BlockBehaviour, BrokenArgs, CanPlaceAtArgs, GetRedstonePowerArgs,
-    GetStateForNeighborUpdateArgs, NormalUseArgs, OnNeighborUpdateArgs, OnPlaceArgs, PlacedArgs,
-    PrepareArgs,
+    BlockBehaviour, CanPlaceAtArgs, EmitsRedstonePowerArgs, GetRedstonePowerArgs,
+    GetStateForNeighborUpdateArgs, NormalUseArgs, OnNeighborUpdateArgs, OnPlaceArgs,
+    OnStateReplacedArgs, PlacedArgs, PrepareArgs,
 };
 use crate::world::World;
 
@@ -52,12 +52,17 @@ impl BlockBehaviour for RedstoneWireBlock {
         update_neighbors_of_neighboring_wires(args.world, args.position);
     }
 
-    fn broken(&self, args: BrokenArgs<'_>) {
+    /// Vanilla `RedstoneWireBlock.affectNeighborsAfterRemoval`.
+    fn on_state_replaced(&self, args: OnStateReplacedArgs<'_>) {
+        if args.moved {
+            return;
+        }
         for direction in BlockDirection::all() {
             let neighbor_pos = args.position.offset(direction.to_offset());
             update_neighbors_at(args.world, &neighbor_pos, &Block::REDSTONE_WIRE);
         }
 
+        update_power_strength_from(args.world, args.position, args.old_state_id);
         update_neighbors_of_neighboring_wires(args.world, args.position);
     }
 
@@ -136,6 +141,9 @@ impl BlockBehaviour for RedstoneWireBlock {
     }
 
     fn normal_use(&self, args: NormalUseArgs<'_>) -> BlockActionResult {
+        if !args.player.may_build() {
+            return BlockActionResult::Pass;
+        }
         let state = args.world.get_block_state(args.position);
         let wire = RedstoneWireProperties::from_state_id(state.id);
 
@@ -186,6 +194,13 @@ impl BlockBehaviour for RedstoneWireBlock {
         }
     }
 
+    /// Vanilla `RedstoneWireBlock.isSignalSource`.
+    fn emits_redstone_power(&self, _args: EmitsRedstonePowerArgs<'_>) -> bool {
+        true
+    }
+
+    /// Vanilla `RedstoneWireBlock.getSignal`: the side check uses the connection state the
+    /// wire would have now, not the stored one.
     fn get_weak_redstone_power(&self, args: GetRedstonePowerArgs<'_>) -> u8 {
         let wire = RedstoneWireProperties::from_state_id(args.state.id);
         if wire.power == 0 || args.direction == BlockDirection::Down {
@@ -194,6 +209,7 @@ impl BlockBehaviour for RedstoneWireBlock {
         if args.direction == BlockDirection::Up {
             return wire.power;
         }
+        let wire = get_connection_state(args.world, wire, args.position);
         if let Some(horizontal) = args.direction.opposite().to_horizontal_facing()
             && is_side_connected_prop(wire, horizontal)
         {
@@ -202,20 +218,9 @@ impl BlockBehaviour for RedstoneWireBlock {
         0
     }
 
+    /// Vanilla `RedstoneWireBlock.getDirectSignal`: the same as its signal.
     fn get_strong_redstone_power(&self, args: GetRedstonePowerArgs<'_>) -> u8 {
-        let wire = RedstoneWireProperties::from_state_id(args.state.id);
-        if wire.power == 0 || args.direction == BlockDirection::Down {
-            return 0;
-        }
-        if args.direction == BlockDirection::Up {
-            return wire.power;
-        }
-        if let Some(horizontal) = args.direction.opposite().to_horizontal_facing()
-            && is_side_connected_prop(wire, horizontal)
-        {
-            return wire.power;
-        }
-        0
+        self.get_weak_redstone_power(args)
     }
 
     fn rotate(
@@ -284,15 +289,22 @@ pub fn update_power_strength(world: &Arc<World>, pos: &BlockPos) {
     if block != &Block::REDSTONE_WIRE {
         return;
     }
+    update_power_strength_from(world, pos, state.id);
+}
 
-    let mut wire = RedstoneWireProperties::from_state_id(state.id);
+/// Vanilla `DefaultRedstoneWireEvaluator.updatePowerStrength` for the wire state `state_id`,
+/// which may already be gone from `pos` (a removed wire still updates its neighbours when
+/// its power differs from what the position would get now).
+fn update_power_strength_from(world: &Arc<World>, pos: &BlockPos, state_id: BlockStateId) {
+    let mut wire = RedstoneWireProperties::from_state_id(state_id);
     let target_strength = calculate_target_strength(world, pos);
 
     if wire.power != target_strength {
-        wire.power = target_strength;
-        let new_state_id = wire.to_state_id(&Block::REDSTONE_WIRE);
-
-        world.set_block_state(pos, new_state_id, BlockFlags::NOTIFY_LISTENERS);
+        if world.get_block_state_id(pos) == state_id {
+            wire.power = target_strength;
+            let new_state_id = wire.to_state_id(&Block::REDSTONE_WIRE);
+            world.set_block_state(pos, new_state_id, BlockFlags::NOTIFY_LISTENERS);
+        }
 
         let mut to_update = Vec::with_capacity(7);
         to_update.push(*pos);

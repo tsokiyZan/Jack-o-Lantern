@@ -326,6 +326,9 @@ pub struct World {
     pub entity_tracker: entity_tracker::EntityTracker,
     /// Vanilla `ServerLevel.waypointManager`.
     pub waypoint_manager: waypoint_manager::WaypointManager,
+    /// Vanilla `RedstoneTorchBlock.RECENT_TOGGLES` for this level: each torch turned off, with
+    /// the game time, oldest first.
+    pub redstone_torch_toggles: std::sync::Mutex<std::collections::VecDeque<(BlockPos, i64)>>,
 }
 
 #[derive(Clone, Copy)]
@@ -512,6 +515,7 @@ impl World {
             custom_block_entity_data: DashMap::new(),
             entity_tracker: entity_tracker::EntityTracker::new(),
             waypoint_manager: waypoint_manager::WaypointManager::default(),
+            redstone_torch_toggles: std::sync::Mutex::new(std::collections::VecDeque::new()),
         }
     }
 

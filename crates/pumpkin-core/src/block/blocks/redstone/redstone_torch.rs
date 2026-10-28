@@ -18,6 +18,7 @@ use pumpkin_data::BlockStateId;
 use pumpkin_data::FacingExt;
 use pumpkin_data::HorizontalFacingExt;
 use pumpkin_data::block_properties::Facing;
+use pumpkin_data::world::WorldEvent;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_world::tick::TickPriority;
 use pumpkin_world::world::BlockAccessor;
@@ -206,45 +207,115 @@ impl BlockBehaviour for RedstoneTorchBlock {
         0
     }
 
+    /// Vanilla `RedstoneTorchBlock.tick`: a torch turned off eight times within 60 ticks
+    /// burns out and tries again after 160.
     fn on_scheduled_tick(&self, args: OnScheduledTickArgs<'_>) {
         let (block, state) = args.world.get_block_and_state(args.position);
-        if block == &Block::REDSTONE_WALL_TORCH {
-            let mut props = RWallTorchProps::from_state_id(state.id);
-            let should_be_lit_now = should_be_lit(
-                args.world,
-                args.position,
-                props.facing.to_block_direction().opposite(),
-            );
-            if props.lit != should_be_lit_now {
-                props.lit = should_be_lit_now;
-                args.world.set_block_state(
-                    args.position,
-                    props.to_state_id(block),
-                    BlockFlags::NOTIFY_ALL,
-                );
-            }
+        let (lit, face) = if block == &Block::REDSTONE_WALL_TORCH {
+            let props = RWallTorchProps::from_state_id(state.id);
+            (props.lit, props.facing.to_block_direction().opposite())
         } else if block == &Block::REDSTONE_TORCH {
-            let mut props = RTorchProps::from_state_id(state.id);
-            let should_be_lit_now = should_be_lit(args.world, args.position, BlockDirection::Down);
-            if props.lit != should_be_lit_now {
-                props.lit = should_be_lit_now;
+            (
+                RTorchProps::from_state_id(state.id).lit,
+                BlockDirection::Down,
+            )
+        } else {
+            return;
+        };
+        let neighbor_signal = !should_be_lit(args.world, args.position, face);
+        let game_time = args.world.get_world_age();
+        {
+            let mut toggles = args
+                .world
+                .redstone_torch_toggles
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            while toggles
+                .front()
+                .is_some_and(|&(_, when)| game_time - when > RECENT_TOGGLE_TIMER)
+            {
+                toggles.pop_front();
+            }
+        }
+
+        if lit {
+            if neighbor_signal {
                 args.world.set_block_state(
                     args.position,
-                    props.to_state_id(block),
+                    with_lit(block, state.id, false),
                     BlockFlags::NOTIFY_ALL,
                 );
+                if is_toggled_too_frequently(args.world, args.position, true) {
+                    args.world.sync_world_event(
+                        WorldEvent::RedstoneTorchBurnout,
+                        *args.position,
+                        0,
+                    );
+                    args.world.schedule_block_tick(
+                        args.world.get_block(args.position),
+                        *args.position,
+                        RESTART_DELAY,
+                        TickPriority::Normal,
+                    );
+                }
             }
+        } else if !neighbor_signal && !is_toggled_too_frequently(args.world, args.position, false) {
+            args.world.set_block_state(
+                args.position,
+                with_lit(block, state.id, true),
+                BlockFlags::NOTIFY_ALL,
+            );
         }
     }
 
     /// Vanilla `RedstoneTorchBlock.onPlace`: every state change (a lit toggle too) notifies
     /// the neighbours, inside `setBlock`.
     fn placed(&self, args: PlacedArgs<'_>) {
-        update_neighbors(args.world, args.position);
+        update_neighbors(args.world, args.position, args.block);
     }
 
+    /// Vanilla `RedstoneTorchBlock.affectNeighborsAfterRemoval`. The torch's recent toggles
+    /// stay, so a torch put back in its place is still burnt out.
     fn on_state_replaced(&self, args: OnStateReplacedArgs<'_>) {
-        update_neighbors(args.world, args.position);
+        if !args.moved {
+            update_neighbors(args.world, args.position, args.block);
+        }
+    }
+}
+
+/// Vanilla `RedstoneTorchBlock.RECENT_TOGGLE_TIMER`.
+const RECENT_TOGGLE_TIMER: i64 = 60;
+/// Vanilla `RedstoneTorchBlock.MAX_RECENT_TOGGLES`.
+const MAX_RECENT_TOGGLES: usize = 8;
+/// Vanilla `RedstoneTorchBlock.RESTART_DELAY`.
+const RESTART_DELAY: i32 = 160;
+
+/// Vanilla `RedstoneTorchBlock.isToggledTooFrequently`.
+fn is_toggled_too_frequently(world: &World, pos: &BlockPos, add: bool) -> bool {
+    let mut toggles = world
+        .redstone_torch_toggles
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if add {
+        toggles.push_back((*pos, world.get_world_age()));
+    }
+    toggles
+        .iter()
+        .filter(|(toggle_pos, _)| toggle_pos == pos)
+        .count()
+        >= MAX_RECENT_TOGGLES
+}
+
+/// The torch state with `LIT` set.
+fn with_lit(block: &Block, state_id: BlockStateId, lit: bool) -> BlockStateId {
+    if block == &Block::REDSTONE_WALL_TORCH {
+        let mut props = RWallTorchProps::from_state_id(state_id);
+        props.lit = lit;
+        props.to_state_id(block)
+    } else {
+        let mut props = RTorchProps::from_state_id(state_id);
+        props.lit = lit;
+        props.to_state_id(block)
     }
 }
 
@@ -254,10 +325,11 @@ pub fn should_be_lit(world: &World, pos: &BlockPos, face: BlockDirection) -> boo
     get_redstone_power(block, state, world, &other_pos, face) == 0
 }
 
-pub fn update_neighbors(world: &Arc<World>, pos: &BlockPos) {
+/// Vanilla `RedstoneTorchBlock.notifyNeighbors`, with the torch as the source.
+pub fn update_neighbors(world: &Arc<World>, pos: &BlockPos, torch: &Block) {
     for dir in BlockDirection::all() {
         let other_pos = pos.offset(dir.to_offset());
-        world.update_neighbors(&other_pos, None);
+        world.update_neighbors_at(&other_pos, torch, None);
     }
 }
 
