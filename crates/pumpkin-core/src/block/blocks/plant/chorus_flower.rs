@@ -7,6 +7,7 @@ use pumpkin_data::{
     world::WorldEvent,
 };
 use pumpkin_macros::pumpkin_block;
+use pumpkin_util::GameMode;
 use pumpkin_util::math::{position::BlockPos, vector3::Vector3};
 use pumpkin_world::{
     tick::TickPriority,
@@ -17,13 +18,49 @@ use rand::RngExt;
 use super::chorus_plant;
 use crate::{
     block::{
-        BlockBehaviour, CanPlaceAtArgs, GetStateForNeighborUpdateArgs, OnScheduledTickArgs,
-        RandomTickArgs,
+        BlockBehaviour, CanPlaceAtArgs, GetStateForNeighborUpdateArgs, OnProjectileHitArgs,
+        OnScheduledTickArgs, RandomTickArgs, projectile_may_interact,
     },
     world::World,
 };
 
 pub const DEAD_AGE: u8 = 5;
+
+/// Vanilla `Projectile.mayBreak`. Pumpkin projectiles carry no `can_break` predicate, so the
+/// adventure-mode branch of `canBreakBlockInAdventureMode` always refuses.
+fn projectile_may_break(args: &OnProjectileHitArgs<'_>) -> bool {
+    if !args
+        .projectile
+        .get_entity()
+        .entity_type
+        .has_tag(&tag::EntityType::MINECRAFT_IMPACT_PROJECTILES)
+        || !args
+            .world
+            .level_info
+            .load()
+            .game_rules
+            .projectiles_can_break_blocks
+    {
+        return false;
+    }
+    let owner = args
+        .projectile
+        .get_owner_id()
+        .and_then(|id| args.world.get_entity_by_id(id));
+    let default_adventure = args
+        .server
+        .defaultgamemode
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .gamemode
+        == GameMode::Adventure;
+    let owner_not_adventure_player = owner.as_ref().is_some_and(|owner| {
+        owner
+            .get_player()
+            .is_some_and(|player| player.gamemode.load() != GameMode::Adventure)
+    });
+    !((owner.is_some() || default_adventure) && !owner_not_adventure_player)
+}
 
 const HORIZONTAL_DIRECTIONS: [BlockDirection; 4] = [
     BlockDirection::North,
@@ -53,6 +90,16 @@ impl BlockBehaviour for ChorusFlowerBlock {
 
     fn on_scheduled_tick(&self, args: OnScheduledTickArgs<'_>) {
         if !can_survive(args.world.as_ref(), args.position) {
+            args.world
+                .break_block(args.position, None, BlockFlags::NOTIFY_ALL);
+        }
+    }
+
+    fn on_projectile_hit(&self, args: OnProjectileHitArgs<'_>) {
+        if projectile_may_interact(args.world, args.projectile, args.position)
+            && projectile_may_break(&args)
+        {
+            // TODO: vanilla passes the projectile as the breaker (`BLOCK_DESTROY` source).
             args.world
                 .break_block(args.position, None, BlockFlags::NOTIFY_ALL);
         }
