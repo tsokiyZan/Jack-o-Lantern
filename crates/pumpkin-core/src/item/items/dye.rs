@@ -7,7 +7,6 @@ use crate::block::entities::{
     sign::{DyeColor, Text},
 };
 use pumpkin_data::tag;
-use pumpkin_util::GameMode;
 
 use crate::{
     block::{UseWithItemArgs, registry::BlockActionResult},
@@ -56,10 +55,6 @@ impl ItemBehaviour for DyeItem {
         } else {
             InteractionResult::PASS
         }
-    }
-
-    fn can_mine(&self, player: &Player) -> bool {
-        player.gamemode.load() != GameMode::Creative
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

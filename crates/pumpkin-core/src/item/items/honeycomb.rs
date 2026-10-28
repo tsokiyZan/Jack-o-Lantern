@@ -8,12 +8,14 @@ use crate::block::registry::BlockActionResult;
 use crate::entity::player::Player;
 use crate::item::{ItemBehaviour, ItemMetadata};
 use crate::server::Server;
+use crate::world::game_event::GameEventContext;
+use pumpkin_data::game_event::GameEvent;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_data::tag::Taggable;
 use pumpkin_data::world::WorldEvent;
-use pumpkin_data::{Block, BlockStateId, tag};
+use pumpkin_data::{Block, BlockState, BlockStateId, tag};
 use pumpkin_data::{BlockDirection, BlockId};
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
@@ -47,6 +49,11 @@ impl ItemBehaviour for HoneyCombItem {
         };
         item.decrement_unless_creative(player.gamemode.load(), 1);
         world.set_block_state(&location, waxed_state, BlockFlags::NOTIFY_ALL);
+        world.game_event(
+            GameEvent::BlockChange,
+            location.to_centered_f64(),
+            GameEventContext::of(Some(player), Some(BlockState::from_id(waxed_state))),
+        );
         world.sync_world_event_from(player, WorldEvent::ParticlesWaxOn, location, 0);
         world.play_block_sound_expect(
             player,
@@ -58,6 +65,11 @@ impl ItemBehaviour for HoneyCombItem {
             && let Some(direction) = get_connected_direction(old_state.id)
         {
             let neighbor_pos = location.offset(direction.to_offset());
+            world.game_event(
+                GameEvent::BlockChange,
+                neighbor_pos.to_centered_f64(),
+                GameEventContext::of(Some(player), Some(world.get_block_state(&neighbor_pos))),
+            );
             world.sync_world_event_from(player, WorldEvent::ParticlesWaxOn, neighbor_pos, 0);
             world.play_block_sound_expect(
                 player,

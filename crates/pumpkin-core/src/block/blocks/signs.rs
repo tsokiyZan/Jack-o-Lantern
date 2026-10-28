@@ -40,6 +40,8 @@ use crate::item::items::glowing_ink_sac::GlowingInkSacItem;
 use crate::item::items::honeycomb::HoneyCombItem;
 use crate::item::items::ink_sac::InkSacItem;
 use crate::world::World;
+use crate::world::game_event::GameEventContext;
+use pumpkin_data::game_event::GameEvent;
 use pumpkin_protocol::java::client::play::COpenSignEditor;
 
 #[pumpkin_block_from_tag("minecraft:all_signs")]
@@ -600,7 +602,13 @@ impl BlockBehaviour for SignBlock {
                 is_facing_front_text(args.world, args.position, args.block, args.player);
             let text = sign_entity.get_text(is_front_text);
 
-            let result = if let Some(honeycomb_item) =
+            // Vanilla `SignApplicator.canApplyToSign`: the text must have a message, except
+            // for honeycomb, which overrides it to true.
+            let can_apply = pumpkin_item.as_any().is::<HoneyCombItem>() || text.has_message(false);
+
+            let result = if !can_apply {
+                BlockActionResult::PassToDefaultBlockAction
+            } else if let Some(honeycomb_item) =
                 pumpkin_item.as_any().downcast_ref::<HoneyCombItem>()
             {
                 honeycomb_item.apply_to_sign(&args, &block_entity, &sign_entity)
@@ -631,6 +639,14 @@ impl BlockBehaviour for SignBlock {
                     sign_entity.allow_op_features(),
                 );
                 args.player.award_item_used(args.item_stack.item);
+                args.world.game_event(
+                    GameEvent::BlockChange,
+                    args.position.to_centered_f64(),
+                    GameEventContext::of(
+                        Some(args.player.as_ref()),
+                        Some(args.world.get_block_state(args.position)),
+                    ),
+                );
                 if pumpkin_item.as_any().is::<GlowingInkSacItem>() {
                     args.player.trigger_advancement(
                         crate::entity::player::advancement::trigger::AdvancementTrigger::GlowedSign,
