@@ -9,6 +9,7 @@ use crate::entity::ai::pathfinder::node::PathType;
 use pumpkin_data::chicken_sound_variant::ChickenSoundVariant;
 use pumpkin_data::chicken_variant::ChickenVariant;
 use pumpkin_data::entity::EntityPose;
+use pumpkin_data::game_event::GameEvent;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::Sound;
 use pumpkin_data::{entity::EntityType, item::Item};
@@ -153,28 +154,37 @@ impl ChickenEntity {
             && !self.is_chicken_jockey()
             && self.egg_lay_time.fetch_sub(1, Ordering::Relaxed) <= 1
         {
+            // `dropFromGiftLootTable(CHICKEN_LAY)`: the egg for the chicken's variant.
             let world = entity.world.load_full();
             let entity_id = entity.entity_id;
-            let mut drop_event =
-                crate::plugin::api::events::entity::entity_drop_item::EntityDropItemEvent::new(
-                    entity_id,
-                    "minecraft:egg".to_string(),
-                    1,
-                );
-            if let Some(server) = world.server.upgrade() {
-                server
-                    .plugin_manager
-                    .fire_blocking(&server, &mut drop_event);
-            }
-            if !drop_event.cancelled {
-                self.get_entity()
-                    .spawn_at_location(ItemStack::new(1, &Item::EGG));
+            let laid = living.drop_from_gift_loot_table_with(
+                self,
+                "minecraft:gameplay/chicken_lay",
+                |stack| {
+                    let mut drop_event =
+                    crate::plugin::api::events::entity::entity_drop_item::EntityDropItemEvent::new(
+                        entity_id,
+                        format!("minecraft:{}", stack.item.registry_key),
+                        stack.item_count,
+                    );
+                    if let Some(server) = world.server.upgrade() {
+                        server
+                            .plugin_manager
+                            .fire_blocking(&server, &mut drop_event);
+                    }
+                    if !drop_event.cancelled {
+                        entity.spawn_at_location(stack);
+                    }
+                },
+            );
+            if laid {
                 // `playSound(CHICKEN_EGG, 1.0F, (nextFloat() - nextFloat()) * 0.2F + 1.0F)`.
                 let pitch = {
                     let mut random = entity.random();
                     (random.next_f32() - random.next_f32()) * 0.2 + 1.0
                 };
                 self.play_sound_at_self(Sound::EntityChickenEgg, 1.0, pitch);
+                world.game_event_from(Some(self), GameEvent::EntityPlace, entity.pos.load());
             }
             let next_time = entity.random().next_bounded_i32(6000) + 6000;
             self.egg_lay_time.store(next_time, Ordering::Relaxed);
