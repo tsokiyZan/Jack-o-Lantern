@@ -22,7 +22,7 @@ impl ScaffoldingBlock {
         let (below_block, below_state) = world.get_block_and_state(&below_pos);
         if below_block == &Block::SCAFFOLDING {
             return ScaffoldingLikeProperties::from_state_id(below_state.id).distance;
-        } else if below_state.is_side_solid(BlockDirection::Up) && below_block.is_solid() {
+        } else if below_state.is_side_solid(BlockDirection::Up) {
             return 0;
         }
 
