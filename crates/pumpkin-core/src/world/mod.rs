@@ -6699,10 +6699,16 @@ impl World {
             crate::block::drop_loot(self, broken_block, position, true, &params);
         }
 
-        let new_state_id = if broken_block.is_waterlogged(broken_block_state.id) {
-            Block::WATER.default_state.id
-        } else {
+        // `removeBlock`: what's left is `getFluidState(pos).createLegacyBlock()`, so a
+        // waterlogged block, seagrass or kelp leaves water. Only fluid blocks themselves carry
+        // a flowing fluid state, and they don't break this way.
+        let (fluid, fluid_state) = Self::fluid_state_from_block_state(broken_block_state.id);
+        let new_state_id = if fluid_state.is_empty {
             Block::AIR.default_state.id
+        } else if fluid.matches_type(&Fluid::LAVA) {
+            Block::LAVA.default_state.id
+        } else {
+            Block::WATER.default_state.id
         };
 
         let broken_state_id = self.set_block_state(position, new_state_id, flags);
