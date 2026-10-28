@@ -202,12 +202,3 @@ pub fn is_diode(block: &Block) -> bool {
     block == &Block::REPEATER || block == &Block::COMPARATOR
 }
 
-pub fn diode_get_input_strength(world: &World, pos: &BlockPos, facing: BlockDirection) -> u8 {
-    let input_pos = pos.offset(facing.to_offset());
-    let (input_block, input_state) = world.get_block_and_state(&input_pos);
-    let power: u8 = get_redstone_power(input_block, input_state, world, &input_pos, facing);
-    if power == 0 && input_state.is_solid_block() {
-        return get_max_weak_power(world, &input_pos, true);
-    }
-    power
-}
