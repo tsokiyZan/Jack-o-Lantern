@@ -91,6 +91,9 @@ pub enum LootFunctionKind {
     ExplosionDecay,
     ApplyBonus(LootBonusFormula),
     FurnaceSmelt,
+    /// A function the evaluator reads from its JSON (`LootFunction::json`) when it runs: the
+    /// component-setting ones (`enchant_randomly`, `set_potion`, `filtered`, ...).
+    Json,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -98,6 +101,8 @@ pub struct LootFunction {
     pub kind: LootFunctionKind,
     pub enchantment: Option<&'static str>,
     pub condition: LootCondition,
+    /// The function's own JSON, for `LootFunctionKind::Json`.
+    pub json: Option<&'static std::sync::LazyLock<serde_json::Value>>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -269,6 +274,8 @@ pub struct DynamicLootFunction {
     pub kind: LootFunctionKind,
     pub enchantment: Option<String>,
     pub condition: DynamicLootCondition,
+    /// The function's own JSON, for `LootFunctionKind::Json`.
+    pub json: Option<serde_json::Value>,
 }
 
 impl From<LootFunction> for DynamicLootFunction {
@@ -277,6 +284,7 @@ impl From<LootFunction> for DynamicLootFunction {
             kind: function.kind,
             enchantment: function.enchantment.map(str::to_owned),
             condition: function.condition.into(),
+            json: function.json.map(|json| (**json).clone()),
         }
     }
 }

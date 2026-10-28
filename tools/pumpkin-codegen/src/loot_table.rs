@@ -223,10 +223,12 @@ impl Generator {
                         quote! { LootFunctionKind::ApplyBonus(#formula) }
                     }
                     LootFunctionKind::FurnaceSmelt => quote! { LootFunctionKind::FurnaceSmelt },
+                    LootFunctionKind::Json => quote! { LootFunctionKind::Json },
                 };
+                let json = function.json.as_ref().map_or_else(|| quote! {None}, |json| { let json = self.predicate(json); quote! {Some(#json)} });
                 let condition = self.condition(&function.condition);
                 let enchantment = function.enchantment.as_ref().map_or_else(|| quote! {None}, |name| quote! {Some(#name)});
-                quote! { LootFunction { kind: #kind, enchantment: #enchantment, condition: #condition } }
+                quote! { LootFunction { kind: #kind, enchantment: #enchantment, condition: #condition, json: #json } }
             })
             .collect();
         quote! { &[#(#functions),*] }

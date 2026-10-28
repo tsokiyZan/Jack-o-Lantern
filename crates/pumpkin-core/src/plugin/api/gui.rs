@@ -396,7 +396,10 @@ mod tests {
             .inventory
             .set_stack(0, ItemStack::new(8, &Item::DIAMOND));
         let mut bundle = ItemStack::new(1, &Item::BUNDLE);
-        bundle.set_data_component(BundleContentsImpl { items: Vec::new() });
+        bundle.set_data_component(BundleContentsImpl {
+            items: Vec::new(),
+            selected_item: -1,
+        });
         set_cursor(&handler, bundle);
         handler.on_slot_click(0, 1, SlotActionType::Pickup, &player);
         assert_eq!(handler.inventory.get_stack(0).item_count, 8);

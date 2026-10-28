@@ -1,5 +1,7 @@
 use std::collections::HashSet;
 
+use serde_json::Value;
+
 use pumpkin_util::math::java_round_f32;
 
 use super::{
@@ -170,7 +172,10 @@ impl<'a> Entry<'a> {
     }
 }
 impl<'a> Functions<'a> {
-    fn iter(self) -> impl Iterator<Item = (LootFunctionKind, Condition<'a>, Option<&'a str>)> {
+    fn iter(
+        self,
+    ) -> impl Iterator<Item = (LootFunctionKind, Condition<'a>, Option<&'a str>, Option<&'a Value>)>
+    {
         let (s, d): (&[_], &[_]) = match self {
             Self::Static(functions) => (functions, &[]),
             Self::Dynamic(functions) => (&[], functions),
@@ -181,6 +186,7 @@ impl<'a> Functions<'a> {
                     function.kind,
                     Condition::Static(function.condition),
                     function.enchantment,
+                    function.json.map(|json| &**json),
                 )
             })
             .chain(d.iter().map(|function: &DynamicLootFunction| {
@@ -188,6 +194,7 @@ impl<'a> Functions<'a> {
                     function.kind,
                     Condition::Dynamic(&function.condition),
                     function.enchantment.as_deref(),
+                    function.json.as_ref(),
                 )
             }))
     }
@@ -204,9 +211,24 @@ struct Candidate<'a> {
     item: Option<&'static Item>,
     parents: Vec<Functions<'a>>,
 }
+/// A stack being built: its item and components in `stack`, and a count that may run past the
+/// item's stack size until the split.
 struct Stack {
-    item: &'static Item,
+    stack: ItemStack,
     count: i32,
+}
+
+impl Stack {
+    fn new(item: &'static Item) -> Self {
+        Self {
+            stack: ItemStack::new(1, item),
+            count: 1,
+        }
+    }
+    /// `ItemStack.isEmpty`.
+    const fn is_empty(&self) -> bool {
+        self.count <= 0 || self.stack.is_empty()
+    }
 }
 
 /// Vanilla `LootTable.getRandomItems(context)`: rolls `table` on `rng` and splits the stacks.
@@ -226,10 +248,12 @@ pub(super) fn generate<R: RandomImpl>(
     generator.table(table, &[], &mut stacks);
     let mut result = Vec::new();
     for stack in stacks {
-        super::split_stack(&ItemStack::new(1, stack.item), stack.count, &mut result);
+        super::split_stack(&stack.stack, stack.count, &mut result);
     }
     result
 }
+
+mod functions;
 
 struct Generator<'a, 'b, R: RandomImpl> {
     params: &'a LootContextParameters<'b>,
@@ -409,13 +433,13 @@ impl<R: RandomImpl> Generator<'_, '_, R> {
         output: &mut Vec<Stack>,
     ) {
         if let Some(item) = candidate.item {
-            self.emit(Stack { item, count: 1 }, functions, output);
+            self.emit(Stack::new(item), functions, output);
             return;
         }
         match candidate.entry.kind() {
             Kind::Item(name) => {
                 if let Some(item) = Item::from_registry_key(name.trim_start_matches("minecraft:")) {
-                    self.emit(Stack { item, count: 1 }, functions, output);
+                    self.emit(Stack::new(item), functions, output);
                 }
             }
             // Dynamic drops emit nothing without a block-registered callback.
@@ -425,7 +449,7 @@ impl<R: RandomImpl> Generator<'_, '_, R> {
                     if let Some(item) =
                         Item::from_registry_key(name.trim_start_matches("minecraft:"))
                     {
-                        self.emit(Stack { item, count: 1 }, functions, output);
+                        self.emit(Stack::new(item), functions, output);
                     }
                 }
             }
@@ -453,7 +477,7 @@ impl<R: RandomImpl> Generator<'_, '_, R> {
     }
     fn emit(&mut self, mut stack: Stack, functions: &[Functions<'_>], output: &mut Vec<Stack>) {
         for functions in functions {
-            for (kind, condition, enchantment) in functions.iter() {
+            for (kind, condition, enchantment, json) in functions.iter() {
                 if !self.test(condition) {
                     continue;
                 }
@@ -522,9 +546,18 @@ impl<R: RandomImpl> Generator<'_, '_, R> {
                         if stack.count <= 0 {
                             continue;
                         }
-                        let (item, count) = smelt(stack.item, stack.count);
-                        stack.item = item;
+                        // Vanilla `SmeltItemFunction.run`: a recipe's result has none of the
+                        // input's components.
+                        let (item, count) = smelt(stack.stack.item, stack.count);
+                        if !std::ptr::eq(item, stack.stack.item) {
+                            stack.stack = ItemStack::new(1, item);
+                        }
                         stack.count = count;
+                    }
+                    LootFunctionKind::Json => {
+                        if let Some(json) = json {
+                            self.run_json(&mut stack, json);
+                        }
                     }
                 }
             }

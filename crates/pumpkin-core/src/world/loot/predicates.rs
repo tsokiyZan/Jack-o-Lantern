@@ -3,7 +3,7 @@ use crate::entity::{
     passive::sheep::SheepEntity,
     player::Player,
 };
-use pumpkin_data::{data_component::DataComponent, data_component_impl::read_data};
+use pumpkin_data::{data_component::DataComponent, data_component_impl::read_data, item_stack::ItemStack};
 use pumpkin_nbt::{compound::NbtCompound, tag::NbtTag};
 use serde_json::Value;
 
@@ -132,7 +132,7 @@ fn flags_match(entity: &dyn EntityBase, expected: &Value) -> bool {
     })
 }
 
-fn json_to_nbt(value: &Value) -> Option<NbtTag> {
+pub(super) fn json_to_nbt(value: &Value) -> Option<NbtTag> {
     Some(match value {
         Value::Null => return None,
         Value::Bool(value) => NbtTag::Byte(i8::from(*value)),
@@ -239,10 +239,35 @@ pub(super) fn matches_block(predicate: &Value, params: &LootContextParameters<'_
 }
 
 pub(super) fn matches_tool(predicate: &Value, params: &LootContextParameters<'_>) -> bool {
+    params
+        .tool
+        .as_ref()
+        .is_some_and(|tool| item_matches(tool, predicate))
+}
+
+/// Vanilla `DataComponentPredicate.Type` ids: a `predicates` key that isn't one of these names
+/// a component, and matches when the stack has it (`AnyValue`).
+const COMPONENT_PREDICATE_TYPES: &[&str] = &[
+    "minecraft:damage",
+    "minecraft:enchantments",
+    "minecraft:stored_enchantments",
+    "minecraft:potion_contents",
+    "minecraft:custom_data",
+    "minecraft:container",
+    "minecraft:bundle_contents",
+    "minecraft:firework_explosion",
+    "minecraft:fireworks",
+    "minecraft:writable_book_content",
+    "minecraft:written_book_content",
+    "minecraft:attribute_modifiers",
+    "minecraft:trim",
+    "minecraft:jukebox_playable",
+    "minecraft:villager/variant",
+];
+
+/// Vanilla `ItemPredicate.test`.
+pub(super) fn item_matches(tool: &ItemStack, predicate: &Value) -> bool {
     use pumpkin_data::data_component_impl::EnchantmentsImpl;
-    let Some(tool) = params.tool.as_ref() else {
-        return false;
-    };
     let Some(predicate) = predicate.as_object() else {
         return false;
     };
@@ -279,6 +304,16 @@ pub(super) fn matches_tool(predicate: &Value, params: &LootContextParameters<'_>
         ),
         "predicates" => expected.as_object().is_some_and(|predicates| {
             predicates.iter().all(|(key, requirements)| {
+                let key = if key.contains(':') {
+                    key.clone()
+                } else {
+                    format!("minecraft:{key}")
+                };
+                if !COMPONENT_PREDICATE_TYPES.contains(&key.as_str()) {
+                    return !tool.is_empty()
+                        && DataComponent::try_from_name(&key)
+                            .is_some_and(|component| tool.has_data_component(component));
+                }
                 if key != "minecraft:enchantments" {
                     return false;
                 }

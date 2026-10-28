@@ -207,6 +207,7 @@ static TWO_DIAMONDS: LootTable = LootTable {
             },
             enchantment: None,
             condition: LootCondition::None,
+            json: None,
         }],
         ..entry(LootEntryKind::Item("minecraft:diamond"))
     }])],

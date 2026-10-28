@@ -61,7 +61,27 @@ fn scalar(value: &Value) -> Option<f64> {
         .or_else(|| value.get("value").and_then(Value::as_f64))
 }
 
-fn provider(value: &Value) -> Option<LootNumberProvider> {
+/// The functions the evaluator reads from their JSON when it runs.
+const JSON_FUNCTIONS: &[&str] = &[
+    "enchant_randomly",
+    "enchant_with_levels",
+    "set_enchantments",
+    "set_damage",
+    "set_potion",
+    "set_stew_effect",
+    "set_ominous_bottle_amplifier",
+    "set_instrument",
+    "set_name",
+    "set_components",
+    "copy_state",
+    "filtered",
+    "discard",
+    "exploration_map",
+];
+
+/// A loot number provider: a constant, `uniform` or `binomial`.
+#[must_use]
+pub fn provider(value: &Value) -> Option<LootNumberProvider> {
     if let Some(value) = scalar(value) {
         return Some(LootNumberProvider::Constant(value));
     }
@@ -458,6 +478,7 @@ impl<R: Fn(&str) -> Option<Value>> Parser<'_, R> {
                         LootFunctionKind::LimitCount { min, max }
                     }
                     "explosion_decay" => LootFunctionKind::ExplosionDecay,
+                    name if JSON_FUNCTIONS.contains(&name) => LootFunctionKind::Json,
                     _ => return None,
                 };
                 let enchantment = function
@@ -472,6 +493,7 @@ impl<R: Fn(&str) -> Option<Value>> Parser<'_, R> {
                         _ => None,
                     });
                 Some(Function {
+                    json: (kind == LootFunctionKind::Json).then(|| function.clone()),
                     kind,
                     enchantment,
                     condition: self.conditions(function),
