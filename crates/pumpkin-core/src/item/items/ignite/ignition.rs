@@ -1,7 +1,6 @@
 use crate::block::blocks::fire::FireBlockBase;
 use crate::block::blocks::fire::fire::FireBlock;
 use crate::world::World;
-use pumpkin_data::fluid::Fluid;
 use pumpkin_data::tag::Taggable;
 use pumpkin_data::{Block, BlockStateId, tag};
 use pumpkin_util::math::position::BlockPos;
@@ -22,9 +21,6 @@ impl Ignition {
     where
         F: FnOnce(Arc<World>, BlockPos, BlockStateId),
     {
-        if *world.get_fluid(&location) != Fluid::EMPTY {
-            return false;
-        }
         let fire_block = FireBlockBase::get_fire_type(world, &fire_pos);
 
         let state_id = world.get_block_state_id(&location);
@@ -57,6 +53,11 @@ fn can_be_lit(block: &Block, state_id: BlockStateId) -> Option<BlockStateId> {
     }
 
     let mut props = block.properties(state_id)?.to_props();
+    // `CampfireBlock.canLight` and `CandleBlock.canLight`: not while waterlogged (candle cakes
+    // have no waterlogged property).
+    if props.contains(&pumpkin_data::Property::Waterlogged(true)) {
+        return None;
+    }
 
     let value = props.iter_mut().find_map(|p| match p {
         pumpkin_data::Property::Lit(lit) => Some(lit),
