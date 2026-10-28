@@ -1,5 +1,6 @@
+use std::sync::Arc;
+
 use pumpkin_data::BlockStateId;
-use pumpkin_data::block_properties::HorizontalFacing;
 use pumpkin_data::block_properties::PoweredRailLikeProperties;
 use pumpkin_data::block_properties::RailLikeProperties;
 use pumpkin_data::block_properties::RailShape;
@@ -7,6 +8,7 @@ use pumpkin_data::block_properties::RailShapeStraight;
 use pumpkin_data::tag::Taggable;
 use pumpkin_data::{Block, tag};
 use pumpkin_util::math::position::BlockPos;
+use pumpkin_world::world::BlockFlags;
 
 use crate::world::World;
 
@@ -17,150 +19,303 @@ pub mod detector_rail;
 pub mod powered_rail;
 pub mod rail;
 
-struct Rail {
-    block: &'static Block,
+/// Vanilla `RailState`: a rail and the positions its shape connects to, used to pick and
+/// propagate rail shapes.
+struct RailState {
     position: BlockPos,
+    block: &'static Block,
     properties: RailProperties,
-    elevation: RailElevation,
+    connections: Vec<BlockPos>,
 }
 
-impl Rail {
-    fn find_with_elevation(world: &World, position: BlockPos) -> Option<Self> {
-        let (block, block_state) = world.get_block_and_state_id(&position);
-        if block.has_tag(&tag::Block::MINECRAFT_RAILS) {
-            let properties = RailProperties::new(block_state, block);
-            return Some(Self {
-                block,
-                position,
-                properties,
-                elevation: RailElevation::Flat,
-            });
-        }
+/// Vanilla `BaseRailBlock.isRail(BlockState)`.
+fn is_rail(block: &Block) -> bool {
+    block.has_tag(&tag::Block::MINECRAFT_RAILS)
+}
 
-        let pos = position.up();
-        let (block, block_state) = world.get_block_and_state_id(&pos);
-        if block.has_tag(&tag::Block::MINECRAFT_RAILS) {
-            let properties = RailProperties::new(block_state, block);
-            return Some(Self {
-                block,
-                position: pos,
-                properties,
-                elevation: RailElevation::Up,
-            });
-        }
+/// Vanilla `BaseRailBlock.isRail(Level, BlockPos)`.
+fn is_rail_at(world: &World, position: &BlockPos) -> bool {
+    is_rail(world.get_block(position))
+}
 
-        let pos = position.down();
-        let (block, block_state) = world.get_block_and_state_id(&pos);
-        if block.has_tag(&tag::Block::MINECRAFT_RAILS) {
-            let properties = RailProperties::new(block_state, block);
-            return Some(Self {
-                block,
-                position: pos,
-                properties,
-                elevation: RailElevation::Down,
-            });
-        }
-
-        None
+impl RailState {
+    fn new(position: BlockPos, state_id: BlockStateId) -> Self {
+        let block = Block::from_state_id(state_id);
+        let properties = RailProperties::new(state_id, block);
+        let mut rail = Self {
+            position,
+            block,
+            properties,
+            connections: Vec::with_capacity(3),
+        };
+        rail.update_connections(rail.properties.shape());
+        rail
     }
 
-    fn find_if_unlocked(
-        world: &World,
-        place_pos: &BlockPos,
-        direction: HorizontalFacing,
-    ) -> Option<Self> {
-        let rail_position = place_pos.offset(direction.to_offset());
-        let rail = Self::find_with_elevation(world, rail_position)?;
-
-        if rail.is_locked(world) {
-            return None;
-        }
-
-        Some(rail)
+    fn connections(&self) -> &[BlockPos] {
+        &self.connections
     }
 
-    fn is_locked(&self, world: &World) -> bool {
-        for direction in self.properties.directions() {
-            let Some(other_rail) =
-                Self::find_with_elevation(world, self.position.offset(direction.to_offset()))
-            else {
-                // Rails pointing to non-rail blocks are not locked
-                return false;
-            };
-
-            let direction = direction.opposite();
-            if !other_rail
-                .properties
-                .directions()
-                .into_iter()
-                .any(|d| d == direction)
-            {
-                // Rails pointing to other rails that are not pointing back are not locked
-                return false;
-            }
-        }
-
-        true
+    fn state_id(&self) -> BlockStateId {
+        self.properties.to_state_id(self.block)
     }
 
-    pub fn get_new_rail_shape(
-        &self,
-        first: HorizontalFacing,
-        second: HorizontalFacing,
-    ) -> RailShape {
-        match (first, second) {
-            (HorizontalFacing::North, HorizontalFacing::South)
-            | (HorizontalFacing::South, HorizontalFacing::North) => RailShape::NorthSouth,
+    /// Vanilla `RailState.updateConnections`.
+    fn update_connections(&mut self, shape: RailShape) {
+        let pos = self.position;
+        self.connections.clear();
+        let [a, b] = match shape {
+            RailShape::NorthSouth => [pos.north(), pos.south()],
+            RailShape::EastWest => [pos.west(), pos.east()],
+            RailShape::AscendingEast => [pos.west(), pos.east().up()],
+            RailShape::AscendingWest => [pos.west().up(), pos.east()],
+            RailShape::AscendingNorth => [pos.north().up(), pos.south()],
+            RailShape::AscendingSouth => [pos.north(), pos.south().up()],
+            RailShape::SouthEast => [pos.east(), pos.south()],
+            RailShape::SouthWest => [pos.west(), pos.south()],
+            RailShape::NorthWest => [pos.west(), pos.north()],
+            RailShape::NorthEast => [pos.east(), pos.north()],
+        };
+        self.connections.push(a);
+        self.connections.push(b);
+    }
 
-            (HorizontalFacing::East, HorizontalFacing::West)
-            | (HorizontalFacing::West, HorizontalFacing::East) => RailShape::EastWest,
-
-            (HorizontalFacing::South, HorizontalFacing::East)
-            | (HorizontalFacing::East, HorizontalFacing::South) => {
-                if self.properties.can_curve() {
-                    RailShape::SouthEast
-                } else {
-                    RailShape::EastWest
+    /// Vanilla `RailState.removeSoftConnections`.
+    fn remove_soft_connections(&mut self, world: &World) {
+        let mut i = 0;
+        while i < self.connections.len() {
+            match Self::get_rail(world, self.connections[i]) {
+                Some(rail) if rail.connects_to(self) => {
+                    self.connections[i] = rail.position;
+                    i += 1;
                 }
-            }
-
-            (HorizontalFacing::South, HorizontalFacing::West)
-            | (HorizontalFacing::West, HorizontalFacing::South) => {
-                if self.properties.can_curve() {
-                    RailShape::SouthWest
-                } else {
-                    RailShape::EastWest
+                _ => {
+                    self.connections.remove(i);
                 }
-            }
-
-            (HorizontalFacing::North, HorizontalFacing::West)
-            | (HorizontalFacing::West, HorizontalFacing::North) => {
-                if self.properties.can_curve() {
-                    RailShape::NorthWest
-                } else {
-                    RailShape::EastWest
-                }
-            }
-
-            (HorizontalFacing::North, HorizontalFacing::East)
-            | (HorizontalFacing::East, HorizontalFacing::North) => {
-                if self.properties.can_curve() {
-                    RailShape::NorthEast
-                } else {
-                    RailShape::EastWest
-                }
-            }
-
-            _ => {
-                tracing::error!(
-                    "Invalid rail direction combination: {:?}, {:?}",
-                    first,
-                    second
-                );
-                RailShape::NorthSouth
             }
         }
     }
+
+    /// Vanilla `RailState.hasRail`.
+    fn has_rail(world: &World, position: BlockPos) -> bool {
+        is_rail_at(world, &position)
+            || is_rail_at(world, &position.up())
+            || is_rail_at(world, &position.down())
+    }
+
+    /// Vanilla `RailState.getRail`: a rail at the position, above it or below it.
+    fn get_rail(world: &World, position: BlockPos) -> Option<Self> {
+        [position, position.up(), position.down()]
+            .into_iter()
+            .find_map(|test_pos| {
+                let (block, state_id) = world.get_block_and_state_id(&test_pos);
+                is_rail(block).then(|| Self::new(test_pos, state_id))
+            })
+    }
+
+    /// Vanilla `RailState.connectsTo`.
+    fn connects_to(&self, rail: &Self) -> bool {
+        self.has_connection(rail.position)
+    }
+
+    /// Vanilla `RailState.hasConnection`: compares only X and Z.
+    fn has_connection(&self, rail_pos: BlockPos) -> bool {
+        self.connections
+            .iter()
+            .any(|pos| pos.0.x == rail_pos.0.x && pos.0.z == rail_pos.0.z)
+    }
+
+    /// Vanilla `RailState.countPotentialConnections`.
+    fn count_potential_connections(&self, world: &World) -> usize {
+        [
+            self.position.north(),
+            self.position.east(),
+            self.position.south(),
+            self.position.west(),
+        ]
+        .into_iter()
+        .filter(|pos| Self::has_rail(world, *pos))
+        .count()
+    }
+
+    /// Vanilla `RailState.canConnectTo`.
+    fn can_connect_to(&self, rail: &Self) -> bool {
+        self.connects_to(rail) || self.connections.len() != 2
+    }
+
+    /// Vanilla `RailState.connectTo`.
+    fn connect_to(&mut self, world: &Arc<World>, rail: &Self) {
+        self.connections.push(rail.position);
+        let pos = self.position;
+        let north = pos.north();
+        let south = pos.south();
+        let west = pos.west();
+        let east = pos.east();
+        let n = self.has_connection(north);
+        let s = self.has_connection(south);
+        let w = self.has_connection(west);
+        let e = self.has_connection(east);
+        // East-west wins over north-south.
+        let mut shape = if w || e {
+            Some(RailShape::EastWest)
+        } else {
+            (n || s).then_some(RailShape::NorthSouth)
+        };
+
+        if self.properties.can_curve() {
+            if s && e && !n && !w {
+                shape = Some(RailShape::SouthEast);
+            }
+            if s && w && !n && !e {
+                shape = Some(RailShape::SouthWest);
+            }
+            if n && w && !s && !e {
+                shape = Some(RailShape::NorthWest);
+            }
+            if n && e && !s && !w {
+                shape = Some(RailShape::NorthEast);
+            }
+        }
+
+        let shape = ascending_shape(world, pos, shape).unwrap_or(RailShape::NorthSouth);
+        self.properties.set_shape(shape);
+        world.set_block_state(&pos, self.state_id(), BlockFlags::NOTIFY_ALL);
+    }
+
+    /// Vanilla `RailState.hasNeighborRail`.
+    fn has_neighbor_rail(&self, world: &World, rail_pos: BlockPos) -> bool {
+        let Some(mut neighbor) = Self::get_rail(world, rail_pos) else {
+            return false;
+        };
+        neighbor.remove_soft_connections(world);
+        neighbor.can_connect_to(self)
+    }
+
+    /// Vanilla `RailState.place`.
+    fn place(
+        mut self,
+        world: &Arc<World>,
+        has_signal: bool,
+        first: bool,
+        default_shape: RailShape,
+    ) -> Self {
+        let pos = self.position;
+        let n = self.has_neighbor_rail(world, pos.north());
+        let s = self.has_neighbor_rail(world, pos.south());
+        let w = self.has_neighbor_rail(world, pos.west());
+        let e = self.has_neighbor_rail(world, pos.east());
+        let mut shape = None;
+        let north_or_south = n || s;
+        let west_or_east = w || e;
+        if north_or_south && !west_or_east {
+            shape = Some(RailShape::NorthSouth);
+        }
+        if west_or_east && !north_or_south {
+            shape = Some(RailShape::EastWest);
+        }
+
+        let south_and_east = s && e;
+        let south_and_west = s && w;
+        let north_and_east = n && e;
+        let north_and_west = n && w;
+        let can_curve = self.properties.can_curve();
+        if can_curve {
+            if south_and_east && !n && !w {
+                shape = Some(RailShape::SouthEast);
+            }
+            if south_and_west && !n && !e {
+                shape = Some(RailShape::SouthWest);
+            }
+            if north_and_west && !s && !e {
+                shape = Some(RailShape::NorthWest);
+            }
+            if north_and_east && !s && !w {
+                shape = Some(RailShape::NorthEast);
+            }
+        }
+
+        if shape.is_none() {
+            if north_or_south && west_or_east {
+                shape = Some(default_shape);
+            } else if north_or_south {
+                shape = Some(RailShape::NorthSouth);
+            } else if west_or_east {
+                shape = Some(RailShape::EastWest);
+            }
+
+            if can_curve {
+                if has_signal {
+                    if south_and_east {
+                        shape = Some(RailShape::SouthEast);
+                    }
+                    if south_and_west {
+                        shape = Some(RailShape::SouthWest);
+                    }
+                    if north_and_east {
+                        shape = Some(RailShape::NorthEast);
+                    }
+                    if north_and_west {
+                        shape = Some(RailShape::NorthWest);
+                    }
+                } else {
+                    if north_and_west {
+                        shape = Some(RailShape::NorthWest);
+                    }
+                    if north_and_east {
+                        shape = Some(RailShape::NorthEast);
+                    }
+                    if south_and_west {
+                        shape = Some(RailShape::SouthWest);
+                    }
+                    if south_and_east {
+                        shape = Some(RailShape::SouthEast);
+                    }
+                }
+            }
+        }
+
+        let shape = ascending_shape(world, pos, shape).unwrap_or(default_shape);
+        self.update_connections(shape);
+        self.properties.set_shape(shape);
+        let state_id = self.state_id();
+        if first || world.get_block_state_id(&pos) != state_id {
+            world.set_block_state(&pos, state_id, BlockFlags::NOTIFY_ALL);
+
+            for i in 0..self.connections.len() {
+                if let Some(mut neighbor) = Self::get_rail(world, self.connections[i]) {
+                    neighbor.remove_soft_connections(world);
+                    if neighbor.can_connect_to(&self) {
+                        neighbor.connect_to(world, &self);
+                    }
+                }
+            }
+        }
+
+        self
+    }
+}
+
+/// The slope check shared by `RailState.connectTo` and `RailState.place`: a flat shape
+/// ascends towards a rail one block up.
+fn ascending_shape(world: &World, pos: BlockPos, shape: Option<RailShape>) -> Option<RailShape> {
+    let mut shape = shape?;
+    if shape == RailShape::NorthSouth {
+        if is_rail_at(world, &pos.north().up()) {
+            shape = RailShape::AscendingNorth;
+        }
+        if is_rail_at(world, &pos.south().up()) {
+            shape = RailShape::AscendingSouth;
+        }
+    }
+    if shape == RailShape::EastWest {
+        if is_rail_at(world, &pos.east().up()) {
+            shape = RailShape::AscendingEast;
+        }
+        if is_rail_at(world, &pos.west().up()) {
+            shape = RailShape::AscendingWest;
+        }
+    }
+    Some(shape)
 }
 
 enum RailProperties {
@@ -206,41 +361,17 @@ impl RailProperties {
         }
     }
 
-    const fn directions(&self) -> [HorizontalFacing; 2] {
-        match self {
-            Self::Rail(props) => match props.shape {
-                RailShape::EastWest | RailShape::AscendingEast | RailShape::AscendingWest => {
-                    [HorizontalFacing::West, HorizontalFacing::East]
-                }
-                RailShape::NorthSouth | RailShape::AscendingNorth | RailShape::AscendingSouth => {
-                    [HorizontalFacing::North, HorizontalFacing::South]
-                }
-                RailShape::SouthEast => [HorizontalFacing::East, HorizontalFacing::South],
-                RailShape::SouthWest => [HorizontalFacing::West, HorizontalFacing::South],
-                RailShape::NorthWest => [HorizontalFacing::West, HorizontalFacing::North],
-                RailShape::NorthEast => [HorizontalFacing::East, HorizontalFacing::North],
-            },
-
-            Self::StraightRail(props) => match props.shape {
-                RailShapeStraight::EastWest
-                | RailShapeStraight::AscendingEast
-                | RailShapeStraight::AscendingWest => {
-                    [HorizontalFacing::West, HorizontalFacing::East]
-                }
-
-                RailShapeStraight::NorthSouth
-                | RailShapeStraight::AscendingNorth
-                | RailShapeStraight::AscendingSouth => {
-                    [HorizontalFacing::North, HorizontalFacing::South]
-                }
-            },
-        }
-    }
-
     fn to_state_id(&self, block: &Block) -> BlockStateId {
         match self {
             Self::Rail(props) => props.to_state_id(block),
             Self::StraightRail(props) => props.to_state_id(block),
+        }
+    }
+
+    const fn is_waterlogged(&self) -> bool {
+        match self {
+            Self::Rail(props) => props.waterlogged,
+            Self::StraightRail(props) => props.waterlogged,
         }
     }
 
@@ -271,13 +402,6 @@ impl RailProperties {
         }
     }
 
-    fn set_straight_shape(&mut self, shape: RailShapeStraight) {
-        match self {
-            Self::Rail(props) => props.shape = shape.as_shape(),
-            Self::StraightRail(props) => props.shape = shape,
-        }
-    }
-
     const fn is_powered(&self) -> bool {
         match self {
             Self::Rail(_) => false,
@@ -289,53 +413,6 @@ impl RailProperties {
         match self {
             Self::Rail(_) => {}
             Self::StraightRail(props) => props.powered = powered,
-        }
-    }
-}
-
-#[derive(Debug, PartialEq)]
-enum RailElevation {
-    Flat,
-    Up,
-    Down,
-}
-
-pub trait StraightRailShapeExt {
-    fn as_shape(&self) -> RailShape;
-}
-
-impl StraightRailShapeExt for RailShapeStraight {
-    fn as_shape(&self) -> RailShape {
-        match self {
-            Self::NorthSouth => RailShape::NorthSouth,
-            Self::EastWest => RailShape::EastWest,
-            Self::AscendingNorth => RailShape::AscendingNorth,
-            Self::AscendingSouth => RailShape::AscendingSouth,
-            Self::AscendingEast => RailShape::AscendingEast,
-            Self::AscendingWest => RailShape::AscendingWest,
-        }
-    }
-}
-
-pub trait HorizontalFacingRailExt {
-    fn to_rail_shape_flat(&self) -> RailShapeStraight;
-    fn to_rail_shape_ascending_towards(&self) -> RailShapeStraight;
-}
-
-impl HorizontalFacingRailExt for HorizontalFacing {
-    fn to_rail_shape_flat(&self) -> RailShapeStraight {
-        match self {
-            Self::North | Self::South => RailShapeStraight::NorthSouth,
-            Self::East | Self::West => RailShapeStraight::EastWest,
-        }
-    }
-
-    fn to_rail_shape_ascending_towards(&self) -> RailShapeStraight {
-        match self {
-            Self::North => RailShapeStraight::AscendingNorth,
-            Self::South => RailShapeStraight::AscendingSouth,
-            Self::East => RailShapeStraight::AscendingEast,
-            Self::West => RailShapeStraight::AscendingWest,
         }
     }
 }

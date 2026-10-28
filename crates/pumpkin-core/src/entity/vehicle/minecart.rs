@@ -143,6 +143,13 @@ impl MinecartEntity {
         }
     }
 
+    /// Vanilla `AbstractContainerMenu.getRedstoneSignalFromContainer` on this minecart, as a
+    /// detector rail reads it. `None` when the minecart is not a container.
+    pub fn comparator_output(&self) -> Option<u8> {
+        self.container()
+            .map(|inventory| crate::block::calculate_comparator_output(inventory.as_ref()))
+    }
+
     /// Vanilla `getDropItem`: spawner and command block minecarts drop a plain minecart.
     const fn drop_item(&self) -> &'static Item {
         match &self.kind {

@@ -1,230 +1,155 @@
+//! The parts of vanilla `BaseRailBlock` every rail shares.
+
 use std::sync::Arc;
 
 use pumpkin_data::{
     Block, BlockDirection, BlockStateId,
-    block_properties::{HorizontalFacing, RailShape, RailShapeStraight},
+    block_properties::{HorizontalFacing, RailShape},
+    fluid::Fluid,
 };
 use pumpkin_util::math::position::BlockPos;
+use pumpkin_world::tick::TickPriority;
 use pumpkin_world::world::{BlockAccessor, BlockFlags};
 
+use crate::block::{OnPlaceArgs, drop_loot};
+use crate::entity::EntityBase;
 use crate::world::World;
+use crate::world::loot::LootContextParameters;
 
-use super::{HorizontalFacingRailExt, Rail, RailElevation, RailProperties, StraightRailShapeExt};
+use super::super::block_receives_redstone_power;
+use super::{RailProperties, RailState};
 
-pub(super) fn rail_placement_is_valid(world: &World, block: &Block, pos: &BlockPos) -> bool {
-    if !can_place_rail_at(world, pos) {
-        return false;
-    }
-
-    let state_id = world.get_block_state_id(pos);
-    let rail_props = RailProperties::new(state_id, block);
-    let rail_leaning_direction = match rail_props.shape() {
-        RailShape::AscendingNorth => Some(HorizontalFacing::North),
-        RailShape::AscendingSouth => Some(HorizontalFacing::South),
-        RailShape::AscendingEast => Some(HorizontalFacing::East),
-        RailShape::AscendingWest => Some(HorizontalFacing::West),
-        _ => None,
-    };
-
-    if let Some(direction) = rail_leaning_direction
-        && !can_place_rail_at(world, &pos.offset(direction.to_offset()).up())
-    {
-        return false;
-    }
-
-    true
-}
-
+/// Vanilla `BaseRailBlock.canSurvive`.
 pub(super) fn can_place_rail_at(world: &dyn BlockAccessor, pos: &BlockPos) -> bool {
     let state = world.get_block_state(&pos.down());
     state.is_side_solid(BlockDirection::Up)
 }
 
-pub(super) fn compute_placed_rail_shape(
-    world: &World,
-    block_pos: &BlockPos,
-    player_facing: HorizontalFacing,
-) -> RailShapeStraight {
-    // Use the same sophisticated logic as normal rails, but adapted for straight rails
-    // Check each direction for rail connections, similar to normal rail placement
-
-    // Check East first
-    if let Some(east_rail) = Rail::find_if_unlocked(world, block_pos, HorizontalFacing::East) {
-        // Check for opposite connection (West) to form a straight line
-        if let Some(west_rail) = Rail::find_if_unlocked(world, block_pos, HorizontalFacing::West) {
-            // We have connections in both East and West
-            if east_rail.elevation == RailElevation::Up {
-                return RailShapeStraight::AscendingEast;
-            } else if west_rail.elevation == RailElevation::Up {
-                return RailShapeStraight::AscendingWest;
-            }
-            return RailShapeStraight::EastWest;
-        }
-        // Only East connection
-        if east_rail.elevation == RailElevation::Up {
-            return RailShapeStraight::AscendingEast;
-        }
-        return RailShapeStraight::EastWest;
+/// Vanilla `BaseRailBlock.shouldBeRemoved`.
+fn should_be_removed(world: &World, pos: &BlockPos, shape: RailShape) -> bool {
+    if !can_place_rail_at(world, pos) {
+        return true;
     }
 
-    // Check South
-    if let Some(south_rail) = Rail::find_if_unlocked(world, block_pos, HorizontalFacing::South) {
-        // Check for opposite connection (North) to form a straight line
-        if let Some(north_rail) = Rail::find_if_unlocked(world, block_pos, HorizontalFacing::North)
-        {
-            // We have connections in both South and North
-            if south_rail.elevation == RailElevation::Up {
-                return RailShapeStraight::AscendingSouth;
-            } else if north_rail.elevation == RailElevation::Up {
-                return RailShapeStraight::AscendingNorth;
-            }
-            return RailShapeStraight::NorthSouth;
-        }
-        // Only South connection
-        if south_rail.elevation == RailElevation::Up {
-            return RailShapeStraight::AscendingSouth;
-        }
-        return RailShapeStraight::NorthSouth;
-    }
-
-    // Check West
-    if let Some(west_rail) = Rail::find_if_unlocked(world, block_pos, HorizontalFacing::West) {
-        if west_rail.elevation == RailElevation::Up {
-            return RailShapeStraight::AscendingWest;
-        }
-        return RailShapeStraight::EastWest;
-    }
-
-    // Check North
-    if let Some(north_rail) = Rail::find_if_unlocked(world, block_pos, HorizontalFacing::North) {
-        if north_rail.elevation == RailElevation::Up {
-            return RailShapeStraight::AscendingNorth;
-        }
-        return RailShapeStraight::NorthSouth;
-    }
-
-    // No connections found, use player facing direction
-    player_facing.to_rail_shape_flat()
+    let slope_support = match shape {
+        RailShape::AscendingEast => pos.east(),
+        RailShape::AscendingWest => pos.west(),
+        RailShape::AscendingNorth => pos.north(),
+        RailShape::AscendingSouth => pos.south(),
+        _ => return false,
+    };
+    !can_place_rail_at(world, &slope_support.up())
 }
 
-pub(super) fn update_flanking_rails_shape(
+/// Vanilla `BaseRailBlock.getStateForPlacement`: the shape follows the player's horizontal
+/// direction, and the rail is waterlogged in a water source.
+pub(super) fn rail_state_for_placement(args: &OnPlaceArgs<'_>) -> BlockStateId {
+    let mut rail_props = RailProperties::default(args.block);
+    let shape = match args.player.get_entity().get_horizontal_facing() {
+        HorizontalFacing::East | HorizontalFacing::West => RailShape::EastWest,
+        HorizontalFacing::North | HorizontalFacing::South => RailShape::NorthSouth,
+    };
+    rail_props.set_shape(shape);
+    rail_props.set_waterlogged(args.replacing.water_source());
+    rail_props.to_state_id(args.block)
+}
+
+/// Vanilla `BaseRailBlock.updateDir`.
+pub(super) fn update_dir(
     world: &Arc<World>,
+    pos: &BlockPos,
+    state_id: BlockStateId,
+    first: bool,
+) -> BlockStateId {
+    let rail = RailState::new(*pos, state_id);
+    let current = rail.properties.shape();
+    rail.place(
+        world,
+        block_receives_redstone_power(world, pos),
+        first,
+        current,
+    )
+    .state_id()
+}
+
+/// Vanilla `BaseRailBlock.onPlace` and its `updateState(state, level, pos, movedByPiston)`:
+/// a new rail picks its shape, and a straight rail then checks its power as a neighbour
+/// update. Returns the updated state.
+pub(super) fn on_place(
+    world: &Arc<World>,
+    pos: &BlockPos,
     block: &Block,
     state_id: BlockStateId,
-    block_pos: &BlockPos,
+) -> BlockStateId {
+    let state_id = update_dir(world, pos, state_id, true);
+    if !RailProperties::new(state_id, block).can_curve() {
+        world.update_neighbor(pos, block);
+    }
+    state_id
+}
+
+/// The first half of vanilla `BaseRailBlock.neighborChanged`: a rail that lost its support
+/// drops and is removed. Returns false when the rail is gone.
+pub(super) fn survives_neighbor_change(world: &Arc<World>, pos: &BlockPos, block: &Block) -> bool {
+    let (current_block, state) = world.get_block_and_state(pos);
+    if current_block != block {
+        return false;
+    }
+    let shape = RailProperties::new(state.id, block).shape();
+    if !should_be_removed(world, pos, shape) {
+        return true;
+    }
+
+    // Vanilla `dropResources` then `removeBlock(pos, false)`: no break event or particles.
+    let params = LootContextParameters {
+        block_state: Some(state),
+        position: Some(pos.to_f64()),
+        ..Default::default()
+    };
+    drop_loot(world, block, pos, true, &params);
+    let left_behind = if block.is_waterlogged(state.id) {
+        Block::WATER.default_state.id
+    } else {
+        BlockStateId::AIR
+    };
+    world.set_block_state(pos, left_behind, BlockFlags::NOTIFY_ALL);
+    false
+}
+
+/// Vanilla `BaseRailBlock.updateShape`: a waterlogged rail schedules a water tick.
+pub(super) fn schedule_water_tick(
+    world: &World,
+    pos: &BlockPos,
+    block: &Block,
+    state_id: BlockStateId,
 ) {
-    for direction in RailProperties::new(state_id, block).directions() {
-        let Some(mut flanking_rail) =
-            Rail::find_with_elevation(world, block_pos.offset(direction.to_offset()))
-        else {
-            // Skip non-rail blocks
-            continue;
-        };
-
-        let new_shape =
-            compute_flanking_rail_new_shape(world, &flanking_rail, direction.opposite());
-
-        if new_shape != flanking_rail.properties.shape() {
-            flanking_rail.properties.set_shape(new_shape);
-            world.set_block_state(
-                &flanking_rail.position,
-                flanking_rail.properties.to_state_id(flanking_rail.block),
-                BlockFlags::NOTIFY_ALL,
-            );
-        }
+    if RailProperties::new(state_id, block).is_waterlogged() {
+        world.schedule_fluid_tick(
+            &Fluid::WATER,
+            *pos,
+            Fluid::WATER.flow_speed as i32,
+            TickPriority::Normal,
+        );
     }
 }
 
-fn compute_flanking_rail_new_shape(
-    world: &World,
-    rail: &Rail,
-    flanking_from: HorizontalFacing,
-) -> RailShape {
-    let mut connected_towards = Vec::with_capacity(2);
-    let mut is_already_connected_to_elevated_rail = false;
-
-    for neighbor_direction in rail.properties.directions() {
-        if neighbor_direction == flanking_from {
-            // Rails pointing to where the player placed are not connected
-            continue;
-        }
-
-        let Some(maybe_connected_rail) =
-            Rail::find_with_elevation(world, rail.position.offset(neighbor_direction.to_offset()))
-        else {
-            // Rails pointing to non-rail blocks are not connected
-            continue;
-        };
-
-        if maybe_connected_rail
-            .properties
-            .directions()
-            .into_iter()
-            .any(|d| d == neighbor_direction.opposite())
-        {
-            // Rails pointing to other rails that are pointing back are connected
-            connected_towards.push(neighbor_direction);
-            is_already_connected_to_elevated_rail =
-                maybe_connected_rail.elevation == RailElevation::Up;
-        }
+/// Vanilla `BaseRailBlock.affectNeighborsAfterRemoval`.
+pub(super) fn affect_neighbors_after_removal(
+    world: &Arc<World>,
+    pos: &BlockPos,
+    block: &Block,
+    old_state_id: BlockStateId,
+    moved: bool,
+) {
+    if moved {
+        return;
     }
-
-    let new_neighbor_directions = match connected_towards.len() {
-        2 => {
-            // Do not update rails that are locked (aka fully connected)
-            return rail.properties.shape();
-        }
-        1 => [connected_towards[0], flanking_from],
-        0 => [flanking_from, flanking_from.opposite()],
-        _ => {
-            tracing::error!(
-                "Rails only have two sides, but got {}",
-                connected_towards.len()
-            );
-            return rail.properties.shape();
-        }
-    };
-
-    // Handle rails that want to be straight
-    if new_neighbor_directions
-        .iter()
-        .all(|d| *d == flanking_from || *d == flanking_from.opposite())
-    {
-        if rail.elevation == RailElevation::Down {
-            if is_already_connected_to_elevated_rail {
-                // Prioritize the South/West ascending
-                return match flanking_from {
-                    HorizontalFacing::South | HorizontalFacing::North => RailShape::AscendingSouth,
-                    HorizontalFacing::West | HorizontalFacing::East => RailShape::AscendingWest,
-                };
-            }
-
-            return flanking_from.to_rail_shape_ascending_towards().as_shape();
-        } else if is_already_connected_to_elevated_rail {
-            return connected_towards[0]
-                .to_rail_shape_ascending_towards()
-                .as_shape();
-        }
-
-        // Reset the shape to flat even if the rail already had good directions
-        return rail.get_new_rail_shape(new_neighbor_directions[0], new_neighbor_directions[1]);
+    let rail_props = RailProperties::new(old_state_id, block);
+    if rail_props.shape().is_ascending() {
+        world.update_neighbors_at(&pos.up(), block, None);
     }
-
-    // Handle straight rails that want to curve
-    if !rail.properties.can_curve() {
-        return if new_neighbor_directions[0] == HorizontalFacing::North
-            || new_neighbor_directions[0] == HorizontalFacing::South
-        {
-            if rail.elevation == RailElevation::Down {
-                // The rail is down so it should be ascending
-                flanking_from.to_rail_shape_ascending_towards().as_shape()
-            } else {
-                rail.get_new_rail_shape(new_neighbor_directions[0], new_neighbor_directions[1])
-            }
-        } else {
-            rail.properties.shape()
-        };
+    if !rail_props.can_curve() {
+        world.update_neighbors_at(pos, block, None);
+        world.update_neighbors_at(&pos.down(), block, None);
     }
-
-    rail.get_new_rail_shape(new_neighbor_directions[0], new_neighbor_directions[1])
 }
