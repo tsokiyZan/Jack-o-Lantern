@@ -587,7 +587,7 @@ impl NbtTag {
 
     /// Converts any numeric tag to a byte, `NumericTag.byteValue`.
     #[must_use]
-    pub fn as_numeric_byte(&self) -> Option<i8> {
+    pub const fn as_numeric_byte(&self) -> Option<i8> {
         match *self {
             Self::Byte(byte) => Some(byte),
             Self::Short(short) => Some(short as i8),
