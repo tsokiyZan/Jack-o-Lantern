@@ -201,6 +201,7 @@ impl BedrockClient {
                         held_item = client_stack;
                     }
 
+                    let before_use = held_item.clone();
                     let result = server.block_registry.use_with_item(
                         block,
                         player,
@@ -216,6 +217,10 @@ impl BedrockClient {
                     );
 
                     if result.consumes_action() {
+                        // What the block did to the stack in the hand stays, as on Java.
+                        if !held_item.are_equal(&before_use) {
+                            player.inventory().set_stack_in_hand(Hand::Right, held_item);
+                        }
                         return;
                     }
 
