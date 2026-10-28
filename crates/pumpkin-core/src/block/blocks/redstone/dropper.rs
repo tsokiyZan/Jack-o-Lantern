@@ -219,7 +219,7 @@ impl BlockBehaviour for DropperBlock {
                 );
             } else {
                 args.world
-                    .sync_world_event(WorldEvent::SoundDispenserDispense, *args.position, 0);
+                    .sync_world_event(WorldEvent::SoundDispenserFail, *args.position, 0);
             }
         }
     }

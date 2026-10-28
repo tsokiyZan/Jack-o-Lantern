@@ -1,11 +1,11 @@
 use crate::block::{
-    BlockBehaviour, BlockMetadata, OnEntityCollisionArgs, OnEntityStepArgs, RandomTickArgs,
-    UseWithItemArgs, registry::BlockActionResult,
+    AttackArgs, BlockBehaviour, BlockMetadata, OnEntityStepArgs, RandomTickArgs, UseWithItemArgs,
+    registry::BlockActionResult,
 };
 use crate::world::World;
 use pumpkin_data::block_properties::RedstoneOreLikeProperties;
 use pumpkin_data::data_component_impl::EquipmentSlot;
-use pumpkin_data::{Block, BlockId, BlockState};
+use pumpkin_data::{Block, BlockDirection, BlockId};
 use pumpkin_protocol::VarInt;
 use pumpkin_protocol::java::server::play::SUseItemOn;
 use pumpkin_util::math::position::BlockPos;
@@ -21,7 +21,20 @@ impl BlockMetadata for RedstoneOreBlock {
 }
 
 impl RedstoneOreBlock {
-    fn light_up(world: &Arc<World>, pos: &BlockPos, block: &Block, state: &BlockState) {
+    /// Vanilla `RedStoneOreBlock.interact`.
+    fn light_up(world: &Arc<World>, pos: &BlockPos, block: &Block) {
+        // `spawnParticles` adds nothing on a server, but still draws two level random floats
+        // for each side whose neighbour is not a full opaque cube.
+        for direction in BlockDirection::all() {
+            if !world
+                .get_block_state(&pos.offset(direction.to_offset()))
+                .is_solid_render()
+            {
+                world.random_f32();
+                world.random_f32();
+            }
+        }
+        let state = world.get_block_state(pos);
         let mut props = RedstoneOreLikeProperties::from_state_id(state.id);
         if !props.lit {
             props.lit = true;
@@ -31,9 +44,13 @@ impl RedstoneOreBlock {
 }
 
 impl BlockBehaviour for RedstoneOreBlock {
+    /// Vanilla `RedStoneOreBlock.attack`.
+    fn attack(&self, args: AttackArgs<'_>) {
+        Self::light_up(args.world, args.position, args.block);
+    }
+
     fn use_with_item(&self, args: UseWithItemArgs<'_>) -> BlockActionResult {
-        let state = args.world.get_block_state(args.position);
-        Self::light_up(args.world, args.position, args.block, state);
+        Self::light_up(args.world, args.position, args.block);
         if args.item_stack.is_empty() {
             return BlockActionResult::Success;
         }
@@ -69,15 +86,10 @@ impl BlockBehaviour for RedstoneOreBlock {
         }
     }
 
-    fn on_entity_collision(&self, args: OnEntityCollisionArgs<'_>) {
-        let state = args.world.get_block_state(args.position);
-        Self::light_up(args.world, args.position, args.block, state);
-    }
-
+    /// Vanilla `RedStoneOreBlock.stepOn`.
     fn on_entity_step(&self, args: OnEntityStepArgs<'_>) {
         if !args.entity.is_stepping_carefully() {
-            let state = args.world.get_block_state(args.position);
-            Self::light_up(args.world, args.position, args.block, state);
+            Self::light_up(args.world, args.position, args.block);
         }
     }
 

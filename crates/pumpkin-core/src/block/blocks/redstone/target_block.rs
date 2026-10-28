@@ -6,8 +6,8 @@ use pumpkin_world::tick::TickPriority;
 use pumpkin_world::world::BlockFlags;
 
 use crate::block::{
-    BlockBehaviour, EmitsRedstonePowerArgs, GetRedstonePowerArgs, OnPlaceArgs, OnProjectileHitArgs,
-    OnScheduledTickArgs, OnStateReplacedArgs,
+    BlockBehaviour, EmitsRedstonePowerArgs, GetRedstonePowerArgs, OnProjectileHitArgs,
+    OnScheduledTickArgs, PlacedArgs,
 };
 
 fn get_redstone_strength(hit_pos: &Vector3<f64>) -> u8 {
@@ -25,7 +25,7 @@ fn get_redstone_strength(hit_pos: &Vector3<f64>) -> u8 {
 
     let norm = ((0.5 - distance) / 0.5).clamp(0.0, 1.0);
     let power = (15.0 * norm).ceil() as u8;
-    power.clamp(1, 15)
+    power.max(1)
 }
 
 #[pumpkin_block("minecraft:target")]
@@ -37,11 +37,6 @@ impl BlockBehaviour for TargetBlock {
     }
 
     fn get_weak_redstone_power(&self, args: GetRedstonePowerArgs<'_>) -> u8 {
-        let props = TargetProperties::from_state_id(args.state.id);
-        props.r#power
-    }
-
-    fn get_strong_redstone_power(&self, args: GetRedstonePowerArgs<'_>) -> u8 {
         let props = TargetProperties::from_state_id(args.state.id);
         props.r#power
     }
@@ -69,8 +64,10 @@ impl BlockBehaviour for TargetBlock {
                 BlockFlags::NOTIFY_ALL,
             );
             let entity_type = args.projectile.get_entity().entity_type;
+            // Vanilla `entity instanceof AbstractArrow`.
             let delay = if entity_type == &EntityType::ARROW
                 || entity_type == &EntityType::SPECTRAL_ARROW
+                || entity_type == &EntityType::TRIDENT
             {
                 20
             } else {
@@ -94,18 +91,23 @@ impl BlockBehaviour for TargetBlock {
         }
     }
 
-    fn on_state_replaced(&self, args: OnStateReplacedArgs<'_>) {
-        if !args.moved {
-            let props = TargetProperties::from_state_id(args.old_state_id);
-            if props.r#power > 0 {
-                args.world.update_neighbors(args.position, None);
-            }
+    /// Vanilla `TargetBlock.onPlace`: a new target keeps no power without a pending tick.
+    fn placed(&self, args: PlacedArgs<'_>) {
+        if !args.is_new_block() {
+            return;
         }
-    }
-
-    fn on_place(&self, args: OnPlaceArgs<'_>) -> pumpkin_data::BlockStateId {
-        let mut props = TargetProperties::default(args.block);
-        props.r#power = 0;
-        props.to_state_id(args.block)
+        let mut props = TargetProperties::from_state_id(args.state_id);
+        if props.r#power > 0
+            && !args
+                .world
+                .is_block_tick_scheduled(args.position, args.block)
+        {
+            props.r#power = 0;
+            args.world.set_block_state(
+                args.position,
+                props.to_state_id(args.block),
+                BlockFlags::NOTIFY_LISTENERS | BlockFlags::UPDATE_KNOWN_SHAPE,
+            );
+        }
     }
 }
