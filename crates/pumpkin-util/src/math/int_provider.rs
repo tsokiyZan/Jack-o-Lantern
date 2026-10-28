@@ -295,7 +295,7 @@ impl BiasedToBottomIntProvider {
     /// # Returns
     /// A random integer in the range [`min_inclusive`, `max_inclusive`], with lower values more likely.
     pub fn get(&self, random: &mut impl RandomImpl) -> i32 {
-        if self.min_inclusive >= self.max_inclusive {
+        if self.min_inclusive > self.max_inclusive {
             return self.min_inclusive;
         }
         let range = self.max_inclusive - self.min_inclusive + 1;
@@ -361,7 +361,7 @@ impl VeryBiasedToBottomIntProvider {
     }
 
     pub fn get(&self, random: &mut impl RandomImpl) -> i32 {
-        if self.min_inclusive >= self.max_inclusive {
+        if self.min_inclusive > self.max_inclusive {
             return self.min_inclusive;
         }
         let range = self.max_inclusive - self.min_inclusive + 1;
@@ -514,7 +514,7 @@ impl TrapezoidIntProvider {
     /// # Returns
     /// A random integer from the source provider, clamped to [`min_inclusive`, `max_inclusive`].
     pub fn get(&self, random: &mut impl RandomImpl) -> i32 {
-        if self.min_inclusive >= self.max_inclusive {
+        if self.min_inclusive > self.max_inclusive {
             return self.min_inclusive;
         }
         if self.plateau == 0 && self.max_inclusive == -self.min_inclusive {

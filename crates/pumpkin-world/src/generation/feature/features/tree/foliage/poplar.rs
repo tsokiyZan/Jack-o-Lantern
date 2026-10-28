@@ -1,4 +1,3 @@
-use pumpkin_data::BlockState;
 use pumpkin_data::block_properties::Axis;
 use pumpkin_util::{
     math::{int_provider::IntProvider, position::BlockPos},
@@ -6,6 +5,7 @@ use pumpkin_util::{
 };
 
 use super::FoliagePlacer;
+use crate::generation::block_state_provider::BlockStateProvider;
 use crate::generation::feature::features::tree::TreeNode;
 use crate::generation::feature::features::tree::trunk::poplar::PoplarTrunkPlacer;
 use crate::generation::proto_chunk::GenerationCache;
@@ -25,8 +25,8 @@ impl PoplarFoliagePlacer {
         foliage_height: i32,
         leaf_radius: i32,
         offset: i32,
-        foliage_provider: &BlockState,
-        trunk_state: &BlockState,
+        foliage_provider: &BlockStateProvider,
+        trunk_provider: &BlockStateProvider,
     ) -> Vec<BlockPos> {
         let mut foliage_positions = Vec::new();
         let pos = node.center.up_height(offset);
@@ -86,12 +86,13 @@ impl PoplarFoliagePlacer {
         Self::replace_leaves_with_log(
             &mut foliage_positions,
             chunk,
+            random,
             pos,
             current_radius,
             foliage_height - 4,
             node.giant_trunk,
             foliage_provider,
-            trunk_state,
+            trunk_provider,
             foliage_height,
             flipped,
         );
@@ -129,12 +130,13 @@ impl PoplarFoliagePlacer {
     fn replace_leaves_with_log<T: GenerationCache>(
         foliage_positions: &mut Vec<BlockPos>,
         chunk: &mut T,
+        random: &mut RandomGenerator,
         origin: BlockPos,
         current_radius: i32,
         y: i32,
         giant_trunk: bool,
-        foliage_provider: &BlockState,
-        trunk_state: &BlockState,
+        foliage_provider: &BlockStateProvider,
+        trunk_provider: &BlockStateProvider,
         foliage_height: i32,
         flipped: bool,
     ) {
@@ -153,13 +155,20 @@ impl PoplarFoliagePlacer {
                 {
                     continue;
                 }
-                // `tryPlaceLog`: only where this tree's leaves are.
+                // `tryPlaceLog`: the block must equal a fresh foliage provider draw, and the log is
+                // a fresh trunk provider draw, turned sideways.
                 let pos = BlockPos(origin.0.add_raw(dx, y, dz));
-                if GenerationCache::get_block_state(chunk, &pos.0) != foliage_provider.id {
+                let foliage = foliage_provider
+                    .get_for_bonemeal(random, pos)
+                    .unwrap_or(pumpkin_data::Block::AIR.default_state);
+                if GenerationCache::get_block_state(chunk, &pos.0) != foliage.id {
                     continue;
                 }
+                let trunk = trunk_provider
+                    .get_for_bonemeal(random, pos)
+                    .unwrap_or(pumpkin_data::Block::AIR.default_state);
                 let axis = if abs_dz == 0 { Axis::X } else { Axis::Z };
-                let log = PoplarTrunkPlacer::get_sideways_state(trunk_state.id, axis);
+                let log = PoplarTrunkPlacer::get_sideways_state(trunk.id, axis);
                 chunk.set_block_state(&pos.0, log.to_state());
                 foliage_positions.push(pos);
             }
@@ -181,7 +190,7 @@ impl PoplarFoliagePlacer {
         radius: i32,
         y: i32,
         giant_trunk: bool,
-        foliage_provider: &BlockState,
+        foliage_provider: &BlockStateProvider,
         foliage_height: i32,
         flipped: bool,
     ) {
@@ -193,7 +202,7 @@ impl PoplarFoliagePlacer {
                     continue;
                 }
                 let pos = BlockPos(center_pos.0.add_raw(x, y, z));
-                if FoliagePlacer::place_foliage_block(chunk, pos, foliage_provider) {
+                if FoliagePlacer::place_foliage_block(chunk, random, pos, foliage_provider) {
                     foliage_positions.push(pos);
                 }
             }
