@@ -1,22 +1,23 @@
-use std::sync::Arc;
-
-use pumpkin_data::{Block, BlockState, BlockStateId, item::Item, item_stack::ItemStack};
+use pumpkin_data::{
+    Block, BlockDirection, BlockState, BlockStateId, block_properties::CandleCakeProperties,
+    item::Item,
+};
 use pumpkin_macros::pumpkin_block_from_tag;
 use pumpkin_util::math::position::BlockPos;
-use pumpkin_world::{
-    tick::TickPriority,
-    world::{BlockAccessor, BlockFlags},
-};
+use pumpkin_world::world::BlockAccessor;
 
 use crate::{
     block::{
-        BlockBehaviour, GetComparatorOutputArgs, GetStateForNeighborUpdateArgs, NormalUseArgs,
-        OnScheduledTickArgs, PathComputationType, UseWithItemArgs,
-        blocks::cake::{CakeBlock, FULL_CAKE_SIGNAL},
+        BlockBehaviour, CanPlaceAtArgs, GetComparatorOutputArgs, GetStateForNeighborUpdateArgs,
+        NormalUseArgs, PathComputationType, UseWithItemArgs,
+        blocks::{
+            cake::{CakeBlock, FULL_CAKE_SIGNAL},
+            candles::extinguish,
+        },
+        drop_loot,
         registry::BlockActionResult,
     },
-    entity::player::Player,
-    world::World,
+    world::loot::LootContextParameters,
 };
 
 const CANDLE_MAP: [(&Item, &Block); 17] = [
@@ -56,64 +57,61 @@ pub fn candle_from_cake(block: &Block) -> &'static Item {
 #[pumpkin_block_from_tag("minecraft:candle_cakes")]
 pub struct CandleCakeBlock;
 
-impl CandleCakeBlock {
-    fn consume_and_drop_candle(
-        block: &Block,
-        player: &Player,
-        location: &BlockPos,
-        world: &Arc<World>,
-    ) -> BlockActionResult {
-        if !player.can_eat(false) {
+impl BlockBehaviour for CandleCakeBlock {
+    /// Vanilla `CandleCakeBlock.useItemOn`: an empty hand on the candle puts it out.
+    fn use_with_item(&self, args: UseWithItemArgs<'_>) -> BlockActionResult {
+        let item = args.item_stack.item;
+        if item == &Item::FLINT_AND_STEEL || item == &Item::FIRE_CHARGE {
             return BlockActionResult::Pass;
         }
-
-        let candle_item = candle_from_cake(block);
-
-        let item_stack = ItemStack::new(1, candle_item);
-
-        world.drop_stack(location, item_stack);
-
-        world.set_block_state(
-            location,
-            Block::CAKE.default_state.id,
-            BlockFlags::NOTIFY_ALL,
-        );
-
-        let (block, state) = world.get_block_and_state_id(location);
-
-        CakeBlock::consume_if_hungry(world, player, block, location, state)
-    }
-}
-
-impl BlockBehaviour for CandleCakeBlock {
-    fn use_with_item(&self, args: UseWithItemArgs<'_>) -> BlockActionResult {
-        let item_id = args.item_stack.item.id;
-        match item_id {
-            id if id == Item::FIRE_CHARGE.id || id == Item::FLINT_AND_STEEL.id => {
-                BlockActionResult::Pass
-            } // Item::FIRE_CHARGE | Item::FLINT_AND_STEEL
-            _ => BlockActionResult::PassToDefaultBlockAction,
+        let state_id = args.world.get_block_state_id(args.position);
+        let mut properties = CandleCakeProperties::from_state_id(state_id);
+        // `candleHit`: above the cake's top half.
+        if args.hit.cursor_pos.y > 0.5 && args.item_stack.is_empty() && properties.lit {
+            properties.lit = false;
+            extinguish(
+                Some(args.player.as_ref()),
+                args.world,
+                args.position,
+                properties.to_state_id(args.block),
+            );
+            return BlockActionResult::Success;
         }
+        BlockActionResult::PassToDefaultBlockAction
     }
 
+    /// Vanilla `CandleCakeBlock.useWithoutItem`: a bite of a whole cake, then the candle cake's
+    /// drops (`dropResources`).
     fn normal_use(&self, args: NormalUseArgs<'_>) -> BlockActionResult {
-        Self::consume_and_drop_candle(args.block, args.player, args.position, args.world)
-    }
-
-    fn on_scheduled_tick(&self, args: OnScheduledTickArgs<'_>) {
-        if !can_place_at(args.world.as_ref(), args.position) {
-            args.world
-                .break_block(args.position, None, BlockFlags::NOTIFY_ALL);
+        let state_id = args.world.get_block_state_id(args.position);
+        let result = CakeBlock::eat(
+            args.world,
+            args.player,
+            args.position,
+            Block::CAKE.default_state.id,
+        );
+        if result.consumes_action() {
+            let params = LootContextParameters {
+                block_state: Some(BlockState::from_id(state_id)),
+                position: Some(args.position.to_centered_f64()),
+                ..Default::default()
+            };
+            drop_loot(args.world, args.block, args.position, false, &params);
         }
+        result
     }
 
+    fn can_place_at(&self, args: CanPlaceAtArgs<'_>) -> bool {
+        can_place_at(args.block_accessor, args.position)
+    }
+
+    /// Vanilla `CandleCakeBlock.updateShape`: gone once the block below stops holding it.
     fn get_state_for_neighbor_update(
         &self,
         args: GetStateForNeighborUpdateArgs<'_>,
     ) -> BlockStateId {
-        if !can_place_at(args.world, args.position) {
-            args.world
-                .schedule_block_tick(args.block, *args.position, 1, TickPriority::Normal);
+        if args.direction == BlockDirection::Down && !can_place_at(args.world, args.position) {
+            return Block::AIR.default_state.id;
         }
         args.state_id
     }
@@ -128,6 +126,7 @@ impl BlockBehaviour for CandleCakeBlock {
     }
 }
 
+/// Vanilla `CandleCakeBlock.canSurvive`.
 fn can_place_at(world: &dyn BlockAccessor, position: &BlockPos) -> bool {
     let state = world.get_block_state(&position.down());
     state.is_solid()
