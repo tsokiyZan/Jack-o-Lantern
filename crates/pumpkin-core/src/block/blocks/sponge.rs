@@ -2,108 +2,148 @@ use pumpkin_macros::pumpkin_block;
 use std::collections::{HashSet, VecDeque};
 use std::sync::Arc;
 
-use crate::block::{BlockBehaviour, OnNeighborUpdateArgs, PlacedArgs};
+use crate::block::{BlockBehaviour, OnNeighborUpdateArgs, PlacedArgs, drop_loot};
+use crate::world::World;
+use crate::world::loot::LootContextParameters;
 use pumpkin_data::sound::{Sound, SoundCategory};
+use pumpkin_data::tag::Taggable;
 use pumpkin_data::world::WorldEvent;
-use pumpkin_data::{Block, BlockStateId};
+use pumpkin_data::{Block, BlockDirection, BlockState, BlockStateId};
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_world::world::BlockFlags;
 
 #[pumpkin_block("minecraft:sponge")]
 pub struct SpongeBlock;
 
+/// Vanilla `SpongeBlock.MAX_DEPTH`.
+const MAX_DEPTH: u32 = 6;
+/// Vanilla `SpongeBlock.MAX_COUNT`; the traversal counts the sponge itself, so it runs to
+/// `MAX_COUNT + 1`.
+const MAX_COUNT: usize = 64;
+
 impl SpongeBlock {
-    pub fn absorb_water(world: &Arc<crate::world::World>, position: &BlockPos) -> bool {
-        let mut water_blocks = Vec::new();
-        let mut visited = HashSet::new();
-        let mut queue = VecDeque::new();
-
-        // Start from the sponge position
-        queue.push_back(*position);
-        visited.insert(*position);
-
-        while let Some(current_pos) = queue.pop_front() {
-            for direction in &[
-                (1, 0, 0),
-                (-1, 0, 0),
-                (0, 1, 0),
-                (0, -1, 0),
-                (0, 0, 1),
-                (0, 0, -1),
-            ] {
-                let next_pos = BlockPos::new(
-                    current_pos.0.x + direction.0,
-                    current_pos.0.y + direction.1,
-                    current_pos.0.z + direction.2,
-                );
-
-                if visited.contains(&next_pos) {
-                    continue;
-                }
-
-                let taxicab_dist = (next_pos.0.x - position.0.x).abs()
-                    + (next_pos.0.y - position.0.y).abs()
-                    + (next_pos.0.z - position.0.z).abs();
-
-                // Wiki standard: distance 7, max 118 blocks
-                if taxicab_dist > 7 || water_blocks.len() >= 118 {
-                    continue;
-                }
-
-                visited.insert(next_pos);
-                let (block, _state) = world.get_block_and_state(&next_pos);
-
-                // Only add to queue if it's water.
-                // This prevents "jumping" through air or solid blocks.
-                if block.id == Block::WATER.id {
-                    water_blocks.push(next_pos);
-                    queue.push_back(next_pos);
-                }
-            }
+    /// Vanilla `SpongeBlock.tryAbsorbWater`.
+    pub fn absorb_water(world: &Arc<World>, position: &BlockPos) -> bool {
+        // Pumpkin's plugin hook; fired only when there is water next to the sponge, which
+        // vanilla needs to absorb anything.
+        let touches_water = BlockDirection::all()
+            .into_iter()
+            .any(|dir| is_water(world, &position.offset(dir.to_offset())));
+        if !touches_water {
+            return false;
+        }
+        let mut event =
+            crate::plugin::api::events::block::sponge_absorb::SpongeAbsorbEvent::new(*position);
+        if let Some(server) = world.server.upgrade() {
+            server.plugin_manager.fire_blocking(&server, &mut event);
+        }
+        if event.cancelled {
+            return false;
         }
 
-        if water_blocks.is_empty() {
-            false
-        } else {
-            let mut event =
-                crate::plugin::api::events::block::sponge_absorb::SpongeAbsorbEvent::new(*position);
-            if let Some(server) = world.server.upgrade() {
-                server.plugin_manager.fire_blocking(&server, &mut event);
-            }
-            if event.cancelled {
-                return false;
-            }
-
-            for water_pos in &water_blocks {
-                world.set_block_state(water_pos, BlockStateId::AIR, BlockFlags::NOTIFY_ALL);
-            }
+        if Self::remove_water_breadth_first_search(world, position) {
             world.set_block_state(
                 position,
                 Block::WET_SPONGE.default_state.id,
-                BlockFlags::NOTIFY_ALL,
+                BlockFlags::NOTIFY_LISTENERS,
             );
-
             world.play_block_sound(Sound::BlockSpongeAbsorb, SoundCategory::Blocks, *position);
-
             true
+        } else {
+            false
         }
+    }
+
+    /// Vanilla `SpongeBlock.removeWaterBreadthFirstSearch`: `BlockPos.breadthFirstTraversal`
+    /// to depth 6 and 65 accepted nodes (the sponge included), removing water as it goes.
+    fn remove_water_breadth_first_search(world: &Arc<World>, start: &BlockPos) -> bool {
+        let mut nodes = VecDeque::new();
+        let mut visited = HashSet::new();
+        nodes.push_back((*start, 0));
+        let mut count = 0;
+
+        while let Some((pos, depth)) = nodes.pop_front() {
+            if !visited.insert(pos) {
+                continue;
+            }
+            if pos != *start && !Self::absorb_at(world, &pos) {
+                continue;
+            }
+            count += 1;
+            if count > MAX_COUNT {
+                break;
+            }
+            if depth < MAX_DEPTH {
+                for dir in BlockDirection::all() {
+                    nodes.push_back((pos.offset(dir.to_offset()), depth + 1));
+                }
+            }
+        }
+
+        count > 1
+    }
+
+    /// The traversal's node processor: whether `pos` is accepted (its water removed).
+    fn absorb_at(world: &Arc<World>, pos: &BlockPos) -> bool {
+        if !is_water(world, pos) {
+            return false;
+        }
+        let (block, state_id) = world.get_block_and_state_id(pos);
+        // `BucketPickup.pickupBlock`: a water source or bubble column becomes air, a
+        // waterlogged block dries.
+        if block == &Block::BUBBLE_COLUMN
+            || (block == &Block::WATER && state_id == Block::WATER.default_state.id)
+        {
+            world.set_block_state(pos, BlockStateId::AIR, BlockFlags::NOTIFY_ALL);
+            return true;
+        }
+        if block.is_waterlogged(state_id) {
+            let dry = block.set_waterlogged(state_id, false).unwrap_or(state_id);
+            world.set_block_state(pos, dry, BlockFlags::NOTIFY_ALL);
+            return true;
+        }
+        if block == &Block::WATER {
+            world.set_block_state(pos, BlockStateId::AIR, BlockFlags::NOTIFY_ALL);
+            return true;
+        }
+        if block == &Block::KELP
+            || block == &Block::KELP_PLANT
+            || block == &Block::SEAGRASS
+            || block == &Block::TALL_SEAGRASS
+        {
+            // `dropResources` then `setBlockAndUpdate(AIR)`.
+            let params = LootContextParameters {
+                block_state: Some(BlockState::from_id(state_id)),
+                position: Some(pos.to_f64()),
+                ..Default::default()
+            };
+            drop_loot(world, block, pos, true, &params);
+            world.set_block_state(pos, BlockStateId::AIR, BlockFlags::NOTIFY_ALL);
+            return true;
+        }
+        false
     }
 }
 
+/// `getFluidState(pos).is(FluidTags.WATER)`.
+fn is_water(world: &World, pos: &BlockPos) -> bool {
+    world
+        .get_fluid(pos)
+        .has_tag(&pumpkin_data::tag::Fluid::MINECRAFT_WATER)
+}
+
 impl BlockBehaviour for SpongeBlock {
+    /// Vanilla `SpongeBlock.onPlace`: only when the block becomes a sponge.
     fn placed(&self, args: PlacedArgs<'_>) {
         if !args.is_new_block() {
             return;
         }
-        // Attempt to absorb water on placement
         Self::absorb_water(args.world, args.position);
     }
 
+    /// Vanilla `SpongeBlock.neighborChanged`: any neighbour change tries to absorb.
     fn on_neighbor_update(&self, args: OnNeighborUpdateArgs<'_>) {
-        // If a neighboring block changed and it's water, attempt to absorb.
-        if args.source_block.id == Block::WATER.id {
-            Self::absorb_water(args.world, args.position);
-        }
+        Self::absorb_water(args.world, args.position);
     }
 }
 

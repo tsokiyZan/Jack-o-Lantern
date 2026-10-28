@@ -1,10 +1,8 @@
-use std::sync::Arc;
-
 use pumpkin_data::Block;
 use pumpkin_data::BlockDirection;
 use pumpkin_data::tag::Taggable;
 use pumpkin_util::math::position::BlockPos;
-use rand::RngExt;
+use pumpkin_util::random::RandomImpl;
 
 use crate::world::World;
 
@@ -12,7 +10,7 @@ pub mod coral_block;
 pub mod coral_fan;
 pub mod coral_plant;
 
-pub fn scan_for_water(world: &Arc<World>, pos: &BlockPos) -> bool {
+pub fn scan_for_water(world: &World, pos: &BlockPos) -> bool {
     for direction in BlockDirection::all() {
         let neighbor_pos = pos.offset(direction.to_offset());
         let block = world.get_fluid(&neighbor_pos);
@@ -44,8 +42,15 @@ fn is_dead_coral(block: &Block) -> bool {
         || block == &Block::DEAD_TUBE_CORAL_FAN
         || block == &Block::DEAD_TUBE_CORAL_WALL_FAN
 }
-pub fn try_schedule_die_tick(block: &Block, world: &Arc<World>, pos: &BlockPos) {
-    let tick_delay = 60 + rand::rng().random_range(0..40);
+/// Vanilla `tryScheduleDieTick` / `CoralBlock.updateShape`: a die tick in `60 + nextInt(40)`
+/// ticks from the level random.
+pub fn try_schedule_die_tick(block: &Block, world: &World, pos: &BlockPos) {
+    let tick_delay = 60
+        + world
+            .random
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .next_bounded_i32(40);
     world.schedule_block_tick(
         block,
         *pos,

@@ -1,27 +1,42 @@
 use crate::block::blocks::redstone::block_receives_redstone_power;
 use crate::block::registry::BlockActionResult;
 use crate::block::{
-    BlockBehaviour, NormalUseArgs, OnNeighborUpdateArgs, OnPlaceArgs, PathComputationType,
+    BlockBehaviour, GetStateForNeighborUpdateArgs, NormalUseArgs, OnNeighborUpdateArgs,
+    OnPlaceArgs, PathComputationType,
 };
 use crate::entity::EntityBase;
 use crate::entity::player::Player;
 use crate::world::World;
 use pumpkin_data::BlockDirection;
 use pumpkin_data::block_properties::Half;
+use pumpkin_data::fluid::Fluid;
+use pumpkin_data::game_event::GameEvent;
 use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_data::tag::Taggable;
 use pumpkin_data::{Block, BlockState, BlockStateId, tag};
 use pumpkin_macros::pumpkin_block_from_tag;
 use pumpkin_util::math::position::BlockPos;
+use pumpkin_world::tick::TickPriority;
 use pumpkin_world::world::BlockFlags;
 use std::sync::Arc;
 
 type TrapDoorProperties = pumpkin_data::block_properties::OakTrapdoorLikeProperties;
 
+/// Vanilla `TrapDoorBlock.toggle`: write with flags 2, the waterlogged fluid tick, then
+/// `playSound` (sound and `BLOCK_OPEN`/`BLOCK_CLOSE` from the player).
 fn toggle_trapdoor(player: &Player, world: &Arc<World>, block_pos: &BlockPos) {
     let (block, block_state) = world.get_block_and_state_id(block_pos);
     let mut trapdoor_props = TrapDoorProperties::from_state_id(block_state);
     trapdoor_props.open = !trapdoor_props.open;
+
+    world.set_block_state(
+        block_pos,
+        trapdoor_props.to_state_id(block),
+        BlockFlags::NOTIFY_LISTENERS,
+    );
+    if trapdoor_props.waterlogged {
+        schedule_water_tick(world, block_pos);
+    }
 
     world.play_block_sound_expect(
         player,
@@ -29,20 +44,27 @@ fn toggle_trapdoor(player: &Player, world: &Arc<World>, block_pos: &BlockPos) {
         SoundCategory::Blocks,
         *block_pos,
     );
-
-    world.set_block_state(
-        block_pos,
-        trapdoor_props.to_state_id(block),
-        BlockFlags::NOTIFY_LISTENERS,
-    );
     world.game_event_from(
         Some(player),
-        if trapdoor_props.open {
-            pumpkin_data::game_event::GameEvent::BlockOpen
-        } else {
-            pumpkin_data::game_event::GameEvent::BlockClose
-        },
+        open_close_event(trapdoor_props.open),
         block_pos.to_centered_f64(),
+    );
+}
+
+const fn open_close_event(open: bool) -> GameEvent {
+    if open {
+        GameEvent::BlockOpen
+    } else {
+        GameEvent::BlockClose
+    }
+}
+
+fn schedule_water_tick(world: &World, pos: &BlockPos) {
+    world.schedule_fluid_tick(
+        &Fluid::FLOWING_WATER,
+        *pos,
+        Fluid::FLOWING_WATER.flow_speed as i32,
+        TickPriority::Normal,
     );
 }
 
@@ -106,10 +128,13 @@ impl BlockBehaviour for TrapDoorBlock {
         trapdoor_props.half = match args.direction {
             BlockDirection::Up => Half::Top,
             BlockDirection::Down => Half::Bottom,
-            _ => match args.use_item_on.cursor_pos.y {
-                0.0..0.5 => Half::Bottom,
-                _ => Half::Top,
-            },
+            _ => {
+                if args.use_item_on.cursor_pos.y > 0.5 {
+                    Half::Top
+                } else {
+                    Half::Bottom
+                }
+            }
         };
 
         trapdoor_props.powered = powered;
@@ -118,31 +143,49 @@ impl BlockBehaviour for TrapDoorBlock {
         trapdoor_props.to_state_id(args.block)
     }
 
+    fn get_state_for_neighbor_update(
+        &self,
+        args: GetStateForNeighborUpdateArgs<'_>,
+    ) -> BlockStateId {
+        if TrapDoorProperties::from_state_id(args.state_id).waterlogged {
+            schedule_water_tick(args.world, args.position);
+        }
+        args.state_id
+    }
+
+    /// Vanilla `TrapDoorBlock.neighborChanged`: only a change of the neighbour signal against
+    /// `POWERED` does anything; `OPEN` follows it with `playSound` (no source entity).
     fn on_neighbor_update(&self, args: OnNeighborUpdateArgs<'_>) {
-        {
-            let block_state = args.world.get_block_state(args.position);
-            let mut trapdoor_props = TrapDoorProperties::from_state_id(block_state.id);
-            let powered = block_receives_redstone_power(args.world, args.position);
+        let block_state = args.world.get_block_state(args.position);
+        let mut trapdoor_props = TrapDoorProperties::from_state_id(block_state.id);
+        let powered = block_receives_redstone_power(args.world, args.position);
 
-            if powered != trapdoor_props.powered {
-                trapdoor_props.powered = !trapdoor_props.powered;
+        if powered != trapdoor_props.powered {
+            if powered != trapdoor_props.open {
+                trapdoor_props.open = powered;
 
-                if powered != trapdoor_props.open {
-                    trapdoor_props.open = trapdoor_props.powered;
-
-                    args.world.play_block_sound(
-                        get_sound(args.block, powered),
-                        SoundCategory::Blocks,
-                        *args.position,
-                    );
-                }
+                args.world.play_block_sound(
+                    get_sound(args.block, powered),
+                    SoundCategory::Blocks,
+                    *args.position,
+                );
+                args.world.game_event_from(
+                    None,
+                    open_close_event(powered),
+                    args.position.to_centered_f64(),
+                );
             }
+
+            trapdoor_props.powered = powered;
 
             args.world.set_block_state(
                 args.position,
                 trapdoor_props.to_state_id(args.block),
                 BlockFlags::NOTIFY_LISTENERS,
             );
+            if trapdoor_props.waterlogged {
+                schedule_water_tick(args.world, args.position);
+            }
         }
     }
 
