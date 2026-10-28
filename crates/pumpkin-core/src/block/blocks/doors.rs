@@ -25,6 +25,7 @@ use crate::block::PlacedArgs;
 use crate::block::PlayerWillDestroyArgs;
 use crate::block::blocks::redstone::block_receives_redstone_power;
 use crate::block::registry::BlockActionResult;
+use crate::entity::EntityBase;
 use crate::entity::player::Player;
 use pumpkin_protocol::java::server::play::SUseItemOn;
 
@@ -117,12 +118,12 @@ fn get_hinge(
     let left_dir = facing.rotate_counter_clockwise();
     let left_pos = pos.offset(left_dir.to_offset());
     let (_left_block, left_state) = world.get_block_and_state(&left_pos);
-    let top_facing = top_pos.offset(facing.to_offset());
-    let top_state = world.get_block_state(&top_facing);
+    let top_left = top_pos.offset(left_dir.to_offset());
+    let top_state = world.get_block_state(&top_left);
     let right_dir = facing.rotate_clockwise();
     let right_pos = pos.offset(right_dir.to_offset());
     let (_right_block, right_state) = world.get_block_and_state(&right_pos);
-    let top_right = top_pos.offset(facing.to_offset());
+    let top_right = top_pos.offset(right_dir.to_offset());
     let top_right_state = world.get_block_state(&top_right);
 
     let has_left_door = world
@@ -143,10 +144,10 @@ fn get_hinge(
         if (!has_right_door || has_left_door) && score >= 0 {
             let offset = facing.to_offset();
             let hit = use_item.cursor_pos;
-            if (offset.x >= 0 || hit.z > 0.5)
-                && (offset.x <= 0 || hit.z < 0.5)
-                && (offset.z >= 0 || hit.x < 0.5)
-                && (offset.z <= 0 || hit.x > 0.5)
+            if (offset.x >= 0 || hit.z >= 0.5)
+                && (offset.x <= 0 || hit.z <= 0.5)
+                && (offset.z >= 0 || hit.x <= 0.5)
+                && (offset.z <= 0 || hit.x >= 0.5)
             {
                 DoorHinge::Left
             } else {
@@ -180,7 +181,14 @@ impl DoorBlock {
         door_props.open
     }
 
-    pub fn set_open(world: &Arc<World>, block_pos: &BlockPos, open: bool) {
+    /// Vanilla `DoorBlock.setOpen`: this half with flags 10 (the other follows through
+    /// `updateShape`), the sound and `BLOCK_OPEN`/`BLOCK_CLOSE` from `source`.
+    pub fn set_open(
+        source: Option<&dyn EntityBase>,
+        world: &Arc<World>,
+        block_pos: &BlockPos,
+        open: bool,
+    ) {
         let (block, block_state) = world.get_block_and_state_id(block_pos);
         if !block.has_tag(&tag::Block::MINECRAFT_DOORS) {
             return;
@@ -191,31 +199,21 @@ impl DoorBlock {
         }
         door_props.open = open;
 
-        let other_half = match door_props.half {
-            DoubleBlockHalf::Upper => BlockDirection::Down,
-            DoubleBlockHalf::Lower => BlockDirection::Up,
-        };
-        let other_pos = block_pos.offset(other_half.to_offset());
-
-        let (other_block, other_state_id) = world.get_block_and_state_id(&other_pos);
-
-        world.play_block_sound(get_sound(block, open), SoundCategory::Blocks, *block_pos);
-
         world.set_block_state(
             block_pos,
             door_props.to_state_id(block),
             BlockFlags::NOTIFY_LISTENERS,
         );
-
-        if other_block.id == block.id {
-            let mut other_door_props = DoorProperties::from_state_id(other_state_id);
-            other_door_props.open = open;
-            world.set_block_state(
-                &other_pos,
-                other_door_props.to_state_id(other_block),
-                BlockFlags::NOTIFY_LISTENERS,
-            );
-        }
+        world.play_block_sound(get_sound(block, open), SoundCategory::Blocks, *block_pos);
+        world.game_event_from(
+            source,
+            if open {
+                pumpkin_data::game_event::GameEvent::BlockOpen
+            } else {
+                pumpkin_data::game_event::GameEvent::BlockClose
+            },
+            block_pos.to_centered_f64(),
+        );
     }
 }
 
@@ -226,8 +224,10 @@ impl BlockBehaviour for DoorBlock {
         door_props.facing = facing;
         door_props.half = DoubleBlockHalf::Lower;
         door_props.hinge = get_hinge(args.world, args.position, args.use_item_on, facing);
-        door_props.open = false;
-        door_props.powered = false;
+        let powered = block_receives_redstone_power(args.world, args.position)
+            || block_receives_redstone_power(args.world, &args.position.up());
+        door_props.open = powered;
+        door_props.powered = powered;
         door_props.to_state_id(args.block)
     }
 
@@ -307,6 +307,8 @@ impl BlockBehaviour for DoorBlock {
         );
     }
 
+    /// Vanilla `DoorBlock.neighborChanged`: this half takes the signal of either half as
+    /// `POWERED` and `OPEN` with flags 2; the other half follows through `updateShape`.
     fn on_neighbor_update(&self, args: OnNeighborUpdateArgs<'_>) {
         let block_state = args.world.get_block_state(args.position);
         let mut door_props = DoorProperties::from_state_id(block_state.id);
@@ -315,51 +317,36 @@ impl BlockBehaviour for DoorBlock {
             DoubleBlockHalf::Lower => BlockDirection::Up,
         };
         let other_pos = args.position.offset(other_half.to_offset());
-        let (other_block, other_state_id) = args.world.get_block_and_state_id(&other_pos);
-
-        if other_block.id != args.block.id {
-            return;
-        }
-
-        let powered = block_receives_redstone_power(args.world, args.position)
+        let signal = block_receives_redstone_power(args.world, args.position)
             || block_receives_redstone_power(args.world, &other_pos);
 
-        if door_props.powered != powered {
-            let sound_half = if door_props.open {
-                DoubleBlockHalf::Lower
-            } else {
-                DoubleBlockHalf::Upper
-            };
-
-            let mut other_door_props = DoorProperties::from_state_id(other_state_id);
-
-            door_props.powered = powered;
-            other_door_props.powered = powered;
-
-            if door_props.open != powered {
-                door_props.open = powered;
-                other_door_props.open = powered;
-            }
-
-            if door_props.half == sound_half {
-                args.world.play_block_sound(
-                    get_sound(args.block, powered),
-                    SoundCategory::Blocks,
-                    *args.position,
-                );
-            }
-
-            args.world.set_block_state(
-                args.position,
-                door_props.to_state_id(args.block),
-                BlockFlags::NOTIFY_ALL,
+        // `!this.defaultBlockState().is(block)`: not from a door of this kind.
+        if args.source_block == args.block || signal == door_props.powered {
+            return;
+        }
+        if signal != door_props.open {
+            args.world.play_block_sound(
+                get_sound(args.block, signal),
+                SoundCategory::Blocks,
+                *args.position,
             );
-            args.world.set_block_state(
-                &other_pos,
-                other_door_props.to_state_id(other_block),
-                BlockFlags::NOTIFY_ALL,
+            args.world.game_event_from(
+                None,
+                if signal {
+                    pumpkin_data::game_event::GameEvent::BlockOpen
+                } else {
+                    pumpkin_data::game_event::GameEvent::BlockClose
+                },
+                args.position.to_centered_f64(),
             );
         }
+        door_props.powered = signal;
+        door_props.open = signal;
+        args.world.set_block_state(
+            args.position,
+            door_props.to_state_id(args.block),
+            BlockFlags::NOTIFY_LISTENERS,
+        );
     }
 
     fn get_state_for_neighbor_update(

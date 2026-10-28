@@ -64,7 +64,7 @@ pub fn interact_with_door() -> OneShot {
                 && is_mob_interactable_door(world, &from_pos)
             {
                 if !DoorBlock::is_open(world, &from_pos) {
-                    DoorBlock::set_open(world, &from_pos, true);
+                    DoorBlock::set_open(Some(tick.mob), world, &from_pos, true);
                 }
                 if let Some(door) = global_pos_in(world, from_pos) {
                     doors.insert(door);
@@ -74,7 +74,7 @@ pub fn interact_with_door() -> OneShot {
                 && is_mob_interactable_door(world, &to_pos)
                 && !DoorBlock::is_open(world, &to_pos)
             {
-                DoorBlock::set_open(world, &to_pos, true);
+                DoorBlock::set_open(Some(tick.mob), world, &to_pos, true);
                 if let Some(door) = global_pos_in(world, to_pos) {
                     doors.insert(door);
                 }
@@ -120,7 +120,7 @@ fn close_doors_i_opened_or_passed_through(
         if other_mobs_are_coming_through(tick, &door_pos, nearest) {
             return false;
         }
-        DoorBlock::set_open(world, &door_pos, false);
+        DoorBlock::set_open(Some(tick.mob), world, &door_pos, false);
         false
     });
 }
