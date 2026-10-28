@@ -107,6 +107,19 @@ impl ShelfBlockEntity {
             comparator_dirty: AtomicBool::new(false),
         }
     }
+
+    /// Vanilla `ShelfBlockEntity.swapItemNoUpdate`: `stack` goes into `slot`, and what was
+    /// there comes back. The caller's `setChanged` follows, so the entity is marked dirty here.
+    pub fn swap_item_no_update(&self, slot: usize, stack: ItemStack) -> ItemStack {
+        let mut items = self
+            .items
+            .write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let old = std::mem::replace(&mut items[slot], stack);
+        drop(items);
+        self.mark_dirty();
+        old
+    }
 }
 
 impl Inventory for ShelfBlockEntity {
