@@ -40,7 +40,8 @@ impl DebugStickItem {
             player.send_system_message_raw(
                 &TextComponent::translate(
                     "item.minecraft.debug_stick.empty",
-                    [TextComponent::text(block.name)],
+                    // `block.getRegisteredName()`.
+                    [TextComponent::text(format!("minecraft:{}", block.name))],
                 ),
                 true,
             );
@@ -52,7 +53,8 @@ impl DebugStickItem {
             player.send_system_message_raw(
                 &TextComponent::translate(
                     "item.minecraft.debug_stick.empty",
-                    [TextComponent::text(block.name)],
+                    // `block.getRegisteredName()`.
+                    [TextComponent::text(format!("minecraft:{}", block.name))],
                 ),
                 true,
             );
@@ -110,7 +112,12 @@ impl DebugStickItem {
 
             let new_state_id = block.from_properties(&new_props).to_state_id(block);
             let world = player.world();
-            world.set_block_state(pos, new_state_id, BlockFlags::NOTIFY_ALL);
+            // Vanilla flags 18: `UPDATE_CLIENTS | UPDATE_KNOWN_SHAPE`, no neighbour updates.
+            world.set_block_state(
+                pos,
+                new_state_id,
+                BlockFlags::NOTIFY_LISTENERS | BlockFlags::UPDATE_KNOWN_SHAPE,
+            );
 
             player.send_system_message_raw(
                 &TextComponent::translate(
