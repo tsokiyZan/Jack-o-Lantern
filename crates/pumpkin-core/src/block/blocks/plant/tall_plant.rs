@@ -33,22 +33,28 @@ impl BlockMetadata for TallPlantBlock {
 
 impl BlockBehaviour for TallPlantBlock {
     fn can_place_at(&self, args: CanPlaceAtArgs<'_>) -> bool {
-        let up_pos = args.position.up();
-
-        let upper_state = args.block_accessor.get_block_state(&up_pos);
-        let Some(world) = args.world else {
-            return <Self as PlantBlockBase>::can_place_at(
-                self,
-                args.block_accessor,
-                args.position,
-            ) && upper_state.is_air();
-        };
-
-        if up_pos.0.y > world.get_top_y() {
-            return false;
+        // Vanilla `DoublePlantBlock.canSurvive`: the upper half needs its own lower half below.
+        let props = TallSeagrassLikeProperties::from_state_id(args.state.id);
+        if props.half == DoubleBlockHalf::Upper {
+            let (below_block, below_state) = args
+                .block_accessor
+                .get_block_and_state(&args.position.down());
+            return below_block == args.block
+                && TallSeagrassLikeProperties::from_state_id(below_state.id).half
+                    == DoubleBlockHalf::Lower;
+        }
+        // `getStateForPlacement`: a player needs room above, below the build limit.
+        if args.player.is_some() {
+            let up_pos = args.position.up();
+            if args
+                .world
+                .is_some_and(|world| up_pos.0.y > world.get_top_y())
+                || !args.block_accessor.get_block_state(&up_pos).replaceable()
+            {
+                return false;
+            }
         }
         <Self as PlantBlockBase>::can_place_at(self, args.block_accessor, args.position)
-            && upper_state.is_air()
     }
 
     fn get_state_for_neighbor_update(

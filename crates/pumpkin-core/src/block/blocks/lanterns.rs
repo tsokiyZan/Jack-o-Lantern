@@ -47,9 +47,7 @@ impl BlockBehaviour for LanternBlock {
     }
 
     fn can_place_at(&self, args: CanPlaceAtArgs<'_>) -> bool {
-        let Some(world) = args.world else {
-            return false;
-        };
+        let world = args.block_accessor;
         if args.player.is_none() {
             let props = LanternLikeProperties::from_state_id(args.state.id);
             return can_survive(world, args.position, props.hanging);

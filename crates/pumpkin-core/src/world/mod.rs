@@ -8979,9 +8979,11 @@ impl WorldPortalExt for WorldPortal {
         block_accessor: &dyn BlockAccessor,
         block_pos: &BlockPos,
     ) -> bool {
+        // Worldgen reads the generating chunk through `block_accessor`; the live world would
+        // see the wrong blocks.
         self.0.block_registry.can_place_at(
             None,
-            Some(&self.0),
+            None,
             block_accessor,
             None,
             block,

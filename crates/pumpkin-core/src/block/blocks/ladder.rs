@@ -57,10 +57,7 @@ impl BlockBehaviour for LadderBlock {
     }
 
     fn can_place_at(&self, args: CanPlaceAtArgs<'_>) -> bool {
-        let Some(world) = args.world else {
-            //this won't happen
-            return false;
-        };
+        let world = args.block_accessor;
         if args.player.is_none() {
             let props = LadderLikeProperties::from_state_id(args.state.id);
             return can_place_ladder_at(

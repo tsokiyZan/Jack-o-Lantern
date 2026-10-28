@@ -183,11 +183,7 @@ impl WallMountedBlock for BellBlock {
 
 impl BlockBehaviour for BellBlock {
     fn can_place_at(&self, args: CanPlaceAtArgs<'_>) -> bool {
-        // Still needs a world: structure placement without one comes with the WorldPortal
-        // change.
-        let Some(world) = args.world else {
-            return false;
-        };
+        let world = args.block_accessor;
         if let Some(player) = args.player
             && let Some(direction) = args.direction
         {
