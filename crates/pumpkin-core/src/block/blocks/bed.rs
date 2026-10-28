@@ -15,8 +15,8 @@ use pumpkin_world::world::BlockFlags;
 
 use crate::block::registry::BlockActionResult;
 use crate::block::{
-    BlockBehaviour, BrokenArgs, CanPlaceAtArgs, NormalUseArgs, OnPlaceArgs, OnStateReplacedArgs,
-    PathComputationType, PlacedArgs,
+    BlockBehaviour, CanPlaceAtArgs, GetStateForNeighborUpdateArgs, NormalUseArgs, OnPlaceArgs,
+    PathComputationType, PlacedArgs, PlayerPlacedArgs, PlayerWillDestroyArgs,
 };
 use crate::entity::{EntityBase, player::Player};
 use crate::world::World;
@@ -40,7 +40,8 @@ impl BlockBehaviour for BedBlock {
                     .get_block_state(&args.position.offset(facing.to_offset()))
                     .replaceable();
         }
-        false
+        // `AbstractBedBlock` has no `canSurvive`.
+        true
     }
 
     fn on_place(&self, args: OnPlaceArgs<'_>) -> BlockStateId {
@@ -56,77 +57,78 @@ impl BlockBehaviour for BedBlock {
         if !args.is_new_block() {
             return;
         }
-        {
-            let bed_entity = BedBlockEntity::new(*args.position);
-            args.world.add_block_entity(Arc::new(bed_entity));
-
-            let mut bed_head_props = BedProperties::default(args.block);
-            bed_head_props.facing = BedProperties::from_state_id(args.state_id).facing;
-            bed_head_props.part = BedPart::Head;
-
-            let bed_head_pos = args.position.offset(bed_head_props.facing.to_offset());
-            args.world.set_block_state(
-                &bed_head_pos,
-                bed_head_props.to_state_id(args.block),
-                BlockFlags::NOTIFY_ALL | BlockFlags::SKIP_BLOCK_ADDED_CALLBACK,
-            );
-
-            let bed_head_entity = BedBlockEntity::new(bed_head_pos);
-            args.world.add_block_entity(Arc::new(bed_head_entity));
-        }
+        let bed_entity = BedBlockEntity::new(*args.position);
+        args.world.add_block_entity(Arc::new(bed_entity));
     }
 
-    fn broken(&self, args: BrokenArgs<'_>) {
+    /// Vanilla `AbstractBedBlock.setPlacedBy`: the head goes in front of the placed foot.
+    fn player_placed(&self, args: PlayerPlacedArgs<'_>) {
+        let mut bed_head_props = BedProperties::from_state_id(args.state_id);
+        bed_head_props.part = BedPart::Head;
+        let bed_head_pos = args.position.offset(bed_head_props.facing.to_offset());
+        args.world.set_block_state(
+            &bed_head_pos,
+            bed_head_props.to_state_id(args.block),
+            BlockFlags::NOTIFY_ALL,
+        );
+    }
+
+    /// Vanilla `AbstractBedBlock.playerWillDestroy`: a player who prevents drops breaking the
+    /// foot takes the head with it, dropping nothing. Otherwise the other half goes through
+    /// `updateShape`.
+    fn player_will_destroy(&self, args: PlayerWillDestroyArgs<'_>) {
+        // `Player.preventsBlockDrops`: `abilities.instabuild`.
+        if args.player.gamemode.load() != GameMode::Creative {
+            return;
+        }
         let bed_props = BedProperties::from_state_id(args.state.id);
-        let other_half_pos = if bed_props.part == BedPart::Head {
-            args.position
-                .offset(bed_props.facing.opposite().to_offset())
-        } else {
-            args.position.offset(bed_props.facing.to_offset())
-        };
-        let neighbor_state_id = args.world.get_block_state_id(&other_half_pos);
-        if neighbor_state_id.to_block_id() != args.block.id {
-            args.world.update_neighbors(&other_half_pos, None);
+        if bed_props.part != BedPart::Foot {
             return;
         }
-
-        let is_creative = args.player.gamemode.load() == GameMode::Creative;
-        let flags = if bed_props.part == BedPart::Foot && !is_creative {
-            // Breaking foot in survival -> allow head to drop
-            BlockFlags::NOTIFY_ALL
-        } else {
-            // Breaking head OR creative mode -> skip drops
-            BlockFlags::SKIP_DROPS | BlockFlags::NOTIFY_ALL
-        };
-
-        args.world
-            .break_block(&other_half_pos, Some(args.player), flags);
+        let head_pos = args.position.offset(bed_props.facing.to_offset());
+        let (head_block, head_state) = args.world.get_block_and_state(&head_pos);
+        if head_block != args.block
+            || BedProperties::from_state_id(head_state.id).part != BedPart::Head
+        {
+            return;
+        }
+        // Flags 35: `UPDATE_ALL | UPDATE_SUPPRESS_DROPS`.
+        args.world.set_block_state(
+            &head_pos,
+            BlockStateId::AIR,
+            BlockFlags::NOTIFY_ALL | BlockFlags::SKIP_DROPS,
+        );
+        args.world.sync_world_event_from(
+            args.player.as_ref(),
+            pumpkin_data::world::WorldEvent::ParticlesAndSoundDestroyBlock,
+            head_pos,
+            i32::from(head_state.id.as_u16()),
+        );
     }
 
-    fn on_state_replaced(&self, args: OnStateReplacedArgs<'_>) {
-        if args.moved {
-            return;
-        }
-
-        let bed_props = BedProperties::from_state_id(args.old_state_id);
-        let other_half_pos = if bed_props.part == BedPart::Head {
-            args.position
-                .offset(bed_props.facing.opposite().to_offset())
+    /// Vanilla `AbstractBedBlock.updateShape`: a half keeps its other half's `occupied`, and
+    /// goes once the other half is gone.
+    fn get_state_for_neighbor_update(
+        &self,
+        args: GetStateForNeighborUpdateArgs<'_>,
+    ) -> BlockStateId {
+        let mut bed_props = BedProperties::from_state_id(args.state_id);
+        let neighbour_direction = if bed_props.part == BedPart::Foot {
+            bed_props.facing.to_block_direction()
         } else {
-            args.position.offset(bed_props.facing.to_offset())
+            bed_props.facing.opposite().to_block_direction()
         };
-
-        let (other_block, other_state) = args.world.get_block_and_state(&other_half_pos);
-        if other_block == args.block {
-            let other_props = BedProperties::from_state_id(other_state.id);
-            if other_props.part != bed_props.part {
-                args.world.break_block(
-                    &other_half_pos,
-                    None,
-                    BlockFlags::SKIP_DROPS | BlockFlags::NOTIFY_ALL,
-                );
+        if args.direction != neighbour_direction {
+            return args.state_id;
+        }
+        if args.neighbor_state_id.to_block_id() == args.block.id {
+            let neighbour_props = BedProperties::from_state_id(args.neighbor_state_id);
+            if neighbour_props.part != bed_props.part {
+                bed_props.occupied = neighbour_props.occupied;
+                return bed_props.to_state_id(args.block);
             }
         }
+        BlockStateId::AIR
     }
 
     fn normal_use(&self, args: NormalUseArgs<'_>) -> BlockActionResult {
