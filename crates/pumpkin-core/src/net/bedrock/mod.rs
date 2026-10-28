@@ -39,6 +39,7 @@ use pumpkin_protocol::{
             player_auth_input::SPlayerAuthInput, request_ability::SRequestAbility,
             request_chunk_radius::SRequestChunkRadius,
             request_network_settings::SRequestNetworkSettings,
+            resource_pack_chunk_request::SResourcePackChunkRequest,
             resource_pack_client_response::SResourcePackClientResponse, respawn::SRespawn,
             set_local_player_as_initialized::SSetLocalPlayerAsInitialized,
             set_player_inventory_options::SSetPlayerInventoryOptions, show_credits::SShowCredits,
@@ -95,6 +96,16 @@ impl OutgoingPacket {
     }
 }
 
+/// Active resource pack staged for chunk streaming to this client.
+#[derive(Clone)]
+pub struct BedrockStreamingPack {
+    pub pack_id: String,
+    pub chunk_size: u32,
+    pub chunk_count: u32,
+    pub total_size: u64,
+    pub data: Arc<Vec<u8>>,
+}
+
 pub struct BedrockClient {
     session: Arc<NetherNetSession>,
     /// The client's IP address.
@@ -127,6 +138,7 @@ pub struct BedrockClient {
     last_food_rejection_tick: AtomicCell<Option<i32>>,
     pub client_cache_supported: AtomicBool,
     pub blob_cache: std::sync::Mutex<HashMap<u64, Vec<u8>>>,
+    pub streaming_packs: std::sync::Mutex<HashMap<String, BedrockStreamingPack>>,
     /// An notifier that is triggered when this client is closed.
     close_token: CancellationToken,
     last_seen: Arc<AtomicCell<std::time::Instant>>,
@@ -166,6 +178,7 @@ impl BedrockClient {
             last_food_rejection_tick: AtomicCell::new(None),
             client_cache_supported: AtomicBool::new(false),
             blob_cache: std::sync::Mutex::new(HashMap::new()),
+            streaming_packs: std::sync::Mutex::new(HashMap::new()),
             close_token: CancellationToken::new(),
             last_seen: Arc::new(AtomicCell::new(std::time::Instant::now())),
             incoming_game_packet_send: incoming_send,
@@ -310,6 +323,10 @@ impl BedrockClient {
         warn!("Closing connection for {}: {message}", self.address);
         self.send_packet(&CDisconnect::new(reason as i32, message))
             .await;
+        let _ = self
+            .session
+            .flush_reliable(std::time::Duration::from_secs(1))
+            .await;
         self.close().await;
     }
 
@@ -330,6 +347,10 @@ impl BedrockClient {
                 filtered_message,
             })
             .await;
+            let _ = self
+                .session
+                .flush_reliable(std::time::Duration::from_secs(1))
+                .await;
         }
         self.close().await;
     }
@@ -733,6 +754,16 @@ impl BedrockClient {
                 server.spawn_task(async move {
                     client
                         .handle_resource_pack_response(packet, &server_c)
+                        .await;
+                });
+            }
+            SResourcePackChunkRequest::PACKET_ID => {
+                let packet = SResourcePackChunkRequest::read(reader)?;
+                let client = self.clone();
+                let server_c = server.clone();
+                server.spawn_task(async move {
+                    client
+                        .handle_resource_pack_chunk_request(packet, &server_c)
                         .await;
                 });
             }

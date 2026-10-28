@@ -55,6 +55,8 @@ static STRUCTURE_NOT_FOUND_ERROR_TYPE: CommandErrorType<1> = CommandErrorType::n
     translation::bedrock::COMMANDS_LOCATE_STRUCTURE_FAIL_NOSTRUCTUREFOUND,
 );
 
+// The stronghold rings are computed in the background and a command can't wait for them.
+
 static BIOME_NOT_FOUND_ERROR_TYPE: CommandErrorType<1> = CommandErrorType::new(
     translation::java::COMMANDS_LOCATE_BIOME_NOT_FOUND,
     translation::bedrock::COMMANDS_LOCATE_BIOME_FAIL,
@@ -76,7 +78,7 @@ fn coordinates_text(pos: &BlockPos, absolute_y: bool) -> TextComponent {
         "~".to_string()
     };
 
-    TextComponent::translate_cross(
+    let coordinates = TextComponent::translate_cross(
         translation::java::CHAT_COORDINATES,
         translation::java::CHAT_COORDINATES,
         [
@@ -84,6 +86,12 @@ fn coordinates_text(pos: &BlockPos, absolute_y: bool) -> TextComponent {
             TextComponent::text(y.clone()),
             TextComponent::text(z.to_string()),
         ],
+    );
+
+    TextComponent::translate_cross(
+        translation::java::CHAT_SQUARE_BRACKETS,
+        translation::java::CHAT_SQUARE_BRACKETS,
+        [coordinates],
     )
     .color_named(NamedColor::Green)
     .click_event(ClickEvent::SuggestCommand {
