@@ -1,6 +1,7 @@
 #[allow(clippy::wildcard_imports)]
 use super::*;
 use pumpkin_protocol::java::client::play::CMoveVehicle;
+use pumpkin_util::math::boundingbox::BoundingBox;
 
 impl JavaClient {
     /// Vanilla `ServerGamePacketListenerImpl.handleMoveVehicle`.
@@ -85,17 +86,41 @@ impl JavaClient {
             return;
         }
 
-        // `vehicle.move(MoverType.PLAYER, ...)`, for its step sounds and the block speed
-        // factor. Vanilla then rejects a move that ends more than 0.25 blocks from the
-        // client's or into a new collision; Pumpkin's `move` has no step height, so that
-        // check would push a horse back off every block it steps up, and like a player's
-        // own movement the vehicle's stays the client's.
+        let old_aabb = vehicle_entity.bounding_box.load();
         if let Some(living) = vehicle.get_living_entity()
             && living.on_climbable(vehicle.as_ref())
         {
             vehicle_entity.reset_fall_distance();
         }
         vehicle.move_entity(vehicle.as_ref(), target.sub(&steered.last_good));
+
+        // The move must end within 0.25 blocks of the client's position (vanilla's
+        // `yDist > -0.5 || yDist < 0.5` always holds, so the height never counts) and must not
+        // run into anything the vehicle wasn't already touching; otherwise it goes back where
+        // it was and the client is corrected, as at the world border.
+        let moved_to = vehicle_entity.pos.load();
+        let x_dist = target.x - moved_to.x;
+        let z_dist = target.z - moved_to.z;
+        let moved_wrongly = x_dist * x_dist + z_dist * z_dist;
+        let fail = moved_wrongly > 0.0625;
+        if fail {
+            warn!(
+                "{} (vehicle of {}) moved wrongly! {}",
+                vehicle_entity.entity_type.resource_name,
+                player.gameprofile.name,
+                moved_wrongly.sqrt()
+            );
+        }
+        let world = vehicle_entity.world.load();
+        if fail && no_collision(&world, vehicle.as_ref(), old_aabb)
+            || is_entity_colliding_with_anything_new(&world, vehicle.as_ref(), old_aabb, target)
+        {
+            // `absSnapTo(oldX, oldY, oldZ, targetYRot, targetXRot)`.
+            vehicle_entity.snap_to(old, Some(yaw % 360.0), Some(pitch.clamp(-90.0, 90.0)));
+            Self::send_vehicle_position(player, vehicle_entity);
+            vehicle_entity.remove_latest_movement_recording();
+            return;
+        }
 
         vehicle_entity.set_pos(target);
         vehicle_entity.set_rotation(yaw, pitch);
@@ -142,4 +167,47 @@ impl JavaClient {
             vehicle.pitch.load(),
         ));
     }
+}
+
+/// Vanilla `CollisionGetter.noCollision(entity, aabb)`: no block, entity or (near it) world
+/// border collision in the box.
+fn no_collision(world: &World, entity: &dyn EntityBase, aabb: BoundingBox) -> bool {
+    if !world.get_block_collisions(aabb, entity).0.is_empty()
+        || !world.get_entity_collisions(entity, aabb).is_empty()
+    {
+        return false;
+    }
+    let pos = entity.get_entity().pos.load();
+    let border = world
+        .worldborder
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    !border.is_inside_close_to_border(pos.x, pos.z, &aabb)
+        || !border
+            .collision_shapes()
+            .iter()
+            .any(|shape| shape.intersects(&aabb))
+}
+
+/// Vanilla `ServerGamePacketListenerImpl.isEntityCollidingWithAnythingNew`: at `target`, the
+/// entity would overlap a block or entity it doesn't already overlap at `old_aabb`.
+fn is_entity_colliding_with_anything_new(
+    world: &World,
+    entity: &dyn EntityBase,
+    old_aabb: BoundingBox,
+    target: Vector3<f64>,
+) -> bool {
+    let deflate = f64::from(1.0E-5f32);
+    let base = entity.get_entity();
+    let new_aabb = base
+        .bounding_box
+        .load()
+        .shift(target.sub(&base.pos.load()))
+        .contract_all(deflate);
+    let old_shape = old_aabb.contract_all(deflate);
+    world
+        .get_entity_collisions(entity, new_aabb)
+        .into_iter()
+        .chain(world.get_block_collisions(new_aabb, entity).0)
+        .any(|shape| !shape.intersects(&old_shape))
 }
