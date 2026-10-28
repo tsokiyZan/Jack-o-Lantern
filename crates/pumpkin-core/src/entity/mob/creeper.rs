@@ -363,11 +363,7 @@ impl Mob for CreeperEntity {
 
     /// Vanilla `Creeper.killedEntity`: a charged creeper's first kill drops a skull.
     fn killed_entity(&self, victim: &dyn EntityBase) -> bool {
-        let living = &self.mob_entity.living_entity;
-        let world = living.entity.world.load();
-        // `shouldDropLoot`.
-        if !living.entity.is_baby()
-            && world.level_info.load().game_rules.mob_drops
+        if self.should_drop_loot()
             && self.is_charged()
             && !self.dropped_skulls.load(Ordering::Relaxed)
             && let Some(victim_living) = victim.get_living_entity()

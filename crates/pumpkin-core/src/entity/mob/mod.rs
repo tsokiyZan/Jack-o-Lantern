@@ -2849,6 +2849,14 @@ pub trait Mob: EntityBase + Send + Sync {
         self.get_entity().entity_type.experience_reward
     }
 
+    /// Vanilla `shouldDropLoot`: `mob_drops`, and no babies, though `Monster` drops loot for
+    /// its babies too.
+    fn should_drop_loot(&self) -> bool {
+        let entity = self.get_entity();
+        (!entity.is_baby() || is_monster(entity.entity_type))
+            && entity.world.load().level_info.load().game_rules.mob_drops
+    }
+
     /// Vanilla `shouldDropExperience`: no babies, though `Monster` drops it for its babies too.
     fn should_drop_experience(&self) -> bool {
         let entity = self.get_entity();

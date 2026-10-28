@@ -558,18 +558,6 @@ impl Mob for ArmadilloEntity {
 }
 
 impl ArmadilloEntity {
-    /// Vanilla `LivingEntity.shouldDropLoot`.
-    fn should_drop_loot(&self) -> bool {
-        !self.is_baby()
-            && self
-                .get_entity()
-                .world
-                .load()
-                .level_info
-                .load()
-                .game_rules
-                .mob_drops
-    }
 }
 
 /// Vanilla `armadillo -> !armadillo.isScared()`, the predicate spiders flee armadillos by.

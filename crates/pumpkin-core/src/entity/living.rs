@@ -2977,7 +2977,11 @@ impl LivingEntity {
         }
         let player_killed = self.last_hurt_by_player_memory_time.load(Relaxed) > 0;
         // `shouldDropLoot`.
-        if !self.entity.is_baby() && world.level_info.load().game_rules.mob_drops {
+        let should_drop_loot = dyn_self.get_mob().map_or_else(
+            || !self.entity.is_baby() && world.level_info.load().game_rules.mob_drops,
+            super::mob::Mob::should_drop_loot,
+        );
+        if should_drop_loot {
             let tool = cause
                 .and_then(|cause| cause.get_player())
                 .map(|player| player.inventory().get_stack_in_hand(Hand::Right))
@@ -3038,10 +3042,14 @@ impl LivingEntity {
     /// player hurt it recently.
     fn drop_experience(&self, dyn_self: &dyn EntityBase, killer: Option<&dyn EntityBase>) {
         let world = self.entity.world.load_full();
-        // `isAlwaysExperienceDropper` is `Player`'s; `shouldDropExperience` is `!isBaby()`.
+        // `isAlwaysExperienceDropper` is `Player`'s.
+        let should_drop_experience = dyn_self.get_mob().map_or_else(
+            || !self.entity.is_baby(),
+            super::mob::Mob::should_drop_experience,
+        );
         let drops = self.is_player()
             || self.last_hurt_by_player_memory_time.load(Relaxed) > 0
-                && !self.entity.is_baby()
+                && should_drop_experience
                 && world.level_info.load().game_rules.mob_drops;
         // TODO: `wasExperienceConsumed`, set by a sculk catalyst; the catalyst isn't ported.
         if drops {
