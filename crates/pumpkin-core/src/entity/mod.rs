@@ -227,10 +227,20 @@ pub trait EntityBase: Send + Sync + std::any::Any {
 
     /// Vanilla `NbtPredicate.getEntityTagToCompare`: the save without `id`, which `/data`
     /// and `nbt=` selectors read.
+    /// Vanilla `NbtPredicate.getEntityTagToCompare`: `saveWithoutId`, and for a player the
+    /// held stack as `SelectedItem`.
     fn tag_to_compare(&self) -> NbtCompound {
         let mut nbt = NbtCompound::new();
         self.write_nbt(&mut nbt);
         nbt.child_tags.remove("id");
+        if let Some(player) = self.get_player() {
+            let selected = player.inventory().held_item();
+            if !selected.is_empty() {
+                let mut item = NbtCompound::new();
+                selected.write_item_stack(&mut item);
+                nbt.put_compound("SelectedItem", item);
+            }
+        }
         nbt
     }
 
