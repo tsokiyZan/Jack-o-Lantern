@@ -3,7 +3,9 @@ use crate::entity::{
     passive::sheep::SheepEntity,
     player::Player,
 };
-use pumpkin_data::{data_component::DataComponent, data_component_impl::read_data, item_stack::ItemStack};
+use pumpkin_data::{
+    data_component::DataComponent, data_component_impl::read_data, item_stack::ItemStack,
+};
 use pumpkin_nbt::{compound::NbtCompound, tag::NbtTag};
 use serde_json::Value;
 

@@ -148,9 +148,9 @@ fn merged_face_occludes(
     vs.sort_by(f64::total_cmp);
     vs.dedup_by(|a, b| (*a - *b).abs() < EPSILON);
     us.windows(2).all(|cu| {
-        let cu = (cu[0] + cu[1]) / 2.0;
+        let cu = f64::midpoint(cu[0], cu[1]);
         vs.windows(2).all(|cv| {
-            let cv = (cv[0] + cv[1]) / 2.0;
+            let cv = f64::midpoint(cv[0], cv[1]);
             rects.iter().any(|b| {
                 b.min.get_axis(u) < cu
                     && cu < b.max.get_axis(u)

@@ -101,7 +101,11 @@ fn update_enchantments(
 }
 
 /// Vanilla `ItemEnchantments.Mutable.upgrade`.
-fn upgrade(enchantments: &mut Vec<(&'static Enchantment, i32)>, enchantment: &'static Enchantment, level: i32) {
+fn upgrade(
+    enchantments: &mut Vec<(&'static Enchantment, i32)>,
+    enchantment: &'static Enchantment,
+    level: i32,
+) {
     if level <= 0 {
         return;
     }
@@ -114,7 +118,11 @@ fn upgrade(enchantments: &mut Vec<(&'static Enchantment, i32)>, enchantment: &'s
 }
 
 /// Vanilla `ItemEnchantments.Mutable.set`.
-fn set_level(enchantments: &mut Vec<(&'static Enchantment, i32)>, enchantment: &'static Enchantment, level: i32) {
+fn set_level(
+    enchantments: &mut Vec<(&'static Enchantment, i32)>,
+    enchantment: &'static Enchantment,
+    level: i32,
+) {
     if level <= 0 {
         enchantments.retain(|(e, _)| *e != enchantment);
     } else if let Some((_, old)) = enchantments.iter_mut().find(|(e, _)| *e == enchantment) {
@@ -221,11 +229,15 @@ impl<R: RandomImpl> Generator<'_, '_, R> {
             book.patch = std::mem::take(&mut stack.stack.patch);
             stack.stack = book;
         }
-        let add = function.get("add").and_then(Value::as_bool).unwrap_or(false);
+        let add = function
+            .get("add")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
         let mut levels = Vec::new();
         if let Some(enchantments) = function.get("enchantments").and_then(Value::as_object) {
             for (name, level) in enchantments {
-                let (Some(enchantment), Some(level)) = (Enchantment::from_name(name), provider(level))
+                let (Some(enchantment), Some(level)) =
+                    (Enchantment::from_name(name), provider(level))
                 else {
                     continue;
                 };
@@ -261,14 +273,19 @@ impl<R: RandomImpl> Generator<'_, '_, R> {
             return;
         }
         let max_damage = stack.stack.get_max_damage().unwrap_or(0);
-        let add = function.get("add").and_then(Value::as_bool).unwrap_or(false);
+        let add = function
+            .get("add")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
         let base = if add {
             1.0 - stack.stack.get_damage() as f32 / max_damage as f32
         } else {
             0.0
         };
         let pct = 1.0 - (self.number_float(damage) + base).clamp(0.0, 1.0);
-        stack.stack.set_damage((pct * max_damage as f32).floor() as i32);
+        stack
+            .stack
+            .set_damage((pct * max_damage as f32).floor() as i32);
     }
 
     /// Vanilla `SetStewEffectFunction.run`.
@@ -285,7 +302,8 @@ impl<R: RandomImpl> Generator<'_, '_, R> {
         let Some(name) = entry.get("type").and_then(Value::as_str) else {
             return;
         };
-        let mut duration = number(entry, "duration").map_or(0, |duration| self.number_int(duration));
+        let mut duration =
+            number(entry, "duration").map_or(0, |duration| self.number_int(duration));
         let effect = StatusEffect::from_name(name.trim_start_matches("minecraft:"));
         if !effect.is_some_and(crate::entity::effect::is_instantaneous) {
             duration *= 20;
@@ -456,7 +474,12 @@ fn set_components(stack: &mut Stack, function: &Value) {
             };
             Some(component)
         };
-        if let Some((_, old)) = stack.stack.patch.iter_mut().find(|(patched, _)| *patched == id) {
+        if let Some((_, old)) = stack
+            .stack
+            .patch
+            .iter_mut()
+            .find(|(patched, _)| *patched == id)
+        {
             *old = component;
         } else {
             stack.stack.patch.push((id, component));

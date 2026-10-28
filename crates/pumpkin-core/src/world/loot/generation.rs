@@ -174,8 +174,14 @@ impl<'a> Entry<'a> {
 impl<'a> Functions<'a> {
     fn iter(
         self,
-    ) -> impl Iterator<Item = (LootFunctionKind, Condition<'a>, Option<&'a str>, Option<&'a Value>)>
-    {
+    ) -> impl Iterator<
+        Item = (
+            LootFunctionKind,
+            Condition<'a>,
+            Option<&'a str>,
+            Option<&'a Value>,
+        ),
+    > {
         let (s, d): (&[_], &[_]) = match self {
             Self::Static(functions) => (functions, &[]),
             Self::Dynamic(functions) => (&[], functions),
