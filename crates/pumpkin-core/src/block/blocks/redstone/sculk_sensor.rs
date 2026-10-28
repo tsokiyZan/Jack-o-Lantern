@@ -4,8 +4,8 @@ use crate::block::blocks::note::get_pitch_from_note;
 use crate::block::entities::sculk_sensor::SculkSensorBlockEntity;
 use crate::block::{
     BlockBehaviour, BlockMetadata, EmitsRedstonePowerArgs, GetComparatorOutputArgs,
-    GetRedstonePowerArgs, OnEntityStepArgs, OnPlaceArgs, OnScheduledTickArgs, OnStateReplacedArgs,
-    PathComputationType, PlacedArgs,
+    GetRedstonePowerArgs, GetStateForNeighborUpdateArgs, OnEntityStepArgs, OnPlaceArgs,
+    OnScheduledTickArgs, OnStateReplacedArgs, PathComputationType, PlacedArgs,
 };
 use crate::entity::EntityBase;
 use crate::world::World;
@@ -16,6 +16,7 @@ use pumpkin_data::block_properties::{
     SculkSensorPhase,
 };
 use pumpkin_data::entity::EntityType;
+use pumpkin_data::fluid::Fluid;
 use pumpkin_data::game_event::GameEvent;
 use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_data::tag::{self, Taggable};
@@ -242,6 +243,22 @@ impl BlockBehaviour for SculkSensorBlock {
             props.waterlogged = waterlogged;
             props.to_state_id(args.block)
         }
+    }
+
+    /// Vanilla `SculkSensorBlock.updateShape`: the waterlogged fluid tick.
+    fn get_state_for_neighbor_update(
+        &self,
+        args: GetStateForNeighborUpdateArgs<'_>,
+    ) -> BlockStateId {
+        if SensorProperties::of(args.block, args.state_id).waterlogged {
+            args.world.schedule_fluid_tick(
+                &Fluid::FLOWING_WATER,
+                *args.position,
+                Fluid::FLOWING_WATER.flow_speed as i32,
+                TickPriority::Normal,
+            );
+        }
+        args.state_id
     }
 
     /// Vanilla `SculkSensorBlock.onPlace`; Pumpkin only calls it for a new block.
