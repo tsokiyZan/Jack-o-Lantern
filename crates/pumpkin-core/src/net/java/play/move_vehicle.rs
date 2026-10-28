@@ -191,7 +191,7 @@ fn no_collision(world: &World, entity: &dyn EntityBase, aabb: BoundingBox) -> bo
 
 /// Vanilla `ServerGamePacketListenerImpl.isEntityCollidingWithAnythingNew`: at `target`, the
 /// entity would overlap a block or entity it doesn't already overlap at `old_aabb`.
-fn is_entity_colliding_with_anything_new(
+pub(super) fn is_entity_colliding_with_anything_new(
     world: &World,
     entity: &dyn EntityBase,
     old_aabb: BoundingBox,

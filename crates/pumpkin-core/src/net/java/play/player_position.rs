@@ -203,6 +203,9 @@ impl JavaClient {
                 if entity.on_ground.load(Ordering::Relaxed) && packet.collision & FLAG_ON_GROUND == 0 && height_difference > 0.0 {
                     player.jump();
                 }
+                if Self::refuse_colliding_move(player, last_pos, pos, None, packet.collision & FLAG_ON_GROUND != 0) {
+                    return;
+                }
                 entity.set_pos(pos);
 
                 let new_on_ground = packet.collision & FLAG_ON_GROUND != 0;
@@ -367,6 +370,15 @@ impl JavaClient {
                     // Vanilla jumps before `player.move`, from where the player was.
                     player.jump();
                 }
+                if Self::refuse_colliding_move(
+                    player,
+                    last_pos,
+                    pos,
+                    Some((wrap_degrees(packet.yaw), wrap_degrees(packet.pitch))),
+                    packet.collision & FLAG_ON_GROUND != 0,
+                ) {
+                    return;
+                }
                 entity.set_pos(pos);
                 entity
                     .on_ground
@@ -446,6 +458,42 @@ impl JavaClient {
                 self.force_tp(player, position);
             }
         }}
+    }
+
+    /// Vanilla `handleMovePlayer`: a move into a block or entity the player wasn't already
+    /// touching (`isEntityCollidingWithAnythingNew`) is teleported back, as when a piston pushes
+    /// a block into a client that hasn't moved with it. Returns whether the move was refused.
+    fn refuse_colliding_move(
+        player: &Arc<Player>,
+        last_pos: Vector3<f64>,
+        pos: Vector3<f64>,
+        rotation: Option<(f32, f32)>,
+        on_ground: bool,
+    ) -> bool {
+        // `noPhysics`; a sleeping player never gets here.
+        if player.is_spectator() {
+            return false;
+        }
+        let entity = player.get_entity();
+        let world = player.world();
+        if !super::move_vehicle::is_entity_colliding_with_anything_new(
+            &world,
+            player.as_ref(),
+            entity.bounding_box.load(),
+            pos,
+        ) {
+            return false;
+        }
+        let (yaw, pitch) = rotation.unwrap_or_else(|| {
+            (
+                wrap_degrees(entity.yaw.load()),
+                wrap_degrees(entity.pitch.load()),
+            )
+        });
+        player.request_teleport(last_pos, yaw, pitch);
+        entity.do_check_fall_damage(player.as_ref(), Vector3::new(0.0, 0.0, 0.0), on_ground);
+        entity.remove_latest_movement_recording();
+        true
     }
 
     /// The sleeping branch of vanilla `handlePlayerPositionChange`: a sleeper doesn't move or
