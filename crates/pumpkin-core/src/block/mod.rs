@@ -414,6 +414,8 @@ pub struct PlayerPlacedArgs<'a> {
     pub position: &'a BlockPos,
     pub direction: BlockDirection,
     pub player: &'a Player,
+    /// The stack the block was placed from, before it is used up.
+    pub item_stack: &'a ItemStack,
 }
 
 pub struct FallOnArgs<'a> {

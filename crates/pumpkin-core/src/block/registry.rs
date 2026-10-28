@@ -837,11 +837,15 @@ impl BlockRegistry {
             BlockState::to_be_network_id(new_state) as i32,
         );
 
-        if let Ok(hand) = pumpkin_util::Hand::from_packet_id(use_item_on.hand.0)
-            && placed_block.default_state.block_entity_type != u16::MAX
+        let placed_from = pumpkin_util::Hand::from_packet_id(use_item_on.hand.0).map_or_else(
+            |_| ItemStack::EMPTY.clone(),
+            |hand| player.inventory().get_stack_in_hand(hand),
+        );
+        if placed_block.default_state.block_entity_type != u16::MAX
+            && !placed_from.is_empty()
             && let Some(block_entity) = world.get_block_entity(&final_block_pos)
         {
-            block_entity.apply_item_components(&player.inventory().get_stack_in_hand(hand));
+            block_entity.apply_item_components(&placed_from);
         }
 
         // `setPlacedBy` runs on the placed state's block (a wall banner, say, not the item's).
@@ -852,6 +856,7 @@ impl BlockRegistry {
             &final_block_pos,
             face,
             player,
+            &placed_from,
         );
 
         player.trigger_advancement(
@@ -1211,6 +1216,7 @@ impl BlockRegistry {
         }
     }
 
+    #[expect(clippy::too_many_arguments)]
     pub fn player_placed(
         &self,
         world: &Arc<World>,
@@ -1219,6 +1225,7 @@ impl BlockRegistry {
         position: &BlockPos,
         direction: BlockDirection,
         player: &Player,
+        item_stack: &ItemStack,
     ) {
         let pumpkin_block = self.get_pumpkin_block(block.id);
         if let Some(pumpkin_block) = pumpkin_block {
@@ -1229,6 +1236,7 @@ impl BlockRegistry {
                 position,
                 direction,
                 player,
+                item_stack,
             });
         }
     }
