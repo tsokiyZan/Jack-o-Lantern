@@ -5,13 +5,13 @@ use std::any::Any;
 
 use crate::entity::player::Player;
 use crate::item::{ItemBehaviour, ItemMetadata};
-use pumpkin_data::Block;
 use pumpkin_data::data_component::DataComponent;
 use pumpkin_data::data_component_impl::PotionContentsImpl;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::potion::Potion;
 use pumpkin_data::sound::{Sound, SoundCategory};
+use pumpkin_data::tag::Taggable;
 
 /// A potion holding water; the contents component is what names it and makes it
 /// brewable.
@@ -56,14 +56,25 @@ impl ItemBehaviour for GlassBottleItem {
             return InteractionResult::PASS;
         }
         let hit_pos = hit.block_pos;
-        let (block, state_id) = world.get_block_and_state_id(&hit_pos);
-        if block.id != Block::WATER.id && !block.is_waterlogged(state_id) {
+        // `level.getFluidState(pos).is(FluidTags.WATER)`: water blocks, waterlogged blocks,
+        // kelp, seagrass, bubble columns.
+        if !world
+            .get_fluid(&hit_pos)
+            .has_tag(&pumpkin_data::tag::Fluid::MINECRAFT_WATER)
+        {
             return InteractionResult::PASS;
         }
-        world.play_sound(
+        // `level.playSound(player, player.getX(), ...)`: at the player, for everyone else.
+        world.play_sound_expect(
+            player,
             Sound::ItemBottleFill,
-            SoundCategory::Players,
-            &hit_pos.to_f64(),
+            SoundCategory::Neutral,
+            &player.position(),
+        );
+        world.game_event_from(
+            Some(player),
+            pumpkin_data::game_event::GameEvent::FluidPickup,
+            hit_pos.to_centered_f64(),
         );
         // `turnBottleIntoItem`.
         player.award_item_used(&Item::GLASS_BOTTLE);
