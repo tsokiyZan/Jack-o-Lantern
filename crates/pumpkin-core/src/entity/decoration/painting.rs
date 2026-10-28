@@ -8,7 +8,7 @@ use pumpkin_data::damage::DamageType;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::painting_variant::PaintingVariant;
-use pumpkin_data::sound::{Sound, SoundCategory};
+use pumpkin_data::sound::Sound;
 use pumpkin_nbt::compound::NbtCompound;
 use pumpkin_protocol::codec::var_int::VarInt;
 use pumpkin_protocol::java::client::play::Metadata;
@@ -192,26 +192,29 @@ impl PaintingEntity {
         Some(fitting_variants[index as usize])
     }
 
-    fn drop_and_remove(&self, caused_by: Option<&dyn EntityBase>) {
-        let entity = &self.entity;
-        let world = entity.world.load();
-        world.play_sound(
-            Sound::EntityPaintingBreak,
-            SoundCategory::Blocks,
-            &entity.pos.load(),
-        );
+    fn direction(&self) -> BlockDirection {
+        BlockDirection::from_index(self.entity.data.load(Ordering::Relaxed) as u8)
+            .unwrap_or(BlockDirection::South)
+    }
 
-        let is_creative = caused_by.is_some_and(|c| {
-            c.cast_any()
-                .downcast_ref::<Player>()
-                .is_some_and(Player::is_creative)
-        });
-
-        if !is_creative {
-            world.drop_stack(&entity.block_pos.load(), ItemStack::new(1, &Item::PAINTING));
+    /// Vanilla `Painting.dropItem`.
+    fn drop_item(&self, caused_by: Option<&dyn EntityBase>) {
+        let world = self.entity.world.load();
+        if !world.level_info.load().game_rules.entity_drops {
+            return;
         }
-
-        entity.remove();
+        self.play_sound_at_self(Sound::EntityPaintingBreak, 1.0, 1.0);
+        if caused_by
+            .and_then(EntityBase::get_player)
+            .is_some_and(Player::is_creative)
+        {
+            return;
+        }
+        let mut stack = ItemStack::new(1, &Item::PAINTING);
+        if let Some(custom_name) = self.entity.custom_name.load().as_ref().clone() {
+            stack.set_custom_name(custom_name.to_pretty_console());
+        }
+        super::hanging_spawn_at_location(self, self.direction(), stack, 0.0);
     }
 }
 
@@ -272,21 +275,63 @@ impl EntityBase for PaintingEntity {
         }
     }
 
+    /// Vanilla `BlockAttachedEntity.hurtServer`.
     fn damage_with_context(
         &self,
-        caller: &dyn EntityBase,
+        _caller: &dyn EntityBase,
         _amount: f32,
-        _damage_type: DamageType,
+        damage_type: DamageType,
         _position: Option<Vector3<f64>>,
         _source: Option<&dyn EntityBase>,
-        _cause: Option<&dyn EntityBase>,
+        cause: Option<&dyn EntityBase>,
     ) -> bool {
-        self.drop_and_remove(Some(caller));
-        true
+        super::block_attached_hurt_server(self, &damage_type, cause, |cause| {
+            self.drop_item(cause);
+        })
     }
 
+    /// Vanilla `BlockAttachedEntity.kill(level)`: `kill(level, this)`.
+    fn kill(&self, _caller: &dyn EntityBase) {
+        super::block_attached_kill(self, None);
+    }
+
+    /// Vanilla `BlockAttachedEntity.ignoreExplosion`.
+    fn is_immune_to_explosion(&self, explosion: &crate::world::explosion::Explosion) -> bool {
+        super::block_attached_ignore_explosion(self, explosion)
+    }
+
+    /// Vanilla `BlockAttachedEntity.thunderHit`.
+    fn on_lightning_strike(
+        &self,
+        _caller: &dyn EntityBase,
+        _lightning: &crate::entity::lightning::LightningBoltEntity,
+    ) {
+        super::block_attached_thunder_hit();
+    }
+
+    /// Vanilla `moveEntityByPiston`: `BlockAttachedEntity.move(PISTON, ..)`.
+    fn move_by_piston(&self, _caller: &dyn EntityBase, delta: Vector3<f64>) {
+        super::block_attached_moved(self, delta, |cause| self.drop_item(cause));
+    }
+
+    /// Vanilla `BlockAttachedEntity.move`.
+    fn move_entity(&self, _caller: &dyn EntityBase, motion: Vector3<f64>) {
+        super::block_attached_moved(self, motion, |cause| self.drop_item(cause));
+    }
+
+    /// Vanilla `BlockAttachedEntity.push(x, y, z)`.
+    fn push_impulse(&self, impulse: Vector3<f64>) {
+        super::block_attached_moved(self, impulse, |cause| self.drop_item(cause));
+    }
+
+    /// Vanilla `BlockAttachedEntity.tick`: no `baseTick`, only `checkBelowWorld`.
+    fn tick(&self, caller: &dyn EntityBase, _server: &crate::server::Server) {
+        self.entity.check_out_of_world(caller);
+    }
+
+    /// Vanilla `BlockAttachedEntity.isPickable`.
     fn can_hit(&self) -> bool {
-        self.entity.is_alive()
+        true
     }
 
     fn cast_any(&self) -> &dyn std::any::Any {

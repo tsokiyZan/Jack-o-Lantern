@@ -108,6 +108,9 @@ impl BlockBehaviour for CaveVinesBlock {
     }
 
     fn placed(&self, args: PlacedArgs<'_>) {
+        if !args.is_new_block() {
+            return;
+        }
         let support_pos = args.position.up();
         let support_block = args.world.get_block(&support_pos);
         if support_block == &Block::CAVE_VINES {

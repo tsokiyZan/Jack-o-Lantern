@@ -92,7 +92,7 @@ impl EntityBase for EvokerFangsEntity {
         self.owner.set_uuid(nbt.get_uuid("Owner"));
     }
 
-    fn tick(&self, _caller: &dyn EntityBase, _server: &Server) {
+    fn tick(&self, caller: &dyn EntityBase, _server: &Server) {
         let entity = &self.entity;
         let world = entity.world.load();
 
@@ -119,6 +119,9 @@ impl EntityBase for EvokerFangsEntity {
                 entity.remove();
             }
         }
+
+        // `Entity.tick` → `baseTick` → `checkBelowWorld`: discard if below world.
+        entity.check_out_of_world(caller);
     }
 
     fn get_entity(&self) -> &Entity {

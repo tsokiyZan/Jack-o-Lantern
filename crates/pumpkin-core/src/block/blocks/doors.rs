@@ -241,6 +241,9 @@ impl BlockBehaviour for DoorBlock {
     }
 
     fn placed(&self, args: PlacedArgs<'_>) {
+        if !args.is_new_block() {
+            return;
+        }
         {
             let mut door_props = DoorProperties::from_state_id(args.state_id);
             door_props.half = DoubleBlockHalf::Upper;

@@ -664,7 +664,7 @@ impl PandaEntity {
         {
             // `dropFromGiftLootTable`: the gift context has the origin and this entity.
             let params = LootContextParameters {
-                this_entity: Some(entity.entity_type),
+                this_entity: Some(self),
                 position: Some(entity.pos.load()),
                 ..Default::default()
             };

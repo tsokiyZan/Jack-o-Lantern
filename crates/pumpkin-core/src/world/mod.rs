@@ -5342,12 +5342,6 @@ impl World {
                         entity.read_nbt_non_mut(entity_nbt);
                         entity.init_data_tracker();
 
-                        let base_entity = entity.get_entity();
-                        // Clear velocity so the client does not replay the drop
-                        // animation; residual velocity from the original drop is
-                        // stale data.
-                        base_entity.velocity.store(Vector3::default());
-
                         // UUID-dedupes if another watcher already loaded this entity.
                         // Tracker owns pairing (spawn packets).
                         if world.add_entity_silent(entity.clone()) {
@@ -6486,7 +6480,12 @@ impl World {
             );
         }
 
-        if !flags.contains(BlockFlags::SKIP_BLOCK_ADDED_CALLBACK) && is_new_block {
+        // LevelChunk.setBlockState: `onPlace` runs on every state change, not only a new
+        // block, as long as the removal callbacks left the new block in place. Each block
+        // guards on `oldState.is(block)` itself where vanilla does.
+        if !flags.contains(BlockFlags::SKIP_BLOCK_ADDED_CALLBACK)
+            && self.get_block(position) == new_block
+        {
             self.block_registry.on_placed(
                 self,
                 new_block,
@@ -6495,15 +6494,18 @@ impl World {
                 replaced_block_state_id,
                 block_moved,
             );
-            let new_fluid = self.get_fluid(position);
-            self.block_registry.on_placed_fluid(
-                self,
-                new_fluid,
-                block_state_id,
-                position,
-                replaced_block_state_id,
-                block_moved,
-            );
+            // LiquidBlock.onPlace: only a liquid block, not a waterlogged one.
+            if new_block == &Block::WATER || new_block == &Block::LAVA {
+                let new_fluid = self.get_fluid(position);
+                self.block_registry.on_placed_fluid(
+                    self,
+                    new_fluid,
+                    block_state_id,
+                    position,
+                    replaced_block_state_id,
+                    block_moved,
+                );
+            }
         }
 
         // Level.java setBlock
@@ -6662,6 +6664,8 @@ impl World {
                 block_state: Some(broken_block_state),
                 position: Some(position.to_f64()),
                 killed_by_player: Some(cause.is_some()),
+                // `THIS_ENTITY`: the breaker, which `entity_properties` conditions read.
+                this_entity: cause.map(|player| player.as_ref() as &dyn crate::entity::EntityBase),
                 ..Default::default()
             };
             crate::block::drop_loot(self, broken_block, position, true, &params);

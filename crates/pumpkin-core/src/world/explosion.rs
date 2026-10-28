@@ -791,7 +791,7 @@ impl Explosion {
                 explosion_radius: (self.block_interaction == BlockInteraction::DestroyWithDecay)
                     .then_some(self.radius),
                 position: Some(pos.to_centered_f64()),
-                this_entity: self.source.as_ref().map(|s| s.get_entity().entity_type),
+                this_entity: self.source.as_deref(),
                 world_time: world.get_time_of_day() as u64,
                 is_raining: Some(world.is_raining()),
                 is_thundering: Some(world.is_thundering()),

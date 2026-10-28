@@ -246,6 +246,9 @@ impl BlockBehaviour for SculkSensorBlock {
 
     /// Vanilla `SculkSensorBlock.onPlace`; Pumpkin only calls it for a new block.
     fn placed(&self, args: PlacedArgs<'_>) {
+        if !args.is_new_block() {
+            return;
+        }
         let props = SensorProperties::of(args.block, args.state_id);
         if props.power > 0
             && !args

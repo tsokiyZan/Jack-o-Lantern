@@ -220,6 +220,25 @@ impl Animal for ChickenEntity {
 const BABY_DIMENSIONS: EntityDimensions = pumpkin_data::entity_dimensions::CHICKEN_BABY_DIMENSIONS;
 
 impl Mob for ChickenEntity {
+    fn mob_get_component(
+        &self,
+        component: pumpkin_data::data_component::DataComponent,
+    ) -> Option<Box<dyn pumpkin_data::data_component_impl::DataComponentImpl>> {
+        use pumpkin_data::{
+            data_component::DataComponent, data_component_impl::ChickenVariantImpl,
+        };
+        match component {
+            DataComponent::ChickenVariant => Some(Box::new(ChickenVariantImpl {
+                value: format!(
+                    "minecraft:{}",
+                    ChickenVariant::from_id(self.variant.load(Ordering::Relaxed))?.to_name()
+                )
+                .into(),
+            })),
+            _ => None,
+        }
+    }
+
     /// Vanilla `Chicken.positionRider`: a living passenger's body turns with the chicken.
     fn mob_after_position_rider(&self, passenger: &dyn EntityBase) {
         if passenger.get_living_entity().is_some() {

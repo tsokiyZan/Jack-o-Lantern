@@ -1,4 +1,5 @@
 // Portals & dimension blocks
+pub mod dried_ghast;
 pub mod end_gateway;
 pub mod end_portal;
 pub mod end_portal_frame;
@@ -8,8 +9,10 @@ pub mod nether_portal;
 // Storage & containers
 pub mod barrel;
 pub mod chests;
+pub mod copper_golem_statue;
 pub mod ender_chest;
 pub mod hopper;
+pub mod potent_sulfur;
 pub mod shulker_box;
 
 // Workstations & processing
@@ -82,6 +85,7 @@ pub mod carved_pumpkin;
 pub mod dripstone;
 pub mod farmland;
 pub mod hay;
+pub mod huge_mushroom;
 pub mod leaves;
 pub mod logs;
 pub mod mangrove_roots;

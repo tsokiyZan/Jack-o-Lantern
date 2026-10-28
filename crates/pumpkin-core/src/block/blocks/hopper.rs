@@ -98,12 +98,13 @@ impl BlockBehaviour for HopperBlock {
     }
 
     fn placed(&self, args: PlacedArgs<'_>) {
+        if !args.is_new_block() {
+            return;
+        }
         let props = HopperLikeProperties::from_state_id(args.state_id);
         let hopper_block_entity = HopperBlockEntity::new(*args.position, props.facing);
         args.world.add_block_entity(Arc::new(hopper_block_entity));
-        if Block::from_state_id(args.old_state_id) != Block::from_state_id(args.state_id) {
-            check_powered_state(args.world, args.position, args.state_id, args.block);
-        }
+        check_powered_state(args.world, args.position, args.state_id, args.block);
     }
 
     fn on_neighbor_update(&self, args: OnNeighborUpdateArgs<'_>) {

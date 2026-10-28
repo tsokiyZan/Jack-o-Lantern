@@ -252,17 +252,22 @@ macro_rules! impl_viewer_count_listener_for_chest {
             fn on_container_open(
                 &self,
                 world: &Arc<$crate::world::World>,
-                _position: &pumpkin_util::math::position::BlockPos,
+                position: &pumpkin_util::math::position::BlockPos,
             ) {
-                self.play_sound(world, pumpkin_data::sound::Sound::BlockChestOpen);
+                let (open_sound, _) =
+                    $crate::block::blocks::chests::get_chest_sounds(world.get_block(position));
+                self.play_sound(world, open_sound);
+                $crate::block::blocks::chests::schedule_chest_recheck(world, position);
             }
 
             fn on_container_close(
                 &self,
                 world: &Arc<$crate::world::World>,
-                _position: &pumpkin_util::math::position::BlockPos,
+                position: &pumpkin_util::math::position::BlockPos,
             ) {
-                self.play_sound(world, pumpkin_data::sound::Sound::BlockChestClose);
+                let (_, close_sound) =
+                    $crate::block::blocks::chests::get_chest_sounds(world.get_block(position));
+                self.play_sound(world, close_sound);
             }
 
             fn on_viewer_count_update(
@@ -302,6 +307,23 @@ macro_rules! impl_chest_helper_methods {
             /// Returns the number of players currently viewing this chest
             pub fn get_viewer_count(&self) -> u16 {
                 self.viewers.get_viewer_count()
+            }
+
+            /// Vanilla `ChestBlockEntity.recheckOpen`: the opener count becomes the number of
+            /// entities that still have the chest open, which the next tick acts on.
+            pub fn recheck_open(&self, world: &Arc<$crate::world::World>) {
+                let open_count = $crate::block::blocks::chests::get_entities_with_container_open(
+                    world,
+                    &self.position,
+                )
+                .len();
+                let open_count = u16::try_from(open_count).unwrap_or(u16::MAX);
+                self.viewers
+                    .current
+                    .store(open_count, std::sync::atomic::Ordering::Relaxed);
+                if open_count > 0 {
+                    $crate::block::blocks::chests::schedule_chest_recheck(world, &self.position);
+                }
             }
 
             #[must_use]

@@ -24,6 +24,9 @@ pub struct CampfireBlock;
 
 impl BlockBehaviour for CampfireBlock {
     fn placed(&self, args: PlacedArgs<'_>) {
+        if !args.is_new_block() {
+            return;
+        }
         let entity = CampfireBlockEntity::new(*args.position);
         args.world.add_block_entity(Arc::new(entity));
     }

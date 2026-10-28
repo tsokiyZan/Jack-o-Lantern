@@ -19,6 +19,9 @@ pub struct DaylightDetectorBlock;
 
 impl BlockBehaviour for DaylightDetectorBlock {
     fn placed(&self, args: PlacedArgs<'_>) {
+        if !args.is_new_block() {
+            return;
+        }
         args.world
             .add_block_entity(Arc::new(DaylightDetectorBlockEntity::new(*args.position)));
     }

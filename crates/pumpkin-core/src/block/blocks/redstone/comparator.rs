@@ -83,9 +83,12 @@ impl BlockBehaviour for ComparatorBlock {
     }
 
     fn placed(&self, args: PlacedArgs<'_>) {
-        let comparator = ComparatorBlockEntity::new(*args.position);
-        args.world.add_block_entity(Arc::new(comparator));
+        if args.is_new_block() {
+            let comparator = ComparatorBlockEntity::new(*args.position);
+            args.world.add_block_entity(Arc::new(comparator));
+        }
 
+        // Vanilla `DiodeBlock.onPlace`: every state change updates the block in front.
         RedstoneGateBlock::update_target(
             self,
             args.world,

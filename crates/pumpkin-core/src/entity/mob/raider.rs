@@ -109,8 +109,25 @@ pub trait Raider: PatrollingMonster {
         self.get_raider_data().raid_id.load().is_some()
     }
 
+    /// Vanilla `Raider.hasRaid`: in a raid, or standing where one is active.
+    fn has_raid(&self) -> bool {
+        if self.get_raider_data().raid_id.load().is_some() {
+            return true;
+        }
+        let entity = &self.get_mob_entity().living_entity.entity;
+        let world = entity.world.load();
+        world
+            .raids
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get_raid_at(&entity.block_pos.load())
+            .is_some()
+    }
+
+    /// Vanilla `Raider.isCaptain`: a patrol leader wearing the ominous banner.
     fn is_captain(&self) -> bool {
-        self.is_patrol_leader()
+        let head = self.get_mob_entity().get_item_slot(&EquipmentSlot::HEAD);
+        !head.is_empty() && is_ominous_banner(&head) && self.is_patrol_leader()
     }
 
     fn get_celebrate_sound(&self) -> Sound;

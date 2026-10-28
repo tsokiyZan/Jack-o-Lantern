@@ -92,6 +92,9 @@ impl SpongeBlock {
 
 impl BlockBehaviour for SpongeBlock {
     fn placed(&self, args: PlacedArgs<'_>) {
+        if !args.is_new_block() {
+            return;
+        }
         // Attempt to absorb water on placement
         Self::absorb_water(args.world, args.position);
     }

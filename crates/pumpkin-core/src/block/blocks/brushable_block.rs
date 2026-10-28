@@ -27,9 +27,11 @@ impl BlockBehaviour for BrushableBlock {
     }
 
     fn placed(&self, args: PlacedArgs<'_>) {
-        let entity = BrushableBlockBlockEntity::new(*args.position);
-        args.world.add_block_entity(Arc::new(entity));
-        // Vanilla `BrushableBlock.onPlace`.
+        if args.is_new_block() {
+            let entity = BrushableBlockBlockEntity::new(*args.position);
+            args.world.add_block_entity(Arc::new(entity));
+        }
+        // Vanilla `BrushableBlock.onPlace`: every state change (each dusted stage) reschedules.
         args.world
             .schedule_block_tick(args.block, *args.position, 2, TickPriority::Normal);
     }

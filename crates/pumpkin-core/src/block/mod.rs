@@ -191,6 +191,12 @@ pub trait BlockBehaviour: Send + Sync {
 
     fn on_scheduled_tick(&self, _args: OnScheduledTickArgs<'_>) {}
 
+    /// Vanilla `LiquidBlockContainer.placeLiquid`, which a bucket pouring water runs on a
+    /// waterloggable block. Returns whether the fluid went in.
+    fn place_liquid(&self, args: PlaceLiquidArgs<'_>) -> bool {
+        place_liquid_waterlogged(&args)
+    }
+
     fn on_state_replaced(&self, _args: OnStateReplacedArgs<'_>) {}
 
     // --- Redstone/Comparator Methods ---
@@ -389,6 +395,15 @@ pub struct PlacedArgs<'a> {
     pub notify: bool,
 }
 
+impl PlacedArgs<'_> {
+    /// Vanilla `!oldState.is(state.getBlock())`: `placed` runs on every state change, and most
+    /// blocks only act when the block itself is new.
+    #[must_use]
+    pub fn is_new_block(&self) -> bool {
+        Block::from_state_id(self.old_state_id) != self.block
+    }
+}
+
 pub struct PlayerPlacedArgs<'a> {
     pub world: &'a Arc<World>,
     pub block: &'a Block,
@@ -462,6 +477,35 @@ pub struct GetStateForNeighborUpdateArgs<'a> {
     pub direction: BlockDirection,
     pub neighbor_position: &'a BlockPos,
     pub neighbor_state_id: BlockStateId,
+}
+
+pub struct PlaceLiquidArgs<'a> {
+    pub world: &'a Arc<World>,
+    pub block: &'a Block,
+    pub state_id: BlockStateId,
+    pub position: &'a BlockPos,
+    pub fluid: &'a Fluid,
+}
+
+/// Vanilla `SimpleWaterloggedBlock.placeLiquid`: water into a dry block waterlogs it and
+/// schedules the water's tick.
+#[must_use]
+pub fn place_liquid_waterlogged(args: &PlaceLiquidArgs<'_>) -> bool {
+    if args.block.is_waterlogged(args.state_id) || args.fluid != &Fluid::WATER {
+        return false;
+    }
+    let Some(state_id) = args.block.set_waterlogged(args.state_id, true) else {
+        return false;
+    };
+    args.world
+        .set_block_state(args.position, state_id, BlockFlags::NOTIFY_ALL);
+    args.world.schedule_fluid_tick(
+        args.fluid,
+        *args.position,
+        args.fluid.flow_speed as i32,
+        pumpkin_world::tick::TickPriority::Normal,
+    );
+    true
 }
 
 pub struct OnScheduledTickArgs<'a> {

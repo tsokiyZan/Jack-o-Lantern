@@ -286,7 +286,7 @@ impl ArmadilloEntity {
         }
         self.mob_entity
             .living_entity
-            .drop_from_entity_interact_loot_table(ARMADILLO_BRUSH, tool);
+            .drop_from_entity_interact_loot_table(self, ARMADILLO_BRUSH, tool);
         self.play_sound_at_self(Sound::EntityArmadilloBrush, 1.0, 1.0);
         self.game_event(GameEvent::EntityInteract);
         true
@@ -442,7 +442,7 @@ impl Mob for ArmadilloEntity {
             if self
                 .mob_entity
                 .living_entity
-                .drop_from_gift_loot_table(ARMADILLO_SHED)
+                .drop_from_gift_loot_table(self, ARMADILLO_SHED)
             {
                 let pitch = {
                     let mut random = self.get_entity().random();

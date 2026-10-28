@@ -32,6 +32,9 @@ impl BlockBehaviour for TestBlock {
     }
 
     fn placed(&self, args: PlacedArgs<'_>) {
+        if !args.is_new_block() {
+            return;
+        }
         let mode = TestBlockMode::from_block_state(args.state_id).unwrap_or(TestBlockMode::Start);
         let entity = TestBlockBlockEntity::new_with_mode(*args.position, mode);
         args.world.add_block_entity(Arc::new(entity));
@@ -114,6 +117,9 @@ impl BlockBehaviour for TestInstanceBlock {
     }
 
     fn placed(&self, args: PlacedArgs<'_>) {
+        if !args.is_new_block() {
+            return;
+        }
         let entity = TestInstanceBlockBlockEntity::new(*args.position);
         args.world.add_block_entity(Arc::new(entity));
     }

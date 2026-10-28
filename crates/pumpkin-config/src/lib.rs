@@ -147,7 +147,7 @@ impl LoadConfiguration for PumpkinConfig {
 /// tweaking performance or experimental options.
 ///
 /// `Important`: The configuration should match vanilla by default.
-#[derive(Deserialize, Serialize, Default)]
+#[derive(Deserialize, Serialize)]
 #[serde(default)]
 pub struct AdvancedConfiguration {
     /// Logging-related configuration such as log levels and output behaviour.
@@ -176,6 +176,30 @@ pub struct AdvancedConfiguration {
     pub plugins: PluginsConfig,
     /// Advancement configuration
     pub advancement: AdvancementConfig,
+    /// Maximum time (in milliseconds) a single server tick is allowed to run before the server
+    /// forcibly shuts down. Set to 0 or negative to disable the watchdog entirely.
+    pub max_tick_time: i64,
+}
+
+impl Default for AdvancedConfiguration {
+    fn default() -> Self {
+        Self {
+            logging: LoggingConfig::default(),
+            resource_pack: ResourcePackConfig::default(),
+            world: LevelConfig::default(),
+            networking: NetworkingConfig::default(),
+            commands: CommandsConfig::default(),
+            chat: ChatConfig::default(),
+            pvp: PVPConfig::default(),
+            server_links: ServerLinksConfig::default(),
+            player_data: PlayerDataConfig::default(),
+            fun: FunConfig::default(),
+            recipe: RecipeConfig::default(),
+            plugins: PluginsConfig::default(),
+            advancement: AdvancementConfig::default(),
+            max_tick_time: 60_000,
+        }
+    }
 }
 
 /// Basic configuration for core server settings.

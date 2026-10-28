@@ -115,6 +115,9 @@ impl BlockBehaviour for BigDripleafBlock {
 
     /// if leaf is placed on top of another leaf, turn the lower one into a stem.
     fn placed(&self, args: PlacedArgs<'_>) {
+        if !args.is_new_block() {
+            return;
+        }
         {
             let support_pos = args.position.down();
             let (support_block, support_state_id) = args.world.get_block_and_state_id(&support_pos);

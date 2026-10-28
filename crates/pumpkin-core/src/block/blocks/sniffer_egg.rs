@@ -67,6 +67,7 @@ impl SnifferEggBlock {
 }
 
 impl BlockBehaviour for SnifferEggBlock {
+    /// Vanilla `SnifferEggBlock.onPlace`: every state change (each crack) reschedules.
     fn placed(&self, args: PlacedArgs<'_>) {
         Self::on_place_in_world(args.world, args.block, args.position);
     }
@@ -114,7 +115,6 @@ impl BlockBehaviour for SnifferEggBlock {
                 props.to_state_id(args.block),
                 BlockFlags::NOTIFY_LISTENERS,
             );
-            Self::on_place_in_world(args.world, args.block, args.position);
         }
     }
 

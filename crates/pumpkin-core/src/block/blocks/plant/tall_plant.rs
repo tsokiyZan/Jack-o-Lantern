@@ -76,6 +76,9 @@ impl BlockBehaviour for TallPlantBlock {
         Block::AIR.default_state.id
     }
     fn placed(&self, args: PlacedArgs<'_>) {
+        if !args.is_new_block() {
+            return;
+        }
         {
             let mut tall_plant_props = TallSeagrassLikeProperties::from_state_id(args.state_id);
             tall_plant_props.half = DoubleBlockHalf::Upper;

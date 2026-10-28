@@ -433,6 +433,10 @@ impl ThrownItemEntity {
 
         // `Projectile.tick`, between the move and `hitTargetOrDeflectSelf`.
         self.projectile.tick(entity);
+
+        // `Entity.tick` → `baseTick` → `checkBelowWorld`: discard if below world.
+        entity.check_out_of_world(caller);
+
         if let Some(h) = hit {
             if is_deflected(caller, &self.last_deflected_by, &h) {
                 return;

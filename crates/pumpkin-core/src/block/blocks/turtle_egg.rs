@@ -4,6 +4,7 @@ use pumpkin_data::block_properties::TurtleEggLikeProperties;
 use pumpkin_data::entity::{EntityPose, EntityType};
 use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_data::tag::Taggable;
+use pumpkin_data::world::WorldEvent;
 use pumpkin_data::{Block, BlockDirection, BlockStateId, tag};
 use pumpkin_macros::pumpkin_block;
 use pumpkin_util::math::position::BlockPos;
@@ -14,7 +15,7 @@ use uuid::Uuid;
 
 use crate::block::{
     BlockBehaviour, BlockIsReplacing, BrokenArgs, CanPlaceAtArgs, CanUpdateAtArgs, FallOnArgs,
-    GetStateForNeighborUpdateArgs, OnEntityStepArgs, OnPlaceArgs, OnScheduledTickArgs,
+    GetStateForNeighborUpdateArgs, OnEntityStepArgs, OnPlaceArgs, OnScheduledTickArgs, PlacedArgs,
     RandomTickArgs,
 };
 use crate::entity::EntityBase;
@@ -105,6 +106,18 @@ impl BlockBehaviour for TurtleEggBlock {
 
         let properties = TurtleEggProperties::default(args.block);
         properties.to_state_id(args.block)
+    }
+
+    /// Vanilla `TurtleEggBlock.onPlace`: every state change on sand (an added egg, a crack)
+    /// sends the placement particles.
+    fn placed(&self, args: PlacedArgs<'_>) {
+        if Self::on_sand(args.world.as_ref(), args.position) {
+            args.world.sync_world_event(
+                WorldEvent::ParticlesTurtleEggPlacement,
+                *args.position,
+                15,
+            );
+        }
     }
 
     fn can_place_at(&self, args: CanPlaceAtArgs<'_>) -> bool {

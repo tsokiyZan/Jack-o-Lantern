@@ -294,6 +294,9 @@ impl BlockBehaviour for CrafterBlock {
     }
 
     fn placed(&self, args: PlacedArgs<'_>) {
+        if !args.is_new_block() {
+            return;
+        }
         let state = args.world.get_block_state(args.position);
         let props = CrafterLikeProperties::from_state_id(state.id);
         let crafter_block_entity = CrafterBlockEntity::new(*args.position);

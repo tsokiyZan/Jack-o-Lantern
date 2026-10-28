@@ -76,7 +76,7 @@ impl BoggedSkeletonEntity {
         };
         let pos = entity.pos.load();
         let params = LootContextParameters {
-            this_entity: Some(entity.entity_type),
+            this_entity: Some(self),
             position: Some(pos),
             tool: Some(tool.clone()),
             ..Default::default()

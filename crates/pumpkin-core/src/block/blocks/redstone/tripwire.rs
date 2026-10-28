@@ -64,7 +64,7 @@ impl BlockBehaviour for TripwireBlock {
     }
 
     fn placed(&self, args: PlacedArgs<'_>) {
-        if Block::from_state_id(args.old_state_id) == Block::from_state_id(args.state_id) {
+        if !args.is_new_block() {
             return;
         }
 

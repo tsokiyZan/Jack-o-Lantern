@@ -354,6 +354,9 @@ impl BlockBehaviour for SignBlock {
     }
 
     fn placed(&self, args: PlacedArgs<'_>) {
+        if !args.is_new_block() {
+            return;
+        }
         if args.block.name.contains("hanging") {
             args.world
                 .add_block_entity(Arc::new(HangingSignBlockEntity::empty(*args.position)));

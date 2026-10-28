@@ -375,9 +375,9 @@ impl Mob for CreeperEntity {
             victim_living.drop_from_loot_table(
                 CHARGED_CREEPER_LOOT_TABLE,
                 &LootContextParameters {
-                    this_entity: Some(victim.get_entity().entity_type),
-                    killer_entity: Some(living.entity.entity_type),
-                    direct_killer_entity: Some(living.entity.entity_type),
+                    this_entity: Some(victim),
+                    killer_entity: Some(self),
+                    direct_killer_entity: Some(self),
                     position: Some(victim.get_entity().pos.load()),
                     ..Default::default()
                 },

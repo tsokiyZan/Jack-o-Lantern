@@ -222,7 +222,6 @@ impl BlockBehaviour for RedstoneTorchBlock {
                     props.to_state_id(block),
                     BlockFlags::NOTIFY_ALL,
                 );
-                update_neighbors(args.world, args.position);
             }
         } else if block == &Block::REDSTONE_TORCH {
             let mut props = RTorchProps::from_state_id(state.id);
@@ -234,11 +233,12 @@ impl BlockBehaviour for RedstoneTorchBlock {
                     props.to_state_id(block),
                     BlockFlags::NOTIFY_ALL,
                 );
-                update_neighbors(args.world, args.position);
             }
         }
     }
 
+    /// Vanilla `RedstoneTorchBlock.onPlace`: every state change (a lit toggle too) notifies
+    /// the neighbours, inside `setBlock`.
     fn placed(&self, args: PlacedArgs<'_>) {
         update_neighbors(args.world, args.position);
     }

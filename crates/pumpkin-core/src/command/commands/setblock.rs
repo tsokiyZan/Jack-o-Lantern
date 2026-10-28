@@ -147,6 +147,11 @@ pub fn load_block_entity_nbt(world: &Arc<World>, pos: &BlockPos, tag: &NbtCompou
     }
     block_entity_from_nbt(&after).is_some_and(|loaded| {
         world.add_block_entity(loaded);
+        // `BlockEntity.setChanged`: comparators reading the block see the new contents.
+        let (block, state) = world.get_block_and_state(pos);
+        if !state.is_air() {
+            world.update_neighbour_for_output_signal(pos, block);
+        }
         true
     })
 }

@@ -1098,7 +1098,7 @@ pub fn get_barter_response_items(tick: &BrainTick<'_>) -> Vec<ItemStack> {
         return Vec::new();
     };
     let params = LootContextParameters {
-        this_entity: Some(tick.mob.get_entity().entity_type),
+        this_entity: Some(tick.mob),
         ..Default::default()
     };
     crate::world::loot::generate_loot_from_handle(&table, tick.world, 0, &params)

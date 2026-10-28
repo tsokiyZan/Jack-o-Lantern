@@ -167,9 +167,7 @@ impl BlockBehaviour for TNTBlock {
     }
 
     fn placed(&self, args: PlacedArgs<'_>) {
-        if args.block != Block::from_state_id(args.old_state_id)
-            && block_receives_redstone_power(args.world, args.position)
-        {
+        if args.is_new_block() && block_receives_redstone_power(args.world, args.position) {
             Self::prime(args.world, args.position, None);
         }
     }
