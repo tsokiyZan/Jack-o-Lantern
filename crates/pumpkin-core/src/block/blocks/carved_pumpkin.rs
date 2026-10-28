@@ -27,7 +27,7 @@ use crate::{
 
 /// One cell of a vanilla `BlockPatternBuilder` aisle.
 #[derive(Clone, Copy)]
-enum Cell {
+pub(crate) enum Cell {
     /// `' '`: anything.
     Any,
     /// `'~'`: `BlockStateBase::isAir`.
@@ -40,6 +40,10 @@ enum Cell {
     IronBlock,
     /// `'#'` in the copper golem patterns: `BlockTags.COPPER`.
     Copper,
+    /// `'^'` in the wither patterns: a wither skeleton skull, standing or on a wall.
+    WitherSkull,
+    /// `'#'` in the wither patterns: `BlockTags.WITHER_SUMMON_BASE_BLOCKS`.
+    WitherBase,
 }
 
 impl Cell {
@@ -52,13 +56,18 @@ impl Cell {
             Self::SnowBlock => block == &Block::SNOW_BLOCK,
             Self::IronBlock => block == &Block::IRON_BLOCK,
             Self::Copper => block.has_tag(&tag::Block::MINECRAFT_COPPER),
+            Self::WitherSkull => {
+                block == &Block::WITHER_SKELETON_SKULL
+                    || block == &Block::WITHER_SKELETON_WALL_SKULL
+            }
+            Self::WitherBase => block.has_tag(&tag::Block::MINECRAFT_WITHER_SUMMON_BASE_BLOCKS),
         }
     }
 }
 
 /// Vanilla `BlockPattern` with a single aisle, which is all the golem patterns use. Rows are
 /// top to bottom, cells left to right.
-struct BlockPattern(&'static [&'static [Cell]]);
+pub(crate) struct BlockPattern(pub(crate) &'static [&'static [Cell]]);
 
 const SNOW_GOLEM_BASE: BlockPattern =
     BlockPattern(&[&[Cell::Any], &[Cell::SnowBlock], &[Cell::SnowBlock]]);
@@ -79,9 +88,9 @@ const COPPER_GOLEM_FULL: BlockPattern = BlockPattern(&[&[Cell::Pumpkin], &[Cell:
 
 /// Vanilla `BlockPattern.BlockPatternMatch`, with the states it read cached like vanilla's
 /// `LoadingCache`.
-struct BlockPatternMatch {
+pub(crate) struct BlockPatternMatch {
     front_top_left: BlockPos,
-    forwards: BlockDirection,
+    pub(crate) forwards: BlockDirection,
     up: BlockDirection,
     width: i32,
     height: i32,
@@ -90,7 +99,7 @@ struct BlockPatternMatch {
 
 impl BlockPatternMatch {
     /// Vanilla `getBlock(x, y, 0)`: the position and the state the match saw there.
-    fn get_block(&self, x: i32, y: i32) -> (BlockPos, &'static BlockState) {
+    pub(crate) fn get_block(&self, x: i32, y: i32) -> (BlockPos, &'static BlockState) {
         let pos = translate_and_rotate(self.front_top_left, self.forwards, self.up, x, y);
         (pos, self.states[(y * self.width + x) as usize])
     }
@@ -154,7 +163,7 @@ impl BlockPattern {
 
     /// Vanilla `BlockPattern.find`: every corner within the pattern's size of `origin`, in
     /// every orientation.
-    fn find(&self, world: &World, origin: &BlockPos) -> Option<BlockPatternMatch> {
+    pub(crate) fn find(&self, world: &World, origin: &BlockPos) -> Option<BlockPatternMatch> {
         let dist = self.width().max(self.height());
         // `BlockPos.betweenClosed` walks x fastest, then y, then z.
         for dz in 0..dist {
@@ -234,7 +243,7 @@ fn spawn_golem_in_world(world: &Arc<World>, found: &BlockPatternMatch, golem: Ar
 }
 
 /// Vanilla `CarvedPumpkinBlock.clearPatternBlocks`.
-fn clear_pattern_blocks(world: &Arc<World>, found: &BlockPatternMatch) {
+pub(crate) fn clear_pattern_blocks(world: &Arc<World>, found: &BlockPatternMatch) {
     for x in 0..found.width {
         for y in 0..found.height {
             let (pos, state) = found.get_block(x, y);
@@ -253,7 +262,7 @@ fn clear_pattern_blocks(world: &Arc<World>, found: &BlockPatternMatch) {
 }
 
 /// Vanilla `CarvedPumpkinBlock.updatePatternBlocks`.
-fn update_pattern_blocks(world: &Arc<World>, found: &BlockPatternMatch) {
+pub(crate) fn update_pattern_blocks(world: &Arc<World>, found: &BlockPatternMatch) {
     for x in 0..found.width {
         for y in 0..found.height {
             let (pos, _) = found.get_block(x, y);

@@ -784,6 +784,11 @@ impl BlockRegistry {
             use_item_on,
         );
 
+        // Vanilla `BlockItem.place`: no placement state fails the placement.
+        if new_state == BlockStateId::AIR {
+            return Ok(None);
+        }
+
         // Mirror vanilla obstruction checks: only entities that block building should prevent
         // placement. (e.g. arrows/xp orbs/displays/markers should not)
         let state = BlockState::from_id(new_state);
@@ -839,9 +844,10 @@ impl BlockRegistry {
             block_entity.apply_item_components(&player.inventory().get_stack_in_hand(hand));
         }
 
+        // `setPlacedBy` runs on the placed state's block (a wall banner, say, not the item's).
         self.player_placed(
             &world,
-            placed_block,
+            Block::from_state_id(new_state),
             new_state,
             &final_block_pos,
             face,

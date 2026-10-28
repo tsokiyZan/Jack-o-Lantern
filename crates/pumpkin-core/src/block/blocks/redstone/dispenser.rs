@@ -7,7 +7,7 @@ use uuid::Uuid;
 use crate::block::blocks::carved_pumpkin::can_spawn_golem;
 use crate::block::blocks::redstone::block_receives_redstone_power;
 use crate::block::blocks::tnt::TNTBlock;
-use crate::block::blocks::wither_skull::find_wither_pattern;
+use crate::block::blocks::wither_skull::{can_spawn_mob, check_spawn};
 use crate::block::registry::BlockActionResult;
 use crate::block::{
     BlockBehaviour, GetComparatorOutputArgs, GetScreenHandlerFactoryArgs, NormalUseArgs,
@@ -1235,7 +1235,7 @@ impl DispenserBlock {
 
         let summons_mob = ctx.world.get_block_state(&target).is_air()
             && if block == &Block::WITHER_SKELETON_SKULL {
-                find_wither_pattern(ctx.world, &target).is_some()
+                can_spawn_mob(ctx.world, &target)
             } else {
                 can_spawn_golem(ctx.world, &target)
             };
@@ -1252,6 +1252,9 @@ impl DispenserBlock {
             let _ = item.split(1);
             ctx.world
                 .set_block_state(&target, state_id, BlockFlags::NOTIFY_ALL);
+            if block == &Block::WITHER_SKELETON_SKULL {
+                check_spawn(ctx.world, &target);
+            }
             Self::play_dispense_effects(ctx, WorldEvent::SoundDispenserDispense);
         } else if Self::dispense_equipment(ctx, item) {
             Self::play_dispense_effects(ctx, WorldEvent::SoundDispenserDispense);

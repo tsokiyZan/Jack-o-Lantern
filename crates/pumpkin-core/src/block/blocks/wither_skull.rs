@@ -1,91 +1,98 @@
-use pumpkin_data::{
-    Block, BlockDirection, BlockState, BlockStateId, entity::EntityType, world::WorldEvent,
-};
-use pumpkin_macros::pumpkin_block;
-use pumpkin_util::math::position::BlockPos;
-use pumpkin_world::world::BlockFlags;
+use pumpkin_data::{BlockDirection, BlockId, BlockState, BlockStateId, entity::EntityType};
+use pumpkin_util::{Difficulty, math::position::BlockPos};
 use std::sync::Arc;
 
+use crate::block::blocks::carved_pumpkin::{
+    BlockPattern, Cell, clear_pattern_blocks, update_pattern_blocks,
+};
+use crate::block::blocks::skull_block::{skull_placement, update_skull_power};
 use crate::block::entities::skull::SkullBlockEntity;
 use crate::{
     block::{
-        BlockBehaviour, OnPlaceArgs, PathComputationType, PlacedArgs,
-        blocks::skull_block::SkullBlock,
+        BlockBehaviour, BlockMetadata, OnNeighborUpdateArgs, OnPlaceArgs, PathComputationType,
+        PlacedArgs, PlayerPlacedArgs,
     },
     entity::{Entity, boss::wither::WitherEntity},
     world::World,
 };
 
-pub struct WitherPattern {
-    blocks: [BlockPos; 7],
-    center: BlockPos,
-}
+/// Vanilla `WitherSkullBlock.getOrCreateWitherFull`: `"^^^", "###", "~#~"`.
+const WITHER_FULL: BlockPattern = BlockPattern(&[
+    &[Cell::WitherSkull, Cell::WitherSkull, Cell::WitherSkull],
+    &[Cell::WitherBase, Cell::WitherBase, Cell::WitherBase],
+    &[Cell::Air, Cell::WitherBase, Cell::Air],
+]);
+/// Vanilla `WitherSkullBlock.getOrCreateWitherBase`: `"   ", "###", "~#~"`.
+const WITHER_BASE: BlockPattern = BlockPattern(&[
+    &[Cell::Any, Cell::Any, Cell::Any],
+    &[Cell::WitherBase, Cell::WitherBase, Cell::WitherBase],
+    &[Cell::Air, Cell::WitherBase, Cell::Air],
+]);
 
+/// Vanilla `WitherSkullBlock.canSpawnMob`, for a dispensed wither skeleton skull.
 #[must_use]
-pub fn find_wither_pattern(world: &Arc<World>, skull_pos: &BlockPos) -> Option<WitherPattern> {
-    let is_soul_block = |block: &Block| block == &Block::SOUL_SAND || block == &Block::SOUL_SOIL;
-    let is_skull =
-        |pos: &BlockPos| pos == skull_pos || world.get_block(pos) == &Block::WITHER_SKELETON_SKULL;
-
-    for dir in [BlockDirection::North, BlockDirection::West] {
-        let opposite = dir.opposite();
-        for center in [
-            *skull_pos,
-            skull_pos.offset(opposite.to_offset()),
-            skull_pos.offset(dir.to_offset()),
-        ] {
-            let top_middle = center.down();
-            let base = top_middle.down();
-            let arm1 = top_middle.offset(dir.to_offset());
-            let arm2 = top_middle.offset(opposite.to_offset());
-            let skull1_pos = arm1.up();
-            let skull2_pos = arm2.up();
-
-            if is_soul_block(world.get_block(&top_middle))
-                && is_soul_block(world.get_block(&base))
-                && is_soul_block(world.get_block(&arm1))
-                && is_soul_block(world.get_block(&arm2))
-                && is_skull(&center)
-                && is_skull(&skull1_pos)
-                && is_skull(&skull2_pos)
-            {
-                return Some(WitherPattern {
-                    blocks: [center, skull1_pos, skull2_pos, top_middle, arm1, arm2, base],
-                    center: top_middle,
-                });
-            }
-        }
-    }
-
-    None
+pub fn can_spawn_mob(world: &World, pos: &BlockPos) -> bool {
+    pos.0.y >= world.min_y + 2
+        && world.level_info.load().difficulty != Difficulty::Peaceful
+        && WITHER_BASE.find(world, pos).is_some()
 }
 
-fn spawn_wither(world: &Arc<World>, pattern: &WitherPattern) {
-    for pos in pattern.blocks {
-        world.set_block_state(&pos, Block::AIR.default_state.id, BlockFlags::NOTIFY_ALL);
-        world.sync_world_event(
-            WorldEvent::ParticlesDestroyBlock,
-            pos,
-            Block::SOUL_SAND.default_state.id.as_u16().into(),
-        );
+/// Vanilla `WitherSkullBlock.checkSpawn`: a skull completing the pattern clears it and
+/// summons an invulnerable wither at its bottom middle, facing across the pattern.
+// TODO: `CriteriaTriggers.SUMMONED_ENTITY` for players within 50 blocks.
+pub fn check_spawn(world: &Arc<World>, pos: &BlockPos) {
+    let block = world.get_block(pos);
+    let correct_block = block.id == BlockId::WITHER_SKELETON_SKULL
+        || block.id == BlockId::WITHER_SKELETON_WALL_SKULL;
+    if !correct_block
+        || pos.0.y < world.min_y
+        || world.level_info.load().difficulty == Difficulty::Peaceful
+    {
+        return;
     }
-
+    let Some(found) = WITHER_FULL.find(world, pos) else {
+        return;
+    };
+    clear_pattern_blocks(world, &found);
+    let (spawn_pos, _) = found.get_block(1, 2);
+    let yaw = if matches!(found.forwards, BlockDirection::East | BlockDirection::West) {
+        0.0
+    } else {
+        90.0
+    };
     let entity = Entity::new(
         world.clone(),
-        pattern.center.to_centered_f64(),
+        pumpkin_util::math::vector3::Vector3::new(
+            f64::from(spawn_pos.0.x) + 0.5,
+            f64::from(spawn_pos.0.y) + 0.55,
+            f64::from(spawn_pos.0.z) + 0.5,
+        ),
         &EntityType::WITHER,
     );
+    entity.set_rotation(yaw, 0.0);
+    entity.body_yaw.store(yaw);
     let wither = WitherEntity::new(entity);
     wither.make_invulnerable();
     world.spawn_entity(wither);
+    update_pattern_blocks(world, &found);
 }
 
-#[pumpkin_block("wither_skeleton_skull")]
+/// Vanilla `WitherSkullBlock` and `WitherWallSkullBlock`.
 pub struct WitherSkeletonSkullBlock;
+
+impl BlockMetadata for WitherSkeletonSkullBlock {
+    fn ids() -> Box<[BlockId]> {
+        [
+            BlockId::WITHER_SKELETON_SKULL,
+            BlockId::WITHER_SKELETON_WALL_SKULL,
+        ]
+        .into()
+    }
+}
 
 impl BlockBehaviour for WitherSkeletonSkullBlock {
     fn on_place(&self, args: OnPlaceArgs<'_>) -> BlockStateId {
-        SkullBlock::on_place(&SkullBlock, args)
+        skull_placement(&args)
     }
 
     fn placed(&self, args: PlacedArgs<'_>) {
@@ -94,10 +101,15 @@ impl BlockBehaviour for WitherSkeletonSkullBlock {
         }
         args.world
             .add_block_entity(Arc::new(SkullBlockEntity::new(*args.position)));
+    }
 
-        if let Some(pattern) = find_wither_pattern(args.world, args.position) {
-            spawn_wither(args.world, &pattern);
-        }
+    /// Vanilla `WitherSkullBlock.setPlacedBy` (and the wall skull's): `checkSpawn`.
+    fn player_placed(&self, args: PlayerPlacedArgs<'_>) {
+        check_spawn(args.world, args.position);
+    }
+
+    fn on_neighbor_update(&self, args: OnNeighborUpdateArgs<'_>) {
+        update_skull_power(&args);
     }
 
     fn is_pathfindable(&self, _state: &BlockState, _computation_type: PathComputationType) -> bool {

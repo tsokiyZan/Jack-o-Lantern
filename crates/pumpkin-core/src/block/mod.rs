@@ -530,6 +530,52 @@ pub fn projectile_may_interact(world: &World, projectile: &dyn EntityBase, pos: 
     })
 }
 
+/// Vanilla `BlockPlaceContext.getNearestLookingDirections`.
+///
+/// The player's directions, nearest first, with the direction into the clicked block moved to
+/// the front unless the placement replaces the clicked block.
+#[must_use]
+pub fn nearest_looking_directions(
+    args: &OnPlaceArgs<'_>,
+) -> [pumpkin_data::block_properties::Facing; 6] {
+    let mut directions = args.player.get_entity().get_entity_facing_order();
+    if *args.position != args.use_item_on.position {
+        let face = args.direction.to_facing();
+        if let Some(i) = directions.iter().position(|direction| *direction == face)
+            && i > 0
+        {
+            directions.copy_within(0..i, 1);
+            directions[0] = face;
+        }
+    }
+    directions
+}
+
+/// Vanilla `StandingAndWallBlockItem.getPlacementState` with `attachmentDirection` DOWN.
+///
+/// The first looking direction other than up that gives a state which survives: the standing
+/// state for down, the wall state otherwise.
+pub fn standing_and_wall_placement(
+    args: &OnPlaceArgs<'_>,
+    standing: BlockStateId,
+    wall: Option<BlockStateId>,
+    can_survive: impl Fn(BlockStateId) -> bool,
+) -> BlockStateId {
+    for direction in nearest_looking_directions(args) {
+        let state = match direction {
+            pumpkin_data::block_properties::Facing::Up => continue,
+            pumpkin_data::block_properties::Facing::Down => Some(standing),
+            _ => wall,
+        };
+        if let Some(state) = state
+            && can_survive(state)
+        {
+            return state;
+        }
+    }
+    BlockStateId::AIR
+}
+
 pub struct OnScheduledTickArgs<'a> {
     pub world: &'a Arc<World>,
     pub block: &'a Block,

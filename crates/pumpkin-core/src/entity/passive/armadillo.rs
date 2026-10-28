@@ -557,8 +557,7 @@ impl Mob for ArmadilloEntity {
     }
 }
 
-impl ArmadilloEntity {
-}
+impl ArmadilloEntity {}
 
 /// Vanilla `armadillo -> !armadillo.isScared()`, the predicate spiders flee armadillos by.
 pub fn armadillo_not_scared(target: &crate::entity::living::LivingEntity) -> bool {
