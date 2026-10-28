@@ -174,6 +174,13 @@ pub trait Animal: Mob {
             }
         }
 
+        // `super.mobInteract`: `AgeableMob`'s golden dandelion.
+        if let Some(ageable) = self.as_ageable()
+            && crate::entity::ageable::golden_dandelion_interact(ageable, player, item_stack)
+        {
+            return InteractionResult::SUCCESS;
+        }
+
         InteractionResult::PASS
     }
 }

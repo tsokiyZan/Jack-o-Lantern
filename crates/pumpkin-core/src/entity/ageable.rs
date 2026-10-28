@@ -346,3 +346,37 @@ const fn default_ageable_group_data(entity_type: &EntityType) -> SpawnGroupData 
         _ => SpawnGroupData::ageable(DEFAULT_BABY_SPAWN_CHANCE),
     }
 }
+
+/// Vanilla `AgeableMob.mobInteract`'s golden dandelion.
+///
+/// A baby the player holds one at toggles its age lock (`setAgeLockedData`: the lock flipped,
+/// the age back to the baby start, the particle timer at 40). Returns whether it took the
+/// interaction.
+pub fn golden_dandelion_interact(
+    ageable: &dyn AgeableMob,
+    player: &Player,
+    item_in_hand: &mut ItemStack,
+) -> bool {
+    let mob: &dyn Mob = ageable;
+    let data = ageable.get_ageable_data();
+    if !can_use_golden_dandelion(
+        item_in_hand,
+        ageable.is_baby(),
+        data.age_lock_particle_timer.load(Relaxed),
+        mob,
+    ) {
+        return false;
+    }
+    set_age_locked_by_player(
+        mob,
+        || ageable.is_age_locked(),
+        player,
+        item_in_hand,
+        || {
+            ageable.set_age_locked(!ageable.is_age_locked());
+            ageable.set_age(ageable.get_baby_start_age());
+            data.age_lock_particle_timer.store(40, Relaxed);
+        },
+    );
+    true
+}
