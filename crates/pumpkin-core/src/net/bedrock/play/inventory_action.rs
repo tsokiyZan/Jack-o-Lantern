@@ -299,6 +299,9 @@ impl BedrockClient {
                         }
                         if item_used {
                             player.award_item_used(before.item);
+                            crate::item::registry::ItemRegistry::apply_use_on_cooldown(
+                                player, &before,
+                            );
                         }
                         if before.is_damageable() && stack.is_empty() {
                             player.increment_stat(

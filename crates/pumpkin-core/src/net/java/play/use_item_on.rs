@@ -190,6 +190,7 @@ impl JavaClient {
         // `ItemStack.useOn`: an item interaction that succeeded.
         if item_result.consumes_action() {
             player.award_item_used(before.item);
+            crate::item::registry::ItemRegistry::apply_use_on_cooldown(player, &before);
         }
 
         let after = item.clone();

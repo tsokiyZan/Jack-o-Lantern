@@ -154,25 +154,27 @@ impl ItemRegistry {
         block: &Block,
         server: &Server,
     ) -> BlockActionResult {
-        let cooldown = stack.get_use_cooldown().cloned();
-        let cooldown_group = cooldown_group(stack);
-
-        if player.is_on_cooldown(&cooldown_group) {
+        if player.is_on_cooldown(&cooldown_group(stack)) {
             return BlockActionResult::Pass;
         }
 
         let pumpkin_item = self.get_pumpkin_item(stack.item.id);
-        let result = pumpkin_item.map_or(BlockActionResult::Pass, |pumpkin_item| {
+        pumpkin_item.map_or(BlockActionResult::Pass, |pumpkin_item| {
             pumpkin_item.use_on_block(
                 stack, player, hand, location, face, cursor_pos, block, server,
             )
-        });
+        })
+    }
 
-        if let Some(cooldown) = cooldown {
-            player.start_cooldown(cooldown_group, (cooldown.seconds * 20.0) as i32);
+    /// The `use_cooldown` part of vanilla `ItemStack.applyAfterUseComponentSideEffects`, which
+    /// `ItemStack.useOn` runs only for a successful item interaction (a placement included).
+    pub fn apply_use_on_cooldown(player: &Player, stack_before_use: &ItemStack) {
+        if let Some(cooldown) = stack_before_use.get_use_cooldown() {
+            player.start_cooldown(
+                cooldown_group(stack_before_use),
+                (cooldown.seconds * 20.0) as i32,
+            );
         }
-
-        result
     }
 
     /// Vanilla `ItemStack.interactLivingEntity`: uses `stack`, the stack in `hand`, on `entity`.
