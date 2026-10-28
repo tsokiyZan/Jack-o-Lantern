@@ -267,8 +267,9 @@ impl Mob for TurtleEntity {
         group_data: Option<SpawnGroupData>,
     ) -> Option<SpawnGroupData> {
         self.home_pos.store(self.get_entity().block_pos.load());
+        let group_data = self.finalize_ageable_spawn(group_data);
         self.mob_entity.finalize_spawn_base();
-        group_data
+        Some(group_data)
     }
 
     /// Vanilla `Turtle.playStepSound`.

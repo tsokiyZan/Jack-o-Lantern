@@ -2354,6 +2354,11 @@ pub trait Mob: EntityBase + Send + Sync {
         _reason: crate::entity::mob::spawn::EntitySpawnReason,
         group_data: Option<spawn::SpawnGroupData>,
     ) -> Option<spawn::SpawnGroupData> {
+        // `AgeableMob.finalizeSpawn`'s baby roll comes before `Mob.finalizeSpawn`.
+        let group_data = match self.as_ageable() {
+            Some(ageable) => Some(ageable.finalize_ageable_spawn(group_data)),
+            None => group_data,
+        };
         self.get_mob_entity().finalize_spawn_base();
         group_data
     }

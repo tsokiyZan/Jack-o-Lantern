@@ -1,3 +1,4 @@
+use pumpkin_data::entity::EntityType;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::particle::Particle;
@@ -150,7 +151,7 @@ pub trait AgeableMob: Mob {
         let mut group_data = match group_data {
             Some(data @ SpawnGroupData::Ageable { .. }) => data,
             // Vanilla's `AgeableMobGroupData(true)`.
-            _ => SpawnGroupData::ageable(DEFAULT_BABY_SPAWN_CHANCE),
+            _ => default_ageable_group_data(self.get_entity().entity_type),
         };
         if let SpawnGroupData::Ageable {
             group_size,
@@ -308,4 +309,40 @@ pub fn set_age_locked_by_player(
         SoundCategory::Players,
         &entity.block_pos.load().to_centered_f64(),
     );
+}
+
+/// The group data an ageable mob's `finalizeSpawn` starts when it gets none: vanilla
+/// `AgeableMob`'s `AgeableMobGroupData(true)` unless the class makes its own first.
+const fn default_ageable_group_data(entity_type: &EntityType) -> SpawnGroupData {
+    match entity_type.id {
+        // `AbstractVillager`, `TraderLlama`, `Parrot`, `Wolf.WolfPackData`,
+        // `Fox.FoxGroupData` and `Axolotl.AxolotlGroupData`: `(false)`.
+        id if id == EntityType::VILLAGER.id
+            || id == EntityType::WANDERING_TRADER.id
+            || id == EntityType::TRADER_LLAMA.id
+            || id == EntityType::PARROT.id
+            || id == EntityType::WOLF.id
+            || id == EntityType::FOX.id
+            || id == EntityType::AXOLOTL.id =>
+        {
+            SpawnGroupData::ageable_without_babies()
+        }
+        // `AbstractHorse` (`Horse` and `Llama` make their own `(true)` group first).
+        id if id == EntityType::DONKEY.id
+            || id == EntityType::MULE.id
+            || id == EntityType::SKELETON_HORSE.id
+            || id == EntityType::ZOMBIE_HORSE.id
+            || id == EntityType::CAMEL.id
+            || id == EntityType::CAMEL_HUSK.id =>
+        {
+            SpawnGroupData::ageable(0.2)
+        }
+        // `PolarBear`, `Rabbit.RabbitGroupData`.
+        id if id == EntityType::POLAR_BEAR.id || id == EntityType::RABBIT.id => {
+            SpawnGroupData::ageable(1.0)
+        }
+        // `Strider`, away from its jockey path.
+        id if id == EntityType::STRIDER.id => SpawnGroupData::ageable(0.5),
+        _ => SpawnGroupData::ageable(DEFAULT_BABY_SPAWN_CHANCE),
+    }
 }

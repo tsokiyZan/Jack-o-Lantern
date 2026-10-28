@@ -46,6 +46,16 @@ pub enum SpawnGroupData {
 }
 
 impl SpawnGroupData {
+    /// Vanilla `AgeableMobGroupData(false)`: the group never spawns babies.
+    #[must_use]
+    pub const fn ageable_without_babies() -> Self {
+        Self::Ageable {
+            group_size: 0,
+            should_spawn_baby: false,
+            baby_spawn_chance: 0.05,
+        }
+    }
+
     /// Vanilla `AgeableMobGroupData(babySpawnChance)`.
     #[must_use]
     pub const fn ageable(baby_spawn_chance: f32) -> Self {
