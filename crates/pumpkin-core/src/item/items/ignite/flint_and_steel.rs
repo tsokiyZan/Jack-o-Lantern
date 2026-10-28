@@ -6,8 +6,10 @@ use crate::item::ItemMetadata;
 use crate::server::Server;
 use crate::world::World;
 use pumpkin_data::BlockDirection;
+use pumpkin_data::game_event::GameEvent;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
+use pumpkin_data::sound::{Sound, SoundCategory};
 use pumpkin_data::{Block, BlockStateId};
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
@@ -61,7 +63,24 @@ impl ItemBehaviour for FlintAndSteelItem {
 
         let ignited = Ignition::ignite_block(
             |world: Arc<World>, pos: BlockPos, new_state_id: BlockStateId| {
+                let pitch = world.random_f32() * 0.4 + 0.8;
+                world.play_sound_raw_expect(
+                    player,
+                    Sound::ItemFlintandsteelUse as u16,
+                    SoundCategory::Blocks,
+                    &pos.to_centered_f64(),
+                    1.0,
+                    pitch,
+                );
                 world.set_block_state(&pos, new_state_id, BlockFlags::NOTIFY_ALL);
+                // Vanilla `FlintAndSteelItem.useOn` emits `BLOCK_PLACE` at the clicked block,
+                // not at the fire.
+                let event = if pos == location {
+                    GameEvent::BlockChange
+                } else {
+                    GameEvent::BlockPlace
+                };
+                world.game_event_from(Some(player), event, location.to_centered_f64());
             },
             &world,
             location,

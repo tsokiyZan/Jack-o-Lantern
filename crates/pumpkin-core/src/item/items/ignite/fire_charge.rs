@@ -1,4 +1,5 @@
 use pumpkin_data::BlockDirection;
+use pumpkin_data::game_event::GameEvent;
 use pumpkin_data::item::Item;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::Sound;
@@ -7,7 +8,6 @@ use pumpkin_data::{Block, BlockStateId};
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
 use pumpkin_world::world::BlockFlags;
-use rand::{RngExt, rng};
 use std::sync::Arc;
 
 use crate::block::registry::BlockActionResult;
@@ -61,9 +61,7 @@ impl ItemBehaviour for FireChargeItem {
 
         let ignited = Ignition::ignite_block(
             |world: Arc<World>, pos: BlockPos, new_state_id: BlockStateId| {
-                world.set_block_state(&pos, new_state_id, BlockFlags::NOTIFY_ALL);
-
-                let pitch = (rng().random::<f32>() - rng().random::<f32>()) * 0.2 + 1.0;
+                let pitch = (world.random_f32() - world.random_f32()) * 0.2 + 1.0;
                 world.play_sound_fine(
                     Sound::ItemFirechargeUse,
                     SoundCategory::Blocks,
@@ -71,6 +69,13 @@ impl ItemBehaviour for FireChargeItem {
                     1.0,
                     pitch,
                 );
+                world.set_block_state(&pos, new_state_id, BlockFlags::NOTIFY_ALL);
+                let event = if pos == location {
+                    GameEvent::BlockChange
+                } else {
+                    GameEvent::BlockPlace
+                };
+                world.game_event_from(Some(player), event, pos.to_centered_f64());
             },
             &world,
             location,
