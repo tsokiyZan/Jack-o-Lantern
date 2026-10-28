@@ -106,7 +106,12 @@ impl BlockBehaviour for CampfireBlock {
 
     fn on_projectile_hit(&self, args: OnProjectileHitArgs<'_>) {
         let props = CampfireLikeProperties::from_state_id(args.state.id);
-        if !args.projectile.get_entity().is_on_fire() || props.lit || props.waterlogged {
+        // Vanilla `CampfireBlock.onProjectileHit`.
+        if !args.projectile.get_entity().is_on_fire()
+            || !crate::block::projectile_may_interact(args.world, args.projectile, args.position)
+            || props.lit
+            || props.waterlogged
+        {
             return;
         }
 

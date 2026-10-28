@@ -508,6 +508,29 @@ pub fn place_liquid_waterlogged(args: &PlaceLiquidArgs<'_>) -> bool {
     true
 }
 
+/// Vanilla `Projectile.mayInteract`: a player owner's own `mayInteract` (spawn protection and
+/// the world border), else no owner or `mob_griefing`.
+#[must_use]
+pub fn projectile_may_interact(world: &World, projectile: &dyn EntityBase, pos: &BlockPos) -> bool {
+    let owner = projectile
+        .get_owner_id()
+        .and_then(|id| world.get_entity_by_id(id));
+    match owner {
+        Some(owner) => match owner.get_player() {
+            Some(player) => {
+                !world.is_in_spawn_protection(player, pos)
+                    && world
+                        .worldborder
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner)
+                        .contains_block(pos.0.x, pos.0.z)
+            }
+            None => world.level_info.load().game_rules.mob_griefing,
+        },
+        None => true,
+    }
+}
+
 pub struct OnScheduledTickArgs<'a> {
     pub world: &'a Arc<World>,
     pub block: &'a Block,

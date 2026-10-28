@@ -190,7 +190,9 @@ impl BlockBehaviour for TNTBlock {
 
     fn on_projectile_hit(&self, args: OnProjectileHitArgs<'_>) {
         // Vanilla `TntBlock.onProjectileHit`: the projectile's owner lights it, when living.
-        if args.projectile.get_entity().is_on_fire() {
+        if args.projectile.get_entity().is_on_fire()
+            && crate::block::projectile_may_interact(args.world, args.projectile, args.position)
+        {
             let owner = args
                 .projectile
                 .get_owner_id()
