@@ -781,6 +781,7 @@ impl Explosion {
                     block,
                     position: pos,
                     tool: None,
+                    drop_experience,
                 });
             }
             if drop_experience {

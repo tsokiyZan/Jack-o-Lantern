@@ -1055,6 +1055,7 @@ impl BlockRegistry {
                 block,
                 position,
                 tool,
+                drop_experience: true,
             });
         }
     }

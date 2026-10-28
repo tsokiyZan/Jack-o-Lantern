@@ -25,10 +25,11 @@ impl BlockBehaviour for SpawnerBlock {
         }
     }
 
-    /// Vanilla `SpawnerBlock.spawnAfterBreak`: 15 + nextInt(15) + nextInt(15) experience from
-    /// the level random, through `popExperience` (which needs `block_drops`).
+    /// Vanilla `SpawnerBlock.spawnAfterBreak`: with `dropExperience`, 15 + nextInt(15) +
+    /// nextInt(15) experience from the level random, through `popExperience` (which needs
+    /// `block_drops`).
     fn spawn_after_break(&self, args: SpawnAfterBreakArgs<'_>) {
-        if !args.world.level_info.load().game_rules.block_drops {
+        if !args.drop_experience || !args.world.level_info.load().game_rules.block_drops {
             return;
         }
         let magic_count = {
