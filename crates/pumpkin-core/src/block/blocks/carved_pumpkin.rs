@@ -253,7 +253,7 @@ pub(crate) fn clear_pattern_blocks(world: &Arc<World>, found: &BlockPatternMatch
                 BlockFlags::NOTIFY_LISTENERS,
             );
             world.sync_world_event(
-                WorldEvent::ParticlesDestroyBlock,
+                WorldEvent::ParticlesAndSoundDestroyBlock,
                 pos,
                 i32::from(state.id.as_u16()),
             );

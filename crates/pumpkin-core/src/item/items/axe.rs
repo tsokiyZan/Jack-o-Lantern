@@ -4,7 +4,6 @@ use crate::enchantment::HurtAndBreak;
 use crate::entity::player::Player;
 use crate::item::{ItemBehaviour, ItemMetadata};
 use crate::server::Server;
-use pumpkin_data::block_properties::{DoubleBlockHalf, OakDoorLikeProperties};
 use pumpkin_data::block_transformer::AXE;
 use pumpkin_data::item_stack::ItemStack;
 use pumpkin_data::sound::SoundCategory;
@@ -62,33 +61,7 @@ impl ItemBehaviour for AxeItem {
                 }
             }
 
-            if block.has_tag(&tag::Block::MINECRAFT_DOORS) {
-                let door_props = OakDoorLikeProperties::from_state_id(current_state_id);
-                let other_half_pos = match door_props.half {
-                    DoubleBlockHalf::Lower => location.up(),
-                    DoubleBlockHalf::Upper => location.down(),
-                };
-                let (other_block, other_state_id) = world.get_block_and_state_id(&other_half_pos);
-                if other_block == block {
-                    let other_new_state_id = if result.target_block.states.len() <= 1 {
-                        result.target_block.default_state.id
-                    } else if let Some(other_props) = other_block.properties(other_state_id) {
-                        let props = other_props.to_props();
-                        result
-                            .target_block
-                            .from_properties(&props)
-                            .to_state_id(result.target_block)
-                    } else {
-                        result.target_block.default_state.id
-                    };
-                    world.set_block_state(
-                        &other_half_pos,
-                        other_new_state_id,
-                        BlockFlags::NOTIFY_ALL,
-                    );
-                }
-            }
-
+            // The other half of a door or double copper chest follows through its updateShape.
             world.set_block_state(&location, result.new_state_id, BlockFlags::NOTIFY_ALL);
 
             if player.gamemode.load() != GameMode::Creative {

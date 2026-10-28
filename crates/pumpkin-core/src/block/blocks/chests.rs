@@ -6,6 +6,7 @@ use crate::block::entities::trapped_chest::TrappedChestBlockEntity;
 use pumpkin_data::BlockStateId;
 use pumpkin_data::block_properties::{ChestLikeProperties, ChestType, HorizontalFacing};
 use pumpkin_data::entity::{EntityPose, EntityType};
+use pumpkin_data::fluid::Fluid;
 use pumpkin_data::sound::Sound;
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_data::{Block, BlockDirection, BlockId, translation};
@@ -22,12 +23,11 @@ use pumpkin_util::math::boundingbox::BoundingBox;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::text::TextComponent;
 use pumpkin_world::tick::TickPriority;
-use pumpkin_world::world::BlockFlags;
 use std::sync::Mutex;
 
 use crate::block::{
-    BlockBehaviour, BrokenArgs, EmitsRedstonePowerArgs, GetComparatorOutputArgs,
-    GetRedstonePowerArgs, GetScreenHandlerFactoryArgs, NormalUseArgs, OnPlaceArgs,
+    BlockBehaviour, EmitsRedstonePowerArgs, GetComparatorOutputArgs, GetRedstonePowerArgs,
+    GetScreenHandlerFactoryArgs, GetStateForNeighborUpdateArgs, NormalUseArgs, OnPlaceArgs,
     OnScheduledTickArgs, OnSyncedBlockEventArgs, PathComputationType, PlacedArgs, RandomTickArgs,
     registry::BlockActionResult,
 };
@@ -111,30 +111,6 @@ fn placed_chest_impl<E: BlockEntity + 'static>(
     }
     let chest = create_entity(*args.position);
     args.world.add_block_entity(Arc::new(chest));
-
-    let chest_props = ChestLikeProperties::from_state_id(args.state_id);
-    let connected_towards = match chest_props.r#type {
-        ChestType::Single => return,
-        ChestType::Left => chest_props.facing.rotate_clockwise(),
-        ChestType::Right => chest_props.facing.rotate_counter_clockwise(),
-    };
-
-    if let Some(mut neighbor_props) = get_chest_properties_if_can_connect(
-        args.world,
-        args.block,
-        args.position,
-        chest_props.facing,
-        connected_towards,
-        ChestType::Single,
-    ) {
-        neighbor_props.r#type = chest_props.r#type.opposite();
-
-        args.world.set_block_state(
-            &args.position.offset(connected_towards.to_offset()),
-            neighbor_props.to_state_id(args.block),
-            BlockFlags::NOTIFY_LISTENERS,
-        );
-    }
 }
 
 /// Vanilla `ChestBlock.getConnectedDirection`, or `None` for a single chest.
@@ -449,32 +425,6 @@ fn normal_use_chest_impl(args: &NormalUseArgs<'_>) -> BlockActionResult {
     BlockActionResult::Success
 }
 
-fn broken_chest_impl(args: &BrokenArgs<'_>) {
-    let chest_props = ChestLikeProperties::from_state_id(args.state.id);
-    let connected_towards = match chest_props.r#type {
-        ChestType::Single => return,
-        ChestType::Left => chest_props.facing.rotate_clockwise(),
-        ChestType::Right => chest_props.facing.rotate_counter_clockwise(),
-    };
-
-    if let Some(mut neighbor_props) = get_chest_properties_if_can_connect(
-        args.world,
-        args.block,
-        args.position,
-        chest_props.facing,
-        connected_towards,
-        chest_props.r#type.opposite(),
-    ) {
-        neighbor_props.r#type = ChestType::Single;
-
-        args.world.set_block_state(
-            &args.position.offset(connected_towards.to_offset()),
-            neighbor_props.to_state_id(args.block),
-            BlockFlags::NOTIFY_LISTENERS,
-        );
-    }
-}
-
 #[pumpkin_block_from_tag("c:chests/wooden")]
 pub struct ChestBlock;
 
@@ -502,8 +452,11 @@ impl BlockBehaviour for ChestBlock {
         get_chest_screen_handler_factory(args)
     }
 
-    fn broken(&self, args: BrokenArgs<'_>) {
-        broken_chest_impl(&args);
+    fn get_state_for_neighbor_update(
+        &self,
+        args: GetStateForNeighborUpdateArgs<'_>,
+    ) -> BlockStateId {
+        chest_update_shape(&args)
     }
 
     fn get_comparator_output(&self, args: GetComparatorOutputArgs<'_>) -> Option<u8> {
@@ -582,8 +535,11 @@ impl BlockBehaviour for CopperChestBlock {
         get_chest_screen_handler_factory(args)
     }
 
-    fn broken(&self, args: BrokenArgs<'_>) {
-        broken_chest_impl(&args);
+    fn get_state_for_neighbor_update(
+        &self,
+        args: GetStateForNeighborUpdateArgs<'_>,
+    ) -> BlockStateId {
+        chest_update_shape(&args)
     }
 
     fn random_tick(&self, args: RandomTickArgs<'_>) {
@@ -653,8 +609,11 @@ impl BlockBehaviour for TrappedChestBlock {
         get_chest_screen_handler_factory(args)
     }
 
-    fn broken(&self, args: BrokenArgs<'_>) {
-        broken_chest_impl(&args);
+    fn get_state_for_neighbor_update(
+        &self,
+        args: GetStateForNeighborUpdateArgs<'_>,
+    ) -> BlockStateId {
+        chest_update_shape(&args)
     }
 
     fn emits_redstone_power(&self, _args: EmitsRedstonePowerArgs<'_>) -> bool {
@@ -764,6 +723,58 @@ fn compute_chest_props(
     }
 }
 
+/// Vanilla `ChestBlock.chestCanConnectTo`: the same block, or for `CopperChestBlock` any
+/// copper chest.
+fn chest_can_connect_to(block: &Block, neighbor: &Block) -> bool {
+    if block.has_tag(&tag::Block::MINECRAFT_COPPER_CHESTS) {
+        neighbor.has_tag(&tag::Block::MINECRAFT_COPPER_CHESTS)
+    } else {
+        neighbor == block
+    }
+}
+
+/// Vanilla `ChestBlock.updateShape` and `CopperChestBlock.updateShape`: a single chest pairs
+/// with a neighbouring half facing the same way and turned towards it, a half whose other half
+/// goes is single again, and a copper half takes the block of the copper half it is joined to.
+fn chest_update_shape(args: &GetStateForNeighborUpdateArgs<'_>) -> BlockStateId {
+    let mut props = ChestLikeProperties::from_state_id(args.state_id);
+    if props.waterlogged {
+        args.world.schedule_fluid_tick(
+            &Fluid::WATER,
+            *args.position,
+            Fluid::WATER.flow_speed as i32,
+            TickPriority::Normal,
+        );
+    }
+    let neighbor_block = Block::from_state_id(args.neighbor_state_id);
+    let can_connect = chest_can_connect_to(args.block, neighbor_block);
+    let direction = args.direction.to_horizontal_facing();
+    let mut state_id = args.state_id;
+    if can_connect && let Some(direction) = direction {
+        let neighbor = ChestLikeProperties::from_state_id(args.neighbor_state_id);
+        if props.r#type == ChestType::Single
+            && neighbor.r#type != ChestType::Single
+            && props.facing == neighbor.facing
+            && get_connected_direction(args.neighbor_state_id) == Some(direction.opposite())
+        {
+            props.r#type = neighbor.r#type.opposite();
+            state_id = props.to_state_id(args.block);
+        }
+    } else if direction.is_some() && get_connected_direction(args.state_id) == direction {
+        props.r#type = ChestType::Single;
+        state_id = props.to_state_id(args.block);
+    }
+    // `CopperChestBlock.updateShape`: `neighbourState.getBlock().withPropertiesOf(state)`.
+    if args.block.has_tag(&tag::Block::MINECRAFT_COPPER_CHESTS)
+        && can_connect
+        && direction.is_some()
+        && get_connected_direction(state_id) == direction
+    {
+        return ChestLikeProperties::from_state_id(state_id).to_state_id(neighbor_block);
+    }
+    state_id
+}
+
 fn get_chest_properties_if_can_connect(
     world: &World,
     block: &Block,
@@ -775,7 +786,7 @@ fn get_chest_properties_if_can_connect(
     let (neighbor_block, neighbor_block_state) =
         world.get_block_and_state_id(&block_pos.offset(direction.to_offset()));
 
-    if neighbor_block != block {
+    if !chest_can_connect_to(block, neighbor_block) {
         return None;
     }
 
