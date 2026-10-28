@@ -1,12 +1,16 @@
 use std::sync::Arc;
 
 use pumpkin_data::{
-    Block, BlockStateId, block_properties::MangrovePropaguleLikeProperties, tag, tag::Taggable,
+    Block, BlockStateId, block_properties::MangrovePropaguleLikeProperties, fluid::Fluid, tag,
+    tag::Taggable,
 };
 use pumpkin_macros::pumpkin_block;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::random::{RandomGenerator, xoroshiro128::Xoroshiro};
-use pumpkin_world::world::{BlockAccessor, BlockFlags};
+use pumpkin_world::{
+    tick::TickPriority,
+    world::{BlockAccessor, BlockFlags},
+};
 
 use crate::block::blocks::plant::tree_grower::TreeGrower;
 use crate::block::{
@@ -61,13 +65,14 @@ impl MangrovePropaguleBlock {
         pos: &BlockPos,
         block: &Block,
         mut props: MangrovePropaguleLikeProperties,
+        bone_meal: bool,
     ) {
         if props.stage == 0 {
             props.stage = 1;
             world.set_block_state(pos, props.to_state_id(block), BlockFlags::NOTIFY_ALL);
         } else {
             use crate::plugin::api::events::world::structure_grow::{StructureGrowEvent, TreeType};
-            let mut event = StructureGrowEvent::new(*pos, TreeType::Mangrove, false);
+            let mut event = StructureGrowEvent::new(*pos, TreeType::Mangrove, bone_meal);
             if let Some(server) = world.server.upgrade() {
                 server.plugin_manager.fire_blocking(&server, &mut event);
                 if event.cancelled {
@@ -107,6 +112,15 @@ impl BlockBehaviour for MangrovePropaguleBlock {
         args: GetStateForNeighborUpdateArgs<'_>,
     ) -> BlockStateId {
         let props = MangrovePropaguleLikeProperties::from_state_id(args.state_id);
+        // Vanilla schedules the water tick before the survival check.
+        if props.waterlogged {
+            args.world.schedule_fluid_tick(
+                &Fluid::WATER,
+                *args.position,
+                Fluid::WATER.flow_speed as i32,
+                TickPriority::Normal,
+            );
+        }
         if !Self::can_survive(args.world, args.position, &props) {
             return Block::AIR.default_state.id;
         }
@@ -118,7 +132,7 @@ impl BlockBehaviour for MangrovePropaguleBlock {
         let mut props = MangrovePropaguleLikeProperties::from_state_id(state_id);
         if !props.hanging {
             if rand::random::<u8>().is_multiple_of(7) {
-                Self::advance_tree(args.world, args.position, args.block, props);
+                Self::advance_tree(args.world, args.position, args.block, props, false);
             }
         } else if props.age < MAX_AGE {
             props.age += 1;
@@ -145,18 +159,16 @@ impl BlockBehaviour for MangrovePropaguleBlock {
     }
 
     fn perform_bonemeal(&self, args: BonemealArgs<'_>) {
-        {
-            let mut props = MangrovePropaguleLikeProperties::from_state_id(args.state_id);
-            if props.hanging && props.age < MAX_AGE {
-                props.age += 1;
-                args.world.set_block_state(
-                    args.position,
-                    props.to_state_id(args.block),
-                    BlockFlags::NOTIFY_ALL,
-                );
-            } else {
-                Self::advance_tree(args.world, args.position, args.block, props);
-            }
+        let mut props = MangrovePropaguleLikeProperties::from_state_id(args.state_id);
+        if props.hanging && props.age < MAX_AGE {
+            props.age += 1;
+            args.world.set_block_state(
+                args.position,
+                props.to_state_id(args.block),
+                BlockFlags::NOTIFY_ALL,
+            );
+        } else {
+            Self::advance_tree(args.world, args.position, args.block, props, true);
         }
     }
 }

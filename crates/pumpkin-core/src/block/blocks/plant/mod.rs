@@ -1,5 +1,7 @@
 use std::sync::MutexGuard;
 
+use pumpkin_data::block_properties::WaterLikeProperties;
+use pumpkin_data::fluid::Fluid;
 use pumpkin_data::{Block, BlockStateId, tag, tag::Taggable};
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::random::legacy_rand::LegacyRand;
@@ -56,6 +58,19 @@ pub(crate) fn level_random(world: &World) -> MutexGuard<'_, LegacyRand> {
         .random
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+/// Vanilla `FluidState.isSourceOfType(Fluids.WATER)` for a block state.
+pub(crate) fn is_water_source(state_id: BlockStateId) -> bool {
+    World::fluid_type_from_state_id(state_id) == &Fluid::WATER
+}
+
+/// Vanilla `fluidState.is(FluidTags.WATER) && fluidState.isFull()`: water of amount 8, a source
+/// or falling water.
+pub(crate) fn is_full_water(state_id: BlockStateId) -> bool {
+    is_water_source(state_id)
+        || (state_id.to_block() == &Block::WATER
+            && WaterLikeProperties::from_state_id(state_id).level >= 8)
 }
 
 pub(crate) trait PlantBlockBase {
