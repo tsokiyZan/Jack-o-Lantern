@@ -9,7 +9,8 @@ use pumpkin_data::world::WorldEvent;
 use pumpkin_data::{BlockState, BlockStateId};
 use pumpkin_macros::pumpkin_block;
 use pumpkin_util::math::position::BlockPos;
-use rand::{RngExt, rng};
+use pumpkin_util::random::RandomImpl;
+use pumpkin_world::world::BlockFlags;
 use std::sync::Arc;
 
 #[pumpkin_block("minecraft:dragon_egg")]
@@ -21,21 +22,33 @@ impl DragonEggBlock {
     const TELEPORT_RADIUS_XZ: i32 = 16;
     const TELEPORT_RADIUS_Y: i32 = 8;
 
+    /// Vanilla `DragonEggBlock.teleport`: up to 1000 tries, from the level random, for an air
+    /// block over a non-air one inside the world border and the build height.
     fn teleport(world: &Arc<World>, pos: &BlockPos) {
+        let state_id = world.get_block_state_id(pos);
         for _ in 0..1000 {
-            let test_pos = pos.add(
-                rng().random_range(0..Self::TELEPORT_RADIUS_XZ)
-                    - rng().random_range(0..Self::TELEPORT_RADIUS_XZ),
-                rng().random_range(0..Self::TELEPORT_RADIUS_Y)
-                    - rng().random_range(0..Self::TELEPORT_RADIUS_Y),
-                rng().random_range(0..Self::TELEPORT_RADIUS_XZ)
-                    - rng().random_range(0..Self::TELEPORT_RADIUS_XZ),
-            );
+            let test_pos = {
+                let mut random = world
+                    .random
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                let mut offset =
+                    |radius: i32| random.next_bounded_i32(radius) - random.next_bounded_i32(radius);
+                let x = offset(Self::TELEPORT_RADIUS_XZ);
+                let y = offset(Self::TELEPORT_RADIUS_Y);
+                let z = offset(Self::TELEPORT_RADIUS_XZ);
+                pos.add(x, y, z)
+            };
 
-            let state = world.get_block_state(&test_pos);
-            let below_state = world.get_block_state(&test_pos.down());
-
-            if state.is_air() && !below_state.is_air() {
+            if world.get_block_state(&test_pos).is_air()
+                && !world.get_block_state(&test_pos.down()).is_air()
+                && world
+                    .worldborder
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .contains_block(test_pos.0.x, test_pos.0.z)
+                && world.is_in_build_limit(test_pos)
+            {
                 let packed_diff = pos.pack_difference_in_position(
                     &test_pos,
                     Self::TELEPORT_RADIUS_XZ,
@@ -43,16 +56,11 @@ impl DragonEggBlock {
                     Self::TELEPORT_RADIUS_XZ,
                 );
                 world.sync_world_event(WorldEvent::ParticlesDragonEggTeleport, *pos, packed_diff);
-                let current_state = world.get_block_state(pos);
-                world.set_block_state(
-                    &test_pos,
-                    current_state.id,
-                    pumpkin_world::world::BlockFlags::NOTIFY_ALL,
-                );
+                world.set_block_state(&test_pos, state_id, BlockFlags::NOTIFY_LISTENERS);
                 world.set_block_state(
                     pos,
                     pumpkin_data::Block::AIR.default_state.id,
-                    pumpkin_world::world::BlockFlags::NOTIFY_ALL,
+                    BlockFlags::NOTIFY_ALL,
                 );
                 return;
             }

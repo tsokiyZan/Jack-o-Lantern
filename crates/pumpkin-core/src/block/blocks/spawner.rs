@@ -3,9 +3,9 @@ use std::sync::Arc;
 use crate::block::entities::mob_spawner::MobSpawnerBlockEntity;
 use crate::entity::experience_orb::ExperienceOrbEntity;
 use pumpkin_macros::pumpkin_block;
-use pumpkin_util::GameMode;
+use pumpkin_util::random::RandomImpl;
 
-use crate::block::{BlockBehaviour, BrokenArgs, OnSyncedBlockEventArgs, PlacedArgs};
+use crate::block::{BlockBehaviour, OnSyncedBlockEventArgs, PlacedArgs, SpawnAfterBreakArgs};
 
 #[pumpkin_block("minecraft:spawner")]
 pub struct SpawnerBlock;
@@ -25,12 +25,25 @@ impl BlockBehaviour for SpawnerBlock {
         }
     }
 
-    fn broken(&self, args: BrokenArgs<'_>) {
-        {
-            if args.player.gamemode.load() != GameMode::Creative {
-                let xp_count = 15 + rand::random_range(0..15) + rand::random_range(0..15);
-                ExperienceOrbEntity::spawn(args.world, args.position.to_centered_f64(), xp_count);
-            }
+    /// Vanilla `SpawnerBlock.spawnAfterBreak`: with `dropExperience`, 15 + nextInt(15) +
+    /// nextInt(15) experience from the level random, through `popExperience` (which needs
+    /// `block_drops`).
+    fn spawn_after_break(&self, args: SpawnAfterBreakArgs<'_>) {
+        if !args.drop_experience || !args.world.level_info.load().game_rules.block_drops {
+            return;
         }
+        let magic_count = {
+            let mut random = args
+                .world
+                .random
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            15 + random.next_bounded_i32(15) + random.next_bounded_i32(15)
+        };
+        ExperienceOrbEntity::spawn(
+            args.world,
+            args.position.to_centered_f64(),
+            magic_count as u32,
+        );
     }
 }

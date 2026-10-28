@@ -137,6 +137,11 @@ impl TurtleEntity {
         self.home_pos.load()
     }
 
+    /// Vanilla `Turtle.setHomePos`.
+    pub fn set_home_pos(&self, pos: BlockPos) {
+        self.home_pos.store(pos);
+    }
+
     /// Vanilla `homePos.closerToCenterThan(position(), dist)`.
     fn home_closer_than(&self, dist: f64) -> bool {
         closer_to_center_than(self.home_pos(), self.get_entity().pos.load(), dist)

@@ -301,11 +301,11 @@ fn can_place_at_pos(
         VerticalDirection::Up => position.up(),
         VerticalDirection::Down => position.down(),
     };
-    let support_block = block_accessor.get_block(&support_pos);
-    if can_support_dripstone(support_block) {
-        return true;
-    }
-    false
+    can_support_dripstone(
+        block_accessor,
+        &support_pos,
+        support_block_vertical_direction,
+    )
 }
 
 fn get_support_block_vertical_direction(
@@ -326,21 +326,26 @@ fn get_support_block_vertical_direction(
     match block_direction_to_vertical_direction(placing_direction) {
         Some(ver_dir) => match ver_dir {
             VerticalDirection::Up => {
-                let block_above = block_accessor.get_block(&position.up());
-                let block_below = block_accessor.get_block(&position.down());
-                if can_support_dripstone(block_above) {
+                if can_support_dripstone(block_accessor, &position.up(), VerticalDirection::Up) {
                     return Some(VerticalDirection::Up);
-                } else if can_support_dripstone(block_below) {
+                } else if can_support_dripstone(
+                    block_accessor,
+                    &position.down(),
+                    VerticalDirection::Down,
+                ) {
                     return Some(VerticalDirection::Down);
                 }
                 None
             }
             VerticalDirection::Down => {
-                let block_above = block_accessor.get_block(&position.up());
-                let block_below = block_accessor.get_block(&position.down());
-                if can_support_dripstone(block_below) {
+                if can_support_dripstone(block_accessor, &position.down(), VerticalDirection::Down)
+                {
                     return Some(VerticalDirection::Down);
-                } else if can_support_dripstone(block_above) {
+                } else if can_support_dripstone(
+                    block_accessor,
+                    &position.up(),
+                    VerticalDirection::Up,
+                ) {
                     return Some(VerticalDirection::Up);
                 }
                 None
@@ -348,14 +353,10 @@ fn get_support_block_vertical_direction(
         },
         None => player_option.map_or(Some(VerticalDirection::Up), |player| {
             let (_, pitch) = player.rotation();
-            let (can_place_above, can_place_below) = {
-                let block_above = block_accessor.get_block(&position.up());
-                let block_below = block_accessor.get_block(&position.down());
-                (
-                    can_support_dripstone(block_above),
-                    can_support_dripstone(block_below),
-                )
-            };
+            let (can_place_above, can_place_below) = (
+                can_support_dripstone(block_accessor, &position.up(), VerticalDirection::Up),
+                can_support_dripstone(block_accessor, &position.down(), VerticalDirection::Down),
+            );
             match (can_place_above, can_place_below) {
                 (true, true) => {
                     if pitch > 0.0 {
@@ -371,11 +372,25 @@ fn get_support_block_vertical_direction(
         }),
     }
 }
-fn can_support_dripstone(support_block: &Block) -> bool {
+/// Vanilla `PointedDripstoneBlock.isValidPointedDripstonePlacement`, from the side of the support
+/// at `support_pos` (`support_dir` from the dripstone): a face sturdy toward the tip, or
+/// dripstone pointing the same way.
+fn can_support_dripstone(
+    block_accessor: &dyn BlockAccessor,
+    support_pos: &BlockPos,
+    support_dir: VerticalDirection,
+) -> bool {
+    let (support_block, support_state) = block_accessor.get_block_and_state(support_pos);
     if support_block == &Block::POINTED_DRIPSTONE {
-        return true;
+        return PointedDripstoneLikeProperties::from_state_id(support_state.id).vertical_direction
+            == flip_dir(support_dir);
     }
-    support_block.default_state.is_solid_render()
+    // The tip points away from the support, so the support's face toward the dripstone.
+    let face = match support_dir {
+        VerticalDirection::Up => BlockDirection::Down,
+        VerticalDirection::Down => BlockDirection::Up,
+    };
+    support_state.is_side_solid(face)
 }
 fn modify_dripstone_thickness_to(
     world: &Arc<World>,

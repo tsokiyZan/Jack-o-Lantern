@@ -7,13 +7,15 @@ use crate::entity::EntityBase;
 use crate::{
     block::{
         BlockBehaviour, BlockMetadata, CanPlaceAtArgs, NormalUseArgs, OnNeighborUpdateArgs,
-        OnPlaceArgs, OnScheduledTickArgs, PlacedArgs, registry::BlockActionResult,
+        OnPlaceArgs, OnScheduledTickArgs, PlacedArgs, PlayerPlacedArgs,
+        registry::BlockActionResult,
     },
     server::Server,
     world::World,
 };
 
 use pumpkin_data::block_properties::{CommandBlockLikeProperties, Facing};
+use pumpkin_data::data_component_impl::BlockEntityDataImpl;
 use pumpkin_data::{Block, BlockId, BlockState, BlockStateId, FacingExt, Rotation};
 
 use pumpkin_util::{GameMode, PermissionLvl, math::position::BlockPos};
@@ -321,6 +323,9 @@ impl BlockBehaviour for CommandBlock {
             args.world
                 .schedule_block_tick(block, *args.position, 1, TickPriority::Normal);
         }
+
+        args.world
+            .update_neighbour_for_output_signal(args.position, block);
     }
 
     fn can_place_at(&self, args: CanPlaceAtArgs<'_>) -> bool {
@@ -333,23 +338,58 @@ impl BlockBehaviour for CommandBlock {
         false
     }
 
+    /// Vanilla `CommandBlock.newBlockEntity`: `trackOutput` true, and `auto` for a chain
+    /// command block (`setAutomatic(this.automatic)`, which schedules nothing without a level).
     fn placed(&self, args: PlacedArgs<'_>) {
         if !args.is_new_block() {
             return;
         }
-        {
-            let send_command_feedback = {
-                let game_rules = &args.world.level_info.load().game_rules;
-                game_rules.send_command_feedback
-            };
+        let entity = CommandBlockEntity::new(
+            *args.position,
+            true,
+            args.block.id == Block::CHAIN_COMMAND_BLOCK.id,
+        );
+        args.world.add_block_entity(Arc::new(entity));
+    }
 
-            let entity = CommandBlockEntity::new(
-                *args.position,
-                send_command_feedback,
+    /// Vanilla `CommandBlock.setPlacedBy`: without block entity data, output tracking follows
+    /// `send_command_feedback` and a chain command block is automatic; then the block takes
+    /// its neighbours' signal.
+    fn player_placed(&self, args: PlayerPlacedArgs<'_>) {
+        let Some(block_entity) = args.world.get_block_entity(args.position) else {
+            return;
+        };
+        let Ok(command_entity) = Arc::downcast::<CommandBlockEntity>(block_entity) else {
+            return;
+        };
+        if args
+            .item_stack
+            .get_data_component::<BlockEntityDataImpl>()
+            .is_none()
+        {
+            let send_command_feedback = args
+                .world
+                .level_info
+                .load()
+                .game_rules
+                .send_command_feedback;
+            command_entity
+                .track_output
+                .store(send_command_feedback, Ordering::Relaxed);
+            // `setAutomatic(this.automatic)`; it schedules no tick for a sequence block or
+            // one that is not automatic.
+            command_entity.auto.store(
                 args.block.id == Block::CHAIN_COMMAND_BLOCK.id,
+                Ordering::Relaxed,
             );
-            args.world.add_block_entity(Arc::new(entity));
         }
+        Self::update(
+            args.world,
+            args.block,
+            &command_entity,
+            args.position,
+            block_receives_redstone_power(args.world, args.position),
+        );
     }
 
     fn get_comparator_output(&self, args: crate::block::GetComparatorOutputArgs<'_>) -> Option<u8> {

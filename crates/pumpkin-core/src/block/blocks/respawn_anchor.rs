@@ -1,4 +1,5 @@
 use pumpkin_data::block_properties::RespawnAnchorLikeProperties;
+use pumpkin_data::data_component_impl::EquipmentSlot;
 use pumpkin_data::item::Item;
 use pumpkin_data::sound::{Sound, SoundCategory};
 use std::sync::Arc;
@@ -18,7 +19,9 @@ use crate::block::registry::BlockActionResult;
 use crate::block::{
     BlockBehaviour, GetComparatorOutputArgs, NormalUseArgs, PathComputationType, UseWithItemArgs,
 };
-use crate::entity::EntityBase;
+use crate::world::game_event::GameEventContext;
+use pumpkin_data::game_event::GameEvent;
+use pumpkin_inventory::screen_handler::InventoryPlayer;
 
 /// Vanilla `RespawnAnchorBlock.MAX_CHARGES`.
 const MAX_CHARGES: u8 = 4;
@@ -27,35 +30,45 @@ const MAX_CHARGES: u8 = 4;
 pub struct RespawnAnchorBlock;
 
 impl BlockBehaviour for RespawnAnchorBlock {
+    /// Vanilla `RespawnAnchorBlock.useItemOn`: glowstone charges an anchor below four charges.
     fn use_with_item(&self, args: UseWithItemArgs<'_>) -> BlockActionResult {
-        if args.item_stack.item.id != Item::GLOWSTONE.id {
-            return BlockActionResult::Pass;
-        }
-
         let state_id = args.world.get_block_state_id(args.position);
         let mut props = RespawnAnchorLikeProperties::from_state_id(state_id);
+        let can_be_charged = props.charges < MAX_CHARGES;
 
-        if props.charges >= 4 {
-            return BlockActionResult::Pass;
+        if args.item_stack.item == &Item::GLOWSTONE && can_be_charged {
+            // `charge`.
+            props.charges += 1;
+            let new_state_id = props.to_state_id(args.block);
+            args.world
+                .set_block_state(args.position, new_state_id, BlockFlags::NOTIFY_ALL);
+            args.world.game_event(
+                GameEvent::BlockChange,
+                args.position.to_centered_f64(),
+                GameEventContext::of(
+                    Some(args.player.as_ref()),
+                    Some(BlockState::from_id(new_state_id)),
+                ),
+            );
+            args.world.play_sound(
+                Sound::BlockRespawnAnchorCharge,
+                SoundCategory::Blocks,
+                &args.position.to_centered_f64(),
+            );
+            if !args.player.has_infinite_materials() {
+                args.item_stack.decrement(1);
+            }
+            return BlockActionResult::Success;
         }
 
-        props.charges += 1;
-        args.world.set_block_state(
-            args.position,
-            props.to_state_id(args.block),
-            BlockFlags::NOTIFY_ALL,
-        );
-
-        args.item_stack
-            .decrement_unless_creative(args.player.gamemode.load(), 1);
-
-        args.world.play_sound(
-            Sound::BlockRespawnAnchorCharge,
-            SoundCategory::Blocks,
-            &args.position.to_f64(),
-        );
-
-        BlockActionResult::Success
+        // The off hand's glowstone gets its turn instead of the empty-hand use.
+        if matches!(args.equipment_slot, EquipmentSlot::MainHand(_))
+            && can_be_charged
+            && args.player.inventory().off_hand_item().item == &Item::GLOWSTONE
+        {
+            return BlockActionResult::Pass;
+        }
+        BlockActionResult::PassToDefaultBlockAction
     }
 
     fn normal_use(&self, args: NormalUseArgs<'_>) -> BlockActionResult {
@@ -75,26 +88,23 @@ impl BlockBehaviour for RespawnAnchorBlock {
         let player = args.player;
         let world = args.world;
         let pos = *args.position;
-        if player.set_respawn_point(
-            world.dimension.clone(),
-            pos,
-            player.get_entity().yaw.load(),
-            player.get_entity().pitch.load(),
-            false,
-        ) {
+        // `RespawnData.of(dimension, pos, 0.0F, 0.0F)`.
+        if player.set_respawn_point(world.dimension.clone(), pos, 0.0, 0.0, false) {
             world.play_sound(
                 Sound::BlockRespawnAnchorSetSpawn,
                 SoundCategory::Blocks,
-                &pos.to_f64(),
+                &pos.to_centered_f64(),
             );
 
             player.send_system_message(&pumpkin_macros::translate_cross!(
                 translation::java::BLOCK_MINECRAFT_SET_SPAWN,
                 translation::bedrock::TILE_BED_RESPAWNSET
             ));
+            return BlockActionResult::SuccessServer;
         }
 
-        BlockActionResult::SuccessServer
+        // Already this anchor (or a plugin cancelled it).
+        BlockActionResult::Consume
     }
 
     /// Charges scale over the full signal range, so each charge is worth 15 / 4.

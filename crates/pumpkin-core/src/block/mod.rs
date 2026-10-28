@@ -329,6 +329,9 @@ pub struct SpawnAfterBreakArgs<'a> {
     pub position: &'a BlockPos,
     /// The breaking tool; `None` is vanilla's `ItemStack.EMPTY`.
     pub tool: Option<&'a ItemStack>,
+    /// Vanilla's `dropExperience`: true for a broken block, and for an exploded one only when a
+    /// player set the explosion off.
+    pub drop_experience: bool,
 }
 
 /// Vanilla `Block.wasExploded`: the block was blown away by `explosion`.
@@ -411,6 +414,8 @@ pub struct PlayerPlacedArgs<'a> {
     pub position: &'a BlockPos,
     pub direction: BlockDirection,
     pub player: &'a Player,
+    /// The stack the block was placed from, before it is used up.
+    pub item_stack: &'a ItemStack,
 }
 
 pub struct FallOnArgs<'a> {
