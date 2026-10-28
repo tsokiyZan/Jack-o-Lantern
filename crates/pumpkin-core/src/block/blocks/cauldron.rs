@@ -49,32 +49,12 @@ fn fire_cauldron_change(
     !event.cancelled
 }
 
-fn give_item_or_drop(
-    player: &crate::entity::player::Player,
-    world: &std::sync::Arc<crate::world::World>,
-    item: &'static Item,
-) {
-    give_stack_or_drop(player, world, ItemStack::new(1, item));
-}
-
-fn give_stack_or_drop(
-    player: &crate::entity::player::Player,
-    world: &std::sync::Arc<crate::world::World>,
-    mut stack: ItemStack,
-) {
-    let was_added = player.inventory.insert_stack_anywhere(&mut stack);
-    if !was_added && !stack.is_empty() {
-        world.drop_stack(&player.position().to_block_pos(), stack);
-    }
-}
-
 impl BlockBehaviour for CauldronBlock {
     #[allow(clippy::too_many_lines)]
     fn use_with_item(&self, args: UseWithItemArgs<'_>) -> BlockActionResult {
         let used_item = args.item_stack.item;
         let item_id = used_item.id;
         let block_id = args.block.id;
-        let gamemode = args.player.gamemode.load();
 
         // `addDefaultInteractions`: every cauldron takes a filled bucket.
         let under_water =
@@ -110,8 +90,13 @@ impl BlockBehaviour for CauldronBlock {
                 SoundCategory::Blocks,
                 &args.position.to_f64(),
             );
-            args.item_stack.decrement_unless_creative(gamemode, 1);
-            give_item_or_drop(args.player, args.world, &Item::BUCKET);
+            // `ItemUtils.createFilledResult`: the hand holds the result once the stack runs out.
+            crate::item::create_filled_result(
+                args.item_stack,
+                args.player,
+                ItemStack::new(1, &Item::BUCKET),
+                true,
+            );
             args.player.increment_stat(
                 pumpkin_data::statistic::StatisticCategory::Custom,
                 pumpkin_data::statistic::CustomStatistic::FillCauldron as i32,
@@ -135,8 +120,13 @@ impl BlockBehaviour for CauldronBlock {
                 SoundCategory::Blocks,
                 &args.position.to_f64(),
             );
-            args.item_stack.decrement_unless_creative(gamemode, 1);
-            give_item_or_drop(args.player, args.world, &Item::BUCKET);
+            // `ItemUtils.createFilledResult`: the hand holds the result once the stack runs out.
+            crate::item::create_filled_result(
+                args.item_stack,
+                args.player,
+                ItemStack::new(1, &Item::BUCKET),
+                true,
+            );
             args.player.increment_stat(
                 pumpkin_data::statistic::StatisticCategory::Custom,
                 pumpkin_data::statistic::CustomStatistic::FillCauldron as i32,
@@ -155,8 +145,13 @@ impl BlockBehaviour for CauldronBlock {
                 SoundCategory::Blocks,
                 &args.position.to_f64(),
             );
-            args.item_stack.decrement_unless_creative(gamemode, 1);
-            give_item_or_drop(args.player, args.world, &Item::BUCKET);
+            // `ItemUtils.createFilledResult`: the hand holds the result once the stack runs out.
+            crate::item::create_filled_result(
+                args.item_stack,
+                args.player,
+                ItemStack::new(1, &Item::BUCKET),
+                true,
+            );
             args.player.increment_stat(
                 pumpkin_data::statistic::StatisticCategory::Custom,
                 pumpkin_data::statistic::CustomStatistic::FillCauldron as i32,
@@ -175,8 +170,13 @@ impl BlockBehaviour for CauldronBlock {
                 SoundCategory::Blocks,
                 &args.position.to_f64(),
             );
-            args.item_stack.decrement_unless_creative(gamemode, 1);
-            give_item_or_drop(args.player, args.world, &Item::GLASS_BOTTLE);
+            // `ItemUtils.createFilledResult`: the hand holds the result once the stack runs out.
+            crate::item::create_filled_result(
+                args.item_stack,
+                args.player,
+                ItemStack::new(1, &Item::GLASS_BOTTLE),
+                true,
+            );
             args.player.increment_stat(
                 pumpkin_data::statistic::StatisticCategory::Custom,
                 pumpkin_data::statistic::CustomStatistic::UseCauldron as i32,
@@ -219,8 +219,13 @@ impl BlockBehaviour for CauldronBlock {
                 );
                 args.world
                     .play_sound(sound, SoundCategory::Blocks, &args.position.to_f64());
-                args.item_stack.decrement_unless_creative(gamemode, 1);
-                give_item_or_drop(args.player, args.world, result_item);
+                // `ItemUtils.createFilledResult`: the hand holds the result once the stack runs out.
+                crate::item::create_filled_result(
+                    args.item_stack,
+                    args.player,
+                    ItemStack::new(1, result_item),
+                    true,
+                );
                 args.player.increment_stat(
                     pumpkin_data::statistic::StatisticCategory::Custom,
                     pumpkin_data::statistic::CustomStatistic::UseCauldron as i32,
@@ -247,8 +252,13 @@ impl BlockBehaviour for CauldronBlock {
                         SoundCategory::Blocks,
                         &args.position.to_f64(),
                     );
-                    args.item_stack.decrement_unless_creative(gamemode, 1);
-                    give_item_or_drop(args.player, args.world, &Item::GLASS_BOTTLE);
+                    // `ItemUtils.createFilledResult`: the hand holds the result once the stack runs out.
+                    crate::item::create_filled_result(
+                        args.item_stack,
+                        args.player,
+                        ItemStack::new(1, &Item::GLASS_BOTTLE),
+                        true,
+                    );
                     args.player.increment_stat(
                         pumpkin_data::statistic::StatisticCategory::Custom,
                         pumpkin_data::statistic::CustomStatistic::UseCauldron as i32,
@@ -281,11 +291,11 @@ impl BlockBehaviour for CauldronBlock {
                         SoundCategory::Blocks,
                         &args.position.to_f64(),
                     );
-                    args.item_stack.decrement_unless_creative(gamemode, 1);
-                    give_stack_or_drop(
+                    crate::item::create_filled_result(
+                        args.item_stack,
                         args.player,
-                        args.world,
                         crate::item::items::glass_bottle::water_bottle(),
+                        true,
                     );
                     args.player.increment_stat(
                         pumpkin_data::statistic::StatisticCategory::Custom,

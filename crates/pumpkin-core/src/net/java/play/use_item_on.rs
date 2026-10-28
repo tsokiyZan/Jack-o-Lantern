@@ -125,8 +125,15 @@ impl JavaClient {
 
         let sneaking = player.get_entity().is_sneaking();
 
+        let slot_index = if matches!(hand, Hand::Right) {
+            inventory.get_selected_slot() as usize
+        } else {
+            PlayerInventory::OFF_HAND_SLOT
+        };
+
         // Code based on the java class ServerPlayerInteractionManager
         if !(sneaking && (!held_item_empty || !off_hand_item_empty)) {
+            let before = item.clone();
             let result = Self::call_use_item_on(
                 player,
                 &position,
@@ -141,16 +148,16 @@ impl JavaClient {
             if result.consumes_action() {
                 // TODO: Trigger ANY_BLOCK_USE Criteria
 
+                // Vanilla's `useItemOn` works on the stack in the hand itself: what the block
+                // did to it (food put on a campfire, a shovel's damage) stays.
+                if !item.are_equal(&before) {
+                    player.sync_hand_slot(slot_index, item.clone());
+                    inventory.set_stack_in_hand(hand, item);
+                }
                 Self::swing_for_use_item_on(player, hand, swing_animation, &result);
                 return Ok(());
             }
         }
-
-        let slot_index = if matches!(hand, Hand::Right) {
-            inventory.get_selected_slot() as usize
-        } else {
-            PlayerInventory::OFF_HAND_SLOT
-        };
 
         // An item on cooldown is not used on the block, nor placed.
         if item.is_empty() || player.is_on_cooldown(&cooldown_group(&item)) {
