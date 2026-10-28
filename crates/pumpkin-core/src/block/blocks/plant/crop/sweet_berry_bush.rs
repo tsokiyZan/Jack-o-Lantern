@@ -4,18 +4,29 @@ use crate::{
     block::{
         BlockBehaviour, CanPlaceAtArgs, GetStateForNeighborUpdateArgs, NormalUseArgs,
         OnEntityCollisionArgs, RandomTickArgs, UseWithItemArgs,
-        blocks::plant::{PlantBlockBase, crop::CropBlockBase},
+        blocks::plant::{
+            PlantBlockBase,
+            crop::{CropBlockBase, MIN_GROWTH_LIGHT},
+            level_random,
+        },
         registry::BlockActionResult,
     },
-    world::World,
+    world::{World, game_event::GameEventContext},
 };
 use pumpkin_data::{
-    Block, BlockStateId, block_properties::NetherWartLikeProperties, damage::DamageType,
-    entity::EntityType, item::Item, item_stack::ItemStack,
+    Block, BlockState, BlockStateId,
+    block_properties::NetherWartLikeProperties,
+    damage::DamageType,
+    entity::EntityType,
+    game_event::GameEvent,
+    item::Item,
+    item_stack::ItemStack,
+    sound::{Sound, SoundCategory},
 };
 use pumpkin_macros::pumpkin_block;
 use pumpkin_util::math::position::BlockPos;
 use pumpkin_util::math::vector3::Vector3;
+use pumpkin_util::random::RandomImpl;
 use pumpkin_world::world::{BlockAccessor, BlockFlags};
 use rand::RngExt;
 
@@ -58,10 +69,24 @@ impl BlockBehaviour for SweetBerryBushBlock {
                 for stack in drops {
                     args.world.drop_stack(args.position, stack);
                 }
-                args.world.set_block_state(
-                    args.position,
-                    props.to_state_id(&Block::SWEET_BERRY_BUSH),
-                    BlockFlags::NOTIFY_ALL,
+                let pitch = 0.8 + level_random(args.world).next_f32() * 0.4;
+                args.world.play_sound_fine(
+                    Sound::BlockSweetBerryBushPickBerries,
+                    SoundCategory::Blocks,
+                    &args.position.to_centered_f64(),
+                    1.0,
+                    pitch,
+                );
+                let new_state = props.to_state_id(&Block::SWEET_BERRY_BUSH);
+                args.world
+                    .set_block_state(args.position, new_state, BlockFlags::NOTIFY_LISTENERS);
+                args.world.game_event(
+                    GameEvent::BlockChange,
+                    args.position.to_centered_f64(),
+                    GameEventContext::of(
+                        Some(args.player.as_ref()),
+                        Some(BlockState::from_id(new_state)),
+                    ),
                 );
                 BlockActionResult::SuccessServer
             }
@@ -174,16 +199,13 @@ impl CropBlockBase for SweetBerryBushBlock {
     fn random_tick(&self, world: &Arc<World>, pos: &BlockPos) {
         let (block, state) = world.get_block_and_state_id(pos);
         let age = self.get_age(state, block);
-        if age < self.max_age() {
-            let state_above = world.get_block_state(&pos.up());
-
-            if state_above.is_full_cube() || state_above.is_solid() {
-                return;
-            }
-            world.set_block_state(
-                pos,
-                self.state_with_age(block, state, age + 1),
-                BlockFlags::NOTIFY_NEIGHBORS,
+        if age < self.max_age() && world.get_raw_brightness(&pos.up(), 0) >= MIN_GROWTH_LIGHT {
+            let new_state = self.state_with_age(block, state, age + 1);
+            world.set_block_state(pos, new_state, BlockFlags::NOTIFY_LISTENERS);
+            world.game_event(
+                GameEvent::BlockChange,
+                pos.to_centered_f64(),
+                GameEventContext::of_state(BlockState::from_id(new_state)),
             );
         }
     }

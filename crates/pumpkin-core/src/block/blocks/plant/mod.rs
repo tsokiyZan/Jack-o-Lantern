@@ -1,6 +1,11 @@
+use std::sync::MutexGuard;
+
 use pumpkin_data::{Block, BlockStateId, tag, tag::Taggable};
 use pumpkin_util::math::position::BlockPos;
+use pumpkin_util::random::legacy_rand::LegacyRand;
 use pumpkin_world::world::BlockAccessor;
+
+use crate::world::World;
 
 pub mod azalea;
 pub mod bamboo;
@@ -44,6 +49,14 @@ pub mod tree_grower;
 pub mod twisting_vines;
 pub mod weeping_vines;
 pub mod wither_rose;
+
+/// `level.getRandom()`. Draw what you need and let the guard drop before touching the world.
+pub(crate) fn level_random(world: &World) -> MutexGuard<'_, LegacyRand> {
+    world
+        .random
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
 
 pub(crate) trait PlantBlockBase {
     fn can_plant_on_top(&self, block_accessor: &dyn BlockAccessor, pos: &BlockPos) -> bool {
