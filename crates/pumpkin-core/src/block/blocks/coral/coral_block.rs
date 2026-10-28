@@ -1,8 +1,8 @@
 use crate::block::{
-    BlockBehaviour, BlockMetadata, OnScheduledTickArgs, PlacedArgs,
+    BlockBehaviour, BlockMetadata, GetStateForNeighborUpdateArgs, OnScheduledTickArgs, PlacedArgs,
     blocks::coral::{is_dead_coral, scan_for_water, try_schedule_die_tick},
 };
-use pumpkin_data::{Block, BlockId, tag};
+use pumpkin_data::{Block, BlockId, BlockStateId, tag};
 use pumpkin_world::world::BlockFlags;
 pub struct CoralBlock;
 impl BlockMetadata for CoralBlock {
@@ -28,14 +28,28 @@ impl BlockBehaviour for CoralBlock {
             }
         }
     }
+    /// Vanilla `CoralBlock.updateShape`: without water around, schedule the die tick.
+    fn get_state_for_neighbor_update(
+        &self,
+        args: GetStateForNeighborUpdateArgs<'_>,
+    ) -> BlockStateId {
+        if !scan_for_water(args.world, args.position) && !is_dead_coral(args.block) {
+            try_schedule_die_tick(args.block, args.world, args.position);
+        }
+        args.state_id
+    }
+
     fn on_scheduled_tick(&self, args: OnScheduledTickArgs<'_>) {
         if !scan_for_water(args.world, args.position) && !is_dead_coral(args.block) {
             let Some(dead_block) = get_dead_coral_block_type(args.block.id) else {
                 return;
             };
             let dead_block_state_id = dead_block.default_state.id;
-            args.world
-                .set_block_state(args.position, dead_block_state_id, BlockFlags::NOTIFY_ALL);
+            args.world.set_block_state(
+                args.position,
+                dead_block_state_id,
+                BlockFlags::NOTIFY_LISTENERS,
+            );
         }
     }
 }
