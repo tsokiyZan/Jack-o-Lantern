@@ -1,7 +1,7 @@
 use super::{pathfinder, physics};
 use crate::world::World;
 use pumpkin_data::{
-    Block, BlockDirection, BlockStateId,
+    Block, BlockDirection, BlockState, BlockStateId,
     fluid::{EnumVariants, Falling, Fluid, FluidProperties, Level},
 };
 use pumpkin_util::math::position::BlockPos;
@@ -144,7 +144,13 @@ pub trait FlowingFluid: Send + Sync {
         let below_pos = block_pos.down();
         let below_state = world.get_block_state(&below_pos);
         let below_block = Block::from_state_id(below_state.id);
-        let is_hole = physics::can_be_replaced(below_state, below_block, fluid);
+        let is_hole = physics::can_pass_through_wall(
+            BlockDirection::Down,
+            block_pos,
+            world.get_block_state(block_pos),
+            &below_pos,
+            below_state,
+        ) && physics::can_be_replaced(below_state, below_block, fluid);
 
         // Try to flow down first
         if is_hole {
@@ -214,6 +220,7 @@ pub trait FlowingFluid: Send + Sync {
             return Some(current_props);
         }
 
+        let current_state = BlockState::from_id(current_state_id);
         // First: check horizontal neighbors for infinite source formation
         let mut highest_neighbor = 0;
         let mut neighbor_source_count = 0;
@@ -228,6 +235,15 @@ pub trait FlowingFluid: Send + Sync {
             let Some(neighbor_props) = self.get_effective_props(fluid, neighbor_state_id) else {
                 continue;
             };
+            if !physics::can_pass_through_wall(
+                direction,
+                block_pos,
+                current_state,
+                &neighbor_pos,
+                BlockState::from_id(neighbor_state_id),
+            ) {
+                continue;
+            }
 
             // Count horizontal non-falling sources for infinite source formation
             if neighbor_props.level == Level::L8 && neighbor_props.falling == Falling::False {
@@ -266,7 +282,15 @@ pub trait FlowingFluid: Send + Sync {
         let above_pos = block_pos.up();
         let above_state_id = world.get_block_state_id(&above_pos);
 
-        if self.has_fluid_at(fluid, above_state_id) {
+        if self.has_fluid_at(fluid, above_state_id)
+            && physics::can_pass_through_wall(
+                BlockDirection::Up,
+                block_pos,
+                current_state,
+                &above_pos,
+                BlockState::from_id(above_state_id),
+            )
+        {
             return Some(self.get_flowing(fluid, Level::L8, true));
         }
 

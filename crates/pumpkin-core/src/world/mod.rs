@@ -7052,9 +7052,21 @@ impl World {
         delay: i32,
         priority: TickPriority,
     ) {
-        if let Some(fluid) = Fluid::from_id(fluid.id) {
+        if let Some(fluid) = Fluid::from_id(Self::fluid_tick_family(fluid)) {
             self.level
                 .schedule_fluid_tick(fluid, block_pos, delay, priority);
+        }
+    }
+
+    /// Fluid ticks key on the flowing family, as `get_fluid` reports it: a tick vanilla
+    /// schedules on `Fluids.WATER` (a waterlogged block's) is the flowing water tick here.
+    const fn fluid_tick_family(fluid: &Fluid) -> u16 {
+        if fluid.id == Fluid::WATER.id {
+            Fluid::FLOWING_WATER.id
+        } else if fluid.id == Fluid::LAVA.id {
+            Fluid::FLOWING_LAVA.id
+        } else {
+            fluid.id
         }
     }
 
@@ -7066,7 +7078,7 @@ impl World {
 
     /// Vanilla `getFluidTicks().hasScheduledTick`.
     pub fn is_fluid_tick_scheduled(&self, block_pos: &BlockPos, fluid: &Fluid) -> bool {
-        Fluid::from_id(fluid.id)
+        Fluid::from_id(Self::fluid_tick_family(fluid))
             .is_some_and(|fluid| self.level.is_fluid_tick_scheduled(block_pos, fluid))
     }
 
