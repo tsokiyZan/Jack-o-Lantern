@@ -6,8 +6,8 @@ use pumpkin_data::{BlockId, BlockStateId};
 use crate::block::blocks::falling::FallingBlock;
 use crate::block::entities::brushable_block::BrushableBlockBlockEntity;
 use crate::block::{
-    BlockBehaviour, BlockMetadata, BrokenArgs, GetStateForNeighborUpdateArgs, OnPlaceArgs,
-    OnScheduledTickArgs, PlacedArgs,
+    BlockBehaviour, BlockMetadata, GetStateForNeighborUpdateArgs, OnPlaceArgs, OnScheduledTickArgs,
+    PlacedArgs,
 };
 use crate::entity::falling::FallingEntity;
 use pumpkin_world::tick::TickPriority;
@@ -60,19 +60,6 @@ impl BlockBehaviour for BrushableBlock {
         {
             let state = args.world.get_block_state(args.position);
             FallingEntity::replace_spawn(args.world, *args.position, state.id).disable_drop();
-        }
-    }
-
-    fn broken(&self, args: BrokenArgs<'_>) {
-        if let Some(be) = args.world.get_block_entity(args.position)
-            && let Some(brush_be) = be.as_any().downcast_ref::<BrushableBlockBlockEntity>()
-            && let Some(contained) = brush_be
-                .item
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .take()
-        {
-            args.world.drop_stack(args.position, contained);
         }
     }
 }
