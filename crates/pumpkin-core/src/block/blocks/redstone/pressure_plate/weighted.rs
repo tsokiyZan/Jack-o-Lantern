@@ -1,17 +1,17 @@
+use pumpkin_data::sound::Sound;
 use pumpkin_data::{Block, BlockDirection, BlockId, BlockState, BlockStateId};
 use pumpkin_util::math::position::BlockPos;
-use pumpkin_world::world::BlockFlags;
 
 use crate::{
     block::{
         BlockBehaviour, BlockMetadata, CanPlaceAtArgs, EmitsRedstonePowerArgs,
-        GetRedstonePowerArgs, OnEntityCollisionArgs, OnNeighborUpdateArgs, OnScheduledTickArgs,
-        OnStateReplacedArgs,
+        GetRedstonePowerArgs, GetStateForNeighborUpdateArgs, OnEntityCollisionArgs,
+        OnScheduledTickArgs, OnStateReplacedArgs,
     },
     world::World,
 };
 
-use super::{PressurePlate, detection_box_at};
+use super::{PressurePlate, entity_count};
 
 /// This is for Gold and Iron Pressure Plate
 pub struct WeightedPressurePlateBlock;
@@ -48,7 +48,7 @@ impl BlockBehaviour for WeightedPressurePlateBlock {
         let output = self.get_redstone_output(args.block, state.id);
         if output > 0 {
             let (block, state) = args.world.get_block_and_state(args.position);
-            Self.update_plate_state(args.world, args.position, block, state, output);
+            Self.update_plate_state(None, args.world, args.position, block, state, output);
         }
     }
 
@@ -71,11 +71,11 @@ impl BlockBehaviour for WeightedPressurePlateBlock {
         true
     }
 
-    fn on_neighbor_update(&self, args: OnNeighborUpdateArgs<'_>) {
-        if !Self::can_pressure_plate_place_at(args.world, args.position) {
-            args.world
-                .break_block(args.position, None, BlockFlags::NOTIFY_ALL);
-        }
+    fn get_state_for_neighbor_update(
+        &self,
+        args: GetStateForNeighborUpdateArgs<'_>,
+    ) -> BlockStateId {
+        self.get_state_for_neighbor_update_pp(&args)
     }
 
     fn can_place_at(&self, args: CanPlaceAtArgs<'_>) -> bool {
@@ -100,15 +100,20 @@ impl PressurePlate for WeightedPressurePlateBlock {
             // Iron
             150
         };
-        let aabb = detection_box_at(pos);
-        let len = world.get_entities_at_box(&aabb).len() + world.get_players_at_box(&aabb).len();
-        signal_strength(len, weight)
+        signal_strength(entity_count(world, pos, false), weight)
     }
 
     fn set_redstone_output(&self, block: &Block, state: &BlockState, output: u8) -> BlockStateId {
         let mut props = PressurePlateProps::from_state_id(state.id);
         props.power = output;
         props.to_state_id(block)
+    }
+
+    fn click_sounds(&self, _block: &Block) -> (Sound, Sound) {
+        (
+            Sound::BlockMetalPressurePlateClickOn,
+            Sound::BlockMetalPressurePlateClickOff,
+        )
     }
 
     fn tick_rate(&self) -> i32 {

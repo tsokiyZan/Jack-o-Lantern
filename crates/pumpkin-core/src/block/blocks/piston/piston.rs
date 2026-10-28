@@ -7,6 +7,7 @@ use pumpkin_data::{
     Block, BlockDirection, BlockState, BlockStateId, FacingExt,
     block_properties::{MovingPistonLikeProperties, PistonHeadLikeProperties, PistonType},
     block_state::PistonBehavior,
+    game_event::GameEvent,
     sound::{Sound, SoundCategory},
 };
 use pumpkin_util::math::position::BlockPos;
@@ -16,11 +17,10 @@ use rustc_hash::FxHashMap;
 
 use crate::{
     block::{
-        BlockBehaviour, BlockMetadata, BrokenArgs, OnNeighborUpdateArgs, OnPlaceArgs,
-        OnSyncedBlockEventArgs, PathComputationType, PlacedArgs,
-        blocks::{piston::piston_head::PistonHeadProperties, redstone::is_emitting_redstone_power},
+        BlockBehaviour, BlockMetadata, OnNeighborUpdateArgs, OnPlaceArgs, OnSyncedBlockEventArgs,
+        PathComputationType, PlacedArgs, blocks::redstone::is_emitting_redstone_power,
     },
-    world::World,
+    world::{World, game_event::GameEventContext},
 };
 
 use super::PistonHandler;
@@ -101,33 +101,12 @@ impl BlockBehaviour for PistonBlock {
         props.to_state_id(args.block)
     }
 
-    fn broken(&self, args: BrokenArgs<'_>) {
-        let props = PistonProps::from_state_id(args.state.id);
-        let pos = args
-            .position
-            .offset(props.facing.to_block_direction().to_offset());
-        let (block_to_check, block_to_check_state_id) = args.world.get_block_and_state_id(&pos);
-        if &Block::PISTON_HEAD == block_to_check {
-            let head_props = PistonHeadProperties::from_state_id(block_to_check_state_id);
-
-            if (head_props.facing.to_block_direction() != props.facing.to_block_direction())
-                && &Block::PISTON_HEAD == block_to_check
-            {
-                //Then this is a head of some other piston.
-                return;
-            }
-
-            args.world.break_block(&pos, None, BlockFlags::SKIP_DROPS);
-        } else if &Block::MOVING_PISTON == block_to_check {
-            args.world.break_block(&pos, None, BlockFlags::SKIP_DROPS);
-        }
-    }
-
+    /// Vanilla `PistonBaseBlock.onPlace`: a new piston without a moving block entity checks
+    /// its signal.
     fn placed(&self, args: PlacedArgs<'_>) {
-        if !args.is_new_block() {
-            return;
+        if args.is_new_block() && args.world.get_block_entity(args.position).is_none() {
+            try_move(args.world, args.block, args.position);
         }
-        try_move(args.world, args.block, args.position);
     }
 
     fn on_neighbor_update(&self, args: OnNeighborUpdateArgs<'_>) {
@@ -191,9 +170,10 @@ impl PistonBlock {
                 return false;
             }
             props.extended = true;
+            let extended_state = props.to_state_id(block);
             world.set_block_state(
                 pos,
-                props.to_state_id(block),
+                extended_state,
                 BlockFlags::NOTIFY_ALL | BlockFlags::MOVED,
             );
             // Play piston extend sound
@@ -204,6 +184,11 @@ impl PistonBlock {
                 &pos.to_centered_f64(),
                 0.5,
                 pitch,
+            );
+            world.game_event(
+                GameEvent::BlockActivate,
+                pos.to_centered_f64(),
+                GameEventContext::of_state(BlockState::from_id(extended_state)),
             );
             return true;
         }
@@ -304,6 +289,11 @@ impl PistonBlock {
             0.5,
             pitch,
         );
+        world.game_event(
+            GameEvent::BlockDeactivate,
+            pos.to_centered_f64(),
+            GameEventContext::of_state(BlockState::from_id(moving_state)),
+        );
         true
     }
 }
@@ -330,11 +320,8 @@ fn should_extend(world: &World, block_pos: &BlockPos, piston_dir: BlockDirection
         }
         return true;
     }
-    let neighbor_pos = block_pos.offset(BlockDirection::Down.to_offset());
-    let (block, state) = world.get_block_and_state(&neighbor_pos);
-    if is_emitting_redstone_power(block, state, world, block_pos, BlockDirection::Down) {
-        return true;
-    }
+    // Vanilla's `hasSignal(pos, DOWN)` reads the piston itself, which is no conductor and
+    // emits nothing, so it never powers the piston.
     for dir in BlockDirection::all() {
         let neighbor_pos = block_pos.up().offset(dir.to_offset());
         let (block, state) = world.get_block_and_state(&neighbor_pos);

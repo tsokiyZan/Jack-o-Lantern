@@ -80,7 +80,11 @@ impl BlockBehaviour for RepeaterBlock {
         }
     }
 
+    /// Vanilla `RepeaterBlock.useWithoutItem`.
     fn normal_use(&self, args: NormalUseArgs<'_>) -> BlockActionResult {
+        if !args.player.may_build() {
+            return BlockActionResult::Pass;
+        }
         let state = args.world.get_block_state(args.position);
         let props = RepeaterProperties::from_state_id(state.id);
         Self::on_use(props, args.world, *args.position, args.block);

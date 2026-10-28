@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::block::{
     EmitsRedstonePowerArgs, GetRedstonePowerArgs, GetStateForNeighborUpdateArgs, OnPlaceArgs,
-    OnScheduledTickArgs, OnStateReplacedArgs,
+    OnScheduledTickArgs, OnStateReplacedArgs, PlacedArgs,
 };
 use crate::entity::EntityBase;
 use pumpkin_data::{Block, BlockStateId, FacingExt, block_properties::ObserverLikeProperties};
@@ -81,21 +81,43 @@ impl BlockBehaviour for ObserverBlock {
         self.get_weak_redstone_power(args)
     }
 
+    /// Vanilla `ObserverBlock.onPlace`: a new powered observer without a pending tick turns
+    /// off.
+    fn placed(&self, args: PlacedArgs<'_>) {
+        if !args.is_new_block() {
+            return;
+        }
+        let mut props = ObserverLikeProperties::from_state_id(args.state_id);
+        if props.powered
+            && !args
+                .world
+                .is_block_tick_scheduled(args.position, args.block)
+        {
+            props.powered = false;
+            args.world.set_block_state(
+                args.position,
+                props.to_state_id(args.block),
+                BlockFlags::NOTIFY_LISTENERS | BlockFlags::UPDATE_KNOWN_SHAPE,
+            );
+            Self::update_neighbors(args.world, args.block, args.position, props);
+        }
+    }
+
+    /// Vanilla `ObserverBlock.affectNeighborsAfterRemoval`, moved by a piston or not.
     fn on_state_replaced(&self, args: OnStateReplacedArgs<'_>) {
-        if !args.moved {
-            let props = ObserverLikeProperties::from_state_id(args.old_state_id);
-            if props.powered
-                && args
-                    .world
-                    .is_block_tick_scheduled(args.position, &Block::OBSERVER)
-            {
-                Self::update_neighbors(args.world, args.block, args.position, props);
-            }
+        let props = ObserverLikeProperties::from_state_id(args.old_state_id);
+        if props.powered
+            && args
+                .world
+                .is_block_tick_scheduled(args.position, &Block::OBSERVER)
+        {
+            Self::update_neighbors(args.world, args.block, args.position, props);
         }
     }
 }
 
 impl ObserverBlock {
+    /// Vanilla `ObserverBlock.updateNeighborsInFront`.
     fn update_neighbors(
         world: &Arc<World>,
         block: &Block,
@@ -106,7 +128,7 @@ impl ObserverBlock {
         let opposite_facing_pos = block_pos.offset(facing.opposite().to_offset());
 
         world.update_neighbor(&opposite_facing_pos, block);
-        world.update_neighbors(&opposite_facing_pos, Some(facing));
+        world.update_neighbors_at(&opposite_facing_pos, block, Some(facing));
     }
 
     fn schedule_tick(world: &World, block_pos: &BlockPos) {

@@ -1,20 +1,20 @@
+use pumpkin_data::sound::Sound;
 use pumpkin_data::{
     Block, BlockDirection, BlockId, BlockState, BlockStateId,
     tag::{self},
 };
 use pumpkin_util::math::position::BlockPos;
-use pumpkin_world::world::BlockFlags;
 
 use crate::{
     block::{
         BlockBehaviour, BlockMetadata, CanPlaceAtArgs, EmitsRedstonePowerArgs,
-        GetRedstonePowerArgs, OnEntityCollisionArgs, OnNeighborUpdateArgs, OnScheduledTickArgs,
-        OnStateReplacedArgs,
+        GetRedstonePowerArgs, GetStateForNeighborUpdateArgs, OnEntityCollisionArgs,
+        OnScheduledTickArgs, OnStateReplacedArgs,
     },
     world::World,
 };
 
-use super::{PressurePlate, detection_box_at};
+use super::{PressurePlate, entity_count};
 
 /// This is for Normal Pressure plates, so not Gold or Iron
 pub struct PressurePlateBlock;
@@ -40,7 +40,7 @@ impl BlockBehaviour for PressurePlateBlock {
         let output = self.get_redstone_output(args.block, state.id);
         if output > 0 {
             let (block, state) = args.world.get_block_and_state(args.position);
-            Self.update_plate_state(args.world, args.position, block, state, output);
+            Self.update_plate_state(None, args.world, args.position, block, state, output);
         }
     }
 
@@ -63,11 +63,11 @@ impl BlockBehaviour for PressurePlateBlock {
         true
     }
 
-    fn on_neighbor_update(&self, args: OnNeighborUpdateArgs<'_>) {
-        if !Self::can_pressure_plate_place_at(args.world, args.position) {
-            args.world
-                .break_block(args.position, None, BlockFlags::NOTIFY_ALL);
-        }
+    fn get_state_for_neighbor_update(
+        &self,
+        args: GetStateForNeighborUpdateArgs<'_>,
+    ) -> BlockStateId {
+        self.get_state_for_neighbor_update_pp(&args)
     }
 
     fn can_place_at(&self, args: CanPlaceAtArgs<'_>) -> bool {
@@ -82,19 +82,53 @@ impl PressurePlate for PressurePlateBlock {
         if props.powered { 15 } else { 0 }
     }
 
-    fn calculate_redstone_output(&self, world: &World, _block: &Block, pos: &BlockPos) -> u8 {
-        let aabb = detection_box_at(pos);
-        if !world.get_entities_at_box(&aabb).is_empty()
-            || !world.get_players_at_box(&aabb).is_empty()
-        {
-            return 15;
+    /// Vanilla `PressurePlateBlock.getSignalStrength`: stone and polished blackstone plates
+    /// (`PressurePlateSensitivity.MOBS`) count only living entities.
+    fn calculate_redstone_output(&self, world: &World, block: &Block, pos: &BlockPos) -> u8 {
+        let living_only = block == &Block::STONE_PRESSURE_PLATE
+            || block == &Block::POLISHED_BLACKSTONE_PRESSURE_PLATE;
+        if entity_count(world, pos, living_only) > 0 {
+            15
+        } else {
+            0
         }
-        0
     }
 
     fn set_redstone_output(&self, block: &Block, state: &BlockState, output: u8) -> BlockStateId {
         let mut props = PressurePlateProps::from_state_id(state.id);
         props.powered = output > 0;
         props.to_state_id(block)
+    }
+
+    fn click_sounds(&self, block: &Block) -> (Sound, Sound) {
+        if block == &Block::STONE_PRESSURE_PLATE
+            || block == &Block::POLISHED_BLACKSTONE_PRESSURE_PLATE
+        {
+            (
+                Sound::BlockStonePressurePlateClickOn,
+                Sound::BlockStonePressurePlateClickOff,
+            )
+        } else if block == &Block::CHERRY_PRESSURE_PLATE {
+            (
+                Sound::BlockCherryWoodPressurePlateClickOn,
+                Sound::BlockCherryWoodPressurePlateClickOff,
+            )
+        } else if block == &Block::CRIMSON_PRESSURE_PLATE || block == &Block::WARPED_PRESSURE_PLATE
+        {
+            (
+                Sound::BlockNetherWoodPressurePlateClickOn,
+                Sound::BlockNetherWoodPressurePlateClickOff,
+            )
+        } else if block == &Block::BAMBOO_PRESSURE_PLATE {
+            (
+                Sound::BlockBambooWoodPressurePlateClickOn,
+                Sound::BlockBambooWoodPressurePlateClickOff,
+            )
+        } else {
+            (
+                Sound::BlockWoodenPressurePlateClickOn,
+                Sound::BlockWoodenPressurePlateClickOff,
+            )
+        }
     }
 }

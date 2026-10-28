@@ -44,6 +44,7 @@ use crate::item::items::minecart::MinecartItem;
 use crate::item::items::spawn_egg::prepare_egg_mob;
 use crate::plugin::api::events::entity::creature_spawn::CreatureSpawnReason;
 use crate::world::World;
+use crate::world::game_event::GameEventContext;
 
 use crate::block::entities::dispenser::DispenserBlockEntity;
 use pumpkin_data::block_properties::{
@@ -277,6 +278,11 @@ impl BlockBehaviour for DispenserBlock {
             } else {
                 args.world
                     .sync_world_event(WorldEvent::SoundDispenserFail, *args.position, 0);
+                args.world.game_event(
+                    GameEvent::BlockActivate,
+                    args.position.to_centered_f64(),
+                    GameEventContext::of_state(state),
+                );
             }
         }
     }

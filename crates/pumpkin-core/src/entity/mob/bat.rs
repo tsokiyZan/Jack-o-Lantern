@@ -97,6 +97,11 @@ fn signum(value: f64) -> f64 {
 }
 
 impl Mob for BatEntity {
+    /// Vanilla `Bat.isIgnoringBlockTriggers`.
+    fn mob_is_ignoring_block_triggers(&self) -> bool {
+        true
+    }
+
     /// Vanilla `Bat.checkFallDamage` does nothing.
     fn mob_check_fall_damage(
         &self,

@@ -145,6 +145,11 @@ impl InteractionEntity {
 }
 
 impl EntityBase for InteractionEntity {
+    /// Vanilla `Interaction.isIgnoringBlockTriggers`.
+    fn is_ignoring_block_triggers(&self) -> bool {
+        true
+    }
+
     /// Vanilla `Interaction.getPistonPushReaction`.
     fn piston_push_reaction(&self) -> pumpkin_data::block_state::PistonBehavior {
         pumpkin_data::block_state::PistonBehavior::Ignore

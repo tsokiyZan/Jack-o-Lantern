@@ -326,6 +326,9 @@ pub struct World {
     pub entity_tracker: entity_tracker::EntityTracker,
     /// Vanilla `ServerLevel.waypointManager`.
     pub waypoint_manager: waypoint_manager::WaypointManager,
+    /// Vanilla `RedstoneTorchBlock.RECENT_TOGGLES` for this level: each torch turned off, with
+    /// the game time, oldest first.
+    pub redstone_torch_toggles: std::sync::Mutex<std::collections::VecDeque<(BlockPos, i64)>>,
 }
 
 #[derive(Clone, Copy)]
@@ -512,6 +515,7 @@ impl World {
             custom_block_entity_data: DashMap::new(),
             entity_tracker: entity_tracker::EntityTracker::new(),
             waypoint_manager: waypoint_manager::WaypointManager::default(),
+            redstone_torch_toggles: std::sync::Mutex::new(std::collections::VecDeque::new()),
         }
     }
 
@@ -6498,7 +6502,11 @@ impl World {
             self.remove_block_entity(position);
         }
 
-        if is_new_block && (flags.contains(BlockFlags::NOTIFY_NEIGHBORS) || block_moved) {
+        // LevelChunk.setBlockState: a rail runs `affectNeighborsAfterRemoval` on every state
+        // change too (`newBlock instanceof BaseRailBlock`).
+        if (is_new_block || new_block.has_tag(&pumpkin_data::tag::Block::MINECRAFT_RAILS))
+            && (flags.contains(BlockFlags::NOTIFY_NEIGHBORS) || block_moved)
+        {
             self.block_registry.on_state_replaced(
                 self,
                 old_block,
