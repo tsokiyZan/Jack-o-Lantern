@@ -229,6 +229,7 @@ use crate::block::blocks::ladder::LadderBlock;
 use crate::block::blocks::lanterns::LanternBlock;
 use crate::block::blocks::lectern::LecternBlock;
 use crate::block::blocks::netherrack::NetherrackBlock;
+use crate::block::blocks::potent_sulfur::PotentSulfurBlock;
 use crate::block::blocks::respawn_anchor::RespawnAnchorBlock;
 use crate::block::blocks::rooted_dirt::RootedDirtBlock;
 use crate::block::blocks::shulker_box::ShulkerBoxBlock;
@@ -349,6 +350,7 @@ pub fn default_registry() -> Arc<BlockRegistry> {
     manager.register(MushroomPlantBlock);
     manager.register(ShelfMushroomBlock);
     manager.register(HugeMushroomBlock);
+    manager.register(PotentSulfurBlock);
     manager.register(FlowerbedBlock);
     manager.register(LeafLitterBlock);
     manager.register(WallBlock);

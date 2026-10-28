@@ -11,6 +11,7 @@ pub mod chests;
 pub mod copper_golem_statue;
 pub mod ender_chest;
 pub mod hopper;
+pub mod potent_sulfur;
 pub mod shulker_box;
 
 // Workstations & processing
