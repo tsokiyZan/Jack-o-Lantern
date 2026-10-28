@@ -684,7 +684,11 @@ impl EntityBase for ArrowEntity {
             // Despawn after enough time
             if life >= Self::DESPAWN_TIME {
                 entity.remove();
+                return;
             }
+            // Vanilla: a live arrow in the ground still touches the blocks it is in (buttons,
+            // pressure plates, tripwire).
+            entity.apply_effects_from_blocks(caller);
             return;
         }
 
@@ -829,6 +833,20 @@ impl EntityBase for ArrowEntity {
                 });
             }
         }
+
+        // Vanilla `stepMoveAndHit`: the blocks along the move up to the hit (or the whole move)
+        // take their effects before the hit.
+        let next_location = match &hit {
+            Some(ProjectileHit::Block { hit_pos, .. } | ProjectileHit::Entity { hit_pos, .. }) => {
+                *hit_pos
+            }
+            None => new_pos,
+        };
+        // `setPos(nextLocation)` first: the blocks' effects find the arrow where it stops.
+        if next_location != new_pos {
+            entity.set_pos(next_location);
+        }
+        entity.apply_effects_from_blocks_between(caller, start_pos, next_location);
 
         // Handle hit
         if let Some(h) = hit {
