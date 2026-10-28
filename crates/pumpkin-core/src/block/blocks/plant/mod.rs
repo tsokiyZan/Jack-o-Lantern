@@ -1,6 +1,13 @@
+use std::sync::MutexGuard;
+
+use pumpkin_data::block_properties::WaterLikeProperties;
+use pumpkin_data::fluid::Fluid;
 use pumpkin_data::{Block, BlockStateId, tag, tag::Taggable};
 use pumpkin_util::math::position::BlockPos;
+use pumpkin_util::random::legacy_rand::LegacyRand;
 use pumpkin_world::world::BlockAccessor;
+
+use crate::world::World;
 
 pub mod azalea;
 pub mod bamboo;
@@ -44,6 +51,27 @@ pub mod tree_grower;
 pub mod twisting_vines;
 pub mod weeping_vines;
 pub mod wither_rose;
+
+/// `level.getRandom()`. Draw what you need and let the guard drop before touching the world.
+pub(crate) fn level_random(world: &World) -> MutexGuard<'_, LegacyRand> {
+    world
+        .random
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+/// Vanilla `FluidState.isSourceOfType(Fluids.WATER)` for a block state.
+pub(crate) fn is_water_source(state_id: BlockStateId) -> bool {
+    World::fluid_type_from_state_id(state_id) == &Fluid::WATER
+}
+
+/// Vanilla `fluidState.is(FluidTags.WATER) && fluidState.isFull()`: water of amount 8, a source
+/// or falling water.
+pub(crate) fn is_full_water(state_id: BlockStateId) -> bool {
+    is_water_source(state_id)
+        || (state_id.to_block() == &Block::WATER
+            && WaterLikeProperties::from_state_id(state_id).level >= 8)
+}
 
 pub(crate) trait PlantBlockBase {
     fn can_plant_on_top(&self, block_accessor: &dyn BlockAccessor, pos: &BlockPos) -> bool {

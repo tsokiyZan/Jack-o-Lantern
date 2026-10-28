@@ -3,6 +3,7 @@ use std::sync::Arc;
 use pumpkin_data::block_properties::{
     GrassBlockLikeProperties, SnowLikeProperties, WaterLikeProperties,
 };
+use pumpkin_data::fluid::Fluid;
 use pumpkin_data::tag::{self, Taggable};
 use pumpkin_data::{Block, BlockDirection, BlockId, BlockState, BlockStateId};
 use pumpkin_util::math::position::BlockPos;
@@ -56,21 +57,22 @@ impl SnowyBlock {
 pub struct SpreadingSnowyBlock;
 
 impl SpreadingSnowyBlock {
+    /// Vanilla `getFluidState().isFull()`: a fluid of amount 8, so a source, falling fluid, or a
+    /// block holding source water.
     #[must_use]
     pub fn is_full_fluid(world: &World, pos: &BlockPos) -> bool {
-        let state = world.get_block_state(pos);
-        let block = state.id.to_block();
+        let state_id = world.get_block_state_id(pos);
+        let block = state_id.to_block();
         if block == &Block::WATER || block == &Block::LAVA {
-            return WaterLikeProperties::from_state_id(state.id).level == 0;
+            let level = WaterLikeProperties::from_state_id(state_id).level;
+            return level == 0 || level >= 8;
         }
-        state.id.is_waterlogged()
+        World::fluid_type_from_state_id(state_id) != &Fluid::EMPTY
     }
 
     #[must_use]
     pub fn is_water_fluid(world: &World, pos: &BlockPos) -> bool {
-        let state = world.get_block_state(pos);
-        let block = state.id.to_block();
-        block == &Block::WATER || state.id.is_waterlogged()
+        world.get_fluid(pos).has_tag(&tag::Fluid::MINECRAFT_WATER)
     }
 
     #[must_use]

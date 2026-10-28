@@ -1,12 +1,14 @@
 use std::sync::Arc;
 
 use pumpkin_data::block_properties::{BambooLeaves, BambooLikeProperties};
+use pumpkin_data::fluid::Fluid;
 use pumpkin_data::tag::Block::MINECRAFT_SUPPORTS_BAMBOO;
 use pumpkin_data::tag::Taggable;
 use pumpkin_data::tag::{self};
 use pumpkin_data::{Block, BlockDirection, BlockState, BlockStateId};
 use pumpkin_macros::pumpkin_block;
 use pumpkin_util::math::position::BlockPos;
+use pumpkin_util::random::RandomImpl;
 use pumpkin_world::tick::TickPriority;
 use pumpkin_world::world::{BlockAccessor, BlockFlags};
 use rand::RngExt;
@@ -14,6 +16,7 @@ use rand::RngExt;
 use crate::block::{
     BlockBehaviour, CanPlaceAtArgs, GetStateForNeighborUpdateArgs, OnPlaceArgs,
     OnScheduledTickArgs, PathComputationType, RandomTickArgs, blocks::plant::PlantBlockBase,
+    blocks::plant::level_random,
 };
 use crate::world::World;
 
@@ -38,6 +41,9 @@ impl BlockBehaviour for BambooBlock {
     }
 
     fn on_place(&self, args: OnPlaceArgs<'_>) -> BlockStateId {
+        if *args.world.get_fluid(args.position) != Fluid::EMPTY {
+            return Block::AIR.default_state.id;
+        }
         let (block_below, state_id_below) =
             args.world.get_block_and_state_id(&args.position.down());
 
@@ -66,6 +72,13 @@ impl BlockBehaviour for BambooBlock {
     }
 
     fn can_place_at(&self, args: CanPlaceAtArgs<'_>) -> bool {
+        if args.player.is_some()
+            && World::fluid_type_from_state_id(
+                args.block_accessor.get_block_state_id(args.position),
+            ) != &Fluid::EMPTY
+        {
+            return false;
+        }
         <Self as PlantBlockBase>::can_place_at(self, args.block_accessor, args.position)
     }
 
@@ -73,12 +86,6 @@ impl BlockBehaviour for BambooBlock {
         if !<Self as PlantBlockBase>::can_place_at(self, args.world.as_ref(), args.position) {
             args.world
                 .break_block(args.position, None, BlockFlags::NOTIFY_ALL);
-        } else if args.world.get_block(&args.position.down()) == &Block::BAMBOO_SAPLING {
-            args.world.set_block_state(
-                &args.position.down(),
-                Block::BAMBOO.default_state.id,
-                BlockFlags::empty(),
-            );
         }
     }
 
@@ -106,7 +113,13 @@ impl BlockBehaviour for BambooBlock {
     }
 
     fn random_tick(&self, args: RandomTickArgs<'_>) {
-        if rand::rng().random_range(0..=3) == 0 {
+        let props =
+            BambooLikeProperties::from_state_id(args.world.get_block_state_id(args.position));
+        if props.stage == 0
+            && level_random(args.world).next_bounded_i32(3) == 0
+            && args.world.get_block_state(&args.position.up()).is_air()
+            && args.world.get_raw_brightness(&args.position.up(), 0) >= 9
+        {
             update_leaves_and_grow(args.world, args.position);
         }
     }
@@ -133,8 +146,8 @@ fn update_leaves_and_grow(world: &Arc<World>, position: &BlockPos) {
         return;
     }
 
-    let bamboo_count = count_bamboo_below(world, position);
-    if bamboo_count >= 16 {
+    let height = count_bamboo_below(world, position) + 1;
+    if height >= 16 {
         return;
     }
     let (block_below, state_id_below) = world.get_block_and_state_id(&below_pos);
@@ -142,7 +155,7 @@ fn update_leaves_and_grow(world: &Arc<World>, position: &BlockPos) {
 
     let mut props_below = BambooLikeProperties::from_state_id(state_id_below);
 
-    if bamboo_count >= 1 {
+    if height >= 1 {
         let below_is_bamboo = block_below == &Block::BAMBOO;
         let below_has_leaves = props_below.leaves != BambooLeaves::None;
 
@@ -171,11 +184,9 @@ fn update_leaves_and_grow(world: &Arc<World>, position: &BlockPos) {
         }
     }
 
-    props.age = u8::from(!(props.age != 1 && block_two_below == &Block::BAMBOO));
+    props.age = u8::from(!(props.age != 1 && block_two_below != &Block::BAMBOO));
 
-    props.stage = u8::from(
-        !((bamboo_count < 11 || rand::rng().random::<f32>() >= 0.25) && bamboo_count != 15),
-    );
+    props.stage = u8::from(!((height < 11 || rand::rng().random::<f32>() >= 0.25) && height != 15));
 
     world.set_block_state(&above_pos, props.to_state_id(block), BlockFlags::NOTIFY_ALL);
 }
