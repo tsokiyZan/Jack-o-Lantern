@@ -96,11 +96,13 @@ impl BowItem {
         Self::shoot(player, weapon, &projectiles, power, 1.0, is_crit);
 
         // The ammo `useAmmo` took.
-        if let Some(slot) = arrow_slot && projectiles.first().is_some_and(|drawn| {
-            drawn
+        if let Some(slot) = arrow_slot
+            && projectiles.first().is_some_and(|drawn| {
+                drawn
                 .get_data_component::<pumpkin_data::data_component_impl::IntangibleProjectileImpl>()
                 .is_none()
-        }) {
+            })
+        {
             player.consume_arrow(slot);
         }
 

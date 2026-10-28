@@ -1,7 +1,7 @@
 use crate::item::interaction_result::InteractionResult;
 use pumpkin_util::Hand;
 use std::any::Any;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::entity::Entity;
 use crate::entity::player::Player;
@@ -50,62 +50,39 @@ impl ItemBehaviour for CrossbowItem {
         InteractionResult::CONSUME
     }
 
+    /// Vanilla `CrossbowItem.releaseUsing` only reports whether it was charged; loading
+    /// happens in `on_use_tick`.
     fn on_stopped_using(&self, _stack: &ItemStack, player: &Player) {
-        let use_ticks = player.living_entity.item_use_time.load(Ordering::Relaxed);
-        let use_ticks = 72000 - use_ticks;
-
-        let hand = player.living_entity.used_item_hand();
-        let mut stack = player.inventory().get_stack_in_hand(hand);
-        let charge_time =
-            crate::enchantment::EnchantmentHelper::modify_crossbow_charge_time(&stack, 25);
-
-        if use_ticks >= charge_time {
-            let arrow_slot = player.find_arrow();
-            let gamemode = player.gamemode.load();
-            let is_creative = gamemode == GameMode::Creative;
-
-            if arrow_slot.is_some() || is_creative {
-                let projectile = arrow_slot.map_or_else(
-                    || ItemStack::new(1, &Item::ARROW),
-                    |slot| {
-                        let inventory = player.inventory();
-                        inventory.get_slot(slot).copy_with_count(1)
-                    },
-                );
-
-                let drawn =
-                    ProjectileWeaponItem::draw(&player.world(), &stack, &projectile, is_creative);
-                if !drawn.is_empty() {
-                    let mut charged_nbts = Vec::new();
-                    for item in drawn {
-                        let mut arrow_nbt = pumpkin_nbt::compound::NbtCompound::new();
-                        item.write_item_stack(&mut arrow_nbt);
-                        charged_nbts.push(arrow_nbt);
-                    }
-
-                    stack.patch.push((
-                        DataComponent::ChargedProjectiles,
-                        Some(Box::new(ChargedProjectilesImpl {
-                            projectiles: charged_nbts,
-                        })),
-                    ));
-                    player.inventory().set_stack_in_hand(hand, stack);
-
-                    if let Some(slot) = arrow_slot
-                        && !is_creative
-                    {
-                        player.consume_arrow(slot);
-                    }
-
-                    player.world().play_sound(
-                        Sound::ItemCrossbowLoadingEnd,
-                        SoundCategory::Players,
-                        &player.position(),
-                    );
-                }
-            }
-        }
         player.living_entity.clear_active_hand();
+    }
+
+    /// Vanilla `CrossbowItem.onUseTick`: the charging sounds at 20% and 50% of the charge, and
+    /// the load at 100%.
+    fn on_use_tick(&self, stack: &ItemStack, player: &Player, remaining_use_ticks: i32) {
+        let charge_duration =
+            crate::enchantment::EnchantmentHelper::modify_crossbow_charge_time(stack, 25);
+        let tick_percent = (72000 - remaining_use_ticks) as f32 / charge_duration as f32;
+        let (start, mid, end) = Self::charging_sounds(stack);
+        let world = player.world();
+        let pos = player.position();
+        if tick_percent < 0.2 {
+            START_SOUND_PLAYED.store(false, Ordering::Relaxed);
+            MID_LOAD_SOUND_PLAYED.store(false, Ordering::Relaxed);
+        }
+        if tick_percent >= 0.2 && !START_SOUND_PLAYED.swap(true, Ordering::Relaxed) {
+            world.play_sound_fine(start, SoundCategory::Players, &pos, 0.5, 1.0);
+        }
+        // The flag is set even when quick charge has no middle sound.
+        if tick_percent >= 0.5
+            && !MID_LOAD_SOUND_PLAYED.swap(true, Ordering::Relaxed)
+            && let Some(mid) = mid
+        {
+            world.play_sound_fine(mid, SoundCategory::Players, &pos, 0.5, 1.0);
+        }
+        if tick_percent >= 1.0 && !Self::is_charged(stack) && Self::try_load_projectiles(player) {
+            let pitch = 1.0 / (world.random_f32() * 0.5 + 1.0) + 0.2;
+            world.play_sound_fine(end, SoundCategory::Players, &pos, 1.0, pitch);
+        }
     }
 
     fn get_use_duration(&self, _stack: &ItemStack) -> i32 {
@@ -117,7 +94,93 @@ impl ItemBehaviour for CrossbowItem {
     }
 }
 
+/// Vanilla `CrossbowItem.startSoundPlayed` and `midLoadSoundPlayed`: fields of the one
+/// crossbow item, so every user shares them.
+static START_SOUND_PLAYED: AtomicBool = AtomicBool::new(false);
+static MID_LOAD_SOUND_PLAYED: AtomicBool = AtomicBool::new(false);
+
 impl CrossbowItem {
+    /// Vanilla `CrossbowItem.isCharged`.
+    fn is_charged(stack: &ItemStack) -> bool {
+        stack
+            .get_data_component::<ChargedProjectilesImpl>()
+            .is_some_and(|charged| !charged.projectiles.is_empty())
+    }
+
+    /// Vanilla `CrossbowItem.getChargingSounds`: the quick charge enchantment's
+    /// `crossbow_charging_sounds` (a start sound per level, no middle one), or the default.
+    fn charging_sounds(stack: &ItemStack) -> (Sound, Option<Sound>, Sound) {
+        match stack.get_enchantment_level(&pumpkin_data::Enchantment::QUICK_CHARGE) {
+            1 => (
+                Sound::ItemCrossbowQuickCharge1,
+                None,
+                Sound::ItemCrossbowLoadingEnd,
+            ),
+            2 => (
+                Sound::ItemCrossbowQuickCharge2,
+                None,
+                Sound::ItemCrossbowLoadingEnd,
+            ),
+            level if level >= 3 => (
+                Sound::ItemCrossbowQuickCharge3,
+                None,
+                Sound::ItemCrossbowLoadingEnd,
+            ),
+            _ => (
+                Sound::ItemCrossbowLoadingStart,
+                Some(Sound::ItemCrossbowLoadingMiddle),
+                Sound::ItemCrossbowLoadingEnd,
+            ),
+        }
+    }
+
+    /// Vanilla `CrossbowItem.tryLoadProjectiles`: `draw` the player's projectile into
+    /// `CHARGED_PROJECTILES`.
+    fn try_load_projectiles(player: &Player) -> bool {
+        let hand = player.living_entity.used_item_hand();
+        let mut stack = player.inventory().get_stack_in_hand(hand);
+        let arrow_slot = player.find_arrow();
+        let is_creative = player.gamemode.load() == GameMode::Creative;
+        if arrow_slot.is_none() && !is_creative {
+            return false;
+        }
+        let projectile = arrow_slot.map_or_else(
+            || ItemStack::new(1, &Item::ARROW),
+            |slot| player.inventory().get_slot(slot).copy_with_count(1),
+        );
+        let drawn = ProjectileWeaponItem::draw(&player.world(), &stack, &projectile, is_creative);
+        if drawn.is_empty() {
+            return false;
+        }
+        // The ammo `useAmmo` took (the first shot; multishot's extras are always free).
+        let took_ammo = drawn[0]
+            .get_data_component::<pumpkin_data::data_component_impl::IntangibleProjectileImpl>()
+            .is_none();
+        let charged_nbts = drawn
+            .iter()
+            .map(|item| {
+                let mut nbt = pumpkin_nbt::compound::NbtCompound::new();
+                item.write_item_stack(&mut nbt);
+                nbt
+            })
+            .collect();
+        stack
+            .patch
+            .retain(|(id, _)| *id != DataComponent::ChargedProjectiles);
+        stack.patch.push((
+            DataComponent::ChargedProjectiles,
+            Some(Box::new(ChargedProjectilesImpl {
+                projectiles: charged_nbts,
+            })),
+        ));
+        player.inventory().set_stack_in_hand(hand, stack);
+        if let Some(slot) = arrow_slot
+            && took_ammo
+        {
+            player.consume_arrow(slot);
+        }
+        true
+    }
     /// Vanilla `CrossbowItem.shootProjectile`'s shot without a target: the view vector turned
     /// by `angle` degrees about the up vector, in float.
     #[must_use]
@@ -161,14 +224,26 @@ impl CrossbowItem {
                     &projectiles,
                     Self::ARROW_POWER,
                     1.0,
-                    false,
+                    // `shooter instanceof Player`.
+                    true,
                     false,
                 );
 
+                // `CrossbowItem.getDurabilityUse`: 3 for a firework, 1 otherwise, per shot.
+                let durability: i32 = projectiles
+                    .iter()
+                    .map(|projectile| {
+                        if projectile.item == &Item::FIREWORK_ROCKET {
+                            3
+                        } else {
+                            1
+                        }
+                    })
+                    .sum();
                 held.patch
                     .retain(|(id, _)| *id != DataComponent::ChargedProjectiles);
                 player.inventory().set_stack_in_hand(hand, held);
-                player.damage_item_in_hand(hand, 1);
+                player.damage_item_in_hand(hand, durability);
                 player.award_item_used(&Item::CROSSBOW);
             }
         }
